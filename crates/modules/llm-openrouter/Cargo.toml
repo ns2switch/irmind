@@ -1,0 +1,13 @@
+[package]
+name = "irmind-mod-llm-openrouter"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-llm-chat-completions = { path = "../../llm-chat-completions", version = "0.1.0" }
+
+[lints]
+workspace = true

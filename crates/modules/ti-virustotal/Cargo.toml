@@ -1,0 +1,15 @@
+[package]
+name = "irmind-mod-ti-virustotal"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+secrecy = "0.10"
+
+[lints]
+workspace = true

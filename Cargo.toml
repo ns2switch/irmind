@@ -1,0 +1,28 @@
+[workspace]
+members = ["crates/domain", "crates/app", "crates/security", "crates/infra", "crates/parser-json", "crates/testkit", "crates/llm-chat-completions", "crates/modules/llm-openai-compatible", "crates/modules/llm-anthropic", "crates/modules/llm-deepseek", "crates/modules/llm-openrouter", "crates/modules/edr-crowdstrike", "crates/modules/edr-sentinelone", "crates/modules/ti-virustotal", "crates/modules/ti-misp", "crates/modules/siem-splunk", "crates/modules/cloud-aws", "crates/bin"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+must_use_candidate = "allow"
+too_many_lines = "allow"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.test]
+debug = 0
+incremental = false

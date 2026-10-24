@@ -1,0 +1,20 @@
+[package]
+name = "irmind-mod-cloud-aws"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+aws-config = { version = "=1.13.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-cloudtrail = { version = "=1.128.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-sts = { version = "=1.122.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-iam = { version = "=1.131.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread"] }
+chrono = "0.4"
+serde_json = "1"
+
+[lints]
+workspace = true
