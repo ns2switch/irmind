@@ -1,18 +1,22 @@
-# Política de seguridad
+# Security policy
 
-IRMind está en desarrollo y **no es apto todavía para incidentes reales ni para datos sensibles**. No existe una versión de producción soportada; se revisan los informes que afecten a la rama pública actual.
+This page is for anyone reporting a vulnerability in IRMind. The project is under development and is **not ready for real incidents or sensitive data**. We review reports affecting the current public branch; no production release is supported yet.
 
-## Reporte privado
+## Report privately
 
-No publiques vulnerabilidades, pruebas de concepto explotables ni datos de incidentes en issues o pull requests. En el repositorio público de GitHub, abre **Security → Advisories → Report a vulnerability** para enviar un informe mediante *Private Vulnerability Reporting*. Incluye el commit o versión, impacto, pasos de reproducción con datos sintéticos y una forma de contacto. Si el botón no aparece, pide por un issue **sin detalles técnicos** que se habilite el canal privado; no publiques el fallo allí.
+Do not post vulnerabilities, exploit details, real incident data, or secrets in public issues or pull requests. On GitHub, use **Security → Advisories → Report a vulnerability** to submit a private report through Private Vulnerability Reporting. Include the affected commit or version, impact, steps to reproduce with synthetic data, and a contact method.
 
-La función de reporte privado debe habilitarse en la configuración del repositorio público antes de anunciarlo. Este archivo por sí solo no la activa.
+If the private reporting button is unavailable, open an issue asking for that channel to be enabled **without technical details of the vulnerability**. This file does not enable the GitHub feature by itself.
 
-## Plazos y divulgación
+## Response targets
 
-- Acuse de recibo: objetivo de **3 días laborables**.
-- Primera evaluación y actualización al informante: objetivo de **7 días laborables**.
-- Actualizaciones mientras esté abierto: al menos cada **14 días**.
-- Corrección y divulgación coordinada: se acordarán según la gravedad; objetivo inicial de **90 días** desde el reporte, con prórroga comunicada si fuera necesaria.
+| Step | Target |
+| --- | --- |
+| Acknowledge receipt | Within 3 business days |
+| Initial assessment and reporter update | Within 7 business days |
+| Updates while open | At least every 14 days |
+| Coordinated fix and disclosure | Initial target of 90 days from report; extensions communicated |
 
-Los plazos son objetivos de respuesta, no una garantía de corrección. Se coordinará la publicación de un aviso de seguridad con el informante cuando haya una mitigación verificable. No se solicitan ni se aceptan evidencias reales ni secretos para reproducir un fallo.
+These are response targets, not a guarantee of a fix by a fixed date. We will coordinate an advisory with the reporter when a verifiable mitigation exists. We do not request or accept real evidence or secrets to reproduce a bug.
+
+For design guarantees and residual risks, read the [security model](docs/security-model.md).
