@@ -19,8 +19,8 @@ use ed25519_dalek::{Signature, Signer as _, SigningKey, VerifyingKey};
 use fs4::fs_std::FileExt as _;
 use irmind_app::{
     AppError, AuditLog, CaseLock, CaseMutation, CaseSeal, EventParser, EvidenceGraph,
-    EvidenceStore, GraphRecord, Repository, SignedEntry, Signer, TimelineEvent, Verifier, hex,
-    seal_challenge, sha256, verify_case_metadata,
+    EvidenceStore, ExportVerifier, GraphRecord, Repository, SignedEntry, SignedOperation, Signer,
+    TimelineEvent, Verifier, hex, seal_challenge, sha256, verify_case_metadata,
 };
 use irmind_domain::{
     Actor, AnalystApprovalVerifier, Case, CaseId, Provenance, Severity, SourceKind, Tainted,
@@ -57,7 +57,7 @@ struct HeldCaseFile {
 }
 impl CaseLock for HeldCaseFile {}
 
-pub use seal::{verify_export, verify_export_expected};
+pub use seal::{LocalExportVerifier, verify_export, verify_export_expected};
 use signing::verify_signature;
 pub use signing::{LocalAnalystVerifier, LocalSigner, LocalVerifier};
 
@@ -72,4 +72,5 @@ mod tests {
     include!("tests/part4.rs");
     include!("tests/part5.rs");
     include!("tests/part6.rs");
+    include!("tests/part7.rs");
 }

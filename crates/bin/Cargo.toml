@@ -50,6 +50,7 @@ workspace = true
 [dev-dependencies]
 tempfile = "3"
 ed25519-dalek = "2"
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

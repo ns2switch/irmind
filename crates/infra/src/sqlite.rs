@@ -45,10 +45,15 @@ impl LocalStore {
                 FOREIGN KEY(case_id) REFERENCES cases(id));
             CREATE TABLE IF NOT EXISTS seal_intent (case_id TEXT PRIMARY KEY, data TEXT NOT NULL,
                 FOREIGN KEY(case_id) REFERENCES cases(id));
+            CREATE TABLE IF NOT EXISTS operational_audit (case_id TEXT NOT NULL, seq INTEGER NOT NULL, at INTEGER NOT NULL,
+                actor TEXT NOT NULL, operation TEXT NOT NULL, prev BLOB NOT NULL, hash BLOB NOT NULL,
+                sig BLOB NOT NULL, public_key BLOB NOT NULL, PRIMARY KEY(case_id,seq), FOREIGN KEY(case_id) REFERENCES cases(id));
             CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT,'audit is append only'); END;
             CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT,'audit is append only'); END;
             CREATE TRIGGER IF NOT EXISTS seal_intent_no_update BEFORE UPDATE ON seal_intent BEGIN SELECT RAISE(ABORT,'seal intent is append only'); END;
             CREATE TRIGGER IF NOT EXISTS seal_intent_no_delete BEFORE DELETE ON seal_intent BEGIN SELECT RAISE(ABORT,'seal intent is append only'); END;
+            CREATE TRIGGER IF NOT EXISTS operational_audit_no_update BEFORE UPDATE ON operational_audit BEGIN SELECT RAISE(ABORT,'operational audit is append only'); END;
+            CREATE TRIGGER IF NOT EXISTS operational_audit_no_delete BEFORE DELETE ON operational_audit BEGIN SELECT RAISE(ABORT,'operational audit is append only'); END;
         ").map_err(storage)?;
         let has_severity = {
             let mut statement = db.prepare("PRAGMA table_info(cases)").map_err(storage)?;
@@ -277,6 +282,21 @@ pub(crate) fn map_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<SignedEntry
         hash: decode_fixed(row.get(9)?)?,
         sig: row.get(10)?,
         public_key: row.get(11)?,
+    })
+}
+
+fn map_operation(row: &rusqlite::Row<'_>) -> rusqlite::Result<SignedOperation> {
+    let actor: String = row.get(3)?;
+    Ok(SignedOperation {
+        case_id: row.get(0)?,
+        seq: row.get(1)?,
+        at: row.get(2)?,
+        actor: Actor::parse_storage(&actor).map_err(|_| rusqlite::Error::InvalidQuery)?,
+        operation: row.get(4)?,
+        prev: decode_fixed(row.get(5)?)?,
+        hash: decode_fixed(row.get(6)?)?,
+        sig: row.get(7)?,
+        public_key: row.get(8)?,
     })
 }
 
@@ -513,6 +533,47 @@ impl AuditLog for LocalStore {
         let conn = self.conn()?;
         let mut stmt = conn.prepare("SELECT case_id,seq,at,actor,origin,kind,payload,evidence,prev,hash,sig,public_key FROM audit WHERE case_id=?1 ORDER BY seq").map_err(storage)?;
         stmt.query_map([id.as_str()], map_entry)
+            .map_err(storage)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(storage)
+    }
+
+    fn last_operation(&self, id: &CaseId) -> Result<Option<SignedOperation>, AppError> {
+        self.conn()?.query_row("SELECT case_id,seq,at,actor,operation,prev,hash,sig,public_key FROM operational_audit WHERE case_id=?1 ORDER BY seq DESC LIMIT 1", [id.as_str()], map_operation)
+            .optional().map_err(storage)
+    }
+
+    fn append_operation(&self, entry: &SignedOperation) -> Result<(), AppError> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction().map_err(storage)?;
+        let last: Option<(u64, Vec<u8>)> = tx
+            .query_row(
+                "SELECT seq,hash FROM operational_audit WHERE case_id=?1 ORDER BY seq DESC LIMIT 1",
+                [&entry.case_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(storage)?;
+        let (next, prev) = last.map_or((1, vec![0u8; 32]), |(seq, hash)| (seq + 1, hash));
+        if entry.seq != next
+            || entry.prev.as_slice() != prev
+            || sha256(&entry.canonical()) != entry.hash
+        {
+            return Err(storage_reason(
+                "operational audit sequence or hash mismatch",
+            ));
+        }
+        verify_signature(&entry.public_key, &entry.hash, &entry.sig)?;
+        tx.execute("INSERT INTO operational_audit (case_id,seq,at,actor,operation,prev,hash,sig,public_key) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+            params![entry.case_id, entry.seq, entry.at, entry.actor.as_storage(), entry.operation,
+                entry.prev.as_slice(), entry.hash.as_slice(), entry.sig, entry.public_key]).map_err(storage)?;
+        tx.commit().map_err(storage)
+    }
+
+    fn operations(&self, id: &CaseId) -> Result<Vec<SignedOperation>, AppError> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare("SELECT case_id,seq,at,actor,operation,prev,hash,sig,public_key FROM operational_audit WHERE case_id=?1 ORDER BY seq").map_err(storage)?;
+        stmt.query_map([id.as_str()], map_operation)
             .map_err(storage)?
             .collect::<Result<Vec<_>, _>>()
             .map_err(storage)

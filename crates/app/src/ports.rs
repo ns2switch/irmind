@@ -1,4 +1,5 @@
 use crate::*;
+use std::path::Path;
 
 #[derive(Debug, Error)]
 pub enum AppError {
@@ -111,6 +112,61 @@ impl SignedEntry {
             }
             None => bytes.push(0),
         }
+        bytes.extend_from_slice(&self.prev);
+        put(&mut bytes, &self.public_key);
+        bytes
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct SignedOperation {
+    pub case_id: String,
+    pub seq: u64,
+    pub at: u64,
+    #[serde(with = "actor_serde")]
+    pub actor: Actor,
+    pub operation: String,
+    pub prev: [u8; 32],
+    pub hash: [u8; 32],
+    pub sig: Vec<u8>,
+    pub public_key: Vec<u8>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CancelledOperation {
+    Ingest,
+    GraphRebuild,
+    Verify,
+    Investigation,
+    Approval,
+    Export,
+    Seal,
+    EvidenceSave,
+}
+
+impl CancelledOperation {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Ingest => "ingest",
+            Self::GraphRebuild => "graph-rebuild",
+            Self::Verify => "verify",
+            Self::Investigation => "investigation",
+            Self::Approval => "approval",
+            Self::Export => "export",
+            Self::Seal => "seal",
+            Self::EvidenceSave => "evidence-save",
+        }
+    }
+}
+
+impl SignedOperation {
+    pub fn canonical(&self) -> Vec<u8> {
+        let mut bytes = b"irmind-operation-v1\0".to_vec();
+        put(&mut bytes, self.case_id.as_bytes());
+        bytes.extend_from_slice(&self.seq.to_be_bytes());
+        bytes.extend_from_slice(&self.at.to_be_bytes());
+        put(&mut bytes, self.actor.as_storage().as_bytes());
+        put(&mut bytes, self.operation.as_bytes());
         bytes.extend_from_slice(&self.prev);
         put(&mut bytes, &self.public_key);
         bytes
@@ -263,6 +319,9 @@ pub trait AuditLog: Send + Sync {
         self.transact(entry, CaseMutation::None)
     }
     fn entries(&self, id: &CaseId) -> Result<Vec<SignedEntry>, AppError>;
+    fn last_operation(&self, id: &CaseId) -> Result<Option<SignedOperation>, AppError>;
+    fn append_operation(&self, entry: &SignedOperation) -> Result<(), AppError>;
+    fn operations(&self, id: &CaseId) -> Result<Vec<SignedOperation>, AppError>;
 }
 
 pub trait EventParser: Send + Sync {
@@ -279,6 +338,14 @@ pub trait Signer: Send + Sync {
 pub trait Verifier: Send + Sync {
     fn trusted_public_key(&self, actor: &Actor) -> Result<Vec<u8>, AppError>;
     fn verify(&self, public_key: &[u8], message: &[u8], sig: &[u8]) -> Result<(), AppError>;
+}
+
+pub trait ExportVerifier: Send + Sync {
+    fn verify_export(
+        &self,
+        path: &Path,
+        expected_key: Option<&str>,
+    ) -> Result<(String, usize), AppError>;
 }
 
 pub trait Clock: Send + Sync {

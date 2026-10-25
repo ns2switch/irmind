@@ -9,7 +9,7 @@ use irmind_app::{
     modules::{ModuleConfig, ModuleManifest, ModuleRegistry},
 };
 use irmind_domain::{Actor, CaseId, ExecutionMode, PolicyRules, Severity, Tool};
-use irmind_infra::{LocalSigner, LocalStore, LocalVerifier, SystemClock, verify_export_expected};
+use irmind_infra::{LocalExportVerifier, LocalSigner, LocalStore, LocalVerifier, SystemClock};
 #[cfg(feature = "cloud-aws")]
 use irmind_mod_cloud_aws::AwsCloudTrail;
 #[cfg(feature = "edr-crowdstrike")]
@@ -31,6 +31,7 @@ use irmind_mod_ti_misp::Misp;
 #[cfg(feature = "ti-virustotal")]
 use irmind_mod_ti_virustotal::VirusTotal;
 use irmind_security::MandatoryGuard;
+use irmind_tui::{ModuleStatus, WorkspaceIo};
 use secrecy::SecretString;
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
@@ -61,10 +62,43 @@ fn load_module_config(manifest: &ModuleManifest) -> Result<ModuleConfig> {
     Ok(config)
 }
 
+fn configuration_issue(manifest: &ModuleManifest) -> String {
+    let missing = manifest
+        .config
+        .iter()
+        .filter(|field| field.required)
+        .filter(|field| {
+            if field.secret {
+                keyring::Entry::new("irmind-module", field.name)
+                    .and_then(|entry| entry.get_password())
+                    .is_err()
+            } else {
+                std::env::var(field.name).is_err()
+            }
+        })
+        .map(|field| field.name)
+        .collect::<Vec<_>>();
+    if missing.is_empty() {
+        "invalid values in module configuration".into()
+    } else {
+        format!("missing required settings: {}", missing.join(", "))
+    }
+}
+
 macro_rules! register_configured {
-    ($registry:expr, $module:ty, $manifest:expr) => {{
-        let config = load_module_config(&$manifest)?;
-        $registry.register(Box::new(<$module>::from_config(&config)?), &config)?;
+    ($registry:expr, $module:ty, $manifest:expr, $interactive:expr, $issues:expr) => {{
+        let outcome = (|| -> Result<()> {
+            let config = load_module_config(&$manifest)?;
+            $registry.register(Box::new(<$module>::from_config(&config)?), &config)?;
+            Ok(())
+        })();
+        if let Err(error) = outcome {
+            if $interactive {
+                $issues.insert($manifest.id, configuration_issue(&$manifest));
+            } else {
+                return Err(error);
+            }
+        }
     }};
 }
 
@@ -91,7 +125,7 @@ struct Cli {
     #[arg(long)]
     enable_sentinelone: bool,
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Deserialize)]
@@ -430,8 +464,132 @@ fn audit_source_name(root: &Path, file: &Path) -> Result<String> {
     Ok(parts.join("/"))
 }
 
+fn write_private_output(path: &Path, bytes: &[u8]) -> Result<()> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.mode(0o600);
+    }
+    let mut file = options
+        .open(path)
+        .with_context(|| format!("open {}", terminal_safe_path(path)))?;
+    irmind_infra::private_file(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    Ok(())
+}
+
+struct RootWorkspaceIo {
+    store: Arc<LocalStore>,
+}
+
+impl WorkspaceIo for RootWorkspaceIo {
+    fn input_files(&self, root: &Path) -> Result<Vec<PathBuf>> {
+        input_files(root)
+    }
+    fn read_evidence(&self, path: &Path) -> Result<Vec<u8>> {
+        read_evidence(path)
+    }
+    fn audit_source_name(&self, root: &Path, file: &Path) -> Result<String> {
+        audit_source_name(root, file)
+    }
+    fn save_evidence(&self, path: &Path, bytes: &[u8]) -> Result<()> {
+        write_private_output(path, bytes)
+    }
+    fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String> {
+        let (fingerprint, entries) =
+            irmind_app::verify_export(&LocalExportVerifier, path, Some(expected_key))?;
+        Ok(format!(
+            "Verified {entries} entries; analyst key {fingerprint}"
+        ))
+    }
+    fn export_case(&self, _engine: &Engine<'_>, id: &CaseId, path: &Path) -> Result<String> {
+        Ok(self.store.export_case(id, path)?)
+    }
+}
+
+fn module_statuses(
+    cli: &Cli,
+    registry: &ModuleRegistry,
+    issues: &BTreeMap<&'static str, String>,
+) -> Vec<ModuleStatus> {
+    let mut out = vec![ModuleStatus {
+        id: "parser-json".into(),
+        compiled: true,
+        enabled: true,
+        configuration: "valid; built-in parser".into(),
+    }];
+    macro_rules! status {
+        ($id:expr, $compiled:expr, $requested:expr) => {{
+            let enabled = registry.manifest($id).is_some();
+            out.push(ModuleStatus {
+                id: $id.into(),
+                compiled: $compiled,
+                enabled,
+                configuration: if let Some(issue) = issues.get($id) {
+                    issue.clone()
+                } else if enabled {
+                    "valid".into()
+                } else if !$compiled {
+                    "not compiled".into()
+                } else if $requested {
+                    "invalid configuration; check required settings and keyring".into()
+                } else {
+                    "disabled".into()
+                },
+            });
+        }};
+    }
+    status!(
+        "llm-openai-compatible",
+        true,
+        cli.llm_module.as_deref() == Some("llm-openai-compatible")
+    );
+    status!(
+        "llm-anthropic",
+        cfg!(feature = "llm-anthropic"),
+        cli.llm_module.as_deref() == Some("llm-anthropic")
+    );
+    status!(
+        "llm-deepseek",
+        cfg!(feature = "llm-deepseek"),
+        cli.llm_module.as_deref() == Some("llm-deepseek")
+    );
+    status!(
+        "llm-openrouter",
+        cfg!(feature = "llm-openrouter"),
+        cli.llm_module.as_deref() == Some("llm-openrouter")
+    );
+    status!(
+        "siem-splunk",
+        cfg!(feature = "siem-splunk"),
+        cli.enable_splunk
+    );
+    status!("cloud-aws", cfg!(feature = "cloud-aws"), cli.enable_aws);
+    status!(
+        "edr-crowdstrike",
+        cfg!(feature = "edr-crowdstrike"),
+        cli.enable_crowdstrike
+    );
+    status!(
+        "edr-sentinelone",
+        cfg!(feature = "edr-sentinelone"),
+        cli.enable_sentinelone
+    );
+    status!("ti-misp", cfg!(feature = "ti-misp"), cli.enable_misp);
+    status!(
+        "ti-virustotal",
+        cfg!(feature = "ti-virustotal"),
+        cli.enable_virustotal
+    );
+    out
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let interactive = matches!(&cli.command, None | Some(Command::Tui { .. }));
     let cancel = CancellationToken::new();
     let signal_cancel = cancel.clone();
     std::thread::spawn(move || {
@@ -445,38 +603,69 @@ fn main() -> Result<()> {
             signal_cancel.cancel();
         }
     });
-    if let Command::VerifyExport { path, expected_key } = &cli.command {
-        let (fingerprint, entries) = verify_export_expected(path, expected_key.as_deref())?;
+    if let Some(Command::VerifyExport { path, expected_key }) = &cli.command {
+        let (fingerprint, entries) =
+            irmind_app::verify_export(&LocalExportVerifier, path, expected_key.as_deref())?;
         println!("verified {entries} audit entries; analyst key fingerprint {fingerprint}");
         return Ok(());
     }
-    let home = match cli.home {
-        Some(path) => path,
+    let home = match &cli.home {
+        Some(path) => path.clone(),
         None => ProjectDirs::from("", "IRMind", "IRMind")
             .ok_or_else(|| anyhow!("cannot determine the user's standard data directory"))?
             .data_local_dir()
             .to_path_buf(),
     };
-    let store = Arc::new(LocalStore::open(&home)?);
-    let signer = Arc::new(
-        LocalSigner::load_or_create(Actor::Analyst)
-            .context("load analyst signing key from system keyring")?,
-    );
+    let store = Arc::new(match LocalStore::open(&home) {
+        Ok(store) => store,
+        Err(error) => {
+            if interactive {
+                let _ = irmind_tui::show_startup_error(
+                    "Local case storage is unavailable. Check the data directory permissions.",
+                );
+            }
+            return Err(error.into());
+        }
+    });
+    let new_analyst_key =
+        interactive && LocalSigner::public_key_for_actor(&Actor::Analyst).is_err();
+    let signer = Arc::new(match LocalSigner::load_or_create(Actor::Analyst) {
+        Ok(signer) => signer,
+        Err(error) => {
+            if interactive {
+                let _ = irmind_tui::show_startup_error(
+                    "The system keyring is unavailable. Configure the native keyring and restart IRMind.",
+                );
+            }
+            return Err(error).context("load analyst signing key from system keyring");
+        }
+    });
     let mut verifier = LocalVerifier::from_signer(signer.as_ref());
     for case in store.list_cases()? {
-        for entry in store.entries(&case.id)? {
-            if entry.actor != signer.actor() {
-                let key = LocalSigner::public_key_for_actor(&entry.actor).with_context(|| {
-                    format!("load trusted public key for {}", entry.actor.as_storage())
-                })?;
-                verifier = verifier.with_trusted_key(&entry.actor, &key)?;
+        let actors = store
+            .entries(&case.id)?
+            .into_iter()
+            .map(|entry| entry.actor)
+            .chain(
+                store
+                    .operations(&case.id)?
+                    .into_iter()
+                    .map(|entry| entry.actor),
+            );
+        for actor in actors {
+            if actor == signer.actor() {
+                continue;
             }
+            let key = LocalSigner::public_key_for_actor(&actor)
+                .with_context(|| format!("load trusted public key for {}", actor.as_storage()))?;
+            verifier = verifier.with_trusted_key(&actor, &key)?;
         }
     }
     let guard = Arc::new(MandatoryGuard::new()?);
     let mut registry = ModuleRegistry::new();
+    let mut config_issues = BTreeMap::<&'static str, String>::new();
     registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
-    if matches!(&cli.command, Command::Ask { .. } | Command::Tui { .. }) {
+    if cli.llm_module.is_some() {
         match cli
             .llm_module
             .as_deref()
@@ -485,77 +674,134 @@ fn main() -> Result<()> {
             DEFAULT_LLM_MODULE => register_configured!(
                 registry,
                 OpenAiCompatible,
-                irmind_mod_llm_openai_compatible::MANIFEST
+                irmind_mod_llm_openai_compatible::MANIFEST,
+                interactive,
+                config_issues
             ),
             #[cfg(feature = "llm-anthropic")]
             irmind_mod_llm_anthropic::MODULE_ID => {
-                register_configured!(registry, Anthropic, irmind_mod_llm_anthropic::MANIFEST);
+                register_configured!(
+                    registry,
+                    Anthropic,
+                    irmind_mod_llm_anthropic::MANIFEST,
+                    interactive,
+                    config_issues
+                );
             }
             #[cfg(feature = "llm-deepseek")]
             irmind_mod_llm_deepseek::MODULE_ID => {
-                register_configured!(registry, DeepSeek, irmind_mod_llm_deepseek::MANIFEST);
+                register_configured!(
+                    registry,
+                    DeepSeek,
+                    irmind_mod_llm_deepseek::MANIFEST,
+                    interactive,
+                    config_issues
+                );
             }
             #[cfg(feature = "llm-openrouter")]
             irmind_mod_llm_openrouter::MODULE_ID => {
-                register_configured!(registry, OpenRouter, irmind_mod_llm_openrouter::MANIFEST);
+                register_configured!(
+                    registry,
+                    OpenRouter,
+                    irmind_mod_llm_openrouter::MANIFEST,
+                    interactive,
+                    config_issues
+                );
             }
+            _ if interactive => {}
             _ => return Err(anyhow!("LLM module is not compiled into this binary")),
         }
     }
     #[cfg(feature = "siem-splunk")]
     if cli.enable_splunk {
-        register_configured!(registry, Splunk, irmind_mod_siem_splunk::MANIFEST);
+        register_configured!(
+            registry,
+            Splunk,
+            irmind_mod_siem_splunk::MANIFEST,
+            interactive,
+            config_issues
+        );
     }
     #[cfg(not(feature = "siem-splunk"))]
-    if cli.enable_splunk {
+    if cli.enable_splunk && !interactive {
         return Err(anyhow!(
             "this binary was built without the siem-splunk feature"
         ));
     }
     #[cfg(feature = "ti-misp")]
     if cli.enable_misp {
-        register_configured!(registry, Misp, irmind_mod_ti_misp::MANIFEST);
+        register_configured!(
+            registry,
+            Misp,
+            irmind_mod_ti_misp::MANIFEST,
+            interactive,
+            config_issues
+        );
     }
     #[cfg(not(feature = "ti-misp"))]
-    if cli.enable_misp {
+    if cli.enable_misp && !interactive {
         return Err(anyhow!("this binary was built without the ti-misp feature"));
     }
     #[cfg(feature = "cloud-aws")]
     if cli.enable_aws {
-        register_configured!(registry, AwsCloudTrail, irmind_mod_cloud_aws::MANIFEST);
+        register_configured!(
+            registry,
+            AwsCloudTrail,
+            irmind_mod_cloud_aws::MANIFEST,
+            interactive,
+            config_issues
+        );
     }
     #[cfg(not(feature = "cloud-aws"))]
-    if cli.enable_aws {
+    if cli.enable_aws && !interactive {
         return Err(anyhow!(
             "this binary was built without the cloud-aws feature"
         ));
     }
     #[cfg(feature = "edr-crowdstrike")]
     if cli.enable_crowdstrike {
-        register_configured!(registry, CrowdStrike, irmind_mod_edr_crowdstrike::MANIFEST);
+        register_configured!(
+            registry,
+            CrowdStrike,
+            irmind_mod_edr_crowdstrike::MANIFEST,
+            interactive,
+            config_issues
+        );
     }
     #[cfg(not(feature = "edr-crowdstrike"))]
-    if cli.enable_crowdstrike {
+    if cli.enable_crowdstrike && !interactive {
         return Err(anyhow!(
             "this binary was built without the edr-crowdstrike feature"
         ));
     }
     #[cfg(feature = "edr-sentinelone")]
     if cli.enable_sentinelone {
-        register_configured!(registry, SentinelOne, irmind_mod_edr_sentinelone::MANIFEST);
+        register_configured!(
+            registry,
+            SentinelOne,
+            irmind_mod_edr_sentinelone::MANIFEST,
+            interactive,
+            config_issues
+        );
     }
     #[cfg(not(feature = "edr-sentinelone"))]
-    if cli.enable_sentinelone {
+    if cli.enable_sentinelone && !interactive {
         return Err(anyhow!(
             "this binary was built without the edr-sentinelone feature"
         ));
     }
     #[cfg(feature = "ti-virustotal")]
     if cli.enable_virustotal {
-        register_configured!(registry, VirusTotal, irmind_mod_ti_virustotal::MANIFEST);
+        register_configured!(
+            registry,
+            VirusTotal,
+            irmind_mod_ti_virustotal::MANIFEST,
+            interactive,
+            config_issues
+        );
     }
     #[cfg(not(feature = "ti-virustotal"))]
-    if cli.enable_virustotal {
+    if cli.enable_virustotal && !interactive {
         return Err(anyhow!(
             "this binary was built without the ti-virustotal feature"
         ));
@@ -580,355 +826,362 @@ fn main() -> Result<()> {
     if let Some(pricing) = load_pricing()? {
         engine = engine.with_pricing(pricing);
     }
+    let workspace_io = RootWorkspaceIo {
+        store: store.clone(),
+    };
+    let module_statuses = module_statuses(&cli, &registry, &config_issues);
+    let selected_model = match cli.llm_module.as_deref() {
+        Some(id) if interactive => registry.llm(id).ok(),
+        Some(id) => Some(registry.llm(id)?),
+        None => None,
+    };
     match cli.command {
-        Command::Case { command } => match command {
-            CaseCommand::New {
-                title,
-                scope,
-                severity,
-            } => {
-                let severity = Severity::parse(&severity)
-                    .map_err(|_| anyhow!("severity must be low, medium, high or critical"))?;
-                let case = engine.create_case_with_severity(&title, severity, &scope)?;
-                println!("{}", case.id.as_str());
-            }
-            CaseCommand::List => {
-                for case in store.list_cases()? {
+        None => irmind_tui::run_workspace(
+            &engine,
+            selected_model,
+            &workspace_io,
+            &module_statuses,
+            &cancel,
+            None,
+            new_analyst_key,
+        )?,
+        Some(command) => match command {
+            Command::Case { command } => match command {
+                CaseCommand::New {
+                    title,
+                    scope,
+                    severity,
+                } => {
+                    let severity = Severity::parse(&severity)
+                        .map_err(|_| anyhow!("severity must be low, medium, high or critical"))?;
+                    let case = engine.create_case_with_severity(&title, severity, &scope)?;
+                    println!("{}", case.id.as_str());
+                }
+                CaseCommand::List => {
+                    for case in store.list_cases()? {
+                        println!(
+                            "{}\t{}\t{}",
+                            case.id.as_str(),
+                            if case.sealed { "sealed" } else { "open" },
+                            irmind_app::ContentGuard::screen(guard.as_ref(), &case.title)?.text
+                        );
+                    }
+                }
+                CaseCommand::Show { case_id } => {
+                    let case = store.get_case(&parse_id(&case_id)?)?;
                     println!(
-                        "{}\t{}\t{}",
+                        "{}\nTitle: {}\nSeverity: {}\nScope: {}\nSealed: {}",
                         case.id.as_str(),
-                        if case.sealed { "sealed" } else { "open" },
-                        irmind_app::ContentGuard::screen(guard.as_ref(), &case.title)?.text
+                        irmind_app::ContentGuard::screen(guard.as_ref(), &case.title)?.text,
+                        case.severity.as_str(),
+                        irmind_app::ContentGuard::screen(guard.as_ref(), &case.scope)?.text,
+                        case.sealed
+                    );
+                }
+                CaseCommand::Scope { case_id, scope } => {
+                    engine.change_scope(&parse_id(&case_id)?, &scope)?;
+                    println!("case scope updated and signed");
+                }
+            },
+            Command::Ingest { case_id, path } => {
+                let id = parse_id(&case_id)?;
+                engine.verify_cancelable(&id, &cancel)?;
+                if store.get_case(&id)?.sealed {
+                    return Err(anyhow!("case is sealed"));
+                }
+                let files = input_files(&path)?;
+                let mut indexed: HashSet<String> = store
+                    .entries(&id)?
+                    .into_iter()
+                    .filter(|entry| entry.kind == "GraphIndexed")
+                    .filter_map(|entry| entry.evidence)
+                    .collect();
+                for file in files {
+                    if cancel.is_cancelled() {
+                        return Err(anyhow!("ingest cancelled"));
+                    }
+                    let bytes = read_evidence(&file)?;
+                    let hash = irmind_app::hex(&irmind_app::sha256(&bytes));
+                    if indexed.contains(&hash) {
+                        println!("skipped {hash} {}", terminal_safe_path(&file));
+                        continue;
+                    }
+                    let ingested = engine.ingest_cancelable(
+                        &id,
+                        &bytes,
+                        &audit_source_name(&path, &file)?,
+                        &cancel,
+                    )?;
+                    indexed.insert(ingested.clone());
+                    println!("{ingested} {}", terminal_safe_path(&file));
+                }
+            }
+            Command::Ask { case_id, alert } => {
+                let model = registry.llm(cli.llm_module.as_deref().ok_or_else(|| {
+                    anyhow!("select an approved LLM explicitly with --llm-module")
+                })?)?;
+                println!(
+                    "{}",
+                    engine.investigate_with_cancel(&parse_id(&case_id)?, &alert, model, &cancel)?
+                );
+            }
+            Command::Approvals { case_id } => {
+                for request in engine.pending_approvals(&parse_id(&case_id)?)? {
+                    println!(
+                        "{} {:?} {} {:?}",
+                        request.id,
+                        request.mode,
+                        request.tool.as_str(),
+                        request.args
                     );
                 }
             }
-            CaseCommand::Show { case_id } => {
-                let case = store.get_case(&parse_id(&case_id)?)?;
-                println!(
-                    "{}\nTitle: {}\nSeverity: {}\nScope: {}\nSealed: {}",
-                    case.id.as_str(),
-                    irmind_app::ContentGuard::screen(guard.as_ref(), &case.title)?.text,
-                    case.severity.as_str(),
-                    irmind_app::ContentGuard::screen(guard.as_ref(), &case.scope)?.text,
-                    case.sealed
-                );
+            Command::Approve {
+                case_id,
+                request_id,
+            } => {
+                println!("{}", engine.approve(&parse_id(&case_id)?, &request_id)?);
             }
-            CaseCommand::Scope { case_id, scope } => {
-                engine.change_scope(&parse_id(&case_id)?, &scope)?;
-                println!("case scope updated and signed");
-            }
-        },
-        Command::Ingest { case_id, path } => {
-            let id = parse_id(&case_id)?;
-            engine.verify_cancelable(&id, &cancel)?;
-            if store.get_case(&id)?.sealed {
-                return Err(anyhow!("case is sealed"));
-            }
-            let files = input_files(&path)?;
-            let mut indexed: HashSet<String> = store
-                .entries(&id)?
-                .into_iter()
-                .filter(|entry| entry.kind == "GraphIndexed")
-                .filter_map(|entry| entry.evidence)
-                .collect();
-            for file in files {
-                if cancel.is_cancelled() {
-                    return Err(anyhow!("ingest cancelled"));
-                }
-                let bytes = read_evidence(&file)?;
-                let hash = irmind_app::hex(&irmind_app::sha256(&bytes));
-                if indexed.contains(&hash) {
-                    println!("skipped {hash} {}", terminal_safe_path(&file));
-                    continue;
-                }
-                let ingested = engine.ingest_cancelable(
-                    &id,
-                    &bytes,
-                    &audit_source_name(&path, &file)?,
-                    &cancel,
-                )?;
-                indexed.insert(ingested.clone());
-                println!("{ingested} {}", terminal_safe_path(&file));
-            }
-        }
-        Command::Ask { case_id, alert } => {
-            let model =
-                registry.llm(cli.llm_module.as_deref().ok_or_else(|| {
-                    anyhow!("select an approved LLM explicitly with --llm-module")
-                })?)?;
-            println!(
-                "{}",
-                engine.investigate_with_cancel(&parse_id(&case_id)?, &alert, model, &cancel)?
-            );
-        }
-        Command::Approvals { case_id } => {
-            for request in engine.pending_approvals(&parse_id(&case_id)?)? {
-                println!(
-                    "{} {:?} {} {:?}",
-                    request.id,
-                    request.mode,
-                    request.tool.as_str(),
-                    request.args
-                );
-            }
-        }
-        Command::Approve {
-            case_id,
-            request_id,
-        } => {
-            println!("{}", engine.approve(&parse_id(&case_id)?, &request_id)?);
-        }
-        Command::Deny {
-            case_id,
-            request_id,
-            reason,
-        } => {
-            println!(
-                "{}",
-                engine.deny(&parse_id(&case_id)?, &request_id, &reason)?
-            );
-        }
-        Command::EditApproval {
-            case_id,
-            request_id,
-            args_json,
-        } => {
-            let args = parse_approval_args(&args_json)?;
-            println!(
-                "{}",
-                engine.edit_approval(&parse_id(&case_id)?, &request_id, args)?
-            );
-        }
-        Command::AddFinding {
-            case_id,
-            kind,
-            value,
-            evidence_hash,
-        } => println!(
-            "{}",
-            engine.add_finding(
-                &parse_id(&case_id)?,
-                FindingKind::parse(&kind)?,
-                &value,
-                &evidence_hash
-            )?
-        ),
-        Command::ConfirmFinding {
-            case_id,
-            finding_id,
-        } => {
-            engine.confirm_finding(&parse_id(&case_id)?, &finding_id)?;
-            println!("finding confirmed");
-        }
-        Command::DismissFinding {
-            case_id,
-            finding_id,
-            reason,
-        } => {
-            engine.dismiss_finding(&parse_id(&case_id)?, &finding_id, &reason)?;
-            println!("finding dismissed");
-        }
-        Command::Findings { case_id } => {
-            for finding in engine.findings(&parse_id(&case_id)?)? {
-                println!(
-                    "{} {:?} {} {} [{}]",
-                    finding.id,
-                    finding.kind,
-                    if finding.confirmed {
-                        "confirmed"
-                    } else if finding.dismissed {
-                        "dismissed"
-                    } else {
-                        "proposed"
-                    },
-                    irmind_app::ContentGuard::screen(guard.as_ref(), &finding.value)?.text,
-                    finding.evidence_hash
-                );
-            }
-        }
-        Command::Report { case_id } => {
-            println!("{}", engine.report(&parse_id(&case_id)?)?);
-        }
-        Command::Evidence {
-            case_id,
-            hash,
-            output,
-        } => {
-            let bytes = store.get_evidence(&parse_id(&case_id)?, &hash)?;
-            if let Some(path) = output {
-                let mut options = OpenOptions::new();
-                options.write(true).create_new(true);
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::OpenOptionsExt as _;
-                    options.mode(0o600);
-                }
-                let mut file = options
-                    .open(&path)
-                    .with_context(|| format!("open {}", terminal_safe_path(&path)))?;
-                irmind_infra::private_file(&path)?;
-                file.write_all(&bytes)?;
-                file.sync_all()?;
-            } else {
+            Command::Deny {
+                case_id,
+                request_id,
+                reason,
+            } => {
                 println!(
                     "{}",
-                    irmind_app::ContentGuard::screen(
-                        guard.as_ref(),
-                        &String::from_utf8_lossy(&bytes)
-                    )?
-                    .text
+                    engine.deny(&parse_id(&case_id)?, &request_id, &reason)?
                 );
             }
-        }
-        Command::Verify { case_id } => println!(
-            "verified {} audit entries",
-            engine.verify_cancelable(&parse_id(&case_id)?, &cancel)?
-        ),
-        Command::Seal { case_id } => {
-            let id = parse_id(&case_id)?;
-            engine.seal(&id)?;
-            let seal = store
-                .case_seal(&id)?
-                .ok_or_else(|| anyhow!("case seal missing"))?;
-            println!(
-                "case sealed; analyst key fingerprint {}",
-                seal.analyst_key_fingerprint
-            );
-        }
-        Command::Graph { case_id } => {
-            let id = parse_id(&case_id)?;
-            let _case_lock = store.lock_case(&id)?;
-            let summary = store.graph_summary(&id)?;
-            println!(
-                "{}",
-                irmind_app::ContentGuard::screen(guard.as_ref(), &summary)?.text
-            );
-        }
-        Command::GraphRebuild { case_id } => println!(
-            "rebuilt {} graph records",
-            engine.rebuild_graph_cancelable(&parse_id(&case_id)?, &cancel)?
-        ),
-        Command::VerifyGraph { case_id } => println!(
-            "verified {} graph records",
-            engine.verify_graph_cancelable(&parse_id(&case_id)?, &cancel)?
-        ),
-        Command::Timeline { case_id } => {
-            let id = parse_id(&case_id)?;
-            let _case_lock = store.lock_case(&id)?;
-            for event in store.timeline(&id, 100)? {
-                let line = format!(
-                    "{} {} [{}#{}]",
-                    event.at, event.event, event.evidence_hash, event.record_index
-                );
+            Command::EditApproval {
+                case_id,
+                request_id,
+                args_json,
+            } => {
+                let args = parse_approval_args(&args_json)?;
                 println!(
                     "{}",
-                    irmind_app::ContentGuard::screen(guard.as_ref(), &line)?.text
+                    engine.edit_approval(&parse_id(&case_id)?, &request_id, args)?
                 );
             }
-        }
-        Command::Entity {
-            case_id,
-            kind,
-            value,
-        } => {
-            let id = parse_id(&case_id)?;
-            let _case_lock = store.lock_case(&id)?;
-            let result = store.entity_lookup(&id, &kind, &value)?;
-            println!(
+            Command::AddFinding {
+                case_id,
+                kind,
+                value,
+                evidence_hash,
+            } => println!(
                 "{}",
-                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
-            );
-        }
-        Command::Neighbors {
-            case_id,
-            kind,
-            value,
-            limit,
-        } => {
-            let id = parse_id(&case_id)?;
-            let _case_lock = store.lock_case(&id)?;
-            let result = store.neighbors(&id, &kind, &value, limit)?;
-            println!(
-                "{}",
-                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
-            );
-        }
-        Command::EntityTimeline {
-            case_id,
-            kind,
-            value,
-            limit,
-        } => {
-            let id = parse_id(&case_id)?;
-            let _case_lock = store.lock_case(&id)?;
-            let result = store.entity_timeline(&id, &kind, &value, limit)?;
-            println!(
-                "{}",
-                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
-            );
-        }
-        Command::GraphPath {
-            case_id,
-            from_kind,
-            from_value,
-            to_kind,
-            to_value,
-        } => {
-            let id = parse_id(&case_id)?;
-            let _case_lock = store.lock_case(&id)?;
-            let result = store.graph_path(&id, (&from_kind, &from_value), (&to_kind, &to_value))?;
-            println!(
-                "{}",
-                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
-            );
-        }
-        Command::TextSearch {
-            case_id,
-            query,
-            limit,
-        } => {
-            let id = parse_id(&case_id)?;
-            let _case_lock = store.lock_case(&id)?;
-            let result = store.text_search(&id, &query, limit)?;
-            println!(
-                "{}",
-                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
-            );
-        }
-        Command::RawRecords {
-            case_id,
-            hash,
-            index,
-        } => {
-            let id = parse_id(&case_id)?;
-            let _case_lock = store.lock_case(&id)?;
-            let result = store.raw_record(&id, &hash, index)?;
-            println!(
-                "{}",
-                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
-            );
-        }
-        Command::Export { case_id, path } => {
-            let id = parse_id(&case_id)?;
-            engine.verify_cancelable(&id, &cancel)?;
-            let fingerprint = store.export_case(&id, &path)?;
-            println!("exported case; analyst key fingerprint {fingerprint}");
-        }
-        Command::VerifyExport { .. } => {
-            return Err(anyhow!(
-                "verify-export must be handled before opening storage"
-            ));
-        }
-        Command::Tui { case_id } => {
-            irmind_tui::run(
+                engine.add_finding(
+                    &parse_id(&case_id)?,
+                    FindingKind::parse(&kind)?,
+                    &value,
+                    &evidence_hash
+                )?
+            ),
+            Command::ConfirmFinding {
+                case_id,
+                finding_id,
+            } => {
+                engine.confirm_finding(&parse_id(&case_id)?, &finding_id)?;
+                println!("finding confirmed");
+            }
+            Command::DismissFinding {
+                case_id,
+                finding_id,
+                reason,
+            } => {
+                engine.dismiss_finding(&parse_id(&case_id)?, &finding_id, &reason)?;
+                println!("finding dismissed");
+            }
+            Command::Findings { case_id } => {
+                for finding in engine.findings(&parse_id(&case_id)?)? {
+                    println!(
+                        "{} {:?} {} {} [{}]",
+                        finding.id,
+                        finding.kind,
+                        if finding.confirmed {
+                            "confirmed"
+                        } else if finding.dismissed {
+                            "dismissed"
+                        } else {
+                            "proposed"
+                        },
+                        irmind_app::ContentGuard::screen(guard.as_ref(), &finding.value)?.text,
+                        finding.evidence_hash
+                    );
+                }
+            }
+            Command::Report { case_id } => {
+                println!("{}", engine.report(&parse_id(&case_id)?)?);
+            }
+            Command::Evidence {
+                case_id,
+                hash,
+                output,
+            } => {
+                let bytes = store.get_evidence(&parse_id(&case_id)?, &hash)?;
+                if let Some(path) = output {
+                    write_private_output(&path, &bytes)?;
+                } else {
+                    println!(
+                        "{}",
+                        irmind_app::ContentGuard::screen(
+                            guard.as_ref(),
+                            &String::from_utf8_lossy(&bytes)
+                        )?
+                        .text
+                    );
+                }
+            }
+            Command::Verify { case_id } => println!(
+                "verified {} audit entries",
+                engine.verify_cancelable(&parse_id(&case_id)?, &cancel)?
+            ),
+            Command::Seal { case_id } => {
+                let id = parse_id(&case_id)?;
+                engine.seal(&id)?;
+                let seal = store
+                    .case_seal(&id)?
+                    .ok_or_else(|| anyhow!("case seal missing"))?;
+                println!(
+                    "case sealed; analyst key fingerprint {}",
+                    seal.analyst_key_fingerprint
+                );
+            }
+            Command::Graph { case_id } => {
+                let id = parse_id(&case_id)?;
+                let _case_lock = store.lock_case(&id)?;
+                let summary = store.graph_summary(&id)?;
+                println!(
+                    "{}",
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &summary)?.text
+                );
+            }
+            Command::GraphRebuild { case_id } => println!(
+                "rebuilt {} graph records",
+                engine.rebuild_graph_cancelable(&parse_id(&case_id)?, &cancel)?
+            ),
+            Command::VerifyGraph { case_id } => println!(
+                "verified {} graph records",
+                engine.verify_graph_cancelable(&parse_id(&case_id)?, &cancel)?
+            ),
+            Command::Timeline { case_id } => {
+                let id = parse_id(&case_id)?;
+                let _case_lock = store.lock_case(&id)?;
+                for event in store.timeline(&id, 100)? {
+                    let line = format!(
+                        "{} {} [{}#{}]",
+                        event.at, event.event, event.evidence_hash, event.record_index
+                    );
+                    println!(
+                        "{}",
+                        irmind_app::ContentGuard::screen(guard.as_ref(), &line)?.text
+                    );
+                }
+            }
+            Command::Entity {
+                case_id,
+                kind,
+                value,
+            } => {
+                let id = parse_id(&case_id)?;
+                let _case_lock = store.lock_case(&id)?;
+                let result = store.entity_lookup(&id, &kind, &value)?;
+                println!(
+                    "{}",
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
+                );
+            }
+            Command::Neighbors {
+                case_id,
+                kind,
+                value,
+                limit,
+            } => {
+                let id = parse_id(&case_id)?;
+                let _case_lock = store.lock_case(&id)?;
+                let result = store.neighbors(&id, &kind, &value, limit)?;
+                println!(
+                    "{}",
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
+                );
+            }
+            Command::EntityTimeline {
+                case_id,
+                kind,
+                value,
+                limit,
+            } => {
+                let id = parse_id(&case_id)?;
+                let _case_lock = store.lock_case(&id)?;
+                let result = store.entity_timeline(&id, &kind, &value, limit)?;
+                println!(
+                    "{}",
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
+                );
+            }
+            Command::GraphPath {
+                case_id,
+                from_kind,
+                from_value,
+                to_kind,
+                to_value,
+            } => {
+                let id = parse_id(&case_id)?;
+                let _case_lock = store.lock_case(&id)?;
+                let result =
+                    store.graph_path(&id, (&from_kind, &from_value), (&to_kind, &to_value))?;
+                println!(
+                    "{}",
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
+                );
+            }
+            Command::TextSearch {
+                case_id,
+                query,
+                limit,
+            } => {
+                let id = parse_id(&case_id)?;
+                let _case_lock = store.lock_case(&id)?;
+                let result = store.text_search(&id, &query, limit)?;
+                println!(
+                    "{}",
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
+                );
+            }
+            Command::RawRecords {
+                case_id,
+                hash,
+                index,
+            } => {
+                let id = parse_id(&case_id)?;
+                let _case_lock = store.lock_case(&id)?;
+                let result = store.raw_record(&id, &hash, index)?;
+                println!(
+                    "{}",
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
+                );
+            }
+            Command::Export { case_id, path } => {
+                let id = parse_id(&case_id)?;
+                engine.verify_cancelable(&id, &cancel)?;
+                let fingerprint = store.export_case(&id, &path)?;
+                println!("exported case; analyst key fingerprint {fingerprint}");
+            }
+            Command::VerifyExport { .. } => {
+                return Err(anyhow!(
+                    "verify-export must be handled before opening storage"
+                ));
+            }
+            Command::Tui { case_id } => irmind_tui::run_workspace(
                 &engine,
-                registry.llm(cli.llm_module.as_deref().ok_or_else(|| {
-                    anyhow!("select an approved LLM explicitly with --llm-module")
-                })?)?,
-                &parse_id(&case_id)?,
+                selected_model,
+                &workspace_io,
+                &module_statuses,
                 &cancel,
-            )?;
-        }
+                Some(&parse_id(&case_id)?),
+                new_analyst_key,
+            )?,
+        },
     }
     Ok(())
 }
@@ -937,6 +1190,13 @@ fn main() -> Result<()> {
 #[allow(clippy::unwrap_used)]
 mod input_tests {
     use super::*;
+
+    #[test]
+    fn no_arguments_selects_the_workspace_without_an_llm() {
+        let cli = Cli::try_parse_from(["irmind"]).unwrap();
+        assert!(cli.command.is_none());
+        assert!(cli.llm_module.is_none());
+    }
 
     #[test]
     fn walks_ingest_directory_in_stable_order() {

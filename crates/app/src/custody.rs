@@ -1,10 +1,75 @@
 use crate::{
-    Actor, AppError, CancellationToken, CaseId, CaseMutation, CaseSeal, Engine, hex,
-    seal_challenge, sha256, summarize_usage, verify_case_metadata,
+    Actor, AppError, CancellationToken, CancelledOperation, CaseId, CaseMutation, CaseSeal, Engine,
+    SignedEntry, SignedOperation, hex, seal_challenge, sha256, summarize_usage,
+    verify_case_metadata,
 };
+use std::path::Path;
+
+pub fn verify_export(
+    verifier: &dyn crate::ExportVerifier,
+    path: &Path,
+    expected_key: Option<&str>,
+) -> Result<(String, usize), AppError> {
+    verifier.verify_export(path, expected_key)
+}
+
+pub struct SealPreview {
+    entry: SignedEntry,
+    seal: CaseSeal,
+}
+
+impl SealPreview {
+    pub fn case_id(&self) -> &str {
+        &self.entry.case_id
+    }
+    pub fn entry_count(&self) -> u64 {
+        self.entry.seq
+    }
+    pub fn final_hash(&self) -> [u8; 32] {
+        self.entry.hash
+    }
+    pub fn analyst_key_fingerprint(&self) -> &str {
+        &self.seal.analyst_key_fingerprint
+    }
+}
 
 impl Engine<'_> {
+    pub fn record_cancellation(
+        &self,
+        id: &CaseId,
+        operation: CancelledOperation,
+    ) -> Result<(), AppError> {
+        let _case_lock = self.repo.lock_case(id)?;
+        self.repo.get_case(id)?;
+        self.verify_operations_unlocked(id, &CancellationToken::new())?;
+        let last = self.audit_log.last_operation(id)?;
+        let mut entry = SignedOperation {
+            case_id: id.as_str().into(),
+            seq: last.as_ref().map_or(Ok(1), |previous| {
+                previous
+                    .seq
+                    .checked_add(1)
+                    .ok_or_else(|| AppError::Policy("operational audit sequence exhausted".into()))
+            })?,
+            at: self.clock.now()?,
+            actor: self.signer.actor(),
+            operation: operation.as_str().into(),
+            prev: last.map_or([0u8; 32], |previous| previous.hash),
+            hash: [0u8; 32],
+            sig: Vec::new(),
+            public_key: self.signer.public_key(),
+        };
+        entry.hash = sha256(&entry.canonical());
+        entry.sig = self.signer.sign(&entry.hash)?;
+        self.audit_log.append_operation(&entry)
+    }
+
     pub fn seal(&self, id: &CaseId) -> Result<(), AppError> {
+        let preview = self.prepare_seal(id)?;
+        self.seal_prepared(&preview)
+    }
+
+    pub fn prepare_seal(&self, id: &CaseId) -> Result<SealPreview, AppError> {
         self.require_attended_analyst("seal case")?;
         let _case_lock = self.repo.lock_case(id)?;
         let case = self.repo.get_case(id)?;
@@ -31,9 +96,43 @@ impl Engine<'_> {
             public_key: self.signer.public_key(),
             analyst_key_fingerprint: hex(&sha256(&self.signer.public_key())),
         };
+        Ok(SealPreview { entry, seal })
+    }
+
+    pub fn seal_prepared(&self, preview: &SealPreview) -> Result<(), AppError> {
+        self.require_attended_analyst("seal case")?;
+        let id = CaseId::parse(&preview.entry.case_id).map_err(|_| AppError::InvalidCaseId)?;
+        let _case_lock = self.repo.lock_case(&id)?;
+        if self.repo.get_case(&id)?.sealed {
+            return Err(AppError::Sealed);
+        }
+        self.verify_unlocked(&id)?;
+        let last = self
+            .audit_log
+            .last_entry(&id)?
+            .ok_or(AppError::InvalidChain(0))?;
+        let manifest = self.evidence_store.evidence_hashes(&id)?.join(",");
+        if Some(preview.entry.seq) != last.seq.checked_add(1)
+            || preview.entry.prev != last.hash
+            || preview.entry.payload != manifest
+            || preview.entry.actor != Actor::Analyst
+            || preview.entry.public_key != self.signer.public_key()
+            || sha256(&preview.entry.canonical()) != preview.entry.hash
+            || preview.seal.hash != preview.entry.hash
+        {
+            return Err(AppError::Policy("seal preview is stale".into()));
+        }
+        if !self
+            .pending_requests_unlocked(&self.repo.get_case(&id)?, &self.audit_log.entries(&id)?)?
+            .is_empty()
+        {
+            return Err(AppError::Policy(
+                "resolve pending approvals before sealing".into(),
+            ));
+        }
         self.audit_log
-            .transact(&entry, CaseMutation::Seal(id.clone()))?;
-        self.repo.write_seal_file(id, &seal)
+            .transact(&preview.entry, CaseMutation::Seal(id.clone()))?;
+        self.repo.write_seal_file(&id, &preview.seal)
     }
 
     pub fn verify(&self, id: &CaseId) -> Result<usize, AppError> {
@@ -129,6 +228,34 @@ impl Engine<'_> {
         self.pending_requests_unlocked(&case, &entries)?;
         self.findings_unlocked(id, &entries)?;
         summarize_usage(&entries)?;
+        self.verify_operations_unlocked(id, cancel)?;
         Ok(entries.len())
+    }
+
+    fn verify_operations_unlocked(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        let operations = self.audit_log.operations(id)?;
+        let mut previous = [0u8; 32];
+        for (index, operation) in operations.iter().enumerate() {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            if operation.case_id != id.as_str()
+                || operation.seq != index as u64 + 1
+                || operation.prev != previous
+                || sha256(&operation.canonical()) != operation.hash
+                || operation.public_key != self.verifier.trusted_public_key(&operation.actor)?
+            {
+                return Err(AppError::InvalidChain(operation.seq));
+            }
+            self.verifier
+                .verify(&operation.public_key, &operation.hash, &operation.sig)
+                .map_err(|_| AppError::InvalidChain(operation.seq))?;
+            previous = operation.hash;
+        }
+        Ok(())
     }
 }

@@ -7,8 +7,18 @@ IRMind is a local Rust client for incident investigation with signed evidence an
 
 ## Getting started
 
+Build and run `irmind` without a subcommand to open the analyst workspace. On first launch, the TUI checks the system keyring, creates the analyst signing key there if needed, and shows its public-key fingerprint. Save that fingerprint outside this computer. Create and open cases from the home screen; ingestion, investigation, approvals, verification, reports, sealing, and export are available inside each case. No LLM is selected by default.
+
 ```bash
 cargo build --release
+./target/release/irmind
+```
+
+Use `--llm-module <module-id>` only after approving the provider and its data handling. The CLI subcommands remain available for automation and use the same application operations:
+
+In the case workspace, press `Ctrl+K` for the command palette, use `/help` for case commands, and use `/pause` to cancel an active task. Sealing and export require an explicit confirmation showing the case, audit count, final hash, and analyst-key fingerprint. The home screen also verifies an exported package against an expected fingerprint.
+
+```bash
 ./target/release/irmind case new "CloudTrail alert" --severity high --scope "account 123456789012; 2026-10-23"
 ./target/release/irmind case scope <CASE_ID> 'v1;sources=splunk-demo;accounts=123456789012;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z'
 ./target/release/irmind ingest <CASE_ID> cloudtrail.json
@@ -63,7 +73,7 @@ No LLM module is enabled by default. Select the OpenAI-compatible Chat Completio
 ## Implemented
 
 - Rust 2024 workspace with an I/O-independent domain, use cases, a mandatory guard, storage adapters, a JSON/CloudTrail parser, and a separate LLM adapter. Compiled products implement `Module`, publish a manifest of ports, tools, and configuration fields, and register at the composition root. The registry supports multiple LLM and EDR modules without changing the engine. Each investigation signs the fingerprints of active modules, the model identifier, and the selected endpoint hash.
-- Typed case severity, SHA-256 ingestion of original evidence files or directories, a timeline with source-record references, a local DuckDB entity index for JSON/CloudTrail files and Splunk/CloudTrail JSON results, bounded search, a graph summary, a basic TUI, and verifiable export. The CLI traverses directories in a stable order, rejects symbolic links and excessive limits, and skips hashes that already have a signed `GraphIndexed` event.
+- Typed case severity, SHA-256 ingestion of original evidence files or directories, a timeline with source-record references, a local DuckDB entity index for JSON/CloudTrail files and Splunk/CloudTrail JSON results, bounded search, a graph summary, a case-centered TUI, and verifiable export. The CLI traverses directories in a stable order, rejects symbolic links and excessive limits, and skips hashes that already have a signed `GraphIndexed` event.
 - Local lookups for entities, co-observed neighbors, and explicit CloudTrail relations (`assumed_role`, role-issued session, source IP, and used or created access keys), with result limits and `hash#record` pointers. The agent accesses them as policy-controlled `Read` tools.
 - Paths of up to three co-observation hops, literal search across all fields of indexed original JSON, and retrieval of an original JSON record by pointer. Queries are bounded and pass through policy, guard, and audit when proposed by the model.
 - Audit with canonical binary serialization, SHA-256 hash chaining, Ed25519 signatures, append-only SQLite protection, and a final-state seal.
@@ -82,6 +92,7 @@ No LLM module is enabled by default. Select the OpenAI-compatible Chat Completio
 - `irmind-testkit` provides an in-memory fake EDR and a shared HTTP contract suite passed by CrowdStrike and SentinelOne. It checks host and time filters, ambiguous or out-of-scope responses, errors, limits, redirects, and declared capabilities. The application test checks the signed evidence hash and confirms that the model receives only a redacted copy.
 - Local findings linked to an evidence hash: IOCs, hypotheses, ATT&CK techniques, impact, and recommendations. The model or agent can propose them through `case_add_finding`; only the analyst can confirm or dismiss them. The deterministic report includes only confirmed findings and the indexed timeline, with each point linked to evidence.
 - The TUI shows findings in a tab and supports `/add <type> <hash> <value>`, `/confirm <id>`, `/dismiss <id> <reason>`, `/findings`, and `/report`.
+- The TUI starts at a searchable case list with severity, state, and last activity. It creates signed cases, selects evidence paths, shows compiled and enabled modules, and keeps ingestion, graph rebuild, and verification on cancelable workers. Canceling a task adds a signed operational entry even when the case is sealed. A `ratatui::TestBackend` test completes a case with fake modules without invoking the CLI.
 - The VirusTotal adapter is an optional feature requiring explicit enablement and a key in the keyring. It accepts only hashes, ASCII domains, and certain public IPv4 addresses, blocking internal or ambiguous indicators. Signed approval precedes the HTTP request; the full result stays as evidence, and the next session receives a bounded, redacted copy. VirusTotal warns that queried IOCs may enter its data set; consider that effect before approving a lookup.
 - Every signed entry has a typed `Actor` (`Analyst` or `Agent`) with event provenance stored separately. Policy receives `ExecutionMode`: unattended mode authorizes only local read queries. A `PendingApproval` binds case, sequence, and arguments, and resolving it requires verification of an analyst-key signature.
 - Use cases have no global state and are `Send + Sync`. File locks coordinate each case across processes; SQLite uses WAL for cases and audit, and each case has its own DuckDB graph. Unattended execution and the local gateway are not exposed as commands yet.
