@@ -152,6 +152,8 @@ Un caso sellado no admite nuevas entradas sin invalidar su sello. Las cancelacio
 
 Para confirmar `seal`, la aplicación prepara una entrada firmada y muestra su hash final real antes de escribirla. Tras la confirmación, comprueba que el caso, su manifiesto y la cabeza de la cadena siguen iguales; una vista previa obsoleta se rechaza. `Engine::seal` usa la misma preparación y ejecución, también desde la CLI. Decisión: 2026-10-25.
 
+La preparación del sello puede verificar evidencias grandes. La TUI la ejecuta en un trabajador cancelable y solo muestra la confirmación cuando recibe una vista previa firmada válida; cancelar no añade la entrada de sello. Decisión: 2026-10-25.
+
 La exportación desde la TUI comprueba la cadena y las evidencias con `verify_cancelable` antes de crear el paquete, igual que la CLI. Una evidencia alterada impide crear el archivo de salida. Decisión: 2026-10-25.
 
 La primera ejecución de B3f reveló que Cargo inicia los tests de integración desde `crates/bin`, mientras el artefacto de CI se buscaba en la raíz del workspace. La ruta del fixture portable se fija con `GITHUB_WORKSPACE` para que Linux y Windows publiquen el archivo que verifican los otros sistemas. Corrección: 2026-10-25.

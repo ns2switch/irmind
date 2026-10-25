@@ -1,10 +1,9 @@
 use crate::{WorkspaceIo, workflow::CaseWorkflow};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use irmind_app::{CancellationToken, CaseId, Engine, FindingKind, LlmPort, summarize_usage};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{
-    collections::BTreeMap,
     io,
     path::PathBuf,
     sync::mpsc,
@@ -17,19 +16,9 @@ mod picker;
 mod view;
 pub(crate) use confirmation::escape_display;
 use confirmation::{Confirmation, confirmation_summary, seal_confirmation};
-use operation::cancelled_operation;
+use operation::{ActiveTask, cancelled_operation, parse_approval_args};
 use picker::PathPicker;
 pub(crate) use view::{CaseFrame, draw_case};
-
-type ActiveTask<'scope> = (
-    CancellationToken,
-    std::thread::ScopedJoinHandle<'scope, Result<String, irmind_app::AppError>>,
-    &'static str,
-);
-
-fn parse_approval_args(value: &str) -> Result<BTreeMap<String, String>> {
-    serde_json::from_str(value).context("approval arguments must be a JSON object of strings")
-}
 
 pub(crate) fn run_case(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
@@ -56,6 +45,7 @@ pub(crate) fn run_case(
     let mut confirmation: Option<Confirmation> = None;
     let mut confirmed_action: Option<Confirmation> = None;
     let (progress_tx, progress_rx) = mpsc::channel::<String>();
+    let (seal_tx, seal_rx) = mpsc::channel::<irmind_app::SealPreview>();
     let workflow = CaseWorkflow {
         engine,
         model,
@@ -90,7 +80,16 @@ pub(crate) fn run_case(
                     .join()
                     .map_err(|_| anyhow::anyhow!("investigation thread panicked"))?
                 {
-                    Ok(text) => messages.push(format!("{label}: {text}")),
+                    Ok(text) => {
+                        if label == "Prepare seal" {
+                            let preview = seal_rx.try_recv().map_err(|_| {
+                                anyhow::anyhow!("signed seal preview was not delivered")
+                            })?;
+                            let summary = seal_confirmation(&preview);
+                            confirmation = Some(Confirmation::Seal(Box::new(preview), summary));
+                        }
+                        messages.push(format!("{label}: {text}"));
+                    }
                     Err(irmind_app::AppError::Cancelled) => {
                         engine.record_cancellation(id, cancelled_operation(label))?;
                         messages.push(format!("{label} cancelled and audited"));
@@ -532,9 +531,19 @@ pub(crate) fn run_case(
                                 });
                                 active = Some((cancel, task, "Seal"));
                             } else {
-                                let preview = workflow.prepare_seal(id)?;
-                                let summary = seal_confirmation(&preview);
-                                confirmation = Some(Confirmation::Seal(Box::new(preview), summary));
+                                let cancel = shutdown.child_token();
+                                let worker_cancel = cancel.clone();
+                                let sender = seal_tx.clone();
+                                let task = scope.spawn(move || {
+                                    let preview = workflow.prepare_seal(id, &worker_cancel)?;
+                                    sender.send(preview).map_err(|_| {
+                                        irmind_app::AppError::Storage(
+                                            "seal preview UI unavailable".into(),
+                                        )
+                                    })?;
+                                    Ok("review the signed preview".into())
+                                });
+                                active = Some((cancel, task, "Prepare seal"));
                             }
                         } else if prompt == "/export" || prompt.starts_with("/export ") {
                             let path = prompt.strip_prefix("/export ").map_or_else(

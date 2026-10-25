@@ -320,20 +320,24 @@ pub(crate) fn run_home(
             .map(|row| (row.id.clone(), row.status))
             .collect::<Vec<_>>();
         let worker_cancel = scan_cancel.clone();
-        let _scanner = scope.spawn(move || {
+        let scanner = scope.spawn(move || -> Result<()> {
             for (id, status) in rows {
                 if worker_cancel.is_cancelled() {
                     break;
                 }
-                let next = if engine.verify_cancelable(&id, &worker_cancel).is_ok() {
-                    status
-                } else {
-                    CaseStatus::Inconsistent
+                let next = match engine.verify_cancelable(&id, &worker_cancel) {
+                    Ok(_) => status,
+                    Err(irmind_app::AppError::Cancelled) => {
+                        engine.record_cancellation(&id, irmind_app::CancelledOperation::Verify)?;
+                        break;
+                    }
+                    Err(_) => CaseStatus::Inconsistent,
                 };
                 if tx.send((id, next)).is_err() {
                     break;
                 }
             }
+            Ok(())
         });
         loop {
             if shutdown.is_cancelled() {
@@ -514,6 +518,9 @@ pub(crate) fn run_home(
             }
         }
         scan_cancel.cancel();
+        scanner
+            .join()
+            .map_err(|_| anyhow::anyhow!("case verification worker failed"))??;
         Ok(())
     })
 }
