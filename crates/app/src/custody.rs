@@ -3,6 +3,9 @@ use crate::{
     SignedEntry, SignedOperation, hex, seal_challenge, sha256, summarize_usage,
     verify_case_metadata,
 };
+use crate::{SecretBackend, SignerBackend};
+use secrecy::ExposeSecret as _;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 pub fn verify_export(
@@ -55,11 +58,150 @@ impl SealPreview {
 }
 
 impl Engine<'_> {
+    pub fn migrate_signer_backend(
+        &self,
+        source: &dyn SignerBackend,
+        target: &dyn SignerBackend,
+    ) -> Result<(), AppError> {
+        self.require_attended_analyst("migrate signing key")?;
+        let old_key = source.public_key_for_actor(&Actor::Analyst)?;
+        if old_key != self.signer.public_key() || source.manifest().id == target.manifest().id {
+            return Err(AppError::Policy("invalid signing backend migration".into()));
+        }
+        let cases = self.repo.list_cases()?;
+        if cases.is_empty() {
+            return Err(AppError::Policy(
+                "create a case before migrating the keystore so the change can be signed".into(),
+            ));
+        }
+        for case in &cases {
+            self.verify(&case.id)?;
+        }
+        let mut actors = BTreeMap::from([(Actor::Analyst.as_storage(), Actor::Analyst)]);
+        for case in &cases {
+            for actor in self
+                .audit_log
+                .entries(&case.id)?
+                .into_iter()
+                .map(|entry| entry.actor)
+                .chain(
+                    self.audit_log
+                        .operations(&case.id)?
+                        .into_iter()
+                        .map(|entry| entry.actor),
+                )
+            {
+                actors.insert(actor.as_storage(), actor);
+            }
+        }
+        let mut ordered = vec![Actor::Analyst];
+        ordered.extend(
+            actors
+                .into_values()
+                .filter(|actor| *actor != Actor::Analyst),
+        );
+        for actor in ordered {
+            let original = source.public_key_for_actor(&actor)?;
+            match target.public_key_for_actor(&actor) {
+                Ok(existing) if existing == original => continue,
+                Ok(_) => {
+                    return Err(AppError::Signature(
+                        "destination has a different signing key".into(),
+                    ));
+                }
+                Err(_) => {}
+            }
+            let recipient = target.migration_recipient(&actor)?;
+            let packet = source.export_wrapped(&actor, &recipient)?;
+            target.import_wrapped(actor.clone(), &packet)?;
+            if target.public_key_for_actor(&actor)? != original {
+                return Err(AppError::Signature(
+                    "migrated signing fingerprint differs".into(),
+                ));
+            }
+        }
+        for case in cases {
+            self.record_keystore_migration(
+                &case.id,
+                "signer",
+                source.manifest().id,
+                target.manifest().id,
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn migrate_secret_backend(
+        &self,
+        source: &dyn SecretBackend,
+        target: &dyn SecretBackend,
+        fields: &[&str],
+    ) -> Result<(), AppError> {
+        self.require_attended_analyst("migrate module credentials")?;
+        if source.manifest().id == target.manifest().id {
+            return Err(AppError::Policy("invalid secret backend migration".into()));
+        }
+        let cases = self.repo.list_cases()?;
+        if cases.is_empty() {
+            return Err(AppError::Policy(
+                "create a case before migrating the keystore so the change can be signed".into(),
+            ));
+        }
+        for case in &cases {
+            self.verify(&case.id)?;
+        }
+        for field in fields {
+            match source.get(field) {
+                Ok(value) => {
+                    target.put(field, &value)?;
+                    if target.get(field)?.expose_secret() != value.expose_secret() {
+                        return Err(AppError::Storage(
+                            "migrated credential verification failed".into(),
+                        ));
+                    }
+                }
+                Err(AppError::SecretMissing) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        for case in cases {
+            self.record_keystore_migration(
+                &case.id,
+                "secrets",
+                source.manifest().id,
+                target.manifest().id,
+            )?;
+        }
+        Ok(())
+    }
+
     pub fn record_cancellation(
         &self,
         id: &CaseId,
         operation: CancelledOperation,
     ) -> Result<(), AppError> {
+        self.record_operational_event(id, operation.as_str())
+    }
+
+    pub fn record_keystore_migration(
+        &self,
+        id: &CaseId,
+        capability: &str,
+        from: &str,
+        to: &str,
+    ) -> Result<(), AppError> {
+        self.require_attended_analyst("migrate keystore")?;
+        if !matches!(capability, "signer" | "secrets")
+            || !matches!(from, "os" | "file")
+            || !matches!(to, "os" | "file")
+            || from == to
+        {
+            return Err(AppError::Policy("invalid keystore migration".into()));
+        }
+        self.record_operational_event(id, &format!("keystore-migration:{capability}:{from}:{to}"))
+    }
+
+    fn record_operational_event(&self, id: &CaseId, operation: &str) -> Result<(), AppError> {
         let _case_lock = self.repo.lock_case(id)?;
         self.repo.get_case(id)?;
         self.verify_operations_unlocked(id, &CancellationToken::new())?;
@@ -74,7 +216,7 @@ impl Engine<'_> {
             })?,
             at: self.clock.now()?,
             actor: self.signer.actor(),
-            operation: operation.as_str().into(),
+            operation: operation.into(),
             prev: last.map_or([0u8; 32], |previous| previous.hash),
             hash: [0u8; 32],
             sig: Vec::new(),

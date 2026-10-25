@@ -4,14 +4,14 @@ Cada proveedor es un crate compilado en el binario. Ninguno se habilita por defe
 
 ## Proveedores disponibles
 
-| Selección | Feature | Modelo (variable no secreta) | Clave (cuenta del llavero) | Protocolo |
+| Selección | Feature | Modelo (variable no secreta) | Clave (campo secreto del manifiesto) | Protocolo |
 | --- | --- | --- | --- | --- |
 | `llm-openai-compatible` | incluida | `IRMIND_MODEL` | `OPENAI_API_KEY` para la API oficial; `IRMIND_LLM_API_KEY` para otra URL | Chat Completions; URL opcional en `IRMIND_LLM_BASE_URL` |
 | `llm-anthropic` | `llm-anthropic` | `IRMIND_ANTHROPIC_MODEL` | `ANTHROPIC_API_KEY` | Messages |
 | `llm-deepseek` | `llm-deepseek` | `IRMIND_DEEPSEEK_MODEL` | `DEEPSEEK_API_KEY` | Chat Completions |
 | `llm-openrouter` | `llm-openrouter` | `IRMIND_OPENROUTER_MODEL` | `OPENROUTER_API_KEY` | Chat Completions |
 
-Las variables de la tabla sirven como nombres de configuración, no como vías para pasar secretos. La raíz de composición lee las claves del llavero del sistema con servicio `irmind-module` y cuenta igual al nombre indicado. Las credenciales nunca se leen de variables de entorno dentro de un módulo. En Linux se requiere un servicio de secretos persistente.
+Las variables de la tabla sirven como nombres de configuración, no como vías para pasar secretos. La raíz de composición lee las claves del backend de secretos elegido; introdúzcalas en la vista de llavero de la TUI. Si se elige `os`, usa el servicio `irmind-module` y la cuenta indicada. Las credenciales nunca se leen de variables de entorno dentro de un módulo. `file` permite trabajar por SSH sin sesión gráfica.
 
 ```bash
 cargo build --release --features llm-anthropic,llm-deepseek,llm-openrouter
@@ -23,7 +23,7 @@ IRMIND_ANTHROPIC_MODEL=<MODELO_APROBADO> ./target/release/irmind --llm-module ll
 ## Contrato para un proveedor nuevo
 
 1. Cree `crates/modules/llm-<nombre>/` con `#![forbid(unsafe_code)]`, edición y lints del workspace. Declare un `MODULE_ID` estable y un `ModuleManifest` con `ModulePort::Llm`, sin herramientas y con cada campo de configuración tipado como secreto o no secreto.
-2. Implemente un constructor `from_config(&ModuleConfig)` que valide el endpoint, modelo y credenciales inyectadas. La raíz de composición lee la configuración no secreta del entorno y los secretos del llavero. El módulo no consulta ni el entorno ni el llavero.
+2. Implemente un constructor `from_config(&ModuleConfig)` que valide el endpoint, modelo y credenciales inyectadas. La raíz de composición lee la configuración no secreta del entorno y los secretos del backend elegido. El módulo no consulta ni el entorno ni el almacén de secretos.
 3. Implemente `Module::register(self: Box<Self>, registry: &mut ModuleRegistry, config: &ModuleConfig) -> Result<(), AppError>` y registre el puerto con `registry.add_llm(MODULE_ID, self)`. `ModuleRegistry` valida el manifiesto y la configuración antes de llamar a `register`.
 4. Implemente el único método de `LlmPort`: `async fn complete(&self, request: CompletionRequest, cancel: &CancellationToken) -> Result<ModelStream, AppError>`. `CompletionRequest` contiene mensajes con rol, el catálogo de `ToolSpec` con JSON Schema, `max_output_tokens` y `remaining_case_tokens`. El adaptador traduce esos datos al protocolo remoto y emite `ModelEvent::Progress` y exactamente un `ModelEvent::Completed { response, usage }`.
 5. Reconstruya los fragmentos de tool calling antes de generar `ProposedCall`. Use `Tool::parse`, limite bytes y tiempo, rechace respuestas incompletas y no ejecute herramientas desde el adaptador. La aplicación vuelve a comprobar esquema, alcance y política. La cancelación debe cortar la lectura HTTP y producir `AppError::Cancelled`.

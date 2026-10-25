@@ -1,4 +1,6 @@
-use crate::{ModuleStatus, WorkspaceIo, case, workflow::CaseWorkflow};
+use crate::{
+    KeystoreStatus, ModuleStatus, WorkspaceIo, case, prompt_hidden, workflow::CaseWorkflow,
+};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use irmind_app::{CancellationToken, CaseId, Engine, LlmPort, hex, sha256};
@@ -11,6 +13,7 @@ use ratatui::{
     text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
 };
+use secrecy::ExposeSecret as _;
 use std::{
     io,
     sync::mpsc,
@@ -48,6 +51,7 @@ enum Mode {
     Search,
     New,
     Modules,
+    Keystore,
     Setup,
     VerifyExport,
 }
@@ -63,6 +67,11 @@ pub(crate) struct HomeState {
     verify_form: [String; 2],
     verify_field: usize,
     notice: String,
+    keystore: Option<KeystoreStatus>,
+    keystore_selected: usize,
+    confirm_credential_delete: bool,
+    pending_migration: Option<&'static str>,
+    restart_required: bool,
 }
 
 impl HomeState {
@@ -86,6 +95,11 @@ impl HomeState {
             verify_form: Default::default(),
             verify_field: 0,
             notice: String::new(),
+            keystore: None,
+            keystore_selected: 0,
+            confirm_credential_delete: false,
+            pending_migration: None,
+            restart_required: false,
         }
     }
 
@@ -150,6 +164,20 @@ pub(crate) fn load_rows(engine: &Engine<'_>) -> Result<Vec<CaseRow>> {
             .then_with(|| a.id.as_str().cmp(b.id.as_str()))
     });
     Ok(rows)
+}
+
+pub(crate) fn render_keystore_status<B: Backend>(
+    terminal: &mut Terminal<B>,
+    engine: &Engine<'_>,
+    status: KeystoreStatus,
+) -> Result<()>
+where
+    B::Error: std::error::Error + Send + Sync + 'static,
+{
+    let mut state = HomeState::new(Vec::new(), false);
+    state.mode = Mode::Keystore;
+    state.keystore = Some(status);
+    render_home(terminal, &state, engine, &[], None, false)
 }
 
 pub(crate) fn render_home<B: Backend>(
@@ -220,6 +248,32 @@ where
                 ))?))
             })
             .collect::<Result<Vec<_>>>()?,
+        Mode::Keystore => state.keystore.as_ref().map_or_else(Vec::new, |keystore| {
+            let mut items = vec![
+                ListItem::new(format!("Signer: {}", keystore.signer_backend)),
+                ListItem::new(format!("Secrets: {}", keystore.secrets_backend)),
+                ListItem::new(format!("Analyst key: {}", keystore.analyst_fingerprint)),
+            ];
+            items.extend(
+                keystore
+                    .credentials
+                    .iter()
+                    .enumerate()
+                    .map(|(index, item)| {
+                        ListItem::new(format!(
+                            "{} {}: {}",
+                            if index == state.keystore_selected {
+                                ">"
+                            } else {
+                                " "
+                            },
+                            item.name,
+                            if item.present { "stored" } else { "missing" }
+                        ))
+                    }),
+            );
+            items
+        }),
         Mode::VerifyExport => ["Package path", "Expected analyst key fingerprint"]
             .iter()
             .enumerate()
@@ -237,9 +291,9 @@ where
             .collect(),
         Mode::Setup => vec![
             ListItem::new(if new_analyst_key {
-                "Signing key: generated in the system keyring"
+                "Signing key: created"
             } else {
-                "Signing key: available in the system keyring"
+                "Signing key: available"
             }),
             ListItem::new(format!("Analyst public-key fingerprint: {fingerprint}")),
             ListItem::new("Save this fingerprint outside this computer before investigating."),
@@ -249,6 +303,7 @@ where
                 "LLM: none selected; investigation is disabled"
             }),
             ListItem::new("Press m to inspect compiled modules and missing configuration."),
+            ListItem::new("Press k to inspect the active keystore and credentials."),
             ListItem::new("Press n to create a case; no CLI setup is required."),
         ],
     };
@@ -256,6 +311,7 @@ where
         Mode::List | Mode::Search => " Cases ",
         Mode::New => " New case ",
         Mode::Modules => " Modules ",
+        Mode::Keystore => " Keystore ",
         Mode::Setup => " First-run guide ",
         Mode::VerifyExport => " Verify exported package ",
     };
@@ -270,10 +326,11 @@ where
         frame.render_widget(List::new(content).block(Block::default().title(header).borders(Borders::ALL)), areas[1]);
         frame.render_widget(Paragraph::new(info).block(Block::default().borders(Borders::ALL)).wrap(Wrap { trim: false }), areas[2]);
         let help = match state.mode {
-            Mode::List => "Enter open · n new · / search · f filter · v verify export · m modules · ? setup · q quit",
+            Mode::List => "Enter open · n new · / search · f filter · v verify export · m modules · k keystore · ? setup · q quit",
             Mode::Search => "Type to search · Enter apply · Esc cancel",
             Mode::New => "Tab next field · Enter create · Esc cancel · sources, accounts, hosts: comma-separated",
             Mode::Modules | Mode::Setup => "Esc back · n new case · m modules · q quit",
+            Mode::Keystore => if state.confirm_credential_delete { "Delete selected credential? y confirm · Esc cancel" } else if state.pending_migration.is_some() { "Copy to the other backend and sign the event? y confirm · Esc cancel" } else { "Up/Down select · a add/replace · d delete · p passphrase · s migrate signer · x migrate secrets · Esc" },
             Mode::VerifyExport => "Tab switch field · Enter verify · Esc back; expected key is mandatory",
         };
         frame.render_widget(Paragraph::new(Line::from(help)).style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)), areas[3]);
@@ -313,6 +370,8 @@ pub(crate) fn run_home(
     std::thread::scope(|scope| -> Result<()> {
         let mut verify_task: Option<std::thread::ScopedJoinHandle<'_, Result<String>>> = None;
         let mut verify_started: Option<Instant> = None;
+        let mut migration_task: Option<std::thread::ScopedJoinHandle<'_, Result<String>>> = None;
+        let mut migration_started: Option<Instant> = None;
         let scan_cancel = shutdown.child_token();
         let rows = state
             .rows
@@ -349,7 +408,10 @@ pub(crate) fn run_home(
                 && let Some(task) = verify_task.take()
             {
                 state.notice = match task.join() {
-                    Ok(Ok(message)) => message,
+                    Ok(Ok(message)) => {
+                        state.restart_required = true;
+                        message
+                    }
                     Ok(Err(_)) => {
                         "Export verification failed: check the package and expected key".into()
                     }
@@ -361,6 +423,25 @@ pub(crate) fn run_home(
             if let Some(started) = verify_started {
                 state.notice = format!(
                     "Verifying export · {}s elapsed",
+                    started.elapsed().as_secs()
+                );
+            }
+            if migration_task
+                .as_ref()
+                .is_some_and(std::thread::ScopedJoinHandle::is_finished)
+                && let Some(task) = migration_task.take()
+            {
+                state.notice = match task.join() {
+                    Ok(Ok(message)) => message,
+                    Ok(Err(error)) => format!("Keystore migration failed: {error}"),
+                    Err(_) => "Keystore migration worker failed".into(),
+                };
+                migration_started = None;
+                state.keystore = Some(io_ops.keystore_status()?);
+            }
+            if let Some(started) = migration_started {
+                state.notice = format!(
+                    "Migrating keystore · {}s elapsed",
                     started.elapsed().as_secs()
                 );
             }
@@ -383,6 +464,18 @@ pub(crate) fn run_home(
             let Event::Key(key) = event::read()? else {
                 continue;
             };
+            if migration_task.is_some() {
+                continue;
+            }
+            if state.restart_required
+                && matches!(state.mode, Mode::List | Mode::Setup | Mode::Modules)
+                && matches!(key.code, KeyCode::Enter | KeyCode::Char('n'))
+            {
+                state.notice =
+                    "Restart IRMind before opening a case so changed credentials take effect"
+                        .into();
+                continue;
+            }
             if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                 break;
             }
@@ -397,6 +490,11 @@ pub(crate) fn run_home(
                     KeyCode::Char('/') => state.mode = Mode::Search,
                     KeyCode::Char('f') => state.cycle_filter(),
                     KeyCode::Char('m') => state.mode = Mode::Modules,
+                    KeyCode::Char('k') => {
+                        state.keystore = Some(io_ops.keystore_status()?);
+                        state.keystore_selected = 0;
+                        state.mode = Mode::Keystore;
+                    }
                     KeyCode::Char('v') => {
                         state.verify_form = Default::default();
                         state.verify_field = 0;
@@ -508,6 +606,10 @@ pub(crate) fn run_home(
                 Mode::Modules | Mode::Setup => match key.code {
                     KeyCode::Esc => state.mode = Mode::List,
                     KeyCode::Char('m') => state.mode = Mode::Modules,
+                    KeyCode::Char('k') => {
+                        state.keystore = Some(io_ops.keystore_status()?);
+                        state.mode = Mode::Keystore;
+                    }
                     KeyCode::Char('n') => {
                         state.form = HomeState::new(Vec::new(), false).form;
                         state.mode = Mode::New;
@@ -515,6 +617,136 @@ pub(crate) fn run_home(
                     KeyCode::Char('q') => break,
                     _ => {}
                 },
+                Mode::Keystore => {
+                    if let Some(capability) = state.pending_migration {
+                        match key.code {
+                            KeyCode::Esc => state.pending_migration = None,
+                            KeyCode::Char('y') => {
+                                if let Some(status) = state.keystore.as_ref() {
+                                    let current = if capability == "signer" {
+                                        &status.signer_backend
+                                    } else {
+                                        &status.secrets_backend
+                                    };
+                                    let target = if current == "os" { "file" } else { "os" };
+                                    let needs_phrase =
+                                        target == "file" && !status.file_backend_active;
+                                    let phrase = if needs_phrase {
+                                        Some(prompt_hidden(
+                                            terminal,
+                                            "Target file keystore passphrase (input hidden): ",
+                                        )?)
+                                    } else {
+                                        None
+                                    };
+                                    migration_task = Some(scope.spawn(move || {
+                                        io_ops.migrate_keystore(engine, capability, target, phrase.as_ref())?;
+                                        Ok(format!("{capability} copied to {target}; restart IRMind to activate it"))
+                                    }));
+                                    migration_started = Some(Instant::now());
+                                }
+                                state.pending_migration = None;
+                            }
+                            _ => {}
+                        }
+                        continue;
+                    }
+                    if state.confirm_credential_delete {
+                        match key.code {
+                            KeyCode::Esc => state.confirm_credential_delete = false,
+                            KeyCode::Char('y') => {
+                                if let Some(name) = state
+                                    .keystore
+                                    .as_ref()
+                                    .and_then(|item| item.credentials.get(state.keystore_selected))
+                                    .map(|item| item.name.clone())
+                                {
+                                    state.restart_required = true;
+                                    state.notice = match io_ops.delete_credential(&name) {
+                                        Ok(()) => {
+                                            format!(
+                                                "Deleted {name}; restart IRMind to unload active connectors"
+                                            )
+                                        }
+                                        Err(error) => {
+                                            format!("Credential deletion failed: {error}")
+                                        }
+                                    };
+                                    state.keystore = Some(io_ops.keystore_status()?);
+                                }
+                                state.confirm_credential_delete = false;
+                            }
+                            _ => {}
+                        }
+                        continue;
+                    }
+                    match key.code {
+                        KeyCode::Esc => state.mode = Mode::List,
+                        KeyCode::Up => {
+                            state.keystore_selected = state.keystore_selected.saturating_sub(1);
+                        }
+                        KeyCode::Down => {
+                            let count = state
+                                .keystore
+                                .as_ref()
+                                .map_or(0, |item| item.credentials.len());
+                            state.keystore_selected =
+                                (state.keystore_selected + 1).min(count.saturating_sub(1));
+                        }
+                        KeyCode::Char('a') => {
+                            if let Some(name) = state
+                                .keystore
+                                .as_ref()
+                                .and_then(|item| item.credentials.get(state.keystore_selected))
+                                .map(|item| item.name.clone())
+                            {
+                                let value =
+                                    prompt_hidden(terminal, &format!("{name} (input hidden): "))?;
+                                state.restart_required = true;
+                                state.notice = match io_ops.put_credential(&name, &value) {
+                                    Ok(()) => {
+                                        format!(
+                                            "Saved {name}; restart IRMind to activate the change"
+                                        )
+                                    }
+                                    Err(error) => format!("Credential update failed: {error}"),
+                                };
+                                state.keystore = Some(io_ops.keystore_status()?);
+                            }
+                        }
+                        KeyCode::Char('d') => state.confirm_credential_delete = true,
+                        KeyCode::Char('s') => {
+                            state.pending_migration = Some("signer");
+                            state.notice = "Copy the analyst key to the other backend; its fingerprint must remain unchanged".into();
+                        }
+                        KeyCode::Char('x') => {
+                            state.pending_migration = Some("secrets");
+                            state.notice = "Copy module credentials to the other backend; source credentials remain".into();
+                        }
+                        KeyCode::Char('p')
+                            if state
+                                .keystore
+                                .as_ref()
+                                .is_some_and(|item| item.file_backend_active) =>
+                        {
+                            let value = prompt_hidden(
+                                terminal,
+                                "New file keystore passphrase (input hidden): ",
+                            )?;
+                            let repeated =
+                                prompt_hidden(terminal, "Repeat new passphrase (input hidden): ")?;
+                            state.notice = if value.expose_secret() == repeated.expose_secret() {
+                                match io_ops.change_keystore_passphrase(&value) {
+                                    Ok(()) => "File keystore passphrase changed".into(),
+                                    Err(error) => format!("Passphrase change failed: {error}"),
+                                }
+                            } else {
+                                "Passphrases differ; the keystore was not changed".into()
+                            };
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
         scan_cancel.cancel();
@@ -536,7 +768,7 @@ pub(crate) fn show_startup_error(
     loop {
         terminal.draw(|frame| {
             let block = Block::default().title(" IRMind startup blocked ").borders(Borders::ALL);
-            frame.render_widget(Paragraph::new(format!("The system keyring or local storage is unavailable.\n\n{visible}\n\nNo investigation can start. Press q or Esc to exit.")).block(block).wrap(Wrap { trim: false }), frame.area());
+            frame.render_widget(Paragraph::new(format!("The selected keystore or local storage is unavailable.\n\n{visible}\n\nNo investigation can start. Press q or Esc to exit.")).block(block).wrap(Wrap { trim: false }), frame.area());
         })?;
         if let Event::Key(key) = event::read()?
             && matches!(key.code, KeyCode::Esc | KeyCode::Char('q') | KeyCode::Enter)

@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 
+#[cfg(not(any(feature = "keystore-os", feature = "keystore-file")))]
+compile_error!("IRMind requires at least one signer and secret backend");
+
 mod cli;
+mod keystore;
 use cli::{
     Cli, Command, audit_source_name, input_files, read_evidence, terminal_safe_path,
     write_private_output,
@@ -10,18 +14,20 @@ use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use irmind_app::{
-    AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph, EvidenceStore,
-    FindingKind, ModelPricing, Repository, Signer,
+    AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,
+    EvidenceStore, FindingKind, ModelPricing, Repository, SecretBackend, SignerBackend,
     modules::{ModuleConfig, ModuleManifest, ModuleRegistry},
 };
-use irmind_domain::{Actor, CaseId, ExecutionMode, PolicyRules, Severity, Tool};
-use irmind_infra::{LocalExportVerifier, LocalSigner, LocalStore, LocalVerifier, SystemClock};
+use irmind_domain::{CaseId, ExecutionMode, PolicyRules, Severity, Tool};
+use irmind_infra::{LocalExportVerifier, LocalStore, LocalVerifier, SystemClock};
 #[cfg(feature = "cloud-aws")]
 use irmind_mod_cloud_aws::AwsCloudTrail;
 #[cfg(feature = "edr-crowdstrike")]
 use irmind_mod_edr_crowdstrike::CrowdStrike;
 #[cfg(feature = "edr-sentinelone")]
 use irmind_mod_edr_sentinelone::SentinelOne;
+#[cfg(feature = "keystore-os")]
+use irmind_mod_keystore_os::OsKeystore;
 #[cfg(feature = "llm-anthropic")]
 use irmind_mod_llm_anthropic::Anthropic;
 #[cfg(feature = "llm-deepseek")]
@@ -37,8 +43,8 @@ use irmind_mod_ti_misp::Misp;
 #[cfg(feature = "ti-virustotal")]
 use irmind_mod_ti_virustotal::VirusTotal;
 use irmind_security::MandatoryGuard;
-use irmind_tui::{ModuleStatus, WorkspaceIo};
-use secrecy::SecretString;
+use irmind_tui::{CredentialStatus, KeystoreStatus, ModuleStatus, WorkspaceIo};
+use secrecy::{ExposeSecret as _, SecretString};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 use std::fs::OpenOptions;
@@ -46,16 +52,22 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-fn load_module_config(manifest: &ModuleManifest) -> Result<ModuleConfig> {
+fn load_module_config(
+    manifest: &ModuleManifest,
+    secrets: &dyn SecretBackend,
+) -> Result<ModuleConfig> {
     let mut config = ModuleConfig::new();
     for field in manifest.config {
         if field.secret {
-            let entry = keyring::Entry::new("irmind-module", field.name)
-                .with_context(|| format!("open keyring entry {}", field.name))?;
-            match entry.get_password() {
-                Ok(value) => config.insert_secret(field.name, SecretString::from(value)),
-                Err(keyring::Error::NoEntry) if !field.required => {}
-                Err(error) => return Err(anyhow!("keyring entry {}: {error}", field.name)),
+            match secrets.get(field.name) {
+                Ok(value) => config.insert_secret(field.name, value),
+                Err(AppError::SecretMissing) if !field.required => {}
+                Err(_) => {
+                    return Err(anyhow!(
+                        "required module secret {} is unavailable",
+                        field.name
+                    ));
+                }
             }
         } else {
             match std::env::var(field.name) {
@@ -68,16 +80,14 @@ fn load_module_config(manifest: &ModuleManifest) -> Result<ModuleConfig> {
     Ok(config)
 }
 
-fn configuration_issue(manifest: &ModuleManifest) -> String {
+fn configuration_issue(manifest: &ModuleManifest, secrets: &dyn SecretBackend) -> String {
     let missing = manifest
         .config
         .iter()
         .filter(|field| field.required)
         .filter(|field| {
             if field.secret {
-                keyring::Entry::new("irmind-module", field.name)
-                    .and_then(|entry| entry.get_password())
-                    .is_err()
+                secrets.get(field.name).is_err()
             } else {
                 std::env::var(field.name).is_err()
             }
@@ -92,15 +102,15 @@ fn configuration_issue(manifest: &ModuleManifest) -> String {
 }
 
 macro_rules! register_configured {
-    ($registry:expr, $module:ty, $manifest:expr, $interactive:expr, $issues:expr) => {{
+    ($registry:expr, $module:ty, $manifest:expr, $secrets:expr, $interactive:expr, $issues:expr) => {{
         let outcome = (|| -> Result<()> {
-            let config = load_module_config(&$manifest)?;
+            let config = load_module_config(&$manifest, $secrets)?;
             $registry.register(Box::new(<$module>::from_config(&config)?), &config)?;
             Ok(())
         })();
         if let Err(error) = outcome {
             if $interactive {
-                $issues.insert($manifest.id, configuration_issue(&$manifest));
+                $issues.insert($manifest.id, configuration_issue(&$manifest, $secrets));
             } else {
                 return Err(error);
             }
@@ -168,7 +178,52 @@ fn load_pricing() -> Result<Option<ModelPricing>> {
 }
 
 struct RootWorkspaceIo {
+    home: PathBuf,
+    credential_fields: Vec<&'static str>,
     store: Arc<LocalStore>,
+    signer_backend: Arc<dyn SignerBackend>,
+    secret_backend: Arc<dyn SecretBackend>,
+    signer_id: String,
+    secrets_id: String,
+    #[cfg(feature = "keystore-file")]
+    file_backend: Option<Arc<irmind_mod_keystore_file::FileKeystore>>,
+}
+
+fn compiled_credential_fields() -> Vec<&'static str> {
+    let mut fields = Vec::new();
+    macro_rules! collect {
+        ($manifest:expr) => {
+            fields.extend(
+                $manifest
+                    .config
+                    .iter()
+                    .filter(|field| field.secret)
+                    .map(|field| field.name),
+            );
+        };
+    }
+    collect!(irmind_mod_llm_openai_compatible::MANIFEST);
+    #[cfg(feature = "llm-anthropic")]
+    collect!(irmind_mod_llm_anthropic::MANIFEST);
+    #[cfg(feature = "llm-deepseek")]
+    collect!(irmind_mod_llm_deepseek::MANIFEST);
+    #[cfg(feature = "llm-openrouter")]
+    collect!(irmind_mod_llm_openrouter::MANIFEST);
+    #[cfg(feature = "siem-splunk")]
+    collect!(irmind_mod_siem_splunk::MANIFEST);
+    #[cfg(feature = "cloud-aws")]
+    collect!(irmind_mod_cloud_aws::MANIFEST);
+    #[cfg(feature = "edr-crowdstrike")]
+    collect!(irmind_mod_edr_crowdstrike::MANIFEST);
+    #[cfg(feature = "edr-sentinelone")]
+    collect!(irmind_mod_edr_sentinelone::MANIFEST);
+    #[cfg(feature = "ti-misp")]
+    collect!(irmind_mod_ti_misp::MANIFEST);
+    #[cfg(feature = "ti-virustotal")]
+    collect!(irmind_mod_ti_virustotal::MANIFEST);
+    fields.sort_unstable();
+    fields.dedup();
+    fields
 }
 
 impl WorkspaceIo for RootWorkspaceIo {
@@ -194,12 +249,130 @@ impl WorkspaceIo for RootWorkspaceIo {
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter {
         self.store.as_ref()
     }
+    fn keystore_status(&self) -> Result<KeystoreStatus> {
+        let credentials = self
+            .credential_fields
+            .iter()
+            .map(|name| {
+                let present = match self.secret_backend.get(name) {
+                    Ok(_) => true,
+                    Err(AppError::SecretMissing) => false,
+                    Err(error) => return Err(error.into()),
+                };
+                Ok(CredentialStatus {
+                    name: (*name).into(),
+                    present,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let key = self
+            .signer_backend
+            .public_key_for_actor(&irmind_domain::Actor::Analyst)?;
+        Ok(KeystoreStatus {
+            signer_backend: self.signer_id.clone(),
+            secrets_backend: self.secrets_id.clone(),
+            analyst_fingerprint: irmind_app::hex(&irmind_app::sha256(&key)),
+            credentials,
+            file_backend_active: self.signer_id == "file" || self.secrets_id == "file",
+        })
+    }
+    fn put_credential(&self, name: &str, value: &SecretString) -> Result<()> {
+        if !self.credential_fields.contains(&name) {
+            return Err(anyhow!("unknown module credential field"));
+        }
+        self.secret_backend.put(name, value)?;
+        if self.secret_backend.get(name)?.expose_secret() != value.expose_secret() {
+            return Err(anyhow!("credential write verification failed"));
+        }
+        Ok(())
+    }
+    fn delete_credential(&self, name: &str) -> Result<()> {
+        if !self.credential_fields.contains(&name) {
+            return Err(anyhow!("unknown module credential field"));
+        }
+        self.secret_backend.delete(name)?;
+        match self.secret_backend.get(name) {
+            Err(AppError::SecretMissing) => Ok(()),
+            _ => Err(anyhow!("credential deletion verification failed")),
+        }
+    }
+    fn change_keystore_passphrase(&self, value: &SecretString) -> Result<()> {
+        #[cfg(feature = "keystore-file")]
+        if let Some(file) = &self.file_backend {
+            return file.change_passphrase(value).map_err(Into::into);
+        }
+        let _ = value;
+        Err(anyhow!("the encrypted file backend is not active"))
+    }
+    fn migrate_keystore(
+        &self,
+        engine: &Engine<'_>,
+        capability: &str,
+        target: &str,
+        passphrase: Option<&SecretString>,
+    ) -> Result<()> {
+        #[cfg(not(feature = "keystore-file"))]
+        let _ = passphrase;
+        let current = match capability {
+            "signer" => self.signer_id.as_str(),
+            "secrets" => self.secrets_id.as_str(),
+            _ => return Err(anyhow!("invalid keystore capability")),
+        };
+        if current == target {
+            return Err(anyhow!("target backend is already active"));
+        }
+        if engine.repo.list_cases()?.is_empty() {
+            return Err(anyhow!(
+                "create a case before migration so the change can be signed"
+            ));
+        }
+        let (target_signer, target_secrets): (Arc<dyn SignerBackend>, Arc<dyn SecretBackend>) =
+            match target {
+                #[cfg(feature = "keystore-os")]
+                "os" => {
+                    let backend = Arc::new(OsKeystore::probe()?);
+                    (backend.clone(), backend)
+                }
+                #[cfg(feature = "keystore-file")]
+                "file" => {
+                    let backend = match &self.file_backend {
+                        Some(backend) => backend.clone(),
+                        None => Arc::new(irmind_mod_keystore_file::FileKeystore::open(
+                            &self.home,
+                            passphrase
+                                .ok_or_else(|| anyhow!("file keystore passphrase required"))?,
+                            true,
+                        )?),
+                    };
+                    (backend.clone(), backend)
+                }
+                _ => return Err(anyhow!("target keystore backend was not compiled")),
+            };
+        match capability {
+            "signer" => engine
+                .migrate_signer_backend(self.signer_backend.as_ref(), target_signer.as_ref())?,
+            "secrets" => engine.migrate_secret_backend(
+                self.secret_backend.as_ref(),
+                target_secrets.as_ref(),
+                &self.credential_fields,
+            )?,
+            _ => return Err(anyhow!("invalid keystore capability")),
+        }
+        let fingerprint = irmind_app::hex(&irmind_app::sha256(
+            &self
+                .signer_backend
+                .public_key_for_actor(&irmind_domain::Actor::Analyst)?,
+        ));
+        keystore::select_migrated_backend(&self.home, capability, target, &fingerprint)?;
+        Ok(())
+    }
 }
 
 fn module_statuses(
     cli: &Cli,
     registry: &ModuleRegistry,
     issues: &BTreeMap<&'static str, String>,
+    keystore: &RootWorkspaceIo,
 ) -> Vec<ModuleStatus> {
     let mut out = vec![ModuleStatus {
         id: "parser-json".into(),
@@ -207,6 +380,20 @@ fn module_statuses(
         enabled: true,
         configuration: "valid; built-in parser".into(),
     }];
+    for (id, compiled) in [
+        ("keystore-os", cfg!(feature = "keystore-os")),
+        ("keystore-file", cfg!(feature = "keystore-file")),
+    ] {
+        let backend = id.strip_prefix("keystore-").unwrap_or(id);
+        let signer = keystore.signer_id == backend;
+        let secrets = keystore.secrets_id == backend;
+        out.push(ModuleStatus {
+            id: id.into(),
+            compiled,
+            enabled: signer || secrets,
+            configuration: format!("signer={signer}, secrets={secrets}"),
+        });
+    }
     macro_rules! status {
         ($id:expr, $compiled:expr, $requested:expr) => {{
             let enabled = registry.manifest($id).is_some();
@@ -221,7 +408,7 @@ fn module_statuses(
                 } else if !$compiled {
                     "not compiled".into()
                 } else if $requested {
-                    "invalid configuration; check required settings and keyring".into()
+                    "invalid configuration; check required settings and keystore".into()
                 } else {
                     "disabled".into()
                 },
@@ -313,19 +500,26 @@ fn main() -> Result<()> {
             return Err(error.into());
         }
     });
-    let new_analyst_key =
-        interactive && LocalSigner::public_key_for_actor(&Actor::Analyst).is_err();
-    let signer = Arc::new(match LocalSigner::load_or_create(Actor::Analyst) {
-        Ok(signer) => signer,
+    let active = match keystore::load_or_configure(
+        &home,
+        cli.passphrase_fd,
+        interactive,
+        !store.list_cases()?.is_empty(),
+    ) {
+        Ok(active) => active,
         Err(error) => {
             if interactive {
                 let _ = irmind_tui::show_startup_error(
-                    "The system keyring is unavailable. Configure the native keyring and restart IRMind.",
+                    "The selected keystore cannot be unlocked or configured. No investigation can start.",
                 );
             }
-            return Err(error).context("load analyst signing key from system keyring");
+            return Err(error);
         }
-    });
+    };
+    let new_analyst_key = interactive && active.new_analyst_key;
+    let signer = active.signer;
+    let secrets = active.secret_backend;
+    let signer_backend = active.signer_backend;
     let mut verifier = LocalVerifier::from_signer(signer.as_ref());
     for case in store.list_cases()? {
         let actors = store
@@ -342,7 +536,8 @@ fn main() -> Result<()> {
             if actor == signer.actor() {
                 continue;
             }
-            let key = LocalSigner::public_key_for_actor(&actor)
+            let key = signer_backend
+                .public_key_for_actor(&actor)
                 .with_context(|| format!("load trusted public key for {}", actor.as_storage()))?;
             verifier = verifier.with_trusted_key(&actor, &key)?;
         }
@@ -361,6 +556,7 @@ fn main() -> Result<()> {
                 registry,
                 OpenAiCompatible,
                 irmind_mod_llm_openai_compatible::MANIFEST,
+                secrets.as_ref(),
                 interactive,
                 config_issues
             ),
@@ -370,6 +566,7 @@ fn main() -> Result<()> {
                     registry,
                     Anthropic,
                     irmind_mod_llm_anthropic::MANIFEST,
+                    secrets.as_ref(),
                     interactive,
                     config_issues
                 );
@@ -380,6 +577,7 @@ fn main() -> Result<()> {
                     registry,
                     DeepSeek,
                     irmind_mod_llm_deepseek::MANIFEST,
+                    secrets.as_ref(),
                     interactive,
                     config_issues
                 );
@@ -390,6 +588,7 @@ fn main() -> Result<()> {
                     registry,
                     OpenRouter,
                     irmind_mod_llm_openrouter::MANIFEST,
+                    secrets.as_ref(),
                     interactive,
                     config_issues
                 );
@@ -404,6 +603,7 @@ fn main() -> Result<()> {
             registry,
             Splunk,
             irmind_mod_siem_splunk::MANIFEST,
+            secrets.as_ref(),
             interactive,
             config_issues
         );
@@ -420,6 +620,7 @@ fn main() -> Result<()> {
             registry,
             Misp,
             irmind_mod_ti_misp::MANIFEST,
+            secrets.as_ref(),
             interactive,
             config_issues
         );
@@ -434,6 +635,7 @@ fn main() -> Result<()> {
             registry,
             AwsCloudTrail,
             irmind_mod_cloud_aws::MANIFEST,
+            secrets.as_ref(),
             interactive,
             config_issues
         );
@@ -450,6 +652,7 @@ fn main() -> Result<()> {
             registry,
             CrowdStrike,
             irmind_mod_edr_crowdstrike::MANIFEST,
+            secrets.as_ref(),
             interactive,
             config_issues
         );
@@ -466,6 +669,7 @@ fn main() -> Result<()> {
             registry,
             SentinelOne,
             irmind_mod_edr_sentinelone::MANIFEST,
+            secrets.as_ref(),
             interactive,
             config_issues
         );
@@ -482,6 +686,7 @@ fn main() -> Result<()> {
             registry,
             VirusTotal,
             irmind_mod_ti_virustotal::MANIFEST,
+            secrets.as_ref(),
             interactive,
             config_issues
         );
@@ -513,9 +718,17 @@ fn main() -> Result<()> {
         engine = engine.with_pricing(pricing);
     }
     let workspace_io = RootWorkspaceIo {
+        home: home.clone(),
+        credential_fields: compiled_credential_fields(),
         store: store.clone(),
+        signer_backend,
+        secret_backend: secrets.clone(),
+        signer_id: active.signer_id,
+        secrets_id: active.secrets_id,
+        #[cfg(feature = "keystore-file")]
+        file_backend: active.file_backend,
     };
-    let module_statuses = module_statuses(&cli, &registry, &config_issues);
+    let module_statuses = module_statuses(&cli, &registry, &config_issues, &workspace_io);
     let selected_model = match cli.llm_module.as_deref() {
         Some(id) if interactive => registry.llm(id).ok(),
         Some(id) => Some(registry.llm(id)?),

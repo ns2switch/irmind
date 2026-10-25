@@ -13,6 +13,7 @@ mod sqlite;
 mod windows_security;
 pub use clock::SystemClock;
 pub use private_fs::private_file;
+pub use seal::{durable_rename, durable_replace, sync_directory};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use ed25519_dalek::{Signature, Signer as _, SigningKey, VerifyingKey};

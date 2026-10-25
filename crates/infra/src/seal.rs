@@ -2,7 +2,7 @@ use crate::*;
 
 pub(crate) const MAX_EXPORT_BYTES: usize = 128 * 1024 * 1024;
 
-pub(crate) fn sync_directory(path: &Path) -> Result<(), AppError> {
+pub fn sync_directory(path: &Path) -> Result<(), AppError> {
     #[cfg(windows)]
     {
         // The Windows rename uses MOVEFILE_WRITE_THROUGH; directory fsync is not exposed.
@@ -18,10 +18,21 @@ pub(crate) fn sync_directory(path: &Path) -> Result<(), AppError> {
     }
 }
 
-pub(crate) fn durable_rename(source: &Path, destination: &Path) -> Result<(), AppError> {
+pub fn durable_rename(source: &Path, destination: &Path) -> Result<(), AppError> {
     #[cfg(windows)]
     {
         windows_security::durable_rename(source, destination).map_err(storage)
+    }
+    #[cfg(not(windows))]
+    {
+        fs::rename(source, destination).map_err(storage)
+    }
+}
+
+pub fn durable_replace(source: &Path, destination: &Path) -> Result<(), AppError> {
+    #[cfg(windows)]
+    {
+        windows_security::durable_replace(source, destination).map_err(storage)
     }
     #[cfg(not(windows))]
     {

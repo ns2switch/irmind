@@ -3,18 +3,27 @@
 
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
-    AppError, CancellationToken, CaseLock, CaseSeal, CompletionRequest, CryptoPorts, Engine,
-    EnginePorts, EvidenceStore, LlmPort, ModelResponse, ModelStream, Repository, Signer,
+    AppError, AuditLog, CancellationToken, CaseLock, CaseSeal, CompletionRequest, CryptoPorts,
+    Engine, EnginePorts, EvidenceStore, LlmPort, ModelResponse, ModelStream, Repository, Signer,
     ThreatIntelPort, single_completion_stream,
 };
+#[cfg(feature = "keystore-file")]
+use irmind_app::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
 use irmind_domain::{
     Actor, AuthorizedCall, Case, CaseId, ExecutionMode, ProposedCall, Severity, Tool,
 };
 use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
+#[cfg(feature = "keystore-file")]
+use irmind_mod_keystore_file::FileKeystore;
 use irmind_mod_parser_json::JsonParser;
 use irmind_security::MandatoryGuard;
-use irmind_tui::{WorkspaceIo, scripted::ScriptedWorkspace};
+use irmind_tui::{
+    WorkspaceIo,
+    scripted::{ScriptedWorkspace, render_keystore_setup},
+};
 use ratatui::{Terminal, backend::TestBackend};
+#[cfg(feature = "keystore-file")]
+use secrecy::{ExposeSecret as _, SecretString};
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -110,6 +119,60 @@ impl ThreatIntelPort for FakeIntel {
 
 struct TestIo(Arc<LocalStore>);
 
+#[cfg(feature = "keystore-file")]
+struct MigrationTarget(FileKeystore);
+
+#[cfg(feature = "keystore-file")]
+static MIGRATION_MANIFEST: KeystoreManifest = KeystoreManifest {
+    id: "os",
+    capabilities: &[KeystoreCapability::Signer, KeystoreCapability::Secrets],
+    interactive_unlock: false,
+    headless: true,
+    network: false,
+    config_fields: &[],
+};
+
+#[cfg(feature = "keystore-file")]
+impl SignerBackend for MigrationTarget {
+    fn manifest(&self) -> &'static KeystoreManifest {
+        &MIGRATION_MANIFEST
+    }
+    fn load(&self, actor: Actor) -> Result<Arc<dyn Signer>, AppError> {
+        self.0.load(actor)
+    }
+    fn create(&self, actor: Actor) -> Result<Arc<dyn Signer>, AppError> {
+        self.0.create(actor)
+    }
+    fn public_key_for_actor(&self, actor: &Actor) -> Result<Vec<u8>, AppError> {
+        self.0.public_key_for_actor(actor)
+    }
+    fn migration_recipient(&self, actor: &Actor) -> Result<[u8; 32], AppError> {
+        self.0.migration_recipient(actor)
+    }
+    fn export_wrapped(&self, actor: &Actor, recipient: &[u8; 32]) -> Result<Vec<u8>, AppError> {
+        self.0.export_wrapped(actor, recipient)
+    }
+    fn import_wrapped(&self, actor: Actor, packet: &[u8]) -> Result<(), AppError> {
+        self.0.import_wrapped(actor, packet)
+    }
+}
+
+#[cfg(feature = "keystore-file")]
+impl SecretBackend for MigrationTarget {
+    fn manifest(&self) -> &'static KeystoreManifest {
+        &MIGRATION_MANIFEST
+    }
+    fn get(&self, name: &str) -> Result<SecretString, AppError> {
+        self.0.get(name)
+    }
+    fn put(&self, name: &str, value: &SecretString) -> Result<(), AppError> {
+        self.0.put(name, value)
+    }
+    fn delete(&self, name: &str) -> Result<(), AppError> {
+        self.0.delete(name)
+    }
+}
+
 impl WorkspaceIo for TestIo {
     fn input_files(&self, root: &Path) -> anyhow::Result<Vec<PathBuf>> {
         Ok(vec![root.to_path_buf()])
@@ -136,6 +199,33 @@ impl WorkspaceIo for TestIo {
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter {
         self.0.as_ref()
     }
+    fn keystore_status(&self) -> anyhow::Result<irmind_tui::KeystoreStatus> {
+        Ok(irmind_tui::KeystoreStatus {
+            signer_backend: "file".into(),
+            secrets_backend: "file".into(),
+            analyst_fingerprint: "synthetic".into(),
+            credentials: Vec::new(),
+            file_backend_active: true,
+        })
+    }
+    fn put_credential(&self, _name: &str, _value: &secrecy::SecretString) -> anyhow::Result<()> {
+        Ok(())
+    }
+    fn delete_credential(&self, _name: &str) -> anyhow::Result<()> {
+        Ok(())
+    }
+    fn change_keystore_passphrase(&self, _value: &secrecy::SecretString) -> anyhow::Result<()> {
+        Ok(())
+    }
+    fn migrate_keystore(
+        &self,
+        _engine: &Engine<'_>,
+        _capability: &str,
+        _target: &str,
+        _passphrase: Option<&secrecy::SecretString>,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 fn screen(terminal: &Terminal<TestBackend>) -> String {
@@ -148,11 +238,22 @@ fn screen(terminal: &Terminal<TestBackend>) -> String {
         .collect::<String>()
 }
 
+#[cfg(feature = "keystore-file")]
 #[test]
-fn complete_case_from_tui_controller_with_test_backend_and_fakes() {
+fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
     let root = tempfile::tempdir().unwrap();
+    let mut setup_terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    let choice = render_keystore_setup(&mut setup_terminal, false).unwrap();
+    assert_eq!((choice.signer, choice.secrets), ("file", "file"));
+    assert!(screen(&setup_terminal).contains("OS keyring: unavailable"));
     let store = Arc::new(LocalStore::open(root.path()).unwrap());
-    let signer = Arc::new(TestSigner(SigningKey::from_bytes(&[119u8; 32])));
+    let file_backend = FileKeystore::open(
+        root.path(),
+        &SecretString::from("synthetic TUI passphrase".to_owned()),
+        true,
+    )
+    .unwrap();
+    let signer = file_backend.create(Actor::Analyst).unwrap();
     let intel = FakeIntel;
     let model = FakeModel(AtomicUsize::new(0));
     let engine = Engine::new(
@@ -179,6 +280,8 @@ fn complete_case_from_tui_controller_with_test_backend_and_fakes() {
 
     tui.render_home().unwrap();
     assert!(screen(tui.terminal()).contains("IRMind"));
+    tui.render_keystore().unwrap();
+    assert!(screen(tui.terminal()).contains("Signer: file"));
     let id = tui.create_case("Synthetic incident", Severity::High,
         "v1;sources=siem-a;accounts=acct-a;hosts=;from=2026-10-23T10:00:00Z;to=2026-10-23T11:00:00Z").unwrap();
     tui.render_case(&id, "Case opened").unwrap();
@@ -191,6 +294,54 @@ fn complete_case_from_tui_controller_with_test_backend_and_fakes() {
     let pending = tui.pending_approval_ids(&id).unwrap();
     assert_eq!(pending.len(), 1);
     tui.approve(&id, &pending[0]).unwrap();
+    let migration_home = tempfile::tempdir().unwrap();
+    let migration_target = MigrationTarget(
+        FileKeystore::open(
+            migration_home.path(),
+            &SecretString::from("second synthetic passphrase".to_owned()),
+            true,
+        )
+        .unwrap(),
+    );
+    engine
+        .migrate_signer_backend(&file_backend, &migration_target)
+        .unwrap();
+    assert_eq!(
+        migration_target
+            .public_key_for_actor(&Actor::Analyst)
+            .unwrap(),
+        signer.public_key()
+    );
+    file_backend
+        .put(
+            "SYNTHETIC_API_KEY",
+            &SecretString::from("synthetic credential".to_owned()),
+        )
+        .unwrap();
+    engine
+        .migrate_secret_backend(&file_backend, &migration_target, &["SYNTHETIC_API_KEY"])
+        .unwrap();
+    assert_eq!(
+        migration_target
+            .get("SYNTHETIC_API_KEY")
+            .unwrap()
+            .expose_secret(),
+        "synthetic credential"
+    );
+    assert!(
+        store
+            .operations(&id)
+            .unwrap()
+            .iter()
+            .any(|entry| entry.operation.contains("keystore-migration:signer"))
+    );
+    assert!(
+        store
+            .operations(&id)
+            .unwrap()
+            .iter()
+            .any(|entry| entry.operation.contains("keystore-migration:secrets"))
+    );
     assert!(tui.verify(&id).unwrap() > 0);
     tui.seal(&id).unwrap();
     let export = root.path().join("synthetic.irmind.json");

@@ -320,3 +320,21 @@ pub(crate) fn durable_rename(source: &Path, destination: &Path) -> io::Result<()
     }
     Ok(())
 }
+
+pub(crate) fn durable_replace(source: &Path, destination: &Path) -> io::Result<()> {
+    let source = wide_path(source);
+    let destination = wide_path(destination);
+    // SAFETY: both paths are terminated and live; replacement is confined to the caller's private directory.
+    if unsafe {
+        MoveFileExW(
+            source.as_ptr(),
+            destination.as_ptr(),
+            windows_sys::Win32::Storage::FileSystem::MOVEFILE_REPLACE_EXISTING
+                | MOVEFILE_WRITE_THROUGH,
+        )
+    } == 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
+}

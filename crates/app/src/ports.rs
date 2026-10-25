@@ -3,6 +3,8 @@ use std::path::Path;
 
 #[derive(Debug, Error)]
 pub enum AppError {
+    #[error("module secret not found")]
+    SecretMissing,
     #[error("operation cancelled")]
     Cancelled,
     #[error("remote tool execution failed")]

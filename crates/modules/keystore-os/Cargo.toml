@@ -1,0 +1,32 @@
+[package]
+name = "irmind-mod-keystore-os"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+default = ["persistent-keyring"]
+persistent-keyring = ["keyring/linux-native-sync-persistent", "keyring/crypto-rust"]
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+irmind-keystore-transfer = { path = "../../keystore-transfer", version = "0.1.0" }
+ed25519-dalek = { version = "2", features = ["rand_core", "zeroize"] }
+keyring = { version = "3", features = ["linux-native", "apple-native", "windows-native"] }
+rand = "0.8"
+hex = "0.4"
+secrecy = "0.10"
+zeroize = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus = { version = "0.9", features = ["vendored"] }
+
+[dev-dependencies]
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+irmind-mod-keystore-file = { path = "../keystore-file", version = "0.1.0" }
+tempfile = "3"
+
+[lints]
+workspace = true
