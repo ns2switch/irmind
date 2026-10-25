@@ -61,7 +61,7 @@ jobs:
           (cd dist && sha256sum irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: {name: irmind-linux, path: dist/, if-no-files-found: error}
-      - run: IRMIND_PORTABLE_EXPORT_DIR=portable-export cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --profile ci --locked
+      - run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --profile ci --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: {name: portable-export-linux, path: portable-export/, if-no-files-found: error}
       - name: Clean staging
@@ -102,7 +102,7 @@ jobs:
         run: |
           (cd dist && sha256sum --check SHA256SUMS)
           ./dist/irmind.exe verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
-      - run: IRMIND_PORTABLE_EXPORT_DIR=portable-export cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --profile ci --locked
+      - run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --profile ci --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: {name: portable-export-windows, path: portable-export/, if-no-files-found: error}
       - name: Clean staging
