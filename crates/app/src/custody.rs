@@ -70,13 +70,24 @@ impl Engine<'_> {
     }
 
     pub fn prepare_seal(&self, id: &CaseId) -> Result<SealPreview, AppError> {
+        self.prepare_seal_cancelable(id, &CancellationToken::new())
+    }
+
+    pub fn prepare_seal_cancelable(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<SealPreview, AppError> {
         self.require_attended_analyst("seal case")?;
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
         let _case_lock = self.repo.lock_case(id)?;
         let case = self.repo.get_case(id)?;
         if case.sealed {
             return Err(AppError::Sealed);
         }
-        self.verify_unlocked(id)?;
+        self.verify_unlocked_cancelable(id, cancel)?;
         if !self
             .pending_requests_unlocked(&case, &self.audit_log.entries(id)?)?
             .is_empty()
@@ -84,6 +95,9 @@ impl Engine<'_> {
             return Err(AppError::Policy(
                 "resolve pending approvals before sealing".into(),
             ));
+        }
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
         }
         let manifest = self.evidence_store.evidence_hashes(id)?.join(",");
         let entry = self.signed_entry(id, "analyst", "CaseSealed", &manifest, None)?;

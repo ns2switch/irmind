@@ -51,6 +51,13 @@ fn seal_preview_rejects_a_changed_case() {
         ExecutionMode::Attended, std::sync::Arc::new(SystemClock),
     ).unwrap();
     let case = engine.create_case("Preview", "local only").unwrap();
+    let cancelled = CancellationToken::new();
+    cancelled.cancel();
+    assert!(matches!(
+        engine.prepare_seal_cancelable(&case.id, &cancelled),
+        Err(AppError::Cancelled)
+    ));
+    assert_eq!(store.entries(&case.id).unwrap().len(), 1);
     let preview = engine.prepare_seal(&case.id).unwrap();
     engine.change_scope(&case.id, "local revised").unwrap();
     assert!(engine.seal_prepared(&preview).is_err());

@@ -95,8 +95,12 @@ impl CaseWorkflow<'_, '_> {
         self.engine.seal(id)
     }
 
-    pub(crate) fn prepare_seal(&self, id: &CaseId) -> Result<SealPreview, AppError> {
-        self.engine.prepare_seal(id)
+    pub(crate) fn prepare_seal(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<SealPreview, AppError> {
+        self.engine.prepare_seal_cancelable(id, cancel)
     }
 
     pub(crate) fn seal_prepared(&self, preview: &SealPreview) -> Result<(), AppError> {
