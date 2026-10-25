@@ -3,11 +3,13 @@
 
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
-    AppError, CancellationToken, CompletionRequest, CryptoPorts, Engine, EnginePorts,
-    EvidenceStore, LlmPort, ModelResponse, ModelStream, Signer, ThreatIntelPort,
-    single_completion_stream,
+    AppError, CancellationToken, CaseLock, CaseSeal, CompletionRequest, CryptoPorts, Engine,
+    EnginePorts, EvidenceStore, LlmPort, ModelResponse, ModelStream, Repository, Signer,
+    ThreatIntelPort, single_completion_stream,
 };
-use irmind_domain::{Actor, AuthorizedCall, ExecutionMode, ProposedCall, Severity, Tool};
+use irmind_domain::{
+    Actor, AuthorizedCall, Case, CaseId, ExecutionMode, ProposedCall, Severity, Tool,
+};
 use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
 use irmind_mod_parser_json::JsonParser;
 use irmind_security::MandatoryGuard;
@@ -18,9 +20,36 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
+    time::{Duration, Instant},
 };
+
+struct SlowRepository {
+    store: Arc<LocalStore>,
+    delay_next_read: AtomicBool,
+}
+
+impl Repository for SlowRepository {
+    fn lock_case(&self, id: &CaseId) -> Result<Box<dyn CaseLock>, AppError> {
+        self.store.lock_case(id)
+    }
+    fn get_case(&self, id: &CaseId) -> Result<Case, AppError> {
+        if self.delay_next_read.swap(false, Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_secs(3));
+        }
+        self.store.get_case(id)
+    }
+    fn list_cases(&self) -> Result<Vec<Case>, AppError> {
+        self.store.list_cases()
+    }
+    fn write_seal_file(&self, id: &CaseId, seal: &CaseSeal) -> Result<(), AppError> {
+        self.store.write_seal_file(id, seal)
+    }
+    fn case_seal(&self, id: &CaseId) -> Result<Option<CaseSeal>, AppError> {
+        self.store.case_seal(id)
+    }
+}
 
 struct TestSigner(SigningKey);
 
@@ -190,4 +219,59 @@ fn complete_case_from_tui_controller_with_test_backend_and_fakes() {
     let rejected_export = root.path().join("must-not-export.irmind.json");
     assert!(tui.export(&id, &rejected_export).is_err());
     assert!(!rejected_export.exists());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn tui_renders_while_a_local_port_is_slow() {
+    let root = tempfile::tempdir().unwrap();
+    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let slow_repo = Arc::new(SlowRepository {
+        store: store.clone(),
+        delay_next_read: AtomicBool::new(false),
+    });
+    let signer = Arc::new(TestSigner(SigningKey::from_bytes(&[120u8; 32])));
+    let intel = FakeIntel;
+    let model = FakeModel(AtomicUsize::new(0));
+    let engine = Engine::new(
+        EnginePorts::new(
+            slow_repo.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(
+                signer.clone(),
+                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            ),
+            Arc::new(MandatoryGuard::new().unwrap()),
+            Arc::new(JsonParser),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )
+    .unwrap()
+    .with_threat_intel(&intel);
+    let id = engine
+        .create_case_with_severity("Synthetic slow port", Severity::Low, "local-only")
+        .unwrap()
+        .id;
+    let io_ops = TestIo(store);
+    let terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+    let mut tui = ScriptedWorkspace::new(terminal, &engine, Some(&model), &io_ops);
+    slow_repo.delay_next_read.store(true, Ordering::SeqCst);
+    let started = Instant::now();
+    let cancel = CancellationToken::new();
+    let (investigation, tick) = tokio::join!(
+        engine.investigate_cancelable(&id, "Synthetic alert", &model, &cancel),
+        async {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            tui.render_home().unwrap();
+            assert!(screen(tui.terminal()).contains("IRMind"));
+            started.elapsed()
+        }
+    );
+    assert!(investigation.is_ok());
+    assert!(
+        tick < Duration::from_secs(1),
+        "TUI render tick was blocked by local I/O"
+    );
 }

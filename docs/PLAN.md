@@ -6,7 +6,7 @@
 3. Trazabilidad: todo evento va a un log append-only, encadenado por hash y firmado (Ed25519).
 4. Mínimo dato hacia el modelo: guard, redacción y envoltorio como dato no confiable. La evidencia original se guarda intacta.
 5. Fallar cerrado ante cualquier error de política, auditoría, firma, guard o redacción.
-6. Las credenciales nunca llegan al modelo ni a los módulos: se leen del llavero en la raíz de composición.
+6. Las credenciales se obtienen solo a través del módulo de secretos configurado en la raíz de composición y se inyectan en los conectores; los módulos nunca las leen del entorno, nunca las registran y nunca llegan al modelo.
 7. irmind-security siempre se carga. Todo contenido externo es no confiable y sus valores son Tainted<T>.
 8. Cada producto es un módulo que implementa un puerto; añadir uno no toca el núcleo.
 9. Arquitectura limpia: dominio ← aplicación ← adaptadores / seguridad / TUI ← bin. Las dependencias solo apuntan hacia dentro, y un test de CI lo verifica.

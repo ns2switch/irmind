@@ -142,6 +142,8 @@ Se propone que el modelo produzca un AST de consulta con campos permitidos por f
 
 ## Fase T: TUI como punto de entrada
 
+La raíz de composición obtiene credenciales únicamente a través del módulo de secretos seleccionado y las inyecta en los conectores. Los módulos no leen el entorno, no registran credenciales y no las envían al modelo. Esto corrige la formulación anterior, que decía que los módulos nunca recibían credenciales aunque sus clientes las necesitan para autenticarse. Decisión: 2026-10-25.
+
 `irmind` sin subcomando abre la TUI. La pantalla de inicio permite descubrir y crear casos; el espacio del caso reúne investigación, ingesta, custodia e informe. Los subcomandos permanecen para automatización y usan los mismos casos de uso. Ningún proveedor LLM se activa de forma implícita. La interfaz no muestra secretos y limpia el contenido externo antes de dibujarlo. Las tareas largas se cancelan mediante el token existente y registran la cancelación. El criterio de H6 es una prueba de caso completo con `ratatui::TestBackend` y módulos falsos, sin CLI. Decisión: 2026-10-25.
 
 ## Fase T: auditoría operativa de cancelaciones
