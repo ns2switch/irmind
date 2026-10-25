@@ -30,7 +30,7 @@ jobs:
         run: python3 .github/scripts/check_dco.py
   linux:
     needs: dco
-    if: always() && (needs.dco.result == 'success' || needs.dco.result == 'skipped')
+    if: ${{ !cancelled() && (needs.dco.result == 'success' || needs.dco.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -124,7 +124,7 @@ jobs:
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('bin', 'foreign-export')) if p.is_dir()]"
   macos:
-    if: always() && needs.linux.result == 'success' && (needs.windows.result == 'success' || needs.windows.result == 'skipped') && (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))) || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    if: ${{ !cancelled() && needs.linux.result == 'success' && (needs.windows.result == 'success' || needs.windows.result == 'skipped') && (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))) || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
     needs: [linux, windows]
     runs-on: macos-latest
     timeout-minutes: 180
