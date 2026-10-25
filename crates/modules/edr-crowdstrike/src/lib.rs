@@ -2,27 +2,24 @@
 
 use chrono::DateTime;
 use irmind_app::{
-    AppError, EdrPort,
-    modules::{ConfigField, Module, ModuleManifest, ModulePort, ModuleRegistry},
+    AppError, CancellationToken, EdrPort, async_trait,
+    modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use irmind_domain::{AuthorizedCall, Tool};
-use reqwest::{
-    Url,
-    blocking::{Client, RequestBuilder},
-};
+use reqwest::Url;
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::{Value, json};
-use std::{io::Read as _, time::Duration};
+use std::time::Duration;
 
 pub struct CrowdStrike {
-    client: Client,
+    async_client: reqwest::Client,
     base: Url,
     client_id: SecretString,
     client_secret: SecretString,
     source_id: String,
 }
 
-static MANIFEST: ModuleManifest = ModuleManifest {
+pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: "edr-crowdstrike",
     version: "0.1.0",
     ports: &[ModulePort::Edr],
@@ -55,17 +52,18 @@ impl Module for CrowdStrike {
     fn manifest(&self) -> &'static ModuleManifest {
         &MANIFEST
     }
-    fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        _config: &ModuleConfig,
+    ) -> Result<(), AppError> {
         registry.add_edr(self)
     }
 }
 
 impl CrowdStrike {
-    pub fn from_env() -> Result<Self, AppError> {
-        let setting = |name| {
-            std::env::var(name)
-                .map_err(|_| AppError::Policy(format!("{name} is required for CrowdStrike")))
-        };
+    pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
+        let setting = |name| config.required_value(name).map(str::to_owned);
         let base = Url::parse(&setting("IRMIND_CROWDSTRIKE_URL")?)
             .map_err(|_| AppError::Policy("invalid CrowdStrike URL".into()))?;
         if base.scheme() != "https"
@@ -84,14 +82,25 @@ impl CrowdStrike {
         if !safe_id(&source_id) {
             return Err(AppError::Policy("invalid CrowdStrike source ID".into()));
         }
-        let client_id = setting("IRMIND_CROWDSTRIKE_CLIENT_ID")?;
-        let client_secret = setting("IRMIND_CROWDSTRIKE_CLIENT_SECRET")?;
+        let client_id = config
+            .required_secret("IRMIND_CROWDSTRIKE_CLIENT_ID")?
+            .expose_secret()
+            .to_owned();
+        let client_secret = config
+            .required_secret("IRMIND_CROWDSTRIKE_CLIENT_SECRET")?
+            .expose_secret()
+            .to_owned();
         if client_id.trim().is_empty() || client_secret.trim().is_empty() {
             return Err(AppError::Policy("empty CrowdStrike credential".into()));
         }
-        let client = Self::http_client()?;
+        let async_client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .timeout(Duration::from_secs(30))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|_| AppError::Storage("cannot create CrowdStrike HTTP client".into()))?;
         Ok(Self {
-            client,
+            async_client,
             base,
             client_id: SecretString::from(client_id),
             client_secret: SecretString::from(client_secret),
@@ -99,54 +108,10 @@ impl CrowdStrike {
         })
     }
 
-    fn http_client() -> Result<Client, AppError> {
-        Client::builder()
-            .timeout(Duration::from_secs(30))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|_| AppError::Storage("cannot create CrowdStrike HTTP client".into()))
-    }
-
     fn endpoint(&self, path: &str) -> Result<Url, AppError> {
         self.base
             .join(path)
             .map_err(|_| AppError::Policy("invalid CrowdStrike endpoint".into()))
-    }
-
-    fn token(&self) -> Result<SecretString, AppError> {
-        let url = self.endpoint("/oauth2/token")?;
-        let response = Self::request(self.client.post(url).form(&[
-            ("client_id", self.client_id.expose_secret()),
-            ("client_secret", self.client_secret.expose_secret()),
-        ]))?;
-        let token = response["access_token"]
-            .as_str()
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| AppError::Storage("CrowdStrike token response is invalid".into()))?;
-        Ok(SecretString::from(token.to_owned()))
-    }
-
-    fn request(request: RequestBuilder) -> Result<Value, AppError> {
-        let mut response = request
-            .send()
-            .map_err(|_| AppError::Storage("CrowdStrike request failed".into()))?;
-        if !response.status().is_success() {
-            return Err(AppError::Storage(format!(
-                "CrowdStrike returned status {}",
-                response.status()
-            )));
-        }
-        let mut raw = Vec::new();
-        response
-            .by_ref()
-            .take(5_000_001)
-            .read_to_end(&mut raw)
-            .map_err(|_| AppError::Storage("CrowdStrike response failed".into()))?;
-        if raw.len() > 5_000_000 {
-            return Err(AppError::Policy("CrowdStrike response exceeds 5 MB".into()));
-        }
-        serde_json::from_slice(&raw)
-            .map_err(|_| AppError::Storage("invalid CrowdStrike JSON".into()))
     }
 
     fn checked_call<'a>(&self, call: &'a AuthorizedCall, tool: &Tool) -> Result<&'a str, AppError> {
@@ -162,19 +127,78 @@ impl CrowdStrike {
         Ok(host)
     }
 
-    fn host(&self, host: &str, token: &SecretString) -> Result<Value, AppError> {
+    async fn request_async(
+        request: reqwest::RequestBuilder,
+        cancel: &CancellationToken,
+    ) -> Result<Value, AppError> {
+        let mut response = tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(AppError::Cancelled),
+            result = request.send() => result.map_err(|_| AppError::Storage("CrowdStrike request failed".into()))?,
+        };
+        if !response.status().is_success() {
+            return Err(AppError::Storage(format!(
+                "CrowdStrike returned status {}",
+                response.status()
+            )));
+        }
+        let mut raw = Vec::new();
+        loop {
+            let chunk = tokio::select! {
+                biased;
+                () = cancel.cancelled() => return Err(AppError::Cancelled),
+                result = response.chunk() => result.map_err(|_| AppError::Storage("CrowdStrike response failed".into()))?,
+            };
+            let Some(chunk) = chunk else {
+                break;
+            };
+            if raw.len().saturating_add(chunk.len()) > 5_000_000 {
+                return Err(AppError::Policy("CrowdStrike response exceeds 5 MB".into()));
+            }
+            raw.extend_from_slice(&chunk);
+        }
+        serde_json::from_slice(&raw)
+            .map_err(|_| AppError::Storage("invalid CrowdStrike JSON".into()))
+    }
+
+    async fn token_async(&self, cancel: &CancellationToken) -> Result<SecretString, AppError> {
+        let url = self.endpoint("/oauth2/token")?;
+        let response = Self::request_async(
+            self.async_client.post(url).form(&[
+                ("client_id", self.client_id.expose_secret()),
+                ("client_secret", self.client_secret.expose_secret()),
+            ]),
+            cancel,
+        )
+        .await?;
+        let token = response["access_token"]
+            .as_str()
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppError::Storage("CrowdStrike token response is invalid".into()))?;
+        Ok(SecretString::from(token.to_owned()))
+    }
+
+    async fn host_async(
+        &self,
+        host: &str,
+        token: &SecretString,
+        cancel: &CancellationToken,
+    ) -> Result<Value, AppError> {
         let url = self.endpoint("/devices/combined/devices/v1")?;
         let filter = format!("hostname:'{host}'");
-        let response = Self::request(
-            self.client
+        let response = Self::request_async(
+            self.async_client
                 .get(url)
                 .bearer_auth(token.expose_secret())
                 .query(&[("filter", filter.as_str()), ("limit", "2")]),
-        )?;
+            cancel,
+        )
+        .await?;
         select_host(&response, host)
     }
 }
 
+#[async_trait]
 impl EdrPort for CrowdStrike {
     fn source_id(&self) -> &str {
         &self.source_id
@@ -183,17 +207,36 @@ impl EdrPort for CrowdStrike {
         matches!(tool, Tool::EdrHostInfo | Tool::EdrDetections)
     }
 
-    fn host_info(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
-        let host = self.checked_call(call, &Tool::EdrHostInfo)?;
-        let token = self.token()?;
-        encode(&self.host(host, &token)?)
+    async fn execute(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
+        match call.tool() {
+            Tool::EdrHostInfo => {
+                let host = self.checked_call(call, &Tool::EdrHostInfo)?;
+                let token = self.token_async(cancel).await?;
+                encode(&self.host_async(host, &token, cancel).await?)
+            }
+            Tool::EdrDetections => self.detections_async(call, cancel).await,
+            Tool::EdrProcessTree => Err(AppError::Policy(
+                "CrowdStrike process tree unavailable".into(),
+            )),
+            _ => Err(AppError::Policy("invalid CrowdStrike tool".into())),
+        }
     }
+}
 
-    fn detections(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+impl CrowdStrike {
+    async fn detections_async(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
         let host = self.checked_call(call, &Tool::EdrDetections)?;
         let (from, to) = window(call)?;
-        let token = self.token()?;
-        let device = self.host(host, &token)?;
+        let token = self.token_async(cancel).await?;
+        let device = self.host_async(host, &token, cancel).await?;
         let aid = device["device_id"]
             .as_str()
             .filter(|id| safe_id(id))
@@ -201,20 +244,16 @@ impl EdrPort for CrowdStrike {
         let filter =
             format!("agent_id:'{aid}'+created_timestamp:>='{from}'+created_timestamp:<='{to}'");
         let url = self.endpoint("/alerts/combined/alerts/v1")?;
-        let response = Self::request(
-            self.client
+        let response = Self::request_async(
+            self.async_client
                 .post(url)
                 .bearer_auth(token.expose_secret())
                 .json(&json!({"filter":filter,"limit":20})),
-        )?;
+            cancel,
+        )
+        .await?;
         validate_alerts(&response, aid, from, to)?;
         encode(&response)
-    }
-
-    fn process_tree(&self, _call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
-        Err(AppError::Policy(
-            "CrowdStrike process tree is not supported by this module".into(),
-        ))
     }
 }
 
@@ -313,7 +352,11 @@ mod tests {
 
         fn build(&self, origin: &str) -> Box<dyn EdrPort> {
             Box::new(CrowdStrike {
-                client: CrowdStrike::http_client().unwrap(),
+                async_client: reqwest::Client::builder()
+                    .use_rustls_tls()
+                    .redirect(reqwest::redirect::Policy::none())
+                    .build()
+                    .unwrap(),
                 base: Url::parse(origin).unwrap(),
                 client_id: SecretString::from("TEST_CLIENT".to_owned()),
                 client_secret: SecretString::from("TEST_SECRET".to_owned()),

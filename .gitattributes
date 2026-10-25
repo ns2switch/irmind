@@ -1,0 +1,13 @@
+* text=auto
+*.rs text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+**/fixtures/**/*.json text eol=lf
+**/fixtures/**/*.txt text eol=lf
+**/fixtures/**/*.csv text eol=lf
+**/corpus/**/*.json text eol=lf
+**/corpus/**/*.txt text eol=lf
+**/seeds/**/*.json text eol=lf
+**/seeds/**/*.txt text eol=lf

@@ -1,0 +1,54 @@
+name: Weekly fuzzing
+on:
+  schedule:
+    - cron: '41 2 * * 0'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CARGO_BUILD_JOBS: 1
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@2c76c034f9e32a5d6e2c104dc4df23a22476db04 # nightly
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with: {key: weekly-fuzz}
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        with: {tool: 'cargo-audit,cargo-deny', fallback: none}
+      - run: cargo audit --file fuzz/Cargo.lock --ignore RUSTSEC-2026-0370 --ignore RUSTSEC-2026-0371 --ignore RUSTSEC-2026-0372
+      - run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
+      - name: Install verified upstream cargo-fuzz binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .tools
+          gh release download 0.13.2 -R rust-fuzz/cargo-fuzz -p cargo-fuzz-0.13.2-x86_64-unknown-linux-musl.tar.gz -O .tools/cargo-fuzz.tar.gz
+          printf '%s  %s\n' b5b704018b63e0f151c17a057ac53b5111e1db545d1b9f72fee79f08a545931c .tools/cargo-fuzz.tar.gz | sha256sum --check
+          tar -xzf .tools/cargo-fuzz.tar.gz -C .tools
+          install -m 0755 .tools/cargo-fuzz "$HOME/.cargo/bin/cargo-fuzz"
+      - name: Copy versioned seeds to temporary corpora
+        run: |
+          for target in guard parsers canonical spl export; do
+            mkdir -p "fuzz/corpus/$target"
+            cp "fuzz/seeds/$target/"* "fuzz/corpus/$target/"
+          done
+      - name: Fuzz guard, parser, canonical format and SPL
+        run: |
+          for target in guard parsers canonical spl; do
+            cargo fuzz run "$target" -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
+          done
+      - name: Fuzz exported packages within memory budget
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
+        run: cargo fuzz run export --features export --sanitizer none -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
+      - name: Delete fuzz artifacts and temporary corpora
+        if: always()
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('.tools', 'fuzz/artifacts', 'fuzz/corpus')) if p.is_dir()]"

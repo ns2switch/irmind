@@ -2,13 +2,13 @@
 
 use duckdb::{Connection, OptionalExt, Transaction, params};
 use irmind_app::{AppError, GraphRecord, GraphRelation, TimelineEvent};
-use irmind_domain::CaseId;
+use irmind_domain::{CaseId, Tainted};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-fn storage(error: impl std::fmt::Display) -> AppError {
-    AppError::Storage(format!("DuckDB graph: {error}"))
+fn storage(_error: impl std::fmt::Display) -> AppError {
+    AppError::Storage("DuckDB graph operation failed".into())
 }
 
 fn short(value: &str, max_chars: usize) -> String {
@@ -21,18 +21,14 @@ fn short(value: &str, max_chars: usize) -> String {
     }
 }
 
-pub struct GraphStore {
+pub(crate) struct GraphStore {
     root: PathBuf,
 }
 
 impl GraphStore {
-    pub fn new(root: &Path) -> Result<Self, AppError> {
+    pub(crate) fn new(root: &Path) -> Result<Self, AppError> {
         fs::create_dir_all(root).map_err(storage)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt as _;
-            fs::set_permissions(root, fs::Permissions::from_mode(0o700)).map_err(storage)?;
-        }
+        crate::private_fs::private_dir(root).map_err(storage)?;
         Ok(Self {
             root: root.to_owned(),
         })
@@ -41,11 +37,7 @@ impl GraphStore {
     pub(crate) fn connect(&self, id: &CaseId) -> Result<Connection, AppError> {
         let path = self.root.join(format!("{}.duckdb", id.as_str()));
         let db = Connection::open(&path).map_err(storage)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt as _;
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).map_err(storage)?;
-        }
+        crate::private_fs::private_file(&path).map_err(storage)?;
         db.execute_batch(
             "CREATE TABLE IF NOT EXISTS indexed (hash VARCHAR PRIMARY KEY, records BIGINT NOT NULL);
              CREATE TABLE IF NOT EXISTS events (
@@ -92,11 +84,12 @@ impl GraphStore {
         Ok(db)
     }
 
-    pub fn index_records(
+    pub(crate) fn index_records(
         &self,
         id: &CaseId,
         hash: &str,
-        records: &[GraphRecord],
+        records: &[Tainted<GraphRecord>],
+        cancel: &irmind_app::CancellationToken,
     ) -> Result<(), AppError> {
         let mut db = self.connect(id)?;
         let tx = db.transaction().map_err(storage)?;
@@ -110,16 +103,23 @@ impl GraphStore {
         if indexed != 0 {
             return Ok(());
         }
-        Self::insert_records(&tx, hash, records)?;
+        Self::insert_records(&tx, hash, records, cancel)?;
         tx.commit().map_err(storage)
     }
 
     fn insert_records(
         tx: &Transaction<'_>,
         hash: &str,
-        records: &[GraphRecord],
+        records: &[Tainted<GraphRecord>],
+        cancel: &irmind_app::CancellationToken,
     ) -> Result<(), AppError> {
-        for record in records {
+        for (batch_index, record) in records.iter().enumerate() {
+            if batch_index % 256 == 0 && cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let mut outcome = Ok(());
+            record.inspect(|record| {
+                outcome = (|| {
             let index = i64::try_from(record.index)
                 .map_err(|_| storage("record index exceeds DuckDB BIGINT"))?;
             tx.execute(
@@ -155,6 +155,10 @@ impl GraphStore {
                 )
                 .map_err(storage)?;
             }
+                Ok(())
+                })();
+            });
+            outcome?;
         }
         let count = i64::try_from(records.len())
             .map_err(|_| storage("record count exceeds DuckDB BIGINT"))?;
@@ -166,25 +170,29 @@ impl GraphStore {
         Ok(())
     }
 
-    pub fn rebuild<F>(
+    pub(crate) fn rebuild<F>(
         &self,
         id: &CaseId,
         sources: &[(String, usize)],
+        cancel: &irmind_app::CancellationToken,
         mut parse: F,
     ) -> Result<usize, AppError>
     where
-        F: FnMut(&str) -> Result<Vec<GraphRecord>, AppError>,
+        F: FnMut(&str) -> Result<Vec<Tainted<GraphRecord>>, AppError>,
     {
         let mut db = self.connect(id)?;
         let tx = db.transaction().map_err(storage)?;
         tx.execute_batch("DELETE FROM relations; DELETE FROM observations; DELETE FROM nodes; DELETE FROM record_texts; DELETE FROM events; DELETE FROM indexed;").map_err(storage)?;
         let mut total = 0usize;
         for (hash, expected) in sources {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
             let records = parse(hash)?;
             if records.len() != *expected {
                 return Err(storage(format!("signed record count differs for {hash}")));
             }
-            Self::insert_records(&tx, hash, &records)?;
+            Self::insert_records(&tx, hash, &records, cancel)?;
             total = total
                 .checked_add(records.len())
                 .ok_or_else(|| storage("record count overflow"))?;
@@ -193,14 +201,15 @@ impl GraphStore {
         Ok(total)
     }
 
-    pub fn verify<F>(
+    pub(crate) fn verify<F>(
         &self,
         id: &CaseId,
         sources: &[(String, usize)],
+        cancel: &irmind_app::CancellationToken,
         mut parse: F,
     ) -> Result<usize, AppError>
     where
-        F: FnMut(&str) -> Result<Vec<GraphRecord>, AppError>,
+        F: FnMut(&str) -> Result<Vec<Tainted<GraphRecord>>, AppError>,
     {
         let db = self.connect(id)?;
         let mut indexed_statement = db
@@ -228,6 +237,9 @@ impl GraphStore {
         let mut expected_relations = 0i64;
         let mut total = 0usize;
         for (hash, expected_count) in sources {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
             let expected = parse(hash)?;
             if expected.len() != *expected_count {
                 return Err(storage(format!("signed record count differs for {hash}")));
@@ -255,7 +267,10 @@ impl GraphStore {
                 })
                 .map_err(storage)?;
             let mut actual: Vec<GraphRecord> = Vec::new();
-            for row in rows {
+            for (batch_index, row) in rows.enumerate() {
+                if batch_index % 256 == 0 && cancel.is_cancelled() {
+                    return Err(AppError::Cancelled);
+                }
                 let (index, at, event, text, kind, value) = row.map_err(storage)?;
                 let index = usize::try_from(index).map_err(|_| storage("invalid record index"))?;
                 if actual.last().is_none_or(|last| last.index != index) {
@@ -294,7 +309,10 @@ impl GraphStore {
                 })
                 .map_err(storage)?;
             let mut by_record = BTreeMap::<usize, Vec<GraphRelation>>::new();
-            for row in relations {
+            for (batch_index, row) in relations.enumerate() {
+                if batch_index % 256 == 0 && cancel.is_cancelled() {
+                    return Err(AppError::Cancelled);
+                }
                 let (index, relation) = row.map_err(storage)?;
                 let index =
                     usize::try_from(index).map_err(|_| storage("invalid relation index"))?;
@@ -306,27 +324,38 @@ impl GraphStore {
             if !by_record.is_empty() {
                 return Err(storage("relation references a missing graph record"));
             }
-            if actual != expected {
+            let mut equal = actual.len() == expected.len();
+            for (actual_record, expected_record) in actual.iter().zip(&expected) {
+                expected_record.inspect(|record| equal &= actual_record == record);
+            }
+            if !equal {
                 return Err(storage(format!(
                     "derived graph differs from signed evidence {hash}"
                 )));
             }
             for record in &expected {
-                expected_relations = expected_relations
-                    .checked_add(i64::try_from(record.relations.len()).map_err(storage)?)
-                    .ok_or_else(|| storage("relation count overflow"))?;
-                for (kind, value) in &record.entities {
-                    let node = expected_nodes
-                        .entry((kind.clone(), value.clone()))
-                        .or_insert_with(|| (record.at.clone(), record.at.clone(), 0));
-                    if record.at < node.0 {
-                        node.0.clone_from(&record.at);
-                    }
-                    if record.at > node.1 {
-                        node.1.clone_from(&record.at);
-                    }
-                    node.2 += 1;
-                }
+                let mut outcome = Ok(());
+                record.inspect(|record| {
+                    outcome = (|| {
+                        expected_relations = expected_relations
+                            .checked_add(i64::try_from(record.relations.len()).map_err(storage)?)
+                            .ok_or_else(|| storage("relation count overflow"))?;
+                        for (kind, value) in &record.entities {
+                            let node = expected_nodes
+                                .entry((kind.clone(), value.clone()))
+                                .or_insert_with(|| (record.at.clone(), record.at.clone(), 0));
+                            if record.at < node.0 {
+                                node.0.clone_from(&record.at);
+                            }
+                            if record.at > node.1 {
+                                node.1.clone_from(&record.at);
+                            }
+                            node.2 += 1;
+                        }
+                        Ok(())
+                    })();
+                });
+                outcome?;
             }
             total = total
                 .checked_add(expected.len())
@@ -374,7 +403,7 @@ impl GraphStore {
         Ok(total)
     }
 
-    pub fn summary(&self, id: &CaseId) -> Result<String, AppError> {
+    pub(crate) fn summary(&self, id: &CaseId) -> Result<String, AppError> {
         let db = self.connect(id)?;
         let records: i64 = db
             .query_row("SELECT COALESCE(SUM(records),0) FROM indexed", [], |row| {
@@ -400,7 +429,11 @@ impl GraphStore {
         Ok(format!("{records} indexed records\n{}", nodes.join("\n")))
     }
 
-    pub fn timeline(&self, id: &CaseId, limit: usize) -> Result<Vec<TimelineEvent>, AppError> {
+    pub(crate) fn timeline(
+        &self,
+        id: &CaseId,
+        limit: usize,
+    ) -> Result<Vec<TimelineEvent>, AppError> {
         let db = self.connect(id)?;
         let count = i64::try_from(limit.min(1000)).map_err(storage)?;
         let mut statement = db
@@ -426,7 +459,12 @@ impl GraphStore {
         rows.collect::<Result<Vec<_>, _>>().map_err(storage)
     }
 
-    pub fn entity_lookup(&self, id: &CaseId, kind: &str, value: &str) -> Result<String, AppError> {
+    pub(crate) fn entity_lookup(
+        &self,
+        id: &CaseId,
+        kind: &str,
+        value: &str,
+    ) -> Result<String, AppError> {
         let db = self.connect(id)?;
         let info: Option<(String, String, i64)> = db
             .query_row(
@@ -472,7 +510,7 @@ impl GraphStore {
         Ok(lines.join("\n"))
     }
 
-    pub fn neighbors(
+    pub(crate) fn neighbors(
         &self,
         id: &CaseId,
         kind: &str,
@@ -555,7 +593,7 @@ impl GraphStore {
         Ok(lines.join("\n"))
     }
 
-    pub fn entity_timeline(
+    pub(crate) fn entity_timeline(
         &self,
         id: &CaseId,
         kind: &str,
@@ -598,7 +636,12 @@ impl GraphStore {
         Ok(lines.join("\n"))
     }
 
-    pub fn has_record(&self, id: &CaseId, hash: &str, index: usize) -> Result<bool, AppError> {
+    pub(crate) fn has_record(
+        &self,
+        id: &CaseId,
+        hash: &str,
+        index: usize,
+    ) -> Result<bool, AppError> {
         let db = self.connect(id)?;
         let index = i64::try_from(index).map_err(storage)?;
         let exists: i64 = db
@@ -611,7 +654,12 @@ impl GraphStore {
         Ok(exists == 1)
     }
 
-    pub fn text_search(&self, id: &CaseId, query: &str, limit: usize) -> Result<String, AppError> {
+    pub(crate) fn text_search(
+        &self,
+        id: &CaseId,
+        query: &str,
+        limit: usize,
+    ) -> Result<String, AppError> {
         let db = self.connect(id)?;
         let (events, texts, empty): (i64, i64, i64) = db
             .query_row(
@@ -659,7 +707,7 @@ impl GraphStore {
         Ok(lines.join("\n"))
     }
 
-    pub fn path(
+    pub(crate) fn path(
         &self,
         id: &CaseId,
         from: (&str, &str),
@@ -747,5 +795,42 @@ impl GraphStore {
         } else {
             Ok("no co-observation path found within 3 hops".into())
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod cancellation_tests {
+    use super::*;
+
+    #[test]
+    fn graph_errors_never_include_source_values_or_paths() {
+        let error = storage(duckdb::Error::InvalidParameterName(
+            "SECRET evidence path".into(),
+        ));
+        assert!(!error.to_string().contains("SECRET"));
+    }
+
+    #[test]
+    fn rebuild_cancellation_between_sources_rolls_back_batch() {
+        let root = tempfile::tempdir().unwrap();
+        let graph = GraphStore::new(root.path()).unwrap();
+        let id = CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+        let cancel = irmind_app::CancellationToken::new();
+        let sources = vec![("a".to_owned(), 0), ("b".to_owned(), 0)];
+        let mut parsed = 0;
+        let result = graph.rebuild(&id, &sources, &cancel, |_| {
+            parsed += 1;
+            cancel.cancel();
+            Ok(Vec::new())
+        });
+        assert!(matches!(result, Err(AppError::Cancelled)));
+        assert_eq!(parsed, 1);
+        let count: i64 = graph
+            .connect(&id)
+            .unwrap()
+            .query_row("SELECT COUNT(*) FROM indexed", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
     }
 }

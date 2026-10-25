@@ -2,9 +2,10 @@
 
 use irmind_app::{
     AppError, EventParser, GraphRecord, GraphRelation,
-    modules::{Module, ModuleManifest, ModulePort, ModuleRegistry},
+    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+    sha256,
 };
-use irmind_domain::{Tainted, classify_field};
+use irmind_domain::{Provenance, SourceKind, Tainted, classify_field};
 use serde_json::Value;
 
 pub struct JsonParser;
@@ -22,7 +23,11 @@ impl Module for JsonParser {
         &MANIFEST
     }
 
-    fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        _config: &ModuleConfig,
+    ) -> Result<(), AppError> {
         registry.add_parser(self)
     }
 }
@@ -32,6 +37,9 @@ impl EventParser for JsonParser {
         "json-cloudtrail-v4"
     }
     fn parse(&self, source: &str, bytes: &[u8]) -> Result<Vec<Tainted<GraphRecord>>, AppError> {
+        if bytes.len() > 50 * 1024 * 1024 {
+            return Err(AppError::Policy("JSON input exceeds 50 MB".into()));
+        }
         let first = bytes.iter().copied().find(|b| !b.is_ascii_whitespace());
         if !matches!(first, Some(b'{' | b'[')) {
             return Ok(Vec::new());
@@ -98,7 +106,18 @@ impl EventParser for JsonParser {
                     entities,
                     relations,
                 },
-                source,
+                Provenance::new(
+                    sha256(bytes),
+                    Some(index as u64),
+                    if source.starts_with("siem_")
+                        || source.starts_with("cloud_")
+                        || source.starts_with("edr_")
+                    {
+                        SourceKind::ToolResult
+                    } else {
+                        SourceKind::File
+                    },
+                ),
             ));
         }
         Ok(records)
@@ -272,29 +291,31 @@ mod tests {
         let bytes = br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","sourceIPAddress":"203.0.113.8","userIdentity":{"arn":"arn:aws:iam::123456789012:role/Admin"}}]}"#;
         let records = JsonParser.parse("cloudtrail.json", bytes).unwrap();
         assert_eq!(records.len(), 1);
-        assert!(
-            records[0]
-                .value()
-                .entities
-                .contains(&("ip".into(), "203.0.113.8".into()))
-        );
-        assert!(
-            records[0]
-                .value()
-                .entities
-                .contains(&("role".into(), "arn:aws:iam::123456789012:role/Admin".into()))
-        );
-        assert!(records[0].value().text.contains("AssumeRole"));
+        records[0].inspect(|record| {
+            assert!(
+                record
+                    .entities
+                    .contains(&("ip".into(), "203.0.113.8".into()))
+            );
+            assert!(
+                record
+                    .entities
+                    .contains(&("role".into(), "arn:aws:iam::123456789012:role/Admin".into()))
+            );
+            assert!(record.text.contains("AssumeRole"));
+        });
     }
 
     #[test]
     fn extracts_assume_role_relation_from_cloudtrail_fields() {
         let bytes = br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","userIdentity":{"arn":"arn:aws:iam::123456789012:user/alice"},"requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/Admin"}}]}"#;
         let records = JsonParser.parse("cloudtrail.json", bytes).unwrap();
-        assert_eq!(records[0].value().relations.len(), 1);
-        assert_eq!(records[0].value().relations[0].relation, "assumed_role");
-        assert_eq!(records[0].value().relations[0].from_kind, "identity");
-        assert_eq!(records[0].value().relations[0].to_kind, "role");
+        records[0].inspect(|record| {
+            assert_eq!(record.relations.len(), 1);
+            assert_eq!(record.relations[0].relation, "assumed_role");
+            assert_eq!(record.relations[0].from_kind, "identity");
+            assert_eq!(record.relations[0].to_kind, "role");
+        });
     }
 
     #[test]
@@ -302,28 +323,27 @@ mod tests {
         let bytes = br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"GetObject","sourceIPAddress":"198.51.100.9","userIdentity":{"arn":"arn:aws:sts::123456789012:assumed-role/Analyst/session","accessKeyId":"ASIAABCDEFGHIJKLMNOP","sessionContext":{"sessionIssuer":{"arn":"arn:aws:iam::123456789012:role/Analyst"}}}},{"eventTime":"2026-10-23T12:01:00Z","eventName":"CreateAccessKey","requestParameters":{"userName":"alice"},"responseElements":{"accessKey":{"accessKeyId":"AKIAABCDEFGHIJKLMNOP"}}}]}"#;
         let records = JsonParser.parse("cloudtrail.json", bytes).unwrap();
         assert_eq!(records.len(), 2);
-        assert_eq!(records[0].value().relations.len(), 3);
-        assert!(
-            records[0]
-                .value()
-                .relations
-                .iter()
-                .any(|relation| relation.relation == "observed_from_ip"
-                    && relation.to_value == "198.51.100.9")
-        );
-        assert!(
-            records[0]
-                .value()
-                .relations
-                .iter()
-                .any(|relation| relation.relation == "issued_session"
-                    && relation.from_kind == "role")
-        );
-        assert!(records[0].value().relations.iter().any(|relation| relation.relation == "used_access_key" && relation.to_kind == "key"));
-        assert_eq!(
-            records[1].value().relations[0].relation,
-            "created_access_key"
-        );
+        records[0].inspect(|record| {
+            assert_eq!(record.relations.len(), 3);
+            assert!(
+                record
+                    .relations
+                    .iter()
+                    .any(|relation| relation.relation == "observed_from_ip"
+                        && relation.to_value == "198.51.100.9")
+            );
+            assert!(
+                record
+                    .relations
+                    .iter()
+                    .any(|relation| relation.relation == "issued_session"
+                        && relation.from_kind == "role")
+            );
+            assert!(record.relations.iter().any(
+                |relation| relation.relation == "used_access_key" && relation.to_kind == "key"
+            ));
+        });
+        records[1].inspect(|record| assert_eq!(record.relations[0].relation, "created_access_key"));
     }
 
     #[test]
@@ -331,10 +351,24 @@ mod tests {
         let cloud = br#"{"events":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole"},{"eventTime":"2026-10-23T13:00:00Z","eventName":"GetObject"}]}"#;
         let records = JsonParser.parse("cloud_audit_events:aws", cloud).unwrap();
         assert_eq!(records.len(), 2);
-        assert_eq!(records[1].value().event, "GetObject");
+        records[1].inspect(|record| assert_eq!(record.event, "GetObject"));
         let splunk = br#"{"result":{"_raw":"{\"eventTime\":\"2026-10-23T12:00:00Z\",\"eventName\":\"AssumeRole\"}"}}"#;
         let records = JsonParser.parse("siem_search:splunk", splunk).unwrap();
         assert_eq!(records.len(), 1);
-        assert_eq!(records[0].value().event, "AssumeRole");
+        records[0].inspect(|record| assert_eq!(record.event, "AssumeRole"));
+    }
+
+    #[test]
+    fn rejects_excessive_size_depth_and_record_count() {
+        let oversized = vec![b' '; 50 * 1024 * 1024 + 1];
+        assert!(JsonParser.parse("large.json", &oversized).is_err());
+        let deeply_nested = format!("{}0{}", "[".repeat(130), "]".repeat(130));
+        assert!(
+            JsonParser
+                .parse("nested.json", deeply_nested.as_bytes())
+                .is_err()
+        );
+        let many = format!("[{}]", "{},".repeat(100_000) + "{}");
+        assert!(JsonParser.parse("many.json", many.as_bytes()).is_err());
     }
 }

@@ -1,10 +1,11 @@
 #![forbid(unsafe_code)]
 
 use irmind_app::{
-    AppError, CompletionRequest, LlmPort, ModelResponse, ModelUsage,
-    modules::{ConfigField, Module, ModuleManifest, ModulePort, ModuleRegistry},
+    AppError, CompletionRequest, LlmPort, ModelStream,
+    modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use irmind_llm_chat_completions::{ChatCompletionsClient, ChatProfile};
+use secrecy::ExposeSecret;
 
 pub const MODULE_ID: &str = "llm-openai-compatible";
 const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1/";
@@ -21,7 +22,7 @@ fn select_key(
     })
 }
 
-static MANIFEST: ModuleManifest = ModuleManifest {
+pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: MODULE_ID,
     version: "0.1.0",
     ports: &[ModulePort::Llm],
@@ -53,17 +54,21 @@ static MANIFEST: ModuleManifest = ModuleManifest {
 pub struct OpenAiCompatible(ChatCompletionsClient);
 
 impl OpenAiCompatible {
-    pub fn from_env() -> Result<Self, AppError> {
-        let base_url =
-            std::env::var("IRMIND_LLM_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE_URL.into());
-        let model = std::env::var("IRMIND_MODEL")
-            .map_err(|_| AppError::Model("IRMIND_MODEL is required".into()))?;
+    pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
+        let base_url = config
+            .value("IRMIND_LLM_BASE_URL")
+            .unwrap_or(DEFAULT_BASE_URL);
+        let model = config.required_value("IRMIND_MODEL")?;
         let key = select_key(
-            &base_url,
-            std::env::var("IRMIND_LLM_API_KEY").ok(),
-            std::env::var("OPENAI_API_KEY").ok(),
+            base_url,
+            config
+                .secret("IRMIND_LLM_API_KEY")
+                .map(|key| key.expose_secret().to_owned()),
+            config
+                .secret("OPENAI_API_KEY")
+                .map(|key| key.expose_secret().to_owned()),
         );
-        Self::new(&base_url, &model, key)
+        Self::new(base_url, model, key)
     }
 
     pub fn new(base_url: &str, model: &str, key: Option<String>) -> Result<Self, AppError> {
@@ -80,29 +85,26 @@ impl Module for OpenAiCompatible {
     fn manifest(&self) -> &'static ModuleManifest {
         &MANIFEST
     }
-    fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        _config: &ModuleConfig,
+    ) -> Result<(), AppError> {
         registry.add_llm(MODULE_ID, self)
     }
 }
 
+#[irmind_app::async_trait]
 impl LlmPort for OpenAiCompatible {
     fn descriptor(&self) -> String {
         self.0.descriptor_for(MODULE_ID)
     }
-    fn complete(&self, context: &str) -> Result<ModelResponse, AppError> {
-        self.0.complete(context)
-    }
-    fn complete_with_usage(
+    async fn complete(
         &self,
-        context: &str,
-    ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
-        self.0.complete_with_usage(context)
-    }
-    fn complete_request(
-        &self,
-        request: &CompletionRequest<'_>,
-    ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
-        self.0.complete_request(request)
+        request: CompletionRequest,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<ModelStream, AppError> {
+        self.0.complete(request, cancel).await
     }
 }
 
@@ -140,7 +142,10 @@ mod tests {
         let adapter =
             OpenAiCompatible::new("http://127.0.0.1:11434/v1/", "test-model", None).unwrap();
         let mut registry = ModuleRegistry::new();
-        registry.register(Box::new(adapter)).unwrap();
+        let mut config = ModuleConfig::new();
+        config.insert_value("IRMIND_MODEL", "test-model".into());
+        registry.register(Box::new(adapter), &config).unwrap();
+        irmind_testkit::run_llm_contract(registry.llm(MODULE_ID).unwrap()).unwrap();
         let descriptor = registry.llm(MODULE_ID).unwrap().descriptor();
         assert!(descriptor.contains("module=llm-openai-compatible"));
         assert!(descriptor.contains("model=test-model"));

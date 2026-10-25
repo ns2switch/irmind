@@ -8,8 +8,12 @@ license.workspace = true
 [dependencies]
 irmind-app = { path = "../../app", version = "0.1.0" }
 irmind-domain = { path = "../../domain", version = "0.1.0" }
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-native-roots"] }
 secrecy = "0.10"
+tokio = { version = "1", default-features = false, features = ["macros"] }
+
+[dev-dependencies]
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
 
 [lints]
 workspace = true

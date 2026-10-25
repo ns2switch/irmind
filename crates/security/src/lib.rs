@@ -329,4 +329,16 @@ mod tests {
         assert_eq!(screened.text, "[UNTRUSTED_INSTRUCTION_REMOVED]");
         assert!(screened.detections.contains(&"instruction-in-json".into()));
     }
+
+    #[test]
+    fn external_text_cannot_emit_terminal_controls() {
+        let guard = MandatoryGuard::new().unwrap();
+        let screened = guard
+            .screen("safe\u{1b}[2J\u{1b}]8;;https://evil.example\u{1b}\\link\u{1b}]8;;\u{1b}\\\r\u{202e}tail")
+            .unwrap();
+        assert!(!screened.text.contains('\u{1b}'));
+        assert!(!screened.text.contains('\r'));
+        assert!(!screened.text.contains('\u{202e}'));
+        assert!(!screened.text.contains("https://evil.example"));
+    }
 }

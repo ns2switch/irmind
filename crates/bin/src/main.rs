@@ -2,9 +2,14 @@
 
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
-use irmind_app::{Engine, FindingKind, ModelPricing, Repository, modules::ModuleRegistry};
+use directories::ProjectDirs;
+use irmind_app::{
+    AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph, EvidenceStore,
+    FindingKind, ModelPricing, Repository, Signer,
+    modules::{ModuleConfig, ModuleManifest, ModuleRegistry},
+};
 use irmind_domain::{Actor, CaseId, ExecutionMode, PolicyRules, Severity, Tool};
-use irmind_infra::{LocalSigner, LocalStore, verify_export};
+use irmind_infra::{LocalSigner, LocalStore, LocalVerifier, verify_export_expected};
 #[cfg(feature = "cloud-aws")]
 use irmind_mod_cloud_aws::AwsCloudTrail;
 #[cfg(feature = "edr-crowdstrike")]
@@ -26,13 +31,42 @@ use irmind_mod_ti_misp::Misp;
 #[cfg(feature = "ti-virustotal")]
 use irmind_mod_ti_virustotal::VirusTotal;
 use irmind_security::MandatoryGuard;
+use secrecy::SecretString;
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-mod tui;
+fn load_module_config(manifest: &ModuleManifest) -> Result<ModuleConfig> {
+    let mut config = ModuleConfig::new();
+    for field in manifest.config {
+        if field.secret {
+            let entry = keyring::Entry::new("irmind-module", field.name)
+                .with_context(|| format!("open keyring entry {}", field.name))?;
+            match entry.get_password() {
+                Ok(value) => config.insert_secret(field.name, SecretString::from(value)),
+                Err(keyring::Error::NoEntry) if !field.required => {}
+                Err(error) => return Err(anyhow!("keyring entry {}: {error}", field.name)),
+            }
+        } else {
+            match std::env::var(field.name) {
+                Ok(value) => config.insert_value(field.name, value),
+                Err(std::env::VarError::NotPresent) if !field.required => {}
+                Err(error) => return Err(anyhow!("module setting {}: {error}", field.name)),
+            }
+        }
+    }
+    Ok(config)
+}
+
+macro_rules! register_configured {
+    ($registry:expr, $module:ty, $manifest:expr) => {{
+        let config = load_module_config(&$manifest)?;
+        $registry.register(Box::new(<$module>::from_config(&config)?), &config)?;
+    }};
+}
 
 #[derive(Parser)]
 #[command(version, about = "IRMind: local, signed incident investigation")]
@@ -71,7 +105,8 @@ struct PolicyFile {
 }
 
 fn load_policy(path: &std::path::Path) -> Result<(PolicyRules, String)> {
-    let raw = std::fs::read(path).with_context(|| format!("read policy {}", path.display()))?;
+    let raw =
+        std::fs::read(path).with_context(|| format!("read policy {}", terminal_safe_path(path)))?;
     let source = std::str::from_utf8(&raw).context("policy must be UTF-8")?;
     let file: PolicyFile = toml::from_str(source).context("parse policy TOML")?;
     if file.version != 1 {
@@ -237,6 +272,8 @@ enum Command {
     },
     VerifyExport {
         path: PathBuf,
+        #[arg(long)]
+        expected_key: Option<String>,
     },
     Tui {
         case_id: String,
@@ -270,17 +307,23 @@ fn parse_approval_args(value: &str) -> Result<BTreeMap<String, String>> {
     serde_json::from_str(value).context("approval arguments must be a JSON object of strings")
 }
 
+// Path::display() emits terminal controls from attacker-controlled file names.
+#[allow(clippy::unnecessary_debug_formatting)]
+fn terminal_safe_path(path: &Path) -> String {
+    format!("{path:?}")
+}
+
 fn input_files(root: &Path) -> Result<Vec<PathBuf>> {
     let mut pending = vec![(root.to_path_buf(), 0usize)];
     let mut files = Vec::new();
     let mut total_bytes = 0u64;
     while let Some((path, depth)) = pending.pop() {
         let metadata = std::fs::symlink_metadata(&path)
-            .with_context(|| format!("inspect {}", path.display()))?;
+            .with_context(|| format!("inspect {}", terminal_safe_path(&path)))?;
         if metadata.file_type().is_symlink() {
             return Err(anyhow!(
                 "symlink ingestion is not allowed: {}",
-                path.display()
+                terminal_safe_path(&path)
             ));
         }
         if metadata.is_dir() {
@@ -294,7 +337,10 @@ fn input_files(root: &Path) -> Result<Vec<PathBuf>> {
             pending.extend(children.into_iter().rev().map(|child| (child, depth + 1)));
         } else if metadata.is_file() {
             if metadata.len() > 50_000_000 {
-                return Err(anyhow!("evidence exceeds 50 MB: {}", path.display()));
+                return Err(anyhow!(
+                    "evidence exceeds 50 MB: {}",
+                    terminal_safe_path(&path)
+                ));
             }
             total_bytes = total_bytes
                 .checked_add(metadata.len())
@@ -307,63 +353,158 @@ fn input_files(root: &Path) -> Result<Vec<PathBuf>> {
                 return Err(anyhow!("ingest directory exceeds 1000 files"));
             }
         } else {
-            return Err(anyhow!("unsupported ingest file: {}", path.display()));
+            return Err(anyhow!(
+                "unsupported ingest file: {}",
+                terminal_safe_path(&path)
+            ));
         }
     }
     Ok(files)
 }
 
 fn read_evidence(path: &Path) -> Result<Vec<u8>> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt as _;
+        options.custom_flags(0x0020_0000); // FILE_FLAG_OPEN_REPARSE_POINT
+    }
+    let file = options.open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(anyhow!("ingest input is not a regular file"));
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt as _;
+        if metadata.file_attributes() & 0x400 != 0 {
+            return Err(anyhow!("ingest input is a reparse point"));
+        }
+    }
     let mut bytes = Vec::new();
-    File::open(path)?
-        .take(50_000_001)
+    file.take(50_000_001)
         .read_to_end(&mut bytes)
-        .with_context(|| format!("read {}", path.display()))?;
+        .with_context(|| format!("read {}", terminal_safe_path(path)))?;
     if bytes.len() > 50_000_000 {
-        return Err(anyhow!("evidence exceeds 50 MB: {}", path.display()));
+        return Err(anyhow!(
+            "evidence exceeds 50 MB: {}",
+            terminal_safe_path(path)
+        ));
     }
     Ok(bytes)
 }
 
+fn audit_source_name(root: &Path, file: &Path) -> Result<String> {
+    let relative = if root.is_dir() {
+        file.strip_prefix(root)
+            .context("ingest path escaped its root")?
+    } else {
+        file.file_name()
+            .map(Path::new)
+            .ok_or_else(|| anyhow!("ingest file has no name"))?
+    };
+    let mut parts = Vec::new();
+    for part in relative.components() {
+        match part {
+            std::path::Component::Normal(value) => {
+                let value = value
+                    .to_str()
+                    .ok_or_else(|| anyhow!("non-UTF-8 ingest path"))?;
+                if value.contains(['/', '\\', ':']) || value == "." || value == ".." {
+                    return Err(anyhow!("invalid ingest path component"));
+                }
+                parts.push(value);
+            }
+            _ => return Err(anyhow!("ingest path must be relative")),
+        }
+    }
+    if parts.is_empty() {
+        return Err(anyhow!("ingest path has no file name"));
+    }
+    Ok(parts.join("/"))
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    if let Command::VerifyExport { path } = &cli.command {
-        let (public_key, entries) = verify_export(path)?;
-        println!("verified {entries} audit entries; public key {public_key}");
+    let cancel = CancellationToken::new();
+    let signal_cancel = cancel.clone();
+    std::thread::spawn(move || {
+        if let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            let _ = runtime.block_on(tokio::signal::ctrl_c());
+            signal_cancel.cancel();
+        } else {
+            signal_cancel.cancel();
+        }
+    });
+    if let Command::VerifyExport { path, expected_key } = &cli.command {
+        let (fingerprint, entries) = verify_export_expected(path, expected_key.as_deref())?;
+        println!("verified {entries} audit entries; analyst key fingerprint {fingerprint}");
         return Ok(());
     }
-    let home = cli.home.unwrap_or_else(|| PathBuf::from(".irmind"));
-    let store = LocalStore::open(&home)?;
-    let signer = LocalSigner::load_or_create(Actor::Analyst)
-        .context("load analyst signing key from system keyring")?;
-    let guard = MandatoryGuard::new()?;
+    let home = match cli.home {
+        Some(path) => path,
+        None => ProjectDirs::from("", "IRMind", "IRMind")
+            .ok_or_else(|| anyhow!("cannot determine the user's standard data directory"))?
+            .data_local_dir()
+            .to_path_buf(),
+    };
+    let store = Arc::new(LocalStore::open(&home)?);
+    let signer = Arc::new(
+        LocalSigner::load_or_create(Actor::Analyst)
+            .context("load analyst signing key from system keyring")?,
+    );
+    let mut verifier = LocalVerifier::from_signer(signer.as_ref());
+    for case in store.list_cases()? {
+        for entry in store.entries(&case.id)? {
+            if entry.actor != signer.actor() {
+                let key = LocalSigner::public_key_for_actor(&entry.actor).with_context(|| {
+                    format!("load trusted public key for {}", entry.actor.as_storage())
+                })?;
+                verifier = verifier.with_trusted_key(&entry.actor, &key)?;
+            }
+        }
+    }
+    let guard = Arc::new(MandatoryGuard::new()?);
     let mut registry = ModuleRegistry::new();
-    registry.register(Box::new(JsonParser))?;
+    registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
     if matches!(&cli.command, Command::Ask { .. } | Command::Tui { .. }) {
         match cli
             .llm_module
             .as_deref()
             .ok_or_else(|| anyhow!("select an approved LLM explicitly with --llm-module"))?
         {
-            DEFAULT_LLM_MODULE => registry.register(Box::new(OpenAiCompatible::from_env()?))?,
+            DEFAULT_LLM_MODULE => register_configured!(
+                registry,
+                OpenAiCompatible,
+                irmind_mod_llm_openai_compatible::MANIFEST
+            ),
             #[cfg(feature = "llm-anthropic")]
             irmind_mod_llm_anthropic::MODULE_ID => {
-                registry.register(Box::new(Anthropic::from_env()?))?;
+                register_configured!(registry, Anthropic, irmind_mod_llm_anthropic::MANIFEST);
             }
             #[cfg(feature = "llm-deepseek")]
             irmind_mod_llm_deepseek::MODULE_ID => {
-                registry.register(Box::new(DeepSeek::from_env()?))?;
+                register_configured!(registry, DeepSeek, irmind_mod_llm_deepseek::MANIFEST);
             }
             #[cfg(feature = "llm-openrouter")]
             irmind_mod_llm_openrouter::MODULE_ID => {
-                registry.register(Box::new(OpenRouter::from_env()?))?;
+                register_configured!(registry, OpenRouter, irmind_mod_llm_openrouter::MANIFEST);
             }
             _ => return Err(anyhow!("LLM module is not compiled into this binary")),
         }
     }
     #[cfg(feature = "siem-splunk")]
     if cli.enable_splunk {
-        registry.register(Box::new(Splunk::from_env()?))?;
+        register_configured!(registry, Splunk, irmind_mod_siem_splunk::MANIFEST);
     }
     #[cfg(not(feature = "siem-splunk"))]
     if cli.enable_splunk {
@@ -373,7 +514,7 @@ fn main() -> Result<()> {
     }
     #[cfg(feature = "ti-misp")]
     if cli.enable_misp {
-        registry.register(Box::new(Misp::from_env()?))?;
+        register_configured!(registry, Misp, irmind_mod_ti_misp::MANIFEST);
     }
     #[cfg(not(feature = "ti-misp"))]
     if cli.enable_misp {
@@ -381,7 +522,7 @@ fn main() -> Result<()> {
     }
     #[cfg(feature = "cloud-aws")]
     if cli.enable_aws {
-        registry.register(Box::new(AwsCloudTrail::from_env()?))?;
+        register_configured!(registry, AwsCloudTrail, irmind_mod_cloud_aws::MANIFEST);
     }
     #[cfg(not(feature = "cloud-aws"))]
     if cli.enable_aws {
@@ -391,7 +532,7 @@ fn main() -> Result<()> {
     }
     #[cfg(feature = "edr-crowdstrike")]
     if cli.enable_crowdstrike {
-        registry.register(Box::new(CrowdStrike::from_env()?))?;
+        register_configured!(registry, CrowdStrike, irmind_mod_edr_crowdstrike::MANIFEST);
     }
     #[cfg(not(feature = "edr-crowdstrike"))]
     if cli.enable_crowdstrike {
@@ -401,7 +542,7 @@ fn main() -> Result<()> {
     }
     #[cfg(feature = "edr-sentinelone")]
     if cli.enable_sentinelone {
-        registry.register(Box::new(SentinelOne::from_env()?))?;
+        register_configured!(registry, SentinelOne, irmind_mod_edr_sentinelone::MANIFEST);
     }
     #[cfg(not(feature = "edr-sentinelone"))]
     if cli.enable_sentinelone {
@@ -411,7 +552,7 @@ fn main() -> Result<()> {
     }
     #[cfg(feature = "ti-virustotal")]
     if cli.enable_virustotal {
-        registry.register(Box::new(VirusTotal::from_env()?))?;
+        register_configured!(registry, VirusTotal, irmind_mod_ti_virustotal::MANIFEST);
     }
     #[cfg(not(feature = "ti-virustotal"))]
     if cli.enable_virustotal {
@@ -420,10 +561,15 @@ fn main() -> Result<()> {
         ));
     }
     let mut engine = registry.bind(Engine::new(
-        &store,
-        &signer,
-        &guard,
-        registry.parser()?,
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(signer.clone(), Arc::new(verifier)),
+            guard.clone(),
+            registry.parser()?,
+        ),
         ExecutionMode::Attended,
     )?)?;
     if let Some(path) = &cli.policy {
@@ -451,7 +597,7 @@ fn main() -> Result<()> {
                         "{}\t{}\t{}",
                         case.id.as_str(),
                         if case.sealed { "sealed" } else { "open" },
-                        irmind_app::ContentGuard::screen(&guard, &case.title)?.text
+                        irmind_app::ContentGuard::screen(guard.as_ref(), &case.title)?.text
                     );
                 }
             }
@@ -460,9 +606,9 @@ fn main() -> Result<()> {
                 println!(
                     "{}\nTitle: {}\nSeverity: {}\nScope: {}\nSealed: {}",
                     case.id.as_str(),
-                    irmind_app::ContentGuard::screen(&guard, &case.title)?.text,
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &case.title)?.text,
                     case.severity.as_str(),
-                    irmind_app::ContentGuard::screen(&guard, &case.scope)?.text,
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &case.scope)?.text,
                     case.sealed
                 );
             }
@@ -473,7 +619,7 @@ fn main() -> Result<()> {
         },
         Command::Ingest { case_id, path } => {
             let id = parse_id(&case_id)?;
-            engine.verify(&id)?;
+            engine.verify_cancelable(&id, &cancel)?;
             if store.get_case(&id)?.sealed {
                 return Err(anyhow!("case is sealed"));
             }
@@ -485,15 +631,23 @@ fn main() -> Result<()> {
                 .filter_map(|entry| entry.evidence)
                 .collect();
             for file in files {
+                if cancel.is_cancelled() {
+                    return Err(anyhow!("ingest cancelled"));
+                }
                 let bytes = read_evidence(&file)?;
                 let hash = irmind_app::hex(&irmind_app::sha256(&bytes));
                 if indexed.contains(&hash) {
-                    println!("skipped {hash} {}", file.display());
+                    println!("skipped {hash} {}", terminal_safe_path(&file));
                     continue;
                 }
-                let ingested = engine.ingest(&id, &bytes, &file.display().to_string())?;
+                let ingested = engine.ingest_cancelable(
+                    &id,
+                    &bytes,
+                    &audit_source_name(&path, &file)?,
+                    &cancel,
+                )?;
                 indexed.insert(ingested.clone());
-                println!("{ingested} {}", file.display());
+                println!("{ingested} {}", terminal_safe_path(&file));
             }
         }
         Command::Ask { case_id, alert } => {
@@ -503,7 +657,7 @@ fn main() -> Result<()> {
                 })?)?;
             println!(
                 "{}",
-                engine.investigate(&parse_id(&case_id)?, &alert, model)?
+                engine.investigate_with_cancel(&parse_id(&case_id)?, &alert, model, &cancel)?
             );
         }
         Command::Approvals { case_id } => {
@@ -586,7 +740,7 @@ fn main() -> Result<()> {
                     } else {
                         "proposed"
                     },
-                    irmind_app::ContentGuard::screen(&guard, &finding.value)?.text,
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &finding.value)?.text,
                     finding.evidence_hash
                 );
             }
@@ -610,24 +764,35 @@ fn main() -> Result<()> {
                 }
                 let mut file = options
                     .open(&path)
-                    .with_context(|| format!("open {}", path.display()))?;
+                    .with_context(|| format!("open {}", terminal_safe_path(&path)))?;
+                irmind_infra::private_file(&path)?;
                 file.write_all(&bytes)?;
                 file.sync_all()?;
             } else {
                 println!(
                     "{}",
-                    irmind_app::ContentGuard::screen(&guard, &String::from_utf8_lossy(&bytes))?
-                        .text
+                    irmind_app::ContentGuard::screen(
+                        guard.as_ref(),
+                        &String::from_utf8_lossy(&bytes)
+                    )?
+                    .text
                 );
             }
         }
         Command::Verify { case_id } => println!(
             "verified {} audit entries",
-            engine.verify(&parse_id(&case_id)?)?
+            engine.verify_cancelable(&parse_id(&case_id)?, &cancel)?
         ),
         Command::Seal { case_id } => {
-            engine.seal(&parse_id(&case_id)?)?;
-            println!("case sealed");
+            let id = parse_id(&case_id)?;
+            engine.seal(&id)?;
+            let seal = store
+                .case_seal(&id)?
+                .ok_or_else(|| anyhow!("case seal missing"))?;
+            println!(
+                "case sealed; analyst key fingerprint {}",
+                seal.analyst_key_fingerprint
+            );
         }
         Command::Graph { case_id } => {
             let id = parse_id(&case_id)?;
@@ -635,16 +800,16 @@ fn main() -> Result<()> {
             let summary = store.graph_summary(&id)?;
             println!(
                 "{}",
-                irmind_app::ContentGuard::screen(&guard, &summary)?.text
+                irmind_app::ContentGuard::screen(guard.as_ref(), &summary)?.text
             );
         }
         Command::GraphRebuild { case_id } => println!(
             "rebuilt {} graph records",
-            engine.rebuild_graph(&parse_id(&case_id)?)?
+            engine.rebuild_graph_cancelable(&parse_id(&case_id)?, &cancel)?
         ),
         Command::VerifyGraph { case_id } => println!(
             "verified {} graph records",
-            engine.verify_graph(&parse_id(&case_id)?)?
+            engine.verify_graph_cancelable(&parse_id(&case_id)?, &cancel)?
         ),
         Command::Timeline { case_id } => {
             let id = parse_id(&case_id)?;
@@ -654,7 +819,10 @@ fn main() -> Result<()> {
                     "{} {} [{}#{}]",
                     event.at, event.event, event.evidence_hash, event.record_index
                 );
-                println!("{}", irmind_app::ContentGuard::screen(&guard, &line)?.text);
+                println!(
+                    "{}",
+                    irmind_app::ContentGuard::screen(guard.as_ref(), &line)?.text
+                );
             }
         }
         Command::Entity {
@@ -667,7 +835,7 @@ fn main() -> Result<()> {
             let result = store.entity_lookup(&id, &kind, &value)?;
             println!(
                 "{}",
-                irmind_app::ContentGuard::screen(&guard, &result)?.text
+                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
             );
         }
         Command::Neighbors {
@@ -681,7 +849,7 @@ fn main() -> Result<()> {
             let result = store.neighbors(&id, &kind, &value, limit)?;
             println!(
                 "{}",
-                irmind_app::ContentGuard::screen(&guard, &result)?.text
+                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
             );
         }
         Command::EntityTimeline {
@@ -695,7 +863,7 @@ fn main() -> Result<()> {
             let result = store.entity_timeline(&id, &kind, &value, limit)?;
             println!(
                 "{}",
-                irmind_app::ContentGuard::screen(&guard, &result)?.text
+                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
             );
         }
         Command::GraphPath {
@@ -710,7 +878,7 @@ fn main() -> Result<()> {
             let result = store.graph_path(&id, (&from_kind, &from_value), (&to_kind, &to_value))?;
             println!(
                 "{}",
-                irmind_app::ContentGuard::screen(&guard, &result)?.text
+                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
             );
         }
         Command::TextSearch {
@@ -723,7 +891,7 @@ fn main() -> Result<()> {
             let result = store.text_search(&id, &query, limit)?;
             println!(
                 "{}",
-                irmind_app::ContentGuard::screen(&guard, &result)?.text
+                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
             );
         }
         Command::RawRecords {
@@ -736,14 +904,14 @@ fn main() -> Result<()> {
             let result = store.raw_record(&id, &hash, index)?;
             println!(
                 "{}",
-                irmind_app::ContentGuard::screen(&guard, &result)?.text
+                irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
             );
         }
         Command::Export { case_id, path } => {
             let id = parse_id(&case_id)?;
-            engine.verify(&id)?;
-            let public_key = store.export_case(&id, &path)?;
-            println!("exported case; public key {public_key}");
+            engine.verify_cancelable(&id, &cancel)?;
+            let fingerprint = store.export_case(&id, &path)?;
+            println!("exported case; analyst key fingerprint {fingerprint}");
         }
         Command::VerifyExport { .. } => {
             return Err(anyhow!(
@@ -751,14 +919,13 @@ fn main() -> Result<()> {
             ));
         }
         Command::Tui { case_id } => {
-            tui::run(
+            irmind_tui::run(
                 &engine,
-                &store,
-                &guard,
                 registry.llm(cli.llm_module.as_deref().ok_or_else(|| {
                     anyhow!("select an approved LLM explicitly with --llm-module")
                 })?)?,
                 &parse_id(&case_id)?,
+                &cancel,
             )?;
         }
     }
@@ -790,6 +957,11 @@ mod input_tests {
                 PathBuf::from("nested/c.json")
             ]
         );
+        assert_eq!(
+            audit_source_name(root.path(), &files[2]).unwrap(),
+            "nested/c.json"
+        );
+        assert_eq!(audit_source_name(&files[0], &files[0]).unwrap(), "a.json");
     }
 
     #[cfg(unix)]
@@ -799,5 +971,29 @@ mod input_tests {
         std::fs::write(root.path().join("real.json"), b"{}").unwrap();
         std::os::unix::fs::symlink("real.json", root.path().join("link.json")).unwrap();
         assert!(input_files(root.path()).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn evidence_reader_refuses_a_swapped_symlink() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("target.json");
+        std::fs::write(&target, b"{}").unwrap();
+        let link = root.path().join("swapped.json");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        assert!(super::read_evidence(&link).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ingest_errors_escape_control_characters_in_file_names() {
+        let root = tempfile::tempdir().unwrap();
+        let target = root.path().join("target.json");
+        std::fs::write(&target, b"synthetic").unwrap();
+        let malicious = root.path().join("bad\u{1b}[31m.txt");
+        std::os::unix::fs::symlink(&target, &malicious).unwrap();
+        let error = input_files(root.path()).unwrap_err().to_string();
+        assert!(!error.contains('\u{1b}'));
+        assert!(error.contains("\\u{1b}"));
     }
 }

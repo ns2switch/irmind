@@ -2,27 +2,24 @@
 
 use chrono::DateTime;
 use irmind_app::{
-    AppError, EdrPort,
-    modules::{ConfigField, Module, ModuleManifest, ModulePort, ModuleRegistry},
+    AppError, CancellationToken, EdrPort, async_trait,
+    modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use irmind_domain::{AuthorizedCall, Tool};
-use reqwest::{
-    Url,
-    blocking::{Client, RequestBuilder},
-};
+use reqwest::Url;
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::Value;
-use std::{io::Read as _, time::Duration};
+use std::time::Duration;
 
 pub struct SentinelOne {
-    client: Client,
+    async_client: reqwest::Client,
     base: Url,
     token: SecretString,
     source_id: String,
     site_id: String,
 }
 
-static MANIFEST: ModuleManifest = ModuleManifest {
+pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: "edr-sentinelone",
     version: "0.1.0",
     ports: &[ModulePort::Edr],
@@ -55,17 +52,18 @@ impl Module for SentinelOne {
     fn manifest(&self) -> &'static ModuleManifest {
         &MANIFEST
     }
-    fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        _config: &ModuleConfig,
+    ) -> Result<(), AppError> {
         registry.add_edr(self)
     }
 }
 
 impl SentinelOne {
-    pub fn from_env() -> Result<Self, AppError> {
-        let setting = |name| {
-            std::env::var(name)
-                .map_err(|_| AppError::Policy(format!("{name} is required for SentinelOne")))
-        };
+    pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
+        let setting = |name| config.required_value(name).map(str::to_owned);
         let base = Url::parse(&setting("IRMIND_SENTINELONE_URL")?)
             .map_err(|_| AppError::Policy("invalid SentinelOne URL".into()))?;
         if base.scheme() != "https"
@@ -88,13 +86,21 @@ impl SentinelOne {
         if !digits(&site_id) {
             return Err(AppError::Policy("invalid SentinelOne site ID".into()));
         }
-        let token = setting("IRMIND_SENTINELONE_API_TOKEN")?;
+        let token = config
+            .required_secret("IRMIND_SENTINELONE_API_TOKEN")?
+            .expose_secret()
+            .to_owned();
         if token.trim().is_empty() {
             return Err(AppError::Policy("empty SentinelOne API token".into()));
         }
-        let client = Self::http_client()?;
+        let async_client = reqwest::Client::builder()
+            .use_rustls_tls()
+            .timeout(Duration::from_secs(30))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|_| AppError::Storage("cannot create SentinelOne HTTP client".into()))?;
         Ok(Self {
-            client,
+            async_client,
             base,
             token: SecretString::from(token),
             source_id,
@@ -102,54 +108,10 @@ impl SentinelOne {
         })
     }
 
-    fn http_client() -> Result<Client, AppError> {
-        Client::builder()
-            .timeout(Duration::from_secs(30))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|_| AppError::Storage("cannot create SentinelOne HTTP client".into()))
-    }
-
     fn endpoint(&self, path: &str) -> Result<Url, AppError> {
         self.base
             .join(path)
             .map_err(|_| AppError::Policy("invalid SentinelOne endpoint".into()))
-    }
-
-    fn get(&self, path: &str, params: &[(&str, &str)]) -> Result<Value, AppError> {
-        let url = self.endpoint(path)?;
-        Self::request(
-            self.client
-                .get(url)
-                .header(
-                    "Authorization",
-                    format!("ApiToken {}", self.token.expose_secret()),
-                )
-                .query(params),
-        )
-    }
-
-    fn request(request: RequestBuilder) -> Result<Value, AppError> {
-        let mut response = request
-            .send()
-            .map_err(|_| AppError::Storage("SentinelOne request failed".into()))?;
-        if !response.status().is_success() {
-            return Err(AppError::Storage(format!(
-                "SentinelOne returned status {}",
-                response.status()
-            )));
-        }
-        let mut raw = Vec::new();
-        response
-            .by_ref()
-            .take(5_000_001)
-            .read_to_end(&mut raw)
-            .map_err(|_| AppError::Storage("SentinelOne response failed".into()))?;
-        if raw.len() > 5_000_000 {
-            return Err(AppError::Policy("SentinelOne response exceeds 5 MB".into()));
-        }
-        serde_json::from_slice(&raw)
-            .map_err(|_| AppError::Storage("invalid SentinelOne JSON".into()))
     }
 
     fn checked_call<'a>(&self, call: &'a AuthorizedCall, tool: &Tool) -> Result<&'a str, AppError> {
@@ -165,26 +127,84 @@ impl SentinelOne {
         Ok(host)
     }
 
-    fn agent(&self, host: &str) -> Result<Value, AppError> {
-        let response = self.get(
-            "/web/api/v2.1/agents",
-            &[
-                ("siteIds", &self.site_id),
-                ("computerName", host),
-                ("limit", "2"),
-            ],
-        )?;
-        select_agent(&response, host, &self.site_id)
-    }
-
     fn agent_id(agent: &Value) -> Result<&str, AppError> {
         agent["id"]
             .as_str()
             .filter(|id| digits(id))
             .ok_or_else(|| AppError::Storage("SentinelOne agent has no valid ID".into()))
     }
+
+    async fn request_async(
+        request: reqwest::RequestBuilder,
+        cancel: &CancellationToken,
+    ) -> Result<Value, AppError> {
+        let mut response = tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(AppError::Cancelled),
+            result = request.send() => result.map_err(|_| AppError::Storage("SentinelOne request failed".into()))?,
+        };
+        if !response.status().is_success() {
+            return Err(AppError::Storage(format!(
+                "SentinelOne returned status {}",
+                response.status()
+            )));
+        }
+        let mut raw = Vec::new();
+        loop {
+            let chunk = tokio::select! {
+                biased;
+                () = cancel.cancelled() => return Err(AppError::Cancelled),
+                result = response.chunk() => result.map_err(|_| AppError::Storage("SentinelOne response failed".into()))?,
+            };
+            let Some(chunk) = chunk else {
+                break;
+            };
+            if raw.len().saturating_add(chunk.len()) > 5_000_000 {
+                return Err(AppError::Policy("SentinelOne response exceeds 5 MB".into()));
+            }
+            raw.extend_from_slice(&chunk);
+        }
+        serde_json::from_slice(&raw)
+            .map_err(|_| AppError::Storage("invalid SentinelOne JSON".into()))
+    }
+
+    async fn get_async(
+        &self,
+        path: &str,
+        params: &[(&str, &str)],
+        cancel: &CancellationToken,
+    ) -> Result<Value, AppError> {
+        let url = self.endpoint(path)?;
+        Self::request_async(
+            self.async_client
+                .get(url)
+                .header(
+                    "Authorization",
+                    format!("ApiToken {}", self.token.expose_secret()),
+                )
+                .query(params),
+            cancel,
+        )
+        .await
+    }
+
+    async fn agent_async(&self, host: &str, cancel: &CancellationToken) -> Result<Value, AppError> {
+        let response = self
+            .get_async(
+                "/web/api/v2.1/agents",
+                &[
+                    ("siteIds", &self.site_id),
+                    ("computerName", host),
+                    ("limit", "2"),
+                ],
+                cancel,
+            )
+            .await?;
+        select_agent(&response, host, &self.site_id)
+    }
 }
 
+#[async_trait]
 impl EdrPort for SentinelOne {
     fn source_id(&self) -> &str {
         &self.source_id
@@ -199,31 +219,61 @@ impl EdrPort for SentinelOne {
         Some("use threat_id:event_id from a threat's Explore process event")
     }
 
-    fn host_info(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+    async fn execute(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
+        match call.tool() {
+            Tool::EdrHostInfo => self.host_info_async(call, cancel).await,
+            Tool::EdrDetections => self.detections_async(call, cancel).await,
+            Tool::EdrProcessTree => self.process_tree_async(call, cancel).await,
+            _ => Err(AppError::Policy("invalid SentinelOne tool".into())),
+        }
+    }
+}
+
+impl SentinelOne {
+    async fn host_info_async(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
         let host = self.checked_call(call, &Tool::EdrHostInfo)?;
-        encode(&self.agent(host)?)
+        encode(&self.agent_async(host, cancel).await?)
     }
 
-    fn detections(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+    async fn detections_async(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
         let host = self.checked_call(call, &Tool::EdrDetections)?;
         let (from, to) = window(call)?;
-        let agent = self.agent(host)?;
+        let agent = self.agent_async(host, cancel).await?;
         let id = Self::agent_id(&agent)?;
-        let response = self.get(
-            "/web/api/v2.1/threats",
-            &[
-                ("siteIds", &self.site_id),
-                ("agentIds", id),
-                ("createdAt__gte", from),
-                ("createdAt__lte", to),
-                ("limit", "20"),
-            ],
-        )?;
+        let response = self
+            .get_async(
+                "/web/api/v2.1/threats",
+                &[
+                    ("siteIds", &self.site_id),
+                    ("agentIds", id),
+                    ("createdAt__gte", from),
+                    ("createdAt__lte", to),
+                    ("limit", "20"),
+                ],
+                cancel,
+            )
+            .await?;
         validate_threats(&response, id, &self.site_id, from, to)?;
         encode(&response)
     }
 
-    fn process_tree(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+    async fn process_tree_async(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
         let host = self.checked_call(call, &Tool::EdrProcessTree)?;
         let process_id = call
             .arg("process_id")
@@ -234,17 +284,20 @@ impl EdrPort for SentinelOne {
         if !digits(threat_id) || !safe_id(event_id) {
             return Err(AppError::Policy("invalid SentinelOne process ID".into()));
         }
-        let agent = self.agent(host)?;
+        let agent = self.agent_async(host, cancel).await?;
         let id = Self::agent_id(&agent)?;
-        let threats = self.get(
-            "/web/api/v2.1/threats",
-            &[
-                ("siteIds", &self.site_id),
-                ("agentIds", id),
-                ("ids", threat_id),
-                ("limit", "2"),
-            ],
-        )?;
+        let threats = self
+            .get_async(
+                "/web/api/v2.1/threats",
+                &[
+                    ("siteIds", &self.site_id),
+                    ("agentIds", id),
+                    ("ids", threat_id),
+                    ("limit", "2"),
+                ],
+                cancel,
+            )
+            .await?;
         let rows = data_array(&threats)?;
         if rows.len() != 1
             || rows[0]["id"].as_str() != Some(threat_id)
@@ -256,7 +309,9 @@ impl EdrPort for SentinelOne {
             ));
         }
         let path = format!("/web/api/v2.1/threats/{threat_id}/explore/events");
-        let events = self.get(&path, &[("eventId", event_id), ("limit", "20")])?;
+        let events = self
+            .get_async(&path, &[("eventId", event_id), ("limit", "20")], cancel)
+            .await?;
         if data_array(&events)?.len() > 20 {
             return Err(AppError::Policy(
                 "SentinelOne process tree exceeds limit".into(),
@@ -371,7 +426,11 @@ mod tests {
 
         fn build(&self, origin: &str) -> Box<dyn EdrPort> {
             Box::new(SentinelOne {
-                client: SentinelOne::http_client().unwrap(),
+                async_client: reqwest::Client::builder()
+                    .use_rustls_tls()
+                    .redirect(reqwest::redirect::Policy::none())
+                    .build()
+                    .unwrap(),
                 base: Url::parse(origin).unwrap(),
                 token: SecretString::from("TEST_TOKEN".to_owned()),
                 source_id: self.source_id().into(),

@@ -1,0 +1,21 @@
+error[E0271]: expected `clone` to return `()`, but it returns `String`
+ --> tests/ui/taint_visit_cannot_return_raw.rs:8:40
+  |
+8 |     let _raw: String = tainted.inspect(Clone::clone);
+  |                                ------- ^^^^^^^^^^^^ expected `()`, found `String`
+  |                                |
+  |                                required by a bound introduced by this call
+  |
+note: required by a bound in `Tainted::<T>::inspect`
+ --> src/lib.rs
+  |
+  |     pub fn inspect(&self, visitor: impl FnOnce(&T)) {
+  |                                         ^^^^^^^^^^ required by this bound in `Tainted::<T>::inspect`
+
+error[E0308]: mismatched types
+ --> tests/ui/taint_visit_cannot_return_raw.rs:8:24
+  |
+8 |     let _raw: String = tainted.inspect(Clone::clone);
+  |               ------   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `String`, found `()`
+  |               |
+  |               expected due to this

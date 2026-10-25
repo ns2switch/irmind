@@ -7,3 +7,9 @@ license.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+sha2 = "0.10"
+
+[dev-dependencies]
+trybuild = "1"

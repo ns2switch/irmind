@@ -2,12 +2,15 @@
 
 //! Shared, offline contract suites for product adapters.
 
+use ed25519_dalek::{Signer as _, SigningKey, Verifier as _};
 use irmind_app::{
-    AppError, EdrPort,
-    modules::{Module, ModuleManifest, ModulePort, ModuleRegistry},
+    AppError, CancellationToken, CloudAuditPort, CompletionMessage, CompletionRequest, EdrPort,
+    InternalIntelPort, LlmPort, MessageRole, SiemPort, ThreatIntelPort, collect_model_stream,
+    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use irmind_domain::{
-    AuthorizedCall, Case, CaseId, Decision, ExecutionMode, ProposedCall, Severity, Tool, evaluate,
+    AnalystApprovalVerifier, AuthorizedCall, Case, CaseId, Decision, ExecutionMode, ProposedCall,
+    Severity, Tool, evaluate,
 };
 use std::{
     collections::BTreeMap,
@@ -55,11 +58,16 @@ impl Module for FakeEdr {
     fn manifest(&self) -> &'static ModuleManifest {
         &FAKE_EDR_MANIFEST
     }
-    fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        _config: &ModuleConfig,
+    ) -> Result<(), AppError> {
         registry.add_edr(self)
     }
 }
 
+#[irmind_app::async_trait]
 impl EdrPort for FakeEdr {
     fn source_id(&self) -> &str {
         &self.source_id
@@ -67,17 +75,11 @@ impl EdrPort for FakeEdr {
     fn supports(&self, tool: &Tool) -> bool {
         tool == &Tool::EdrDetections
     }
-    fn host_info(&self, _call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
-        Err(AppError::Policy(
-            "fake EDR host lookup is unavailable".into(),
-        ))
-    }
-    fn process_tree(&self, _call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
-        Err(AppError::Policy(
-            "fake EDR process tree is unavailable".into(),
-        ))
-    }
-    fn detections(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+    async fn execute(
+        &self,
+        call: &AuthorizedCall,
+        _cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
         if call.tool() != &Tool::EdrDetections
             || call.arg("source") != Some(self.source_id())
             || call.arg("host") != Some(self.host.as_str())
@@ -220,7 +222,7 @@ pub fn run_edr_contract(fixture: &impl EdrFixture) -> Result<(), String> {
         run_scenario(fixture, scenario)?;
     }
     run_preflight(fixture, Tool::EdrHostInfo, "another-edr", true)?;
-    run_preflight(fixture, Tool::EdrDetections, source, true)?;
+    run_preflight(fixture, Tool::EdrDetections, "another-edr", true)?;
     run_long_window(fixture)?;
     run_scenario(fixture, EdrScenario::ProcessTree)?;
     run_scenario(fixture, EdrScenario::ProcessTreeCrossHost)?;
@@ -299,7 +301,8 @@ fn run_preflight(
         "2026-10-23T00:00:00Z",
         "2026-10-23T23:59:59Z",
     )?;
-    let result = port.host_info(&call);
+    let cancel = CancellationToken::new();
+    let result = run_port(port.execute(&call, &cancel));
     let requests = server.finish()?;
     if !requests.is_empty() || (should_fail && result.is_ok()) {
         return Err("wrong source or tool reached the EDR network".into());
@@ -319,7 +322,8 @@ fn run_long_window(fixture: &impl EdrFixture) -> Result<(), String> {
         "2026-10-22T00:00:00Z",
         "2026-10-23T23:59:59Z",
     )?;
-    let result = port.detections(&call);
+    let cancel = CancellationToken::new();
+    let result = run_port(port.execute(&call, &cancel));
     let requests = server.finish()?;
     if result.is_ok() || !requests.is_empty() {
         return Err("overlong detection window reached the EDR network".into());
@@ -328,14 +332,26 @@ fn run_long_window(fixture: &impl EdrFixture) -> Result<(), String> {
 }
 
 fn dispatch(port: &dyn EdrPort, call: &AuthorizedCall) -> Result<Vec<u8>, irmind_app::AppError> {
+    let cancel = CancellationToken::new();
     match call.tool() {
-        Tool::EdrHostInfo => port.host_info(call),
-        Tool::EdrDetections => port.detections(call),
-        Tool::EdrProcessTree => port.process_tree(call),
+        Tool::EdrHostInfo | Tool::EdrDetections | Tool::EdrProcessTree => {
+            run_port(port.execute(call, &cancel))
+        }
         _ => Err(irmind_app::AppError::Policy(
             "non-EDR tool in contract".into(),
         )),
     }
+}
+
+fn run_port<F>(future: F) -> Result<Vec<u8>, AppError>
+where
+    F: std::future::Future<Output = Result<Vec<u8>, AppError>>,
+{
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| AppError::Storage(error.to_string()))?;
+    runtime.block_on(future)
 }
 
 fn authorized(
@@ -384,6 +400,322 @@ fn case(source: &str, host: &str, from: &str, to: &str) -> Result<Case, String> 
         severity: Severity::High,
         scope: format!("v1;sources={source};accounts=;hosts={host};from={from};to={to}"),
         sealed: false,
+    })
+}
+
+struct ContractAnalyst(SigningKey);
+
+impl AnalystApprovalVerifier for ContractAnalyst {
+    fn verify_analyst(&self, message: &[u8], signature: &[u8]) -> bool {
+        let Ok(bytes): Result<[u8; 64], _> = signature.try_into() else {
+            return false;
+        };
+        self.0
+            .verifying_key()
+            .verify(message, &ed25519_dalek::Signature::from_bytes(&bytes))
+            .is_ok()
+    }
+}
+
+fn contract_call(
+    tool: Tool,
+    source: &str,
+    args: BTreeMap<String, String>,
+) -> Result<AuthorizedCall, String> {
+    let case = Case {
+        id: CaseId::parse("22222222-2222-2222-2222-222222222222")
+            .map_err(|error| format!("{error:?}"))?,
+        title: "port contract".into(),
+        severity: Severity::High,
+        scope: format!(
+            "v1;sources={source};accounts=123456789012;hosts=host-1;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z"
+        ),
+        sealed: false,
+    };
+    match evaluate(
+        &case,
+        ProposedCall { tool, args },
+        1,
+        ExecutionMode::Attended,
+    ) {
+        Decision::Allow(call) => Ok(call),
+        Decision::NeedsApproval(pending) => {
+            let analyst = ContractAnalyst(SigningKey::from_bytes(&[49; 32]));
+            let signature = analyst.0.sign(&pending.challenge());
+            pending
+                .resolve(&signature.to_bytes(), &analyst)
+                .map_err(|error| format!("signed approval failed: {error:?}"))
+        }
+        Decision::Deny(reason) => Err(format!("contract proposal denied: {reason}")),
+    }
+}
+
+fn contract_runtime() -> Result<tokio::runtime::Runtime, String> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| error.to_string())
+}
+
+pub fn run_siem_contract(port: &dyn SiemPort) -> Result<(), String> {
+    if port.source_id().is_empty() || port.dialect().is_empty() {
+        return Err("SIEM source or dialect is empty".into());
+    }
+    let args = |source: &str| {
+        BTreeMap::from([
+            ("source".into(), source.into()),
+            ("account".into(), "123456789012".into()),
+            ("from".into(), FROM.into()),
+            ("to".into(), TO.into()),
+            ("query".into(), "AssumeRole".into()),
+        ])
+    };
+    let call = contract_call(Tool::SiemSearch, port.source_id(), args(port.source_id()))?;
+    let wrong = contract_call(Tool::SiemSearch, "other-source", args("other-source"))?;
+    contract_runtime()?.block_on(async {
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        if !matches!(
+            port.execute(&call, &cancelled).await,
+            Err(AppError::Cancelled)
+        ) {
+            return Err("SIEM did not cancel a scoped search".into());
+        }
+        if port
+            .execute(&wrong, &CancellationToken::new())
+            .await
+            .is_ok()
+        {
+            return Err("SIEM accepted another source".into());
+        }
+        Ok(())
+    })
+}
+
+pub fn run_siem_recorded(
+    port: &dyn SiemPort,
+    server: MockServer,
+    expected_body: &[u8],
+) -> Result<Vec<RecordedRequest>, String> {
+    let call = contract_call(
+        Tool::SiemSearch,
+        port.source_id(),
+        BTreeMap::from([
+            ("source".into(), port.source_id().into()),
+            ("account".into(), "123456789012".into()),
+            ("from".into(), FROM.into()),
+            ("to".into(), TO.into()),
+            ("query".into(), "AssumeRole".into()),
+        ]),
+    )?;
+    let result = contract_runtime()?.block_on(port.execute(&call, &CancellationToken::new()));
+    let requests = server.finish()?;
+    if result.map_err(|error| error.to_string())? != expected_body {
+        return Err("SIEM recorded response differs".into());
+    }
+    Ok(requests)
+}
+
+pub fn run_cloud_audit_contract(port: &dyn CloudAuditPort) -> Result<(), String> {
+    if port.source_id().is_empty() {
+        return Err("cloud source is empty".into());
+    }
+    let events = |source: &str| {
+        BTreeMap::from([
+            ("source".into(), source.into()),
+            ("account".into(), "123456789012".into()),
+            ("from".into(), FROM.into()),
+            ("to".into(), TO.into()),
+            ("event_name".into(), "AssumeRole".into()),
+        ])
+    };
+    let identity = BTreeMap::from([
+        ("source".into(), port.source_id().into()),
+        ("account".into(), "123456789012".into()),
+        ("kind".into(), "role".into()),
+        ("name".into(), "SecurityAudit".into()),
+    ]);
+    let scoped = contract_call(
+        Tool::CloudAuditEvents,
+        port.source_id(),
+        events(port.source_id()),
+    )?;
+    let wrong = contract_call(
+        Tool::CloudAuditEvents,
+        "other-source",
+        events("other-source"),
+    )?;
+    let named = contract_call(Tool::CloudIdentity, port.source_id(), identity)?;
+    contract_runtime()?.block_on(async {
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        if !matches!(
+            port.execute(&scoped, &cancelled).await,
+            Err(AppError::Cancelled)
+        ) || !matches!(
+            port.execute(&named, &cancelled).await,
+            Err(AppError::Cancelled)
+        ) {
+            return Err("cloud read did not cancel".into());
+        }
+        if port
+            .execute(&wrong, &CancellationToken::new())
+            .await
+            .is_ok()
+        {
+            return Err("cloud module accepted another source".into());
+        }
+        Ok(())
+    })
+}
+
+pub fn run_cloud_audit_recorded(
+    port: &dyn CloudAuditPort,
+    expected_fragment: &str,
+) -> Result<Vec<u8>, String> {
+    let call = contract_call(
+        Tool::CloudAuditEvents,
+        port.source_id(),
+        BTreeMap::from([
+            ("source".into(), port.source_id().into()),
+            ("account".into(), "123456789012".into()),
+            ("from".into(), FROM.into()),
+            ("to".into(), TO.into()),
+            ("event_name".into(), "AssumeRole".into()),
+        ]),
+    )?;
+    let bytes = contract_runtime()?
+        .block_on(port.execute(&call, &CancellationToken::new()))
+        .map_err(|error| error.to_string())?;
+    if !String::from_utf8_lossy(&bytes).contains(expected_fragment) {
+        return Err("cloud recorded event missing from evidence".into());
+    }
+    Ok(bytes)
+}
+
+pub fn run_threat_intel_contract(port: &dyn ThreatIntelPort) -> Result<(), String> {
+    let proposal = ProposedCall {
+        tool: Tool::ThreatIntelExternal,
+        args: BTreeMap::from([("ioc".into(), "example.org".into())]),
+    };
+    let case = Case {
+        id: CaseId::parse("22222222-2222-2222-2222-222222222222")
+            .map_err(|error| format!("{error:?}"))?,
+        title: "TI contract".into(),
+        severity: Severity::High,
+        scope: "v1;sources=;accounts=;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z"
+            .into(),
+        sealed: false,
+    };
+    if !matches!(
+        evaluate(&case, proposal.clone(), 1, ExecutionMode::Attended),
+        Decision::NeedsApproval(_)
+    ) {
+        return Err("external intelligence did not require approval".into());
+    }
+    let call = contract_call(Tool::ThreatIntelExternal, "", proposal.args)?;
+    contract_runtime()?.block_on(async {
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        if !matches!(
+            port.execute(&call, &cancelled).await,
+            Err(AppError::Cancelled)
+        ) {
+            return Err("external intelligence did not cancel".into());
+        }
+        Ok(())
+    })
+}
+
+pub fn run_threat_intel_recorded(
+    port: &dyn ThreatIntelPort,
+    server: MockServer,
+    expected_body: &[u8],
+) -> Result<Vec<RecordedRequest>, String> {
+    let call = contract_call(
+        Tool::ThreatIntelExternal,
+        "",
+        BTreeMap::from([("ioc".into(), "example.org".into())]),
+    )?;
+    let result = contract_runtime()?.block_on(port.execute(&call, &CancellationToken::new()));
+    let requests = server.finish()?;
+    if result.map_err(|error| error.to_string())? != expected_body {
+        return Err("external intel recorded response differs".into());
+    }
+    Ok(requests)
+}
+
+pub fn run_internal_intel_contract(port: &dyn InternalIntelPort) -> Result<(), String> {
+    let args = BTreeMap::from([
+        ("source".into(), port.source_id().into()),
+        ("ioc".into(), "example.org".into()),
+    ]);
+    let call = contract_call(Tool::ThreatIntelInternal, port.source_id(), args)?;
+    contract_runtime()?.block_on(async {
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        if !matches!(
+            port.execute(&call, &cancelled).await,
+            Err(AppError::Cancelled)
+        ) {
+            return Err("internal intelligence did not cancel".into());
+        }
+        Ok(())
+    })
+}
+
+pub fn run_internal_intel_recorded(
+    port: &dyn InternalIntelPort,
+    server: MockServer,
+    expected_body: &[u8],
+) -> Result<Vec<RecordedRequest>, String> {
+    let call = contract_call(
+        Tool::ThreatIntelInternal,
+        port.source_id(),
+        BTreeMap::from([
+            ("source".into(), port.source_id().into()),
+            ("ioc".into(), "example.org".into()),
+        ]),
+    )?;
+    let result = contract_runtime()?.block_on(port.execute(&call, &CancellationToken::new()));
+    let requests = server.finish()?;
+    if result.map_err(|error| error.to_string())? != expected_body {
+        return Err("internal intel recorded response differs".into());
+    }
+    Ok(requests)
+}
+
+pub fn run_llm_contract(port: &dyn LlmPort) -> Result<(), String> {
+    if port.descriptor().is_empty() {
+        return Err("LLM descriptor is empty".into());
+    }
+    let request = |limit| CompletionRequest {
+        messages: vec![CompletionMessage {
+            role: MessageRole::User,
+            content: "synthetic incident".into(),
+        }],
+        tools: Vec::new(),
+        max_output_tokens: limit,
+        remaining_case_tokens: 100,
+    };
+    contract_runtime()?.block_on(async {
+        if port
+            .complete(request(0), &CancellationToken::new())
+            .await
+            .is_ok()
+        {
+            return Err("LLM accepted an empty output budget".into());
+        }
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        match port.complete(request(10), &cancelled).await {
+            Err(AppError::Cancelled) => Ok(()),
+            Ok(stream) => match collect_model_stream(stream, &cancelled).await {
+                Err(AppError::Cancelled) => Ok(()),
+                _ => Err("LLM ignored cancellation".into()),
+            },
+            _ => Err("LLM ignored cancellation".into()),
+        }
     })
 }
 

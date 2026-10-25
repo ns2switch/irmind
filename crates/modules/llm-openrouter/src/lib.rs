@@ -1,15 +1,16 @@
 #![forbid(unsafe_code)]
 
 use irmind_app::{
-    AppError, CompletionRequest, LlmPort, ModelResponse, ModelUsage,
-    modules::{ConfigField, Module, ModuleManifest, ModulePort, ModuleRegistry},
+    AppError, CompletionRequest, LlmPort, ModelStream,
+    modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use irmind_llm_chat_completions::{ChatCompletionsClient, ChatProfile};
+use secrecy::ExposeSecret;
 
 pub const MODULE_ID: &str = "llm-openrouter";
 const BASE_URL: &str = "https://openrouter.ai/api/v1/";
 
-static MANIFEST: ModuleManifest = ModuleManifest {
+pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: MODULE_ID,
     version: "0.1.0",
     ports: &[ModulePort::Llm],
@@ -31,14 +32,15 @@ static MANIFEST: ModuleManifest = ModuleManifest {
 pub struct OpenRouter(ChatCompletionsClient);
 
 impl OpenRouter {
-    pub fn from_env() -> Result<Self, AppError> {
-        let model = std::env::var("IRMIND_OPENROUTER_MODEL")
-            .map_err(|_| AppError::Model("IRMIND_OPENROUTER_MODEL is required".into()))?;
-        let key = std::env::var("OPENROUTER_API_KEY")
-            .map_err(|_| AppError::Model("OPENROUTER_API_KEY is required".into()))?;
+    pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
+        let model = config.required_value("IRMIND_OPENROUTER_MODEL")?;
+        let key = config
+            .required_secret("OPENROUTER_API_KEY")?
+            .expose_secret()
+            .to_owned();
         Ok(Self(ChatCompletionsClient::new_with_profile(
             BASE_URL,
-            &model,
+            model,
             Some(key),
             ChatProfile::OpenRouter,
         )?))
@@ -49,29 +51,26 @@ impl Module for OpenRouter {
     fn manifest(&self) -> &'static ModuleManifest {
         &MANIFEST
     }
-    fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        _config: &ModuleConfig,
+    ) -> Result<(), AppError> {
         registry.add_llm(MODULE_ID, self)
     }
 }
 
+#[irmind_app::async_trait]
 impl LlmPort for OpenRouter {
     fn descriptor(&self) -> String {
         self.0.descriptor_for(MODULE_ID)
     }
-    fn complete(&self, context: &str) -> Result<ModelResponse, AppError> {
-        self.0.complete(context)
-    }
-    fn complete_with_usage(
+    async fn complete(
         &self,
-        context: &str,
-    ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
-        self.0.complete_with_usage(context)
-    }
-    fn complete_request(
-        &self,
-        request: &CompletionRequest<'_>,
-    ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
-        self.0.complete_request(request)
+        request: CompletionRequest,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<ModelStream, AppError> {
+        self.0.complete(request, cancel).await
     }
 }
 
@@ -90,7 +89,16 @@ mod tests {
         )
         .unwrap();
         let mut registry = ModuleRegistry::new();
-        registry.register(Box::new(OpenRouter(inner))).unwrap();
+        let mut config = ModuleConfig::new();
+        config.insert_value("IRMIND_OPENROUTER_MODEL", "test-model".into());
+        config.insert_secret(
+            "OPENROUTER_API_KEY",
+            secrecy::SecretString::from("test-secret".to_owned()),
+        );
+        registry
+            .register(Box::new(OpenRouter(inner)), &config)
+            .unwrap();
+        irmind_testkit::run_llm_contract(registry.llm(MODULE_ID).unwrap()).unwrap();
         let descriptor = registry.llm(MODULE_ID).unwrap().descriptor();
         assert!(descriptor.contains(&format!("module={MODULE_ID}")));
         assert!(descriptor.contains("model=test-model"));

@@ -5,7 +5,9 @@ use crate::{
     ThreatIntelPort, hex, sha256,
 };
 use irmind_domain::Tool;
+use secrecy::SecretString;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ModulePort {
@@ -34,16 +36,84 @@ pub struct ModuleManifest {
     pub config: &'static [ConfigField],
 }
 
+#[derive(Default)]
+pub struct ModuleConfig {
+    values: BTreeMap<String, String>,
+    secrets: BTreeMap<String, SecretString>,
+}
+
+impl ModuleConfig {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert_value(&mut self, name: &str, value: String) {
+        self.values.insert(name.to_owned(), value);
+    }
+
+    pub fn insert_secret(&mut self, name: &str, value: SecretString) {
+        self.secrets.insert(name.to_owned(), value);
+    }
+
+    #[must_use]
+    pub fn value(&self, name: &str) -> Option<&str> {
+        self.values.get(name).map(String::as_str)
+    }
+
+    #[must_use]
+    pub fn secret(&self, name: &str) -> Option<&SecretString> {
+        self.secrets.get(name)
+    }
+
+    pub fn required_value(&self, name: &str) -> Result<&str, AppError> {
+        self.value(name)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppError::Policy(format!("missing module setting {name}")))
+    }
+
+    pub fn required_secret(&self, name: &str) -> Result<&SecretString, AppError> {
+        self.secret(name)
+            .ok_or_else(|| AppError::Policy(format!("missing module secret {name}")))
+    }
+
+    fn validate(&self, manifest: &ModuleManifest) -> Result<(), AppError> {
+        for field in manifest.config {
+            let present = if field.secret {
+                self.secrets.contains_key(field.name)
+            } else {
+                self.values.contains_key(field.name)
+            };
+            if field.required && !present {
+                return Err(AppError::Policy(format!(
+                    "missing module setting {}",
+                    field.name
+                )));
+            }
+        }
+        for name in self.values.keys().chain(self.secrets.keys()) {
+            if !manifest.config.iter().any(|field| field.name == name) {
+                return Err(AppError::Policy(format!("unknown module setting {name}")));
+            }
+        }
+        Ok(())
+    }
+}
+
 pub trait Module: Send + Sync {
     fn manifest(&self) -> &'static ModuleManifest;
-    fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError>;
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        config: &ModuleConfig,
+    ) -> Result<(), AppError>;
 }
 
 #[derive(Default)]
 pub struct ModuleRegistry {
     manifests: BTreeMap<&'static str, &'static ModuleManifest>,
     llms: BTreeMap<&'static str, Box<dyn LlmPort>>,
-    parser: Option<Box<dyn EventParser>>,
+    parser: Option<Arc<dyn EventParser>>,
     siems: Vec<Box<dyn SiemPort>>,
     edrs: Vec<Box<dyn EdrPort>>,
     cloud_audits: Vec<Box<dyn CloudAuditPort>>,
@@ -57,14 +127,19 @@ impl ModuleRegistry {
         Self::default()
     }
 
-    pub fn register(&mut self, module: Box<dyn Module>) -> Result<(), AppError> {
+    pub fn register(
+        &mut self,
+        module: Box<dyn Module>,
+        config: &ModuleConfig,
+    ) -> Result<(), AppError> {
         let manifest = module.manifest();
         validate_manifest(manifest)?;
+        config.validate(manifest)?;
         if self.manifests.contains_key(manifest.id) {
             return Err(AppError::Policy("duplicate module ID".into()));
         }
         let mut staged = Self::new();
-        module.register(&mut staged)?;
+        module.register(&mut staged, config)?;
         let actual = staged.counts();
         for port in [
             ModulePort::Llm,
@@ -151,13 +226,13 @@ impl ModuleRegistry {
         if self.parser.is_some() {
             return Err(AppError::Policy("duplicate event parser".into()));
         }
-        self.parser = Some(port);
+        self.parser = Some(Arc::from(port));
         Ok(())
     }
 
-    pub fn parser(&self) -> Result<&dyn EventParser, AppError> {
+    pub fn parser(&self) -> Result<Arc<dyn EventParser>, AppError> {
         self.parser
-            .as_deref()
+            .clone()
             .ok_or_else(|| AppError::Policy("event parser is not registered".into()))
     }
 
@@ -337,7 +412,9 @@ fn validate_manifest(manifest: &ModuleManifest) -> Result<(), AppError> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::{ModelResponse, ModelUsage};
+    use crate::{
+        CancellationToken, CompletionRequest, ModelEvent, ModelResponse, ModelStream, async_trait,
+    };
     use irmind_domain::AuthorizedCall;
 
     static LLM: ModuleManifest = ModuleManifest {
@@ -366,33 +443,63 @@ mod tests {
         config: &[],
     };
 
+    #[test]
+    fn module_config_rejects_missing_and_unknown_settings() {
+        static REQUIRED: ModuleManifest = ModuleManifest {
+            id: "config-test",
+            version: "0.1.0",
+            ports: &[],
+            tools: &[],
+            config: &[ConfigField {
+                name: "SECRET",
+                required: true,
+                secret: true,
+            }],
+        };
+        let mut config = ModuleConfig::new();
+        assert!(config.validate(&REQUIRED).is_err());
+        config.insert_secret("SECRET", secrecy::SecretString::from("value".to_owned()));
+        assert!(config.validate(&REQUIRED).is_ok());
+        config.insert_value("UNKNOWN", "value".into());
+        assert!(config.validate(&REQUIRED).is_err());
+    }
+
     struct TestLlm;
+    #[async_trait]
     impl LlmPort for TestLlm {
-        fn complete(&self, _context: &str) -> Result<ModelResponse, AppError> {
-            Ok(ModelResponse {
+        async fn complete(
+            &self,
+            _request: CompletionRequest,
+            _cancel: &CancellationToken,
+        ) -> Result<ModelStream, AppError> {
+            let response = ModelResponse {
                 text: "ok".into(),
                 calls: Vec::new(),
                 raw: "ok".into(),
-            })
-        }
-
-        fn complete_with_usage(
-            &self,
-            context: &str,
-        ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
-            self.complete(context).map(|response| (response, None))
+            };
+            Ok(Box::pin(futures_util::stream::once(async move {
+                Ok(ModelEvent::Completed {
+                    response,
+                    usage: None,
+                })
+            })))
         }
     }
     impl Module for TestLlm {
         fn manifest(&self) -> &'static ModuleManifest {
             &LLM
         }
-        fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+        fn register(
+            self: Box<Self>,
+            registry: &mut ModuleRegistry,
+            _config: &ModuleConfig,
+        ) -> Result<(), AppError> {
             registry.add_llm(LLM.id, self)
         }
     }
 
     struct TestEdr;
+    #[crate::async_trait]
     impl EdrPort for TestEdr {
         fn source_id(&self) -> &'static str {
             "edr-test-source"
@@ -400,13 +507,11 @@ mod tests {
         fn supports(&self, tool: &Tool) -> bool {
             tool == &Tool::EdrDetections
         }
-        fn host_info(&self, _call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
-            Ok(Vec::new())
-        }
-        fn process_tree(&self, _call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
-            Ok(Vec::new())
-        }
-        fn detections(&self, _call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+        async fn execute(
+            &self,
+            _call: &AuthorizedCall,
+            _cancel: &crate::CancellationToken,
+        ) -> Result<Vec<u8>, AppError> {
             Ok(Vec::new())
         }
     }
@@ -414,7 +519,11 @@ mod tests {
         fn manifest(&self) -> &'static ModuleManifest {
             &EDR
         }
-        fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+        fn register(
+            self: Box<Self>,
+            registry: &mut ModuleRegistry,
+            _config: &ModuleConfig,
+        ) -> Result<(), AppError> {
             registry.add_edr(self)
         }
     }
@@ -424,30 +533,73 @@ mod tests {
         fn manifest(&self) -> &'static ModuleManifest {
             &MISDECLARED
         }
-        fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+        fn register(
+            self: Box<Self>,
+            registry: &mut ModuleRegistry,
+            _config: &ModuleConfig,
+        ) -> Result<(), AppError> {
             registry.add_edr(Box::new(TestEdr))
         }
     }
 
-    #[test]
-    fn llm_and_edr_share_registry_without_replacing_each_other() {
+    #[tokio::test]
+    async fn llm_and_edr_share_registry_without_replacing_each_other() {
         let mut registry = ModuleRegistry::new();
-        registry.register(Box::new(TestLlm)).unwrap();
-        registry.register(Box::new(TestEdr)).unwrap();
+        registry
+            .register(Box::new(TestLlm), &ModuleConfig::new())
+            .unwrap();
+        registry
+            .register(Box::new(TestEdr), &ModuleConfig::new())
+            .unwrap();
+        let cancel = CancellationToken::new();
+        let events = registry
+            .llm(LLM.id)
+            .unwrap()
+            .complete(
+                CompletionRequest {
+                    messages: Vec::new(),
+                    tools: Vec::new(),
+                    max_output_tokens: 1,
+                    remaining_case_tokens: 1,
+                },
+                &cancel,
+            )
+            .await
+            .unwrap();
         assert_eq!(
-            registry.llm(LLM.id).unwrap().complete("x").unwrap().text,
+            crate::collect_model_stream(events, &cancel)
+                .await
+                .unwrap()
+                .0
+                .text,
             "ok"
         );
         assert_eq!(registry.counts()[&ModulePort::Edr], 1);
-        assert!(registry.register(Box::new(TestLlm)).is_err());
-        assert!(registry.register(Box::new(TestEdr)).is_err());
+        assert!(
+            registry
+                .register(Box::new(TestLlm), &ModuleConfig::new())
+                .is_err()
+        );
+        assert!(
+            registry
+                .register(Box::new(TestEdr), &ModuleConfig::new())
+                .is_err()
+        );
         let fingerprint = registry.fingerprint();
         let mut reversed = ModuleRegistry::new();
-        reversed.register(Box::new(TestEdr)).unwrap();
-        reversed.register(Box::new(TestLlm)).unwrap();
+        reversed
+            .register(Box::new(TestEdr), &ModuleConfig::new())
+            .unwrap();
+        reversed
+            .register(Box::new(TestLlm), &ModuleConfig::new())
+            .unwrap();
         assert_eq!(fingerprint, reversed.fingerprint());
         let before = registry.fingerprint();
-        assert!(registry.register(Box::new(Misdeclared)).is_err());
+        assert!(
+            registry
+                .register(Box::new(Misdeclared), &ModuleConfig::new())
+                .is_err()
+        );
         assert_eq!(registry.fingerprint(), before);
         assert_eq!(registry.counts()[&ModulePort::Edr], 1);
     }

@@ -1,0 +1,60 @@
+[package]
+name = "irmind-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[features]
+export = ["dep:irmind-infra"]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+irmind-app = { path = "../crates/app", version = "0.1.0" }
+irmind-domain = { path = "../crates/domain", version = "0.1.0" }
+irmind-security = { path = "../crates/security", version = "0.1.0" }
+irmind-mod-parser-json = { path = "../crates/parser-json", version = "0.1.0" }
+irmind-infra = { path = "../crates/infra", version = "0.1.0", optional = true }
+tempfile = "3"
+serde_json = "1"
+
+[[bin]]
+name = "guard"
+path = "fuzz_targets/guard.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parsers"
+path = "fuzz_targets/parsers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "canonical"
+path = "fuzz_targets/canonical.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "spl"
+path = "fuzz_targets/spl.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "export"
+path = "fuzz_targets/export.rs"
+test = false
+doc = false
+bench = false
+required-features = ["export"]
+
+[workspace]

@@ -1,20 +1,20 @@
 #![forbid(unsafe_code)]
 
 use irmind_app::{
-    AppError, ThreatIntelPort,
-    modules::{ConfigField, Module, ModuleManifest, ModulePort, ModuleRegistry},
+    AppError, CancellationToken, ThreatIntelPort, async_trait,
+    modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use irmind_domain::{AuthorizedCall, Tool};
 use secrecy::{ExposeSecret, SecretString};
-use std::io::Read as _;
 use std::net::Ipv4Addr;
 
 pub struct VirusTotal {
-    client: reqwest::blocking::Client,
+    async_client: reqwest::Client,
+    api_base: reqwest::Url,
     key: SecretString,
 }
 
-static MANIFEST: ModuleManifest = ModuleManifest {
+pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: "ti-virustotal",
     version: "0.1.0",
     ports: &[ModulePort::ThreatIntel],
@@ -31,32 +31,46 @@ impl Module for VirusTotal {
         &MANIFEST
     }
 
-    fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        _config: &ModuleConfig,
+    ) -> Result<(), AppError> {
         registry.add_threat_intel(self)
     }
 }
 
 impl VirusTotal {
-    pub fn from_env() -> Result<Self, AppError> {
-        let key = std::env::var("VIRUSTOTAL_API_KEY")
-            .map_err(|_| AppError::Policy("VIRUSTOTAL_API_KEY is required".into()))?;
+    pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
+        let key = config
+            .required_secret("VIRUSTOTAL_API_KEY")?
+            .expose_secret()
+            .to_owned();
         if key.trim().is_empty() {
             return Err(AppError::Policy("empty VirusTotal key".into()));
         }
-        let client = reqwest::blocking::Client::builder()
+        let async_client = reqwest::Client::builder()
+            .use_rustls_tls()
             .timeout(std::time::Duration::from_secs(30))
             .redirect(reqwest::redirect::Policy::none())
             .build()
-            .map_err(|e| AppError::Storage(e.to_string()))?;
+            .map_err(|_| AppError::Storage("VirusTotal HTTP client unavailable".into()))?;
         Ok(Self {
-            client,
+            async_client,
+            api_base: reqwest::Url::parse("https://www.virustotal.com/api/v3/")
+                .map_err(|_| AppError::Storage("invalid fixed VirusTotal endpoint".into()))?,
             key: SecretString::from(key),
         })
     }
 }
 
+#[async_trait]
 impl ThreatIntelPort for VirusTotal {
-    fn lookup(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+    async fn execute(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
         if call.tool() != &Tool::ThreatIntelExternal {
             return Err(AppError::Policy("wrong tool for VirusTotal".into()));
         }
@@ -64,13 +78,16 @@ impl ThreatIntelPort for VirusTotal {
             .arg("ioc")
             .ok_or_else(|| AppError::Policy("missing IOC".into()))?;
         let collection = classify_ioc(ioc)?;
-        let url = format!("https://www.virustotal.com/api/v3/{collection}/{ioc}");
-        let mut response = self
-            .client
-            .get(url)
-            .header("x-apikey", self.key.expose_secret())
-            .send()
-            .map_err(|e| AppError::Storage(format!("VirusTotal request failed: {e}")))?;
+        let url = self
+            .api_base
+            .join(&format!("{collection}/{ioc}"))
+            .map_err(|_| AppError::Policy("invalid VirusTotal path".into()))?;
+        let mut response = tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(AppError::Cancelled),
+            result = self.async_client.get(url).header("x-apikey", self.key.expose_secret()).send()
+                => result.map_err(|_| AppError::Storage("VirusTotal request failed".into()))?,
+        };
         if !response.status().is_success() {
             return Err(AppError::Storage(format!(
                 "VirusTotal returned status {}",
@@ -78,13 +95,19 @@ impl ThreatIntelPort for VirusTotal {
             )));
         }
         let mut raw = Vec::new();
-        response
-            .by_ref()
-            .take(5_000_001)
-            .read_to_end(&mut raw)
-            .map_err(|e| AppError::Storage(format!("VirusTotal response failed: {e}")))?;
-        if raw.len() > 5_000_000 {
-            return Err(AppError::Policy("VirusTotal response exceeds 5 MB".into()));
+        loop {
+            let chunk = tokio::select! {
+                biased;
+                () = cancel.cancelled() => return Err(AppError::Cancelled),
+                result = response.chunk() => result.map_err(|_| AppError::Storage("VirusTotal response failed".into()))?,
+            };
+            let Some(chunk) = chunk else {
+                break;
+            };
+            if raw.len().saturating_add(chunk.len()) > 5_000_000 {
+                return Err(AppError::Policy("VirusTotal response exceeds 5 MB".into()));
+            }
+            raw.extend_from_slice(&chunk);
         }
         Ok(raw)
     }
@@ -142,8 +165,42 @@ fn classify_ioc(ioc: &str) -> Result<&'static str, AppError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
-    use super::classify_ioc;
+    use super::*;
+
+    #[test]
+    fn threat_intel_contract() {
+        let mut config = ModuleConfig::new();
+        config.insert_secret(
+            "VIRUSTOTAL_API_KEY",
+            SecretString::from("test-key".to_owned()),
+        );
+        let port = VirusTotal::from_config(&config).unwrap();
+        irmind_testkit::run_threat_intel_contract(&port).unwrap();
+    }
+
+    #[test]
+    fn recorded_external_intel_response_is_returned() {
+        const RESPONSE: &str = "{\"data\":{\"id\":\"example.org\",\"type\":\"domain\",\"attributes\":{\"reputation\":5}}}";
+        let server =
+            irmind_testkit::MockServer::start(vec![irmind_testkit::MockResponse::json(RESPONSE)])
+                .unwrap();
+        let port = VirusTotal {
+            async_client: reqwest::Client::builder()
+                .use_rustls_tls()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap(),
+            api_base: reqwest::Url::parse(&format!("{}api/v3/", server.origin())).unwrap(),
+            key: SecretString::from("synthetic-key".to_owned()),
+        };
+        let requests =
+            irmind_testkit::run_threat_intel_recorded(&port, server, RESPONSE.as_bytes()).unwrap();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method, "GET");
+        assert_eq!(requests[0].target, "/api/v3/domains/example.org");
+    }
 
     #[test]
     fn only_public_bounded_iocs_reach_the_external_path() {

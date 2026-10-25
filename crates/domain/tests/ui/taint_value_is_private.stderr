@@ -1,0 +1,5 @@
+error[E0599]: no method named `value` found for struct `Tainted<T>` in the current scope
+ --> tests/ui/taint_value_is_private.rs:8:24
+  |
+8 |     let _raw = tainted.value().clone();
+  |                        ^^^^^ private field, not a method

@@ -1,58 +1,33 @@
 # Módulos LLM de IRMind
 
-Cada proveedor es un crate compilado con el binario. El agente usa únicamente `LlmPort`: recibe un `CompletionRequest` con el contexto ya cribado y el catálogo de herramientas activas, y devuelve texto, propuestas de llamadas y uso de tokens. El modelo no ejecuta herramientas; `irmind-app` valida cada propuesta, aplica política, pide aprobación si corresponde y firma la auditoría.
+Cada proveedor es un crate compilado en el binario. Ninguno se habilita por defecto: el analista elige uno con `--llm-module`. El modelo solo devuelve texto y propuestas; la aplicación valida cada propuesta, aplica la política y registra la decisión antes de despachar una herramienta.
 
 ## Proveedores disponibles
 
-| `--llm-module` | Feature de Cargo | Modelo | Clave | Protocolo |
+| Selección | Feature | Modelo (variable no secreta) | Clave (cuenta del llavero) | Protocolo |
 | --- | --- | --- | --- | --- |
-| `llm-openai-compatible` | incluido | `IRMIND_MODEL` | `OPENAI_API_KEY` para el endpoint oficial, o `IRMIND_LLM_API_KEY` para uno personalizado | Chat Completions, base `IRMIND_LLM_BASE_URL` (por defecto `https://api.openai.com/v1/`) |
-| `llm-anthropic` | `llm-anthropic` | `IRMIND_ANTHROPIC_MODEL` | `ANTHROPIC_API_KEY` | Messages nativo, `https://api.anthropic.com/v1/messages` |
-| `llm-deepseek` | `llm-deepseek` | `IRMIND_DEEPSEEK_MODEL` | `DEEPSEEK_API_KEY` | Chat Completions, `https://api.deepseek.com/chat/completions` |
-| `llm-openrouter` | `llm-openrouter` | `IRMIND_OPENROUTER_MODEL` | `OPENROUTER_API_KEY` | Chat Completions, `https://openrouter.ai/api/v1/chat/completions` |
+| `llm-openai-compatible` | incluida | `IRMIND_MODEL` | `OPENAI_API_KEY` para la API oficial; `IRMIND_LLM_API_KEY` para otra URL | Chat Completions; URL opcional en `IRMIND_LLM_BASE_URL` |
+| `llm-anthropic` | `llm-anthropic` | `IRMIND_ANTHROPIC_MODEL` | `ANTHROPIC_API_KEY` | Messages |
+| `llm-deepseek` | `llm-deepseek` | `IRMIND_DEEPSEEK_MODEL` | `DEEPSEEK_API_KEY` | Chat Completions |
+| `llm-openrouter` | `llm-openrouter` | `IRMIND_OPENROUTER_MODEL` | `OPENROUTER_API_KEY` | Chat Completions |
 
-Los tres módulos nuevos se compilan explícitamente. Ejemplos:
+Las variables de la tabla sirven como nombres de configuración, no como vías para pasar secretos. La raíz de composición lee las claves del llavero del sistema con servicio `irmind-module` y cuenta igual al nombre indicado. Las credenciales nunca se leen de variables de entorno dentro de un módulo. En Linux se requiere un servicio de secretos persistente.
 
 ```bash
 cargo build --release --features llm-anthropic,llm-deepseek,llm-openrouter
-IRMIND_CASE_ID=... # ID devuelto por `irmind case new`
-ANTHROPIC_API_KEY=... IRMIND_ANTHROPIC_MODEL=... ./target/release/irmind --llm-module llm-anthropic ask "$IRMIND_CASE_ID" "Investiga esta alerta"
-DEEPSEEK_API_KEY=... IRMIND_DEEPSEEK_MODEL=... ./target/release/irmind --llm-module llm-deepseek tui "$IRMIND_CASE_ID"
-OPENROUTER_API_KEY=... IRMIND_OPENROUTER_MODEL=... ./target/release/irmind --llm-module llm-openrouter ask "$IRMIND_CASE_ID" "Investiga esta alerta"
+IRMIND_ANTHROPIC_MODEL=<MODELO_APROBADO> ./target/release/irmind --llm-module llm-anthropic ask <CASE_ID> "Investiga esta alerta"
 ```
 
-`--llm-module` también admite `IRMIND_LLM_MODULE`. La opción va antes del subcomando. Si la feature no está compilada o falta su clave o modelo, IRMind falla antes de enviar datos. Las claves no se comparten entre proveedores. Las llamadas a DeepSeek, Anthropic y OpenRouter usan endpoints fijos HTTPS, sin redirecciones. El módulo compatible permite HTTPS remoto con clave propia o HTTP en loopback; nunca reutiliza `OPENAI_API_KEY` para un endpoint personalizado.
+`--llm-module` también admite `IRMIND_LLM_MODULE`. Ollama local puede usar HTTP sin clave solo en loopback, y el mismo adaptador acepta HTTPS si Ollama está servido con TLS. Los servicios remotos requieren HTTPS y una clave específica del destino. Los clientes no siguen redirecciones y rechazan streams incompletos. Antes de activar un servicio externo, confirme su región, retención y tratamiento de datos con el responsable de cumplimiento. La redacción basada en patrones no garantiza detectar toda información sensible.
 
-Antes de usar un servicio externo, compruebe sus condiciones de retención, región de tratamiento y enrutamiento con su responsable de datos. OpenRouter puede enviar la solicitud a un proveedor subyacente según el modelo y la configuración de la cuenta. IRMind redacta patrones conocidos antes de enviar contexto, pero esa redacción no garantiza eliminar todos los secretos o datos personales.
+## Contrato para un proveedor nuevo
 
-## Cómo crear otro módulo LLM
+1. Cree `crates/modules/llm-<nombre>/` con `#![forbid(unsafe_code)]`, edición y lints del workspace. Declare un `MODULE_ID` estable y un `ModuleManifest` con `ModulePort::Llm`, sin herramientas y con cada campo de configuración tipado como secreto o no secreto.
+2. Implemente un constructor `from_config(&ModuleConfig)` que valide el endpoint, modelo y credenciales inyectadas. La raíz de composición lee la configuración no secreta del entorno y los secretos del llavero. El módulo no consulta ni el entorno ni el llavero.
+3. Implemente `Module::register(self: Box<Self>, registry: &mut ModuleRegistry, config: &ModuleConfig) -> Result<(), AppError>` y registre el puerto con `registry.add_llm(MODULE_ID, self)`. `ModuleRegistry` valida el manifiesto y la configuración antes de llamar a `register`.
+4. Implemente el único método de `LlmPort`: `async fn complete(&self, request: CompletionRequest, cancel: &CancellationToken) -> Result<ModelStream, AppError>`. `CompletionRequest` contiene mensajes con rol, el catálogo de `ToolSpec` con JSON Schema, `max_output_tokens` y `remaining_case_tokens`. El adaptador traduce esos datos al protocolo remoto y emite `ModelEvent::Progress` y exactamente un `ModelEvent::Completed { response, usage }`.
+5. Reconstruya los fragmentos de tool calling antes de generar `ProposedCall`. Use `Tool::parse`, limite bytes y tiempo, rechace respuestas incompletas y no ejecute herramientas desde el adaptador. La aplicación vuelve a comprobar esquema, alcance y política. La cancelación debe cortar la lectura HTTP y producir `AppError::Cancelled`.
+6. Devuelva en `descriptor()` el ID de módulo, modelo y hash del endpoint, sin secretos. Añada una feature y selección explícita en `crates/bin`; el dominio y la aplicación no cambian para incorporar otro proveedor.
+7. Añada respuestas grabadas para texto, tool calls fragmentadas, error, truncación y cancelación. Ejecute `irmind-testkit::run_llm_contract` además de `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings` y `cargo nextest run --workspace --all-features`.
 
-1. Cree `crates/modules/llm-<nombre>/` con su `Cargo.toml` y `src/lib.rs`, y añádalo a `members` en el `Cargo.toml` del workspace. Use edición y lints del workspace y `#![forbid(unsafe_code)]`.
-2. Declare un `MODULE_ID` estable y un `ModuleManifest` con `ports: &[ModulePort::Llm]`, `tools: &[]` y cada variable de configuración con `secret: true` cuando corresponda. El manifiesto se incorpora a la huella firmada de módulos activos.
-3. Implemente `Module` y registre `self` con `registry.add_llm(MODULE_ID, self)`. `ModuleRegistry::register` comprueba que el módulo aporta exactamente el puerto declarado, que su ID no se repite y que el registro fallido no altera los módulos activos.
-4. Implemente `LlmPort::complete_request(&CompletionRequest)` para traducir `request.context` y `request.tools` al formato del proveedor. Cada `ToolSpec` tiene nombre, descripción y JSON Schema. No defina las herramientas de investigación dentro del adaptador: el catálogo común está en `crates/app/src/tool_catalog.rs` y la aplicación ya lo filtra por conectores activos. Devuelva `ModelResponse { text, calls, raw }` y `ModelUsage { input_tokens, output_tokens }`. Use `Tool::parse` para los nombres devueltos y convierta los argumentos en `ProposedCall`; la aplicación vuelve a validar esquema, alcance y política antes de ejecutar.
-5. Devuelva en `descriptor()` el ID de módulo, el ID del modelo y un hash SHA-256 del endpoint. Ese descriptor entra en el log firmado; no incluya claves, cabeceras de autenticación ni URLs que puedan contener secretos. Lea credenciales del entorno o llavero y guárdelas en `SecretString`.
-6. Añada la dependencia opcional y una feature `llm-<nombre>` en `crates/bin/Cargo.toml`; añada la rama correspondiente en la selección de `crates/bin/src/main.rs`. El binario es la única raíz de composición. El dominio, la política y los casos de uso no cambian al incorporar otro proveedor.
-7. Pruebe el formato de la petición, un stream completo con texto y tool calling fragmentado, los eventos de error y la truncación. Limite los bytes recibidos, exija terminación correcta y uso de tokens, y rechace herramientas o argumentos desconocidos. Ejecute `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings` y `cargo nextest run --workspace --all-features`.
-
-Fragmento mínimo del registro (junto a la definición de `MANIFEST` y la implementación de `LlmPort` descritas arriba):
-
-```rust
-pub const MODULE_ID: &str = "llm-ejemplo";
-
-impl Module for Ejemplo {
-    fn manifest(&self) -> &'static ModuleManifest { &MANIFEST }
-
-    fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
-        registry.add_llm(MODULE_ID, self)
-    }
-}
-```
-
-`complete_with_usage` tiene una implementación predeterminada que llama a `complete`; para admitir también la invocación directa, impleméntelo delegando a `complete_request` con `irmind_app::tool_catalog::catalog()`, como hacen los módulos incluidos. El parser debe rechazar streams incompletos antes de devolver propuestas al motor.
-
-Si el proveedor ofrece Chat Completions, puede reutilizar `irmind-llm-chat-completions` mediante un perfil de petición, como hacen los módulos OpenAI compatible, DeepSeek y OpenRouter. Este crate común no implementa `Module` ni se registra por sí solo. Si el proveedor usa otro protocolo, implemente el adaptador y parser dentro de su crate, como Anthropic. Evite SDKs que ejecuten herramientas automáticamente: el puerto solo debe devolver propuestas.
-
-Las respuestas de Anthropic usan eventos `message_start`, `content_block_*`, `message_delta` y `message_stop`; los argumentos de `tool_use` se reconstruyen antes de convertirlos en `ProposedCall`. El recuento de entrada suma `input_tokens`, `cache_read_input_tokens` y `cache_creation_input_tokens` para el presupuesto del caso. Los perfiles DeepSeek y OpenRouter comparten el parser de Chat Completions, pero envían solo los parámetros documentados para cada API.
-
-Referencias de protocolo: [Anthropic Messages](https://platform.claude.com/docs/en/api/messages/create), [Anthropic streaming](https://platform.claude.com/docs/en/build-with-claude/streaming), [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/), [OpenRouter Chat Completions](https://openrouter.ai/docs/api/api-reference/chat/create-a-chat-completion).
+Para proveedores de Chat Completions, `irmind-llm-chat-completions` aporta el cliente y parser comunes; no es un módulo registrable. Anthropic implementa su protocolo Messages por separado.

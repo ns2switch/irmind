@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
+use sha2::{Digest as _, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct CaseId(String);
@@ -58,30 +60,100 @@ pub enum ExecutionMode {
 }
 
 /// Data that originated outside the trusted case and policy boundary.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Tainted<T> {
     value: T,
-    source: String,
+    provenance: Provenance,
 }
 
-impl<T> Tainted<T> {
-    pub fn from_external(value: T, source: impl Into<String>) -> Self {
+impl<T> std::fmt::Debug for Tainted<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Tainted")
+            .field("provenance", &self.provenance)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SourceKind {
+    File,
+    ToolResult,
+    Graph,
+    ModelProposal,
+    AnalystInput,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Provenance {
+    evidence_hash: [u8; 32],
+    record_index: Option<u64>,
+    source_kind: SourceKind,
+}
+
+impl Provenance {
+    pub fn new(
+        evidence_hash: [u8; 32],
+        record_index: Option<u64>,
+        source_kind: SourceKind,
+    ) -> Self {
         Self {
-            value,
-            source: source.into(),
+            evidence_hash,
+            record_index,
+            source_kind,
         }
     }
 
-    pub fn value(&self) -> &T {
-        &self.value
+    pub fn evidence_hash(&self) -> &[u8; 32] {
+        &self.evidence_hash
+    }
+    pub fn record_index(&self) -> Option<u64> {
+        self.record_index
+    }
+    pub fn source_kind(&self) -> SourceKind {
+        self.source_kind
     }
 
-    pub fn source(&self) -> &str {
-        &self.source
+    pub fn approval_challenge(&self, case_id: &CaseId) -> Vec<u8> {
+        let mut out = b"irmind-declassify-v1\0".to_vec();
+        out.extend_from_slice(case_id.as_str().as_bytes());
+        out.push(0);
+        out.extend_from_slice(&self.evidence_hash);
+        out.extend_from_slice(&self.record_index.unwrap_or(u64::MAX).to_be_bytes());
+        out.push(self.source_kind as u8);
+        out
+    }
+}
+
+pub trait DeclassificationAuthority {
+    fn verify_and_audit(&self, challenge: &[u8], signature: &[u8], provenance: &Provenance)
+    -> bool;
+}
+
+impl<T> Tainted<T> {
+    pub fn from_external(value: T, provenance: Provenance) -> Self {
+        Self { value, provenance }
     }
 
-    pub fn into_inner(self) -> T {
-        self.value
+    /// Permits local processing without returning an untainted value.
+    pub fn inspect(&self, visitor: impl FnOnce(&T)) {
+        visitor(&self.value);
+    }
+
+    pub fn provenance(&self) -> &Provenance {
+        &self.provenance
+    }
+
+    pub fn release_with_approval(
+        self,
+        case_id: &CaseId,
+        signature: &[u8],
+        authority: &dyn DeclassificationAuthority,
+    ) -> Result<T, DomainError> {
+        let challenge = self.provenance.approval_challenge(case_id);
+        if !authority.verify_and_audit(&challenge, signature, &self.provenance) {
+            return Err(DomainError::InvalidApproval);
+        }
+        Ok(self.value)
     }
 }
 
@@ -403,6 +475,53 @@ pub enum Tool {
     ThreatIntelExternal,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SplQueryClass {
+    SafeLiteral,
+    Forbidden,
+    Unparseable,
+}
+
+/// The MVP dialect is one literal term, never arbitrary SPL. The command list is
+/// defense in depth so known side-effect commands are denied before approval.
+pub fn classify_spl_query(query: &str) -> SplQueryClass {
+    const FORBIDDEN: &[&str] = &[
+        "outputlookup",
+        "outputcsv",
+        "collect",
+        "sendemail",
+        "sendalert",
+        "script",
+        "run",
+        "rest",
+        "map",
+        "delete",
+        "tscollect",
+        "meventcollect",
+    ];
+    if query
+        .split(|ch: char| !ch.is_ascii_alphanumeric())
+        .filter(|token| !token.is_empty())
+        .any(|token| {
+            FORBIDDEN
+                .iter()
+                .any(|command| token.eq_ignore_ascii_case(command))
+        })
+    {
+        return SplQueryClass::Forbidden;
+    }
+    if !query.is_empty()
+        && query.len() <= 128
+        && query
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._-:@/".contains(&byte))
+    {
+        SplQueryClass::SafeLiteral
+    } else {
+        SplQueryClass::Unparseable
+    }
+}
+
 impl Tool {
     pub fn parse(name: &str) -> Result<Self, DomainError> {
         match name {
@@ -459,13 +578,22 @@ impl Tool {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ProposedCall {
     pub tool: Tool,
     pub args: BTreeMap<String, String>,
 }
 
-#[derive(Debug)]
+impl std::fmt::Debug for ProposedCall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProposedCall")
+            .field("tool", &self.tool)
+            .field("argument_count", &self.args.len())
+            .finish()
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct AuthorizedCall {
     case_id: CaseId,
     proposal: ProposedCall,
@@ -502,6 +630,7 @@ pub struct PendingApproval {
     case_id: CaseId,
     proposal: ProposedCall,
     decision_seq: u64,
+    expires_at: u64,
 }
 
 pub trait AnalystApprovalVerifier {
@@ -509,9 +638,22 @@ pub trait AnalystApprovalVerifier {
 }
 
 impl PendingApproval {
+    fn new(case_id: CaseId, proposal: ProposedCall, decision_seq: u64) -> Self {
+        let expires_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |duration| duration.as_secs())
+            .saturating_add(300);
+        Self {
+            case_id,
+            proposal,
+            decision_seq,
+            expires_at,
+        }
+    }
+
     pub fn recover(case: &Case, mode: ExecutionMode, encoded: &[u8]) -> Result<Self, DomainError> {
         let mut rest = encoded
-            .strip_prefix(b"irmind-approval-v1\0")
+            .strip_prefix(b"irmind-approval-v2\0")
             .ok_or(DomainError::InvalidApproval)?;
         let case_id = std::str::from_utf8(take_field(&mut rest)?)
             .map_err(|_| DomainError::InvalidApproval)?;
@@ -539,16 +681,23 @@ impl PendingApproval {
                 return Err(DomainError::InvalidApproval);
             }
         }
+        let claimed_hash = rest.get(..32).ok_or(DomainError::InvalidApproval)?;
+        if claimed_hash != Sha256::digest(canonical_args(&args)).as_slice() {
+            return Err(DomainError::InvalidApproval);
+        }
+        rest = &rest[32..];
+        let expires_at = take_u64(&mut rest)?;
         if !rest.is_empty() {
             return Err(DomainError::InvalidApproval);
         }
         let mut open = case.clone();
         open.sealed = false;
-        let Decision::NeedsApproval(pending) =
+        let Decision::NeedsApproval(mut pending) =
             evaluate(&open, ProposedCall { tool, args }, decision_seq, mode)
         else {
             return Err(DomainError::InvalidApproval);
         };
+        pending.expires_at = expires_at;
         if pending.challenge() != encoded {
             return Err(DomainError::InvalidApproval);
         }
@@ -563,15 +712,14 @@ impl PendingApproval {
     }
 
     pub fn challenge(&self) -> Vec<u8> {
-        let mut bytes = b"irmind-approval-v1\0".to_vec();
+        let mut bytes = b"irmind-approval-v2\0".to_vec();
         put(&mut bytes, self.case_id.as_str().as_bytes());
         bytes.extend_from_slice(&self.decision_seq.to_be_bytes());
         put(&mut bytes, self.proposal.tool.as_str().as_bytes());
-        bytes.extend_from_slice(&(self.proposal.args.len() as u64).to_be_bytes());
-        for (key, value) in &self.proposal.args {
-            put(&mut bytes, key.as_bytes());
-            put(&mut bytes, value.as_bytes());
-        }
+        let args = canonical_args(&self.proposal.args);
+        bytes.extend_from_slice(&args);
+        bytes.extend_from_slice(&Sha256::digest(&args));
+        bytes.extend_from_slice(&self.expires_at.to_be_bytes());
         bytes
     }
 
@@ -580,7 +728,11 @@ impl PendingApproval {
         signature: &[u8],
         verifier: &dyn AnalystApprovalVerifier,
     ) -> Result<AuthorizedCall, DomainError> {
-        if !verifier.verify_analyst(&self.challenge(), signature) {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| DomainError::InvalidApproval)?
+            .as_secs();
+        if now > self.expires_at || !verifier.verify_analyst(&self.challenge(), signature) {
             return Err(DomainError::InvalidApproval);
         }
         Ok(AuthorizedCall {
@@ -606,6 +758,15 @@ impl PendingApproval {
         }
         Ok(())
     }
+}
+
+fn canonical_args(args: &BTreeMap<String, String>) -> Vec<u8> {
+    let mut bytes = (args.len() as u64).to_be_bytes().to_vec();
+    for (key, value) in args {
+        put(&mut bytes, key.as_bytes());
+        put(&mut bytes, value.as_bytes());
+    }
+    bytes
 }
 
 fn put(out: &mut Vec<u8>, value: &[u8]) {
@@ -700,7 +861,7 @@ pub fn evaluate_tainted(
 ) -> Decision {
     evaluate_with_context(
         case,
-        proposal.into_inner(),
+        proposal.value,
         decision_seq,
         mode,
         PolicyContext {
@@ -812,9 +973,17 @@ pub fn evaluate_with_context(
                 && proposal.args.get("to").is_some_and(|v| valid_scope_time(v))
                 && proposal.args.get(query_key).is_some_and(|v| {
                     !v.is_empty()
-                        && v.len() <= 128
-                        && v.bytes()
-                            .all(|byte| byte.is_ascii_alphanumeric() || b"._-:@/".contains(&byte))
+                        && v.len()
+                            <= if proposal.tool == Tool::SiemSearch {
+                                1024
+                            } else {
+                                128
+                            }
+                        && !v.contains('\0')
+                        && (proposal.tool == Tool::SiemSearch
+                            || v.bytes().all(|byte| {
+                                byte.is_ascii_alphanumeric() || b"._-:@/".contains(&byte)
+                            }))
                 })
         }
         Tool::ThreatIntelInternal => {
@@ -894,6 +1063,26 @@ pub fn evaluate_with_context(
     if !valid {
         return Decision::Deny("invalid tool arguments");
     }
+    if proposal.tool == Tool::SiemSearch {
+        match proposal
+            .args
+            .get("query")
+            .map(|query| classify_spl_query(query))
+        {
+            Some(SplQueryClass::Forbidden) => {
+                return Decision::Deny("SPL side-effect command is forbidden");
+            }
+            Some(SplQueryClass::Unparseable) => {
+                return Decision::NeedsApproval(PendingApproval::new(
+                    case.id.clone(),
+                    proposal,
+                    decision_seq,
+                ));
+            }
+            Some(SplQueryClass::SafeLiteral) => {}
+            None => return Decision::Deny("missing SIEM query"),
+        }
+    }
     if matches!(proposal.tool, Tool::SiemSearch | Tool::CloudAuditEvents) {
         let Ok(scope) = CaseScope::parse(&case.scope) else {
             return Decision::Deny("invalid case scope");
@@ -908,11 +1097,11 @@ pub fn evaluate_with_context(
                 scope.contains(source, Some(account), None, from, to)
             });
         if !in_scope {
-            return Decision::NeedsApproval(PendingApproval {
-                case_id: case.id.clone(),
+            return Decision::NeedsApproval(PendingApproval::new(
+                case.id.clone(),
                 proposal,
                 decision_seq,
-            });
+            ));
         }
     }
     if proposal.tool == Tool::ThreatIntelInternal {
@@ -924,11 +1113,11 @@ pub fn evaluate_with_context(
             .get("source")
             .is_some_and(|source| scope.allows_source(source))
         {
-            return Decision::NeedsApproval(PendingApproval {
-                case_id: case.id.clone(),
+            return Decision::NeedsApproval(PendingApproval::new(
+                case.id.clone(),
                 proposal,
                 decision_seq,
-            });
+            ));
         }
     }
     if proposal.tool == Tool::CloudIdentity {
@@ -941,11 +1130,11 @@ pub fn evaluate_with_context(
             .zip(proposal.args.get("account"))
             .is_some_and(|(source, account)| scope.allows_account(source, account))
         {
-            return Decision::NeedsApproval(PendingApproval {
-                case_id: case.id.clone(),
+            return Decision::NeedsApproval(PendingApproval::new(
+                case.id.clone(),
                 proposal,
                 decision_seq,
-            });
+            ));
         }
     }
     if matches!(
@@ -973,43 +1162,43 @@ pub fn evaluate_with_context(
                 }
             });
         if !in_scope {
-            return Decision::NeedsApproval(PendingApproval {
-                case_id: case.id.clone(),
+            return Decision::NeedsApproval(PendingApproval::new(
+                case.id.clone(),
                 proposal,
                 decision_seq,
-            });
+            ));
         }
     }
     if proposal.tool.risk() == RiskLevel::Contain {
         return Decision::Deny("containment outside MVP");
     }
     if context.tainted_arguments && proposal.tool.risk() == RiskLevel::Enrich {
-        return Decision::NeedsApproval(PendingApproval {
-            case_id: case.id.clone(),
+        return Decision::NeedsApproval(PendingApproval::new(
+            case.id.clone(),
             proposal,
             decision_seq,
-        });
+        ));
     }
     if context.turn_has_detections && proposal.tool.risk() != RiskLevel::Read {
-        return Decision::NeedsApproval(PendingApproval {
-            case_id: case.id.clone(),
+        return Decision::NeedsApproval(PendingApproval::new(
+            case.id.clone(),
             proposal,
             decision_seq,
-        });
+        ));
     }
     if mode == ExecutionMode::Unattended && proposal.tool.risk() != RiskLevel::Read {
-        return Decision::NeedsApproval(PendingApproval {
-            case_id: case.id.clone(),
+        return Decision::NeedsApproval(PendingApproval::new(
+            case.id.clone(),
             proposal,
             decision_seq,
-        });
+        ));
     }
     if proposal.tool.risk() == RiskLevel::Enrich {
-        return Decision::NeedsApproval(PendingApproval {
-            case_id: case.id.clone(),
+        return Decision::NeedsApproval(PendingApproval::new(
+            case.id.clone(),
             proposal,
             decision_seq,
-        });
+        ));
     }
     Decision::Allow(AuthorizedCall {
         case_id: case.id.clone(),
@@ -1053,6 +1242,20 @@ pub fn valid_entity(kind: &str, value: &str) -> bool {
 mod tests {
     use super::*;
 
+    #[test]
+    fn debug_of_tainted_and_proposed_values_is_redacted() {
+        let tainted = Tainted::from_external(
+            "SECRET-from-log".to_owned(),
+            Provenance::new([0; 32], Some(3), SourceKind::File),
+        );
+        assert!(!format!("{tainted:?}").contains("SECRET"));
+        let proposal = ProposedCall {
+            tool: Tool::ThreatIntelExternal,
+            args: BTreeMap::from([("ioc".into(), "SECRET-from-log".into())]),
+        };
+        assert!(!format!("{proposal:?}").contains("SECRET"));
+    }
+
     fn case() -> Case {
         Case {
             id: CaseId::parse("00000000-0000-0000-0000-000000000001").unwrap(),
@@ -1079,6 +1282,65 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::panic)]
+    fn spl_commands_are_denied_and_unparseable_queries_need_exact_approval() {
+        let mut scoped = case();
+        scoped.scope = "v1;sources=splunk-prod;accounts=123;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z".into();
+        let proposal = |query: &str| ProposedCall {
+            tool: Tool::SiemSearch,
+            args: BTreeMap::from([
+                ("source".into(), "splunk-prod".into()),
+                ("account".into(), "123".into()),
+                ("from".into(), "2026-10-23T12:00:00Z".into()),
+                ("to".into(), "2026-10-23T13:00:00Z".into()),
+                ("query".into(), query.into()),
+            ]),
+        };
+        for command in [
+            "outputlookup",
+            "outputcsv",
+            "collect",
+            "sendemail",
+            "sendalert",
+            "script",
+            "run",
+            "rest",
+            "map",
+            "delete",
+            "tscollect",
+            "meventcollect",
+        ] {
+            assert_eq!(
+                classify_spl_query(&format!("event | {command} target")),
+                SplQueryClass::Forbidden
+            );
+            assert!(matches!(
+                evaluate(
+                    &scoped,
+                    proposal(&format!("event | {command} target")),
+                    1,
+                    ExecutionMode::Attended
+                ),
+                Decision::Deny(_)
+            ));
+        }
+        let exact = "event | stats count";
+        let Decision::NeedsApproval(pending) =
+            evaluate(&scoped, proposal(exact), 2, ExecutionMode::Attended)
+        else {
+            panic!("expected approval")
+        };
+        assert_eq!(
+            pending.proposal().args.get("query").map(String::as_str),
+            Some(exact)
+        );
+        assert!(matches!(
+            evaluate(&scoped, proposal("AssumeRole"), 3, ExecutionMode::Attended),
+            Decision::Allow(_)
+        ));
+    }
+
+    #[test]
     fn external_lookup_requires_approval() {
         let proposal = ProposedCall {
             tool: Tool::ThreatIntelExternal,
@@ -1088,6 +1350,70 @@ mod tests {
             evaluate(&case(), proposal, 1, ExecutionMode::Attended),
             Decision::NeedsApproval(_)
         ));
+    }
+
+    #[test]
+    #[allow(clippy::panic)]
+    fn approval_signature_binds_case_arguments_sequence_and_expiry() {
+        struct ExactChallenge(Vec<u8>);
+        impl AnalystApprovalVerifier for ExactChallenge {
+            fn verify_analyst(&self, message: &[u8], signature: &[u8]) -> bool {
+                message == self.0 && signature == self.0
+            }
+        }
+        let proposal = |ioc: &str| ProposedCall {
+            tool: Tool::ThreatIntelExternal,
+            args: BTreeMap::from([("ioc".into(), ioc.into())]),
+        };
+        let Decision::NeedsApproval(first) =
+            evaluate(&case(), proposal("example.com"), 7, ExecutionMode::Attended)
+        else {
+            panic!("expected pending approval")
+        };
+        let signed = first.challenge();
+        let verifier = ExactChallenge(signed.clone());
+        assert!(first.resolve(&signed, &verifier).is_ok());
+
+        let mut other_case = case();
+        other_case.id = CaseId::parse("00000000-0000-0000-0000-000000000002").unwrap();
+        let Decision::NeedsApproval(other) = evaluate(
+            &other_case,
+            proposal("example.com"),
+            7,
+            ExecutionMode::Attended,
+        ) else {
+            panic!("expected pending approval")
+        };
+        assert!(other.resolve(&signed, &verifier).is_err());
+        let Decision::NeedsApproval(other_args) = evaluate(
+            &case(),
+            proposal("other.example"),
+            7,
+            ExecutionMode::Attended,
+        ) else {
+            panic!("expected pending approval")
+        };
+        assert!(other_args.resolve(&signed, &verifier).is_err());
+        let Decision::NeedsApproval(other_seq) =
+            evaluate(&case(), proposal("example.com"), 8, ExecutionMode::Attended)
+        else {
+            panic!("expected pending approval")
+        };
+        assert!(other_seq.resolve(&signed, &verifier).is_err());
+        let mut expired =
+            PendingApproval::recover(&case(), ExecutionMode::Attended, &signed).unwrap();
+        expired.expires_at = 1;
+        let expired_challenge = expired.challenge();
+        assert!(
+            expired
+                .resolve(
+                    &expired_challenge,
+                    &ExactChallenge(expired_challenge.clone())
+                )
+                .is_err()
+        );
+        assert!(!signed.starts_with(b"irmind-audit-v2\0"));
+        assert!(!signed.starts_with(b"irmind-seal-v1\0"));
     }
 
     #[test]
@@ -1415,9 +1741,9 @@ mod tests {
                 tool: Tool::ThreatIntelExternal,
                 args: BTreeMap::from([("ioc".into(), "example.com".into())]),
             },
-            "siem-record:sha256",
+            Provenance::new([7; 32], Some(3), SourceKind::ToolResult),
         );
-        assert_eq!(proposal.source(), "siem-record:sha256");
+        assert_eq!(proposal.provenance().record_index(), Some(3));
         assert!(matches!(
             evaluate_tainted(&case(), proposal, 1, ExecutionMode::Attended, false),
             Decision::NeedsApproval(_)
@@ -1440,7 +1766,7 @@ mod tests {
                         ("query".into(), "AssumeRole".into()),
                     ]),
                 },
-                "malicious-log",
+                Provenance::new([8; 32], Some(4), SourceKind::ToolResult),
             )
         };
         assert!(matches!(

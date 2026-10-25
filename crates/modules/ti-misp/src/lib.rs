@@ -1,22 +1,21 @@
 #![forbid(unsafe_code)]
 
 use irmind_app::{
-    AppError, InternalIntelPort,
-    modules::{ConfigField, Module, ModuleManifest, ModulePort, ModuleRegistry},
+    AppError, CancellationToken, InternalIntelPort, async_trait,
+    modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use irmind_domain::{AuthorizedCall, Tool};
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::{Value, json};
-use std::io::Read as _;
 
 pub struct Misp {
-    client: reqwest::blocking::Client,
+    async_client: reqwest::Client,
     endpoint: reqwest::Url,
     key: SecretString,
     source_id: String,
 }
 
-static MANIFEST: ModuleManifest = ModuleManifest {
+pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: "ti-misp",
     version: "0.1.0",
     ports: &[ModulePort::InternalIntel],
@@ -45,17 +44,18 @@ impl Module for Misp {
         &MANIFEST
     }
 
-    fn register(self: Box<Self>, registry: &mut ModuleRegistry) -> Result<(), AppError> {
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        _config: &ModuleConfig,
+    ) -> Result<(), AppError> {
         registry.add_internal_intel(self)
     }
 }
 
 impl Misp {
-    pub fn from_env() -> Result<Self, AppError> {
-        let setting = |name| {
-            std::env::var(name)
-                .map_err(|_| AppError::Policy(format!("{name} is required for MISP")))
-        };
+    pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
+        let setting = |name| config.required_value(name).map(str::to_owned);
         let base = setting("IRMIND_MISP_URL")?;
         let url =
             reqwest::Url::parse(&base).map_err(|_| AppError::Policy("invalid MISP URL".into()))?;
@@ -87,17 +87,21 @@ impl Misp {
         {
             return Err(AppError::Policy("invalid MISP source ID".into()));
         }
-        let key = setting("IRMIND_MISP_API_KEY")?;
+        let key = config
+            .required_secret("IRMIND_MISP_API_KEY")?
+            .expose_secret()
+            .to_owned();
         if key.trim().is_empty() {
             return Err(AppError::Policy("empty MISP API key".into()));
         }
-        let client = reqwest::blocking::Client::builder()
+        let async_client = reqwest::Client::builder()
+            .use_rustls_tls()
             .timeout(std::time::Duration::from_secs(30))
             .redirect(reqwest::redirect::Policy::none())
             .build()
-            .map_err(|error| AppError::Storage(error.to_string()))?;
+            .map_err(|_| AppError::Storage("MISP HTTP client unavailable".into()))?;
         Ok(Self {
-            client,
+            async_client,
             endpoint,
             key: SecretString::from(key),
             source_id,
@@ -105,12 +109,17 @@ impl Misp {
     }
 }
 
+#[async_trait]
 impl InternalIntelPort for Misp {
     fn source_id(&self) -> &str {
         &self.source_id
     }
 
-    fn lookup(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+    async fn execute(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
         if call.tool() != &Tool::ThreatIntelInternal || call.arg("source") != Some(self.source_id())
         {
             return Err(AppError::Policy("wrong MISP source or tool".into()));
@@ -119,14 +128,14 @@ impl InternalIntelPort for Misp {
             .arg("ioc")
             .ok_or_else(|| AppError::Policy("missing IOC".into()))?;
         let body = search_body(ioc)?;
-        let mut response = self
-            .client
-            .post(self.endpoint.clone())
-            .header("Authorization", self.key.expose_secret())
-            .header("Accept", "application/json")
-            .json(&body)
-            .send()
-            .map_err(|error| AppError::Storage(format!("MISP request failed: {error}")))?;
+        let mut response = tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(AppError::Cancelled),
+            result = self.async_client.post(self.endpoint.clone())
+                .header("Authorization", self.key.expose_secret())
+                .header("Accept", "application/json")
+                .json(&body).send() => result.map_err(|_| AppError::Storage("MISP request failed".into()))?,
+        };
         if !response.status().is_success() {
             return Err(AppError::Storage(format!(
                 "MISP returned status {}",
@@ -134,13 +143,19 @@ impl InternalIntelPort for Misp {
             )));
         }
         let mut raw = Vec::new();
-        response
-            .by_ref()
-            .take(5_000_001)
-            .read_to_end(&mut raw)
-            .map_err(|error| AppError::Storage(format!("MISP response failed: {error}")))?;
-        if raw.len() > 5_000_000 {
-            return Err(AppError::Policy("MISP response exceeds 5 MB".into()));
+        loop {
+            let chunk = tokio::select! {
+                biased;
+                () = cancel.cancelled() => return Err(AppError::Cancelled),
+                result = response.chunk() => result.map_err(|_| AppError::Storage("MISP response failed".into()))?,
+            };
+            let Some(chunk) = chunk else {
+                break;
+            };
+            if raw.len().saturating_add(chunk.len()) > 5_000_000 {
+                return Err(AppError::Policy("MISP response exceeds 5 MB".into()));
+            }
+            raw.extend_from_slice(&chunk);
         }
         Ok(raw)
     }
@@ -161,7 +176,46 @@ fn search_body(ioc: &str) -> Result<Value, AppError> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use super::search_body;
+    use super::*;
+
+    #[test]
+    fn internal_intel_contract() {
+        let mut config = ModuleConfig::new();
+        config.insert_value("IRMIND_MISP_URL", "https://misp.invalid/".into());
+        config.insert_value("IRMIND_MISP_SOURCE_ID", "misp-prod".into());
+        config.insert_secret(
+            "IRMIND_MISP_API_KEY",
+            SecretString::from("test-key".to_owned()),
+        );
+        let port = Misp::from_config(&config).unwrap();
+        irmind_testkit::run_internal_intel_contract(&port).unwrap();
+    }
+
+    #[test]
+    fn recorded_internal_intel_response_is_returned() {
+        const RESPONSE: &str =
+            "{\"response\":{\"Attribute\":[{\"type\":\"domain\",\"value\":\"example.org\"}]}}";
+        let server =
+            irmind_testkit::MockServer::start(vec![irmind_testkit::MockResponse::json(RESPONSE)])
+                .unwrap();
+        let port = Misp {
+            async_client: reqwest::Client::builder()
+                .use_rustls_tls()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap(),
+            endpoint: reqwest::Url::parse(&format!("{}attributes/restSearch", server.origin()))
+                .unwrap(),
+            key: SecretString::from("synthetic-key".to_owned()),
+            source_id: "misp-prod".into(),
+        };
+        let requests =
+            irmind_testkit::run_internal_intel_recorded(&port, server, RESPONSE.as_bytes())
+                .unwrap();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].method, "POST");
+        assert!(String::from_utf8_lossy(&requests[0].body).contains("example.org"));
+    }
 
     #[test]
     fn search_is_exact_and_bounded() {

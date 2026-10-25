@@ -1,0 +1,11 @@
+error[E0451]: fields `case_id`, `proposal` and `decision_seq` of struct `AuthorizedCall` are private
+ --> tests/ui/authorized_call_private.rs:6:9
+  |
+5 |     let _forged = AuthorizedCall {
+  |                   -------------- in this type
+6 |         case_id: CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap(),
+  |         ^^^^^^^ private field
+7 |         proposal: ProposedCall { tool: Tool::GraphSummary, args: BTreeMap::new() },
+  |         ^^^^^^^^ private field
+8 |         decision_seq: 1,
+  |         ^^^^^^^^^^^^ private field

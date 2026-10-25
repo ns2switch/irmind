@@ -1,0 +1,5 @@
+error[E0599]: no method named `into_inner` found for struct `Tainted<T>` in the current scope
+ --> tests/ui/taint_cannot_be_removed.rs:5:45
+  |
+5 |     let _untrusted_without_approval = value.into_inner();
+  |                                             ^^^^^^^^^^ method not found in `Tainted<String>`
