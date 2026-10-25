@@ -9,12 +9,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: rust-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: rust-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 env:
   CARGO_INCREMENTAL: 0
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
-  CARGO_BUILD_JOBS: 1
 jobs:
   dco:
     if: github.event_name == 'pull_request'
@@ -32,7 +31,7 @@ jobs:
     needs: dco
     if: ${{ !cancelled() && (needs.dco.result == 'success' || needs.dco.result == 'skipped') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 120
     env:
       RUSTFLAGS: -C link-arg=-fuse-ld=mold
     steps:
@@ -48,7 +47,7 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo fmt --manifest-path fuzz/Cargo.toml -- --check
       - run: cargo clippy --workspace --all-targets --all-features --profile ci --locked -- -D warnings
-      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked --test-threads 1
+      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
       - run: cargo test -p irmind-testkit --test dependency_direction --profile ci --locked
       - run: cargo deny check --hide-inclusion-graph
       - run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
@@ -72,7 +71,7 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')
     needs: linux
     runs-on: windows-latest
-    timeout-minutes: 180
+    timeout-minutes: 120
     env:
       CARGO_BUILD_TARGET: x86_64-pc-windows-msvc
     defaults:
@@ -87,7 +86,7 @@ jobs:
         with: {key: windows-msvc-tests}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
-      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked --test-threads 1
+      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
       - run: cargo build --release -p irmind --locked
       - name: Package unsigned binary and checksum
         run: |
@@ -124,10 +123,10 @@ jobs:
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('bin', 'foreign-export')) if p.is_dir()]"
   macos:
-    if: ${{ !cancelled() && needs.linux.result == 'success' && (needs.windows.result == 'success' || needs.windows.result == 'skipped') && (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))) || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
-    needs: [linux, windows]
+    if: ${{ !cancelled() && needs.linux.result == 'success' && (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))) || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    needs: linux
     runs-on: macos-latest
-    timeout-minutes: 180
+    timeout-minutes: 120
     env:
       CARGO_BUILD_TARGET: aarch64-apple-darwin
     defaults:
@@ -142,7 +141,7 @@ jobs:
         with: {key: macos-arm64-tests}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
-      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked --test-threads 1
+      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
       - run: cargo build --release -p irmind --locked
       - name: Package unsigned binary and checksum
         run: |
@@ -156,12 +155,23 @@ jobs:
         with: {name: portable-export-linux, path: foreign-export}
       - name: Verify Linux export on macOS
         run: (cd dist && shasum -a 256 -c SHA256SUMS) && chmod +x dist/irmind && dist/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        with: {name: portable-export-windows, path: windows-export}
-      - name: Verify Windows export on macOS
-        if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        run: dist/irmind verify-export windows-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < windows-export/expected-key.txt)"
       - name: Clean staging
         if: always()
-        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export', 'windows-export')) if p.is_dir()]"
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export')) if p.is_dir()]"
+  macos_verify_windows:
+    if: ${{ !cancelled() && needs.macos.result == 'success' && needs.windows.result == 'success' }}
+    needs: [macos, windows]
+    runs-on: macos-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: irmind-macos-arm64, path: bin}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: portable-export-windows, path: foreign-export}
+      - run: (cd bin && shasum -a 256 -c SHA256SUMS) && chmod +x bin/irmind && bin/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
+      - name: Clean staging
+        if: always()
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('bin', 'foreign-export')) if p.is_dir()]"

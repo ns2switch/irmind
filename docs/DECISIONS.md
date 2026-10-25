@@ -96,7 +96,7 @@ El endpoint OpenAI compatible permite HTTP solo si el destino es `localhost` o u
 
 Se evaluó `cargo-hakari 0.9.39` con los tres targets de CI. Su manifiesto generado activaba `serde_json/preserve_order` en crates que no usan AWS y añadía dependencias de conectores opcionales a otros crates. La feature `unbounded_depth` también aparecía, pero solo habilita una API optativa: el límite de profundidad predeterminado permanece activo. El workspace-hack cambiaría la representación de JSON y la modularidad de compilación, por lo que se descartó. Se mantienen features explícitas, con `default-features = false` donde es seguro. Revisión si cargo-hakari permite unificar solo dependencias compartidas sin cambiar la representación de datos ni conectar familias de productos. Decisión: 2026-10-25.
 
-La máquina local carece de swap y sufrió una interrupción por memoria al compilar DuckDB con ASan y otra compilación en paralelo. Las mediciones y pruebas restantes se ejecutan secuencialmente con `CARGO_BUILD_JOBS=1`; el target de fuzz de exportación usa libFuzzer sin sanitizador y con optimización de compilación a nivel 0 para contener la compilación C++ de DuckDB. El trabajo de CI usa el mismo límite de compilación y un tiempo máximo por job. Decisión: 2026-10-25.
+La máquina local carece de swap y sufrió una interrupción por memoria al compilar DuckDB con ASan y otra compilación en paralelo. Las mediciones y pruebas restantes se ejecutan secuencialmente con `CARGO_BUILD_JOBS=1`; el target de fuzz de exportación usa libFuzzer sin sanitizador y con optimización de compilación a nivel 0 para contener la compilación C++ de DuckDB. B3e aplicó ese mismo límite a CI; B3f lo retira de los runners. Decisión: 2026-10-25.
 
 ## Timeout de AWS
 
@@ -122,9 +122,23 @@ El parser rechaza entradas de más de 50 MB y más de 100 000 registros; conserv
 
 ## CI y caché de compilación
 
-Linux ejecuta todas las puertas en cada push y PR; Windows ejecuta sus pruebas en PR y main, y macOS en main, nightly y tags. Los jobs de Windows y macOS esperan a Linux. La verificación cruzada se hace en el mismo job de destino; un job breve de Linux verifica el paquete creado por Windows. Se usan cachés separadas por sistema y job, compilación serial, perfil `ci` y mold en Linux. Mold se instala desde el paquete binario de Ubuntu porque tampoco figura en el catálogo de `taiki-e`. No se añade sccache sin una medición remota que demuestre que `rust-cache` es insuficiente. Las duplicaciones de `crossterm`, `base64`, `hashlink` y `toml` vienen de versiones mayores fijadas por dependencias transitivas; forzarlas sin prueba de compatibilidad cambiaría el comportamiento. Decisión: 2026-10-25.
+Linux ejecuta todas las puertas en cada push y PR; Windows ejecuta sus pruebas en PR y main, y macOS en main, nightly y tags. Los jobs de Windows y macOS esperan a Linux. La verificación cruzada se hace en el mismo job de destino; un job breve de Linux verifica el paquete creado por Windows. Se usan cachés separadas por sistema y job, perfil `ci` y mold en Linux; la compilación serial de B3e se retiró de CI en B3f. Mold se instala desde el paquete binario de Ubuntu porque tampoco figura en el catálogo de `taiki-e`. No se añade sccache sin una medición remota que demuestre que `rust-cache` es insuficiente. Las duplicaciones de `crossterm`, `base64`, `hashlink` y `toml` vienen de versiones mayores fijadas por dependencias transitivas; forzarlas sin prueba de compatibilidad cambiaría el comportamiento. Decisión: 2026-10-25.
 
-`nextest` usa también un solo hilo de tests en local y CI. Las pruebas de grafo y custodia pueden coincidir en memoria con DuckDB; en una máquina sin swap se prefiere una ejecución predecible, aunque aumente la duración de la fase de tests. La ejecución final en Linux terminó en 31,454 s, con 117 tests aprobados. Decisión: 2026-10-25.
+En B3e, `nextest` usaba un solo hilo de tests en local y CI. Las pruebas de grafo y custodia pueden coincidir en memoria con DuckDB; en una máquina sin swap se prefiere una ejecución predecible. B3f conserva esa limitación solo en local y usa un grupo limitado para infraestructura en CI. La ejecución final en Linux terminó en 31,454 s, con 117 tests aprobados. Decisión: 2026-10-25.
+
+## B3f: paralelismo de CI y módulos internos
+
+La compilación de CI usa el paralelismo del runner; `CARGO_BUILD_JOBS=1` y `--test-threads 1` quedan reservados para la máquina local sin swap. `nextest` limita a dos los tests de `irmind-infra`, que abren bases locales pesadas, sin serializar los demás crates. macOS depende solo de Linux y se ejecuta en paralelo con Windows; un job posterior verifica el paquete de Windows en macOS para conservar la verificación cruzada. La clave de concurrencia usa el nombre de rama tanto en push como en PR, de modo que el PR cancela el run previo de esa misma rama. Los jobs de compilación tienen 120 minutos de límite mientras se mide la primera ejecución con DuckDB bundled; se ajustarán con el tiempo real observado. Decisión: 2026-10-25. Esta decisión sustituye la serialización global descrita arriba.
+
+`irmind-app` separa puertos, motor, despacho, aprobaciones, ingesta, informes y custodia. `irmind-infra` separa SQLite, evidencias, firma, sello, grafo, reloj y la frontera Win32. Las fachadas de ambos crates mantienen las exportaciones públicas anteriores. Los helpers compartidos entre archivos son visibles solo dentro del crate. Decisión: 2026-10-25.
+
+## B3f: reloj inyectado
+
+El dominio recibe segundos Unix como dato explícito al evaluar propuestas, crear una aprobación pendiente y resolverla; no consulta el reloj del sistema. `Clock` es un puerto obligatorio inyectado por la raíz de composición. `SystemClock` vive en infraestructura y `FixedClock` en testkit. Un fallo al leer el reloj impide firmar el evento o aprobar una llamada. La reconstrucción de una aprobación firmada usa el instante de su propia entrada de auditoría para recomputar su política original. Decisión: 2026-10-25.
+
+## Propuesta para C: consulta SIEM estructurada
+
+Se propone que el modelo produzca un AST de consulta con campos permitidos por fuente (`event_time`, cuenta, host, usuario, IP, proceso y nombre de evento), operadores tipados (`eq`, `in`, `contains`, comparaciones temporales), ventana obligatoria dentro del caso, límite de resultados y agregaciones simples (`count by`, `top`, `distinct`). El dominio valida cada campo, operador y límite; el módulo Splunk traduce el AST a SPL, escapa los valores y fija el índice y la ventana por parámetros del servidor. La política y la TUI muestran tanto el AST canónico como la consulta efectiva antes de una aprobación. Nunca se aceptará SPL libre del modelo. Esta propuesta no se implementa en B3f y requiere diseño y tests de traducción en C. Propuesta: 2026-10-25.
 
 ## Publicación como software libre
 

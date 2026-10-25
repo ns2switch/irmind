@@ -4,8 +4,9 @@
 
 use ed25519_dalek::{Signer as _, SigningKey, Verifier as _};
 use irmind_app::{
-    AppError, CancellationToken, CloudAuditPort, CompletionMessage, CompletionRequest, EdrPort,
-    InternalIntelPort, LlmPort, MessageRole, SiemPort, ThreatIntelPort, collect_model_stream,
+    AppError, CancellationToken, Clock, CloudAuditPort, CompletionMessage, CompletionRequest,
+    EdrPort, InternalIntelPort, LlmPort, MessageRole, SiemPort, ThreatIntelPort,
+    collect_model_stream,
     modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use irmind_domain::{
@@ -16,7 +17,10 @@ use std::{
     collections::BTreeMap,
     io::{BufRead as _, BufReader, Read as _, Write as _},
     net::{TcpListener, TcpStream},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
@@ -25,6 +29,24 @@ pub const HOST: &str = "host-1";
 pub const FROM: &str = "2026-10-23T12:00:00Z";
 pub const TO: &str = "2026-10-23T13:00:00Z";
 pub const OUTSIDE: &str = "2026-10-23T14:00:00Z";
+
+pub struct FixedClock(AtomicU64);
+
+impl FixedClock {
+    pub fn new(now: u64) -> Self {
+        Self(AtomicU64::new(now))
+    }
+
+    pub fn set(&self, now: u64) {
+        self.0.store(now, Ordering::SeqCst);
+    }
+}
+
+impl Clock for FixedClock {
+    fn now(&self) -> Result<u64, AppError> {
+        Ok(self.0.load(Ordering::SeqCst))
+    }
+}
 
 /// In-memory EDR for application tests. The manifest exposes only detections.
 pub struct FakeEdr {
@@ -172,7 +194,7 @@ pub fn run_edr_contract(fixture: &impl EdrFixture) -> Result<(), String> {
     let scoped = proposal(Tool::EdrHostInfo, source, HOST, FROM, TO);
     let case = case(source, HOST, "2026-10-23T00:00:00Z", "2026-10-23T23:59:59Z")?;
     if !matches!(
-        evaluate(&case, scoped, 1, ExecutionMode::Unattended),
+        evaluate(&case, scoped, 1, ExecutionMode::Unattended, 1_700_000_000),
         Decision::Allow(_)
     ) {
         return Err("scoped unattended host read was not allowed".into());
@@ -182,7 +204,8 @@ pub fn run_edr_contract(fixture: &impl EdrFixture) -> Result<(), String> {
             &case,
             proposal(Tool::EdrHostInfo, source, "host-2", FROM, TO),
             2,
-            ExecutionMode::Unattended
+            ExecutionMode::Unattended,
+            1_700_000_000
         ),
         Decision::NeedsApproval(_)
     ) {
@@ -199,7 +222,8 @@ pub fn run_edr_contract(fixture: &impl EdrFixture) -> Result<(), String> {
                 TO
             ),
             3,
-            ExecutionMode::Unattended
+            ExecutionMode::Unattended,
+            1_700_000_000
         ),
         Decision::NeedsApproval(_)
     ) {
@@ -369,6 +393,7 @@ fn authorized(
         proposal(tool, source, host, from, to),
         1,
         ExecutionMode::Attended,
+        1_700_000_000,
     );
     match decision {
         Decision::Allow(call) => Ok(call),
@@ -437,13 +462,14 @@ fn contract_call(
         ProposedCall { tool, args },
         1,
         ExecutionMode::Attended,
+        1_700_000_000,
     ) {
         Decision::Allow(call) => Ok(call),
         Decision::NeedsApproval(pending) => {
             let analyst = ContractAnalyst(SigningKey::from_bytes(&[49; 32]));
             let signature = analyst.0.sign(&pending.challenge());
             pending
-                .resolve(&signature.to_bytes(), &analyst)
+                .resolve(&signature.to_bytes(), &analyst, 1_700_000_000)
                 .map_err(|error| format!("signed approval failed: {error:?}"))
         }
         Decision::Deny(reason) => Err(format!("contract proposal denied: {reason}")),
@@ -608,7 +634,13 @@ pub fn run_threat_intel_contract(port: &dyn ThreatIntelPort) -> Result<(), Strin
         sealed: false,
     };
     if !matches!(
-        evaluate(&case, proposal.clone(), 1, ExecutionMode::Attended),
+        evaluate(
+            &case,
+            proposal.clone(),
+            1,
+            ExecutionMode::Attended,
+            1_700_000_000
+        ),
         Decision::NeedsApproval(_)
     ) {
         return Err("external intelligence did not require approval".into());

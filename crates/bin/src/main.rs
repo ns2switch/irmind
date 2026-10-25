@@ -9,7 +9,7 @@ use irmind_app::{
     modules::{ModuleConfig, ModuleManifest, ModuleRegistry},
 };
 use irmind_domain::{Actor, CaseId, ExecutionMode, PolicyRules, Severity, Tool};
-use irmind_infra::{LocalSigner, LocalStore, LocalVerifier, verify_export_expected};
+use irmind_infra::{LocalSigner, LocalStore, LocalVerifier, SystemClock, verify_export_expected};
 #[cfg(feature = "cloud-aws")]
 use irmind_mod_cloud_aws::AwsCloudTrail;
 #[cfg(feature = "edr-crowdstrike")]
@@ -571,6 +571,7 @@ fn main() -> Result<()> {
             registry.parser()?,
         ),
         ExecutionMode::Attended,
+        Arc::new(SystemClock),
     )?)?;
     if let Some(path) = &cli.policy {
         let (policy, fingerprint) = load_policy(path)?;
