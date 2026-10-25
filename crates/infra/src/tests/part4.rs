@@ -363,7 +363,7 @@
         let seal = store.case_seal(&case.id).unwrap().unwrap();
         assert_ne!(seal.sig, last.sig);
         let path = root.path().join("export.json");
-        let public_key = store.export_case(&case.id, &path).unwrap();
+        let public_key = CaseExporter::export_case(store.as_ref(), &case.id, &path, &CancellationToken::new()).unwrap();
         assert_eq!(verify_export(&path).unwrap().0, public_key);
         assert_eq!(
             verify_export_expected(&path, Some(&public_key)).unwrap().0,

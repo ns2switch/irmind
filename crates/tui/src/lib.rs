@@ -32,12 +32,7 @@ pub trait WorkspaceIo: Send + Sync {
     fn audit_source_name(&self, root: &Path, file: &Path) -> Result<String>;
     fn save_evidence(&self, path: &Path, bytes: &[u8]) -> Result<()>;
     fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String>;
-    fn export_case(
-        &self,
-        engine: &Engine<'_>,
-        id: &irmind_app::CaseId,
-        path: &Path,
-    ) -> Result<String>;
+    fn case_exporter(&self) -> &dyn irmind_app::CaseExporter;
 }
 
 struct TerminalSession;

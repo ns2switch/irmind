@@ -211,7 +211,15 @@ impl LocalStore {
         result
     }
 
-    pub fn export_case(&self, id: &CaseId, path: &Path) -> Result<String, AppError> {
+    fn export_case_cancelable(
+        &self,
+        id: &CaseId,
+        path: &Path,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
         let case = self.get_case(id)?;
         if !case.sealed {
             return Err(storage_reason("seal the case before export"));
@@ -222,6 +230,9 @@ impl LocalStore {
         let mut evidence = std::collections::BTreeMap::new();
         let mut encoded_bytes = 0usize;
         for hash in self.evidence_hashes(id)? {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
             let encoded = BASE64.encode(self.get_evidence(id, &hash)?);
             encoded_bytes = encoded_bytes
                 .checked_add(encoded.len())
@@ -245,18 +256,45 @@ impl LocalStore {
         if bytes.len() > MAX_EXPORT_BYTES {
             return Err(storage_reason("export exceeds 128 MiB"));
         }
-        let mut options = OpenOptions::new();
-        options.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt as _;
-            options.mode(0o600);
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
         }
-        let mut file = options.open(path).map_err(storage)?;
-        private_file(path).map_err(storage)?;
-        file.write_all(&bytes).map_err(storage)?;
-        file.sync_all().map_err(storage)?;
-        Ok(bundle.seal.analyst_key_fingerprint)
+        let mut created = false;
+        let result = (|| {
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt as _;
+                options.mode(0o600);
+            }
+            let mut file = options.open(path).map_err(storage)?;
+            created = true;
+            private_file(path).map_err(storage)?;
+            for chunk in bytes.chunks(1024 * 1024) {
+                if cancel.is_cancelled() {
+                    return Err(AppError::Cancelled);
+                }
+                file.write_all(chunk).map_err(storage)?;
+            }
+            file.sync_all().map_err(storage)?;
+            Ok(bundle.seal.analyst_key_fingerprint)
+        })();
+        if result.is_err() && created {
+            let _ = fs::remove_file(path);
+        }
+        result
+    }
+}
+
+impl CaseExporter for LocalStore {
+    fn export_case(
+        &self,
+        id: &CaseId,
+        path: &Path,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        self.export_case_cancelable(id, path, cancel)
     }
 }
 pub fn verify_export(path: &Path) -> Result<(String, usize), AppError> {

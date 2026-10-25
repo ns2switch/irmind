@@ -441,7 +441,7 @@
         assert!(entries.iter().any(|entry| entry.actor == Actor::Analyst));
         attended.seal(&case.id).unwrap();
         let path = root.path().join("mixed.json");
-        store.export_case(&case.id, &path).unwrap();
+        CaseExporter::export_case(store.as_ref(), &case.id, &path, &CancellationToken::new()).unwrap();
         assert!(verify_export(&path).is_ok());
     }
 

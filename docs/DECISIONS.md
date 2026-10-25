@@ -150,6 +150,8 @@ Un caso sellado no admite nuevas entradas sin invalidar su sello. Las cancelacio
 
 `verify-export` se ofrece mediante un puerto local `ExportVerifier` de `irmind-app`. La implementación existente de infraestructura conserva la verificación sin llavero; la CLI la invoca antes de abrir almacenamiento y la TUI la ofrece desde la pantalla de inicio. El analista aprobó este cambio de puerto. Decisión: 2026-10-25.
 
+La exportación usa el puerto local síncrono `CaseExporter` y un único caso de uso de `irmind-app` para TUI y CLI. Ese caso de uso mantiene el bloqueo del caso durante la verificación firmada y la creación del paquete; el adaptador cancela entre evidencias y bloques de escritura y borra un archivo de salida incompleto. El analista aprobó añadir el puerto. Decisión: 2026-10-25.
+
 Para confirmar `seal`, la aplicación prepara una entrada firmada y muestra su hash final real antes de escribirla. Tras la confirmación, comprueba que el caso, su manifiesto y la cabeza de la cadena siguen iguales; una vista previa obsoleta se rechaza. `Engine::seal` usa la misma preparación y ejecución, también desde la CLI. Decisión: 2026-10-25.
 
 La preparación del sello puede verificar evidencias grandes. La TUI la ejecuta en un trabajador cancelable y solo muestra la confirmación cuando recibe una vista previa firmada válida; cancelar no añade la entrada de sello. Decisión: 2026-10-25.
