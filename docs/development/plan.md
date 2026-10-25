@@ -1,0 +1,53 @@
+# IRMind reference plan
+
+This internal plan is for maintainers tracking acceptance criteria. Public readers should use the [roadmap](roadmap.md). The English version is authoritative.
+
+## Principles
+
+1. The model proposes; domain policy decides. No remote port executes without `AuthorizedCall`.
+2. Read is the default. Enrich needs signed analyst approval; Contain is denied.
+3. Every custody event enters an append-only, hash-chained, Ed25519-signed audit log.
+4. Original evidence stays intact. Model input is guarded, redacted, bounded, and marked as untrusted.
+5. Policy, audit, signing, guard, or redaction failure stops the operation.
+6. The composition root reads credentials from the system keyring and injects them into connectors. The model never receives them; modules never read the keyring or environment.
+7. `irmind-security` is mandatory. External values carry `Tainted<T>` provenance.
+8. Each product implements a port in its own crate; adding one does not change the core.
+9. Dependencies point inward: domain ← application ← adapters / security / TUI ← binary. CI checks this direction.
+10. macOS, Linux, and Windows must preserve the same security guarantees.
+11. The TUI is the analyst's main workspace. `irmind` with no subcommand opens it; CLI subcommands reuse application use cases for automation.
+
+## Milestones and acceptance criteria
+
+| Milestone | Scope | Done when |
+| --- | --- | --- |
+| H0 Skeleton | Workspace, lints, CI, cargo-deny, dependency-direction test. | The test rejects an intentionally introduced reverse dependency. |
+| H1 Domain | Typed IDs, risk and approval types, execution mode, actors, taint, scoped policy and quotas, case entities, pure hash-chain rules. | Tests cover every policy rule and chain failure. |
+| H2 Application | Cancelable async remote ports; synchronous local ports through `spawn_blocking` in async use cases; investigation, approval, reporting, seal, verify, ingest, export, and export verification; generic module dispatch and port contracts. | No local operation blocks the runtime; each remote family has an approved-call end-to-end test; no raw data reaches the fake LLM. |
+| H3 Security | Nonce isolation, normalization, injection detection, taint containment, safe output, startup corpus self-test, signed detection event. | An obedient fake LLM cannot execute an unapproved call; a broken rule blocks startup. |
+| H4 Signed storage | SQLite WAL, SHA-256 evidence, persistent Analyst and Agent keyring keys, verify, seal, export, expected-key verification. | Verification detects database and evidence tampering. |
+| H5 LLM | Streaming tool calls, case-state context, per-case token and cost limits. | Recorded-response tests and a documented manual test pass. |
+| H6 TUI | Home case list and creation, case panels and actions, command palette, cancelable work, first-run guide, module status, scope and evidence commands. | A `ratatui::TestBackend` test creates, ingests, investigates, approves, verifies, seals, and exports without the CLI. |
+| H7 Graph | DuckDB, hashed ingestion, streaming CloudTrail and JSON parsers, deterministic extraction, aggregated edges, text search, bounded Read tools. | A benchmark ingests at least 1 GB of synthetic data and measures time and tokens. |
+| H8 Integrations | Cloud, SIEM, EDR, and threat-intelligence modules passing shared port contracts. | Each module has recorded-response tests and a setup guide. |
+
+## Later unattended gateway
+
+Do not implement the gateway yet. Preserve distinct Analyst and Agent signing keys, `ExecutionMode`, unattended scoped reads only, analyst-signed approvals, and service-safe concurrent use cases.
+
+## Accepted design choices
+
+- `ProposedCall` has no risk field. `Tool` determines risk.
+- The evidence graph uses DuckDB.
+- `Actor` names the signer; event origin is separate.
+- No LLM is enabled by default. Use only synthetic data until provider compliance approval.
+- Local Ollama may use keyless loopback HTTP or HTTPS; remote models require HTTPS.
+- The keyring has no fallback. Missing native keyring fails closed.
+- Rustls uses native roots; its platform-verification limits remain documented.
+
+## Distribution
+
+CI publishes unsigned binaries with `SHA256SUMS`. Signing, notarization, and Authenticode are deferred. Review this decision by 2027-04-24 or before external binary distribution.
+
+## Documentation
+
+English is authoritative. Public guides live under `docs/`; Spanish user guides identify the English source commit. Do not translate or alter signed event identifiers, canonical formats, or the bilingual attack corpus merely to localize documentation.

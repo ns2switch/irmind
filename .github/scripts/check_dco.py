@@ -25,11 +25,11 @@ def main() -> int:
     base = os.environ.get("BASE_SHA", "")
     head = os.environ.get("HEAD_SHA", "")
     if not SHA.fullmatch(base) or not SHA.fullmatch(head):
-        print("DCO: BASE_SHA y HEAD_SHA deben ser hashes de commit completos", file=sys.stderr)
+        print("DCO: BASE_SHA and HEAD_SHA must be full commit hashes", file=sys.stderr)
         return 2
     commits = git("rev-list", "--reverse", f"{base}..{head}").splitlines()
     if not commits:
-        print("DCO: no hay commits en el rango del PR", file=sys.stderr)
+        print("DCO: no commits found in the pull request range", file=sys.stderr)
         return 2
     missing = []
     for commit in commits:
@@ -44,9 +44,9 @@ def main() -> int:
         if not signed_by_author:
             missing.append(commit[:12])
     if missing:
-        print("DCO: falta Signed-off-by del autor en: " + ", ".join(missing), file=sys.stderr)
+        print("DCO: missing author Signed-off-by on: " + ", ".join(missing), file=sys.stderr)
         return 1
-    print(f"DCO: {len(commits)} commits verificados")
+    print(f"DCO: verified {len(commits)} commits")
     return 0
 
 

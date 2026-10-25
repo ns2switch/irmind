@@ -1,0 +1,35 @@
+{
+  "Records": [
+    {
+      "eventVersion": "1.09",
+      "eventTime": "2026-10-23T10:14:00Z",
+      "eventSource": "signin.amazonaws.com",
+      "eventName": "ConsoleLogin",
+      "awsRegion": "eu-west-1",
+      "recipientAccountId": "000000000000",
+      "sourceIPAddress": "203.0.113.10",
+      "userAgent": "Synthetic example for IRMind documentation",
+      "userIdentity": {
+        "type": "IAMUser",
+        "userName": "demo-analyst"
+      }
+    },
+    {
+      "eventVersion": "1.09",
+      "eventTime": "2026-10-23T10:17:00Z",
+      "eventSource": "sts.amazonaws.com",
+      "eventName": "AssumeRole",
+      "awsRegion": "eu-west-1",
+      "recipientAccountId": "000000000000",
+      "sourceIPAddress": "203.0.113.10",
+      "userIdentity": {
+        "type": "IAMUser",
+        "userName": "demo-analyst"
+      },
+      "requestParameters": {
+        "roleArn": "arn:aws:iam::000000000000:role/DemoReadOnly",
+        "roleSessionName": "synthetic-session"
+      }
+    }
+  ]
+}

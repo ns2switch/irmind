@@ -1,26 +1,24 @@
-# Contribuir a IRMind
+# Contributing to IRMind
 
-IRMind está en desarrollo. Usa solo datos sintéticos en issues, pull requests, tests y ejemplos; no adjuntes evidencias reales, credenciales ni datos personales de incidentes. Para vulnerabilidades, sigue [SECURITY.md](SECURITY.md).
+This guide is for contributors preparing an issue or pull request. IRMind is under development: use only synthetic data in issues, tests, examples, and review discussions. Never attach real incident evidence, credentials, or personal data. Report vulnerabilities privately through [SECURITY.md](SECURITY.md).
 
-## Licencia y DCO
+## License and DCO
 
-Toda contribución enviada intencionadamente al proyecto se ofrece bajo **MIT OR Apache-2.0**, sin condiciones adicionales, como indica el [README](README.md#contribution).
+Contributions intentionally submitted for inclusion are offered under **MIT OR Apache-2.0**, without additional conditions, as stated in the [README](README.md#license).
 
-Cada commit de un pull request debe incluir un tráiler `Signed-off-by` con el nombre y correo del autor. El tráiler certifica el [Developer Certificate of Origin 1.1](https://developercertificate.org/); el check de CI compara el correo del tráiler con el correo del autor del commit.
+Every commit in a pull request must include a `Signed-off-by` trailer with the author's name and email. The trailer certifies the [Developer Certificate of Origin 1.1](https://developercertificate.org/). CI checks that its email matches the commit author.
 
 ```text
-Signed-off-by: Nombre Apellido <correo@example.com>
+Signed-off-by: Your Name <you@example.com>
 ```
 
-Para añadirlo al crear el commit, usa `git commit -s`. Para corregir el último commit local, usa `git commit --amend -s`; en un PR con varios commits, firma cada uno antes de actualizar la rama. No firmes en nombre de otra persona.
+Use `git commit -s` for a new commit. To fix your last local commit, use `git commit --amend -s`. Sign each commit in a multi-commit pull request. Never sign on behalf of another person.
 
-## Comprobaciones locales
+## Before opening a pull request
 
-```sh
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-cargo nextest run --workspace --all-features --locked --test-threads 1
-cargo deny check
-```
+- Keep the change within the current [architecture](docs/development/architecture.md) and document any new public behavior.
+- Add meaningful tests for policy, custody, parsing, or connector changes. Use synthetic fixtures.
+- Run `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo nextest run --workspace --all-features --locked`, and `cargo deny check`.
+- Describe security implications, tests run, and known limits in the pull request template.
 
-Describe en el PR los cambios de seguridad, las pruebas ejecutadas y las limitaciones. Los módulos nuevos siguen las guías de `docs/`, una vez que se reabra esa fase del plan.
+English documentation is authoritative. Update a Spanish translation when its user-facing source changes, and put the English source commit hash in its first line.
