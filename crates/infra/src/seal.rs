@@ -263,6 +263,18 @@ pub fn verify_export(path: &Path) -> Result<(String, usize), AppError> {
     verify_export_expected(path, None)
 }
 
+pub struct LocalExportVerifier;
+
+impl ExportVerifier for LocalExportVerifier {
+    fn verify_export(
+        &self,
+        path: &Path,
+        expected_key: Option<&str>,
+    ) -> Result<(String, usize), AppError> {
+        verify_export_expected(path, expected_key)
+    }
+}
+
 pub fn verify_export_expected(
     path: &Path,
     expected_key: Option<&str>,

@@ -2409,6 +2409,7 @@ dependencies = [
  "irmind-tui",
  "keyring",
  "libc",
+ "ratatui",
  "secrecy",
  "serde",
  "serde_json",
@@ -2650,6 +2651,7 @@ name = "irmind-tui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "crossterm 0.29.0",
  "irmind-app",
  "ratatui",

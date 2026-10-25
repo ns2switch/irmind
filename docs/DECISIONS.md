@@ -140,6 +140,22 @@ El dominio recibe segundos Unix como dato explícito al evaluar propuestas, crea
 
 Se propone que el modelo produzca un AST de consulta con campos permitidos por fuente (`event_time`, cuenta, host, usuario, IP, proceso y nombre de evento), operadores tipados (`eq`, `in`, `contains`, comparaciones temporales), ventana obligatoria dentro del caso, límite de resultados y agregaciones simples (`count by`, `top`, `distinct`). El dominio valida cada campo, operador y límite; el módulo Splunk traduce el AST a SPL, escapa los valores y fija el índice y la ventana por parámetros del servidor. La política y la TUI muestran tanto el AST canónico como la consulta efectiva antes de una aprobación. Nunca se aceptará SPL libre del modelo. Esta propuesta no se implementa en B3f y requiere diseño y tests de traducción en C. Propuesta: 2026-10-25.
 
+## Fase T: TUI como punto de entrada
+
+`irmind` sin subcomando abre la TUI. La pantalla de inicio permite descubrir y crear casos; el espacio del caso reúne investigación, ingesta, custodia e informe. Los subcomandos permanecen para automatización y usan los mismos casos de uso. Ningún proveedor LLM se activa de forma implícita. La interfaz no muestra secretos y limpia el contenido externo antes de dibujarlo. Las tareas largas se cancelan mediante el token existente y registran la cancelación. El criterio de H6 es una prueba de caso completo con `ratatui::TestBackend` y módulos falsos, sin CLI. Decisión: 2026-10-25.
+
+## Fase T: auditoría operativa de cancelaciones
+
+Un caso sellado no admite nuevas entradas sin invalidar su sello. Las cancelaciones de tareas de la TUI se registran en una cadena operativa Ed25519 separada, vinculada al `case_id`, con prefijo canónico `irmind-operation-v1`. `verify` comprueba también esa cadena; la cadena sellada del caso no cambia. El analista aprobó ampliar `AuditLog` para este fin. Decisión: 2026-10-25.
+
+`verify-export` se ofrece mediante un puerto local `ExportVerifier` de `irmind-app`. La implementación existente de infraestructura conserva la verificación sin llavero; la CLI la invoca antes de abrir almacenamiento y la TUI la ofrece desde la pantalla de inicio. El analista aprobó este cambio de puerto. Decisión: 2026-10-25.
+
+Para confirmar `seal`, la aplicación prepara una entrada firmada y muestra su hash final real antes de escribirla. Tras la confirmación, comprueba que el caso, su manifiesto y la cabeza de la cadena siguen iguales; una vista previa obsoleta se rechaza. `Engine::seal` usa la misma preparación y ejecución, también desde la CLI. Decisión: 2026-10-25.
+
+La exportación desde la TUI comprueba la cadena y las evidencias con `verify_cancelable` antes de crear el paquete, igual que la CLI. Una evidencia alterada impide crear el archivo de salida. Decisión: 2026-10-25.
+
+La primera ejecución de B3f reveló que Cargo inicia los tests de integración desde `crates/bin`, mientras el artefacto de CI se buscaba en la raíz del workspace. La ruta del fixture portable se fija con `GITHUB_WORKSPACE` para que Linux y Windows publiquen el archivo que verifican los otros sistemas. Corrección: 2026-10-25.
+
 ## Publicación como software libre
 
 IRMind se publica bajo `MIT OR Apache-2.0`, con copyright de 2026 de Aníbal Cañada. Cada commit de un PR debe llevar un tráiler DCO `Signed-off-by` que coincida con el correo del autor; el check DCO precede a los trabajos de compilación para evitar gastar minutos en PRs sin firma. El README declara que la aplicación aún no sirve para incidentes reales con datos sensibles. `SECURITY.md` dirige los informes a GitHub Private Vulnerability Reporting, que se debe habilitar en la configuración del repositorio antes de hacerlo público. Decisión: 2026-10-25.

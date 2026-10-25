@@ -11,6 +11,7 @@
 8. Cada producto es un módulo que implementa un puerto; añadir uno no toca el núcleo.
 9. Arquitectura limpia: dominio ← aplicación ← adaptadores / seguridad / TUI ← bin. Las dependencias solo apuntan hacia dentro, y un test de CI lo verifica.
 10. IRMind funciona en macOS, Linux y Windows con las mismas garantías de seguridad.
+11. La TUI es el punto central del trabajo del analista: `irmind` sin argumentos la abre, y la CLI conserva subcomandos de automatización sobre los mismos casos de uso.
 
 ## Hitos y criterio de "hecho"
 H0 Esqueleto: workspace, lints, CI, cargo-deny y test de dirección de dependencias. Hecho cuando: el test falla con una arista inversa introducida a propósito.
@@ -19,7 +20,7 @@ H2 Aplicación: puertos remotos async y cancelables (LlmPort con un único méto
 H3 Seguridad: aislamiento con nonce, normalización, detección, contención por procedencia (Tainted), salida segura, autotest de arranque y evento InjectionDetected. Hecho cuando: el LLM falso obediente no consigue ejecutar nada sin aprobación, y una regla rota bloquea el arranque.
 H4 Almacenamiento firmado: SQLite en WAL, evidencias por SHA-256, claves Analyst y Agent en el llavero persistente; verify, seal, export y verify-export con huella de clave esperada. Hecho cuando: verify detecta la manipulación de la base de datos y de las evidencias.
 H5 Proveedor LLM: streaming, tool calling, contexto construido desde el estado del caso, y límite de tokens y coste por caso. Hecho cuando: hay tests con respuestas grabadas y una prueba manual documentada.
-H6 TUI (crate irmind-tui): conversación, paneles del caso, diálogo de aprobación, /scope, /evidence y /pause cancelable, e indicador de detecciones. Hecho cuando: se puede llevar un caso completo con módulos falsos.
+H6 TUI (crate irmind-tui): pantalla inicial de casos y creación, conversación y paneles del caso, ingesta, investigación, aprobaciones, verify, report, seal y export, paleta de comandos, tareas cancelables, guía de primer arranque, estado de módulos, /scope, /evidence y /pause. Hecho cuando: un test con `ratatui::TestBackend` y módulos falsos crea, ingiere, investiga, aprueba, verifica, sella y exporta un caso sin usar la CLI.
 H7 Grafo de evidencias (DuckDB): ingesta con hash, parsers en streaming (CloudTrail y JSON), extracción determinista, aristas agregadas, búsqueda de texto completo, y herramientas Read con budget de tokens. Hecho cuando: hay un benchmark con al menos 1 GB sintético.
 H8 Integraciones: cloud, SIEM, EDR y TI, cada módulo pasando la suite de su puerto. Hecho cuando: cada módulo tiene tests con respuestas grabadas y una guía de configuración.
 
