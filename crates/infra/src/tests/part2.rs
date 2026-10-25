@@ -130,7 +130,7 @@
         assert_eq!(store.entries(&case.id).unwrap()[1].kind, "CaseScopeChanged");
         engine.seal(&case.id).unwrap();
         let path = root.path().join("case.json");
-        store.export_case(&case.id, &path).unwrap();
+        CaseExporter::export_case(store.as_ref(), &case.id, &path, &CancellationToken::new()).unwrap();
         verify_export(&path).unwrap();
         store
             .conn()

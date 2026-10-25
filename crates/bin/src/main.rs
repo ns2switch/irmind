@@ -505,8 +505,8 @@ impl WorkspaceIo for RootWorkspaceIo {
             "Verified {entries} entries; analyst key {fingerprint}"
         ))
     }
-    fn export_case(&self, _engine: &Engine<'_>, id: &CaseId, path: &Path) -> Result<String> {
-        Ok(self.store.export_case(id, path)?)
+    fn case_exporter(&self) -> &dyn irmind_app::CaseExporter {
+        self.store.as_ref()
     }
 }
 
@@ -1163,8 +1163,8 @@ fn main() -> Result<()> {
             }
             Command::Export { case_id, path } => {
                 let id = parse_id(&case_id)?;
-                engine.verify_cancelable(&id, &cancel)?;
-                let fingerprint = store.export_case(&id, &path)?;
+                let fingerprint =
+                    irmind_app::export_case(&engine, store.as_ref(), &id, &path, &cancel)?;
                 println!("exported case; analyst key fingerprint {fingerprint}");
             }
             Command::VerifyExport { .. } => {

@@ -348,6 +348,18 @@ pub trait ExportVerifier: Send + Sync {
     ) -> Result<(String, usize), AppError>;
 }
 
+/// Writes a sealed case package to a new local path. The application verifies
+/// the signed case before invoking this port. Implementations must never
+/// overwrite an existing path and must remove incomplete output on error.
+pub trait CaseExporter: Send + Sync {
+    fn export_case(
+        &self,
+        id: &CaseId,
+        path: &Path,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError>;
+}
+
 pub trait Clock: Send + Sync {
     fn now(&self) -> Result<u64, AppError>;
 }

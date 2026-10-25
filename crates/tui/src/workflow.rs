@@ -113,12 +113,6 @@ impl CaseWorkflow<'_, '_> {
         path: &Path,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        self.engine.verify_cancelable(id, cancel)?;
-        if cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        self.io_ops
-            .export_case(self.engine, id, path)
-            .map_err(|_| AppError::Storage("case export failed".into()))
+        irmind_app::export_case(self.engine, self.io_ops.case_exporter(), id, path, cancel)
     }
 }

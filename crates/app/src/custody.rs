@@ -13,6 +13,27 @@ pub fn verify_export(
     verifier.verify_export(path, expected_key)
 }
 
+pub fn export_case(
+    engine: &Engine<'_>,
+    exporter: &dyn crate::CaseExporter,
+    id: &CaseId,
+    path: &Path,
+    cancel: &CancellationToken,
+) -> Result<String, AppError> {
+    if cancel.is_cancelled() {
+        return Err(AppError::Cancelled);
+    }
+    let _case_lock = engine.repo.lock_case(id)?;
+    engine.verify_unlocked_cancelable(id, cancel)?;
+    if !engine.repo.get_case(id)?.sealed {
+        return Err(AppError::Policy("seal the case before export".into()));
+    }
+    if cancel.is_cancelled() {
+        return Err(AppError::Cancelled);
+    }
+    exporter.export_case(id, path, cancel)
+}
+
 pub struct SealPreview {
     entry: SignedEntry,
     seal: CaseSeal,

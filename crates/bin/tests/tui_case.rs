@@ -104,13 +104,8 @@ impl WorkspaceIo for TestIo {
             "Verified {entries} entries; analyst key {fingerprint}"
         ))
     }
-    fn export_case(
-        &self,
-        _engine: &Engine<'_>,
-        id: &irmind_app::CaseId,
-        path: &Path,
-    ) -> anyhow::Result<String> {
-        Ok(self.0.export_case(id, path)?)
+    fn case_exporter(&self) -> &dyn irmind_app::CaseExporter {
+        self.0.as_ref()
     }
 }
 
@@ -178,6 +173,14 @@ fn complete_case_from_tui_controller_with_test_backend_and_fakes() {
             .unwrap()
             .contains("Verified")
     );
+    let cancelled = CancellationToken::new();
+    cancelled.cancel();
+    let cancelled_path = root.path().join("cancelled.irmind.json");
+    assert!(matches!(
+        irmind_app::export_case(&engine, store.as_ref(), &id, &cancelled_path, &cancelled),
+        Err(AppError::Cancelled)
+    ));
+    assert!(!cancelled_path.exists());
     tui.render_case(&id, "Case sealed and exported").unwrap();
     tui.render_home().unwrap();
     assert!(screen(tui.terminal()).contains("sealed"));

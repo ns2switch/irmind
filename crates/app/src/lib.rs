@@ -28,7 +28,7 @@ mod ports;
 mod report;
 
 pub use approvals::ApprovalRequest;
-pub use custody::{SealPreview, verify_export};
+pub use custody::{SealPreview, export_case, verify_export};
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::{GraphRecord, GraphRelation, TimelineEvent};
 pub use ports::*;

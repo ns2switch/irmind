@@ -18,9 +18,10 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use ed25519_dalek::{Signature, Signer as _, SigningKey, VerifyingKey};
 use fs4::fs_std::FileExt as _;
 use irmind_app::{
-    AppError, AuditLog, CaseLock, CaseMutation, CaseSeal, EventParser, EvidenceGraph,
-    EvidenceStore, ExportVerifier, GraphRecord, Repository, SignedEntry, SignedOperation, Signer,
-    TimelineEvent, Verifier, hex, seal_challenge, sha256, verify_case_metadata,
+    AppError, AuditLog, CancellationToken, CaseExporter, CaseLock, CaseMutation, CaseSeal,
+    EventParser, EvidenceGraph, EvidenceStore, ExportVerifier, GraphRecord, Repository,
+    SignedEntry, SignedOperation, Signer, TimelineEvent, Verifier, hex, seal_challenge, sha256,
+    verify_case_metadata,
 };
 use irmind_domain::{
     Actor, AnalystApprovalVerifier, Case, CaseId, Provenance, Severity, SourceKind, Tainted,
