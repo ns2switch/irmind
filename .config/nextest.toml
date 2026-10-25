@@ -1,0 +1,6 @@
+[test-groups]
+local-databases = { max-threads = 2 }
+
+[[profile.default.overrides]]
+filter = 'package(irmind-infra)'
+test-group = 'local-databases'

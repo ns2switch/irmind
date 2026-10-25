@@ -423,7 +423,9 @@ mod tests {
                 ("event_name".into(), "AssumeRole".into()),
             ]),
         };
-        let Decision::Allow(call) = evaluate(&case, proposal, 1, ExecutionMode::Attended) else {
+        let Decision::Allow(call) =
+            evaluate(&case, proposal, 1, ExecutionMode::Attended, 1_700_000_000)
+        else {
             panic!("scoped cloud read should be authorized");
         };
         let request = CloudRequest::from_call(&call, "aws-prod").unwrap();

@@ -2,7 +2,6 @@
 
 use sha2::{Digest as _, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct CaseId(String);
@@ -638,11 +637,8 @@ pub trait AnalystApprovalVerifier {
 }
 
 impl PendingApproval {
-    fn new(case_id: CaseId, proposal: ProposedCall, decision_seq: u64) -> Self {
-        let expires_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |duration| duration.as_secs())
-            .saturating_add(300);
+    fn new(case_id: CaseId, proposal: ProposedCall, decision_seq: u64, now: u64) -> Self {
+        let expires_at = now.saturating_add(300);
         Self {
             case_id,
             proposal,
@@ -651,7 +647,12 @@ impl PendingApproval {
         }
     }
 
-    pub fn recover(case: &Case, mode: ExecutionMode, encoded: &[u8]) -> Result<Self, DomainError> {
+    pub fn recover(
+        case: &Case,
+        mode: ExecutionMode,
+        encoded: &[u8],
+        now: u64,
+    ) -> Result<Self, DomainError> {
         let mut rest = encoded
             .strip_prefix(b"irmind-approval-v2\0")
             .ok_or(DomainError::InvalidApproval)?;
@@ -693,7 +694,7 @@ impl PendingApproval {
         let mut open = case.clone();
         open.sealed = false;
         let Decision::NeedsApproval(mut pending) =
-            evaluate(&open, ProposedCall { tool, args }, decision_seq, mode)
+            evaluate(&open, ProposedCall { tool, args }, decision_seq, mode, now)
         else {
             return Err(DomainError::InvalidApproval);
         };
@@ -727,11 +728,8 @@ impl PendingApproval {
         self,
         signature: &[u8],
         verifier: &dyn AnalystApprovalVerifier,
+        now: u64,
     ) -> Result<AuthorizedCall, DomainError> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| DomainError::InvalidApproval)?
-            .as_secs();
         if now > self.expires_at || !verifier.verify_analyst(&self.challenge(), signature) {
             return Err(DomainError::InvalidApproval);
         }
@@ -848,8 +846,16 @@ pub fn evaluate(
     proposal: ProposedCall,
     decision_seq: u64,
     mode: ExecutionMode,
+    now: u64,
 ) -> Decision {
-    evaluate_with_context(case, proposal, decision_seq, mode, PolicyContext::default())
+    evaluate_with_context(
+        case,
+        proposal,
+        decision_seq,
+        mode,
+        PolicyContext::default(),
+        now,
+    )
 }
 
 pub fn evaluate_tainted(
@@ -858,6 +864,7 @@ pub fn evaluate_tainted(
     decision_seq: u64,
     mode: ExecutionMode,
     turn_has_detections: bool,
+    now: u64,
 ) -> Decision {
     evaluate_with_context(
         case,
@@ -868,6 +875,7 @@ pub fn evaluate_tainted(
             tainted_arguments: true,
             turn_has_detections,
         },
+        now,
     )
 }
 
@@ -877,6 +885,7 @@ pub fn evaluate_with_context(
     decision_seq: u64,
     mode: ExecutionMode,
     context: PolicyContext,
+    now: u64,
 ) -> Decision {
     if case.sealed {
         return Decision::Deny("case is sealed");
@@ -1077,6 +1086,7 @@ pub fn evaluate_with_context(
                     case.id.clone(),
                     proposal,
                     decision_seq,
+                    now,
                 ));
             }
             Some(SplQueryClass::SafeLiteral) => {}
@@ -1101,6 +1111,7 @@ pub fn evaluate_with_context(
                 case.id.clone(),
                 proposal,
                 decision_seq,
+                now,
             ));
         }
     }
@@ -1117,6 +1128,7 @@ pub fn evaluate_with_context(
                 case.id.clone(),
                 proposal,
                 decision_seq,
+                now,
             ));
         }
     }
@@ -1134,6 +1146,7 @@ pub fn evaluate_with_context(
                 case.id.clone(),
                 proposal,
                 decision_seq,
+                now,
             ));
         }
     }
@@ -1166,6 +1179,7 @@ pub fn evaluate_with_context(
                 case.id.clone(),
                 proposal,
                 decision_seq,
+                now,
             ));
         }
     }
@@ -1177,6 +1191,7 @@ pub fn evaluate_with_context(
             case.id.clone(),
             proposal,
             decision_seq,
+            now,
         ));
     }
     if context.turn_has_detections && proposal.tool.risk() != RiskLevel::Read {
@@ -1184,6 +1199,7 @@ pub fn evaluate_with_context(
             case.id.clone(),
             proposal,
             decision_seq,
+            now,
         ));
     }
     if mode == ExecutionMode::Unattended && proposal.tool.risk() != RiskLevel::Read {
@@ -1191,6 +1207,7 @@ pub fn evaluate_with_context(
             case.id.clone(),
             proposal,
             decision_seq,
+            now,
         ));
     }
     if proposal.tool.risk() == RiskLevel::Enrich {
@@ -1198,6 +1215,7 @@ pub fn evaluate_with_context(
             case.id.clone(),
             proposal,
             decision_seq,
+            now,
         ));
     }
     Decision::Allow(AuthorizedCall {
@@ -1276,7 +1294,7 @@ mod tests {
             ]),
         };
         assert!(matches!(
-            evaluate(&case(), proposal, 1, ExecutionMode::Attended),
+            evaluate(&case(), proposal, 1, ExecutionMode::Attended, 1_700_000_000),
             Decision::Deny(_)
         ));
     }
@@ -1319,15 +1337,20 @@ mod tests {
                     &scoped,
                     proposal(&format!("event | {command} target")),
                     1,
-                    ExecutionMode::Attended
+                    ExecutionMode::Attended,
+                    1_700_000_000
                 ),
                 Decision::Deny(_)
             ));
         }
         let exact = "event | stats count";
-        let Decision::NeedsApproval(pending) =
-            evaluate(&scoped, proposal(exact), 2, ExecutionMode::Attended)
-        else {
+        let Decision::NeedsApproval(pending) = evaluate(
+            &scoped,
+            proposal(exact),
+            2,
+            ExecutionMode::Attended,
+            1_700_000_000,
+        ) else {
             panic!("expected approval")
         };
         assert_eq!(
@@ -1335,7 +1358,13 @@ mod tests {
             Some(exact)
         );
         assert!(matches!(
-            evaluate(&scoped, proposal("AssumeRole"), 3, ExecutionMode::Attended),
+            evaluate(
+                &scoped,
+                proposal("AssumeRole"),
+                3,
+                ExecutionMode::Attended,
+                1_700_000_000
+            ),
             Decision::Allow(_)
         ));
     }
@@ -1347,7 +1376,7 @@ mod tests {
             args: BTreeMap::from([("ioc".into(), "example.com".into())]),
         };
         assert!(matches!(
-            evaluate(&case(), proposal, 1, ExecutionMode::Attended),
+            evaluate(&case(), proposal, 1, ExecutionMode::Attended, 1_700_000_000),
             Decision::NeedsApproval(_)
         ));
     }
@@ -1365,14 +1394,18 @@ mod tests {
             tool: Tool::ThreatIntelExternal,
             args: BTreeMap::from([("ioc".into(), ioc.into())]),
         };
-        let Decision::NeedsApproval(first) =
-            evaluate(&case(), proposal("example.com"), 7, ExecutionMode::Attended)
-        else {
+        let Decision::NeedsApproval(first) = evaluate(
+            &case(),
+            proposal("example.com"),
+            7,
+            ExecutionMode::Attended,
+            1_700_000_000,
+        ) else {
             panic!("expected pending approval")
         };
         let signed = first.challenge();
         let verifier = ExactChallenge(signed.clone());
-        assert!(first.resolve(&signed, &verifier).is_ok());
+        assert!(first.resolve(&signed, &verifier, 1_700_000_000).is_ok());
 
         let mut other_case = case();
         other_case.id = CaseId::parse("00000000-0000-0000-0000-000000000002").unwrap();
@@ -1381,37 +1414,47 @@ mod tests {
             proposal("example.com"),
             7,
             ExecutionMode::Attended,
+            1_700_000_000,
         ) else {
             panic!("expected pending approval")
         };
-        assert!(other.resolve(&signed, &verifier).is_err());
+        assert!(other.resolve(&signed, &verifier, 1_700_000_000).is_err());
         let Decision::NeedsApproval(other_args) = evaluate(
             &case(),
             proposal("other.example"),
             7,
             ExecutionMode::Attended,
+            1_700_000_000,
         ) else {
             panic!("expected pending approval")
         };
-        assert!(other_args.resolve(&signed, &verifier).is_err());
-        let Decision::NeedsApproval(other_seq) =
-            evaluate(&case(), proposal("example.com"), 8, ExecutionMode::Attended)
-        else {
-            panic!("expected pending approval")
-        };
-        assert!(other_seq.resolve(&signed, &verifier).is_err());
-        let mut expired =
-            PendingApproval::recover(&case(), ExecutionMode::Attended, &signed).unwrap();
-        expired.expires_at = 1;
-        let expired_challenge = expired.challenge();
         assert!(
-            expired
-                .resolve(
-                    &expired_challenge,
-                    &ExactChallenge(expired_challenge.clone())
-                )
+            other_args
+                .resolve(&signed, &verifier, 1_700_000_000)
                 .is_err()
         );
+        let Decision::NeedsApproval(other_seq) = evaluate(
+            &case(),
+            proposal("example.com"),
+            8,
+            ExecutionMode::Attended,
+            1_700_000_000,
+        ) else {
+            panic!("expected pending approval")
+        };
+        assert!(
+            other_seq
+                .resolve(&signed, &verifier, 1_700_000_000)
+                .is_err()
+        );
+        let before =
+            PendingApproval::recover(&case(), ExecutionMode::Attended, &signed, 1_700_000_000)
+                .unwrap();
+        assert!(before.resolve(&signed, &verifier, 1_700_000_299).is_ok());
+        let after =
+            PendingApproval::recover(&case(), ExecutionMode::Attended, &signed, 1_700_000_000)
+                .unwrap();
+        assert!(after.resolve(&signed, &verifier, 1_700_000_301).is_err());
         assert!(!signed.starts_with(b"irmind-audit-v2\0"));
         assert!(!signed.starts_with(b"irmind-seal-v1\0"));
     }
@@ -1436,7 +1479,8 @@ mod tests {
                     args: BTreeMap::from([("ioc".into(), "example.com".into())]),
                 },
                 1,
-                ExecutionMode::Attended
+                ExecutionMode::Attended,
+                1_700_000_000
             ),
             Decision::NeedsApproval(_)
         ));
@@ -1490,25 +1534,55 @@ mod tests {
             ]),
         };
         assert!(matches!(
-            evaluate(&scoped, call("splunk-prod"), 1, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                call("splunk-prod"),
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::Allow(_)
         ));
         assert!(matches!(
-            evaluate(&scoped, call("splunk-other"), 1, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                call("splunk-other"),
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
         assert!(matches!(
-            evaluate(&case(), call("splunk-prod"), 1, ExecutionMode::Attended),
+            evaluate(
+                &case(),
+                call("splunk-prod"),
+                1,
+                ExecutionMode::Attended,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
         scoped.scope = "v1;sources=splunk-prod;accounts=;hosts=host-1;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z".into();
         assert!(matches!(
-            evaluate(&scoped, call("splunk-prod"), 1, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                call("splunk-prod"),
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
         scoped.scope = "v1;sources=splunk-prod;accounts=123;hosts=host-1;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z".into();
         assert!(matches!(
-            evaluate(&scoped, call("splunk-prod"), 1, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                call("splunk-prod"),
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
     }
@@ -1528,11 +1602,23 @@ mod tests {
             ]),
         };
         assert!(matches!(
-            evaluate(&scoped, call("123456789012"), 1, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                call("123456789012"),
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::Allow(_)
         ));
         assert!(matches!(
-            evaluate(&scoped, call("999999999999"), 1, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                call("999999999999"),
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
     }
@@ -1551,11 +1637,23 @@ mod tests {
             ]),
         };
         assert!(matches!(
-            evaluate(&scoped, call("123456789012"), 1, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                call("123456789012"),
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::Allow(_)
         ));
         assert!(matches!(
-            evaluate(&scoped, call("999999999999"), 1, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                call("999999999999"),
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
     }
@@ -1572,11 +1670,23 @@ mod tests {
             ]),
         };
         assert!(matches!(
-            evaluate(&scoped, proposal.clone(), 1, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                proposal.clone(),
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::Allow(_)
         ));
         assert!(matches!(
-            evaluate(&case(), proposal, 1, ExecutionMode::Unattended),
+            evaluate(
+                &case(),
+                proposal,
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
     }
@@ -1588,7 +1698,7 @@ mod tests {
             args: BTreeMap::from([("query".into(), "alice".into())]),
         };
         assert!(matches!(
-            evaluate(&case(), read, 1, ExecutionMode::Unattended),
+            evaluate(&case(), read, 1, ExecutionMode::Unattended, 1_700_000_000),
             Decision::Allow(_)
         ));
         let external = ProposedCall {
@@ -1596,7 +1706,13 @@ mod tests {
             args: BTreeMap::from([("ioc".into(), "example.com".into())]),
         };
         assert!(matches!(
-            evaluate(&case(), external, 2, ExecutionMode::Unattended),
+            evaluate(
+                &case(),
+                external,
+                2,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
     }
@@ -1616,7 +1732,8 @@ mod tests {
                     args: args.clone(),
                 },
                 2,
-                ExecutionMode::Unattended
+                ExecutionMode::Unattended,
+                1_700_000_000
             ),
             Decision::Allow(_)
         ));
@@ -1630,7 +1747,8 @@ mod tests {
                     args: invalid,
                 },
                 3,
-                ExecutionMode::Attended
+                ExecutionMode::Attended,
+                1_700_000_000
             ),
             Decision::Deny(_)
         ));
@@ -1660,7 +1778,13 @@ mod tests {
             },
         ] {
             assert!(matches!(
-                evaluate(&case(), proposal, 4, ExecutionMode::Unattended),
+                evaluate(
+                    &case(),
+                    proposal,
+                    4,
+                    ExecutionMode::Unattended,
+                    1_700_000_000
+                ),
                 Decision::Allow(_)
             ));
         }
@@ -1675,7 +1799,8 @@ mod tests {
                     ]),
                 },
                 5,
-                ExecutionMode::Attended
+                ExecutionMode::Attended,
+                1_700_000_000
             ),
             Decision::Deny(_)
         ));
@@ -1693,11 +1818,23 @@ mod tests {
             ]),
         };
         assert!(matches!(
-            evaluate(&scoped, info("host-1"), 1, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                info("host-1"),
+                1,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::Allow(_)
         ));
         assert!(matches!(
-            evaluate(&scoped, info("host-2"), 2, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                info("host-2"),
+                2,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
         let detection = |from: &str| ProposedCall {
@@ -1714,7 +1851,8 @@ mod tests {
                 &scoped,
                 detection("2026-10-23T12:00:00Z"),
                 3,
-                ExecutionMode::Unattended
+                ExecutionMode::Unattended,
+                1_700_000_000
             ),
             Decision::Allow(_)
         ));
@@ -1723,13 +1861,20 @@ mod tests {
                 &scoped,
                 detection("2026-10-22T12:00:00Z"),
                 4,
-                ExecutionMode::Unattended
+                ExecutionMode::Unattended,
+                1_700_000_000
             ),
             Decision::NeedsApproval(_)
         ));
         scoped.scope = "v1;sources=edr-prod;accounts=123;hosts=host-1;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z".into();
         assert!(matches!(
-            evaluate(&scoped, info("host-1"), 5, ExecutionMode::Unattended),
+            evaluate(
+                &scoped,
+                info("host-1"),
+                5,
+                ExecutionMode::Unattended,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
     }
@@ -1745,7 +1890,14 @@ mod tests {
         );
         assert_eq!(proposal.provenance().record_index(), Some(3));
         assert!(matches!(
-            evaluate_tainted(&case(), proposal, 1, ExecutionMode::Attended, false),
+            evaluate_tainted(
+                &case(),
+                proposal,
+                1,
+                ExecutionMode::Attended,
+                false,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
     }
@@ -1770,11 +1922,25 @@ mod tests {
             )
         };
         assert!(matches!(
-            evaluate_tainted(&scoped, proposal("123"), 1, ExecutionMode::Attended, true),
+            evaluate_tainted(
+                &scoped,
+                proposal("123"),
+                1,
+                ExecutionMode::Attended,
+                true,
+                1_700_000_000
+            ),
             Decision::Allow(_)
         ));
         assert!(matches!(
-            evaluate_tainted(&scoped, proposal("999"), 2, ExecutionMode::Attended, true),
+            evaluate_tainted(
+                &scoped,
+                proposal("999"),
+                2,
+                ExecutionMode::Attended,
+                true,
+                1_700_000_000
+            ),
             Decision::NeedsApproval(_)
         ));
     }
