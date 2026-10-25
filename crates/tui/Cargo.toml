@@ -12,6 +12,8 @@ ratatui = { version = "0.30", default-features = false, features = ["crossterm"]
 crossterm = "0.29"
 serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
+secrecy = "0.10"
+rpassword = "7.5"
 
 [lints]
 workspace = true

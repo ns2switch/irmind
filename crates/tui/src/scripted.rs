@@ -1,11 +1,29 @@
 //! Deterministic driver for the same presentation controller and renderers used
 //! by the interactive workspace. It accepts `ratatui::TestBackend` in tests.
 
-use crate::{WorkspaceIo, case, home, workflow::CaseWorkflow};
+use crate::{KeystoreChoice, WorkspaceIo, case, home, setup, workflow::CaseWorkflow};
 use anyhow::Result;
 use irmind_app::{CancellationToken, CaseId, Engine, LlmPort, Severity};
 use ratatui::{Terminal, backend::Backend};
 use std::path::Path;
+
+pub fn render_keystore_setup<B: Backend>(
+    terminal: &mut Terminal<B>,
+    os_available: bool,
+) -> Result<KeystoreChoice>
+where
+    B::Error: std::error::Error + Send + Sync + 'static,
+{
+    let choice = KeystoreChoice::initial(os_available, true)?;
+    setup::render_setup(
+        terminal,
+        "Choose a keystore explicitly",
+        choice,
+        os_available,
+        true,
+    )?;
+    Ok(choice)
+}
 
 pub struct ScriptedWorkspace<'a, 'ports, B: Backend> {
     terminal: Terminal<B>,
@@ -45,6 +63,14 @@ where
             &[],
             self.workflow.model,
             false,
+        )
+    }
+
+    pub fn render_keystore(&mut self) -> Result<()> {
+        home::render_keystore_status(
+            &mut self.terminal,
+            self.workflow.engine,
+            self.workflow.io_ops.keystore_status()?,
         )
     }
 

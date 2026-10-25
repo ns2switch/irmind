@@ -16,6 +16,8 @@ pub(super) struct Cli {
     #[arg(long, env = "IRMIND_LLM_MODULE")]
     pub(super) llm_module: Option<String>,
     #[arg(long)]
+    pub(super) passphrase_fd: Option<u32>,
+    #[arg(long)]
     pub(super) enable_virustotal: bool,
     #[arg(long)]
     pub(super) enable_splunk: bool,

@@ -30,7 +30,13 @@ Por ahora no se firman los binarios, ni se aplica notarización en macOS o Authe
 
 ## Respaldo del llavero
 
-No habrá respaldo del llavero. Si Secret Service, Keychain o Credential Manager no están disponibles, IRMind falla cerrado. Decisión: 2026-10-25.
+La decisión anterior era no tener respaldo del llavero y fallar cerrado sin Secret Service, Keychain o Credential Manager. Revocada el 2026-10-25 por el requisito de trabajar por SSH sin sesión gráfica. La selección de backend es explícita por capacidad; un backend ausente o inaccesible nunca se sustituye en silencio. El archivo cifrado es una opción local explícita, no un fallback automático.
+
+`keystore-os` usa el llavero nativo y `keystore-file` cifra un archivo privado con los crates RustCrypto Argon2id (mínimo 32 MiB, tres pasadas) y XChaCha20-Poly1305. La versión y los parámetros de derivación se autentican como AAD; cada escritura usa un nonce aleatorio y reemplazo atómico. Se exige una passphrase de al menos 12 bytes; su entropía real sigue siendo responsabilidad del analista. El cifrado permite usar la TUI por SSH, pero su seguridad depende de una passphrase sólida y de la integridad de la máquina. La clave privada no sale por el puerto de firma; la migración usa X25519 y un paquete cifrado de un solo uso, verifica la huella pública y genera un evento operativo firmado por caso. Sin caso previo se impide migrar, ya que no existiría una cadena para firmar el cambio. El crate compartido de traspaso evita que `keystore-os` dependa de SQLite o DuckDB. Decisión: 2026-10-25.
+
+Tras cambiar o intentar borrar una credencial, la TUI exige reiniciar antes de abrir otro caso: los conectores ya instanciados pueden conservar la credencial anterior en memoria. La migración también requiere reinicio para activar la selección nueva. El almacén cifrado rechaza una segunda sesión concurrente con un error inmediato y mantiene el bloqueo hasta salir. Decisión: 2026-10-25.
+
+Diseño futuro, sin implementar: `keystore-ssh-agent` firmaría mediante el agente SSH, incluidas claves `sk-ssh-ed25519` con toque FIDO; un root del servidor puede usar el agente mientras esté reenviado. `keystore-hardware` firmaría mediante token PIV u OpenPGP. `keystore-aws-secrets` y `keystore-vault` solo darían secretos de conectores: sus propias credenciales vendrían de un rol de instancia, SSO o de otro backend local declarado, nunca del mismo servicio. Esos secretos se leerían al iniciar y vivirían solo en memoria. La clave privada del analista no se guardará en un servicio remoto: el operador del servicio o un compromiso de red podría firmar o bloquear casos sin control local. Propuesta: 2026-10-25.
 
 ## Raíces TLS nativas
 

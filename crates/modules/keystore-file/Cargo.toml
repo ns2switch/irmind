@@ -1,0 +1,29 @@
+[package]
+name = "irmind-mod-keystore-file"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+irmind-infra = { path = "../../infra", version = "0.1.0" }
+irmind-keystore-transfer = { path = "../../keystore-transfer", version = "0.1.0" }
+ed25519-dalek = { version = "2", features = ["rand_core", "zeroize"] }
+argon2 = { version = "0.6", default-features = false, features = ["alloc"] }
+chacha20poly1305 = { version = "0.11", default-features = false, features = ["alloc"] }
+rand = "0.8"
+secrecy = "0.10"
+zeroize = "1"
+fs4 = "0.13"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+
+[lints]
+workspace = true

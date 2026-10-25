@@ -24,6 +24,7 @@ mod custody;
 mod dispatch;
 mod engine;
 mod ingest;
+mod keystore;
 mod ports;
 mod report;
 
@@ -31,6 +32,7 @@ pub use approvals::ApprovalRequest;
 pub use custody::{SealPreview, export_case, verify_export};
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::{GraphRecord, GraphRelation, TimelineEvent};
+pub use keystore::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
 pub use ports::*;
 use ports::{isolate_untrusted, remote_tool_error, run_async, safe_markdown};
 pub use report::{Finding, FindingKind};

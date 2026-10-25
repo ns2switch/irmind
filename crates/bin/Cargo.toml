@@ -6,6 +6,9 @@ rust-version.workspace = true
 license.workspace = true
 
 [features]
+default = ["keystore-os", "keystore-file"]
+keystore-os = ["dep:irmind-mod-keystore-os"]
+keystore-file = ["dep:irmind-mod-keystore-file"]
 persistent-keyring = ["irmind-infra/persistent-keyring"]
 llm-anthropic = ["dep:irmind-mod-llm-anthropic"]
 llm-deepseek = ["dep:irmind-mod-llm-deepseek"]
@@ -25,6 +28,8 @@ irmind-security = { path = "../security", version = "0.1.0" }
 irmind-infra = { path = "../infra", version = "0.1.0" }
 irmind-mod-parser-json = { path = "../parser-json", version = "0.1.0" }
 irmind-mod-llm-openai-compatible = { path = "../modules/llm-openai-compatible", version = "0.1.0" }
+irmind-mod-keystore-os = { path = "../modules/keystore-os", version = "0.1.0", optional = true }
+irmind-mod-keystore-file = { path = "../modules/keystore-file", version = "0.1.0", optional = true }
 irmind-mod-llm-anthropic = { path = "../modules/llm-anthropic", version = "0.1.0", optional = true }
 irmind-mod-llm-deepseek = { path = "../modules/llm-deepseek", version = "0.1.0", optional = true }
 irmind-mod-llm-openrouter = { path = "../modules/llm-openrouter", version = "0.1.0", optional = true }
@@ -39,10 +44,10 @@ clap = { version = "4", default-features = false, features = ["std", "color", "h
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 toml = "0.9"
-keyring = { version = "3", default-features = false }
 secrecy = "0.10"
 directories = "6"
 tokio = { version = "1", default-features = false, features = ["rt", "signal"] }
+rpassword = "7.5"
 
 [lints]
 workspace = true
