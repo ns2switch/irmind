@@ -22,6 +22,7 @@ jobs:
     outputs:
       run_matrix: ${{ steps.scope.outputs.run_matrix }}
       docs_only: ${{ steps.scope.outputs.docs_only }}
+      release_build: ${{ steps.scope.outputs.release_build }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false, fetch-depth: 0}
@@ -29,38 +30,59 @@ jobs:
         id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
         run: |
           python3 - <<'PY'
           import os
           import subprocess
-          import time
           from pathlib import Path
 
           event = os.environ['EVENT_NAME']
+          def documentation(path: bytes) -> bool:
+              return path.startswith(b'docs/') or path.endswith(b'.md')
+
+          def release_source(path: bytes) -> bool:
+              return path.startswith(b'crates/') or path in {
+                  b'Cargo.toml', b'Cargo.lock', b'rust-toolchain.toml',
+              }
+
           docs_only = False
-          if event == 'pull_request':
+          if event == 'pull_request' or (
+              event == 'push' and os.environ['GIT_REF'] == 'refs/heads/main'
+          ):
+              base = os.environ['BASE_SHA'] if event == 'pull_request' else os.environ['BEFORE_SHA']
+              head = os.environ['HEAD_SHA'] if event == 'pull_request' else os.environ['CURRENT_SHA']
               changed = subprocess.check_output([
-                  'git', 'diff', '--name-only', '-z',
-                  os.environ['BASE_SHA'], os.environ['HEAD_SHA'],
+                  'git', 'diff', '--name-only', '-z', base, head,
               ]).split(b'\0')
               changed = [path for path in changed if path]
-              docs_only = bool(changed) and all(
-                  path.startswith(b'docs/') or path.endswith(b'.md') for path in changed
-              )
+              docs_only = bool(changed) and all(documentation(path) for path in changed)
           run_matrix = True
+          release_build = False
           if event == 'schedule':
-              latest = int(subprocess.check_output(
-                  ['git', 'log', '-1', '--format=%ct'], text=True,
-              ))
-              age = int(time.time()) - latest
-              run_matrix = 0 <= age <= 86_400
+              commits = subprocess.check_output([
+                  'git', 'log', '--since=24 hours ago', '--format=%H',
+              ], text=True).splitlines()
+              changed = [
+                  path
+                  for commit in commits
+                  for path in subprocess.check_output([
+                      'git', 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', commit,
+                  ]).split(b'\0')
+                  if path
+              ]
+              release_build = any(release_source(path) for path in changed)
+              run_matrix = release_build
               if not run_matrix:
-                  print('Skipping nightly matrix: main has no commits in the last 24 hours.')
+                  print('Skipping daily build: main has no code commits in the last 24 hours.')
           with Path(os.environ['GITHUB_OUTPUT']).open('a', encoding='ascii') as output:
               output.write(f'docs_only={str(docs_only).lower()}\n')
               output.write(f'run_matrix={str(run_matrix).lower()}\n')
+              output.write(f'release_build={str(release_build).lower()}\n')
           PY
       - name: Verify DCO sign-off on every PR commit
         if: github.event_name == 'pull_request'
@@ -112,20 +134,28 @@ jobs:
         run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
       - if: needs.dco.outputs.docs_only != 'true'
         run: cargo audit --ignore RUSTSEC-2026-0370 --ignore RUSTSEC-2026-0371 --ignore RUSTSEC-2026-0372
-      - if: needs.dco.outputs.docs_only != 'true'
+      - name: Stage CLI test executable for cross-platform verification
+        if: needs.dco.outputs.docs_only != 'true'
+        run: mkdir -p verify-bin && cp target/ci/irmind verify-bin/irmind
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.dco.outputs.docs_only != 'true'
+        with: {name: verify-test-linux, path: verify-bin/, if-no-files-found: error}
+      - name: Build daily unsigned binary on main
+        if: needs.dco.outputs.release_build == 'true'
         run: cargo build --release -p irmind --locked
       - name: Check documented CLI commands against the built binary
         if: needs.dco.outputs.docs_only != 'true'
-        run: python3 .github/scripts/check_docs.py --binary target/release/irmind
+        run: python3 .github/scripts/check_docs.py --binary target/ci/irmind
       - name: Package unsigned binary and checksum
-        if: needs.dco.outputs.docs_only != 'true'
+        if: needs.dco.outputs.release_build == 'true'
         run: |
           mkdir -p dist
           cp target/release/irmind dist/irmind
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md dist/
           (cd dist && sha256sum irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
+          (cd dist && sha256sum --check SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.dco.outputs.docs_only != 'true'
+        if: needs.dco.outputs.release_build == 'true'
         with: {name: irmind-linux, path: dist/, if-no-files-found: error}
       - if: needs.dco.outputs.docs_only != 'true'
         run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --profile ci --locked
@@ -134,10 +164,10 @@ jobs:
         with: {name: portable-export-linux, path: portable-export/, if-no-files-found: error}
       - name: Clean staging
         if: ${{ always() && needs.dco.outputs.docs_only != 'true' }}
-        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'portable-export')) if p.is_dir()]"
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'portable-export', 'verify-bin')) if p.is_dir()]"
   windows:
-    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.linux.outputs.docs_only != 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')) }}
-    needs: linux
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.linux.outputs.docs_only != 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')) }}
+    needs: [linux, dco]
     runs-on: windows-latest
     timeout-minutes: 120
     env:
@@ -155,45 +185,53 @@ jobs:
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
       - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
-      - run: cargo build --release -p irmind --locked
+      - name: Stage CLI test executable for cross-platform verification
+        run: mkdir -p verify-bin && cp target/x86_64-pc-windows-msvc/ci/irmind.exe verify-bin/irmind.exe
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: {name: verify-test-windows, path: verify-bin/, if-no-files-found: error}
+      - name: Build daily unsigned binary on main
+        if: needs.dco.outputs.release_build == 'true'
+        run: cargo build --release -p irmind --locked
       - name: Package unsigned binary and checksum
+        if: needs.dco.outputs.release_build == 'true'
         run: |
           mkdir -p dist
           cp target/x86_64-pc-windows-msvc/release/irmind.exe dist/irmind.exe
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md dist/
           python -c "from pathlib import Path; import hashlib; root=Path('dist'); names=('irmind.exe','LICENSE-MIT','LICENSE-APACHE','THIRD_PARTY_NOTICES.md'); (root/'SHA256SUMS').write_bytes(''.join(hashlib.sha256((root/name).read_bytes()).hexdigest()+'  '+name+'\n' for name in names).encode('ascii'))"
           python -c "from pathlib import Path; assert b'\r' not in Path('dist/SHA256SUMS').read_bytes()"
+          (cd dist && sha256sum --check SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.dco.outputs.release_build == 'true'
         with: {name: irmind-windows, path: dist/, if-no-files-found: error}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {name: portable-export-linux, path: foreign-export}
       - name: Verify Linux export on Windows
         run: |
-          (cd dist && sha256sum --check SHA256SUMS)
-          ./dist/irmind.exe verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
+          ./verify-bin/irmind.exe verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
       - run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --profile ci --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: {name: portable-export-windows, path: portable-export/, if-no-files-found: error}
       - name: Clean staging
         if: always()
-        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export', 'portable-export')) if p.is_dir()]"
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export', 'portable-export', 'verify-bin')) if p.is_dir()]"
   linux_verify_windows:
-    if: ${{ !cancelled() && needs.windows.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')) }}
+    if: ${{ !cancelled() && needs.windows.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')) }}
     needs: windows
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with: {name: irmind-linux, path: bin}
+        with: {name: verify-test-linux, path: bin}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {name: portable-export-windows, path: foreign-export}
-      - run: (cd bin && sha256sum --check SHA256SUMS) && chmod +x bin/irmind && bin/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
+      - run: chmod +x bin/irmind && bin/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
       - name: Clean staging
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('bin', 'foreign-export')) if p.is_dir()]"
   macos:
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.linux.outputs.docs_only != 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))) || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
-    needs: linux
+    needs: [linux, dco]
     runs-on: macos-latest
     timeout-minutes: 120
     env:
@@ -211,22 +249,31 @@ jobs:
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
       - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked --test-threads 4
-      - run: cargo build --release -p irmind --locked
+      - name: Stage CLI test executable for cross-platform verification
+        run: mkdir -p verify-bin && cp target/aarch64-apple-darwin/ci/irmind verify-bin/irmind
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: {name: verify-test-macos, path: verify-bin/, if-no-files-found: error}
+      - name: Build daily unsigned binary on main
+        if: needs.dco.outputs.release_build == 'true'
+        run: cargo build --release -p irmind --locked
       - name: Package unsigned binary and checksum
+        if: needs.dco.outputs.release_build == 'true'
         run: |
           mkdir -p dist
           cp target/aarch64-apple-darwin/release/irmind dist/irmind
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md dist/
           (cd dist && shasum -a 256 irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
+          (cd dist && shasum -a 256 -c SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.dco.outputs.release_build == 'true'
         with: {name: irmind-macos-arm64, path: dist/, if-no-files-found: error}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {name: portable-export-linux, path: foreign-export}
       - name: Verify Linux export on macOS
-        run: (cd dist && shasum -a 256 -c SHA256SUMS) && chmod +x dist/irmind && dist/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
+        run: verify-bin/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
       - name: Clean staging
         if: always()
-        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export')) if p.is_dir()]"
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export', 'verify-bin')) if p.is_dir()]"
   macos_verify_windows:
     if: ${{ !cancelled() && needs.macos.result == 'success' && needs.windows.result == 'success' }}
     needs: [macos, windows]
@@ -237,10 +284,10 @@ jobs:
         shell: bash
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with: {name: irmind-macos-arm64, path: bin}
+        with: {name: verify-test-macos, path: bin}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {name: portable-export-windows, path: foreign-export}
-      - run: (cd bin && shasum -a 256 -c SHA256SUMS) && chmod +x bin/irmind && bin/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
+      - run: chmod +x bin/irmind && bin/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
       - name: Clean staging
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('bin', 'foreign-export')) if p.is_dir()]"
