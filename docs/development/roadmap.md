@@ -17,7 +17,8 @@ This page is for contributors and evaluators planning around current limitations
 3. Show model streaming incrementally in the TUI and improve per-batch progress for long local tasks.
 4. Stream CloudTrail and JSON parsing for larger inputs, add full-text graph search, and benchmark at least 1 GB of synthetic evidence.
 5. Add SIEM alert retrieval and separate tracing from signed audit data.
-6. Confirm the full macOS, Linux, and Windows matrix, including cross-platform export checks, before treating a change as ready for integration.
+
+The merge matrix covers Linux, macOS, Windows, and cross-platform export verification. Release binaries are built once daily on `main` after code changes.
 
 ## Later work
 
