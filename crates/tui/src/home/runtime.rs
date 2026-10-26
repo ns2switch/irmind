@@ -1,7 +1,7 @@
 use super::{
-    CancellationToken, CaseId, CaseStatus, CrosstermBackend, Engine, Event, HomeAction, HomeState,
-    Instant, KeyCode, KeyModifiers, LlmPort, Mode, ModuleStatus, Result, Terminal, WorkspaceIo,
-    case, event, io, load_rows, mpsc, render_home, update,
+    CancellationToken, CaseId, CaseStatus, ConfigChange, CrosstermBackend, Engine, Event,
+    HomeAction, HomeState, Instant, KeyCode, KeyModifiers, LlmPort, Mode, ModuleStatus, Result,
+    Terminal, WorkspaceIo, case, event, io, load_rows, mpsc, render_home, update,
 };
 use crate::{prompt_hidden, workflow::CaseWorkflow};
 use secrecy::ExposeSecret as _;
@@ -128,7 +128,20 @@ impl HomeRuntime<'_, '_, '_> {
             }
             HomeAction::OpenCase(id) => self.open_case(&id)?,
             HomeAction::CreateCase => self.create_case()?,
-            HomeAction::LoadKeystore => self.state.keystore = Some(self.io_ops.keystore_status()?),
+            HomeAction::LoadKeystore => {
+                self.state.keystore = Some(self.io_ops.keystore_status()?);
+                if let Some(module) = self.state.modules.get(self.state.module_selected)
+                    && let Some(name) = module.credentials.first()
+                    && let Some(index) = self.state.keystore.as_ref().and_then(|status| {
+                        status
+                            .credentials
+                            .iter()
+                            .position(|item| &item.name == name)
+                    })
+                {
+                    self.state.keystore_selected = index;
+                }
+            }
             HomeAction::VerifyExport(path, fingerprint) => {
                 let io_ops = self.io_ops;
                 self.verify_task = Some(
@@ -141,8 +154,48 @@ impl HomeRuntime<'_, '_, '_> {
             HomeAction::AddCredential => self.add_credential()?,
             HomeAction::DeleteCredential => self.delete_credential()?,
             HomeAction::ChangePassphrase => self.change_passphrase()?,
+            HomeAction::ChangeModule(change, confirmed) => {
+                return Ok(self.change_module(change, confirmed));
+            }
         }
         Ok(false)
+    }
+
+    fn change_module(&mut self, change: ConfigChange, confirmed: bool) -> bool {
+        match self
+            .io_ops
+            .change_module_configuration(self.engine, change.clone(), confirmed)
+        {
+            Ok(true) => {
+                self.restart_requested = true;
+                true
+            }
+            Ok(false) => {
+                self.state.notice = "Configuration is unchanged".into();
+                false
+            }
+            Err(error)
+                if error
+                    .downcast_ref::<irmind_app::AppError>()
+                    .is_some_and(|error| {
+                        matches!(
+                            error,
+                            irmind_app::AppError::Fixed(
+                                irmind_app::FixedAppError::PolicyConfigurationConfirmationRequired
+                            )
+                        )
+                    }) =>
+            {
+                self.state.pending_module_change = Some(change);
+                self.state.notice =
+                    "Confirm that this setting may send case data off this device".into();
+                false
+            }
+            Err(error) => {
+                self.state.notice = format!("Configuration change failed: {error}");
+                false
+            }
+        }
     }
 
     fn open_case(&mut self, id: &CaseId) -> Result<()> {

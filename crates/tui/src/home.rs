@@ -1,7 +1,7 @@
-use crate::{KeystoreStatus, ModuleStatus, WorkspaceIo, case};
+use crate::{KeystoreStatus, ModuleKind, ModuleStatus, WorkspaceIo, case};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use irmind_app::{CancellationToken, CaseId, Engine, LlmPort, hex, sha256};
+use irmind_app::{CancellationToken, CaseId, ConfigChange, Engine, LlmPort, hex, sha256};
 use ratatui::{
     Terminal,
     backend::Backend,
@@ -39,7 +39,7 @@ pub(crate) struct CaseRow {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Mode {
+pub(crate) enum Mode {
     List,
     Search,
     New,
@@ -51,7 +51,7 @@ enum Mode {
 
 pub(crate) struct HomeState {
     rows: Vec<CaseRow>,
-    mode: Mode,
+    pub(crate) mode: Mode,
     search: String,
     status_filter: Option<CaseStatus>,
     selected: usize,
@@ -65,6 +65,17 @@ pub(crate) struct HomeState {
     confirm_credential_delete: bool,
     pending_migration: Option<&'static str>,
     restart_required: bool,
+    modules: Vec<ModuleStatus>,
+    module_selected: usize,
+    parameter_selected: usize,
+    module_edit: Option<ModuleEdit>,
+    pub(crate) pending_module_change: Option<ConfigChange>,
+}
+
+struct ModuleEdit {
+    module: String,
+    field: String,
+    value: String,
 }
 
 impl HomeState {
@@ -93,7 +104,19 @@ impl HomeState {
             confirm_credential_delete: false,
             pending_migration: None,
             restart_required: false,
+            modules: Vec::new(),
+            module_selected: 0,
+            parameter_selected: 0,
+            module_edit: None,
+            pending_module_change: None,
         }
+    }
+
+    pub(crate) fn set_modules(&mut self, modules: &[ModuleStatus]) {
+        self.modules = modules.to_vec();
+        self.module_selected = self
+            .module_selected
+            .min(self.modules.len().saturating_sub(1));
     }
 
     fn visible(&self) -> Vec<&CaseRow> {
@@ -175,10 +198,11 @@ where
 
 mod render;
 pub(crate) use render::render_home;
+mod modules;
 mod runtime;
 mod state;
 use runtime::HomeRuntime;
-use state::{HomeAction, update};
+pub(crate) use state::{HomeAction, update};
 
 #[derive(Clone, Copy)]
 pub(crate) struct HomeLaunch<'a> {
@@ -199,6 +223,7 @@ pub(crate) fn run_home(
         load_rows(engine)?,
         launch.new_analyst_key || engine.repo.list_cases()?.is_empty(),
     );
+    state.set_modules(modules);
     if let Some(id) = launch.initial_case {
         case::run_case(terminal, engine, model, io_ops, id, shutdown)?;
         state.rows = load_rows(engine)?;

@@ -1,6 +1,6 @@
-use super::{CaseId, HomeState, KeyCode, Mode};
+use super::{CaseId, ConfigChange, HomeState, KeyCode, Mode, modules};
 
-pub(super) enum HomeAction {
+pub(crate) enum HomeAction {
     None,
     Quit,
     Restart,
@@ -12,10 +12,11 @@ pub(super) enum HomeAction {
     DeleteCredential,
     Migrate(&'static str),
     ChangePassphrase,
+    ChangeModule(ConfigChange, bool),
 }
 
 /// A screen transition does not perform I/O. The event loop applies the returned action.
-pub(super) fn update(state: &mut HomeState, key: KeyCode) -> HomeAction {
+pub(crate) fn update(state: &mut HomeState, key: KeyCode) -> HomeAction {
     if state.restart_required
         && matches!(state.mode, Mode::List | Mode::Setup | Mode::Modules)
         && matches!(key, KeyCode::Enter | KeyCode::Char('n'))
@@ -29,7 +30,8 @@ pub(super) fn update(state: &mut HomeState, key: KeyCode) -> HomeAction {
         Mode::Search => update_search(state, key),
         Mode::New => update_new_case(state, key),
         Mode::VerifyExport => update_verify_export(state, key),
-        Mode::Modules | Mode::Setup => update_setup(state, key),
+        Mode::Modules => modules::update_module_screen(state, key),
+        Mode::Setup => update_setup(state, key),
         Mode::Keystore => update_keystore(state, key),
     }
 }

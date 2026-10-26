@@ -21,6 +21,7 @@ pub use tokio_util::sync::CancellationToken;
 
 mod adapter_storage_errors;
 mod approvals;
+mod configuration;
 mod custody;
 mod dispatch;
 mod engine;
@@ -41,6 +42,7 @@ pub use fixed_errors::FixedAppError;
 mod report;
 
 pub use approvals::ApprovalRequest;
+pub use configuration::{ConfigChange, ConfigurationStore, PersistentConfig, ProductSettings};
 pub use custody::{SealPreview, export_case, verify_export};
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::{GraphRecord, GraphRelation, TimelineEvent};

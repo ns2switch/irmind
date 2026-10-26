@@ -1,11 +1,12 @@
 #![forbid(unsafe_code)]
 #![allow(clippy::unwrap_used)]
 
+use crossterm::event::KeyCode;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
-    AppError, AuditLog, CancellationToken, CaseLock, CaseSeal, CompletionRequest, CryptoPorts,
-    Engine, EnginePorts, EvidenceStore, LlmPort, ModelResponse, ModelStream, Repository, Signer,
-    ThreatIntelPort, single_completion_stream,
+    AppError, AuditLog, CancellationToken, CaseLock, CaseSeal, CompletionRequest,
+    ConfigurationStore, CryptoPorts, Engine, EnginePorts, EvidenceStore, LlmPort, ModelResponse,
+    ModelStream, Repository, Signer, ThreatIntelPort, single_completion_stream,
 };
 #[cfg(feature = "keystore-file")]
 use irmind_app::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
@@ -18,7 +19,7 @@ use irmind_mod_keystore_file::FileKeystore;
 use irmind_mod_parser_json::JsonParser;
 use irmind_security::MandatoryGuard;
 use irmind_tui::{
-    WorkspaceIo,
+    ModuleKind, ModuleParameter, ModuleSelectionSource, ModuleStatus, WorkspaceIo,
     scripted::{ScriptedWorkspace, render_keystore_setup},
 };
 use ratatui::{Terminal, backend::TestBackend};

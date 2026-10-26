@@ -3,6 +3,7 @@ use super::{
     ListItem, LlmPort, Mode, Modifier, ModuleStatus, Paragraph, Result, Style, Terminal, Wrap,
     case, hex, sha256,
 };
+use ratatui::widgets::ListState;
 
 pub(crate) fn render_home<B: Backend>(
     terminal: &mut Terminal<B>,
@@ -30,6 +31,18 @@ where
         "Search: {} | Filter: {filter} | {}",
         state.search, state.notice
     ))?;
+    let mut list_state = ListState::default();
+    if state.mode == Mode::Modules {
+        let prefix = usize::from(state.pending_module_change.is_some())
+            + usize::from(state.module_edit.is_some());
+        let field_offset = state
+            .modules
+            .get(state.module_selected)
+            .map_or(0, |module| {
+                usize::from(!module.parameters.is_empty()) * (state.parameter_selected + 1)
+            });
+        list_state.select(Some(prefix + state.module_selected + field_offset));
+    }
     terminal.draw(|frame| {
         let areas = Layout::vertical([
             Constraint::Length(3),
@@ -43,9 +56,12 @@ where
                 .block(Block::default().borders(Borders::ALL)),
             areas[0],
         );
-        frame.render_widget(
-            List::new(content).block(Block::default().title(header).borders(Borders::ALL)),
+        frame.render_stateful_widget(
+            List::new(content)
+                .block(Block::default().title(header).borders(Borders::ALL))
+                .highlight_style(Style::default().fg(Color::Yellow)),
             areas[1],
+            &mut list_state,
         );
         frame.render_widget(
             Paragraph::new(info)
@@ -99,15 +115,7 @@ fn home_items(
                 })
                 .collect::<Result<Vec<_>>>()?
         }
-        Mode::Modules => modules
-            .iter()
-            .map(|module| -> Result<ListItem<'_>> {
-                Ok(ListItem::new(safe(&format!(
-                    "{}  compiled={} enabled={}  {}",
-                    module.id, module.compiled, module.enabled, module.configuration
-                ))?))
-            })
-            .collect::<Result<Vec<_>>>()?,
+        Mode::Modules => module_items(state, modules, &safe)?,
         Mode::Keystore => keystore_items(state),
         Mode::VerifyExport => ["Package path", "Expected analyst key fingerprint"]
             .iter()
@@ -127,6 +135,93 @@ fn home_items(
         Mode::Setup => setup_items(&fingerprint, model.is_some(), new_analyst_key),
     };
     Ok(content)
+}
+
+fn module_items(
+    state: &HomeState,
+    modules: &[ModuleStatus],
+    safe: &impl Fn(&str) -> Result<String>,
+) -> Result<Vec<ListItem<'static>>> {
+    let mut items = Vec::new();
+    if let Some(change) = &state.pending_module_change {
+        let summary = match change {
+            irmind_app::ConfigChange::SelectLlm(id) => {
+                format!("select LLM {}", id.as_deref().unwrap_or("none"))
+            }
+            irmind_app::ConfigChange::SetEnabled { module, enabled } => {
+                format!("set {module} enabled={enabled}")
+            }
+            irmind_app::ConfigChange::SetValue {
+                module,
+                field,
+                value,
+            } => format!("set {module}.{field}={value}"),
+        };
+        items.push(ListItem::new(safe(&format!(
+            "Confirm egress change: {summary}"
+        ))?));
+    }
+    if let Some(edit) = &state.module_edit {
+        items.push(ListItem::new(safe(&format!(
+            "Edit {}.{}: {}",
+            edit.module, edit.field, edit.value
+        ))?));
+    }
+    for (index, module) in modules.iter().enumerate() {
+        items.push(ListItem::new(safe(&format!(
+            "{} {}  compiled={} selected={} active={}{}  {}",
+            if index == state.module_selected {
+                ">"
+            } else {
+                " "
+            },
+            module.id,
+            module.compiled,
+            module.selected,
+            module.enabled,
+            if module.selection_overridden() {
+                " (temporary override)"
+            } else {
+                ""
+            },
+            module.configuration
+        ))?));
+        if index == state.module_selected {
+            for (parameter_index, parameter) in module.parameters.iter().enumerate() {
+                items.push(ListItem::new(safe(&format!(
+                    "   {} {} = {}{}{}",
+                    if parameter_index == state.parameter_selected {
+                        ">"
+                    } else {
+                        " "
+                    },
+                    parameter.name,
+                    if parameter.value.is_empty() {
+                        "<unset>"
+                    } else {
+                        &parameter.value
+                    },
+                    if parameter.required {
+                        " (required)"
+                    } else {
+                        ""
+                    },
+                    if parameter.overridden {
+                        " (environment override)"
+                    } else {
+                        ""
+                    },
+                ))?));
+            }
+            if !module.credentials.is_empty() {
+                items.push(ListItem::new(safe(&format!(
+                    "   Credentials: {} (press k to open keystore)",
+                    module.credentials.join(", ")
+                ))?));
+            }
+        }
+    }
+    Ok(items)
 }
 
 fn case_items(state: &HomeState, engine: &Engine<'_>) -> Result<Vec<ListItem<'static>>> {
@@ -217,7 +312,16 @@ fn help_line(state: &HomeState) -> &'static str {
         Mode::New => {
             "Tab next field · Enter create · Esc cancel · sources, accounts, hosts: comma-separated"
         }
-        Mode::Modules | Mode::Setup => "Esc back · n new case · m modules · q quit",
+        Mode::Modules => {
+            if state.pending_module_change.is_some() {
+                "This change may send case data off this device · y confirm and sign · Esc cancel"
+            } else if state.module_edit.is_some() {
+                "Type parameter value · Enter save and restart session · Esc cancel"
+            } else {
+                "Up/Down module · Tab field · e edit · Enter select/toggle · k credentials · Esc back"
+            }
+        }
+        Mode::Setup => "Esc back · n new case · m modules · q quit",
         Mode::Keystore => {
             if state.confirm_credential_delete {
                 "Delete selected credential? y confirm · Esc cancel"

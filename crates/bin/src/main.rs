@@ -4,22 +4,27 @@
 compile_error!("IRMind requires at least one signer and secret backend");
 
 mod cli;
+mod configuration;
 mod keystore;
 use cli::{
     Cli, Command, audit_source_name, input_files, read_evidence, terminal_safe_path,
     write_private_output,
 };
+use configuration::{configuration_issue, load_module_config, load_pricing};
 
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use irmind_app::{
-    AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,
-    EvidenceStore, FindingKind, ModelPricing, Repository, SecretBackend, SignerBackend,
+    AppError, AuditLog, CancellationToken, ConfigChange, ConfigurationStore, CryptoPorts, Engine,
+    EnginePorts, EvidenceGraph, EvidenceStore, FindingKind, PersistentConfig, Repository,
+    SecretBackend, SignerBackend,
     modules::{ModuleConfig, ModuleManifest, ModuleRegistry},
 };
 use irmind_domain::{CaseId, ExecutionMode, PolicyRules, Severity, Tool};
-use irmind_infra::{LocalExportVerifier, LocalStore, LocalVerifier, SystemClock};
+use irmind_infra::{
+    LocalExportVerifier, LocalStore, LocalVerifier, SystemClock, TomlConfigurationStore,
+};
 #[cfg(feature = "cloud-aws")]
 use irmind_mod_cloud_aws::AwsCloudTrail;
 #[cfg(feature = "edr-crowdstrike")]
@@ -52,65 +57,19 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-fn load_module_config(
-    manifest: &ModuleManifest,
-    secrets: &dyn SecretBackend,
-) -> Result<ModuleConfig> {
-    let mut config = ModuleConfig::new();
-    for field in manifest.config {
-        if field.secret {
-            match secrets.get(field.name) {
-                Ok(value) => config.insert_secret(field.name, value),
-                Err(AppError::SecretMissing) if !field.required => {}
-                Err(_) => {
-                    return Err(anyhow!(
-                        "required module secret {} is unavailable",
-                        field.name
-                    ));
-                }
-            }
-        } else {
-            match std::env::var(field.name) {
-                Ok(value) => config.insert_value(field.name, value),
-                Err(std::env::VarError::NotPresent) if !field.required => {}
-                Err(error) => return Err(anyhow!("module setting {}: {error}", field.name)),
-            }
-        }
-    }
-    Ok(config)
-}
-
-fn configuration_issue(manifest: &ModuleManifest, secrets: &dyn SecretBackend) -> String {
-    let missing = manifest
-        .config
-        .iter()
-        .filter(|field| field.required)
-        .filter(|field| {
-            if field.secret {
-                secrets.get(field.name).is_err()
-            } else {
-                std::env::var(field.name).is_err()
-            }
-        })
-        .map(|field| field.name)
-        .collect::<Vec<_>>();
-    if missing.is_empty() {
-        "invalid values in module configuration".into()
-    } else {
-        format!("missing required settings: {}", missing.join(", "))
-    }
-}
-
 macro_rules! register_configured {
-    ($registry:expr, $module:ty, $manifest:expr, $secrets:expr, $interactive:expr, $issues:expr) => {{
+    ($registry:expr, $module:ty, $manifest:expr, $secrets:expr, $saved:expr, $interactive:expr, $issues:expr) => {{
         let outcome = (|| -> Result<()> {
-            let config = load_module_config(&$manifest, $secrets)?;
+            let config = load_module_config(&$manifest, $secrets, $saved)?;
             $registry.register(Box::new(<$module>::from_config(&config)?), &config)?;
             Ok(())
         })();
         if let Err(error) = outcome {
             if $interactive {
-                $issues.insert($manifest.id, configuration_issue(&$manifest, $secrets));
+                $issues.insert(
+                    $manifest.id,
+                    configuration_issue(&$manifest, $secrets, $saved),
+                );
             } else {
                 return Err(error);
             }
@@ -154,35 +113,15 @@ fn load_policy(path: &std::path::Path) -> Result<(PolicyRules, String)> {
     Ok((policy, fingerprint))
 }
 
-fn load_pricing() -> Result<Option<ModelPricing>> {
-    let input = std::env::var("IRMIND_INPUT_MICROUSD_PER_MILLION").ok();
-    let output = std::env::var("IRMIND_OUTPUT_MICROUSD_PER_MILLION").ok();
-    match (input, output) {
-        (None, None) => Ok(None),
-        (Some(input), Some(output)) => {
-            let input_microusd_per_million = input.parse::<u64>().context("invalid input price")?;
-            let output_microusd_per_million =
-                output.parse::<u64>().context("invalid output price")?;
-            if input_microusd_per_million > 1_000_000_000_000
-                || output_microusd_per_million > 1_000_000_000_000
-            {
-                return Err(anyhow!("model price exceeds configured maximum"));
-            }
-            Ok(Some(ModelPricing {
-                input_microusd_per_million,
-                output_microusd_per_million,
-            }))
-        }
-        _ => Err(anyhow!("both input and output model prices must be set")),
-    }
-}
-
 struct RootWorkspaceIo {
     home: PathBuf,
     credential_fields: Vec<&'static str>,
     store: Arc<LocalStore>,
     signer_backend: Arc<dyn SignerBackend>,
     secret_backend: Arc<dyn SecretBackend>,
+    config_store: Arc<TomlConfigurationStore>,
+    manifests: Vec<&'static ModuleManifest>,
+    module_overrides: HashSet<String>,
     signer_id: String,
     secrets_id: String,
     #[cfg(feature = "keystore-file")]
@@ -360,6 +299,67 @@ impl WorkspaceIo for RootWorkspaceIo {
         ));
         keystore::select_migrated_backend(&self.home, capability, target, &fingerprint)?;
         Ok(())
+    }
+    fn change_module_configuration(
+        &self,
+        engine: &Engine<'_>,
+        change: ConfigChange,
+        confirmed: bool,
+    ) -> Result<bool> {
+        let overridden = match &change {
+            ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
+            ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
+            ConfigChange::SetValue { module, field, .. } => {
+                std::env::var_os(field).is_some()
+                    || self.module_overrides.contains(module)
+                    || (self.module_overrides.contains("llm")
+                        && self.manifests.iter().any(|manifest| {
+                            manifest.id == module
+                                && manifest
+                                    .ports
+                                    .contains(&irmind_app::modules::ModulePort::Llm)
+                        }))
+            }
+        };
+        if overridden {
+            return Err(anyhow!(
+                "this setting is overridden by a flag or environment variable"
+            ));
+        }
+        let current = self.config_store.load()?;
+        let next = current.changed(change.clone(), &self.manifests)?;
+        let active_module = match &change {
+            ConfigChange::SelectLlm(Some(id)) => Some(id.as_str()),
+            ConfigChange::SetEnabled {
+                module,
+                enabled: true,
+            } => Some(module.as_str()),
+            ConfigChange::SetValue { module, .. }
+                if next.llm_module.as_deref() == Some(module.as_str())
+                    || next
+                        .modules
+                        .get(module)
+                        .is_some_and(|settings| settings.enabled) =>
+            {
+                Some(module.as_str())
+            }
+            _ => None,
+        };
+        if let Some(id) = active_module {
+            let manifest = self
+                .manifests
+                .iter()
+                .copied()
+                .find(|manifest| manifest.id == id)
+                .ok_or_else(|| anyhow!("module is not compiled into this binary"))?;
+            load_module_config(manifest, self.secret_backend.as_ref(), &next)?;
+        }
+        Ok(engine.apply_configuration_change(
+            self.config_store.as_ref(),
+            &self.manifests,
+            change,
+            confirmed,
+        )?)
     }
 }
 

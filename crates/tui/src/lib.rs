@@ -19,11 +19,46 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum ModuleKind {
+    Llm,
+    Connector,
+    Local,
+    Keystore,
+}
+
+#[derive(Clone)]
+pub struct ModuleParameter {
+    pub name: String,
+    pub value: String,
+    pub required: bool,
+    pub overridden: bool,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum ModuleSelectionSource {
+    Persistent,
+    Override,
+}
+
+#[derive(Clone)]
 pub struct ModuleStatus {
     pub id: String,
     pub compiled: bool,
     pub enabled: bool,
     pub configuration: String,
+    pub kind: ModuleKind,
+    pub selected: bool,
+    pub selection_source: ModuleSelectionSource,
+    pub parameters: Vec<ModuleParameter>,
+    pub credentials: Vec<String>,
+}
+
+impl ModuleStatus {
+    #[must_use]
+    pub fn selection_overridden(&self) -> bool {
+        self.selection_source == ModuleSelectionSource::Override
+    }
 }
 
 #[derive(Clone)]
@@ -63,6 +98,12 @@ pub trait WorkspaceIo: Send + Sync {
         target: &str,
         passphrase: Option<&SecretString>,
     ) -> Result<()>;
+    fn change_module_configuration(
+        &self,
+        engine: &Engine<'_>,
+        change: irmind_app::ConfigChange,
+        confirmed: bool,
+    ) -> Result<bool>;
 }
 
 struct TerminalSession;
