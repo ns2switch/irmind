@@ -52,6 +52,7 @@ These environment variables override their matching public fields. Set only valu
 | `IRMIND_HOME` | Optional local data directory override. |
 | `IRMIND_POLICY` | Path to a policy TOML file. |
 | `IRMIND_LLM_MODULE` | Explicit model module selection; alternative to `--llm-module`. |
+| `IRMIND_ENABLE_SPLUNK`, `IRMIND_ENABLE_AWS`, `IRMIND_ENABLE_CROWDSTRIKE`, `IRMIND_ENABLE_SENTINELONE`, `IRMIND_ENABLE_MISP`, `IRMIND_ENABLE_VIRUSTOTAL` | Temporary connector enable overrides (`true` or `false`). |
 | `IRMIND_MODEL`, `IRMIND_LLM_BASE_URL` | OpenAI-compatible model and optional base URL. |
 | `IRMIND_ANTHROPIC_MODEL`, `IRMIND_DEEPSEEK_MODEL`, `IRMIND_OPENROUTER_MODEL` | Provider model IDs. |
 | `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, `IRMIND_SPLUNK_ACCOUNT_FIELD` | Splunk endpoint and bounded search source. |
