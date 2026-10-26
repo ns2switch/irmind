@@ -1,3 +1,5 @@
+use crate::*;
+
 pub fn signer_backend_contract(backend: &dyn SignerBackend) -> Result<(), String> {
     if !backend
         .manifest()

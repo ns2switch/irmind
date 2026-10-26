@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 #[allow(clippy::too_many_lines)]
 fn sealed_export_verifies_without_local_key_and_detects_tampering() {

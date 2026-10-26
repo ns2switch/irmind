@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn malicious_evidence_cannot_trigger_external_call() {
     let root = tempfile::tempdir().unwrap();

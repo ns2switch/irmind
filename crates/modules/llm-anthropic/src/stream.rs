@@ -372,4 +372,6 @@ fn parse_tool(name: &str, input: &Value) -> Result<ProposedCall, AppError> {
     Ok(ProposedCall { tool, args })
 }
 
-include!("stream_tests.rs");
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::wildcard_imports)]
+mod tests;

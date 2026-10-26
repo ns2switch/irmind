@@ -1,53 +1,9 @@
-pub fn verify_export(
-    verifier: &dyn crate::ExportVerifier,
-    path: &Path,
-    expected_key: Option<&str>,
-) -> Result<(String, usize), AppError> {
-    verifier.verify_export(path, expected_key)
-}
-
-pub fn export_case(
-    engine: &Engine<'_>,
-    exporter: &dyn crate::CaseExporter,
-    id: &CaseId,
-    path: &Path,
-    cancel: &CancellationToken,
-) -> Result<String, AppError> {
-    if cancel.is_cancelled() {
-        return Err(AppError::Cancelled);
-    }
-    let _case_lock = engine.repo.lock_case(id)?;
-    engine.verify_unlocked_cancelable(id, cancel)?;
-    if !engine.repo.get_case(id)?.sealed {
-        return Err(AppError::Fixed(
-            crate::FixedAppError::PolicySealTheCaseBeforeExport,
-        ));
-    }
-    if cancel.is_cancelled() {
-        return Err(AppError::Cancelled);
-    }
-    exporter.export_case(id, path, cancel)
-}
-
-pub struct SealPreview {
-    entry: SignedEntry,
-    seal: CaseSeal,
-}
-
-impl SealPreview {
-    pub fn case_id(&self) -> &str {
-        &self.entry.case_id
-    }
-    pub fn entry_count(&self) -> u64 {
-        self.entry.seq
-    }
-    pub fn final_hash(&self) -> [u8; 32] {
-        self.entry.hash
-    }
-    pub fn analyst_key_fingerprint(&self) -> &str {
-        &self.seal.analyst_key_fingerprint
-    }
-}
+use crate::{
+    Actor, AppError, CancellationToken, CancelledOperation, CaseId, Engine, GLOBAL_OPERATION_SCOPE,
+    SecretBackend, SignedOperation, SignerBackend, sha256,
+};
+use secrecy::ExposeSecret as _;
+use std::collections::BTreeMap;
 
 impl Engine<'_> {
     pub fn migrate_signer_backend(
@@ -237,5 +193,31 @@ impl Engine<'_> {
         entry.hash = sha256(&entry.canonical());
         entry.sig = self.signer.sign(&entry.hash)?;
         self.audit_log.append_operation(&entry)
+    }
+    pub(super) fn verify_operations_unlocked(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        let operations = self.audit_log.operations(id)?;
+        let mut previous = [0u8; 32];
+        for (index, operation) in operations.iter().enumerate() {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            if operation.case_id != id.as_str()
+                || operation.seq != index as u64 + 1
+                || operation.prev != previous
+                || sha256(&operation.canonical()) != operation.hash
+                || operation.public_key != self.verifier.trusted_public_key(&operation.actor)?
+            {
+                return Err(AppError::InvalidChain(operation.seq));
+            }
+            self.verifier
+                .verify(&operation.public_key, &operation.hash, &operation.sig)
+                .map_err(|_| AppError::InvalidChain(operation.seq))?;
+            previous = operation.hash;
+        }
+        Ok(())
     }
 }

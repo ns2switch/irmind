@@ -1,3 +1,6 @@
+use crate::crypto::persist;
+use crate::*;
+
 impl SignerBackend for FileKeystore {
     fn manifest(&self) -> &'static KeystoreManifest {
         &MANIFEST

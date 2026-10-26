@@ -1,3 +1,6 @@
+use super::support::*;
+use super::*;
+
 #[cfg(feature = "keystore-file")]
 #[test]
 #[allow(clippy::too_many_lines)]

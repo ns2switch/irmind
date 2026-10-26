@@ -1,18 +1,20 @@
-struct FakeSiem {
-    calls: Mutex<usize>,
-    source_id: String,
+use super::*;
+
+pub(super) struct FakeSiem {
+    pub(super) calls: Mutex<usize>,
+    pub(super) source_id: String,
 }
 
-struct FakeInternalIntel {
-    calls: Mutex<usize>,
-    source_id: String,
+pub(super) struct FakeInternalIntel {
+    pub(super) calls: Mutex<usize>,
+    pub(super) source_id: String,
 }
 
-struct FakeCloudAudit(Mutex<usize>);
+pub(super) struct FakeCloudAudit(pub(super) Mutex<usize>);
 
-struct EdrModel {
-    turns: Mutex<usize>,
-    seen: Mutex<Vec<String>>,
+pub(super) struct EdrModel {
+    pub(super) turns: Mutex<usize>,
+    pub(super) seen: Mutex<Vec<String>>,
 }
 
 streaming_test_model!(EdrModel);
@@ -139,8 +141,8 @@ impl ThreatIntelPort for FakeExternalIntel {
     }
 }
 
-struct CaptureModel {
-    seen: Mutex<String>,
+pub(super) struct CaptureModel {
+    pub(super) seen: Mutex<String>,
 }
 
 streaming_test_model!(CaptureModel);
@@ -200,9 +202,9 @@ impl LegacyModel for QuietModel {
     }
 }
 
-struct TestSigner {
-    actor: Actor,
-    key: SigningKey,
+pub(super) struct TestSigner {
+    pub(super) actor: Actor,
+    pub(super) key: SigningKey,
 }
 
 impl Signer for TestSigner {

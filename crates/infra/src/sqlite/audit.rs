@@ -1,3 +1,6 @@
+use super::codec::{append_entry_tx, map_entry, map_operation};
+use super::*;
+
 impl AuditLog for LocalStore {
     fn last_entry(&self, id: &CaseId) -> Result<Option<SignedEntry>, AppError> {
         self.conn()?.query_row("SELECT case_id,seq,at,actor,origin,kind,payload,evidence,prev,hash,sig,public_key FROM audit WHERE case_id=?1 ORDER BY seq DESC LIMIT 1", [id.as_str()], map_entry)

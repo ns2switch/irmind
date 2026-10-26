@@ -1,3 +1,4 @@
+use crate::*;
 pub struct ModelResponse {
     pub text: String,
     pub calls: Vec<ProposedCall>,

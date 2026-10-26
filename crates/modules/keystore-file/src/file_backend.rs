@@ -1,3 +1,6 @@
+use crate::crypto::{decrypt, derive, persist};
+use crate::*;
+
 impl FileKeystore {
     pub fn open(home: &Path, passphrase: &SecretString, create: bool) -> Result<Self, AppError> {
         let path = home.join("keystore.enc");
@@ -82,7 +85,7 @@ impl FileKeystore {
         }
     }
 
-    fn with_state<T>(
+    pub(super) fn with_state<T>(
         &self,
         f: impl FnOnce(&mut VaultState) -> Result<T, AppError>,
     ) -> Result<T, AppError> {

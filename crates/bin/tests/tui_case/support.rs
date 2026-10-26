@@ -1,39 +1,8 @@
-use ed25519_dalek::{Signer as _, SigningKey};
-use irmind_app::{
-    AppError, AuditLog, CancellationToken, CaseLock, CaseSeal, CompletionRequest, CryptoPorts,
-    Engine, EnginePorts, EvidenceStore, LlmPort, ModelResponse, ModelStream, Repository, Signer,
-    ThreatIntelPort, single_completion_stream,
-};
-#[cfg(feature = "keystore-file")]
-use irmind_app::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
-use irmind_domain::{
-    Actor, AuthorizedCall, Case, CaseId, ExecutionMode, ProposedCall, Severity, Tool,
-};
-use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
-#[cfg(feature = "keystore-file")]
-use irmind_mod_keystore_file::FileKeystore;
-use irmind_mod_parser_json::JsonParser;
-use irmind_security::MandatoryGuard;
-use irmind_tui::{
-    WorkspaceIo,
-    scripted::{ScriptedWorkspace, render_keystore_setup},
-};
-use ratatui::{Terminal, backend::TestBackend};
-#[cfg(feature = "keystore-file")]
-use secrecy::{ExposeSecret as _, SecretString};
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-    },
-    time::{Duration, Instant},
-};
+use super::*;
 
-struct SlowRepository {
-    store: Arc<LocalStore>,
-    delay_next_read: AtomicBool,
+pub(super) struct SlowRepository {
+    pub(super) store: Arc<LocalStore>,
+    pub(super) delay_next_read: AtomicBool,
 }
 
 impl Repository for SlowRepository {
@@ -57,7 +26,7 @@ impl Repository for SlowRepository {
     }
 }
 
-struct TestSigner(SigningKey);
+pub(super) struct TestSigner(pub(super) SigningKey);
 
 impl Signer for TestSigner {
     fn actor(&self) -> Actor {
@@ -71,7 +40,7 @@ impl Signer for TestSigner {
     }
 }
 
-struct FakeModel(AtomicUsize);
+pub(super) struct FakeModel(pub(super) AtomicUsize);
 
 #[irmind_app::async_trait]
 impl LlmPort for FakeModel {
@@ -100,7 +69,7 @@ impl LlmPort for FakeModel {
     }
 }
 
-struct FakeIntel;
+pub(super) struct FakeIntel;
 
 #[irmind_app::async_trait]
 impl ThreatIntelPort for FakeIntel {
@@ -114,10 +83,10 @@ impl ThreatIntelPort for FakeIntel {
     }
 }
 
-struct TestIo(Arc<LocalStore>);
+pub(super) struct TestIo(pub(super) Arc<LocalStore>);
 
 #[cfg(feature = "keystore-file")]
-struct MigrationTarget(FileKeystore);
+pub(super) struct MigrationTarget(pub(super) FileKeystore);
 
 #[cfg(feature = "keystore-file")]
 static MIGRATION_MANIFEST: KeystoreManifest = KeystoreManifest {
@@ -225,7 +194,7 @@ impl WorkspaceIo for TestIo {
     }
 }
 
-fn screen(terminal: &Terminal<TestBackend>) -> String {
+pub(super) fn screen(terminal: &Terminal<TestBackend>) -> String {
     terminal
         .backend()
         .buffer()

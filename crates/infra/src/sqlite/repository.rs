@@ -1,3 +1,5 @@
+use super::*;
+
 impl Repository for LocalStore {
     fn lock_case(&self, id: &CaseId) -> Result<Box<dyn CaseLock>, AppError> {
         let mut options = OpenOptions::new();

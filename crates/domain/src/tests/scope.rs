@@ -1,3 +1,4 @@
+use super::case;
 use crate::*;
 
 #[test]
@@ -12,16 +13,6 @@ fn debug_of_tainted_and_proposed_values_is_redacted() {
         args: BTreeMap::from([("ioc".into(), "SECRET-from-log".into())]),
     };
     assert!(!format!("{proposal:?}").contains("SECRET"));
-}
-
-fn case() -> Case {
-    Case {
-        id: CaseId::parse("00000000-0000-0000-0000-000000000001").unwrap(),
-        title: "x".into(),
-        severity: Severity::Medium,
-        scope: "local".into(),
-        sealed: false,
-    }
 }
 
 #[test]

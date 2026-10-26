@@ -1,11 +1,13 @@
-fn data_array(value: &Value) -> Result<&Vec<Value>, AppError> {
+use crate::{AppError, AuthorizedCall, DateTime, Value};
+
+pub(super) fn data_array(value: &Value) -> Result<&Vec<Value>, AppError> {
     value["data"].as_array().ok_or({
         AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
             irmind_app::AdapterStorageError::SentinelOneResponseHasNoDataArray,
         ))
     })
 }
-fn select_agent(response: &Value, host: &str, site_id: &str) -> Result<Value, AppError> {
+pub(super) fn select_agent(response: &Value, host: &str, site_id: &str) -> Result<Value, AppError> {
     let data = data_array(response)?;
     if data.len() != 1
         || !data[0]["computerName"]
@@ -19,7 +21,7 @@ fn select_agent(response: &Value, host: &str, site_id: &str) -> Result<Value, Ap
     }
     Ok(data[0].clone())
 }
-fn validate_threats(
+pub(super) fn validate_threats(
     response: &Value,
     id: &str,
     site_id: &str,
@@ -38,27 +40,27 @@ fn validate_threats(
     }
     Ok(())
 }
-fn encode(value: &Value) -> Result<Vec<u8>, AppError> {
+pub(super) fn encode(value: &Value) -> Result<Vec<u8>, AppError> {
     serde_json::to_vec(value).map_err(|_| {
         AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
             irmind_app::AdapterStorageError::CannotEncodeSentinelOneEvidence,
         ))
     })
 }
-fn safe_id(value: &str) -> bool {
+pub(super) fn safe_id(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
         && value
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"_-.".contains(&b))
 }
-fn digits(value: &str) -> bool {
+pub(super) fn digits(value: &str) -> bool {
     !value.is_empty() && value.len() <= 32 && value.bytes().all(|b| b.is_ascii_digit())
 }
-fn safe_host(value: &str) -> bool {
+pub(super) fn safe_host(value: &str) -> bool {
     safe_id(value) && value.len() <= 253
 }
-fn window(call: &AuthorizedCall) -> Result<(&str, &str), AppError> {
+pub(super) fn window(call: &AuthorizedCall) -> Result<(&str, &str), AppError> {
     let from = call.arg("from").ok_or({
         AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
             irmind_app::AdapterPolicyError::MissingStartTime,
@@ -86,7 +88,7 @@ fn window(call: &AuthorizedCall) -> Result<(&str, &str), AppError> {
     }
     Ok((from, to))
 }
-fn within(value: Option<&str>, from: &str, to: &str) -> bool {
+pub(super) fn within(value: Option<&str>, from: &str, to: &str) -> bool {
     let Some(value) = value else { return false };
     let (Ok(value), Ok(from), Ok(to)) = (
         DateTime::parse_from_rfc3339(value),
@@ -97,5 +99,3 @@ fn within(value: Option<&str>, from: &str, to: &str) -> bool {
     };
     value >= from && value <= to
 }
-
-include!("tests.rs");

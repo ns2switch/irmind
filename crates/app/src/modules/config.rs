@@ -1,3 +1,9 @@
+use super::registry::ModuleRegistry;
+use crate::AppError;
+use irmind_domain::Tool;
+use secrecy::SecretString;
+use std::collections::BTreeMap;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ModulePort {
     Llm,
@@ -66,7 +72,7 @@ impl ModuleConfig {
             .ok_or_else(|| AppError::Policy(format!("missing module secret {name}")))
     }
 
-    fn validate(&self, manifest: &ModuleManifest) -> Result<(), AppError> {
+    pub(super) fn validate(&self, manifest: &ModuleManifest) -> Result<(), AppError> {
         for field in manifest.config {
             let present = if field.secret {
                 self.secrets.contains_key(field.name)

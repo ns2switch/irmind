@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn forged_approval_without_challenge_signature_fails_verification() {
     let root = tempfile::tempdir().unwrap();

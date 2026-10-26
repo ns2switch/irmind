@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn operational_cancellation_preserves_a_sealed_case_and_is_verified() {
     let root = tempfile::tempdir().unwrap();

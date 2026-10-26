@@ -388,4 +388,6 @@ fn safe_name(value: &str, limit: usize) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"_-".contains(&byte))
 }
 
-include!("tests.rs");
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, clippy::wildcard_imports)]
+mod tests;

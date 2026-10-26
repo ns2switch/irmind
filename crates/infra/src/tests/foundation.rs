@@ -12,59 +12,6 @@ fn local_errors_do_not_echo_external_values() {
         "storage: evidence file exceeds 50 MB"
     );
 }
-use irmind_app::modules::{ModuleConfig, ModuleRegistry};
-use irmind_app::{
-    CancellationToken, CloudAuditPort, CompletionRequest, CryptoPorts, Engine, EnginePorts,
-    FindingKind, InternalIntelPort, LlmPort, ModelResponse, ModelStream, ModelUsage, SiemPort,
-    ThreatIntelPort, async_trait,
-};
-use irmind_domain::{
-    Actor, Case, CaseId, Decision, ExecutionMode, PolicyRules, ProposedCall, Tool, evaluate,
-};
-use irmind_mod_parser_json::JsonParser;
-use irmind_security::MandatoryGuard;
-use irmind_testkit::{FakeEdr, FixedClock};
-use std::collections::BTreeMap;
-use std::sync::Arc;
-
-trait LegacyModel: Send + Sync {
-    fn complete(&self, context: &str) -> Result<ModelResponse, AppError>;
-    fn complete_with_usage(
-        &self,
-        context: &str,
-    ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
-        self.complete(context).map(|response| (response, None))
-    }
-    fn complete_request(
-        &self,
-        request: &CompletionRequest,
-    ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
-        self.complete_with_usage(request.context().unwrap_or_default())
-    }
-}
-
-macro_rules! streaming_test_model {
-    ($name:ty) => {
-        #[async_trait]
-        impl LlmPort for $name {
-            async fn complete(
-                &self,
-                request: CompletionRequest,
-                cancel: &CancellationToken,
-            ) -> Result<ModelStream, AppError> {
-                if cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
-                }
-                let (response, usage) = LegacyModel::complete_request(self, &request)?;
-                if cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
-                }
-                Ok(irmind_app::single_completion_stream(response, usage))
-            }
-        }
-    };
-}
-
 #[test]
 fn refuses_oversized_evidence_file_before_loading_it() {
     let root = tempfile::tempdir().unwrap();
@@ -76,13 +23,13 @@ fn refuses_oversized_evidence_file_before_loading_it() {
     assert!(read_evidence_file(&path).is_err());
 }
 
-struct ObedientModel {
-    seen: Mutex<Vec<String>>,
+pub(super) struct ObedientModel {
+    pub(super) seen: Mutex<Vec<String>>,
 }
 
-struct QuietModel;
+pub(super) struct QuietModel;
 
-struct WaitingModel(std::sync::mpsc::Sender<()>);
+pub(super) struct WaitingModel(std::sync::mpsc::Sender<()>);
 
 #[async_trait]
 impl LlmPort for WaitingModel {
@@ -155,7 +102,7 @@ fn cancelling_model_request_is_audited_without_a_result() {
     assert_eq!(engine.verify(&case.id).unwrap(), entries.len());
 }
 
-struct MissingReadModel;
+pub(super) struct MissingReadModel;
 
 streaming_test_model!(MissingReadModel);
 
@@ -172,13 +119,13 @@ impl LegacyModel for MissingReadModel {
     }
 }
 
-struct RepeatingReadModel {
-    turns: Mutex<usize>,
+pub(super) struct RepeatingReadModel {
+    pub(super) turns: Mutex<usize>,
 }
 
-struct FindingModel {
-    hash: String,
-    turns: Mutex<usize>,
+pub(super) struct FindingModel {
+    pub(super) hash: String,
+    pub(super) turns: Mutex<usize>,
 }
 
 streaming_test_model!(FindingModel);
@@ -210,11 +157,11 @@ impl LegacyModel for FindingModel {
     }
 }
 
-struct FakeExternalIntel {
-    calls: Mutex<usize>,
+pub(super) struct FakeExternalIntel {
+    pub(super) calls: Mutex<usize>,
 }
 
-struct WaitingIntel(std::sync::mpsc::Sender<()>);
+pub(super) struct WaitingIntel(std::sync::mpsc::Sender<()>);
 
 #[irmind_app::async_trait]
 impl ThreatIntelPort for WaitingIntel {

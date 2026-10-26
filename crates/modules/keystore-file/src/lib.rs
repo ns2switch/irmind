@@ -123,7 +123,9 @@ fn secret_name(name: &str) -> Result<String, AppError> {
     Ok(format!("secret:{name}"))
 }
 
-include!("crypto.rs");
-include!("file_backend.rs");
-include!("backend_ports.rs");
-include!("tests.rs");
+mod backend_ports;
+mod crypto;
+mod file_backend;
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::wildcard_imports)]
+mod tests;
