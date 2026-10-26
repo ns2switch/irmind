@@ -1,7 +1,8 @@
 name: Rust CI
 on:
   push:
-    paths-ignore: ['docs/**', '**/*.md']
+    branches: [main]
+    tags: ['v*']
   pull_request:
   schedule:
     - cron: '17 3 * * *'
@@ -9,27 +10,69 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: rust-${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  group: rust-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 env:
   CARGO_INCREMENTAL: 0
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
 jobs:
   dco:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      run_matrix: ${{ steps.scope.outputs.run_matrix }}
+      docs_only: ${{ steps.scope.outputs.docs_only }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false, fetch-depth: 0}
+      - name: Select CI scope and skip stale nightly runs
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import subprocess
+          import time
+          from pathlib import Path
+
+          event = os.environ['EVENT_NAME']
+          docs_only = False
+          if event == 'pull_request':
+              changed = subprocess.check_output([
+                  'git', 'diff', '--name-only', '-z',
+                  os.environ['BASE_SHA'], os.environ['HEAD_SHA'],
+              ]).split(b'\0')
+              changed = [path for path in changed if path]
+              docs_only = bool(changed) and all(
+                  path.startswith(b'docs/') or path.endswith(b'.md') for path in changed
+              )
+          run_matrix = True
+          if event == 'schedule':
+              latest = int(subprocess.check_output(
+                  ['git', 'log', '-1', '--format=%ct'], text=True,
+              ))
+              age = int(time.time()) - latest
+              run_matrix = 0 <= age <= 86_400
+              if not run_matrix:
+                  print('Skipping nightly matrix: main has no commits in the last 24 hours.')
+          with Path(os.environ['GITHUB_OUTPUT']).open('a', encoding='ascii') as output:
+              output.write(f'docs_only={str(docs_only).lower()}\n')
+              output.write(f'run_matrix={str(run_matrix).lower()}\n')
+          PY
       - name: Verify DCO sign-off on every PR commit
+        if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: python3 .github/scripts/check_dco.py
   linux:
     needs: dco
-    if: ${{ !cancelled() && (needs.dco.result == 'success' || needs.dco.result == 'skipped') }}
+    if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_matrix == 'true' }}
+    outputs:
+      docs_only: ${{ needs.dco.outputs.docs_only }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -37,38 +80,61 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
+      - name: Check links and documented CLI commands
+        if: needs.dco.outputs.docs_only == 'true'
+        run: python3 .github/scripts/check_docs.py
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+        if: needs.dco.outputs.docs_only != 'true'
         with: {components: 'rustfmt, clippy'}
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        if: needs.dco.outputs.docs_only != 'true'
         with: {key: linux-checks}
-      - run: sudo apt-get update && sudo apt-get install -y mold
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: sudo apt-get update && sudo apt-get install -y mold
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        if: needs.dco.outputs.docs_only != 'true'
         with: {tool: 'cargo-nextest,cargo-deny,cargo-audit', fallback: none}
-      - run: cargo fmt --all -- --check
-      - run: cargo fmt --manifest-path fuzz/Cargo.toml -- --check
-      - run: cargo clippy --workspace --all-targets --all-features --profile ci --locked -- -D warnings
-      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
-      - run: cargo test -p irmind-testkit --test dependency_direction --profile ci --locked
-      - run: cargo deny check --hide-inclusion-graph
-      - run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
-      - run: cargo audit --ignore RUSTSEC-2026-0370 --ignore RUSTSEC-2026-0371 --ignore RUSTSEC-2026-0372
-      - run: cargo build --release -p irmind --locked
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: cargo fmt --all -- --check
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: cargo fmt --manifest-path fuzz/Cargo.toml -- --check
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: cargo clippy --workspace --all-targets --all-features --profile ci --locked -- -D warnings
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: cargo test -p irmind-testkit --test dependency_direction --profile ci --locked
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: cargo deny check --hide-inclusion-graph
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: cargo audit --ignore RUSTSEC-2026-0370 --ignore RUSTSEC-2026-0371 --ignore RUSTSEC-2026-0372
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: cargo build --release -p irmind --locked
+      - name: Check documented CLI commands against the built binary
+        if: needs.dco.outputs.docs_only != 'true'
+        run: python3 .github/scripts/check_docs.py --binary target/release/irmind
       - name: Package unsigned binary and checksum
+        if: needs.dco.outputs.docs_only != 'true'
         run: |
           mkdir -p dist
           cp target/release/irmind dist/irmind
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md dist/
           (cd dist && sha256sum irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.dco.outputs.docs_only != 'true'
         with: {name: irmind-linux, path: dist/, if-no-files-found: error}
-      - run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --profile ci --locked
+      - if: needs.dco.outputs.docs_only != 'true'
+        run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --profile ci --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.dco.outputs.docs_only != 'true'
         with: {name: portable-export-linux, path: portable-export/, if-no-files-found: error}
       - name: Clean staging
-        if: always()
+        if: ${{ always() && needs.dco.outputs.docs_only != 'true' }}
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'portable-export')) if p.is_dir()]"
   windows:
-    if: ${{ !cancelled() && needs.linux.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')) }}
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.linux.outputs.docs_only != 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')) }}
     needs: linux
     runs-on: windows-latest
     timeout-minutes: 120
@@ -124,7 +190,7 @@ jobs:
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('bin', 'foreign-export')) if p.is_dir()]"
   macos:
-    if: ${{ !cancelled() && needs.linux.result == 'success' && (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))) || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.linux.outputs.docs_only != 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))) || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
     needs: linux
     runs-on: macos-latest
     timeout-minutes: 120
