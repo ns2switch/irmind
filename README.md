@@ -1,6 +1,6 @@
-# IRMind — Assisted Incident Response
-
 [Spanish version](README.es.md)
+
+# IRMind — Assisted Incident Response
 
 A terminal AI client for security investigations with policy-enforced tool calls and a signed chain of custody.
 
