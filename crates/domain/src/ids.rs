@@ -74,4 +74,5 @@ pub enum DomainError {
     InvalidPolicy,
     InvalidScope,
     InvalidSeverity,
+    UnknownAuditEvent,
 }

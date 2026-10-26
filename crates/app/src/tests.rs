@@ -2,8 +2,8 @@ use super::{isolate_untrusted, safe_markdown};
 
 #[test]
 fn remote_tool_errors_cannot_reach_audit_or_tui_with_secret_text() {
-    let error = super::remote_tool_error(super::AppError::Storage(
-        "SECRET from hostile provider URL".into(),
+    let error = super::remote_tool_error(super::AppError::Fixed(
+        crate::FixedAppError::StorageSECRETFromHostileProviderURL,
     ));
     assert_eq!(error.to_string(), "remote tool execution failed");
 }
@@ -11,14 +11,14 @@ fn remote_tool_errors_cannot_reach_audit_or_tui_with_secret_text() {
 #[test]
 fn canonical_audit_fields_are_unambiguous() {
     use super::{SignedEntry, sha256};
-    use irmind_domain::Actor;
+    use irmind_domain::{Actor, AuditEventKind};
     let base = SignedEntry {
         seq: 1,
         case_id: "case".into(),
         at: 1,
         actor: Actor::Analyst,
         origin: "a".into(),
-        kind: "bc".into(),
+        kind: AuditEventKind::Prompt,
         payload: "payload".into(),
         evidence: None,
         prev: [0; 32],
@@ -29,7 +29,7 @@ fn canonical_audit_fields_are_unambiguous() {
     let mut entries = vec![base.clone()];
     let mut changed = base.clone();
     changed.origin = "ab".into();
-    changed.kind = "c".into();
+    changed.kind = AuditEventKind::Proposal;
     entries.push(changed);
     let mut changed = base.clone();
     changed.seq = 2;
@@ -69,7 +69,7 @@ fn audit_debug_omits_payload_and_signature() {
         at: 1,
         actor: Actor::Analyst,
         origin: "source".into(),
-        kind: "Prompt".into(),
+        kind: irmind_domain::AuditEventKind::Prompt,
         payload: "SECRET evidence".into(),
         evidence: None,
         prev: [0; 32],
@@ -125,7 +125,9 @@ async fn incomplete_or_repeated_model_completion_fails_closed() {
     ))]));
     assert!(matches!(
         collect_model_stream(incomplete, &cancelled).await,
-        Err(AppError::Model(_))
+        Err(AppError::Fixed(
+            super::FixedAppError::ModelProviderStreamEndedWithoutCompletion
+        ))
     ));
     let response = || ModelResponse {
         text: "ok".into(),
@@ -144,8 +146,22 @@ async fn incomplete_or_repeated_model_completion_fails_closed() {
     ]));
     assert!(matches!(
         collect_model_stream(repeated, &cancelled).await,
-        Err(AppError::Model(_))
+        Err(AppError::Fixed(
+            super::FixedAppError::ModelProviderEmittedDataAfterCompletion
+        ))
     ));
+}
+
+#[test]
+fn fixed_application_errors_keep_their_public_messages() {
+    assert_eq!(
+        super::AppError::Fixed(super::FixedAppError::PolicyPendingApprovalNotFound).to_string(),
+        "policy denied: pending approval not found"
+    );
+    assert_eq!(
+        super::AppError::Fixed(super::FixedAppError::StorageAuditSequenceOverflow).to_string(),
+        "storage: audit sequence overflow"
+    );
 }
 
 #[test]

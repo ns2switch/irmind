@@ -2520,6 +2520,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-http"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "irmind-infra"
 version = "0.1.0"
 dependencies = [
@@ -2562,6 +2571,7 @@ dependencies = [
  "async-stream",
  "irmind-app",
  "irmind-domain",
+ "irmind-http",
  "irmind-testkit",
  "reqwest",
  "secrecy",
@@ -2597,6 +2607,7 @@ dependencies = [
  "chrono",
  "irmind-app",
  "irmind-domain",
+ "irmind-http",
  "irmind-testkit",
  "reqwest",
  "secrecy",
@@ -2611,6 +2622,7 @@ dependencies = [
  "chrono",
  "irmind-app",
  "irmind-domain",
+ "irmind-http",
  "irmind-testkit",
  "reqwest",
  "secrecy",
@@ -2664,6 +2676,7 @@ dependencies = [
  "async-stream",
  "irmind-app",
  "irmind-domain",
+ "irmind-http",
  "irmind-testkit",
  "reqwest",
  "secrecy",
@@ -2717,6 +2730,7 @@ dependencies = [
  "chrono",
  "irmind-app",
  "irmind-domain",
+ "irmind-http",
  "irmind-testkit",
  "reqwest",
  "secrecy",
@@ -2729,6 +2743,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-http",
  "irmind-testkit",
  "reqwest",
  "secrecy",
@@ -2742,6 +2757,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-http",
  "irmind-testkit",
  "reqwest",
  "secrecy",
@@ -2768,6 +2784,7 @@ dependencies = [
  "ed25519-dalek",
  "irmind-app",
  "irmind-domain",
+ "irmind-http",
  "secrecy",
  "serde_json",
  "tokio",

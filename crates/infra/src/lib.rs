@@ -34,7 +34,9 @@ use std::sync::Mutex;
 use graph_duckdb::GraphStore;
 
 fn storage(_error: impl std::fmt::Display) -> AppError {
-    AppError::Storage("local storage operation failed".into())
+    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+        irmind_app::AdapterStorageError::LocalStorageOperationFailed,
+    ))
 }
 
 fn storage_reason(message: &'static str) -> AppError {
@@ -63,11 +65,16 @@ pub use signing::{LocalAnalystVerifier, LocalSigner, LocalVerifier};
 mod tests {
     use super::evidence_fs::read_evidence_file;
     use super::seal::MAX_EXPORT_BYTES;
-    include!("tests/part1.rs");
-    include!("tests/part2.rs");
-    include!("tests/part3.rs");
-    include!("tests/part4.rs");
-    include!("tests/part5.rs");
-    include!("tests/part6.rs");
-    include!("tests/part7.rs");
+    include!("tests/foundation.rs");
+    include!("tests/test_support.rs");
+    include!("tests/scope_and_graph.rs");
+    include!("tests/case_findings_and_agent.rs");
+    include!("tests/remote_dispatch_siem_cloud.rs");
+    include!("tests/remote_dispatch_edr_ti.rs");
+    include!("tests/injection_and_taint.rs");
+    include!("tests/seal_export.rs");
+    include!("tests/approvals.rs");
+    include!("tests/concurrency_and_migrations.rs");
+    include!("tests/graph_runtime.rs");
+    include!("tests/custody_operations.rs");
 }

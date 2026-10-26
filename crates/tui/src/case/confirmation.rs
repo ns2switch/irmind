@@ -37,10 +37,11 @@ pub(super) fn confirmation_summary(
     id: &CaseId,
     operation: &str,
 ) -> Result<String> {
-    let seal = engine
-        .repo
-        .case_seal(id)?
-        .ok_or_else(|| irmind_app::AppError::Policy("seal the case before export".into()))?;
+    let seal = engine.repo.case_seal(id)?.ok_or({
+        irmind_app::AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+            irmind_app::AdapterPolicyError::SealTheCaseBeforeExport,
+        ))
+    })?;
     let entries = engine.audit_log.entries(id)?;
     let last = entries.last().map_or([0u8; 32], |entry| entry.hash);
     Ok(format!(

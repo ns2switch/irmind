@@ -14,7 +14,9 @@ const VERSION: u8 = 1;
 const PACKET_LEN: usize = 1 + 32 + 24 + 32 + 16;
 
 fn error() -> AppError {
-    AppError::Signature("signing-key migration failed".into())
+    AppError::Fixed(irmind_app::FixedAppError::AdapterSignature(
+        irmind_app::AdapterSignatureError::SigningKeyMigrationFailed,
+    ))
 }
 
 fn context(actor: &Actor, recipient: &[u8; 32], sender: &[u8; 32]) -> Result<Vec<u8>, AppError> {

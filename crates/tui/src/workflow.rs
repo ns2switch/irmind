@@ -30,23 +30,26 @@ impl CaseWorkflow<'_, '_> {
         cancel: &CancellationToken,
         mut progress: impl FnMut(usize, usize, &str),
     ) -> Result<usize, AppError> {
-        let files = self
-            .io_ops
-            .input_files(path)
-            .map_err(|_| AppError::Storage("cannot list selected evidence".into()))?;
+        let files = self.io_ops.input_files(path).map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                irmind_app::AdapterStorageError::CannotListSelectedEvidence,
+            ))
+        })?;
         let total = files.len();
         for (index, file) in files.iter().enumerate() {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            let bytes = self
-                .io_ops
-                .read_evidence(file)
-                .map_err(|_| AppError::Storage("cannot read selected evidence".into()))?;
-            let source = self
-                .io_ops
-                .audit_source_name(path, file)
-                .map_err(|_| AppError::Storage("invalid selected evidence path".into()))?;
+            let bytes = self.io_ops.read_evidence(file).map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                    irmind_app::AdapterStorageError::CannotReadSelectedEvidence,
+                ))
+            })?;
+            let source = self.io_ops.audit_source_name(path, file).map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                    irmind_app::AdapterStorageError::InvalidSelectedEvidencePath,
+                ))
+            })?;
             self.engine.ingest_cancelable(id, &bytes, &source, cancel)?;
             progress(index + 1, total, &source);
         }
@@ -59,9 +62,11 @@ impl CaseWorkflow<'_, '_> {
         alert: &str,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        let model = self
-            .model
-            .ok_or_else(|| AppError::Policy("no LLM selected".into()))?;
+        let model = self.model.ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::NoLLMSelected,
+            ))
+        })?;
         self.engine
             .investigate_with_cancel(id, alert, model, cancel)
     }

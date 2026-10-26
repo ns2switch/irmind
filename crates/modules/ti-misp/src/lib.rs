@@ -57,8 +57,11 @@ impl Misp {
     pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
         let setting = |name| config.required_value(name).map(str::to_owned);
         let base = setting("IRMIND_MISP_URL")?;
-        let url =
-            reqwest::Url::parse(&base).map_err(|_| AppError::Policy("invalid MISP URL".into()))?;
+        let url = reqwest::Url::parse(&base).map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidMISPURL,
+            ))
+        })?;
         if url.scheme() != "https"
             || url.host_str().is_none()
             || !url.username().is_empty()
@@ -71,13 +74,15 @@ impl Misp {
                 .bytes()
                 .all(|byte| byte.is_ascii_alphanumeric() || b"_-/".contains(&byte))
         {
-            return Err(AppError::Policy(
-                "MISP URL must be an HTTPS base path".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::MISPURLMustBeAnHTTPSBasePath,
+            )));
         }
-        let endpoint = url
-            .join("attributes/restSearch")
-            .map_err(|_| AppError::Policy("invalid MISP endpoint".into()))?;
+        let endpoint = url.join("attributes/restSearch").map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidMISPEndpoint,
+            ))
+        })?;
         let source_id = setting("IRMIND_MISP_SOURCE_ID")?;
         if source_id.is_empty()
             || source_id.len() > 64
@@ -85,21 +90,26 @@ impl Misp {
                 .bytes()
                 .all(|byte| byte.is_ascii_alphanumeric() || b"_-".contains(&byte))
         {
-            return Err(AppError::Policy("invalid MISP source ID".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidMISPSourceID,
+            )));
         }
         let key = config
             .required_secret("IRMIND_MISP_API_KEY")?
             .expose_secret()
             .to_owned();
         if key.trim().is_empty() {
-            return Err(AppError::Policy("empty MISP API key".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::EmptyMISPAPIKey,
+            )));
         }
-        let async_client = reqwest::Client::builder()
-            .use_rustls_tls()
-            .timeout(std::time::Duration::from_secs(30))
-            .redirect(reqwest::redirect::Policy::none())
+        let async_client = irmind_http::client_builder(std::time::Duration::from_secs(30), false)
             .build()
-            .map_err(|_| AppError::Storage("MISP HTTP client unavailable".into()))?;
+            .map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                    irmind_app::AdapterStorageError::MISPHTTPClientUnavailable,
+                ))
+            })?;
         Ok(Self {
             async_client,
             endpoint,
@@ -122,19 +132,23 @@ impl InternalIntelPort for Misp {
     ) -> Result<Vec<u8>, AppError> {
         if call.tool() != &Tool::ThreatIntelInternal || call.arg("source") != Some(self.source_id())
         {
-            return Err(AppError::Policy("wrong MISP source or tool".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::WrongMISPSourceOrTool,
+            )));
         }
-        let ioc = call
-            .arg("ioc")
-            .ok_or_else(|| AppError::Policy("missing IOC".into()))?;
+        let ioc = call.arg("ioc").ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::MissingIOC,
+            ))
+        })?;
         let body = search_body(ioc)?;
-        let mut response = tokio::select! {
+        let response = tokio::select! {
             biased;
             () = cancel.cancelled() => return Err(AppError::Cancelled),
             result = self.async_client.post(self.endpoint.clone())
                 .header("Authorization", self.key.expose_secret())
                 .header("Accept", "application/json")
-                .json(&body).send() => result.map_err(|_| AppError::Storage("MISP request failed".into()))?,
+                .json(&body).send() => result.map_err(|_| AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(irmind_app::AdapterStorageError::MISPRequestFailed)))?,
         };
         if !response.status().is_success() {
             return Err(AppError::Storage(format!(
@@ -142,21 +156,21 @@ impl InternalIntelPort for Misp {
                 response.status()
             )));
         }
-        let mut raw = Vec::new();
-        loop {
-            let chunk = tokio::select! {
-                biased;
-                () = cancel.cancelled() => return Err(AppError::Cancelled),
-                result = response.chunk() => result.map_err(|_| AppError::Storage("MISP response failed".into()))?,
-            };
-            let Some(chunk) = chunk else {
-                break;
-            };
-            if raw.len().saturating_add(chunk.len()) > 5_000_000 {
-                return Err(AppError::Policy("MISP response exceeds 5 MB".into()));
-            }
-            raw.extend_from_slice(&chunk);
-        }
+        let raw = irmind_http::read_limited(response, 5_000_000, cancel)
+            .await
+            .map_err(|error| match error {
+                irmind_http::BodyError::Cancelled => AppError::Cancelled,
+                irmind_http::BodyError::Transport => {
+                    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                        irmind_app::AdapterStorageError::MISPResponseFailed,
+                    ))
+                }
+                irmind_http::BodyError::TooLarge => {
+                    AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                        irmind_app::AdapterPolicyError::MISPResponseExceeds5MB,
+                    ))
+                }
+            })?;
         Ok(raw)
     }
 }
@@ -168,7 +182,9 @@ fn search_body(ioc: &str) -> Result<Value, AppError> {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
     {
-        return Err(AppError::Policy("invalid MISP IOC".into()));
+        return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+            irmind_app::AdapterPolicyError::InvalidMISPIOC,
+        )));
     }
     Ok(json!({"returnFormat":"json","value":ioc,"limit":20,"page":1}))
 }
@@ -189,6 +205,7 @@ mod tests {
         );
         let port = Misp::from_config(&config).unwrap();
         irmind_testkit::run_internal_intel_contract(&port).unwrap();
+        irmind_testkit::run_http_safety_contract().unwrap();
     }
 
     #[test]

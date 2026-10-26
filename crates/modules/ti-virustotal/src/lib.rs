@@ -47,18 +47,24 @@ impl VirusTotal {
             .expose_secret()
             .to_owned();
         if key.trim().is_empty() {
-            return Err(AppError::Policy("empty VirusTotal key".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::EmptyVirusTotalKey,
+            )));
         }
-        let async_client = reqwest::Client::builder()
-            .use_rustls_tls()
-            .timeout(std::time::Duration::from_secs(30))
-            .redirect(reqwest::redirect::Policy::none())
+        let async_client = irmind_http::client_builder(std::time::Duration::from_secs(30), false)
             .build()
-            .map_err(|_| AppError::Storage("VirusTotal HTTP client unavailable".into()))?;
+            .map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                    irmind_app::AdapterStorageError::VirusTotalHTTPClientUnavailable,
+                ))
+            })?;
         Ok(Self {
             async_client,
-            api_base: reqwest::Url::parse("https://www.virustotal.com/api/v3/")
-                .map_err(|_| AppError::Storage("invalid fixed VirusTotal endpoint".into()))?,
+            api_base: reqwest::Url::parse("https://www.virustotal.com/api/v3/").map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                    irmind_app::AdapterStorageError::InvalidFixedVirusTotalEndpoint,
+                ))
+            })?,
             key: SecretString::from(key),
         })
     }
@@ -72,21 +78,29 @@ impl ThreatIntelPort for VirusTotal {
         cancel: &CancellationToken,
     ) -> Result<Vec<u8>, AppError> {
         if call.tool() != &Tool::ThreatIntelExternal {
-            return Err(AppError::Policy("wrong tool for VirusTotal".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::WrongToolForVirusTotal,
+            )));
         }
-        let ioc = call
-            .arg("ioc")
-            .ok_or_else(|| AppError::Policy("missing IOC".into()))?;
+        let ioc = call.arg("ioc").ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::MissingIOC,
+            ))
+        })?;
         let collection = classify_ioc(ioc)?;
         let url = self
             .api_base
             .join(&format!("{collection}/{ioc}"))
-            .map_err(|_| AppError::Policy("invalid VirusTotal path".into()))?;
-        let mut response = tokio::select! {
+            .map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                    irmind_app::AdapterPolicyError::InvalidVirusTotalPath,
+                ))
+            })?;
+        let response = tokio::select! {
             biased;
             () = cancel.cancelled() => return Err(AppError::Cancelled),
             result = self.async_client.get(url).header("x-apikey", self.key.expose_secret()).send()
-                => result.map_err(|_| AppError::Storage("VirusTotal request failed".into()))?,
+                => result.map_err(|_| AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(irmind_app::AdapterStorageError::VirusTotalRequestFailed)))?,
         };
         if !response.status().is_success() {
             return Err(AppError::Storage(format!(
@@ -94,21 +108,21 @@ impl ThreatIntelPort for VirusTotal {
                 response.status()
             )));
         }
-        let mut raw = Vec::new();
-        loop {
-            let chunk = tokio::select! {
-                biased;
-                () = cancel.cancelled() => return Err(AppError::Cancelled),
-                result = response.chunk() => result.map_err(|_| AppError::Storage("VirusTotal response failed".into()))?,
-            };
-            let Some(chunk) = chunk else {
-                break;
-            };
-            if raw.len().saturating_add(chunk.len()) > 5_000_000 {
-                return Err(AppError::Policy("VirusTotal response exceeds 5 MB".into()));
-            }
-            raw.extend_from_slice(&chunk);
-        }
+        let raw = irmind_http::read_limited(response, 5_000_000, cancel)
+            .await
+            .map_err(|error| match error {
+                irmind_http::BodyError::Cancelled => AppError::Cancelled,
+                irmind_http::BodyError::Transport => {
+                    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                        irmind_app::AdapterStorageError::VirusTotalResponseFailed,
+                    ))
+                }
+                irmind_http::BodyError::TooLarge => {
+                    AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                        irmind_app::AdapterPolicyError::VirusTotalResponseExceeds5MB,
+                    ))
+                }
+            })?;
         Ok(raw)
     }
 }
@@ -133,14 +147,16 @@ fn classify_ioc(ioc: &str) -> Result<&'static str, AppError> {
             || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0)
             || (octets[0] == 192 && octets[1] == 88 && octets[2] == 99);
         if reserved {
-            return Err(AppError::Policy(
-                "non-public IP cannot be sent externally".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::NonPublicIPCannotBeSentExternally,
+            )));
         }
         return Ok("ip_addresses");
     }
     if !ioc.is_ascii() || ioc.len() > 253 || !ioc.contains('.') {
-        return Err(AppError::Policy("unsupported or private IOC".into()));
+        return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+            irmind_app::AdapterPolicyError::UnsupportedOrPrivateIOC,
+        )));
     }
     let labels = ioc.split('.').collect::<Vec<_>>();
     let tld = labels.last().copied().unwrap_or_default();
@@ -159,7 +175,9 @@ fn classify_ioc(ioc: &str) -> Result<&'static str, AppError> {
             "local" | "internal" | "localhost" | "invalid" | "test" | "example" | "onion"
         )
     {
-        return Err(AppError::Policy("unsupported or private IOC".into()));
+        return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+            irmind_app::AdapterPolicyError::UnsupportedOrPrivateIOC,
+        )));
     }
     Ok("domains")
 }
@@ -178,6 +196,7 @@ mod tests {
         );
         let port = VirusTotal::from_config(&config).unwrap();
         irmind_testkit::run_threat_intel_contract(&port).unwrap();
+        irmind_testkit::run_http_safety_contract().unwrap();
     }
 
     #[test]

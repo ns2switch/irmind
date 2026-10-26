@@ -11,6 +11,12 @@ pub struct ToolSpec {
 
 #[must_use]
 pub fn catalog() -> Vec<ToolSpec> {
+    let mut tools = local_catalog();
+    tools.extend(remote_catalog());
+    tools
+}
+
+fn local_catalog() -> Vec<ToolSpec> {
     vec![
         ToolSpec {
             name: "evidence_search",
@@ -62,6 +68,11 @@ pub fn catalog() -> Vec<ToolSpec> {
             description: "Propose an unconfirmed case finding linked to existing evidence; only the analyst can confirm it for the report",
             parameters: json!({"type":"object","properties":{"kind":{"type":"string","enum":["ioc","hypothesis","technique","impact","recommendation"]},"value":{"type":"string"},"evidence_hash":{"type":"string","description":"SHA-256 of existing case evidence"}},"required":["kind","value","evidence_hash"],"additionalProperties":false}),
         },
+    ]
+}
+
+fn remote_catalog() -> Vec<ToolSpec> {
+    vec![
         ToolSpec {
             name: "siem_search",
             description: "Search a configured SIEM source for a single literal term in one scoped account and UTC window; Splunk uses a restricted SPL query built by its module",

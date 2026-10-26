@@ -57,7 +57,9 @@ impl Engine<'_> {
         }
         self.verify_unlocked(id)?;
         if bytes.len() > 50_000_000 {
-            return Err(AppError::Policy("evidence exceeds 50 MB".into()));
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyEvidenceExceeds50MB,
+            ));
         }
         if source.is_empty()
             || source.len() > 1000
@@ -68,8 +70,8 @@ impl Engine<'_> {
                 .split('/')
                 .any(|part| part.is_empty() || part == "." || part == "..")
         {
-            return Err(AppError::Policy(
-                "source must be a relative, slash-separated path".into(),
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicySourceMustBeARelativeSlashSeparatedPath,
             ));
         }
         let hash = hex(&sha256(bytes));
@@ -190,7 +192,7 @@ impl Engine<'_> {
     pub(crate) fn graph_sources(&self, id: &CaseId) -> Result<Vec<(String, usize)>, AppError> {
         let mut sources = std::collections::BTreeMap::new();
         for entry in self.audit_log.entries(id)? {
-            if entry.kind != "GraphIndexed" {
+            if entry.kind != irmind_domain::AuditEventKind::GraphIndexed {
                 continue;
             }
             let hash = entry.evidence.ok_or(AppError::InvalidChain(entry.seq))?;

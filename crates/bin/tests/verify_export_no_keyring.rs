@@ -19,7 +19,7 @@ fn synthetic_export(path: &std::path::Path) -> String {
         at: 1,
         actor: Actor::Analyst,
         origin: "analyst".into(),
-        kind: "CaseCreated".into(),
+        kind: irmind_domain::AuditEventKind::CaseCreated,
         payload: json!({"version": 3, "title": "Synthetic", "severity": "medium", "scope": scope})
             .to_string(),
         evidence: None,
@@ -36,7 +36,7 @@ fn synthetic_export(path: &std::path::Path) -> String {
         at: 2,
         actor: Actor::Analyst,
         origin: "analyst".into(),
-        kind: "CaseSealed".into(),
+        kind: irmind_domain::AuditEventKind::CaseSealed,
         payload: String::new(),
         evidence: None,
         prev: created.hash,

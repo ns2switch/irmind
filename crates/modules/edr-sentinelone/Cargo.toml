@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+irmind-http = { path = "../../http", version = "0.1.0" }
 irmind-app = { path = "../../app", version = "0.1.0" }
 irmind-domain = { path = "../../domain", version = "0.1.0" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "json"] }

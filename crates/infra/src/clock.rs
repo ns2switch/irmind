@@ -8,6 +8,10 @@ impl Clock for SystemClock {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|elapsed| elapsed.as_secs())
-            .map_err(|_| AppError::Storage("system clock is before the Unix epoch".into()))
+            .map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                    irmind_app::AdapterStorageError::SystemClockIsBeforeTheUnixEpoch,
+                ))
+            })
     }
 }

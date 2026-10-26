@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/domain", "crates/app", "crates/security", "crates/infra", "crates/fs", "crates/keystore-transfer", "crates/parser-json", "crates/testkit", "crates/llm-chat-completions", "crates/modules/llm-openai-compatible", "crates/modules/llm-anthropic", "crates/modules/llm-deepseek", "crates/modules/llm-openrouter", "crates/modules/edr-crowdstrike", "crates/modules/edr-sentinelone", "crates/modules/ti-virustotal", "crates/modules/ti-misp", "crates/modules/siem-splunk", "crates/modules/cloud-aws", "crates/modules/keystore-os", "crates/modules/keystore-file", "crates/tui", "crates/bin"]
+members = ["crates/domain", "crates/app", "crates/security", "crates/infra", "crates/fs", "crates/http", "crates/keystore-transfer", "crates/parser-json", "crates/testkit", "crates/llm-chat-completions", "crates/modules/llm-openai-compatible", "crates/modules/llm-anthropic", "crates/modules/llm-deepseek", "crates/modules/llm-openrouter", "crates/modules/edr-crowdstrike", "crates/modules/edr-sentinelone", "crates/modules/ti-virustotal", "crates/modules/ti-misp", "crates/modules/siem-splunk", "crates/modules/cloud-aws", "crates/modules/keystore-os", "crates/modules/keystore-file", "crates/tui", "crates/bin"]
 resolver = "3"
 
 [workspace.package]
@@ -16,7 +16,8 @@ dead_code = "deny"
 pedantic = { level = "warn", priority = -1 }
 missing_errors_doc = "allow"
 must_use_candidate = "allow"
-too_many_lines = "allow"
+too_many_lines = "warn"
+cognitive_complexity = "warn"
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
