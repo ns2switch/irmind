@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 332d190657f969d89689b9ae150900b5c7b35723; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 095cd1db66e6dec2b51c6115d4fd44de6981e6a4; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -8,7 +8,7 @@ Esta guía es para analistas que evalúan IRMind con datos sintéticos. Explica 
 
 ## Instalación
 
-La opción recomendada para uso interno es compilar desde el código. Instala Rust 1.95.0, un terminal compatible y el llavero nativo del sistema. Después ejecuta:
+La opción recomendada para uso interno es compilar desde el código. Instala Rust 1.95.0 y un terminal compatible. Puedes elegir el archivo cifrado sin disponer de un llavero del sistema. Después ejecuta:
 
 ```sh
 rustup toolchain install 1.95.0
@@ -20,7 +20,9 @@ En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Tambi�
 
 ## Primer arranque
 
-Al ejecutar `irmind` sin subcomando se abre la TUI. La pantalla inicial comprueba el llavero, crea la clave de firma del analista si falta y muestra la huella de la clave pública. Guarda esa huella por un canal de confianza distinto. IRMind no puede recuperar una clave perdida y se detiene si el llavero no está disponible.
+Al ejecutar `irmind` sin subcomando se abre la TUI. Elige `os` o `file` por separado para la firma y los secretos. Ambos se compilan por defecto; IRMind nunca cambia de backend en silencio. El archivo cifrado pide una passphrase sin eco y funciona por SSH con un terminal interactivo, sin sesión gráfica. En el primer uso, IRMind crea la clave de firma del analista y muestra su huella pública. Guárdala por otro canal de confianza. Un paquete exportado no permite recuperar una clave perdida.
+
+Si el backend elegido no está disponible, el arranque se detiene y la TUI ofrece cambiarlo explícitamente. La selección queda en `keystore.toml`, dentro del directorio de datos. Pulsa `k` en la pantalla de inicio para ver los backends y la huella, gestionar credenciales, cambiar la passphrase del archivo o migrar. Tras sustituir una credencial, los conectores activos conservan el valor anterior; pulsa `r` en esta vista para reiniciar la sesión.
 
 Pulsa `m` para ver qué módulos están compilados, habilitados y configurados. Ningún LLM se activa automáticamente. Puedes trabajar con casos locales sin modelo.
 
@@ -37,4 +39,4 @@ Puedes verificar el paquete en otro equipo con `irmind verify-export <PACKAGE> -
 
 ## Siguientes pasos
 
-Consulta [configuración](configuration.md) para el alcance, la política y las cuentas del llavero. Consulta [módulos](modules.md) para conocer los permisos y límites de los conectores. La TUI es el flujo principal; los subcomandos sirven para automatizar tareas.
+Consulta [configuración](configuration.md) para el alcance, la política, los backends y los nombres de credenciales. Consulta [módulos](modules.md) para los permisos y límites de los conectores y [plataformas](platforms.md) para el uso por SSH. La TUI es el flujo principal; los subcomandos sirven para automatizar tareas.
