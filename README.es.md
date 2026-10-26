@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 7407ca6aedfc764c944d0f525b27b505c7115b0e; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 3506de21def7f380096317087cf9310c33cd1d0d; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -46,8 +46,8 @@ La ejecución diaria de CI en `main` publica binarios sin firma para Linux, macO
 1. Ejecuta `irmind` sin subcomando. Elige el llavero del sistema o el archivo cifrado para las firmas y los secretos. El archivo funciona por SSH sin sesión gráfica. Guarda la huella de la clave pública del analista fuera de este equipo.
 2. Pulsa `n` para crear un caso. Indica título, severidad y ventana temporal. Deja vacías las fuentes remotas para trabajar solo con evidencia local.
 3. Abre el caso y escribe `/ingest`. Selecciona [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), que contiene únicamente datos sintéticos.
-4. Elige un modelo explícitamente. Para un servicio local compatible con OpenAI, como Ollama, configura `IRMIND_MODEL` con un modelo instalado y `IRMIND_LLM_BASE_URL=http://127.0.0.1:11434/v1/`; después inicia `irmind --llm-module llm-openai-compatible`. También admite HTTPS. Para un proveedor remoto, sigue [configuración](docs/es/configuration.md) y aprueba antes su tratamiento de datos.
-5. Vuelve a abrir el caso, describe la alerta sintética y revisa las llamadas propuestas. `/help` y `Ctrl+K` muestran acciones; `/pause` cancela una tarea.
+4. Vuelve a la pantalla de inicio y pulsa `m`. Selecciona el módulo compatible con OpenAI, pulsa `e` para indicar un modelo instalado y una URL local como `http://127.0.0.1:11434/v1/`, y confirma el cambio. La sesión se recarga dentro de la TUI. Para un proveedor remoto, sigue [configuración](docs/es/configuration.md) y aprueba antes su tratamiento de datos.
+5. Abre de nuevo el caso, describe la alerta sintética y revisa las llamadas propuestas. `/help` y `Ctrl+K` muestran acciones; `/pause` cancela una tarea.
 6. Revisa la cronología y la evidencia. Usa `/verify`, `/report`, `/seal` y `/export`. El sellado y la exportación muestran el hash y la huella de la clave antes de confirmar.
 
 Ningún LLM está habilitado por defecto. Puedes ingerir y verificar evidencia local sin uno.

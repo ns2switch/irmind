@@ -1,4 +1,4 @@
-Traducción de docs/platforms.md en el commit ba25f5d9205890fc05649a84caaa003d08bc0116; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit 3506de21def7f380096317087cf9310c33cd1d0d; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
@@ -14,6 +14,8 @@ cargo build --release --locked -p irmind
 ```
 
 CI prueba Ubuntu Linux, macOS arm64 y Windows x64 con el toolchain MSVC. SQLite y DuckDB se compilan desde fuentes incluidas. TLS usa rustls con las raíces de certificados nativas, incluidas las CA corporativas instaladas; IRMind no enlaza OpenSSL del sistema. Esta opción de raíces nativas puede diferir de las comprobaciones de política de un verificador específico de cada plataforma.
+
+Instala un compilador de C/C++ antes de compilar: GCC o Clang y `pkg-config` en Linux, Xcode Command Line Tools en macOS, o Visual Studio Build Tools con MSVC C++ en Windows. La compilación de DuckDB incluido compila C++ en local. Para una compilación release sin caché, reserva aproximadamente 20–60 minutos y 20–30 GB libres; depende de la CPU, el compilador y la caché. Las [instrucciones de duckdb-rs](https://github.com/duckdb/duckdb-rs) explican esta compilación.
 
 ## Artefactos de CI y checksums
 

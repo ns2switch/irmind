@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check local Markdown links and cited IRMind CLI names against binary help."""
+"""Check local links, CLI references, and Spanish source-commit citations."""
 
 from __future__ import annotations
 
@@ -31,6 +31,36 @@ NON_IRMIND_FLAGS = {
     "--test-threads",
     "--workspace",
 }
+TRANSLATIONS = {
+    ROOT / "README.es.md": ROOT / "README.md",
+    **{
+        ROOT / "docs/es" / name: ROOT / "docs" / name
+        for name in ("getting-started.md", "configuration.md", "modules.md", "security-model.md", "platforms.md")
+    },
+}
+
+
+def check_translations() -> list[str]:
+    warnings: list[str] = []
+    for translation, source in TRANSLATIONS.items():
+        first = translation.read_text(encoding="utf-8").splitlines()[0]
+        match = re.fullmatch(
+            rf"Traducción de {re.escape(source.relative_to(ROOT).as_posix())} en el commit ([0-9a-f]{{40}}); si hay diferencias, prevalece la versión en inglés\.",
+            first,
+        )
+        if match is None:
+            warnings.append(f"{translation.relative_to(ROOT)}: missing or malformed source citation")
+            continue
+        last = subprocess.check_output(
+            ["git", "log", "-1", "--format=%H", "--", source.relative_to(ROOT).as_posix()],
+            cwd=ROOT, text=True,
+        ).strip()
+        if match.group(1) != last:
+            warnings.append(
+                f"{translation.relative_to(ROOT)}: translation may be stale; "
+                f"English source was last changed in {last}"
+            )
+    return warnings
 
 
 def markdown_files() -> list[Path]:
@@ -161,9 +191,12 @@ def main() -> int:
     paths = markdown_files()
     link_count, link_errors = check_links(paths)
     cli_count, cli_errors = check_cli(paths, binary)
+    translation_warnings = check_translations()
     for error in link_errors + cli_errors:
         print(error, file=sys.stderr)
-    print(f"Checked {len(paths)} Markdown files, {link_count} local links, and {cli_count} CLI references")
+    for warning in translation_warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    print(f"Checked {len(paths)} Markdown files, {link_count} local links, {cli_count} CLI references, and {len(TRANSLATIONS)} translation citations")
     return int(bool(link_errors or cli_errors))
 
 

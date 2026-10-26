@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit ba25f5d9205890fc05649a84caaa003d08bc0116; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 3506de21def7f380096317087cf9310c33cd1d0d; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -24,14 +24,14 @@ Al ejecutar `irmind` sin subcomando se abre la TUI. Elige `os` o `file` por sepa
 
 Si el backend elegido no está disponible, el arranque se detiene y la TUI ofrece cambiarlo explícitamente. La selección queda en `keystore.toml`, dentro del directorio de datos. Pulsa `k` en la pantalla de inicio para ver los backends y la huella, gestionar credenciales, cambiar la passphrase del archivo o migrar. Tras sustituir una credencial, los conectores activos conservan el valor anterior; pulsa `r` en esta vista para reiniciar la sesión.
 
-Pulsa `m` para ver qué módulos están compilados, habilitados y configurados. Ningún LLM se activa automáticamente. Puedes trabajar con casos locales sin modelo.
+Pulsa `m` para ver qué módulos están compilados, habilitados y configurados. Usa las flechas para elegir un módulo, Tab para elegir un campo público y `e` para editarlo. Enter selecciona un LLM o activa un conector. `k` abre sus credenciales en el llavero. Un cambio que pueda enviar datos fuera del equipo pide confirmación firmada. La TUI recarga la sesión tras aplicarlo. Ningún LLM se activa automáticamente.
 
 ## Primer caso sintético
 
 1. Pulsa `n`, escribe un título como «Alerta de CloudTrail de prueba», elige una severidad y deja vacíos los campos de fuentes remotas. Se creará un caso local con un evento firmado.
 2. En el caso, escribe `/ingest` y selecciona [el archivo sintético de CloudTrail](../../examples/cloudtrail-alert.json). El original se guarda y se identifica por su hash.
 3. Usa `/timeline` o `/graph` para examinar los eventos indexados. Usa `/evidence <hash>` para ver un registro original.
-4. Si tienes un proveedor aprobado, selecciónalo según [configuración](configuration.md), reinicia IRMind, abre el caso y pregunta: «¿Qué sugiere el evento AssumeRole sintético?».
+4. Vuelve a la pantalla de inicio, pulsa `m` y elige un modelo y sus ajustes públicos como explica [configuración](configuration.md). La sesión se recarga sin salir de IRMind. Abre el caso y pregunta: «¿Qué sugiere el evento AssumeRole sintético?».
 5. Revisa las llamadas propuestas antes de aprobarlas. `/pause` cancela una tarea activa; `/help` y `Ctrl+K` muestran las acciones.
 6. Ejecuta `/verify`, revisa `/report` y usa `/seal` y `/export` solo después de comprobar el hash del caso y la huella de la clave de firma que se muestran.
 

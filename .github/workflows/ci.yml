@@ -101,7 +101,7 @@ jobs:
       RUSTFLAGS: -C link-arg=-fuse-ld=mold
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with: {persist-credentials: false}
+        with: {persist-credentials: false, fetch-depth: 0}
       - name: Check links and documented CLI commands
         if: needs.dco.outputs.docs_only == 'true'
         run: python3 .github/scripts/check_docs.py
