@@ -39,11 +39,11 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-CI also publishes unsigned binaries for Linux, macOS, and Windows. Verify `SHA256SUMS` before running one. Follow the [platform guide](docs/platforms.md) for checksums, keyrings, terminal support, and operating-system warnings.
+CI also publishes unsigned binaries for Linux, macOS, and Windows. Verify `SHA256SUMS` before running one. Follow the [platform guide](docs/platforms.md) for checksums, keystore backends, SSH, and terminal support.
 
 ## First case in the TUI
 
-1. Run `irmind` without a subcommand. The first-run guide checks the system keyring, creates the analyst signing key if needed, and shows its public-key fingerprint. Save the fingerprint outside this computer.
+1. Run `irmind` without a subcommand. Choose the OS keyring or encrypted-file backend for signing and module secrets. The file backend works over SSH without a graphical session. Save the analyst public-key fingerprint outside this computer.
 2. Press `n` to create a case. Give it a title, severity, and a time window. Leave remote sources empty for a local-only case.
 3. Open the case and enter `/ingest`. Select [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), which contains only synthetic data.
 4. Choose a model explicitly. For a local OpenAI-compatible service such as Ollama, set `IRMIND_MODEL` to an installed model and `IRMIND_LLM_BASE_URL=http://127.0.0.1:11434/v1/`, then start `irmind --llm-module llm-openai-compatible`. HTTPS is also supported. For a remote provider, follow [configuration](docs/configuration.md) and obtain approval for its data handling first.
@@ -69,13 +69,15 @@ A Cargo feature includes a module in the binary; enabling a connector or selecti
 | MISP | internal threat intel | `ti-misp` | experimental | [MISP](docs/modules.md#misp) |
 | VirusTotal | external enrichment | `ti-virustotal` | experimental | [VirusTotal](docs/modules.md#virustotal) |
 | JSON and CloudTrail parser | local parser | included | experimental | [Local parser](docs/modules.md#json-and-cloudtrail-parser) |
+| OS keystore | signing and secrets | `keystore-os` (default) | experimental | [OS keystore](docs/modules.md#os-keystore) |
+| Encrypted-file keystore | signing and secrets | `keystore-file` (default) | experimental | [File keystore](docs/modules.md#file-keystore) |
 
 ## Security model
 
 - External tools accept only authorized calls. Unattended work permits only scoped reads.
 - External enrichment waits for a signed analyst approval; containment is disabled.
 - Original evidence stays local, while model input is bounded, guarded, and redacted.
-- Audit entries are hash chained and signed; a sealed export can be checked on another computer.
+- Audit entries are hash chained and signed; a sealed export can be checked on another computer. Keystore migrations enter a separate signed global chain.
 - Pattern-based redaction can miss data, and a local signer can rewrite an entire chain unless its key fingerprint is pinned elsewhere. Do not treat this build as production-ready.
 
 Read [security-model.md](docs/security-model.md) before connecting a provider.

@@ -9,10 +9,11 @@ This page is for scripts and reviewers who need a non-interactive operation. Ana
 | `--home <PATH>` | Override the standard local data directory. |
 | `--policy <PATH>` | Load versioned policy TOML. |
 | `--llm-module <ID>` | Select a compiled model module explicitly. |
+| `--passphrase-fd <FD>` | Read the selected file keystore's passphrase from an explicit descriptor; Windows supports `0` only. Omit it for a no-echo terminal prompt. |
 | `--enable-splunk`, `--enable-aws`, `--enable-crowdstrike`, `--enable-sentinelone`, `--enable-misp`, `--enable-virustotal` | Enable a compiled connector for this run. |
 | `--help`, `--version` | Display command help or version. |
 
-The [configuration guide](../configuration.md) lists environment alternatives and keyring accounts. A connector switch requires its Cargo feature in the binary.
+The [configuration guide](../configuration.md) lists non-secret environment settings, keystore selection, and credential names. A connector switch requires its Cargo feature in the binary.
 
 ## Cases and evidence
 
@@ -63,6 +64,6 @@ The [configuration guide](../configuration.md) lists environment alternatives an
 | `irmind verify <CASE_ID>` | Verify audit signatures and evidence hashes. |
 | `irmind seal <CASE_ID>` | Make a verified case read-only. |
 | `irmind export <CASE_ID> <PATH>` | Verify and export a sealed case. |
-| `irmind verify-export <PATH> --expected-key <FINGERPRINT>` | Verify a package without the local keyring. |
+| `irmind verify-export <PATH> --expected-key <FINGERPRINT>` | Verify a package without unlocking a local keystore. |
 
 Use `irmind <COMMAND> --help` to check positional arguments for the installed binary. Keep the expected key fingerprint outside the exported package and obtain it through a trusted channel.

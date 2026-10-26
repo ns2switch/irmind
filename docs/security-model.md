@@ -13,9 +13,9 @@ The analyst controls the case, its scope, approvals, and signing key. Files, log
 ## What the build enforces
 
 - **Custody:** Original evidence is stored locally by SHA-256. Case changes and tool activity enter an append-only SQLite audit chain with Ed25519 signatures. Verification detects changed entries and evidence bytes.
-- **Separate identities:** Analyst and Agent have different keyring entries. Only an analyst signature can resolve a pending approval. A sealed case has a separate signed operational chain for task cancellations.
+- **Separate identities:** Analyst and Agent have distinct signing keys in the selected backend. Only an analyst signature can resolve a pending approval. A sealed case has a separate signed operational chain for task cancellations; backend migrations enter a global signed operational chain.
 - **Guarded model input:** External text is normalized, screened for prompt injection, redacted for known secret and PII patterns, bounded, and wrapped as untrusted data. The original remains local. A startup self-test blocks the application if the guard's known corpus fails.
-- **Constrained connectors:** Credentials come from the system keyring through the composition root. Remote clients require HTTPS, except keyless HTTP to an explicit loopback model service. Redirects are disabled and responses are bounded.
+- **Constrained connectors:** Credentials come from the explicitly selected secret backend through the composition root. Remote clients require HTTPS, except keyless HTTP to an explicit loopback model service. Redirects are disabled and responses are bounded.
 - **Safe presentation:** The TUI removes terminal control characters from model output, evidence summaries, and filenames. Approval views show the exact proposed arguments after terminal escaping.
 
 A case export contains its signed log, seal, evidence, and public key. Use `verify-export --expected-key` with a fingerprint obtained through another trusted channel.
@@ -37,7 +37,7 @@ A case export contains its signed log, seal, evidence, and public key. Use `veri
 - VirusTotal enrichment exposes the queried IOC to an outside service. It always needs approval. A read-only connector still depends on the permissions actually granted by its service.
 - The graph is a derived index, not original evidence. Verify or rebuild it from signed inputs when its correctness matters.
 - CI binaries have checksums but are not code-signed, notarized, or Authenticode signed. See [platforms](platforms.md).
-- A system keyring is required for signing; no password-file fallback exists. Losing its key can prevent continued case work.
+- The OS keyring and encrypted-file backends are explicit choices, never silent fallbacks. The file backend works over SSH, but its security depends on a strong passphrase and a trustworthy host. Losing the signing key can prevent continued case work.
 
 ## Operating guidance
 
