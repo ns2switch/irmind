@@ -46,8 +46,8 @@ The daily `main` CI run publishes unsigned binaries for Linux, macOS, and Window
 1. Run `irmind` without a subcommand. Choose the OS keyring or encrypted-file backend for signing and module secrets. The file backend works over SSH without a graphical session. Save the analyst public-key fingerprint outside this computer.
 2. Press `n` to create a case. Give it a title, severity, and a time window. Leave remote sources empty for a local-only case.
 3. Open the case and enter `/ingest`. Select [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), which contains only synthetic data.
-4. Choose a model explicitly. For a local OpenAI-compatible service such as Ollama, set `IRMIND_MODEL` to an installed model and `IRMIND_LLM_BASE_URL=http://127.0.0.1:11434/v1/`, then start `irmind --llm-module llm-openai-compatible`. HTTPS is also supported. For a remote provider, follow [configuration](docs/configuration.md) and obtain approval for its data handling first.
-5. Reopen the case, describe the synthetic alert in the conversation panel, and inspect proposed calls. Use `/help` or `Ctrl+K` for case actions; `/pause` cancels a running task.
+4. Return to the home screen and press `m`. Select the OpenAI-compatible module, press `e` to set an installed model and a local base URL such as `http://127.0.0.1:11434/v1/`, then confirm the change. The session reloads inside the TUI. For a remote provider, follow [configuration](docs/configuration.md) and approve its data handling first.
+5. Open the case again, describe the synthetic alert in the conversation panel, and inspect proposed calls. Use `/help` or `Ctrl+K` for case actions; `/pause` cancels a running task.
 6. Review the timeline and evidence, then use `/verify`, `/report`, `/seal`, and `/export`. Sealing and export show the case hash and signing-key fingerprint before confirmation.
 
 No LLM is enabled by default. You can ingest, inspect, and verify local evidence without one.
