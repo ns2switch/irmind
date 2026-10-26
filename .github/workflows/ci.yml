@@ -158,7 +158,7 @@ jobs:
         if: needs.dco.outputs.release_build == 'true'
         with: {name: irmind-linux, path: dist/, if-no-files-found: error}
       - if: needs.dco.outputs.docs_only != 'true'
-        run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --profile ci --locked
+        run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --all-features --profile ci --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.docs_only != 'true'
         with: {name: portable-export-linux, path: portable-export/, if-no-files-found: error}
@@ -209,7 +209,7 @@ jobs:
       - name: Verify Linux export on Windows
         run: |
           ./verify-bin/irmind.exe verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
-      - run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --profile ci --locked
+      - run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --all-features --profile ci --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: {name: portable-export-windows, path: portable-export/, if-no-files-found: error}
       - name: Clean staging

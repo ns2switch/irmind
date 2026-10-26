@@ -21,6 +21,7 @@ This page is for maintainers reviewing tradeoffs that shape the current build. E
 | Export and package verification must not depend on presentation. | Add local `CaseExporter` and `ExportVerifier` ports. | CLI and TUI use the same checks; package verification needs no keyring. | 2026-10-25 |
 | Provider selection can expose evidence. | No LLM enabled by default; secrets are read by the composition root and injected. | Provider approval is a separate operating decision. | 2026-10-25 |
 | Public distribution lacks a signing process. | Publish unsigned CI binaries with checksums. | Reassess signing by 2027-04-24 or before external distribution. | 2026-10-25 |
+| Repeated release builds consume runner time without changing the binary. | Build unsigned binaries once daily on `main`, and only after code changes; PRs and merges still run tests. | Documentation-only changes run a lightweight check; CI test binaries are reused for cross-platform export verification. | 2026-10-26 |
 | Public contributions need clear provenance. | Dual license MIT OR Apache-2.0 and require DCO on every PR commit. | CI checks author-matching sign-off. | 2026-10-25 |
 | Free-form model SPL is difficult to constrain. | Proposed future structured SIEM query AST with allowed fields and escaped translation. | Not implemented; current Splunk accepts a bounded literal term. | 2026-10-25 |
 
