@@ -1,7 +1,7 @@
 use crate::{
     Actor, AppError, CancellationToken, CancelledOperation, CaseId, CaseMutation, CaseSeal, Engine,
-    SignedEntry, SignedOperation, hex, seal_challenge, sha256, summarize_usage,
-    verify_case_metadata,
+    GLOBAL_OPERATION_SCOPE, SignedEntry, SignedOperation, hex, seal_challenge, sha256,
+    summarize_usage, verify_case_metadata,
 };
 use crate::{SecretBackend, SignerBackend};
 use secrecy::ExposeSecret as _;
@@ -69,11 +69,6 @@ impl Engine<'_> {
             return Err(AppError::Policy("invalid signing backend migration".into()));
         }
         let cases = self.repo.list_cases()?;
-        if cases.is_empty() {
-            return Err(AppError::Policy(
-                "create a case before migrating the keystore so the change can be signed".into(),
-            ));
-        }
         for case in &cases {
             self.verify(&case.id)?;
         }
@@ -120,15 +115,7 @@ impl Engine<'_> {
                 ));
             }
         }
-        for case in cases {
-            self.record_keystore_migration(
-                &case.id,
-                "signer",
-                source.manifest().id,
-                target.manifest().id,
-            )?;
-        }
-        Ok(())
+        self.record_global_keystore_migration("signer", source.manifest().id, target.manifest().id)
     }
 
     pub fn migrate_secret_backend(
@@ -142,11 +129,6 @@ impl Engine<'_> {
             return Err(AppError::Policy("invalid secret backend migration".into()));
         }
         let cases = self.repo.list_cases()?;
-        if cases.is_empty() {
-            return Err(AppError::Policy(
-                "create a case before migrating the keystore so the change can be signed".into(),
-            ));
-        }
         for case in &cases {
             self.verify(&case.id)?;
         }
@@ -164,15 +146,7 @@ impl Engine<'_> {
                 Err(error) => return Err(error),
             }
         }
-        for case in cases {
-            self.record_keystore_migration(
-                &case.id,
-                "secrets",
-                source.manifest().id,
-                target.manifest().id,
-            )?;
-        }
-        Ok(())
+        self.record_global_keystore_migration("secrets", source.manifest().id, target.manifest().id)
     }
 
     pub fn record_cancellation(
@@ -183,9 +157,8 @@ impl Engine<'_> {
         self.record_operational_event(id, operation.as_str())
     }
 
-    pub fn record_keystore_migration(
+    fn record_global_keystore_migration(
         &self,
-        id: &CaseId,
         capability: &str,
         from: &str,
         to: &str,
@@ -198,7 +171,47 @@ impl Engine<'_> {
         {
             return Err(AppError::Policy("invalid keystore migration".into()));
         }
-        self.record_operational_event(id, &format!("keystore-migration:{capability}:{from}:{to}"))
+        let _global_lock = self.audit_log.lock_global_operations()?;
+        self.verify_global_operations()?;
+        let last = self.audit_log.global_operations()?.pop();
+        let mut entry = SignedOperation {
+            case_id: GLOBAL_OPERATION_SCOPE.into(),
+            seq: last.as_ref().map_or(Ok(1), |previous| {
+                previous.seq.checked_add(1).ok_or_else(|| {
+                    AppError::Policy("global operational audit sequence exhausted".into())
+                })
+            })?,
+            at: self.clock.now()?,
+            actor: Actor::Analyst,
+            operation: format!("keystore-migration:{capability}:{from}:{to}"),
+            prev: last.map_or([0u8; 32], |previous| previous.hash),
+            hash: [0u8; 32],
+            sig: Vec::new(),
+            public_key: self.signer.public_key(),
+        };
+        entry.hash = sha256(&entry.canonical());
+        entry.sig = self.signer.sign(&entry.hash)?;
+        self.audit_log.append_global_operation(&entry)
+    }
+
+    pub fn verify_global_operations(&self) -> Result<(), AppError> {
+        let mut previous = [0u8; 32];
+        for (index, entry) in self.audit_log.global_operations()?.iter().enumerate() {
+            if entry.case_id != GLOBAL_OPERATION_SCOPE
+                || entry.actor != Actor::Analyst
+                || entry.seq != index as u64 + 1
+                || entry.prev != previous
+                || sha256(&entry.canonical()) != entry.hash
+                || entry.public_key != self.verifier.trusted_public_key(&entry.actor)?
+            {
+                return Err(AppError::InvalidChain(entry.seq));
+            }
+            self.verifier
+                .verify(&entry.public_key, &entry.hash, &entry.sig)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            previous = entry.hash;
+        }
+        Ok(())
     }
 
     fn record_operational_event(&self, id: &CaseId, operation: &str) -> Result<(), AppError> {

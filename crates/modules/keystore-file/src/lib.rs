@@ -79,9 +79,6 @@ fn failure() -> AppError {
 }
 
 fn open_private(path: &Path, create: bool) -> Result<File, AppError> {
-    #[cfg(windows)]
-    use std::os::windows::fs::MetadataExt as _;
-
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(create);
     #[cfg(unix)]
@@ -96,10 +93,13 @@ fn open_private(path: &Path, create: bool) -> Result<File, AppError> {
     }
     let file = options.open(path).map_err(|_| failure())?;
     #[cfg(windows)]
-    if file.metadata().map_err(|_| failure())?.file_attributes() & 0x400 != 0 {
-        return Err(failure());
+    {
+        use std::os::windows::fs::MetadataExt as _;
+        if file.metadata().map_err(|_| failure())?.file_attributes() & 0x400 != 0 {
+            return Err(failure());
+        }
     }
-    irmind_infra::private_file(path).map_err(|_| failure())?;
+    irmind_fs::private_file(path).map_err(|_| failure())?;
     Ok(file)
 }
 
@@ -292,12 +292,13 @@ fn persist(vault: &Vault, state: &VaultState) -> Result<(), AppError> {
             .create_new(true)
             .open(&path)
             .map_err(|_| failure())?;
-        irmind_infra::private_file(&path).map_err(|_| failure())?;
+        irmind_fs::private_file(&path).map_err(|_| failure())?;
         file.write_all(&bytes).map_err(|_| failure())?;
         file.sync_all().map_err(|_| failure())?;
         replace_started = true;
-        irmind_infra::durable_replace(&path, &vault.path)?;
-        irmind_infra::sync_directory(vault.path.parent().ok_or_else(failure)?)?;
+        irmind_fs::durable_replace(&path, &vault.path).map_err(|_| failure())?;
+        irmind_fs::sync_directory(vault.path.parent().ok_or_else(failure)?)
+            .map_err(|_| failure())?;
         Ok(())
     })();
     if result.is_err() {

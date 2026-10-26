@@ -321,21 +321,81 @@ where
         state.search, state.notice
     ))?;
     terminal.draw(|frame| {
-        let areas = Layout::vertical([Constraint::Length(3), Constraint::Min(4), Constraint::Length(3), Constraint::Length(1)]).split(frame.area());
-        frame.render_widget(Paragraph::new("IRMind · incident workspace").block(Block::default().borders(Borders::ALL)), areas[0]);
-        frame.render_widget(List::new(content).block(Block::default().title(header).borders(Borders::ALL)), areas[1]);
-        frame.render_widget(Paragraph::new(info).block(Block::default().borders(Borders::ALL)).wrap(Wrap { trim: false }), areas[2]);
-        let help = match state.mode {
-            Mode::List => "Enter open · n new · / search · f filter · v verify export · m modules · k keystore · ? setup · q quit",
-            Mode::Search => "Type to search · Enter apply · Esc cancel",
-            Mode::New => "Tab next field · Enter create · Esc cancel · sources, accounts, hosts: comma-separated",
-            Mode::Modules | Mode::Setup => "Esc back · n new case · m modules · q quit",
-            Mode::Keystore => if state.confirm_credential_delete { "Delete selected credential? y confirm · Esc cancel" } else if state.pending_migration.is_some() { "Copy to the other backend and sign the event? y confirm · Esc cancel" } else { "Up/Down select · a add/replace · d delete · p passphrase · s migrate signer · x migrate secrets · Esc" },
-            Mode::VerifyExport => "Tab switch field · Enter verify · Esc back; expected key is mandatory",
-        };
-        frame.render_widget(Paragraph::new(Line::from(help)).style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)), areas[3]);
+        let areas = Layout::vertical([
+            Constraint::Length(3),
+            Constraint::Min(4),
+            Constraint::Length(3),
+            Constraint::Length(1),
+        ])
+        .split(frame.area());
+        frame.render_widget(
+            Paragraph::new("IRMind · incident workspace")
+                .block(Block::default().borders(Borders::ALL)),
+            areas[0],
+        );
+        frame.render_widget(
+            List::new(content).block(Block::default().title(header).borders(Borders::ALL)),
+            areas[1],
+        );
+        frame.render_widget(
+            Paragraph::new(info)
+                .block(Block::default().borders(Borders::ALL))
+                .wrap(Wrap { trim: false }),
+            areas[2],
+        );
+        let help = help_line(state);
+        frame.render_widget(
+            Paragraph::new(Line::from(help)).style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            areas[3],
+        );
     })?;
     Ok(())
+}
+
+fn help_line(state: &HomeState) -> &'static str {
+    match state.mode {
+        Mode::List => {
+            "Enter open · n new · / search · f filter · v verify export · m modules · k keystore · ? setup · q quit"
+        }
+        Mode::Search => "Type to search · Enter apply · Esc cancel",
+        Mode::New => {
+            "Tab next field · Enter create · Esc cancel · sources, accounts, hosts: comma-separated"
+        }
+        Mode::Modules | Mode::Setup => "Esc back · n new case · m modules · q quit",
+        Mode::Keystore => {
+            if state.confirm_credential_delete {
+                "Delete selected credential? y confirm · Esc cancel"
+            } else if state.pending_migration.is_some() {
+                "Copy to the other backend and sign the event? y confirm · Esc cancel"
+            } else if state.restart_required {
+                "r restart session · active connectors may still hold old credentials · Esc back"
+            } else {
+                "Up/Down select · a add/replace · d delete · p passphrase · s migrate signer · x migrate secrets · Esc"
+            }
+        }
+        Mode::VerifyExport => {
+            "Tab switch field · Enter verify · Esc back; expected key is mandatory"
+        }
+    }
+}
+
+#[cfg(test)]
+mod help_tests {
+    use super::{HomeState, Mode, help_line};
+
+    #[test]
+    fn keystore_offers_session_restart_after_credentials_change() {
+        let mut state = HomeState::new(Vec::new(), false);
+        state.mode = Mode::Keystore;
+        assert!(!help_line(&state).contains("restart session"));
+        state.restart_required = true;
+        assert!(help_line(&state).contains("r restart session"));
+        assert!(help_line(&state).contains("active connectors"));
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -352,7 +412,7 @@ pub(crate) fn run_home(
     modules: &[ModuleStatus],
     shutdown: &CancellationToken,
     launch: HomeLaunch<'_>,
-) -> Result<()> {
+) -> Result<bool> {
     let workflow = CaseWorkflow {
         engine,
         model,
@@ -367,6 +427,7 @@ pub(crate) fn run_home(
         state.rows = load_rows(engine)?;
     }
     let (tx, rx) = mpsc::channel::<(CaseId, CaseStatus)>();
+    let mut restart_requested = false;
     std::thread::scope(|scope| -> Result<()> {
         let mut verify_task: Option<std::thread::ScopedJoinHandle<'_, Result<String>>> = None;
         let mut verify_started: Option<Instant> = None;
@@ -408,10 +469,7 @@ pub(crate) fn run_home(
                 && let Some(task) = verify_task.take()
             {
                 state.notice = match task.join() {
-                    Ok(Ok(message)) => {
-                        state.restart_required = true;
-                        message
-                    }
+                    Ok(Ok(message)) => message,
                     Ok(Err(_)) => {
                         "Export verification failed: check the package and expected key".into()
                     }
@@ -432,7 +490,10 @@ pub(crate) fn run_home(
                 && let Some(task) = migration_task.take()
             {
                 state.notice = match task.join() {
-                    Ok(Ok(message)) => message,
+                    Ok(Ok(message)) => {
+                        state.restart_required = true;
+                        message
+                    }
                     Ok(Err(error)) => format!("Keystore migration failed: {error}"),
                     Err(_) => "Keystore migration worker failed".into(),
                 };
@@ -618,6 +679,10 @@ pub(crate) fn run_home(
                     _ => {}
                 },
                 Mode::Keystore => {
+                    if key.code == KeyCode::Char('r') && state.restart_required {
+                        restart_requested = true;
+                        break;
+                    }
                     if let Some(capability) = state.pending_migration {
                         match key.code {
                             KeyCode::Esc => state.pending_migration = None,
@@ -665,7 +730,7 @@ pub(crate) fn run_home(
                                     state.notice = match io_ops.delete_credential(&name) {
                                         Ok(()) => {
                                             format!(
-                                                "Deleted {name}; restart IRMind to unload active connectors"
+                                                "Deleted {name}. Active connectors may still use it; press r to restart this session"
                                             )
                                         }
                                         Err(error) => {
@@ -694,20 +759,26 @@ pub(crate) fn run_home(
                                 (state.keystore_selected + 1).min(count.saturating_sub(1));
                         }
                         KeyCode::Char('a') => {
-                            if let Some(name) = state
+                            if let Some((name, replacing)) = state
                                 .keystore
                                 .as_ref()
                                 .and_then(|item| item.credentials.get(state.keystore_selected))
-                                .map(|item| item.name.clone())
+                                .map(|item| (item.name.clone(), item.present))
                             {
                                 let value =
                                     prompt_hidden(terminal, &format!("{name} (input hidden): "))?;
                                 state.restart_required = true;
                                 state.notice = match io_ops.put_credential(&name, &value) {
                                     Ok(()) => {
-                                        format!(
-                                            "Saved {name}; restart IRMind to activate the change"
-                                        )
+                                        if replacing {
+                                            format!(
+                                                "Replaced {name}. Active connectors still use the previous credential; press r to restart this session"
+                                            )
+                                        } else {
+                                            format!(
+                                                "Saved {name}. Restart the session with r to activate the credential"
+                                            )
+                                        }
                                     }
                                     Err(error) => format!("Credential update failed: {error}"),
                                 };
@@ -754,7 +825,8 @@ pub(crate) fn run_home(
             .join()
             .map_err(|_| anyhow::anyhow!("case verification worker failed"))??;
         Ok(())
-    })
+    })?;
+    Ok(restart_requested)
 }
 
 pub(crate) fn show_startup_error(

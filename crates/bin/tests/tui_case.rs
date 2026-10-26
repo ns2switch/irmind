@@ -330,18 +330,19 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
     );
     assert!(
         store
-            .operations(&id)
+            .global_operations()
             .unwrap()
             .iter()
             .any(|entry| entry.operation.contains("keystore-migration:signer"))
     );
     assert!(
         store
-            .operations(&id)
+            .global_operations()
             .unwrap()
             .iter()
             .any(|entry| entry.operation.contains("keystore-migration:secrets"))
     );
+    assert!(store.operations(&id).unwrap().is_empty());
     assert!(tui.verify(&id).unwrap() > 0);
     tui.seal(&id).unwrap();
     let export = root.path().join("synthetic.irmind.json");
@@ -370,6 +371,66 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
     let rejected_export = root.path().join("must-not-export.irmind.json");
     assert!(tui.export(&id, &rejected_export).is_err());
     assert!(!rejected_export.exists());
+}
+
+#[cfg(feature = "keystore-file")]
+#[test]
+fn keystore_migration_without_a_case_is_globally_signed() {
+    let root = tempfile::tempdir().unwrap();
+    let target_root = tempfile::tempdir().unwrap();
+    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let source = FileKeystore::open(
+        root.path(),
+        &SecretString::from("synthetic source passphrase".to_owned()),
+        true,
+    )
+    .unwrap();
+    let target = MigrationTarget(
+        FileKeystore::open(
+            target_root.path(),
+            &SecretString::from("synthetic target passphrase".to_owned()),
+            true,
+        )
+        .unwrap(),
+    );
+    let signer = source.create(Actor::Analyst).unwrap();
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(
+                signer.clone(),
+                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            ),
+            Arc::new(MandatoryGuard::new().unwrap()),
+            Arc::new(JsonParser),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )
+    .unwrap();
+    source
+        .put(
+            "SYNTHETIC_API_KEY",
+            &SecretString::from("fictional secret".to_owned()),
+        )
+        .unwrap();
+    assert!(store.list_cases().unwrap().is_empty());
+    engine.migrate_signer_backend(&source, &target).unwrap();
+    engine
+        .migrate_secret_backend(&source, &target, &["SYNTHETIC_API_KEY"])
+        .unwrap();
+    let operations = store.global_operations().unwrap();
+    assert_eq!(operations.len(), 2);
+    assert_eq!(operations[0].case_id, irmind_app::GLOBAL_OPERATION_SCOPE);
+    assert_eq!(operations[1].prev, operations[0].hash);
+    assert_eq!(
+        target.public_key_for_actor(&Actor::Analyst).unwrap(),
+        signer.public_key()
+    );
+    engine.verify_global_operations().unwrap();
 }
 
 #[tokio::test(flavor = "current_thread")]

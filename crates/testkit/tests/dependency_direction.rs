@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use cargo_metadata::MetadataCommand;
+use cargo_metadata::{DependencyKind, MetadataCommand};
 use std::collections::BTreeSet;
 
 fn layer(name: &str) -> Result<u8, String> {
@@ -21,6 +21,16 @@ fn check_edge(from: &str, to: &str) -> Result<(), String> {
     if layer(from)? < layer(to)? {
         return Err(format!("reverse dependency: {from} -> {to}"));
     }
+    let shared = [
+        "irmind-fs",
+        "irmind-keystore-transfer",
+        "irmind-llm-chat-completions",
+    ];
+    if layer(from)? == 2 && layer(to)? == 2 && !shared.contains(&to) {
+        return Err(format!(
+            "adapter depends on another adapter: {from} -> {to}"
+        ));
+    }
     Ok(())
 }
 
@@ -35,7 +45,9 @@ fn workspace_dependencies_point_inward() -> Result<(), Box<dyn std::error::Error
     for package in metadata.workspace_packages() {
         layer(package.name.as_str())?;
         for dependency in &package.dependencies {
-            if members.contains(dependency.name.as_str()) {
+            if dependency.kind != DependencyKind::Development
+                && members.contains(dependency.name.as_str())
+            {
                 check_edge(package.name.as_str(), dependency.name.as_str())?;
             }
         }
@@ -49,4 +61,6 @@ fn deliberate_reverse_edge_is_rejected() {
     assert!(check_edge("irmind-app", "irmind-domain").is_ok());
     assert!(check_edge("irmind-tui", "irmind-domain").is_err());
     assert!(check_edge("irmind-tui", "irmind-app").is_ok());
+    assert!(check_edge("irmind-mod-keystore-file", "irmind-infra").is_err());
+    assert!(check_edge("irmind-mod-keystore-file", "irmind-fs").is_ok());
 }

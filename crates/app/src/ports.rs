@@ -134,6 +134,9 @@ pub struct SignedOperation {
     pub public_key: Vec<u8>,
 }
 
+/// Reserved scope for installation-wide operations; no valid `CaseId` has this value.
+pub const GLOBAL_OPERATION_SCOPE: &str = "global";
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CancelledOperation {
     Ingest,
@@ -324,6 +327,9 @@ pub trait AuditLog: Send + Sync {
     fn last_operation(&self, id: &CaseId) -> Result<Option<SignedOperation>, AppError>;
     fn append_operation(&self, entry: &SignedOperation) -> Result<(), AppError>;
     fn operations(&self, id: &CaseId) -> Result<Vec<SignedOperation>, AppError>;
+    fn lock_global_operations(&self) -> Result<Box<dyn CaseLock>, AppError>;
+    fn global_operations(&self) -> Result<Vec<SignedOperation>, AppError>;
+    fn append_global_operation(&self, entry: &SignedOperation) -> Result<(), AppError>;
 }
 
 pub trait EventParser: Send + Sync {

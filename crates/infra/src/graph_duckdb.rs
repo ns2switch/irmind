@@ -20,7 +20,7 @@ pub(crate) struct GraphStore {
 impl GraphStore {
     pub(crate) fn new(root: &Path) -> Result<Self, AppError> {
         fs::create_dir_all(root).map_err(storage)?;
-        crate::private_fs::private_dir(root).map_err(storage)?;
+        irmind_fs::private_dir(root).map_err(storage)?;
         Ok(Self {
             root: root.to_owned(),
         })
@@ -29,7 +29,7 @@ impl GraphStore {
     pub(crate) fn connect(&self, id: &CaseId) -> Result<Connection, AppError> {
         let path = self.root.join(format!("{}.duckdb", id.as_str()));
         let db = Connection::open(&path).map_err(storage)?;
-        crate::private_fs::private_file(&path).map_err(storage)?;
+        irmind_fs::private_file(&path).map_err(storage)?;
         db.execute_batch(
             "CREATE TABLE IF NOT EXISTS indexed (hash VARCHAR PRIMARY KEY, records BIGINT NOT NULL);
              CREATE TABLE IF NOT EXISTS events (

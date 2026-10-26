@@ -321,7 +321,7 @@ pub(super) fn write_private_output(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut file = options
         .open(path)
         .with_context(|| format!("open {}", terminal_safe_path(path)))?;
-    irmind_infra::private_file(path)?;
+    irmind_fs::private_file(path)?;
     file.write_all(bytes)?;
     file.sync_all()?;
     Ok(())
@@ -341,7 +341,7 @@ pub(super) struct AutomationContext<'a, 'ports> {
 }
 
 impl AutomationContext<'_, '_> {
-    pub(super) fn run(self, command: Command) -> Result<()> {
+    pub(super) fn run(self, command: Command) -> Result<bool> {
         let Self {
             engine,
             store,
@@ -681,17 +681,19 @@ impl AutomationContext<'_, '_> {
                     "verify-export must be handled before opening storage"
                 ));
             }
-            Command::Tui { case_id } => irmind_tui::run_workspace(
-                engine,
-                selected_model,
-                workspace_io,
-                module_statuses,
-                cancel,
-                Some(&parse_id(&case_id)?),
-                new_analyst_key,
-            )?,
+            Command::Tui { case_id } => {
+                return irmind_tui::run_workspace(
+                    engine,
+                    selected_model,
+                    workspace_io,
+                    module_statuses,
+                    cancel,
+                    Some(&parse_id(&case_id)?),
+                    new_analyst_key,
+                );
+            }
         }
-        Ok(())
+        Ok(false)
     }
 }
 

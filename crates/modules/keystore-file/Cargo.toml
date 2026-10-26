@@ -8,7 +8,7 @@ license.workspace = true
 [dependencies]
 irmind-app = { path = "../../app", version = "0.1.0" }
 irmind-domain = { path = "../../domain", version = "0.1.0" }
-irmind-infra = { path = "../../infra", version = "0.1.0" }
+irmind-fs = { path = "../../fs", version = "0.1.0" }
 irmind-keystore-transfer = { path = "../../keystore-transfer", version = "0.1.0" }
 ed25519-dalek = { version = "2", features = ["rand_core", "zeroize"] }
 argon2 = { version = "0.6", default-features = false, features = ["alloc"] }

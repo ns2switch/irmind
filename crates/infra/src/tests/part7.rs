@@ -38,6 +38,46 @@ fn operational_cancellation_preserves_a_sealed_case_and_is_verified() {
 }
 
 #[test]
+fn altered_global_operational_chain_blocks_engine_startup() {
+    let root = tempfile::tempdir().unwrap();
+    let store = std::sync::Arc::new(LocalStore::open(root.path()).unwrap());
+    let signer = std::sync::Arc::new(TestSigner {
+        key: SigningKey::from_bytes(&[118u8; 32]),
+        actor: Actor::Analyst,
+    });
+    let mut entry = SignedOperation {
+        case_id: GLOBAL_OPERATION_SCOPE.into(),
+        seq: 1,
+        at: 1,
+        actor: Actor::Analyst,
+        operation: "keystore-migration:signer:os:file".into(),
+        prev: [0u8; 32],
+        hash: [0u8; 32],
+        sig: Vec::new(),
+        public_key: signer.public_key(),
+    };
+    entry.hash = sha256(&entry.canonical());
+    entry.sig = signer.sign(&entry.hash).unwrap();
+    store.append_global_operation(&entry).unwrap();
+    let make_engine = || Engine::new(
+        EnginePorts::new(
+            store.clone(), store.clone(), store.clone(), store.clone(),
+            CryptoPorts::new(signer.clone(), std::sync::Arc::new(LocalVerifier::from_signer(signer.as_ref()))),
+            std::sync::Arc::new(MandatoryGuard::new().unwrap()),
+            std::sync::Arc::new(JsonParser),
+        ),
+        ExecutionMode::Attended,
+        std::sync::Arc::new(SystemClock),
+    );
+    make_engine().unwrap();
+    let db = store.conn().unwrap();
+    db.execute_batch("DROP TRIGGER global_operational_audit_no_update").unwrap();
+    db.execute("UPDATE global_operational_audit SET operation='tampered' WHERE seq=1", []).unwrap();
+    drop(db);
+    assert!(matches!(make_engine(), Err(AppError::InvalidChain(1))));
+}
+
+#[test]
 fn seal_preview_rejects_a_changed_case() {
     let root = tempfile::tempdir().unwrap();
     let store = std::sync::Arc::new(LocalStore::open(root.path()).unwrap());
