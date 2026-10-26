@@ -43,6 +43,8 @@ IRMIND_SPLUNK_SOURCE_ID = "demo"
 IRMIND_SPLUNK_INDEX = "security"
 ```
 
+This example describes the stored format. Change it through the TUI: a hand-edited file does not match the signed operational record and blocks startup. Restore the last approved file if an external edit was accidental.
+
 These environment variables override their matching public fields. Set only values that match your approved endpoint and case scope.
 
 | Variable | Purpose |
