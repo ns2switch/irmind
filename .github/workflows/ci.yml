@@ -97,6 +97,8 @@ jobs:
       - if: needs.dco.outputs.docs_only != 'true'
         run: cargo fmt --all -- --check
       - if: needs.dco.outputs.docs_only != 'true'
+        run: python3 scripts/check_included_rustfmt.py
+      - if: needs.dco.outputs.docs_only != 'true'
         run: cargo fmt --manifest-path fuzz/Cargo.toml -- --check
       - if: needs.dco.outputs.docs_only != 'true'
         run: cargo clippy --workspace --all-targets --all-features --profile ci --locked -- -D warnings
