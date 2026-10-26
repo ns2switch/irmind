@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit e329fbe3bfcfef5f8a30d6010d7072c95f17bd03; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit b460a9066d011ef751175ed04199ee15a61312a8; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -54,6 +54,7 @@ Estas variables de entorno prevalecen sobre los campos públicos correspondiente
 | `IRMIND_HOME` | Directorio de datos local opcional. |
 | `IRMIND_POLICY` | Ruta del archivo TOML de política. |
 | `IRMIND_LLM_MODULE` | Selección explícita del módulo de modelo; alternativa a `--llm-module`. |
+| `IRMIND_ENABLE_SPLUNK`, `IRMIND_ENABLE_AWS`, `IRMIND_ENABLE_CROWDSTRIKE`, `IRMIND_ENABLE_SENTINELONE`, `IRMIND_ENABLE_MISP`, `IRMIND_ENABLE_VIRUSTOTAL` | Overrides temporales para activar conectores (`true` o `false`). |
 | `IRMIND_MODEL`, `IRMIND_LLM_BASE_URL` | Modelo compatible con OpenAI y URL base opcional. |
 | `IRMIND_ANTHROPIC_MODEL`, `IRMIND_DEEPSEEK_MODEL`, `IRMIND_OPENROUTER_MODEL` | IDs de modelos de esos proveedores. |
 | `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, `IRMIND_SPLUNK_ACCOUNT_FIELD` | Servicio Splunk y fuente de búsqueda acotada. |
