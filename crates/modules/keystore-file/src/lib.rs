@@ -79,6 +79,9 @@ fn failure() -> AppError {
 }
 
 fn open_private(path: &Path, create: bool) -> Result<File, AppError> {
+    #[cfg(windows)]
+    use std::os::windows::fs::MetadataExt as _;
+
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(create);
     #[cfg(unix)]
@@ -88,7 +91,7 @@ fn open_private(path: &Path, create: bool) -> Result<File, AppError> {
     }
     #[cfg(windows)]
     {
-        use std::os::windows::fs::{MetadataExt as _, OpenOptionsExt as _};
+        use std::os::windows::fs::OpenOptionsExt as _;
         options.custom_flags(0x0020_0000);
     }
     let file = options.open(path).map_err(|_| failure())?;
