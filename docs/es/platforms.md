@@ -1,4 +1,4 @@
-Traducción de docs/platforms.md en el commit 095cd1db66e6dec2b51c6115d4fd44de6981e6a4; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit ba25f5d9205890fc05649a84caaa003d08bc0116; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
@@ -17,7 +17,7 @@ CI prueba Ubuntu Linux, macOS arm64 y Windows x64 con el toolchain MSVC. SQLite 
 
 ## Artefactos de CI y checksums
 
-Cada job publica el binario, las dos licencias del proyecto, los avisos de terceros y `SHA256SUMS`. Descarga desde una ejecución de CI de confianza y compara el checksum **antes** de ejecutar el archivo:
+La ejecución diaria de CI en `main` publica un binario por plataforma solo cuando hubo cambios de código en las 24 horas anteriores. Los cambios exclusivos de documentación no generan binarios de distribución. Cada artefacto incluye las dos licencias del proyecto, los avisos de terceros y `SHA256SUMS`. Descárgalo de una ejecución diaria de confianza y compara el checksum **antes** de ejecutar el archivo:
 
 | Sistema | Comprobación |
 | --- | --- |

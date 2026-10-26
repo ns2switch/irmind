@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 095cd1db66e6dec2b51c6115d4fd44de6981e6a4; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit ba25f5d9205890fc05649a84caaa003d08bc0116; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -39,7 +39,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-CI también publica binarios sin firma para Linux, macOS y Windows. Verifica `SHA256SUMS` antes de ejecutarlos. La [guía de plataformas](docs/es/platforms.md) explica las comprobaciones, los almacenes de claves y el uso por SSH.
+La ejecución diaria de CI en `main` publica binarios sin firma para Linux, macOS y Windows cuando hubo cambios de código en las 24 horas anteriores. Verifica `SHA256SUMS` antes de ejecutarlos. La [guía de plataformas](docs/es/platforms.md) explica las comprobaciones, los almacenes de claves y el uso por SSH.
 
 ## Primer caso en la TUI
 
