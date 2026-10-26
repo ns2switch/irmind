@@ -1,3 +1,5 @@
+use super::*;
+
 impl CaseExporter for LocalStore {
     fn export_case(
         &self,

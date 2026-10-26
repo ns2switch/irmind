@@ -306,4 +306,4 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         Ok(())
     }
 }
-include!("commands/approval.rs");
+mod approval;

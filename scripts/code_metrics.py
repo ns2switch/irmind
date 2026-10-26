@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report Rust source files and function bodies over the project size limits."""
+"""Report oversized Rust files, expanded modules, and function bodies."""
 
 from __future__ import annotations
 
@@ -10,6 +10,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FUNCTION = re.compile(r"\bfn\s+([A-Za-z_][A-Za-z_0-9]*)\b")
+INCLUDE = re.compile(r'\binclude!\s*\(\s*"([^"\n]+\.rs)"\s*\)')
+
+
+def expanded_module(path: Path, stack: frozenset[Path] = frozenset()) -> str:
+    """Expand legacy Rust includes for comparable before and after counts."""
+    resolved = path.resolve()
+    if resolved in stack:
+        raise ValueError(f"recursive Rust include: {path}")
+    source = path.read_text(encoding="utf-8")
+    return INCLUDE.sub(
+        lambda match: expanded_module(path.parent / match.group(1), stack | {resolved}),
+        source,
+    )
 
 
 def mask_source(source: str) -> str:
@@ -109,16 +122,28 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--file-limit", type=int, default=400)
     parser.add_argument("--function-limit", type=int, default=80)
+    parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
-    files = sorted((ROOT / "crates").rglob("*.rs"))
+    root = args.root.resolve()
+    files = sorted((root / "crates").rglob("*.rs"))
     long_files = []
+    long_modules = []
     long_functions = []
+    included = {
+        (path.parent / relative).resolve()
+        for path in files
+        for relative in INCLUDE.findall(path.read_text(encoding="utf-8"))
+    }
     for path in files:
-        relative = str(path.relative_to(ROOT))
+        relative = str(path.relative_to(root))
         length = len(path.read_text(encoding="utf-8").splitlines())
         if length > args.file_limit:
             long_files.append((relative, length))
+        if path.resolve() not in included:
+            expanded_length = len(expanded_module(path).splitlines())
+            if expanded_length > args.file_limit:
+                long_modules.append((relative, expanded_length))
         for name, start, count in functions(path):
             if count > args.function_limit:
                 long_functions.append((f"{relative}:{start}:{name}", count))
@@ -126,6 +151,7 @@ def main() -> None:
         "file_limit": args.file_limit,
         "function_limit": args.function_limit,
         "files_over_limit": long_files,
+        "modules_over_limit": long_modules,
         "functions_over_limit": long_functions,
     }
     if args.json:
@@ -133,6 +159,9 @@ def main() -> None:
     else:
         print(f"Files over {args.file_limit} lines: {len(long_files)}")
         for name, count in long_files:
+            print(f"  {count:4} {name}")
+        print(f"Modules over {args.file_limit} expanded lines: {len(long_modules)}")
+        for name, count in long_modules:
             print(f"  {count:4} {name}")
         print(f"Functions over {args.function_limit} lines: {len(long_functions)}")
         for name, count in long_functions:

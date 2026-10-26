@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn agent_signature_cannot_resolve_analyst_approval() {
     let analyst = SigningKey::from_bytes(&[11u8; 32]);

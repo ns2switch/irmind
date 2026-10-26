@@ -1,3 +1,5 @@
+use super::*;
+
 impl LocalStore {
     pub fn open(root: &Path) -> Result<Self, AppError> {
         let (evidence_dir, seal_dir, lock_dir, graph_dir) = Self::prepare_directories(root)?;

@@ -1,3 +1,5 @@
+use crate::{ConfigField, ModuleManifest, ModulePort, Tool};
+
 pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: "edr-sentinelone",
     version: "0.1.0",

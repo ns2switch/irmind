@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn detected_injection_cannot_expand_next_read_scope() {
     struct FollowLog(Mutex<usize>);

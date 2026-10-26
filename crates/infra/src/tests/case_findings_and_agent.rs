@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 #[allow(clippy::too_many_lines)]
 fn agent_can_propose_but_only_analyst_can_confirm_evidence_finding() {

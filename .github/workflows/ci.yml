@@ -97,7 +97,7 @@ jobs:
       - if: needs.dco.outputs.docs_only != 'true'
         run: cargo fmt --all -- --check
       - if: needs.dco.outputs.docs_only != 'true'
-        run: python3 scripts/check_included_rustfmt.py
+        run: python3 scripts/check_no_rust_includes.py
       - if: needs.dco.outputs.docs_only != 'true'
         run: cargo fmt --manifest-path fuzz/Cargo.toml -- --check
       - if: needs.dco.outputs.docs_only != 'true'

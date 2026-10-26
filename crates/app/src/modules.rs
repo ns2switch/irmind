@@ -1,14 +1,9 @@
-//! Compile-time modules are owned by the composition root and exposed through application ports.
+mod config;
+mod registry;
 
-use crate::{
-    AppError, CloudAuditPort, EdrPort, Engine, EventParser, InternalIntelPort, LlmPort, SiemPort,
-    ThreatIntelPort, hex, sha256,
-};
-use irmind_domain::Tool;
-use secrecy::SecretString;
-use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+pub use config::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort};
+pub use registry::ModuleRegistry;
 
-include!("modules/config.rs");
-include!("modules/registry.rs");
-include!("modules/tests.rs");
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::wildcard_imports)]
+mod tests;

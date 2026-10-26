@@ -311,4 +311,6 @@ fn collect(value: &Value, entities: &mut Vec<(String, String)>, depth: usize) {
     }
 }
 
-include!("tests.rs");
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::wildcard_imports)]
+mod tests;

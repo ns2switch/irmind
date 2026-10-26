@@ -1,3 +1,9 @@
+use super::SealPreview;
+use crate::{
+    Actor, AppError, CancellationToken, CaseId, CaseMutation, CaseSeal, Engine, hex,
+    seal_challenge, sha256, summarize_usage, verify_case_metadata,
+};
+
 impl Engine<'_> {
     pub fn seal(&self, id: &CaseId) -> Result<(), AppError> {
         let preview = self.prepare_seal(id)?;
@@ -181,32 +187,5 @@ impl Engine<'_> {
         summarize_usage(&entries)?;
         self.verify_operations_unlocked(id, cancel)?;
         Ok(entries.len())
-    }
-
-    fn verify_operations_unlocked(
-        &self,
-        id: &CaseId,
-        cancel: &CancellationToken,
-    ) -> Result<(), AppError> {
-        let operations = self.audit_log.operations(id)?;
-        let mut previous = [0u8; 32];
-        for (index, operation) in operations.iter().enumerate() {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            if operation.case_id != id.as_str()
-                || operation.seq != index as u64 + 1
-                || operation.prev != previous
-                || sha256(&operation.canonical()) != operation.hash
-                || operation.public_key != self.verifier.trusted_public_key(&operation.actor)?
-            {
-                return Err(AppError::InvalidChain(operation.seq));
-            }
-            self.verifier
-                .verify(&operation.public_key, &operation.hash, &operation.sig)
-                .map_err(|_| AppError::InvalidChain(operation.seq))?;
-            previous = operation.hash;
-        }
-        Ok(())
     }
 }

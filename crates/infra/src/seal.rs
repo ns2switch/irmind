@@ -19,5 +19,6 @@ fn default_export_severity() -> String {
     "medium".into()
 }
 
-include!("seal/local.rs");
-include!("seal/export.rs");
+mod export;
+mod local;
+pub use export::{LocalExportVerifier, verify_export, verify_export_expected};

@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 #[allow(clippy::too_many_lines)]
 fn every_port_family_dispatches_signed_approval_through_registry() {

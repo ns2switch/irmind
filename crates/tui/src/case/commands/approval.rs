@@ -1,5 +1,7 @@
+use super::{CaseRuntime, PathBuf, Result, parse_approval_args};
+
 impl CaseRuntime<'_, '_, '_> {
-    fn approval_command(&mut self, prompt: &str) -> Result<bool> {
+    pub(super) fn approval_command(&mut self, prompt: &str) -> Result<bool> {
         if let Some(request_id) = prompt.strip_prefix("/approve ") {
             self.start_approval(request_id.to_owned());
         } else if let Some(rest) = prompt.strip_prefix("/deny ") {
@@ -42,7 +44,7 @@ impl CaseRuntime<'_, '_, '_> {
         Ok(())
     }
 
-    fn evidence_command(&mut self, prompt: &str) -> bool {
+    pub(super) fn evidence_command(&mut self, prompt: &str) -> bool {
         if let Some(rest) = prompt.strip_prefix("/evidence-save ") {
             if let Some((hash, path)) = rest.split_once(' ') {
                 let hash = hash.to_owned();

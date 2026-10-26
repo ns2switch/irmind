@@ -1,8 +1,13 @@
+use super::{
+    Actor, AppError, OptionalExtension, SignedEntry, SignedOperation, Transaction, params, sha256,
+    storage, storage_reason,
+};
+
 fn decode_fixed<const N: usize>(value: Vec<u8>) -> Result<[u8; N], rusqlite::Error> {
     value.try_into().map_err(|_| rusqlite::Error::InvalidQuery)
 }
 
-pub(crate) fn map_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<SignedEntry> {
+pub(super) fn map_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<SignedEntry> {
     let actor: String = row.get(3)?;
     Ok(SignedEntry {
         case_id: row.get(0)?,
@@ -21,7 +26,7 @@ pub(crate) fn map_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<SignedEntry
     })
 }
 
-fn map_operation(row: &rusqlite::Row<'_>) -> rusqlite::Result<SignedOperation> {
+pub(super) fn map_operation(row: &rusqlite::Row<'_>) -> rusqlite::Result<SignedOperation> {
     let actor: String = row.get(3)?;
     Ok(SignedOperation {
         case_id: row.get(0)?,
@@ -36,7 +41,7 @@ fn map_operation(row: &rusqlite::Row<'_>) -> rusqlite::Result<SignedOperation> {
     })
 }
 
-fn append_entry_tx(tx: &Transaction<'_>, entry: &SignedEntry) -> Result<(), AppError> {
+pub(super) fn append_entry_tx(tx: &Transaction<'_>, entry: &SignedEntry) -> Result<(), AppError> {
     let sealed: i64 = tx
         .query_row(
             "SELECT sealed FROM cases WHERE id=?1",

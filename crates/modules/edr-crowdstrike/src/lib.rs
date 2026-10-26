@@ -375,4 +375,6 @@ fn within(value: Option<&str>, from: &str, to: &str) -> bool {
     value >= from && value <= to
 }
 
-include!("tests.rs");
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::wildcard_imports)]
+mod tests;

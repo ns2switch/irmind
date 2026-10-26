@@ -19,7 +19,9 @@ pub struct SentinelOne {
     site_id: String,
 }
 
-include!("manifest.rs");
+mod manifest;
+pub use manifest::MANIFEST;
+
 impl Module for SentinelOne {
     fn manifest(&self) -> &'static ModuleManifest {
         &MANIFEST
@@ -323,4 +325,10 @@ impl SentinelOne {
     }
 }
 
-include!("helpers.rs");
+mod helpers;
+use helpers::{
+    data_array, digits, encode, safe_host, safe_id, select_agent, validate_threats, window,
+};
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::wildcard_imports)]
+mod tests;

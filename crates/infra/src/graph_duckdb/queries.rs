@@ -3,5 +3,5 @@ use super::{
     VecDeque, params, short, storage,
 };
 
-include!("queries/entity.rs");
-include!("queries/search.rs");
+mod entity;
+mod search;

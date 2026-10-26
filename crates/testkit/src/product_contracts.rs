@@ -1,3 +1,11 @@
+use crate::contract_support::{contract_call, contract_runtime};
+use crate::{
+    AppError, BTreeMap, CancellationToken, Case, CaseId, CloudAuditPort, CompletionMessage,
+    CompletionRequest, Decision, ExecutionMode, FROM, InternalIntelPort, LlmPort, MessageRole,
+    MockServer, ProposedCall, RecordedRequest, Severity, SiemPort, TO, ThreatIntelPort, Tool,
+    collect_model_stream, evaluate,
+};
+
 pub fn run_siem_contract(port: &dyn SiemPort) -> Result<(), String> {
     if port.source_id().is_empty() || port.dialect().is_empty() {
         return Err("SIEM source or dialect is empty".into());

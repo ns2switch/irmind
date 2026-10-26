@@ -1,3 +1,5 @@
+use super::*;
+
 impl LocalStore {
     pub(crate) fn reconcile_pending_seals(&self) -> Result<(), AppError> {
         let ids = {
@@ -168,7 +170,7 @@ impl LocalStore {
         result
     }
 
-    fn export_case_cancelable(
+    pub(super) fn export_case_cancelable(
         &self,
         id: &CaseId,
         path: &Path,

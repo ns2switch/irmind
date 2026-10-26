@@ -1,4 +1,6 @@
-fn derive(
+use crate::*;
+
+pub(super) fn derive(
     passphrase: &SecretString,
     salt: &[u8; 16],
     memory: u32,
@@ -119,7 +121,7 @@ fn encrypt(state: &VaultState) -> Result<Zeroizing<Vec<u8>>, AppError> {
     Ok(output)
 }
 
-fn decrypt(bytes: &[u8], passphrase: &SecretString) -> Result<VaultState, AppError> {
+pub(super) fn decrypt(bytes: &[u8], passphrase: &SecretString) -> Result<VaultState, AppError> {
     if bytes.len() < HEADER_LEN + 16 || bytes.len() > MAX_FILE_BYTES || &bytes[..4] != MAGIC {
         return Err(failure());
     }
@@ -161,7 +163,7 @@ fn decrypt(bytes: &[u8], passphrase: &SecretString) -> Result<VaultState, AppErr
     })
 }
 
-fn persist(vault: &Vault, state: &VaultState) -> Result<(), AppError> {
+pub(super) fn persist(vault: &Vault, state: &VaultState) -> Result<(), AppError> {
     let bytes = encrypt(state)?;
     let mut suffix = [0u8; 8];
     rand::rngs::OsRng.fill_bytes(&mut suffix);

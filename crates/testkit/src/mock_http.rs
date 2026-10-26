@@ -1,3 +1,59 @@
+use crate::contract_support::contract_runtime;
+use crate::*;
+
+pub struct MockResponse {
+    pub status: u16,
+    pub body: Vec<u8>,
+    pub location: Option<&'static str>,
+    pub delay: Duration,
+}
+
+impl MockResponse {
+    #[must_use]
+    pub fn json(body: &str) -> Self {
+        Self {
+            status: 200,
+            body: body.as_bytes().to_vec(),
+            location: None,
+            delay: Duration::ZERO,
+        }
+    }
+    #[must_use]
+    pub fn status(status: u16) -> Self {
+        Self {
+            status,
+            body: b"{}".to_vec(),
+            location: None,
+            delay: Duration::ZERO,
+        }
+    }
+    #[must_use]
+    pub fn redirect() -> Self {
+        Self {
+            status: 302,
+            body: Vec::new(),
+            location: Some("/unexpected-redirect"),
+            delay: Duration::ZERO,
+        }
+    }
+
+    #[must_use]
+    pub fn delayed(body: &str, delay: Duration) -> Self {
+        Self {
+            delay,
+            ..Self::json(body)
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RecordedRequest {
+    pub method: String,
+    pub target: String,
+    pub headers: BTreeMap<String, String>,
+    pub body: Vec<u8>,
+}
+
 pub struct MockServer {
     origin: String,
     task: JoinHandle<Result<Vec<RecordedRequest>, String>>,
@@ -91,6 +147,10 @@ fn serve(listener: &TcpListener, script: &[MockResponse]) -> Result<Vec<Recorded
                 if requests.len() >= script.len() {
                     return Err("EDR followed a redirect or made an unexpected request".into());
                 }
+                // Accepted sockets can inherit nonblocking mode on macOS and Windows.
+                stream
+                    .set_nonblocking(false)
+                    .map_err(|error| error.to_string())?;
                 stream
                     .set_read_timeout(Some(Duration::from_secs(2)))
                     .map_err(|error| error.to_string())?;
@@ -185,4 +245,29 @@ fn write_response(stream: &mut TcpStream, response: &MockResponse) -> Result<(),
     stream
         .write_all(&response.body)
         .map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepted_socket_waits_for_request_bytes() {
+        let server = MockServer::start(vec![MockResponse::json("{}")]).unwrap();
+        let address = server
+            .origin()
+            .strip_prefix("http://")
+            .unwrap()
+            .trim_end_matches('/');
+        let mut client = TcpStream::connect(address).unwrap();
+        thread::sleep(Duration::from_millis(30));
+        client
+            .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .unwrap();
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 200"));
+        assert_eq!(server.finish().unwrap().len(), 1);
+    }
 }

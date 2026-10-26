@@ -1,3 +1,12 @@
+use super::config::{Module, ModuleConfig, ModuleManifest, ModulePort};
+use crate::{
+    AppError, CloudAuditPort, EdrPort, Engine, EventParser, InternalIntelPort, LlmPort, SiemPort,
+    ThreatIntelPort, hex, sha256,
+};
+use irmind_domain::Tool;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
+
 #[derive(Default)]
 pub struct ModuleRegistry {
     manifests: BTreeMap<&'static str, &'static ModuleManifest>,
@@ -251,7 +260,7 @@ impl ModuleRegistry {
         hex(&sha256(&data))
     }
 
-    fn counts(&self) -> BTreeMap<ModulePort, usize> {
+    pub(super) fn counts(&self) -> BTreeMap<ModulePort, usize> {
         BTreeMap::from([
             (ModulePort::Llm, self.llms.len()),
             (ModulePort::Siem, self.siems.len()),

@@ -1,3 +1,10 @@
+use super::{AnalystVerifierAdapter, ApprovalEvent, ApprovalRequest, PendingEvent};
+use crate::{
+    Actor, AnalystApprovalVerifier, AppError, AuthorizedCall, BTreeMap, CancellationToken, Case,
+    CaseId, Decision, Engine, ExecutionMode, PendingApproval, ProposedCall, SignedEntry, evaluate,
+    hex, sha256,
+};
+
 impl Engine<'_> {
     pub fn edit_approval(
         &self,

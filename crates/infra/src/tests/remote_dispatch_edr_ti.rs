@@ -1,3 +1,5 @@
+use super::*;
+
 #[test]
 fn scoped_edr_read_is_audited_indexed_and_redacted() {
     let root = tempfile::tempdir().unwrap();
