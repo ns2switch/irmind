@@ -56,17 +56,22 @@ impl Anthropic {
                 .bytes()
                 .all(|byte| byte.is_ascii_alphanumeric() || b"._:/-".contains(&byte))
         {
-            return Err(AppError::Model("invalid Anthropic model ID".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::InvalidAnthropicModelID,
+            )));
         }
         if key.trim().is_empty() {
-            return Err(AppError::Model("Anthropic API key is empty".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::AnthropicAPIKeyIsEmpty,
+            )));
         }
-        let async_client = reqwest::Client::builder()
-            .use_rustls_tls()
-            .timeout(std::time::Duration::from_secs(90))
-            .redirect(reqwest::redirect::Policy::none())
+        let async_client = irmind_http::client_builder(std::time::Duration::from_secs(90), false)
             .build()
-            .map_err(|_| AppError::Model("Anthropic HTTP client unavailable".into()))?;
+            .map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                    irmind_app::AdapterModelError::AnthropicHTTPClientUnavailable,
+                ))
+            })?;
         Ok(Self {
             async_client,
             key: SecretString::from(key),
@@ -76,7 +81,9 @@ impl Anthropic {
 
     fn body(&self, request: &CompletionRequest) -> Result<serde_json::Value, AppError> {
         if request.max_output_tokens == 0 || request.remaining_case_tokens == 0 {
-            return Err(AppError::Model("model token budget is empty".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::ModelTokenBudgetIsEmpty,
+            )));
         }
         let tools = request
             .tools
@@ -154,7 +161,7 @@ impl LlmPort for Anthropic {
                 .bearer_auth(self.key.expose_secret())
                 .header("anthropic-version", API_VERSION)
                 .json(&body)
-                .send() => result.map_err(|_| AppError::Model("Anthropic request failed".into()))?,
+                .send() => result.map_err(|_| AppError::Fixed(irmind_app::FixedAppError::AdapterModel(irmind_app::AdapterModelError::AnthropicRequestFailed)))?,
         };
         if !response.status().is_success() {
             return Err(AppError::Model(format!(
@@ -170,11 +177,11 @@ impl LlmPort for Anthropic {
                 let chunk = tokio::select! {
                     biased;
                     () = cancel.cancelled() => Err(AppError::Cancelled),
-                    result = response.chunk() => result.map_err(|_| AppError::Model("Anthropic response failed".into())),
+                    result = response.chunk() => result.map_err(|_| AppError::Fixed(irmind_app::FixedAppError::AdapterModel(irmind_app::AdapterModelError::AnthropicResponseFailed))),
                 }?;
                 let Some(chunk) = chunk else { break };
                 if raw.len().saturating_add(chunk.len()) > 2_000_000 {
-                    Err(AppError::Model("provider stream exceeds 2 MB".into()))?;
+                    Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(irmind_app::AdapterModelError::ProviderStreamExceeds2MB)))?;
                 }
                 raw.extend_from_slice(&chunk);
                 yield ModelEvent::Progress(chunk.len());
@@ -225,6 +232,7 @@ mod tests {
         );
         registry.register(Box::new(adapter), &config).unwrap();
         irmind_testkit::run_llm_contract(registry.llm(MODULE_ID).unwrap()).unwrap();
+        irmind_testkit::run_http_safety_contract().unwrap();
         assert!(
             registry
                 .llm(MODULE_ID)

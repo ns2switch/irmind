@@ -217,6 +217,10 @@ pub(crate) fn verify_private(path: &Path) -> io::Result<()> {
         return Err(io::Error::from_raw_os_error(status as i32));
     }
     let _descriptor = LocalAllocation(descriptor);
+    verify_acl(acl, descriptor, &sid, metadata.is_dir())
+}
+
+fn verify_acl(acl: *mut ACL, descriptor: *mut c_void, sid: &[u8], is_dir: bool) -> io::Result<()> {
     if descriptor.is_null() || acl.is_null() {
         return Err(denied("private file has no DACL"));
     }
@@ -245,7 +249,7 @@ pub(crate) fn verify_private(path: &Path) -> io::Result<()> {
     {
         return Err(denied("Windows DACL ACE has an invalid type or size"));
     }
-    let expected_flags = if metadata.is_dir() {
+    let expected_flags = if is_dir {
         (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE) as u8
     } else {
         0

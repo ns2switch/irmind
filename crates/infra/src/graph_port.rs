@@ -67,7 +67,9 @@ impl EvidenceGraph for LocalStore {
     fn text_search(&self, id: &CaseId, query: &str, limit: usize) -> Result<String, AppError> {
         self.get_case(id)?;
         if query.trim().is_empty() || query.len() > 128 || !(1..=20).contains(&limit) {
-            return Err(AppError::Policy("invalid text search arguments".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidTextSearchArguments,
+            )));
         }
         self.graph.text_search(id, query, limit)
     }
@@ -75,13 +77,15 @@ impl EvidenceGraph for LocalStore {
     fn raw_record(&self, id: &CaseId, hash: &str, index: usize) -> Result<String, AppError> {
         self.get_case(id)?;
         if hash.len() != 64 || !hash.chars().all(|c| c.is_ascii_hexdigit()) || index >= 100_000 {
-            return Err(AppError::Policy("invalid raw record pointer".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidRawRecordPointer,
+            )));
         }
         let hash = hash.to_ascii_lowercase();
         if !self.graph.has_record(id, &hash, index)? {
-            return Err(AppError::Policy(
-                "record pointer is not indexed in this case".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::RecordPointerIsNotIndexedInThisCase,
+            )));
         }
         let bytes = self.get_evidence(id, &hash)?;
         let parsed: Result<Value, _> = serde_json::from_slice(&bytes);

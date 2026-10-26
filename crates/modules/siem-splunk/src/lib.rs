@@ -69,8 +69,11 @@ impl Splunk {
     pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
         let setting = |name| config.required_value(name).map(str::to_owned);
         let base = setting("IRMIND_SPLUNK_URL")?;
-        let parsed = reqwest::Url::parse(&base)
-            .map_err(|_| AppError::Policy("invalid Splunk URL".into()))?;
+        let parsed = reqwest::Url::parse(&base).map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidSplunkURL,
+            ))
+        })?;
         if parsed.scheme() != "https"
             || parsed.host_str().is_none()
             || !parsed.username().is_empty()
@@ -79,34 +82,41 @@ impl Splunk {
             || parsed.fragment().is_some()
             || parsed.path() != "/"
         {
-            return Err(AppError::Policy(
-                "Splunk URL must be an HTTPS origin".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::SplunkURLMustBeAnHTTPSOrigin,
+            )));
         }
         let endpoint = parsed
             .join("/services/search/v2/jobs/export")
-            .map_err(|_| AppError::Policy("invalid Splunk endpoint".into()))?;
+            .map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                    irmind_app::AdapterPolicyError::InvalidSplunkEndpoint,
+                ))
+            })?;
         let source_id = setting("IRMIND_SPLUNK_SOURCE_ID")?;
         let index = setting("IRMIND_SPLUNK_INDEX")?;
         let account_field = setting("IRMIND_SPLUNK_ACCOUNT_FIELD")?;
         if !safe_identifier(&source_id) || !safe_identifier(&index) || !safe_field(&account_field) {
-            return Err(AppError::Policy(
-                "invalid Splunk source, index or account field".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidSplunkSourceIndexOrAccountField,
+            )));
         }
         let token = config
             .required_secret("IRMIND_SPLUNK_TOKEN")?
             .expose_secret()
             .to_owned();
         if token.trim().is_empty() {
-            return Err(AppError::Policy("empty Splunk token".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::EmptySplunkToken,
+            )));
         }
-        let async_client = reqwest::Client::builder()
-            .use_rustls_tls()
-            .timeout(std::time::Duration::from_secs(45))
-            .redirect(reqwest::redirect::Policy::none())
+        let async_client = irmind_http::client_builder(std::time::Duration::from_secs(45), false)
             .build()
-            .map_err(|_| AppError::Storage("Splunk HTTP client unavailable".into()))?;
+            .map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                    irmind_app::AdapterStorageError::SplunkHTTPClientUnavailable,
+                ))
+            })?;
         Ok(Self {
             async_client,
             endpoint,
@@ -119,7 +129,9 @@ impl Splunk {
 
     fn spl(&self, account: &str, term: &str) -> Result<String, AppError> {
         if !safe_identifier(account) || classify_spl_query(term) != SplQueryClass::SafeLiteral {
-            return Err(AppError::Policy("invalid Splunk search term".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidSplunkSearchTerm,
+            )));
         }
         Ok(format!(
             "search index={} {}=\"{}\" \"{}\" | head 20",
@@ -144,33 +156,41 @@ impl SiemPort for Splunk {
         cancel: &CancellationToken,
     ) -> Result<Vec<u8>, AppError> {
         if call.tool() != &Tool::SiemSearch || call.arg("source") != Some(self.source_id()) {
-            return Err(AppError::Policy("wrong Splunk source or tool".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::WrongSplunkSourceOrTool,
+            )));
         }
         let arg = |name| {
             call.arg(name)
                 .ok_or_else(|| AppError::Policy(format!("missing {name}")))
         };
         let account = arg("account")?;
-        let from = DateTime::parse_from_rfc3339(arg("from")?)
-            .map_err(|_| AppError::Policy("invalid Splunk start time".into()))?;
-        let to = DateTime::parse_from_rfc3339(arg("to")?)
-            .map_err(|_| AppError::Policy("invalid Splunk end time".into()))?;
+        let from = DateTime::parse_from_rfc3339(arg("from")?).map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidSplunkStartTime,
+            ))
+        })?;
+        let to = DateTime::parse_from_rfc3339(arg("to")?).map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidSplunkEndTime,
+            ))
+        })?;
         if !(1..=86_400).contains(&to.signed_duration_since(from).num_seconds()) {
-            return Err(AppError::Policy(
-                "Splunk query window must be at most 24 hours".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::SplunkQueryWindowMustBeAtMost24Hours,
+            )));
         }
         let spl = self.spl(account, arg("query")?)?;
         let earliest = from.timestamp().to_string();
         let latest = to.timestamp().to_string();
-        let mut response = tokio::select! {
+        let response = tokio::select! {
             biased;
             () = cancel.cancelled() => return Err(AppError::Cancelled),
             result = self.async_client.post(self.endpoint.clone())
                 .bearer_auth(self.token.expose_secret())
                 .form(&[("search", spl.as_str()),("earliest_time", earliest.as_str()),
                         ("latest_time", latest.as_str()),("output_mode", "json"),("max_time", "30")])
-                .send() => result.map_err(|_| AppError::Storage("Splunk request failed".into()))?,
+                .send() => result.map_err(|_| AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(irmind_app::AdapterStorageError::SplunkRequestFailed)))?,
         };
         if !response.status().is_success() {
             return Err(AppError::Storage(format!(
@@ -178,21 +198,21 @@ impl SiemPort for Splunk {
                 response.status()
             )));
         }
-        let mut raw = Vec::new();
-        loop {
-            let chunk = tokio::select! {
-                biased;
-                () = cancel.cancelled() => return Err(AppError::Cancelled),
-                result = response.chunk() => result.map_err(|_| AppError::Storage("Splunk response failed".into()))?,
-            };
-            let Some(chunk) = chunk else {
-                break;
-            };
-            if raw.len().saturating_add(chunk.len()) > 5_000_000 {
-                return Err(AppError::Policy("Splunk response exceeds 5 MB".into()));
-            }
-            raw.extend_from_slice(&chunk);
-        }
+        let raw = irmind_http::read_limited(response, 5_000_000, cancel)
+            .await
+            .map_err(|error| match error {
+                irmind_http::BodyError::Cancelled => AppError::Cancelled,
+                irmind_http::BodyError::Transport => {
+                    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                        irmind_app::AdapterStorageError::SplunkResponseFailed,
+                    ))
+                }
+                irmind_http::BodyError::TooLarge => {
+                    AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                        irmind_app::AdapterPolicyError::SplunkResponseExceeds5MB,
+                    ))
+                }
+            })?;
         Ok(raw)
     }
 }
@@ -227,6 +247,7 @@ mod tests {
         );
         let port = Splunk::from_config(&config).unwrap();
         irmind_testkit::run_siem_contract(&port).unwrap();
+        irmind_testkit::run_http_safety_contract().unwrap();
     }
 
     #[test]

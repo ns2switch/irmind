@@ -1,7 +1,10 @@
+mod local;
+mod remote;
+
 use crate::{
-    AppError, AuthorizedCall, BTreeMap, CancellationToken, Case, CaseId, Decision, Engine,
-    FindingKind, ProposedCall, Provenance, Screened, SourceKind, Tainted, Tool, evaluate_tainted,
-    hex, remote_tool_error, sha256,
+    AppError, AuditEventKind, AuthorizedCall, BTreeMap, CancellationToken, Case, CaseId, Decision,
+    Engine, PendingApproval, ProposedCall, Provenance, Screened, SourceKind, Tainted, Tool,
+    evaluate_tainted, hex, remote_tool_error, sha256,
 };
 
 impl Engine<'_> {
@@ -51,55 +54,10 @@ impl Engine<'_> {
                 Ok(format!("denied: {reason}"))
             }
             Decision::NeedsApproval(pending) => {
-                if pending.proposal().tool == Tool::SiemSearch
-                    && !self
-                        .siem_available(pending.proposal().args.get("source").map(String::as_str))
-                {
-                    self.audit_local(id, "policy", "Denied", "SIEM source unavailable", None)
+                if let Some(reason) = self.pending_unavailable_reason(&pending) {
+                    self.audit_local(id, "policy", "Denied", reason, None)
                         .await?;
-                    return Ok("denied: SIEM source unavailable".into());
-                }
-                if matches!(
-                    pending.proposal().tool,
-                    Tool::CloudAuditEvents | Tool::CloudIdentity
-                ) && !self
-                    .cloud_available(pending.proposal().args.get("source").map(String::as_str))
-                {
-                    self.audit_local(
-                        id,
-                        "policy",
-                        "Denied",
-                        "cloud audit source unavailable",
-                        None,
-                    )
-                    .await?;
-                    return Ok("denied: cloud audit source unavailable".into());
-                }
-                if matches!(
-                    pending.proposal().tool,
-                    Tool::EdrHostInfo | Tool::EdrProcessTree | Tool::EdrDetections
-                ) && !self.edr_available(
-                    pending.proposal().args.get("source").map(String::as_str),
-                    &pending.proposal().tool,
-                ) {
-                    self.audit_local(id, "policy", "Denied", "EDR source unavailable", None)
-                        .await?;
-                    return Ok("denied: EDR source unavailable".into());
-                }
-                if pending.proposal().tool == Tool::ThreatIntelInternal
-                    && !self.internal_intel_available(
-                        pending.proposal().args.get("source").map(String::as_str),
-                    )
-                {
-                    self.audit_local(
-                        id,
-                        "policy",
-                        "Denied",
-                        "internal intelligence source unavailable",
-                        None,
-                    )
-                    .await?;
-                    return Ok("denied: internal intelligence source unavailable".into());
+                    return Ok(format!("denied: {reason}"));
                 }
                 let id_owned = id.clone();
                 let mode = self.mode;
@@ -123,25 +81,33 @@ impl Engine<'_> {
     }
 
     pub(crate) fn unavailable_reason(&self, call: &AuthorizedCall) -> Option<&'static str> {
-        match call.tool() {
-            Tool::SiemSearch if !self.siem_available(call.arg("source")) => {
-                Some("SIEM source unavailable")
-            }
-            Tool::CloudAuditEvents | Tool::CloudIdentity
-                if !self.cloud_available(call.arg("source")) =>
-            {
+        self.source_unavailable_reason(call.tool(), call.arg("source"))
+            .or_else(|| {
+                (call.tool() == &Tool::ThreatIntelExternal && self.threat_intel.is_none())
+                    .then_some("external intelligence module unavailable")
+            })
+    }
+
+    fn pending_unavailable_reason(&self, pending: &PendingApproval) -> Option<&'static str> {
+        self.source_unavailable_reason(
+            &pending.proposal().tool,
+            pending.proposal().args.get("source").map(String::as_str),
+        )
+    }
+
+    fn source_unavailable_reason(&self, tool: &Tool, source: Option<&str>) -> Option<&'static str> {
+        match tool {
+            Tool::SiemSearch if !self.siem_available(source) => Some("SIEM source unavailable"),
+            Tool::CloudAuditEvents | Tool::CloudIdentity if !self.cloud_available(source) => {
                 Some("cloud audit source unavailable")
             }
             Tool::EdrHostInfo | Tool::EdrProcessTree | Tool::EdrDetections
-                if !self.edr_available(call.arg("source"), call.tool()) =>
+                if !self.edr_available(source, tool) =>
             {
                 Some("EDR source unavailable")
             }
-            Tool::ThreatIntelInternal if !self.internal_intel_available(call.arg("source")) => {
+            Tool::ThreatIntelInternal if !self.internal_intel_available(source) => {
                 Some("internal intelligence source unavailable")
-            }
-            Tool::ThreatIntelExternal if self.threat_intel.is_none() => {
-                Some("external intelligence module unavailable")
             }
             _ => None,
         }
@@ -149,135 +115,14 @@ impl Engine<'_> {
 
     pub(crate) fn turn_has_detections(&self, id: &CaseId) -> Result<bool, AppError> {
         for entry in self.audit_log.entries(id)?.iter().rev() {
-            if entry.kind == "InjectionDetected" {
+            if entry.kind == irmind_domain::AuditEventKind::InjectionDetected {
                 return Ok(true);
             }
-            if entry.kind == "Prompt" {
+            if entry.kind == irmind_domain::AuditEventKind::Prompt {
                 break;
             }
         }
         Ok(false)
-    }
-
-    pub(crate) fn execute_local_tool(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
-        Ok(match call.tool() {
-            Tool::EvidenceSearch => {
-                let query = call
-                    .arg("query")
-                    .ok_or_else(|| AppError::Policy("missing query".into()))?;
-                let limit = call.arg("limit").and_then(|v| v.parse().ok()).unwrap_or(10);
-                self.evidence_store
-                    .search_evidence(call.case_id(), query, limit)?
-                    .join("\n")
-                    .into_bytes()
-            }
-            Tool::EvidenceRead => {
-                let hash = call
-                    .arg("hash")
-                    .ok_or_else(|| AppError::Policy("missing hash".into()))?;
-                let bytes = self.evidence_store.get_evidence(call.case_id(), hash)?;
-                let limit = call
-                    .arg("limit")
-                    .and_then(|v| v.parse::<usize>().ok())
-                    .unwrap_or(10);
-                let max = limit * 500;
-                bytes.into_iter().take(max).collect()
-            }
-            Tool::GraphSummary => self.graph.graph_summary(call.case_id())?.into_bytes(),
-            Tool::EntityLookup => self
-                .graph
-                .entity_lookup(
-                    call.case_id(),
-                    call.arg("kind")
-                        .ok_or_else(|| AppError::Policy("missing kind".into()))?,
-                    call.arg("value")
-                        .ok_or_else(|| AppError::Policy("missing value".into()))?,
-                )?
-                .into_bytes(),
-            Tool::Neighbors => self
-                .graph
-                .neighbors(
-                    call.case_id(),
-                    call.arg("kind")
-                        .ok_or_else(|| AppError::Policy("missing kind".into()))?,
-                    call.arg("value")
-                        .ok_or_else(|| AppError::Policy("missing value".into()))?,
-                    call.arg("limit")
-                        .and_then(|v| v.parse::<usize>().ok())
-                        .unwrap_or(10),
-                )?
-                .into_bytes(),
-            Tool::EntityTimeline => self
-                .graph
-                .entity_timeline(
-                    call.case_id(),
-                    call.arg("kind")
-                        .ok_or_else(|| AppError::Policy("missing kind".into()))?,
-                    call.arg("value")
-                        .ok_or_else(|| AppError::Policy("missing value".into()))?,
-                    call.arg("limit")
-                        .and_then(|v| v.parse::<usize>().ok())
-                        .unwrap_or(10),
-                )?
-                .into_bytes(),
-            Tool::GraphPath => self
-                .graph
-                .graph_path(
-                    call.case_id(),
-                    (
-                        call.arg("from_kind")
-                            .ok_or_else(|| AppError::Policy("missing from_kind".into()))?,
-                        call.arg("from_value")
-                            .ok_or_else(|| AppError::Policy("missing from_value".into()))?,
-                    ),
-                    (
-                        call.arg("to_kind")
-                            .ok_or_else(|| AppError::Policy("missing to_kind".into()))?,
-                        call.arg("to_value")
-                            .ok_or_else(|| AppError::Policy("missing to_value".into()))?,
-                    ),
-                )?
-                .into_bytes(),
-            Tool::TextSearch => self
-                .graph
-                .text_search(
-                    call.case_id(),
-                    call.arg("query")
-                        .ok_or_else(|| AppError::Policy("missing query".into()))?,
-                    call.arg("limit")
-                        .and_then(|value| value.parse().ok())
-                        .unwrap_or(10),
-                )?
-                .into_bytes(),
-            Tool::RawRecords => self
-                .graph
-                .raw_record(
-                    call.case_id(),
-                    call.arg("hash")
-                        .ok_or_else(|| AppError::Policy("missing hash".into()))?,
-                    call.arg("index")
-                        .and_then(|value| value.parse().ok())
-                        .ok_or_else(|| AppError::Policy("missing index".into()))?,
-                )?
-                .into_bytes(),
-            Tool::CaseAddFinding => {
-                let kind = FindingKind::parse(
-                    call.arg("kind")
-                        .ok_or_else(|| AppError::Policy("missing finding kind".into()))?,
-                )?;
-                self.propose_finding_unlocked(
-                    call.case_id(),
-                    kind,
-                    call.arg("value")
-                        .ok_or_else(|| AppError::Policy("missing finding value".into()))?,
-                    call.arg("evidence_hash")
-                        .ok_or_else(|| AppError::Policy("missing finding evidence".into()))?,
-                    "model",
-                )?
-                .into_bytes()
-            }
-            _ => return Err(AppError::Policy("invalid local tool".into())),
-        })
     }
 
     pub(crate) async fn execute_authorized(
@@ -307,35 +152,7 @@ impl Engine<'_> {
                 | Tool::RawRecords
                 | Tool::CaseAddFinding
         );
-        let raw = if local_tool {
-            if cancel.is_cancelled() {
-                Err(AppError::Cancelled)
-            } else {
-                let call = call.clone();
-                self.blocking_local(move |local| local.execute_local_tool(&call))
-                    .await
-            }
-        } else {
-            tokio::select! {
-                biased;
-                () = cancel.cancelled() => Err(AppError::Cancelled),
-                result = async {
-                    Ok(match call.tool() {
-                    Tool::SiemSearch => self.dispatch_siem(call, cancel).await?,
-                    Tool::CloudAuditEvents | Tool::CloudIdentity => self.dispatch_cloud(call, cancel).await?,
-                    Tool::EdrHostInfo | Tool::EdrProcessTree | Tool::EdrDetections => {
-                        self.dispatch_edr(call, cancel).await?
-                    }
-                    Tool::ThreatIntelInternal => self.dispatch_internal_intel(call, cancel).await?,
-                    Tool::ThreatIntelExternal => self
-                        .threat_intel
-                        .ok_or_else(|| AppError::Policy("external intel unavailable".into()))?
-                        .execute(call, cancel).await?,
-                    _ => return Err(AppError::Policy("invalid remote tool".into())),
-                    })
-                } => result,
-            }
-        };
+        let raw = self.run_authorized_tool(call, local_tool, cancel).await;
         let raw = match raw {
             Ok(raw) => raw,
             Err(AppError::Cancelled) => {
@@ -361,8 +178,20 @@ impl Engine<'_> {
         if raw.len() > 5_000_000 {
             self.audit_local(id, "system", "ToolError", "tool result exceeds 5 MB", None)
                 .await?;
-            return Err(AppError::Policy("tool result exceeds 5 MB".into()));
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyToolResultExceeds5MB,
+            ));
         }
+        self.persist_tool_result(id, call, raw, cancel).await
+    }
+
+    async fn persist_tool_result(
+        &self,
+        id: &CaseId,
+        call: &AuthorizedCall,
+        raw: Vec<u8>,
+        cancel: &CancellationToken,
+    ) -> Result<(String, String), AppError> {
         let id = id.clone();
         let call_owned = call.clone();
         let cancel_owned = cancel.clone();
@@ -393,6 +222,43 @@ impl Engine<'_> {
             .await?;
         }
         stored
+    }
+
+    async fn run_authorized_tool(
+        &self,
+        call: &AuthorizedCall,
+        local_tool: bool,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
+        if local_tool {
+            if cancel.is_cancelled() {
+                Err(AppError::Cancelled)
+            } else {
+                let call = call.clone();
+                self.blocking_local(move |local| local.execute_local_tool(&call))
+                    .await
+            }
+        } else {
+            tokio::select! {
+                biased;
+                () = cancel.cancelled() => Err(AppError::Cancelled),
+                result = async {
+                    Ok(match call.tool() {
+                    Tool::SiemSearch => self.dispatch_siem(call, cancel).await?,
+                    Tool::CloudAuditEvents | Tool::CloudIdentity => self.dispatch_cloud(call, cancel).await?,
+                    Tool::EdrHostInfo | Tool::EdrProcessTree | Tool::EdrDetections => {
+                        self.dispatch_edr(call, cancel).await?
+                    }
+                    Tool::ThreatIntelInternal => self.dispatch_internal_intel(call, cancel).await?,
+                    Tool::ThreatIntelExternal => self
+                        .threat_intel
+                        .ok_or(AppError::Fixed(crate::FixedAppError::PolicyExternalIntelUnavailable))?
+                        .execute(call, cancel).await?,
+                    _ => return Err(AppError::Fixed(crate::FixedAppError::PolicyInvalidRemoteTool)),
+                    })
+                } => result,
+            }
+        }
     }
 
     pub(crate) fn screen_and_audit(
@@ -463,99 +329,12 @@ impl Engine<'_> {
             .audit_log
             .entries(id)?
             .iter()
-            .filter(|entry| matches!(entry.kind.as_str(), "Allowed" | "ToolDispatch"))
+            .filter(|entry| {
+                matches!(
+                    entry.kind,
+                    AuditEventKind::Allowed | AuditEventKind::ToolDispatch
+                )
+            })
             .count())
-    }
-
-    pub(crate) fn siem_available(&self, source: Option<&str>) -> bool {
-        source.is_some_and(|source| self.siems.iter().any(|port| port.source_id() == source))
-    }
-
-    pub(crate) async fn dispatch_siem(
-        &self,
-        call: &AuthorizedCall,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<u8>, AppError> {
-        let source = call
-            .arg("source")
-            .ok_or_else(|| AppError::Policy("missing SIEM source".into()))?;
-        self.siems
-            .iter()
-            .find(|port| port.source_id() == source)
-            .ok_or_else(|| AppError::Policy("SIEM source unavailable".into()))?
-            .execute(call, cancel)
-            .await
-    }
-
-    pub(crate) fn cloud_available(&self, source: Option<&str>) -> bool {
-        source.is_some_and(|source| {
-            self.cloud_audits
-                .iter()
-                .any(|port| port.source_id() == source)
-        })
-    }
-
-    pub(crate) async fn dispatch_cloud(
-        &self,
-        call: &AuthorizedCall,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<u8>, AppError> {
-        let source = call
-            .arg("source")
-            .ok_or_else(|| AppError::Policy("missing cloud audit source".into()))?;
-        self.cloud_audits
-            .iter()
-            .find(|port| port.source_id() == source)
-            .ok_or_else(|| AppError::Policy("cloud audit source unavailable".into()))?
-            .execute(call, cancel)
-            .await
-    }
-
-    pub(crate) fn internal_intel_available(&self, source: Option<&str>) -> bool {
-        source.is_some_and(|source| {
-            self.internal_intel
-                .iter()
-                .any(|port| port.source_id() == source)
-        })
-    }
-
-    pub(crate) fn edr_available(&self, source: Option<&str>, tool: &Tool) -> bool {
-        source.is_some_and(|source| {
-            self.edrs
-                .iter()
-                .any(|port| port.source_id() == source && port.supports(tool))
-        })
-    }
-
-    pub(crate) async fn dispatch_edr(
-        &self,
-        call: &AuthorizedCall,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<u8>, AppError> {
-        let source = call
-            .arg("source")
-            .ok_or_else(|| AppError::Policy("missing EDR source".into()))?;
-        let port = self
-            .edrs
-            .iter()
-            .find(|port| port.source_id() == source && port.supports(call.tool()))
-            .ok_or_else(|| AppError::Policy("EDR source unavailable".into()))?;
-        port.execute(call, cancel).await
-    }
-
-    pub(crate) async fn dispatch_internal_intel(
-        &self,
-        call: &AuthorizedCall,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<u8>, AppError> {
-        let source = call
-            .arg("source")
-            .ok_or_else(|| AppError::Policy("missing internal intelligence source".into()))?;
-        self.internal_intel
-            .iter()
-            .find(|port| port.source_id() == source)
-            .ok_or_else(|| AppError::Policy("internal intelligence source unavailable".into()))?
-            .execute(call, cancel)
-            .await
     }
 }

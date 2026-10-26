@@ -58,8 +58,10 @@ impl OsKeystore {
             && let Ok(analyst) = self.load_key(&Actor::Analyst)
             && key.verifying_key() == analyst.verifying_key()
         {
-            return Err(AppError::Signature(
-                "agent and analyst keys must differ".into(),
+            return Err(AppError::Fixed(
+                irmind_app::FixedAppError::AdapterSignature(
+                    irmind_app::AdapterSignatureError::AgentAndAnalystKeysMustDiffer,
+                ),
             ));
         }
         Ok(key)
@@ -80,7 +82,9 @@ fn signing_key_from_entry(entry: &keyring::Entry) -> Result<SigningKey, AppError
 }
 
 fn unavailable() -> AppError {
-    AppError::Storage("system keyring unavailable".into())
+    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+        irmind_app::AdapterStorageError::SystemKeyringUnavailable,
+    ))
 }
 
 fn account(actor: &Actor) -> String {
@@ -107,7 +111,11 @@ impl SignerBackend for OsKeystore {
     fn create(&self, actor: Actor) -> Result<Arc<dyn Signer>, AppError> {
         let entry = self.entry("irmind", &account(&actor))?;
         match entry.get_password() {
-            Ok(_) => return Err(AppError::Policy("signing key already exists".into())),
+            Ok(_) => {
+                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                    irmind_app::AdapterPolicyError::SigningKeyAlreadyExists,
+                )));
+            }
             Err(keyring::Error::NoEntry) => {}
             Err(_) => return Err(unavailable()),
         }
@@ -116,8 +124,10 @@ impl SignerBackend for OsKeystore {
         entry.set_password(&encoded).map_err(|_| unavailable())?;
         let loaded = self.load_key(&actor)?;
         if loaded.verifying_key() != key.verifying_key() {
-            return Err(AppError::Signature(
-                "signing key changed during creation".into(),
+            return Err(AppError::Fixed(
+                irmind_app::FixedAppError::AdapterSignature(
+                    irmind_app::AdapterSignatureError::SigningKeyChangedDuringCreation,
+                ),
             ));
         }
         Ok(Arc::new(OsSigner {
@@ -134,9 +144,9 @@ impl SignerBackend for OsKeystore {
     fn migration_recipient(&self, actor: &Actor) -> Result<[u8; 32], AppError> {
         let entry = self.entry("irmind", &account(actor))?;
         if !matches!(entry.get_password(), Err(keyring::Error::NoEntry)) {
-            return Err(AppError::Policy(
-                "destination signing key already exists or is unavailable".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::DestinationSigningKeyAlreadyExistsOrIsUnavailable,
+            )));
         }
         let session = KeyImportSession::new();
         let recipient = session.recipient();
@@ -164,15 +174,17 @@ impl SignerBackend for OsKeystore {
             && let Ok(analyst) = self.load_key(&Actor::Analyst)
             && SigningKey::from_bytes(&seed).verifying_key() == analyst.verifying_key()
         {
-            return Err(AppError::Signature(
-                "agent and analyst keys must differ".into(),
+            return Err(AppError::Fixed(
+                irmind_app::FixedAppError::AdapterSignature(
+                    irmind_app::AdapterSignatureError::AgentAndAnalystKeysMustDiffer,
+                ),
             ));
         }
         let entry = self.entry("irmind", &account(&actor))?;
         if !matches!(entry.get_password(), Err(keyring::Error::NoEntry)) {
-            return Err(AppError::Policy(
-                "destination signing key already exists or is unavailable".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::DestinationSigningKeyAlreadyExistsOrIsUnavailable,
+            )));
         }
         let encoded = Zeroizing::new(hex::encode(*seed));
         entry.set_password(&encoded).map_err(|_| unavailable())?;
@@ -193,8 +205,10 @@ impl Signer for OsSigner {
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, AppError> {
         let key = signing_key_from_entry(&self.entry)?;
         if key.verifying_key().to_bytes().as_slice() != self.public_key {
-            return Err(AppError::Signature(
-                "OS signing key changed during session".into(),
+            return Err(AppError::Fixed(
+                irmind_app::FixedAppError::AdapterSignature(
+                    irmind_app::AdapterSignatureError::OSSigningKeyChangedDuringSession,
+                ),
             ));
         }
         Ok(key.sign(message).to_bytes().to_vec())
@@ -212,14 +226,18 @@ impl SecretBackend for OsKeystore {
             _ => unavailable(),
         })?;
         if value.is_empty() {
-            return Err(AppError::Storage("module secret is empty".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                irmind_app::AdapterStorageError::ModuleSecretIsEmpty,
+            )));
         }
         Ok(SecretString::from(value))
     }
     fn put(&self, name: &str, secret: &SecretString) -> Result<(), AppError> {
         use secrecy::ExposeSecret as _;
         if secret.expose_secret().is_empty() {
-            return Err(AppError::Policy("empty module secret".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::EmptyModuleSecret,
+            )));
         }
         self.entry("irmind-module", name)?
             .set_password(secret.expose_secret())

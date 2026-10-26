@@ -23,6 +23,7 @@ fn check_edge(from: &str, to: &str) -> Result<(), String> {
     }
     let shared = [
         "irmind-fs",
+        "irmind-http",
         "irmind-keystore-transfer",
         "irmind-llm-chat-completions",
     ];
@@ -63,4 +64,5 @@ fn deliberate_reverse_edge_is_rejected() {
     assert!(check_edge("irmind-tui", "irmind-app").is_ok());
     assert!(check_edge("irmind-mod-keystore-file", "irmind-infra").is_err());
     assert!(check_edge("irmind-mod-keystore-file", "irmind-fs").is_ok());
+    assert!(check_edge("irmind-mod-siem-splunk", "irmind-http").is_ok());
 }

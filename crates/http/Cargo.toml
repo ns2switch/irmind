@@ -1,0 +1,14 @@
+[package]
+name = "irmind-http"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots"] }
+tokio = { version = "1", default-features = false, features = ["macros"] }
+tokio-util = { version = "0.7", default-features = false }
+
+[lints]
+workspace = true

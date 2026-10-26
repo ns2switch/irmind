@@ -37,7 +37,9 @@ impl FindingKind {
             "technique" => Ok(Self::Technique),
             "impact" => Ok(Self::Impact),
             "recommendation" => Ok(Self::Recommendation),
-            _ => Err(AppError::Policy("invalid finding type".into())),
+            _ => Err(AppError::Fixed(
+                crate::FixedAppError::PolicyInvalidFindingType,
+            )),
         }
     }
 
@@ -78,7 +80,9 @@ impl Engine<'_> {
         origin: &str,
     ) -> Result<String, AppError> {
         if value.trim().is_empty() || value.len() > 2_000 || value.contains('\0') {
-            return Err(AppError::Policy("invalid finding value".into()));
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyInvalidFindingValue,
+            ));
         }
         if !self
             .evidence_store
@@ -86,8 +90,8 @@ impl Engine<'_> {
             .iter()
             .any(|hash| hash == evidence_hash)
         {
-            return Err(AppError::Policy(
-                "finding evidence is absent from case".into(),
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyFindingEvidenceIsAbsentFromCase,
             ));
         }
         let finding = Finding {
@@ -120,7 +124,9 @@ impl Engine<'_> {
             .iter()
             .any(|finding| finding.id == finding_id && !finding.confirmed && !finding.dismissed)
         {
-            return Err(AppError::Policy("unconfirmed finding not found".into()));
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyUnconfirmedFindingNotFound,
+            ));
         }
         self.audit(id, "analyst", "FindingConfirmed", finding_id, None)
     }
@@ -133,7 +139,9 @@ impl Engine<'_> {
     ) -> Result<(), AppError> {
         self.require_attended_analyst("dismiss case finding")?;
         if reason.trim().is_empty() || reason.len() > 500 {
-            return Err(AppError::Policy("invalid dismissal reason".into()));
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyInvalidDismissalReason,
+            ));
         }
         let _case_lock = self.repo.lock_case(id)?;
         if self.repo.get_case(id)?.sealed {
@@ -145,7 +153,9 @@ impl Engine<'_> {
             .iter()
             .any(|finding| finding.id == finding_id && !finding.confirmed && !finding.dismissed)
         {
-            return Err(AppError::Policy("open finding not found".into()));
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyOpenFindingNotFound,
+            ));
         }
         let event = FindingDismissal {
             id: finding_id.to_owned(),
@@ -174,8 +184,8 @@ impl Engine<'_> {
         let known_evidence = self.evidence_store.evidence_hashes(id)?;
         let mut findings = BTreeMap::<String, Finding>::new();
         for entry in entries {
-            match entry.kind.as_str() {
-                "FindingProposed" => {
+            match entry.kind {
+                AuditEventKind::FindingProposed => {
                     let finding: Finding = serde_json::from_str(&entry.payload)
                         .map_err(|_| AppError::InvalidChain(entry.seq))?;
                     if !matches!(entry.origin.as_str(), "analyst" | "model")
@@ -193,7 +203,7 @@ impl Engine<'_> {
                         return Err(AppError::InvalidChain(entry.seq));
                     }
                 }
-                "FindingConfirmed" => {
+                AuditEventKind::FindingConfirmed => {
                     let finding = findings
                         .get_mut(&entry.payload)
                         .ok_or(AppError::InvalidChain(entry.seq))?;
@@ -206,7 +216,7 @@ impl Engine<'_> {
                     }
                     finding.confirmed = true;
                 }
-                "FindingDismissed" => {
+                AuditEventKind::FindingDismissed => {
                     let event: FindingDismissal = serde_json::from_str(&entry.payload)
                         .map_err(|_| AppError::InvalidChain(entry.seq))?;
                     let finding = findings

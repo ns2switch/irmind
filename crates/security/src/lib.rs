@@ -252,7 +252,9 @@ impl ContentGuard for MandatoryGuard {
         for (input, forbidden) in INJECTION_CORPUS {
             let result = self.clean(input);
             if result.text.contains(forbidden) || result.detections.is_empty() {
-                return Err(AppError::Guard("startup injection corpus failed".into()));
+                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterGuard(
+                    irmind_app::AdapterGuardError::StartupInjectionCorpusFailed,
+                )));
             }
         }
         let pii = self.clean("alice@example.com bearer abcdefghijklmnop ASIAABCDEFGHIJKLMNOP secretAccessKey=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY client_secret=abcdefgh12345678");
@@ -264,21 +266,25 @@ impl ContentGuard for MandatoryGuard {
                 .contains("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
             || pii.text.contains("abcdefgh12345678")
         {
-            return Err(AppError::Guard("startup redaction self-test failed".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterGuard(
+                irmind_app::AdapterGuardError::StartupRedactionSelfTestFailed,
+            )));
         }
         let key =
             self.clean("-----BEGIN PRIVATE KEY-----\nabcdefgh12345678\n-----END PRIVATE KEY-----");
         if key.text.contains("abcdefgh12345678") || key.text.contains("BEGIN PRIVATE KEY") {
-            return Err(AppError::Guard(
-                "startup private-key self-test failed".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterGuard(
+                irmind_app::AdapterGuardError::StartupPrivateKeySelfTestFailed,
+            )));
         }
         Ok(())
     }
 
     fn screen(&self, input: &str) -> Result<Screened, AppError> {
         if input.len() > 1_000_000 {
-            return Err(AppError::Guard("content exceeds guard limit".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterGuard(
+                irmind_app::AdapterGuardError::ContentExceedsGuardLimit,
+            )));
         }
         Ok(self.clean(input))
     }

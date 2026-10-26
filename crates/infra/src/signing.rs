@@ -27,8 +27,10 @@ impl LocalSigner {
             && let Ok(analyst) = load_key(&Actor::Analyst, false)
             && key.verifying_key() == analyst.verifying_key()
         {
-            return Err(AppError::Signature(
-                "agent and analyst keys must differ".into(),
+            return Err(AppError::Fixed(
+                irmind_app::FixedAppError::AdapterSignature(
+                    irmind_app::AdapterSignatureError::AgentAndAnalystKeysMustDiffer,
+                ),
             ));
         }
         Ok(Self { key, actor })
@@ -94,21 +96,33 @@ impl LocalVerifier {
 
     pub fn with_trusted_key(mut self, actor: &Actor, key: &[u8]) -> Result<Self, AppError> {
         if key.len() != 32 {
-            return Err(AppError::Signature("invalid trusted public key".into()));
+            return Err(AppError::Fixed(
+                irmind_app::FixedAppError::AdapterSignature(
+                    irmind_app::AdapterSignatureError::InvalidTrustedPublicKey,
+                ),
+            ));
         }
         if self
             .trusted
             .iter()
             .any(|(name, existing)| name != &actor.as_storage() && existing == key)
         {
-            return Err(AppError::Signature("actors share a public key".into()));
+            return Err(AppError::Fixed(
+                irmind_app::FixedAppError::AdapterSignature(
+                    irmind_app::AdapterSignatureError::ActorsShareAPublicKey,
+                ),
+            ));
         }
         if self
             .trusted
             .insert(actor.as_storage(), key.to_vec())
             .is_some_and(|existing| existing != key)
         {
-            return Err(AppError::Signature("trusted actor key changed".into()));
+            return Err(AppError::Fixed(
+                irmind_app::FixedAppError::AdapterSignature(
+                    irmind_app::AdapterSignatureError::TrustedActorKeyChanged,
+                ),
+            ));
         }
         Ok(self)
     }
@@ -116,10 +130,11 @@ impl LocalVerifier {
 
 impl Verifier for LocalVerifier {
     fn trusted_public_key(&self, actor: &Actor) -> Result<Vec<u8>, AppError> {
-        self.trusted
-            .get(&actor.as_storage())
-            .cloned()
-            .ok_or_else(|| AppError::Signature("actor public key is not trusted".into()))
+        self.trusted.get(&actor.as_storage()).cloned().ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterSignature(
+                irmind_app::AdapterSignatureError::ActorPublicKeyIsNotTrusted,
+            ))
+        })
     }
 
     fn verify(&self, public_key: &[u8], message: &[u8], sig: &[u8]) -> Result<(), AppError> {

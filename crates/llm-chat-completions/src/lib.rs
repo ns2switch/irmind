@@ -36,8 +36,11 @@ impl ChatCompletionsClient {
         key: Option<String>,
         profile: ChatProfile,
     ) -> Result<Self, AppError> {
-        let mut base = reqwest::Url::parse(base_url)
-            .map_err(|_| AppError::Model("invalid LLM base URL".into()))?;
+        let mut base = reqwest::Url::parse(base_url).map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::InvalidLLMBaseURL,
+            ))
+        })?;
         let loopback = base.host_str().is_some_and(|host| {
             let host = host.trim_start_matches('[').trim_end_matches(']');
             host == "localhost" || host.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
@@ -64,31 +67,32 @@ impl ChatCompletionsClient {
                 .bytes()
                 .all(|byte| byte.is_ascii_alphanumeric() || b"._:/-".contains(&byte))
         {
-            return Err(AppError::Model("invalid LLM model ID".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::InvalidLLMModelID,
+            )));
         }
         if key.as_ref().is_some_and(|value| value.trim().is_empty()) || (!loopback && key.is_none())
         {
-            return Err(AppError::Model(
-                "LLM API key is required for a remote endpoint".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::LLMAPIKeyIsRequiredForARemoteEndpoint,
+            )));
         }
         if !base.path().ends_with('/') {
             let path = format!("{}/", base.path());
             base.set_path(&path);
         }
-        let endpoint = base
-            .join("chat/completions")
-            .map_err(|_| AppError::Model("invalid LLM chat endpoint".into()))?;
-        let mut async_client = reqwest::Client::builder()
-            .use_rustls_tls()
-            .timeout(std::time::Duration::from_secs(90))
-            .redirect(reqwest::redirect::Policy::none());
-        if loopback {
-            async_client = async_client.no_proxy();
-        }
-        let async_client = async_client
-            .build()
-            .map_err(|_| AppError::Model("provider HTTP client unavailable".into()))?;
+        let endpoint = base.join("chat/completions").map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::InvalidLLMChatEndpoint,
+            ))
+        })?;
+        let async_client =
+            irmind_http::client_builder(std::time::Duration::from_secs(90), loopback);
+        let async_client = async_client.build().map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::ProviderHTTPClientUnavailable,
+            ))
+        })?;
         Ok(Self {
             async_client,
             endpoint,
@@ -108,20 +112,8 @@ impl ChatCompletionsClient {
     }
 }
 
-#[async_trait]
-impl LlmPort for ChatCompletionsClient {
-    fn descriptor(&self) -> String {
-        self.descriptor_for("llm-chat-completions")
-    }
-
-    async fn complete(
-        &self,
-        request: CompletionRequest,
-        cancel: &CancellationToken,
-    ) -> Result<ModelStream, AppError> {
-        if request.max_output_tokens == 0 || request.remaining_case_tokens == 0 {
-            return Err(AppError::Model("model token budget is empty".into()));
-        }
+impl ChatCompletionsClient {
+    fn request_body(&self, request: &CompletionRequest) -> serde_json::Value {
         let tools = request
             .tools
             .iter()
@@ -160,6 +152,27 @@ impl LlmPort for ChatCompletionsClient {
                 body["parallel_tool_calls"] = json!(false);
             }
         }
+        body
+    }
+}
+
+#[async_trait]
+impl LlmPort for ChatCompletionsClient {
+    fn descriptor(&self) -> String {
+        self.descriptor_for("llm-chat-completions")
+    }
+
+    async fn complete(
+        &self,
+        request: CompletionRequest,
+        cancel: &CancellationToken,
+    ) -> Result<ModelStream, AppError> {
+        if request.max_output_tokens == 0 || request.remaining_case_tokens == 0 {
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::ModelTokenBudgetIsEmpty,
+            )));
+        }
+        let body = self.request_body(&request);
         let mut http_request = self.async_client.post(self.endpoint.clone());
         if let Some(key) = &self.key {
             http_request = http_request.bearer_auth(key.expose_secret());
@@ -167,7 +180,7 @@ impl LlmPort for ChatCompletionsClient {
         let mut response = tokio::select! {
             biased;
             () = cancel.cancelled() => return Err(AppError::Cancelled),
-            result = http_request.json(&body).send() => result.map_err(|_| AppError::Model("provider request failed".into()))?,
+            result = http_request.json(&body).send() => result.map_err(|_| AppError::Fixed(irmind_app::FixedAppError::AdapterModel(irmind_app::AdapterModelError::ProviderRequestFailed)))?,
         };
         if !response.status().is_success() {
             return Err(AppError::Model(format!(
@@ -182,11 +195,11 @@ impl LlmPort for ChatCompletionsClient {
                 let chunk = tokio::select! {
                     biased;
                     () = cancel.cancelled() => Err(AppError::Cancelled),
-                    result = response.chunk() => result.map_err(|_| AppError::Model("provider response failed".into())),
+                    result = response.chunk() => result.map_err(|_| AppError::Fixed(irmind_app::FixedAppError::AdapterModel(irmind_app::AdapterModelError::ProviderResponseFailed))),
                 }?;
                 let Some(chunk) = chunk else { break };
                 if raw.len().saturating_add(chunk.len()) > 2_000_000 {
-                    Err(AppError::Model("provider stream exceeds 2 MB".into()))?;
+                    Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(irmind_app::AdapterModelError::ProviderStreamExceeds2MB)))?;
                 }
                 raw.extend_from_slice(&chunk);
                 yield ModelEvent::Progress(chunk.len());
@@ -216,6 +229,7 @@ mod tests {
         assert!(local.descriptor().contains("endpoint_sha256="));
         assert!(!local.descriptor().contains("127.0.0.1"));
         irmind_testkit::run_llm_contract(&local).unwrap();
+        irmind_testkit::run_http_safety_contract().unwrap();
         let ipv6 = ChatCompletionsClient::new("http://[::1]:11434/v1/", "local-model", None);
         assert!(ipv6.is_ok());
         assert!(
@@ -240,6 +254,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::too_many_lines)]
     async fn chat_profiles_send_supported_fields_and_parse_complete_streams() {
         for profile in [
             ChatProfile::OpenAi,

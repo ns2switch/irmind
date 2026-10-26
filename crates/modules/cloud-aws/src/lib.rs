@@ -89,13 +89,19 @@ impl AwsCloudTrail {
             .secret("AWS_SESSION_TOKEN")
             .map(|value| value.expose_secret().to_owned());
         if access_key.is_empty() || secret_key.is_empty() {
-            return Err(AppError::Policy("empty AWS credential".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::EmptyAWSCredential,
+            )));
         }
         if !safe_name(&source_id, 64) || !safe_name(&region, 32) || !region.contains('-') {
-            return Err(AppError::Policy("invalid AWS source ID or region".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidAWSSourceIDOrRegion,
+            )));
         }
         if !safe_name(&role_name, 64) {
-            return Err(AppError::Policy("invalid AWS role name".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidAWSRoleName,
+            )));
         }
         let config = aws_config::SdkConfig::builder()
             .behavior_version(BehaviorVersion::latest())
@@ -126,24 +132,23 @@ impl AwsCloudTrail {
     }
 
     async fn verify_aws_identity(&self, account: &str) -> Result<(), AppError> {
-        let identity = self
-            .sts
-            .get_caller_identity()
-            .send()
-            .await
-            .map_err(|_| AppError::Storage("AWS STS identity lookup failed".into()))?;
+        let identity = self.sts.get_caller_identity().send().await.map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                irmind_app::AdapterStorageError::AWSSTSIdentityLookupFailed,
+            ))
+        })?;
         if identity.account() != Some(account) {
-            return Err(AppError::Policy(
-                "AWS credential account differs from case scope".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::AWSCredentialAccountDiffersFromCaseScope,
+            )));
         }
         if !identity.arn().is_some_and(|arn| {
             arn.contains(&format!(":assumed-role/{}/", self.role_name))
                 || arn.ends_with(&format!(":role/{}", self.role_name))
         }) {
-            return Err(AppError::Policy(
-                "AWS credentials do not use the dedicated role".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::AWSCredentialsDoNotUseTheDedicatedRole,
+            )));
         }
         Ok(())
     }
@@ -155,7 +160,11 @@ impl AwsCloudTrail {
             .attribute_key(LookupAttributeKey::EventName)
             .attribute_value(request.event_name)
             .build()
-            .map_err(|_| AppError::Policy("invalid CloudTrail event name".into()))?;
+            .map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                    irmind_app::AdapterPolicyError::InvalidCloudTrailEventName,
+                ))
+            })?;
         let output = self
             .cloudtrail
             .lookup_events()
@@ -165,7 +174,11 @@ impl AwsCloudTrail {
             .max_results(20)
             .send()
             .await
-            .map_err(|_| AppError::Storage("CloudTrail LookupEvents failed".into()))?;
+            .map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                    irmind_app::AdapterStorageError::CloudTrailLookupEventsFailed,
+                ))
+            })?;
         let events = output
             .events()
             .iter()
@@ -180,24 +193,37 @@ impl AwsCloudTrail {
         }))
         .map_err(|error| AppError::Storage(error.to_string()))?;
         if raw.len() > 5_000_000 {
-            return Err(AppError::Policy("CloudTrail response exceeds 5 MB".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::CloudTrailResponseExceeds5MB,
+            )));
         }
         Ok(raw)
     }
 
-    async fn identity_async(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+    fn identity_request<'a>(
+        &self,
+        call: &'a AuthorizedCall,
+    ) -> Result<(&'a str, &'a str, &'a str), AppError> {
         if call.tool() != &Tool::CloudIdentity || call.arg("source") != Some(self.source_id()) {
-            return Err(AppError::Policy("wrong AWS identity source or tool".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::WrongAWSIdentitySourceOrTool,
+            )));
         }
-        let account = call
-            .arg("account")
-            .ok_or_else(|| AppError::Policy("missing AWS account".into()))?;
-        let kind = call
-            .arg("kind")
-            .ok_or_else(|| AppError::Policy("missing IAM identity kind".into()))?;
-        let name = call
-            .arg("name")
-            .ok_or_else(|| AppError::Policy("missing IAM identity name".into()))?;
+        let account = call.arg("account").ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::MissingAWSAccount,
+            ))
+        })?;
+        let kind = call.arg("kind").ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::MissingIAMIdentityKind,
+            ))
+        })?;
+        let name = call.arg("name").ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::MissingIAMIdentityName,
+            ))
+        })?;
         if account.len() != 12
             || !account.bytes().all(|byte| byte.is_ascii_digit())
             || name.is_empty()
@@ -206,8 +232,15 @@ impl AwsCloudTrail {
                 .bytes()
                 .all(|byte| byte.is_ascii_alphanumeric() || b"_+=,.@-".contains(&byte))
         {
-            return Err(AppError::Policy("invalid AWS identity request".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidAWSIdentityRequest,
+            )));
         }
+        Ok((account, kind, name))
+    }
+
+    async fn identity_async(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+        let (account, kind, name) = self.identity_request(call)?;
         self.verify_aws_identity(account).await?;
         let value = match kind {
             "role" => {
@@ -217,10 +250,16 @@ impl AwsCloudTrail {
                     .role_name(name)
                     .send()
                     .await
-                    .map_err(|_| AppError::Storage("AWS IAM GetRole failed".into()))?;
-                let role = output
-                    .role()
-                    .ok_or_else(|| AppError::Storage("AWS IAM role missing".into()))?;
+                    .map_err(|_| {
+                        AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                            irmind_app::AdapterStorageError::AWSIAMGetRoleFailed,
+                        ))
+                    })?;
+                let role = output.role().ok_or({
+                    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                        irmind_app::AdapterStorageError::AWSIAMRoleMissing,
+                    ))
+                })?;
                 json!({"kind":"role","name":role.role_name(),"arn":role.arn(),"id":role.role_id()})
             }
             "user" => {
@@ -230,13 +269,23 @@ impl AwsCloudTrail {
                     .user_name(name)
                     .send()
                     .await
-                    .map_err(|_| AppError::Storage("AWS IAM GetUser failed".into()))?;
-                let user = output
-                    .user()
-                    .ok_or_else(|| AppError::Storage("AWS IAM user missing".into()))?;
+                    .map_err(|_| {
+                        AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                            irmind_app::AdapterStorageError::AWSIAMGetUserFailed,
+                        ))
+                    })?;
+                let user = output.user().ok_or({
+                    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                        irmind_app::AdapterStorageError::AWSIAMUserMissing,
+                    ))
+                })?;
                 json!({"kind":"user","name":user.user_name(),"arn":user.arn(),"id":user.user_id()})
             }
-            _ => return Err(AppError::Policy("unsupported IAM identity kind".into())),
+            _ => {
+                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                    irmind_app::AdapterPolicyError::UnsupportedIAMIdentityKind,
+                )));
+            }
         };
         serde_json::to_vec(&value).map_err(|error| AppError::Storage(error.to_string()))
     }
@@ -260,7 +309,7 @@ impl CloudAuditPort for AwsCloudTrail {
                 match call.tool() {
                     Tool::CloudAuditEvents => self.events_async(call).await,
                     Tool::CloudIdentity => self.identity_async(call).await,
-                    _ => Err(AppError::Policy("invalid cloud tool".into())),
+                    _ => Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(irmind_app::AdapterPolicyError::InvalidCloudTool))),
                 }
             } => result,
         }
@@ -277,14 +326,20 @@ struct CloudRequest<'a> {
 impl<'a> CloudRequest<'a> {
     fn from_call(call: &'a AuthorizedCall, source_id: &str) -> Result<Self, AppError> {
         if call.tool() != &Tool::CloudAuditEvents || call.arg("source") != Some(source_id) {
-            return Err(AppError::Policy("wrong CloudTrail source or tool".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::WrongCloudTrailSourceOrTool,
+            )));
         }
-        let account = call
-            .arg("account")
-            .ok_or_else(|| AppError::Policy("missing AWS account".into()))?;
-        let event_name = call
-            .arg("event_name")
-            .ok_or_else(|| AppError::Policy("missing CloudTrail event name".into()))?;
+        let account = call.arg("account").ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::MissingAWSAccount,
+            ))
+        })?;
+        let event_name = call.arg("event_name").ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::MissingCloudTrailEventName,
+            ))
+        })?;
         let from = parse_utc(call.arg("from"))?;
         let to = parse_utc(call.arg("to"))?;
         if account.len() != 12
@@ -292,9 +347,9 @@ impl<'a> CloudRequest<'a> {
             || !safe_name(event_name, 128)
             || !(1..=86_400).contains(&(to - from))
         {
-            return Err(AppError::Policy(
-                "invalid bounded CloudTrail request".into(),
-            ));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidBoundedCloudTrailRequest,
+            )));
         }
         Ok(Self {
             account,
@@ -306,15 +361,23 @@ impl<'a> CloudRequest<'a> {
 }
 
 fn parse_utc(value: Option<&str>) -> Result<i64, AppError> {
-    let value = value.ok_or_else(|| AppError::Policy("missing CloudTrail time".into()))?;
+    let value = value.ok_or({
+        AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+            irmind_app::AdapterPolicyError::MissingCloudTrailTime,
+        ))
+    })?;
     if value.len() != 20 || !value.ends_with('Z') {
-        return Err(AppError::Policy(
-            "CloudTrail requires UTC second precision".into(),
-        ));
+        return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+            irmind_app::AdapterPolicyError::CloudTrailRequiresUTCSecondPrecision,
+        )));
     }
     DateTime::parse_from_rfc3339(value)
         .map(|time| time.timestamp())
-        .map_err(|_| AppError::Policy("invalid CloudTrail time".into()))
+        .map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::InvalidCloudTrailTime,
+            ))
+        })
 }
 
 fn safe_name(value: &str, limit: usize) -> bool {
@@ -325,111 +388,4 @@ fn safe_name(value: &str, limit: usize) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"_-".contains(&byte))
 }
 
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::panic)]
-mod tests {
-    use super::*;
-    use irmind_domain::{Case, CaseId, Decision, ExecutionMode, ProposedCall, Severity, evaluate};
-    use std::collections::BTreeMap;
-
-    #[test]
-    fn cloud_audit_contract() {
-        let mut config = ModuleConfig::new();
-        config.insert_value("IRMIND_AWS_SOURCE_ID", "aws-prod".into());
-        config.insert_value("IRMIND_AWS_REGION", "eu-west-1".into());
-        config.insert_value("IRMIND_AWS_ROLE_NAME", "SecurityAudit".into());
-        config.insert_secret(
-            "AWS_ACCESS_KEY_ID",
-            secrecy::SecretString::from("test-access".to_owned()),
-        );
-        config.insert_secret(
-            "AWS_SECRET_ACCESS_KEY",
-            secrecy::SecretString::from("test-secret".to_owned()),
-        );
-        let port = AwsCloudTrail::from_config(&config).unwrap();
-        irmind_testkit::run_cloud_audit_contract(&port).unwrap();
-    }
-
-    #[test]
-    fn recorded_sts_and_cloudtrail_responses_produce_evidence() {
-        use aws_smithy_http_client::test_util::{ReplayEvent, StaticReplayClient};
-        use aws_smithy_types::body::SdkBody;
-
-        let sts = r#"<GetCallerIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><GetCallerIdentityResult><Arn>arn:aws:sts::123456789012:assumed-role/IRMindReadOnly/synthetic</Arn><Account>123456789012</Account><UserId>AROAEXAMPLE:synthetic</UserId></GetCallerIdentityResult></GetCallerIdentityResponse>"#;
-        let trail = r#"{"Events":[{"EventId":"11111111-1111-1111-1111-111111111111","EventName":"AssumeRole","CloudTrailEvent":"{\"eventName\":\"AssumeRole\",\"userAgent\":\"synthetic-test\"}"}]}"#;
-        let replay = StaticReplayClient::new(vec![
-            ReplayEvent::new(
-                http::Request::builder()
-                    .uri("https://sts.eu-west-1.amazonaws.com/")
-                    .body(SdkBody::empty())
-                    .unwrap(),
-                http::Response::builder()
-                    .status(200)
-                    .header("content-type", "text/xml")
-                    .body(SdkBody::from(sts))
-                    .unwrap(),
-            ),
-            ReplayEvent::new(
-                http::Request::builder()
-                    .uri("https://cloudtrail.eu-west-1.amazonaws.com/")
-                    .body(SdkBody::empty())
-                    .unwrap(),
-                http::Response::builder()
-                    .status(200)
-                    .header("content-type", "application/x-amz-json-1.1")
-                    .body(SdkBody::from(trail))
-                    .unwrap(),
-            ),
-        ]);
-        let config = aws_config::SdkConfig::builder()
-            .behavior_version(BehaviorVersion::latest())
-            .region(Region::new("eu-west-1"))
-            .credentials_provider(SharedCredentialsProvider::new(Credentials::new(
-                "AKIATEST",
-                "synthetic-secret",
-                None,
-                None,
-                "test",
-            )))
-            .http_client(replay)
-            .build();
-        let port = AwsCloudTrail {
-            cloudtrail: aws_sdk_cloudtrail::Client::new(&config),
-            iam: aws_sdk_iam::Client::new(&config),
-            sts: aws_sdk_sts::Client::new(&config),
-            source_id: "aws-prod".into(),
-            role_name: "IRMindReadOnly".into(),
-        };
-        let bytes = irmind_testkit::run_cloud_audit_recorded(&port, "synthetic-test").unwrap();
-        assert!(serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()["events"].is_array());
-    }
-
-    #[test]
-    fn authorized_cloud_request_is_bounded_before_sdk_dispatch() {
-        let case = Case {
-            id: CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap(),
-            title: "AWS".into(),
-            severity: Severity::Medium,
-            scope: "v1;sources=aws-prod;accounts=123456789012;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z".into(),
-            sealed: false,
-        };
-        let proposal = ProposedCall {
-            tool: Tool::CloudAuditEvents,
-            args: BTreeMap::from([
-                ("source".into(), "aws-prod".into()),
-                ("account".into(), "123456789012".into()),
-                ("from".into(), "2026-10-23T12:00:00Z".into()),
-                ("to".into(), "2026-10-23T13:00:00Z".into()),
-                ("event_name".into(), "AssumeRole".into()),
-            ]),
-        };
-        let Decision::Allow(call) =
-            evaluate(&case, proposal, 1, ExecutionMode::Attended, 1_700_000_000)
-        else {
-            panic!("scoped cloud read should be authorized");
-        };
-        let request = CloudRequest::from_call(&call, "aws-prod").unwrap();
-        assert_eq!(request.to - request.from, 3600);
-        assert!(CloudRequest::from_call(&call, "other").is_err());
-    }
-}
+include!("tests.rs");

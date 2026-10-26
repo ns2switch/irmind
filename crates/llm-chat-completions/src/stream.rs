@@ -13,16 +13,21 @@ struct ToolDelta {
     arguments: String,
 }
 
+#[derive(Default)]
+struct StreamState {
+    raw: String,
+    text: String,
+    tools: BTreeMap<usize, ToolDelta>,
+    usage: Option<ModelUsage>,
+    finished: bool,
+    done: bool,
+    bytes_read: usize,
+}
+
 pub(super) fn parse(reader: impl Read) -> Result<(ModelResponse, ModelUsage), AppError> {
     let mut reader = BufReader::new(reader.take((MAX_STREAM_BYTES + 1) as u64));
     let mut line = String::new();
-    let mut raw = String::new();
-    let mut bytes_read = 0usize;
-    let mut text = String::new();
-    let mut tools = BTreeMap::<usize, ToolDelta>::new();
-    let mut usage = None;
-    let mut finished = false;
-    let mut done = false;
+    let mut state = StreamState::default();
     loop {
         line.clear();
         let count = reader
@@ -31,9 +36,11 @@ pub(super) fn parse(reader: impl Read) -> Result<(ModelResponse, ModelUsage), Ap
         if count == 0 {
             break;
         }
-        bytes_read += count;
-        if bytes_read > MAX_STREAM_BYTES {
-            return Err(AppError::Model("provider stream exceeds 2 MB".into()));
+        state.bytes_read += count;
+        if state.bytes_read > MAX_STREAM_BYTES {
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::ProviderStreamExceeds2MB,
+            )));
         }
         let line = line.trim_end_matches(['\r', '\n']);
         if line.is_empty() || line.starts_with(':') {
@@ -41,123 +48,193 @@ pub(super) fn parse(reader: impl Read) -> Result<(ModelResponse, ModelUsage), Ap
         }
         let data = line
             .strip_prefix("data:")
-            .ok_or_else(|| AppError::Model("unexpected provider stream field".into()))?
+            .ok_or({
+                AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                    irmind_app::AdapterModelError::UnexpectedProviderStreamField,
+                ))
+            })?
             .trim_start();
         if data == "[DONE]" {
-            done = true;
+            state.done = true;
             break;
         }
-        raw.push_str(data);
-        raw.push('\n');
+        state.raw.push_str(data);
+        state.raw.push('\n');
         let chunk: Value = serde_json::from_str(data)
             .map_err(|error| AppError::Model(format!("invalid provider chunk: {error}")))?;
+        state.apply_chunk(&chunk)?;
+    }
+    state.finish()
+}
+
+impl StreamState {
+    fn apply_chunk(&mut self, chunk: &Value) -> Result<(), AppError> {
         if let Some(value) = chunk.get("usage").filter(|value| !value.is_null()) {
-            if usage.is_some() {
-                return Err(AppError::Model("duplicate provider usage".into()));
+            if self.usage.is_some() {
+                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                    irmind_app::AdapterModelError::DuplicateProviderUsage,
+                )));
             }
-            usage = Some(ModelUsage {
-                input_tokens: value
-                    .get("prompt_tokens")
-                    .and_then(Value::as_u64)
-                    .ok_or_else(|| AppError::Model("missing prompt token usage".into()))?,
+            self.usage = Some(ModelUsage {
+                input_tokens: value.get("prompt_tokens").and_then(Value::as_u64).ok_or({
+                    AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                        irmind_app::AdapterModelError::MissingPromptTokenUsage,
+                    ))
+                })?,
                 output_tokens: value
                     .get("completion_tokens")
                     .and_then(Value::as_u64)
-                    .ok_or_else(|| AppError::Model("missing completion token usage".into()))?,
+                    .ok_or({
+                        AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                            irmind_app::AdapterModelError::MissingCompletionTokenUsage,
+                        ))
+                    })?,
             });
         }
-        let choices = chunk
-            .get("choices")
-            .and_then(Value::as_array)
-            .ok_or_else(|| AppError::Model("missing provider choices".into()))?;
+        let choices = chunk.get("choices").and_then(Value::as_array).ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::MissingProviderChoices,
+            ))
+        })?;
         if choices.len() > 1 {
-            return Err(AppError::Model("multiple provider choices".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::MultipleProviderChoices,
+            )));
         }
-        let Some(choice) = choices.first() else {
-            continue;
-        };
+        if let Some(choice) = choices.first() {
+            self.apply_choice(choice)?;
+        }
+        Ok(())
+    }
+
+    fn apply_choice(&mut self, choice: &Value) -> Result<(), AppError> {
         if choice.get("index").and_then(Value::as_u64) != Some(0) {
-            return Err(AppError::Model("unexpected provider choice index".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::UnexpectedProviderChoiceIndex,
+            )));
         }
-        if finished {
-            return Err(AppError::Model("provider output after finish".into()));
+        if self.finished {
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::ProviderOutputAfterFinish,
+            )));
         }
-        let delta = choice
-            .get("delta")
-            .and_then(Value::as_object)
-            .ok_or_else(|| AppError::Model("missing provider delta".into()))?;
+        let delta = choice.get("delta").and_then(Value::as_object).ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::MissingProviderDelta,
+            ))
+        })?;
         if let Some(part) = delta.get("content").and_then(Value::as_str) {
-            text.push_str(part);
+            self.text.push_str(part);
         }
         if let Some(calls) = delta.get("tool_calls").and_then(Value::as_array) {
             for call in calls {
-                let index = call
-                    .get("index")
-                    .and_then(Value::as_u64)
-                    .and_then(|index| usize::try_from(index).ok())
-                    .filter(|index| *index < 16)
-                    .ok_or_else(|| AppError::Model("invalid provider tool index".into()))?;
-                let collected = tools.entry(index).or_default();
-                if let Some(id) = call.get("id").and_then(Value::as_str) {
-                    if collected.id.as_deref().is_some_and(|prior| prior != id) {
-                        return Err(AppError::Model("provider tool ID changed".into()));
-                    }
-                    collected.id = Some(id.to_owned());
-                }
-                if call
-                    .get("type")
-                    .and_then(Value::as_str)
-                    .is_some_and(|kind| kind != "function")
-                {
-                    return Err(AppError::Model("unsupported provider tool type".into()));
-                }
-                if let Some(function) = call.get("function") {
-                    if let Some(name) = function.get("name").and_then(Value::as_str) {
-                        collected.name.push_str(name);
-                    }
-                    if let Some(arguments) = function.get("arguments").and_then(Value::as_str) {
-                        collected.arguments.push_str(arguments);
-                    }
-                }
+                self.apply_tool_delta(call)?;
             }
         }
         if let Some(reason) = choice.get("finish_reason").and_then(Value::as_str) {
             if !matches!(reason, "stop" | "tool_calls") {
-                return Err(AppError::Model("provider stopped unexpectedly".into()));
+                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                    irmind_app::AdapterModelError::ProviderStoppedUnexpectedly,
+                )));
             }
-            finished = true;
+            self.finished = true;
         }
+        Ok(())
     }
-    if !done || !finished {
-        return Err(AppError::Model("provider stream incomplete".into()));
-    }
-    let usage = usage.ok_or_else(|| AppError::Model("provider stream omitted usage".into()))?;
-    let mut calls = Vec::with_capacity(tools.len());
-    for (expected, (index, tool)) in tools.into_iter().enumerate() {
-        if index != expected || tool.id.is_none() {
-            return Err(AppError::Model("incomplete provider tool call".into()));
+
+    fn apply_tool_delta(&mut self, call: &Value) -> Result<(), AppError> {
+        let index = call
+            .get("index")
+            .and_then(Value::as_u64)
+            .and_then(|index| usize::try_from(index).ok())
+            .filter(|index| *index < 16)
+            .ok_or({
+                AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                    irmind_app::AdapterModelError::InvalidProviderToolIndex,
+                ))
+            })?;
+        let collected = self.tools.entry(index).or_default();
+        if let Some(id) = call.get("id").and_then(Value::as_str) {
+            if collected.id.as_deref().is_some_and(|prior| prior != id) {
+                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                    irmind_app::AdapterModelError::ProviderToolIDChanged,
+                )));
+            }
+            collected.id = Some(id.to_owned());
         }
-        calls.push(parse_tool(&tool.name, &tool.arguments)?);
+        if call
+            .get("type")
+            .and_then(Value::as_str)
+            .is_some_and(|kind| kind != "function")
+        {
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::UnsupportedProviderToolType,
+            )));
+        }
+        if let Some(function) = call.get("function") {
+            if let Some(name) = function.get("name").and_then(Value::as_str) {
+                collected.name.push_str(name);
+            }
+            if let Some(arguments) = function.get("arguments").and_then(Value::as_str) {
+                collected.arguments.push_str(arguments);
+            }
+        }
+        Ok(())
     }
-    Ok((ModelResponse { text, calls, raw }, usage))
+
+    fn finish(self) -> Result<(ModelResponse, ModelUsage), AppError> {
+        if !self.done || !self.finished {
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::ProviderStreamIncomplete,
+            )));
+        }
+        let usage = self.usage.ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::ProviderStreamOmittedUsage,
+            ))
+        })?;
+        let mut calls = Vec::with_capacity(self.tools.len());
+        for (expected, (index, tool)) in self.tools.into_iter().enumerate() {
+            if index != expected || tool.id.is_none() {
+                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                    irmind_app::AdapterModelError::IncompleteProviderToolCall,
+                )));
+            }
+            calls.push(parse_tool(&tool.name, &tool.arguments)?);
+        }
+        Ok((
+            ModelResponse {
+                text: self.text,
+                calls,
+                raw: self.raw,
+            },
+            usage,
+        ))
+    }
 }
 
 fn parse_tool(name: &str, arguments: &str) -> Result<ProposedCall, AppError> {
-    let tool = Tool::parse(name).map_err(|_| AppError::Policy("unknown provider tool".into()))?;
+    let tool = Tool::parse(name).map_err(|_| {
+        AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+            irmind_app::AdapterPolicyError::UnknownProviderTool,
+        ))
+    })?;
     let value: Value = serde_json::from_str(arguments)
         .map_err(|error| AppError::Model(format!("invalid provider tool arguments: {error}")))?;
-    let object = value
-        .as_object()
-        .ok_or_else(|| AppError::Policy("tool arguments must be an object".into()))?;
+    let object = value.as_object().ok_or({
+        AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+            irmind_app::AdapterPolicyError::ToolArgumentsMustBeAnObject,
+        ))
+    })?;
     let mut args = BTreeMap::new();
     for (key, value) in object {
         let value = match value {
             Value::String(value) => value.clone(),
             Value::Number(value) => value.to_string(),
             _ => {
-                return Err(AppError::Policy(
-                    "tool argument must be string or number".into(),
-                ));
+                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                    irmind_app::AdapterPolicyError::ToolArgumentMustBeStringOrNumber,
+                )));
             }
         };
         args.insert(key.clone(), value);

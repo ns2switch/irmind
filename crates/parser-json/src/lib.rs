@@ -38,90 +38,110 @@ impl EventParser for JsonParser {
     }
     fn parse(&self, source: &str, bytes: &[u8]) -> Result<Vec<Tainted<GraphRecord>>, AppError> {
         if bytes.len() > 50 * 1024 * 1024 {
-            return Err(AppError::Policy("JSON input exceeds 50 MB".into()));
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::JSONInputExceeds50MB,
+            )));
         }
         let first = bytes.iter().copied().find(|b| !b.is_ascii_whitespace());
         if !matches!(first, Some(b'{' | b'[')) {
             return Ok(Vec::new());
         }
-        let values = match serde_json::from_slice::<Value>(bytes) {
-            Ok(Value::Array(items)) => items,
-            Ok(Value::Object(mut object)) => {
-                if let Some(Value::Array(items)) = object.remove("Records") {
-                    items
-                } else if let Some(Value::Array(items)) = object.remove("events") {
-                    items
-                } else {
-                    vec![Value::Object(object)]
-                }
-            }
-            Ok(_) => Vec::new(),
-            Err(_) => {
-                let mut items = Vec::new();
-                for line in bytes.split(|byte| *byte == b'\n') {
-                    if line.iter().all(u8::is_ascii_whitespace) {
-                        continue;
-                    }
-                    let item = serde_json::from_slice(line)
-                        .map_err(|e| AppError::Storage(format!("invalid JSON record: {e}")))?;
-                    items.push(normalize_record(item));
-                    if items.len() > 100_000 {
-                        return Err(AppError::Policy("too many JSON records".into()));
-                    }
-                }
-                items
-            }
-        };
-        if values.len() > 100_000 {
-            return Err(AppError::Policy("too many JSON records".into()));
-        }
+        let values = parse_values(bytes)?;
         let mut records = Vec::with_capacity(values.len());
         for (index, value) in values.into_iter().map(normalize_record).enumerate() {
-            let at = value
-                .get("eventTime")
-                .or_else(|| value.get("timestamp"))
-                .or_else(|| value.get("time"))
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .to_owned();
-            let event = value
-                .get("eventName")
-                .or_else(|| value.get("eventType"))
-                .or_else(|| value.get("action"))
-                .and_then(Value::as_str)
-                .unwrap_or("record")
-                .to_owned();
-            let mut entities = Vec::new();
-            collect(&value, &mut entities, 0);
-            let relations = cloudtrail_relations(&value, &mut entities);
-            entities.sort();
-            entities.dedup();
-            records.push(Tainted::from_external(
-                GraphRecord {
-                    index,
-                    at,
-                    event,
-                    text: serde_json::to_string(&value)
-                        .map_err(|e| AppError::Storage(format!("serialize JSON record: {e}")))?,
-                    entities,
-                    relations,
-                },
-                Provenance::new(
-                    sha256(bytes),
-                    Some(index as u64),
-                    if source.starts_with("siem_")
-                        || source.starts_with("cloud_")
-                        || source.starts_with("edr_")
-                    {
-                        SourceKind::ToolResult
-                    } else {
-                        SourceKind::File
-                    },
-                ),
-            ));
+            records.push(parse_record(source, bytes, index, &value)?);
         }
         Ok(records)
     }
+}
+
+fn parse_values(bytes: &[u8]) -> Result<Vec<Value>, AppError> {
+    let values = match serde_json::from_slice::<Value>(bytes) {
+        Ok(Value::Array(items)) => items,
+        Ok(Value::Object(mut object)) => {
+            if let Some(Value::Array(items)) = object.remove("Records") {
+                items
+            } else if let Some(Value::Array(items)) = object.remove("events") {
+                items
+            } else {
+                vec![Value::Object(object)]
+            }
+        }
+        Ok(_) => Vec::new(),
+        Err(_) => {
+            let mut items = Vec::new();
+            for line in bytes.split(|byte| *byte == b'\n') {
+                if line.iter().all(u8::is_ascii_whitespace) {
+                    continue;
+                }
+                let item = serde_json::from_slice(line)
+                    .map_err(|e| AppError::Storage(format!("invalid JSON record: {e}")))?;
+                items.push(normalize_record(item));
+                if items.len() > 100_000 {
+                    return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                        irmind_app::AdapterPolicyError::TooManyJSONRecords,
+                    )));
+                }
+            }
+            items
+        }
+    };
+    if values.len() > 100_000 {
+        return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+            irmind_app::AdapterPolicyError::TooManyJSONRecords,
+        )));
+    }
+    Ok(values)
+}
+
+fn parse_record(
+    source: &str,
+    bytes: &[u8],
+    index: usize,
+    value: &Value,
+) -> Result<Tainted<GraphRecord>, AppError> {
+    let at = value
+        .get("eventTime")
+        .or_else(|| value.get("timestamp"))
+        .or_else(|| value.get("time"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+    let event = value
+        .get("eventName")
+        .or_else(|| value.get("eventType"))
+        .or_else(|| value.get("action"))
+        .and_then(Value::as_str)
+        .unwrap_or("record")
+        .to_owned();
+    let mut entities = Vec::new();
+    collect(value, &mut entities, 0);
+    let relations = cloudtrail_relations(value, &mut entities);
+    entities.sort();
+    entities.dedup();
+    Ok(Tainted::from_external(
+        GraphRecord {
+            index,
+            at,
+            event,
+            text: serde_json::to_string(value)
+                .map_err(|e| AppError::Storage(format!("serialize JSON record: {e}")))?,
+            entities,
+            relations,
+        },
+        Provenance::new(
+            sha256(bytes),
+            Some(index as u64),
+            if source.starts_with("siem_")
+                || source.starts_with("cloud_")
+                || source.starts_with("edr_")
+            {
+                SourceKind::ToolResult
+            } else {
+                SourceKind::File
+            },
+        ),
+    ))
 }
 
 fn normalize_record(value: Value) -> Value {
@@ -148,61 +168,7 @@ fn cloudtrail_relations(value: &Value, entities: &mut Vec<(String, String)>) -> 
     let actor = value.pointer("/userIdentity/arn").and_then(Value::as_str);
     let mut relations = Vec::new();
     if let (Some(_), Some(actor)) = (event, actor) {
-        let actor_kind = if actor.contains(":role/") {
-            "role"
-        } else {
-            "identity"
-        };
-        if let Some(ip) = value.get("sourceIPAddress").and_then(Value::as_str)
-            && ip.parse::<std::net::IpAddr>().is_ok()
-        {
-            add_relation(
-                entities,
-                &mut relations,
-                (actor_kind, actor),
-                "observed_from_ip",
-                ("ip", ip),
-            );
-        }
-        if let Some(issuer) = value
-            .pointer("/userIdentity/sessionContext/sessionIssuer/arn")
-            .and_then(Value::as_str)
-        {
-            add_relation(
-                entities,
-                &mut relations,
-                ("role", issuer),
-                "issued_session",
-                (actor_kind, actor),
-            );
-        }
-        if let Some(key) = value
-            .pointer("/userIdentity/accessKeyId")
-            .and_then(Value::as_str)
-            && valid_access_key(key)
-        {
-            add_relation(
-                entities,
-                &mut relations,
-                (actor_kind, actor),
-                "used_access_key",
-                ("key", key),
-            );
-        }
-        if event == Some("AssumeRole")
-            && let Some(target) = value
-                .pointer("/requestParameters/roleArn")
-                .and_then(Value::as_str)
-            && target.contains(":role/")
-        {
-            add_relation(
-                entities,
-                &mut relations,
-                (actor_kind, actor),
-                "assumed_role",
-                ("role", target),
-            );
-        }
+        actor_relations(value, event, actor, entities, &mut relations);
     }
     if event == Some("CreateAccessKey")
         && let (Some(user), Some(key)) = (
@@ -226,6 +192,70 @@ fn cloudtrail_relations(value: &Value, entities: &mut Vec<(String, String)>) -> 
     relations.sort();
     relations.dedup();
     relations
+}
+
+fn actor_relations(
+    value: &Value,
+    event: Option<&str>,
+    actor: &str,
+    entities: &mut Vec<(String, String)>,
+    relations: &mut Vec<GraphRelation>,
+) {
+    let actor_kind = if actor.contains(":role/") {
+        "role"
+    } else {
+        "identity"
+    };
+    if let Some(ip) = value.get("sourceIPAddress").and_then(Value::as_str)
+        && ip.parse::<std::net::IpAddr>().is_ok()
+    {
+        add_relation(
+            entities,
+            relations,
+            (actor_kind, actor),
+            "observed_from_ip",
+            ("ip", ip),
+        );
+    }
+    if let Some(issuer) = value
+        .pointer("/userIdentity/sessionContext/sessionIssuer/arn")
+        .and_then(Value::as_str)
+    {
+        add_relation(
+            entities,
+            relations,
+            ("role", issuer),
+            "issued_session",
+            (actor_kind, actor),
+        );
+    }
+    if let Some(key) = value
+        .pointer("/userIdentity/accessKeyId")
+        .and_then(Value::as_str)
+        && valid_access_key(key)
+    {
+        add_relation(
+            entities,
+            relations,
+            (actor_kind, actor),
+            "used_access_key",
+            ("key", key),
+        );
+    }
+    if event == Some("AssumeRole")
+        && let Some(target) = value
+            .pointer("/requestParameters/roleArn")
+            .and_then(Value::as_str)
+        && target.contains(":role/")
+    {
+        add_relation(
+            entities,
+            relations,
+            (actor_kind, actor),
+            "assumed_role",
+            ("role", target),
+        );
+    }
 }
 
 fn valid_access_key(value: &str) -> bool {
@@ -281,94 +311,4 @@ fn collect(value: &Value, entities: &mut Vec<(String, String)>, depth: usize) {
     }
 }
 
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn indexes_cloudtrail_record() {
-        let bytes = br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","sourceIPAddress":"203.0.113.8","userIdentity":{"arn":"arn:aws:iam::123456789012:role/Admin"}}]}"#;
-        let records = JsonParser.parse("cloudtrail.json", bytes).unwrap();
-        assert_eq!(records.len(), 1);
-        records[0].inspect(|record| {
-            assert!(
-                record
-                    .entities
-                    .contains(&("ip".into(), "203.0.113.8".into()))
-            );
-            assert!(
-                record
-                    .entities
-                    .contains(&("role".into(), "arn:aws:iam::123456789012:role/Admin".into()))
-            );
-            assert!(record.text.contains("AssumeRole"));
-        });
-    }
-
-    #[test]
-    fn extracts_assume_role_relation_from_cloudtrail_fields() {
-        let bytes = br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","userIdentity":{"arn":"arn:aws:iam::123456789012:user/alice"},"requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/Admin"}}]}"#;
-        let records = JsonParser.parse("cloudtrail.json", bytes).unwrap();
-        records[0].inspect(|record| {
-            assert_eq!(record.relations.len(), 1);
-            assert_eq!(record.relations[0].relation, "assumed_role");
-            assert_eq!(record.relations[0].from_kind, "identity");
-            assert_eq!(record.relations[0].to_kind, "role");
-        });
-    }
-
-    #[test]
-    fn links_cloudtrail_origin_session_and_access_keys() {
-        let bytes = br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"GetObject","sourceIPAddress":"198.51.100.9","userIdentity":{"arn":"arn:aws:sts::123456789012:assumed-role/Analyst/session","accessKeyId":"ASIAABCDEFGHIJKLMNOP","sessionContext":{"sessionIssuer":{"arn":"arn:aws:iam::123456789012:role/Analyst"}}}},{"eventTime":"2026-10-23T12:01:00Z","eventName":"CreateAccessKey","requestParameters":{"userName":"alice"},"responseElements":{"accessKey":{"accessKeyId":"AKIAABCDEFGHIJKLMNOP"}}}]}"#;
-        let records = JsonParser.parse("cloudtrail.json", bytes).unwrap();
-        assert_eq!(records.len(), 2);
-        records[0].inspect(|record| {
-            assert_eq!(record.relations.len(), 3);
-            assert!(
-                record
-                    .relations
-                    .iter()
-                    .any(|relation| relation.relation == "observed_from_ip"
-                        && relation.to_value == "198.51.100.9")
-            );
-            assert!(
-                record
-                    .relations
-                    .iter()
-                    .any(|relation| relation.relation == "issued_session"
-                        && relation.from_kind == "role")
-            );
-            assert!(record.relations.iter().any(
-                |relation| relation.relation == "used_access_key" && relation.to_kind == "key"
-            ));
-        });
-        records[1].inspect(|record| assert_eq!(record.relations[0].relation, "created_access_key"));
-    }
-
-    #[test]
-    fn remote_envelopes_become_separate_timeline_records() {
-        let cloud = br#"{"events":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole"},{"eventTime":"2026-10-23T13:00:00Z","eventName":"GetObject"}]}"#;
-        let records = JsonParser.parse("cloud_audit_events:aws", cloud).unwrap();
-        assert_eq!(records.len(), 2);
-        records[1].inspect(|record| assert_eq!(record.event, "GetObject"));
-        let splunk = br#"{"result":{"_raw":"{\"eventTime\":\"2026-10-23T12:00:00Z\",\"eventName\":\"AssumeRole\"}"}}"#;
-        let records = JsonParser.parse("siem_search:splunk", splunk).unwrap();
-        assert_eq!(records.len(), 1);
-        records[0].inspect(|record| assert_eq!(record.event, "AssumeRole"));
-    }
-
-    #[test]
-    fn rejects_excessive_size_depth_and_record_count() {
-        let oversized = vec![b' '; 50 * 1024 * 1024 + 1];
-        assert!(JsonParser.parse("large.json", &oversized).is_err());
-        let deeply_nested = format!("{}0{}", "[".repeat(130), "]".repeat(130));
-        assert!(
-            JsonParser
-                .parse("nested.json", deeply_nested.as_bytes())
-                .is_err()
-        );
-        let many = format!("[{}]", "{},".repeat(100_000) + "{}");
-        assert!(JsonParser.parse("many.json", many.as_bytes()).is_err());
-    }
-}
+include!("tests.rs");

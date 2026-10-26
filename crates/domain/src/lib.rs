@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 mod approvals;
+mod audit_kind;
 mod canonical;
 mod entities;
 mod ids;
@@ -11,6 +12,7 @@ mod tainted;
 use canonical::{canonical_args, put, take_field, take_u64};
 
 pub use approvals::*;
+pub use audit_kind::*;
 pub use entities::*;
 use entities::{valid_scope_target, valid_scope_time};
 pub use ids::*;

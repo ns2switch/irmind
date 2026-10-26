@@ -21,6 +21,7 @@ type FilePorts = (
     Arc<dyn SecretBackend>,
     Arc<FileKeystore>,
 );
+type BackendPair = (Arc<dyn SignerBackend>, Arc<dyn SecretBackend>);
 #[cfg(feature = "keystore-os")]
 use irmind_mod_keystore_os::OsKeystore;
 
@@ -164,6 +165,24 @@ fn file_backend(home: &Path, fd: Option<u32>, create: bool) -> Result<FilePorts>
     Ok((backend.clone(), backend.clone(), backend))
 }
 
+fn select_backends(
+    selection: &Selection,
+    file: Option<&BackendPair>,
+    os: Option<&BackendPair>,
+) -> Result<BackendPair> {
+    let signer = match selection.signer.as_str() {
+        "file" => Arc::clone(&file.ok_or_else(|| anyhow!("file backend unavailable"))?.0),
+        "os" => Arc::clone(&os.ok_or_else(|| anyhow!("OS backend unavailable"))?.0),
+        _ => return Err(anyhow!("unknown signer backend")),
+    };
+    let secrets = match selection.secrets.as_str() {
+        "file" => Arc::clone(&file.ok_or_else(|| anyhow!("file backend unavailable"))?.1),
+        "os" => Arc::clone(&os.ok_or_else(|| anyhow!("OS backend unavailable"))?.1),
+        _ => return Err(anyhow!("unknown secrets backend")),
+    };
+    Ok((signer, secrets))
+}
+
 fn activate(
     home: &Path,
     selection: &Selection,
@@ -196,34 +215,7 @@ fn activate(
     } else {
         None
     };
-    let signer_backend = match selection.signer.as_str() {
-        "file" => Arc::clone(
-            &file
-                .as_ref()
-                .ok_or_else(|| anyhow!("file backend unavailable"))?
-                .0,
-        ),
-        "os" => Arc::clone(
-            &os.as_ref()
-                .ok_or_else(|| anyhow!("OS backend unavailable"))?
-                .0,
-        ),
-        _ => return Err(anyhow!("unknown signer backend")),
-    };
-    let secret_backend = match selection.secrets.as_str() {
-        "file" => Arc::clone(
-            &file
-                .as_ref()
-                .ok_or_else(|| anyhow!("file backend unavailable"))?
-                .1,
-        ),
-        "os" => Arc::clone(
-            &os.as_ref()
-                .ok_or_else(|| anyhow!("OS backend unavailable"))?
-                .1,
-        ),
-        _ => return Err(anyhow!("unknown secrets backend")),
-    };
+    let (signer_backend, secret_backend) = select_backends(selection, file.as_ref(), os.as_ref())?;
     let loaded = signer_backend.load(Actor::Analyst);
     let new_analyst_key = loaded.is_err();
     let signer = match loaded {
