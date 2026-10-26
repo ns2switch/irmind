@@ -1,4 +1,4 @@
-Traducción de docs/security-model.md en el commit 332d190657f969d89689b9ae150900b5c7b35723; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/security-model.md en el commit 095cd1db66e6dec2b51c6115d4fd44de6981e6a4; si hay diferencias, prevalece la versión en inglés.
 
 # Modelo de seguridad
 
@@ -15,9 +15,9 @@ El analista controla el caso, su alcance, las aprobaciones y su clave de firma. 
 ## Garantías de esta versión
 
 - **Custodia:** La evidencia original se guarda en local por SHA-256. Los cambios del caso y la actividad de herramientas entran en una cadena de auditoría SQLite de solo anexado, con firmas Ed25519. La verificación detecta entradas y bytes de evidencia modificados.
-- **Identidades separadas:** Analyst y Agent tienen entradas distintas en el llavero. Solo la firma del analista puede resolver una aprobación pendiente. Un caso sellado tiene una cadena operativa firmada aparte para las cancelaciones de tareas.
+- **Identidades separadas:** Analyst y Agent tienen claves distintas en el backend elegido. Solo la firma del analista puede resolver una aprobación pendiente. Un caso sellado tiene una cadena operativa firmada aparte para cancelaciones; las migraciones entran en una cadena operativa global firmada.
 - **Entrada protegida del modelo:** El texto externo se normaliza, se examina en busca de inyección de instrucciones, se redacta según patrones conocidos de secretos y datos personales, se limita y se envuelve como dato no confiable. El original queda en local. Un autotest de arranque bloquea la aplicación si falla el corpus conocido del guard.
-- **Conectores limitados:** Las credenciales llegan desde el llavero a través de la raíz de composición. Los clientes remotos exigen HTTPS, salvo HTTP sin clave hacia un servicio de modelo explícito en loopback. Las redirecciones están desactivadas y las respuestas tienen límites.
+- **Conectores limitados:** Las credenciales llegan desde el backend de secretos elegido a través de la raíz de composición. Los clientes remotos exigen HTTPS, salvo HTTP sin clave hacia un servicio de modelo explícito en loopback. Las redirecciones están desactivadas y las respuestas tienen límites.
 - **Presentación segura:** La TUI elimina controles del terminal de la salida del modelo, los resúmenes de evidencia y los nombres de archivo. Los diálogos de aprobación muestran los argumentos exactos tras escaparlos para el terminal.
 
 Un paquete exportado contiene el log firmado, el sello, la evidencia y la clave pública. Usa `verify-export --expected-key` con una huella obtenida por otro canal de confianza.
@@ -39,7 +39,7 @@ Un paquete exportado contiene el log firmado, el sello, la evidencia y la clave 
 - El enriquecimiento en VirusTotal expone el IOC consultado a un servicio externo. Siempre necesita aprobación. Un conector de solo lectura también depende de los permisos reales concedidos por su servicio.
 - El grafo es un índice derivado, no la evidencia original. Verifícalo o reconstruye desde entradas firmadas cuando importe su exactitud.
 - Los binarios de CI tienen checksums, pero no firma de código, notarización ni firma Authenticode. Consulta [plataformas](platforms.md).
-- El llavero del sistema es obligatorio para firmar; no hay respaldo en archivo con contraseña. Perder la clave puede impedir continuar un caso.
+- Los backends del sistema y de archivo cifrado se eligen expresamente; no hay cambios automáticos. El archivo funciona por SSH, pero depende de una passphrase sólida y de la integridad de la máquina. Perder la clave de firma puede impedir continuar un caso.
 
 ## Uso recomendado
 

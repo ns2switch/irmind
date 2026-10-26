@@ -1,8 +1,8 @@
-Traducción de docs/configuration.md en el commit 332d190657f969d89689b9ae150900b5c7b35723; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 095cd1db66e6dec2b51c6115d4fd44de6981e6a4; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
-Esta página es para quienes preparan una evaluación controlada. Explica el alcance de los casos, la política, los ajustes no secretos y el llavero. Los permisos de cada conector están en [módulos](modules.md).
+Esta página es para quienes preparan una evaluación controlada. Explica el alcance de los casos, la política, los ajustes no secretos y la selección del backend. Los permisos de los conectores están en [módulos](modules.md).
 
 ## Alcance del caso
 
@@ -48,9 +48,26 @@ La raíz de composición lee estas variables de entorno. Usa solo valores acorde
 
 VirusTotal no tiene ajustes no secretos. Las features y los interruptores de activación están en [módulos](modules.md).
 
-## Cuentas del llavero
+## Backends de firma y secretos
 
-No pongas credenciales en variables de entorno. Añade cada credencial de módulo al llavero nativo, con servicio `irmind-module` y la cuenta indicada. Usa el gestor de llaves del sistema; IRMind no muestra secretos.
+La TUI guarda la selección explícita del primer arranque en `keystore.toml`, dentro del directorio de datos:
+
+```toml
+[keystore]
+signer = "file"
+secrets = "file"
+analyst_key_fingerprint = "<huella mostrada por IRMind>"
+```
+
+Elige `os` o `file` por separado para cada capacidad. `os` usa Keychain, Credential Manager o Secret Service. `file` guarda ambas capacidades en `keystore.enc`, pide una passphrase sin eco una vez por sesión y funciona por SSH. Emplea Argon2id y XChaCha20-Poly1305; sigue siendo necesaria una passphrase sólida y una máquina protegida. Si el backend elegido no se abre, IRMind falla cerrado y ofrece un cambio explícito en la TUI. Nunca cambia en silencio.
+
+Pulsa `k` en la pantalla de inicio para ver los backends, comprobar qué credenciales existen, añadir o sustituir (`a`), eliminar (`d`), cambiar la passphrase (`p`) o migrar una capacidad (`s` o `x`). La migración conserva la huella pública del analista y deja un evento operativo global firmado incluso antes del primer caso. Tras cambiar una credencial, los conectores activos pueden conservar el valor anterior: pulsa `r` para reiniciar la sesión. No escribas secretos en el texto del caso.
+
+La CLI lee la passphrase del terminal sin eco o de un descriptor abierto explícitamente con `--passphrase-fd <FD>`; Windows admite actualmente solo el descriptor `0`. IRMind no acepta passphrases ni secretos por argumentos o variables de entorno. `verify-export` no necesita desbloquear ningún backend.
+
+## Nombres de credenciales
+
+No pongas credenciales en variables de entorno. Introdúcelas en la vista de llavero de la TUI con el nombre de campo indicado; IRMind nunca muestra su valor. Con `os`, el servicio es `irmind-module` y la cuenta es ese campo. Con `file`, cada campo queda cifrado en un registro.
 
 | Cuenta en `irmind-module` | Uso |
 | --- | --- |
@@ -64,7 +81,7 @@ No pongas credenciales en variables de entorno. Añade cada credencial de módul
 | `IRMIND_MISP_API_KEY` | Clave MISP de solo lectura. |
 | `VIRUSTOTAL_API_KEY` | Clave de enriquecimiento de VirusTotal. |
 
-Las claves de firma usan otro servicio, `irmind`: cuenta `local-analyst` y, para una futura ejecución desatendida, `local-agent-<id>`. La aplicación crea estas claves en el llavero. No hay respaldo en archivo. Si falla el llavero, se detiene la firma; `verify-export` aún puede comprobar un paquete sin él.
+Con `os`, las claves de firma usan otro servicio, `irmind`: `local-analyst` y `local-agent-<id>` para una futura ejecución desatendida. Con `file`, esas mismas identidades quedan cifradas. Ambos backends mantienen dentro la clave privada; si falta el backend configurado, la firma se bloquea.
 
 ## Elegir un modelo
 

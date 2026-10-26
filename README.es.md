@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 332d190657f969d89689b9ae150900b5c7b35723; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 095cd1db66e6dec2b51c6115d4fd44de6981e6a4; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -39,11 +39,11 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-CI también publica binarios sin firma para Linux, macOS y Windows. Verifica `SHA256SUMS` antes de ejecutarlos. La [guía de plataformas](docs/es/platforms.md) explica las comprobaciones y particularidades de cada sistema.
+CI también publica binarios sin firma para Linux, macOS y Windows. Verifica `SHA256SUMS` antes de ejecutarlos. La [guía de plataformas](docs/es/platforms.md) explica las comprobaciones, los almacenes de claves y el uso por SSH.
 
 ## Primer caso en la TUI
 
-1. Ejecuta `irmind` sin subcomando. El asistente comprueba el llavero, crea la clave de firma del analista si falta y muestra su huella pública. Guarda la huella fuera de este equipo.
+1. Ejecuta `irmind` sin subcomando. Elige el llavero del sistema o el archivo cifrado para las firmas y los secretos. El archivo funciona por SSH sin sesión gráfica. Guarda la huella de la clave pública del analista fuera de este equipo.
 2. Pulsa `n` para crear un caso. Indica título, severidad y ventana temporal. Deja vacías las fuentes remotas para trabajar solo con evidencia local.
 3. Abre el caso y escribe `/ingest`. Selecciona [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), que contiene únicamente datos sintéticos.
 4. Elige un modelo explícitamente. Para un servicio local compatible con OpenAI, como Ollama, configura `IRMIND_MODEL` con un modelo instalado y `IRMIND_LLM_BASE_URL=http://127.0.0.1:11434/v1/`; después inicia `irmind --llm-module llm-openai-compatible`. También admite HTTPS. Para un proveedor remoto, sigue [configuración](docs/es/configuration.md) y aprueba antes su tratamiento de datos.
@@ -69,13 +69,15 @@ Una feature de Cargo incluye el módulo en el binario; activarlo es un paso dist
 | MISP | TI interna | `ti-misp` | experimental | [Módulos](docs/es/modules.md) |
 | VirusTotal | enriquecimiento externo | `ti-virustotal` | experimental | [Módulos](docs/es/modules.md) |
 | Parser JSON y CloudTrail | parser local | incluido | experimental | [Módulos](docs/es/modules.md) |
+| Llavero del sistema | firma y secretos | `keystore-os` (por defecto) | experimental | [Módulos](docs/es/modules.md#llavero-del-sistema) |
+| Archivo cifrado | firma y secretos | `keystore-file` (por defecto) | experimental | [Módulos](docs/es/modules.md#archivo-cifrado) |
 
 ## Seguridad
 
 - Los puertos externos solo aceptan llamadas autorizadas; el modo desatendido solo permite lecturas dentro del alcance.
 - El enriquecimiento externo necesita una aprobación firmada del analista; la contención está deshabilitada.
 - La evidencia original queda en local; el contexto del modelo se limita, protege y redacta.
-- La auditoría se encadena por hash y se firma; un paquete sellado se puede comprobar en otro equipo.
+- La auditoría se encadena por hash y se firma; un paquete sellado se puede comprobar en otro equipo. Las migraciones de llavero entran en una cadena global firmada.
 - La redacción puede pasar datos por alto. Un firmante local puede reescribir una cadena completa si su huella no está fijada fuera del equipo. Esta versión no es apta para producción.
 
 Lee [security-model.md](docs/es/security-model.md) antes de conectar un proveedor.

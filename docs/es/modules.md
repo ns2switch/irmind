@@ -1,8 +1,8 @@
-Traducción de docs/modules.md en el commit 332d190657f969d89689b9ae150900b5c7b35723; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit 095cd1db66e6dec2b51c6115d4fd44de6981e6a4; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
-Esta página es para quienes eligen conectores. Cada apartado indica qué consulta el módulo, los permisos mínimos, cómo activarlo y sus límites. Guarda las credenciales según [configuración](configuration.md); los crates de módulos no leen el llavero ni el entorno.
+Esta página es para quienes eligen conectores o backends de llavero. Cada apartado explica qué hace el módulo, sus permisos, configuración y límites. Guarda las credenciales según [configuración](configuration.md); los conectores no leen el llavero ni el entorno por su cuenta.
 
 Los módulos se compilan dentro del binario. Una feature de Cargo incluye un módulo opcional; un interruptor de la CLI activa un conector en la sesión. El modelo se elige con `--llm-module`. Ninguno se selecciona automáticamente.
 
@@ -22,7 +22,7 @@ Los módulos se compilan dentro del binario. Una feature de Cargo incluye un mó
 
 **Permiso:** Cuenta API autorizada para el modelo aprobado.
 
-**Configuración:** Compila con `--features llm-anthropic`, define `IRMIND_ANTHROPIC_MODEL`, guarda `ANTHROPIC_API_KEY` en el llavero y selecciona `--llm-module llm-anthropic`.
+**Configuración:** Compila con `--features llm-anthropic`, define `IRMIND_ANTHROPIC_MODEL`, guarda `ANTHROPIC_API_KEY` en el backend de secretos elegido y selecciona `--llm-module llm-anthropic`.
 
 **Límites:** El servicio remoto usa HTTPS. Comprueba región, retención y tratamiento contractual de datos antes de usarlo.
 
@@ -115,6 +115,26 @@ Los módulos se compilan dentro del binario. Una feature de Cargo incluye un mó
 **Configuración:** Incluido y activo en todos los binarios. Usa el selector `/ingest` de la TUI o el [comando de ingesta de la CLI](../development/cli.md).
 
 **Límites:** El parseo actual es acotado y en memoria. Rechaza archivos demasiado grandes, JSON muy anidado y demasiados registros. Otros formatos necesitan parsers futuros.
+
+## Llavero del sistema
+
+**Función:** Firma como Analyst o Agent y guarda credenciales de módulos en Keychain, Credential Manager o Secret Service.
+
+**Permiso:** Acceso al almacén de credenciales del usuario actual. En Linux, Secret Service suele necesitar una sesión D-Bus.
+
+**Configuración:** Se compila por defecto con `keystore-os`. Elige `os` explícitamente para `signer`, `secrets` o ambos en el primer arranque. Pulsa `k` para gestionar credenciales sin mostrar sus valores.
+
+**Límites:** Una sesión SSH sin entorno gráfico puede no tener el llavero desbloqueado. Si este backend está seleccionado y no funciona, IRMind se detiene; la selección o migración a `file` debe ser explícita.
+
+## Archivo cifrado
+
+**Función:** Firma como Analyst o Agent y guarda credenciales en un archivo local cifrado.
+
+**Permiso:** Escritura en el directorio privado de datos del usuario; no requiere red ni sesión gráfica.
+
+**Configuración:** Se compila por defecto con `keystore-file`. Elige `file` explícitamente para `signer`, `secrets` o ambos. La TUI pide la passphrase sin eco; la CLI admite `--passphrase-fd`. Pulsa `k` para cambiar la passphrase o migrar.
+
+**Límites:** Argon2id y XChaCha20-Poly1305 protegen el archivo en reposo, pero una passphrase débil o una sesión comprometida pueden exponerlo desbloqueado. Conserva fuera de la máquina la huella pública. La migración queda en la cadena operativa global firmada y requiere reiniciar la sesión para activarse.
 
 ## Contrato de proveedores
 
