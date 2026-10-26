@@ -5,7 +5,7 @@ use irmind_domain::Actor;
 use secrecy::SecretString;
 use serde::Deserialize;
 #[cfg(feature = "keystore-file")]
-use std::io::Read as _;
+use std::io::Read;
 use std::{
     fs::{self, OpenOptions},
     io::Write as _,
@@ -121,7 +121,7 @@ fn read_passphrase(fd: Option<u32>) -> Result<SecretString> {
             let input = fs::File::open(format!("/dev/fd/{descriptor}"))
                 .context("open passphrase descriptor")?;
             #[cfg(windows)]
-            let mut input: Box<dyn Read> = if descriptor == 0 {
+            let input: Box<dyn Read> = if descriptor == 0 {
                 Box::new(std::io::stdin())
             } else {
                 return Err(anyhow!("Windows supports --passphrase-fd 0 only"));
