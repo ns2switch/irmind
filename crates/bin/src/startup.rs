@@ -1,11 +1,28 @@
+#[cfg(feature = "llm-anthropic")]
+use super::Anthropic;
+#[cfg(feature = "cloud-aws")]
+use super::AwsCloudTrail;
+#[cfg(feature = "edr-crowdstrike")]
+use super::CrowdStrike;
+#[cfg(feature = "llm-deepseek")]
+use super::DeepSeek;
+#[cfg(feature = "ti-misp")]
+use super::Misp;
+#[cfg(feature = "llm-openrouter")]
+use super::OpenRouter;
+#[cfg(feature = "edr-sentinelone")]
+use super::SentinelOne;
+#[cfg(feature = "siem-splunk")]
+use super::Splunk;
+#[cfg(feature = "ti-virustotal")]
+use super::VirusTotal;
 use super::{
-    Anthropic, Arc, AuditLog, AwsCloudTrail, BTreeMap, CancellationToken, Cli, Command, Context,
-    CrowdStrike, CryptoPorts, DEFAULT_LLM_MODULE, DeepSeek, Engine, EnginePorts, ExecutionMode,
-    JsonParser, LocalExportVerifier, LocalStore, LocalVerifier, MandatoryGuard, Misp, ModuleConfig,
-    ModuleRegistry, ModuleStatus, OpenAiCompatible, OpenRouter, Parser, PathBuf, ProjectDirs,
-    Repository, Result, RootWorkspaceIo, SecretBackend, SentinelOne, SignerBackend, Splunk,
-    SystemClock, VirusTotal, anyhow, cli, compiled_credential_fields, configuration_issue,
-    keystore, load_module_config, load_policy, load_pricing,
+    Arc, AuditLog, BTreeMap, CancellationToken, Cli, Command, Context, CryptoPorts,
+    DEFAULT_LLM_MODULE, Engine, EnginePorts, ExecutionMode, JsonParser, LocalExportVerifier,
+    LocalStore, LocalVerifier, MandatoryGuard, ModuleConfig, ModuleRegistry, ModuleStatus,
+    OpenAiCompatible, Parser, PathBuf, ProjectDirs, Repository, Result, RootWorkspaceIo,
+    SecretBackend, SignerBackend, SystemClock, anyhow, cli, compiled_credential_fields,
+    configuration_issue, keystore, load_module_config, load_policy, load_pricing,
 };
 
 mod status;
