@@ -1,6 +1,6 @@
 # Modules
 
-This page is for operators choosing a connector. Each section states what the module reads, the least privilege it needs, how to enable it, and what it cannot do. Store credentials as described in [configuration](configuration.md); module crates never read the keyring or environment themselves.
+This page is for operators choosing a connector or keystore. Each section states what it does, the least privilege it needs, how to enable it, and what it cannot do. Store credentials as described in [configuration](configuration.md); product modules never read a keystore or environment themselves.
 
 Modules are compiled into the binary. A Cargo feature includes an optional module, while a CLI switch enables a connector for a session. A model is selected with `--llm-module`. Nothing is selected automatically.
 
@@ -10,7 +10,7 @@ Modules are compiled into the binary. A Cargo feature includes an optional modul
 
 **Permission:** Access only to an approved model and endpoint. A local keyless service may use HTTP on loopback; HTTPS also works. Remote endpoints require HTTPS and a key dedicated to that URL.
 
-**Configure:** Included in the standard binary. Set `IRMIND_MODEL` and optionally `IRMIND_LLM_BASE_URL`. Select `--llm-module llm-openai-compatible`. Put `OPENAI_API_KEY` in the keyring only for the official URL, or `IRMIND_LLM_API_KEY` for a custom endpoint.
+**Configure:** Included in the standard binary. Set `IRMIND_MODEL` and optionally `IRMIND_LLM_BASE_URL`. Select `--llm-module llm-openai-compatible`. Store `OPENAI_API_KEY` in the selected secret backend only for the official URL, or `IRMIND_LLM_API_KEY` for a custom endpoint.
 
 **Limits:** Streaming must include final usage data; incomplete streams fail closed. Pattern redaction cannot guarantee that all sensitive content is removed. Obtain provider approval before sending incident data.
 
@@ -20,7 +20,7 @@ Modules are compiled into the binary. A Cargo feature includes an optional modul
 
 **Permission:** An API account allowed to invoke the approved model.
 
-**Configure:** Build with `--features llm-anthropic`, set `IRMIND_ANTHROPIC_MODEL`, store `ANTHROPIC_API_KEY` in the keyring, and select `--llm-module llm-anthropic`.
+**Configure:** Build with `--features llm-anthropic`, set `IRMIND_ANTHROPIC_MODEL`, store `ANTHROPIC_API_KEY` in the selected secret backend, and select `--llm-module llm-anthropic`.
 
 **Limits:** The endpoint is remote HTTPS. Confirm region, retention, and contractual data handling before use.
 
@@ -113,6 +113,26 @@ Modules are compiled into the binary. A Cargo feature includes an optional modul
 **Configure:** Included and active in every binary. Use the TUI's `/ingest` picker or the [CLI ingest command](development/cli.md).
 
 **Limits:** Parsing is currently bounded and in memory. It rejects oversized, deeply nested, or excessive record sets. Other log formats need future parsers.
+
+## OS keystore
+
+**Does:** Signs as Analyst or Agent and stores module credentials in Keychain, Credential Manager, or Secret Service.
+
+**Permission:** Access to the current user's OS credential store. Linux Secret Service normally needs a D-Bus session.
+
+**Configure:** Compiled by default with `keystore-os`. Choose `os` explicitly for `signer`, `secrets`, or both on first launch. Press `k` to manage credentials without displaying their values.
+
+**Limits:** A headless SSH session may lack an unlocked OS keyring. IRMind stops if this backend is selected but unavailable; select and migrate to `file` explicitly.
+
+## File keystore
+
+**Does:** Signs as Analyst or Agent and stores module credentials in a local encrypted file.
+
+**Permission:** Write access to the current user's private application-data directory; no network or graphical session is needed.
+
+**Configure:** Compiled by default with `keystore-file`. Choose `file` explicitly for `signer`, `secrets`, or both. The TUI prompts for a passphrase without echo; use `--passphrase-fd` for CLI automation. Press `k` to change the passphrase or migrate a capability.
+
+**Limits:** Argon2id and XChaCha20-Poly1305 protect data at rest, but a weak passphrase or a compromised user session can expose an unlocked store. Keep the public-key fingerprint outside the machine. Migration is signed in the global operational chain and requires a session restart to take effect.
 
 ## Provider contract
 

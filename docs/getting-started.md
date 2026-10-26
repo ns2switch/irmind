@@ -6,7 +6,7 @@ This guide is for analysts evaluating IRMind with synthetic data. It takes you f
 
 ## Install
 
-The recommended internal path is a source build. Install Rust 1.95.0, a supported terminal, and a native system keyring. Then run:
+The recommended internal path is a source build. Install Rust 1.95.0 and a supported terminal. An OS keyring is optional if you explicitly select the encrypted-file backend. Then run:
 
 ```sh
 rustup toolchain install 1.95.0
@@ -18,7 +18,9 @@ On Windows, run `.\target\release\irmind.exe` in Windows Terminal. You may inste
 
 ## First launch
 
-Running `irmind` without a subcommand opens the TUI. The first-run view checks the keyring, creates an analyst signing key when none exists, and shows the public-key fingerprint. Save that fingerprint through a separate trusted channel. IRMind cannot recover a lost signing key and will stop if the keyring is unavailable.
+Running `irmind` without a subcommand opens the TUI. Choose `os` or `file` separately for signing and module secrets. Both backends are compiled by default; IRMind never switches between them silently. The file backend asks for a passphrase without echo and works through an interactive SSH terminal without a graphical session. On first use IRMind creates an analyst signing key and shows its public-key fingerprint. Save the fingerprint through a separate trusted channel. A lost key cannot be recovered from a case export.
+
+If the selected backend is unavailable, startup stops and the TUI offers an explicit new selection. The chosen backends are stored in `keystore.toml` inside the data directory. Press `k` on the home screen to see the selection and fingerprint, manage module credentials, change the file passphrase, or migrate. Replacing a credential leaves already-created connectors using the old value; press `r` in the keystore view to restart the session.
 
 Press `m` to see which modules are compiled, enabled, and configured. No LLM is enabled automatically. Local case work remains available without a model.
 
@@ -35,4 +37,4 @@ The export can be checked on a second computer with `irmind verify-export <PACKA
 
 ## Next
 
-Use [configuration](configuration.md) for scopes, policy, and keyring accounts. Use [modules](modules.md) for connector permissions and limitations. The TUI is the primary workflow; subcommands serve automation.
+Use [configuration](configuration.md) for scopes, policy, backends, and credential names. Use [modules](modules.md) for connector permissions and limitations, and [platforms](platforms.md) for SSH notes. The TUI is the primary workflow; subcommands serve automation.

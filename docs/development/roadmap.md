@@ -6,7 +6,7 @@ This page is for contributors and evaluators planning around current limitations
 
 - A case-centered TUI with signed case creation, evidence ingestion, investigation, approval, verification, sealing, and export.
 - Policy-gated reads and analyst-approved external enrichment, with a mandatory content guard.
-- Local SQLite custody, a derived DuckDB graph, and keyring-backed Ed25519 signatures.
+- Local SQLite custody, a derived DuckDB graph, and Ed25519 signatures from an explicitly selected OS or encrypted-file backend.
 - Explicitly selected LLM modules and optional Splunk, AWS, EDR, MISP, and VirusTotal connectors.
 - Automated contracts and synthetic end-to-end tests.
 
@@ -17,7 +17,7 @@ This page is for contributors and evaluators planning around current limitations
 3. Show model streaming incrementally in the TUI and improve per-batch progress for long local tasks.
 4. Stream CloudTrail and JSON parsing for larger inputs, add full-text graph search, and benchmark at least 1 GB of synthetic evidence.
 5. Add SIEM alert retrieval and separate tracing from signed audit data.
-6. Complete async service-safe use cases and run the full macOS, Linux, and Windows matrix, including cross-platform export checks.
+6. Confirm the full macOS, Linux, and Windows matrix, including cross-platform export checks, before treating a change as ready for integration.
 
 ## Later work
 

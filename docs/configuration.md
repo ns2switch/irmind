@@ -1,6 +1,6 @@
 # Configuration
 
-This page is for operators setting up a controlled evaluation. It explains case scope, policy, non-secret settings, and the keyring. For individual connector permissions, see [modules](modules.md).
+This page is for operators setting up a controlled evaluation. It explains case scope, policy, non-secret settings, and keystore selection. For connector permissions, see [modules](modules.md).
 
 ## Case scope
 
@@ -46,9 +46,26 @@ The composition root reads these environment variables. Set only values that mat
 
 VirusTotal has no non-secret module setting. Feature flags and enable switches are listed in [modules](modules.md).
 
-## Keyring accounts
+## Signing and secret backends
 
-Do not set credential values in environment variables. Add each module credential to the native keyring with service `irmind-module` and the account name below. Use your system's keyring manager; IRMind does not display secrets.
+The first-run TUI writes an explicit selection to `keystore.toml` in the local data directory:
+
+```toml
+[keystore]
+signer = "file"
+secrets = "file"
+analyst_key_fingerprint = "<fingerprint shown by IRMind>"
+```
+
+Choose `os` or `file` independently for each capability. The OS backend uses Keychain, Credential Manager, or Secret Service. The encrypted-file backend keeps both capabilities in `keystore.enc`, prompts once per session without echo, and works over SSH. It uses Argon2id and XChaCha20-Poly1305; a strong passphrase and a protected host still matter. If a selected backend cannot be opened, IRMind fails closed and offers an explicit change in the TUI. It never falls back silently.
+
+Press `k` on the home screen to view the active backends, check credential presence, add or replace a credential (`a`), delete one (`d`), change the file passphrase (`p`), or migrate a capability (`s` or `x`). Migration preserves the analyst public-key fingerprint and writes a signed global operational event even before the first case exists. After a credential change, active connectors may retain the previous value: press `r` to restart the session. Never type secrets into case text.
+
+The CLI reads a file-backend passphrase from the terminal without echo or from an explicitly opened descriptor with `--passphrase-fd <FD>`; Windows currently accepts descriptor `0` only. IRMind does not accept passphrases or module secrets through arguments or environment variables. `verify-export` needs no keystore.
+
+## Credential names
+
+Do not set credential values in environment variables. Enter them in the TUI keystore view under the manifest field name below; IRMind never displays their values. With the OS backend, the service is `irmind-module` and the account is that field name. With the file backend, each field is an encrypted record.
 
 | Account under `irmind-module` | Used by |
 | --- | --- |
@@ -62,7 +79,7 @@ Do not set credential values in environment variables. Add each module credentia
 | `IRMIND_MISP_API_KEY` | MISP read-only key. |
 | `VIRUSTOTAL_API_KEY` | VirusTotal enrichment key. |
 
-Signing keys use a separate `irmind` service: account `local-analyst` and, for later unattended operation, `local-agent-<id>`. The application creates these keys in the keyring. There is no file fallback. If the keyring fails, signing stops; `verify-export` can still check a package without it.
+The OS backend stores signing keys under a separate `irmind` service: `local-analyst` and `local-agent-<id>` for later unattended operation. The file backend stores the same identities encrypted. Both keep private keys inside the backend; a missing configured backend blocks signing.
 
 ## Choose a model
 

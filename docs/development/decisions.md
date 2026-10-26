@@ -9,8 +9,11 @@ This page is for maintainers reviewing tradeoffs that shape the current build. E
 | Case evidence needs a reproducible local index. | Use DuckDB for the derived graph. | Signed originals, not the index, remain authoritative. | 2026-10-23 |
 | Later unattended agents need distinct authority. | Analyst and Agent use separate Ed25519 keys and `ExecutionMode`. | Only analyst signatures resolve approvals. | 2026-10-23 |
 | Product connectors must be replaceable. | Static Cargo modules implement application ports. | No runtime plugin loader; modules remain explicitly selected. | 2026-10-23 |
-| Remote I/O and local custody have different costs. | Remote ports are async; local ports are synchronous and must run off the runtime when long. | Application use cases still need further `spawn_blocking` work. | 2026-10-25 |
-| Native key storage may be unavailable. | Fail closed without a keyring; no encrypted-file fallback. | Key recovery is not yet available. | 2026-10-25 |
+| Remote I/O and local custody have different costs. | Remote ports are async; local ports are synchronous and use `spawn_blocking` from async use cases. | Local work does not block the runtime. | 2026-10-25 |
+| Native key storage may be unavailable over SSH. | Select `os` or encrypted `file` explicitly per signing and secret capability. | No silent fallback; an unavailable selected backend stops startup. | 2026-10-25 |
+| The file keystore needs private writes without an adapter dependency. | Move ACL and durable-write helpers to `irmind-fs`. | Infra and keystore-file share one audited filesystem boundary; adapters cannot depend on adapters. | 2026-10-26 |
+| Key migration can happen before the first case. | Record it once in a global signed operational chain. | Startup verifies the chain; historical case operations remain intact. | 2026-10-26 |
+| Active connectors may retain a changed credential. | Warn in the TUI and offer `r` to rebuild the session. | The new value takes effect only after the composition root restarts. | 2026-10-26 |
 | Local and remote TLS needs corporate roots. | Rustls uses native certificate roots; keyless local models may use loopback HTTP. | No system OpenSSL; platform-verifier checks are not fully replicated. | 2026-10-25 |
 | A crash during sealing can leave two stores out of sync. | Sign the seal separately, persist seal intent first, and reconcile on startup. | Verification reports unresolved inconsistency. | 2026-10-25 |
 | Sealed cases cannot accept more case-chain entries. | Record cancellations in a separate signed operational chain. | The case seal remains immutable. | 2026-10-25 |

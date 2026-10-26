@@ -1,6 +1,6 @@
 # Platforms
 
-This page is for people installing IRMind on Linux, macOS, or Windows. It covers build requirements, unsigned CI binaries, keyrings, and terminal behavior. Start with [getting started](getting-started.md) for the case workflow.
+This page is for people installing IRMind on Linux, macOS, or Windows, including headless SSH hosts. It covers builds, unsigned CI binaries, keystore backends, and terminal behavior. Start with [getting started](getting-started.md) for the case workflow.
 
 ## Build from source
 
@@ -27,18 +27,18 @@ The binaries are not signed, notarized, or Authenticode signed. Their checksum p
 
 ## Linux
 
-Use a terminal compatible with xterm, such as GNOME Terminal or Konsole. The native Secret Service must be available through D-Bus; IRMind fails closed if the signing key cannot be stored or loaded. Local files and directories are restricted to the current user with Unix `0600` and `0700` permissions.
+Use a terminal compatible with xterm, such as GNOME Terminal or Konsole. The `os` backend needs Secret Service through D-Bus; it may be unavailable over SSH. Select `file` explicitly for a headless session. Local files and directories are restricted to the current user with Unix `0600` and `0700` permissions.
 
 ## macOS
 
-Use Terminal.app or iTerm2. Signing keys live in Keychain. CI targets Apple Silicon. After verifying the checksum, Gatekeeper may block the unsigned downloaded binary. Allow **that binary only** in System Settings → Privacy & Security, or remove only its quarantine attribute with `xattr -d com.apple.quarantine ./irmind`. Never disable Gatekeeper system-wide.
+Use Terminal.app or iTerm2. The `os` backend uses Keychain; the `file` backend is available for explicit SSH use. CI targets Apple Silicon. After verifying the checksum, Gatekeeper may block the unsigned downloaded binary. Allow **that binary only** in System Settings → Privacy & Security, or remove only its quarantine attribute with `xattr -d com.apple.quarantine ./irmind`. Never disable Gatekeeper system-wide.
 
 ## Windows
 
-Use Windows Terminal and the x64 MSVC build. Signing keys live in Credential Manager. IRMind checks that local case files are restricted to the current user's SID. SmartScreen or corporate antivirus may warn about an unsigned binary. Verify the checksum and provenance, then request a narrow exception from your security team if policy allows it. Do not disable protection globally.
+Use Windows Terminal and the x64 MSVC build. The `os` backend uses Credential Manager; `file` is available when it is explicitly selected. IRMind checks that local case files and the encrypted store are restricted to the current user's SID. SmartScreen or corporate antivirus may warn about an unsigned binary. Verify the checksum and provenance, then request a narrow exception from your security team if policy allows it. Do not disable protection globally.
 
 ## Data and terminal behavior
 
 Without `--home`, data goes to the platform's standard local application-data directory: XDG on Linux, Application Support on macOS, and LocalAppData on Windows. Evidence names are lower-case hashes; paths stored in the audit and export use relative `/` separators. Each case has a SQLite audit database and a DuckDB derived graph.
 
-The TUI uses the alternate screen and sanitizes external text before display. Automated tests cover control sequences and bidirectional controls on all three systems. Visual interaction still needs manual review in each terminal before production use. There is no encrypted-file fallback if the native keyring is unavailable; `verify-export` can run without a local keyring.
+The TUI uses the alternate screen and sanitizes external text before display. Automated tests cover control sequences and bidirectional controls on all three systems. Visual interaction still needs manual review in each terminal before production use. Over SSH, request a terminal (`ssh -t`), select `file` during setup, and enter the passphrase at the no-echo prompt. Backend changes are explicit; IRMind never falls back silently. `verify-export` can run without unlocking a keystore.
