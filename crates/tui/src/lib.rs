@@ -103,7 +103,7 @@ pub fn run_workspace(
     shutdown: &CancellationToken,
     initial_case: Option<&irmind_app::CaseId>,
     new_analyst_key: bool,
-) -> Result<()> {
+) -> Result<bool> {
     let _session = TerminalSession::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     home::run_home(

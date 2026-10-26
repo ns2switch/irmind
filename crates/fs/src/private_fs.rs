@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-pub(crate) fn private_dir(path: &Path) -> std::io::Result<()> {
+pub fn private_dir(path: &Path) -> std::io::Result<()> {
     refuse_link(path)?;
     #[cfg(unix)]
     {

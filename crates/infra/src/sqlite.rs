@@ -21,7 +21,7 @@ impl LocalStore {
         fs::create_dir_all(&seal_dir).map_err(storage)?;
         fs::create_dir_all(&lock_dir).map_err(storage)?;
         for path in [root, &evidence_dir, &seal_dir, &lock_dir] {
-            private_fs::private_dir(path).map_err(storage)?;
+            private_dir(path).map_err(storage)?;
         }
         let db_path = root.join("irmind.db");
         let mut db_file = OpenOptions::new();
@@ -48,12 +48,17 @@ impl LocalStore {
             CREATE TABLE IF NOT EXISTS operational_audit (case_id TEXT NOT NULL, seq INTEGER NOT NULL, at INTEGER NOT NULL,
                 actor TEXT NOT NULL, operation TEXT NOT NULL, prev BLOB NOT NULL, hash BLOB NOT NULL,
                 sig BLOB NOT NULL, public_key BLOB NOT NULL, PRIMARY KEY(case_id,seq), FOREIGN KEY(case_id) REFERENCES cases(id));
+            CREATE TABLE IF NOT EXISTS global_operational_audit (seq INTEGER PRIMARY KEY, at INTEGER NOT NULL,
+                actor TEXT NOT NULL, operation TEXT NOT NULL, prev BLOB NOT NULL, hash BLOB NOT NULL,
+                sig BLOB NOT NULL, public_key BLOB NOT NULL);
             CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT,'audit is append only'); END;
             CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT,'audit is append only'); END;
             CREATE TRIGGER IF NOT EXISTS seal_intent_no_update BEFORE UPDATE ON seal_intent BEGIN SELECT RAISE(ABORT,'seal intent is append only'); END;
             CREATE TRIGGER IF NOT EXISTS seal_intent_no_delete BEFORE DELETE ON seal_intent BEGIN SELECT RAISE(ABORT,'seal intent is append only'); END;
             CREATE TRIGGER IF NOT EXISTS operational_audit_no_update BEFORE UPDATE ON operational_audit BEGIN SELECT RAISE(ABORT,'operational audit is append only'); END;
             CREATE TRIGGER IF NOT EXISTS operational_audit_no_delete BEFORE DELETE ON operational_audit BEGIN SELECT RAISE(ABORT,'operational audit is append only'); END;
+            CREATE TRIGGER IF NOT EXISTS global_operational_audit_no_update BEFORE UPDATE ON global_operational_audit BEGIN SELECT RAISE(ABORT,'global operational audit is append only'); END;
+            CREATE TRIGGER IF NOT EXISTS global_operational_audit_no_delete BEFORE DELETE ON global_operational_audit BEGIN SELECT RAISE(ABORT,'global operational audit is append only'); END;
         ").map_err(storage)?;
         let has_severity = {
             let mut statement = db.prepare("PRAGMA table_info(cases)").map_err(storage)?;
@@ -577,5 +582,59 @@ impl AuditLog for LocalStore {
             .map_err(storage)?
             .collect::<Result<Vec<_>, _>>()
             .map_err(storage)
+    }
+
+    fn lock_global_operations(&self) -> Result<Box<dyn CaseLock>, AppError> {
+        let path = self.lock_dir.join("global-operations.lock");
+        let mut options = OpenOptions::new();
+        options.read(true).write(true).create(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt as _;
+            options.mode(0o600);
+        }
+        let file = options.open(&path).map_err(storage)?;
+        private_file(&path).map_err(storage)?;
+        file.lock_exclusive().map_err(storage)?;
+        Ok(Box::new(HeldCaseFile { _file: file }))
+    }
+
+    fn global_operations(&self) -> Result<Vec<SignedOperation>, AppError> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare("SELECT ?1 AS case_id,seq,at,actor,operation,prev,hash,sig,public_key FROM global_operational_audit ORDER BY seq").map_err(storage)?;
+        stmt.query_map([GLOBAL_OPERATION_SCOPE], map_operation)
+            .map_err(storage)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(storage)
+    }
+
+    fn append_global_operation(&self, entry: &SignedOperation) -> Result<(), AppError> {
+        if entry.case_id != GLOBAL_OPERATION_SCOPE || entry.actor != Actor::Analyst {
+            return Err(storage_reason("invalid global operational actor or scope"));
+        }
+        let mut conn = self.conn()?;
+        let tx = conn.transaction().map_err(storage)?;
+        let last: Option<(u64, Vec<u8>)> = tx
+            .query_row(
+                "SELECT seq,hash FROM global_operational_audit ORDER BY seq DESC LIMIT 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(storage)?;
+        let (next, prev) = last.map_or((1, vec![0u8; 32]), |(seq, hash)| (seq + 1, hash));
+        if entry.seq != next
+            || entry.prev.as_slice() != prev
+            || sha256(&entry.canonical()) != entry.hash
+        {
+            return Err(storage_reason(
+                "global operational audit sequence or hash mismatch",
+            ));
+        }
+        verify_signature(&entry.public_key, &entry.hash, &entry.sig)?;
+        tx.execute("INSERT INTO global_operational_audit (seq,at,actor,operation,prev,hash,sig,public_key) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+            params![entry.seq, entry.at, entry.actor.as_storage(), entry.operation,
+                entry.prev.as_slice(), entry.hash.as_slice(), entry.sig, entry.public_key]).map_err(storage)?;
+        tx.commit().map_err(storage)
     }
 }

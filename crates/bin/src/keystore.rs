@@ -63,7 +63,7 @@ fn read_config(home: &Path) -> Result<Option<Selection>> {
     if !metadata.is_file() || metadata.len() > 4096 {
         return Err(anyhow!("invalid keystore configuration file"));
     }
-    irmind_infra::private_file(&path).context("restrict keystore configuration")?;
+    irmind_fs::private_file(&path).context("restrict keystore configuration")?;
     let source = fs::read_to_string(&path).context("read keystore configuration")?;
     let parsed: Configuration = toml::from_str(&source).context("parse keystore configuration")?;
     if !matches!(parsed.keystore.signer.as_str(), "os" | "file")
@@ -96,11 +96,11 @@ fn write_config(home: &Path, selection: &Selection) -> Result<()> {
             Err(_) => return Err(anyhow!("cannot create private keystore configuration")),
         };
         let result = (|| {
-            irmind_infra::private_file(&temporary)?;
+            irmind_fs::private_file(&temporary)?;
             file.write_all(source.as_bytes())?;
             file.sync_all()?;
-            irmind_infra::durable_replace(&temporary, &path)?;
-            irmind_infra::sync_directory(home)?;
+            irmind_fs::durable_replace(&temporary, &path)?;
+            irmind_fs::sync_directory(home)?;
             Ok::<(), anyhow::Error>(())
         })();
         if result.is_err() {

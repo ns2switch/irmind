@@ -321,11 +321,6 @@ impl WorkspaceIo for RootWorkspaceIo {
         if current == target {
             return Err(anyhow!("target backend is already active"));
         }
-        if engine.repo.list_cases()?.is_empty() {
-            return Err(anyhow!(
-                "create a case before migration so the change can be signed"
-            ));
-        }
         let (target_signer, target_secrets): (Arc<dyn SignerBackend>, Arc<dyn SecretBackend>) =
             match target {
                 #[cfg(feature = "keystore-os")]
@@ -461,8 +456,6 @@ fn module_statuses(
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
-    let interactive = matches!(&cli.command, None | Some(Command::Tui { .. }));
     let cancel = CancellationToken::new();
     let signal_cancel = cancel.clone();
     std::thread::spawn(move || {
@@ -476,11 +469,18 @@ fn main() -> Result<()> {
             signal_cancel.cancel();
         }
     });
+    while !cancel.is_cancelled() && run_once(&cancel)? {}
+    Ok(())
+}
+
+fn run_once(cancel: &CancellationToken) -> Result<bool> {
+    let cli = Cli::parse();
+    let interactive = matches!(&cli.command, None | Some(Command::Tui { .. }));
     if let Some(Command::VerifyExport { path, expected_key }) = &cli.command {
         let (fingerprint, entries) =
             irmind_app::verify_export(&LocalExportVerifier, path, expected_key.as_deref())?;
         println!("verified {entries} audit entries; analyst key fingerprint {fingerprint}");
-        return Ok(());
+        return Ok(false);
     }
     let home = match &cli.home {
         Some(path) => path.clone(),
@@ -734,13 +734,13 @@ fn main() -> Result<()> {
         Some(id) => Some(registry.llm(id)?),
         None => None,
     };
-    match cli.command {
+    let restart = match cli.command {
         None => irmind_tui::run_workspace(
             &engine,
             selected_model,
             &workspace_io,
             &module_statuses,
-            &cancel,
+            cancel,
             None,
             new_analyst_key,
         )?,
@@ -753,10 +753,10 @@ fn main() -> Result<()> {
             selected_model,
             workspace_io: &workspace_io,
             module_statuses: &module_statuses,
-            cancel: &cancel,
+            cancel,
             new_analyst_key,
         }
         .run(command)?,
-    }
-    Ok(())
+    };
+    Ok(restart)
 }

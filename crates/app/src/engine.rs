@@ -282,7 +282,7 @@ impl<'a> Engine<'a> {
         if matches!(ports.signer.actor(), Actor::Agent(_)) && mode == ExecutionMode::Attended {
             return Err(AppError::Policy("agent cannot run in attended mode".into()));
         }
-        Ok(Engine {
+        let engine = Engine {
             repo: ports.repo,
             evidence_store: ports.evidence_store,
             graph: ports.graph,
@@ -302,7 +302,9 @@ impl<'a> Engine<'a> {
             edrs: Vec::new(),
             internal_intel: Vec::new(),
             pricing: None,
-        })
+        };
+        engine.verify_global_operations()?;
+        Ok(engine)
     }
 
     #[must_use]

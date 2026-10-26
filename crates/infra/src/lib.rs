@@ -4,25 +4,20 @@ mod clock;
 mod evidence_fs;
 mod graph_duckdb;
 mod graph_port;
-mod private_fs;
 mod seal;
 mod signing;
 mod sqlite;
-#[cfg(windows)]
-#[allow(unsafe_code)]
-mod windows_security;
 pub use clock::SystemClock;
-pub use private_fs::private_file;
-pub use seal::{durable_rename, durable_replace, sync_directory};
+use irmind_fs::{private_dir, private_file};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use ed25519_dalek::{Signature, Signer as _, SigningKey, VerifyingKey};
 use fs4::fs_std::FileExt as _;
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CaseExporter, CaseLock, CaseMutation, CaseSeal,
-    EventParser, EvidenceGraph, EvidenceStore, ExportVerifier, GraphRecord, Repository,
-    SignedEntry, SignedOperation, Signer, TimelineEvent, Verifier, hex, seal_challenge, sha256,
-    verify_case_metadata,
+    EventParser, EvidenceGraph, EvidenceStore, ExportVerifier, GLOBAL_OPERATION_SCOPE, GraphRecord,
+    Repository, SignedEntry, SignedOperation, Signer, TimelineEvent, Verifier, hex, seal_challenge,
+    sha256, verify_case_metadata,
 };
 use irmind_domain::{
     Actor, AnalystApprovalVerifier, Case, CaseId, Provenance, Severity, SourceKind, Tainted,

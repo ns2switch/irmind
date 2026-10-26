@@ -2,44 +2,6 @@ use crate::*;
 
 pub(crate) const MAX_EXPORT_BYTES: usize = 128 * 1024 * 1024;
 
-pub fn sync_directory(path: &Path) -> Result<(), AppError> {
-    #[cfg(windows)]
-    {
-        // The Windows rename uses MOVEFILE_WRITE_THROUGH; directory fsync is not exposed.
-        let _ = path;
-        Ok(())
-    }
-    #[cfg(not(windows))]
-    {
-        fs::File::open(path)
-            .map_err(storage)?
-            .sync_all()
-            .map_err(storage)
-    }
-}
-
-pub fn durable_rename(source: &Path, destination: &Path) -> Result<(), AppError> {
-    #[cfg(windows)]
-    {
-        windows_security::durable_rename(source, destination).map_err(storage)
-    }
-    #[cfg(not(windows))]
-    {
-        fs::rename(source, destination).map_err(storage)
-    }
-}
-
-pub fn durable_replace(source: &Path, destination: &Path) -> Result<(), AppError> {
-    #[cfg(windows)]
-    {
-        windows_security::durable_replace(source, destination).map_err(storage)
-    }
-    #[cfg(not(windows))]
-    {
-        fs::rename(source, destination).map_err(storage)
-    }
-}
-
 #[derive(Deserialize, Serialize)]
 pub(crate) struct ExportBundle {
     version: u32,
@@ -135,7 +97,7 @@ impl LocalStore {
             if seal != expected {
                 return Err(AppError::InvalidChain(last.seq));
             }
-            sync_directory(&self.seal_dir)?;
+            irmind_fs::sync_directory(&self.seal_dir).map_err(storage)?;
             self.finish_seal(id)?;
         } else {
             self.write_seal_bytes_atomic(id, &expected)?;
@@ -212,8 +174,8 @@ impl LocalStore {
             file.write_all(&bytes).map_err(storage)?;
             file.sync_all().map_err(storage)?;
             drop(file);
-            durable_rename(&temporary, &path)?;
-            sync_directory(&self.seal_dir)?;
+            irmind_fs::durable_rename(&temporary, &path).map_err(storage)?;
+            irmind_fs::sync_directory(&self.seal_dir).map_err(storage)?;
             self.finish_seal(id)
         })();
         if result.is_err() {
