@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 3506de21def7f380096317087cf9310c33cd1d0d; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit e329fbe3bfcfef5f8a30d6010d7072c95f17bd03; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -44,6 +44,8 @@ IRMIND_SPLUNK_URL = "https://splunk.example.invalid/"
 IRMIND_SPLUNK_SOURCE_ID = "demo"
 IRMIND_SPLUNK_INDEX = "security"
 ```
+
+El ejemplo describe el formato guardado. Cámbialo desde la TUI: una edición directa del archivo no coincide con el registro operativo firmado y bloquea el arranque. Si fue accidental, restaura el último archivo aprobado.
 
 Estas variables de entorno prevalecen sobre los campos públicos correspondientes. Usa solo valores acordes con el destino aprobado y el alcance del caso.
 
