@@ -15,7 +15,7 @@ CI tests Ubuntu Linux, macOS arm64, and Windows x64 with the MSVC toolchain. SQL
 
 ## CI artifacts and checksums
 
-Each platform job publishes the binary, both project licenses, third-party notices, and `SHA256SUMS`. Download from a trusted CI run and compare the checksum **before** executing the file:
+The daily `main` run publishes a binary for each platform only when code changed in the preceding 24 hours. Documentation-only changes do not trigger a release build. Each artifact includes both project licenses, third-party notices, and `SHA256SUMS`. Download from a trusted daily run and compare the checksum **before** executing the file:
 
 | System | Check |
 | --- | --- |
