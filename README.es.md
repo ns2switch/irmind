@@ -87,6 +87,7 @@ Lee [security-model.md](docs/es/security-model.md) antes de conectar un proveedo
 - [Inicio](docs/es/getting-started.md) · [Configuración](docs/es/configuration.md) · [Módulos](docs/es/modules.md)
 - [Plataformas](docs/es/platforms.md) · [Seguridad](docs/es/security-model.md)
 - [Arquitectura](docs/development/architecture.md) y [CLI](docs/development/cli.md), solo en inglés
+- [Hoja de ruta](docs/es/roadmap.md)
 - [Contribuciones](CONTRIBUTING.md) · [Reporte privado de vulnerabilidades](SECURITY.md) · [Licencias](LICENSE-MIT)
 
 Licencia dual **MIT OR Apache-2.0**; consulta [LICENSE-MIT](LICENSE-MIT) y [LICENSE-APACHE](LICENSE-APACHE).
