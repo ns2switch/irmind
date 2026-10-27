@@ -73,6 +73,9 @@ pub enum DomainError {
     InvalidApproval,
     InvalidPolicy,
     InvalidScope,
+    InvalidTimestamp,
+    InvalidEvidenceHash,
+    InvalidIocValue,
     InvalidSeverity,
     UnknownAuditEvent,
 }

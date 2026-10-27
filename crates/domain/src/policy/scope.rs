@@ -1,18 +1,22 @@
 use super::Gate;
 use crate::{Case, CaseScope, ProposedCall, Tool};
 
+const SCOPED_TOOLS: &[Tool] = &[
+    Tool::SiemSearch,
+    Tool::CloudAuditEvents,
+    Tool::ThreatIntelInternal,
+    Tool::CloudIdentity,
+    Tool::EdrHostInfo,
+    Tool::EdrProcessTree,
+    Tool::EdrDetections,
+];
+
+fn is_scoped(tool: &Tool) -> bool {
+    SCOPED_TOOLS.contains(tool)
+}
+
 pub(super) fn scope_gate(case: &Case, proposal: &ProposedCall) -> Gate {
-    let scoped = matches!(
-        proposal.tool,
-        Tool::SiemSearch
-            | Tool::CloudAuditEvents
-            | Tool::ThreatIntelInternal
-            | Tool::CloudIdentity
-            | Tool::EdrHostInfo
-            | Tool::EdrProcessTree
-            | Tool::EdrDetections
-    );
-    if !scoped {
+    if !is_scoped(&proposal.tool) {
         return Gate::Continue;
     }
     let Ok(scope) = CaseScope::parse(&case.scope) else {
@@ -26,16 +30,7 @@ pub(super) fn scope_gate(case: &Case, proposal: &ProposedCall) -> Gate {
 }
 
 pub(super) fn in_scope(scope: &CaseScope, proposal: &ProposedCall) -> bool {
-    if !matches!(
-        proposal.tool,
-        Tool::SiemSearch
-            | Tool::CloudAuditEvents
-            | Tool::ThreatIntelInternal
-            | Tool::CloudIdentity
-            | Tool::EdrHostInfo
-            | Tool::EdrProcessTree
-            | Tool::EdrDetections
-    ) {
+    if !is_scoped(&proposal.tool) {
         return true;
     }
     match proposal.tool {

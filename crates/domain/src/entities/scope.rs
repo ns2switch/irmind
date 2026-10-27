@@ -1,4 +1,4 @@
-use crate::{BTreeMap, BTreeSet, DomainError};
+use crate::{BTreeMap, BTreeSet, DomainError, UtcTimestamp};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CaseScope {
@@ -49,9 +49,7 @@ impl CaseScope {
         let to = *fields.get("to").ok_or(DomainError::InvalidScope)?;
         if sources.is_empty()
             || (accounts.is_empty() && projects.is_empty() && hosts.is_empty())
-            || !valid_scope_time(from)
-            || !valid_scope_time(to)
-            || from > to
+            || !valid_window(from, to)
         {
             return Err(DomainError::InvalidScope);
         }
@@ -102,11 +100,7 @@ impl CaseScope {
                 }
                 None => *version == 2 || hosts.is_empty(),
             }
-            && valid_scope_time(from)
-            && valid_scope_time(to)
-            && from <= to
-            && from >= scope_from.as_str()
-            && to <= scope_to.as_str()
+            && window_within(from, to, scope_from, scope_to)
     }
 
     pub fn allows_source(&self, source: &str) -> bool {
@@ -132,11 +126,7 @@ impl CaseScope {
         sources.contains(source)
             && (*version == 2 || (accounts.is_empty() && hosts.is_empty()))
             && projects.contains(project)
-            && valid_scope_time(from)
-            && valid_scope_time(to)
-            && from <= to
-            && from >= scope_from.as_str()
-            && to <= scope_to.as_str()
+            && window_within(from, to, scope_from, scope_to)
     }
 
     pub fn allows_project(&self, source: &str, project: &str) -> bool {
@@ -246,12 +236,7 @@ impl CaseScope {
         else {
             return Err(DomainError::InvalidScope);
         };
-        if !valid_scope_time(from)
-            || !valid_scope_time(to)
-            || from > old_from
-            || to < old_to
-            || from > to
-        {
+        if !window_within(old_from, old_to, from, to) {
             return Err(DomainError::InvalidScope);
         }
         Self::parse(&format!(
@@ -283,6 +268,40 @@ impl CaseScope {
             join_scope_set(projects),
             join_scope_set(hosts)
         ))
+    }
+
+    /// Whether every remote target and instant in this case is allowed by the policy ceiling.
+    pub fn is_within(&self, ceiling: &Self) -> bool {
+        match (self, ceiling) {
+            (Self::LocalOnly, _) => true,
+            (
+                Self::Remote {
+                    sources,
+                    accounts,
+                    projects,
+                    hosts,
+                    from,
+                    to,
+                    ..
+                },
+                Self::Remote {
+                    sources: allowed_sources,
+                    accounts: allowed_accounts,
+                    projects: allowed_projects,
+                    hosts: allowed_hosts,
+                    from: allowed_from,
+                    to: allowed_to,
+                    ..
+                },
+            ) => {
+                sources.is_subset(allowed_sources)
+                    && accounts.is_subset(allowed_accounts)
+                    && projects.is_subset(allowed_projects)
+                    && hosts.is_subset(allowed_hosts)
+                    && window_within(from, to, allowed_from, allowed_to)
+            }
+            _ => false,
+        }
     }
 }
 
@@ -317,40 +336,24 @@ pub(crate) fn valid_scope_target(value: &str) -> bool {
 }
 
 pub(crate) fn valid_scope_time(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    bytes.len() == 20
-        && bytes[4] == b'-'
-        && bytes[7] == b'-'
-        && bytes[10] == b'T'
-        && bytes[13] == b':'
-        && bytes[16] == b':'
-        && bytes[19] == b'Z'
-        && bytes.iter().enumerate().all(|(index, byte)| {
-            matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
-        })
-        && {
-            let number = |range: std::ops::Range<usize>| {
-                value.get(range).and_then(|part| part.parse::<u32>().ok())
-            };
-            let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
-                number(0..4),
-                number(5..7),
-                number(8..10),
-                number(11..13),
-                number(14..16),
-                number(17..19),
-            ) else {
-                return false;
-            };
-            let leap =
-                year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
-            let max_day = match month {
-                2 if leap => 29,
-                2 => 28,
-                4 | 6 | 9 | 11 => 30,
-                1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-                _ => 0,
-            };
-            year > 0 && (1..=max_day).contains(&day) && hour < 24 && minute < 60 && second < 60
-        }
+    UtcTimestamp::parse(value).is_ok()
+}
+
+fn valid_window(from: &str, to: &str) -> bool {
+    UtcTimestamp::parse(from)
+        .ok()
+        .zip(UtcTimestamp::parse(to).ok())
+        .is_some_and(|(from, to)| from <= to)
+}
+
+fn window_within(from: &str, to: &str, allowed_from: &str, allowed_to: &str) -> bool {
+    let (Ok(from), Ok(to), Ok(allowed_from), Ok(allowed_to)) = (
+        UtcTimestamp::parse(from),
+        UtcTimestamp::parse(to),
+        UtcTimestamp::parse(allowed_from),
+        UtcTimestamp::parse(allowed_to),
+    ) else {
+        return false;
+    };
+    from <= to && from >= allowed_from && to <= allowed_to
 }

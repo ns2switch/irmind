@@ -211,8 +211,14 @@ pub fn evaluate_tainted_with_rules(
     now: u64,
     rules: &PolicyRules,
 ) -> Decision {
-    let decision = evaluate_tainted(case, proposal, decision_seq, mode, turn_has_detections, now);
-    apply_policy_scope(case, decision, decision_seq, now, rules)
+    if rules
+        .scope
+        .as_ref()
+        .is_some_and(|scope| !in_scope(scope, &proposal.value))
+    {
+        return Decision::Deny("outside organization policy scope");
+    }
+    evaluate_tainted(case, proposal, decision_seq, mode, turn_has_detections, now)
 }
 
 pub fn evaluate_with_rules(
@@ -223,33 +229,14 @@ pub fn evaluate_with_rules(
     now: u64,
     rules: &PolicyRules,
 ) -> Decision {
-    let decision = evaluate(case, proposal, decision_seq, mode, now);
-    apply_policy_scope(case, decision, decision_seq, now, rules)
-}
-
-fn apply_policy_scope(
-    case: &Case,
-    decision: Decision,
-    decision_seq: u64,
-    now: u64,
-    rules: &PolicyRules,
-) -> Decision {
-    match decision {
-        Decision::Allow(call)
-            if rules
-                .scope
-                .as_ref()
-                .is_some_and(|scope| !in_scope(scope, &call.proposal)) =>
-        {
-            Decision::NeedsApproval(PendingApproval::new(
-                case.id.clone(),
-                call.proposal,
-                decision_seq,
-                now,
-            ))
-        }
-        other => other,
+    if rules
+        .scope
+        .as_ref()
+        .is_some_and(|scope| !in_scope(scope, &proposal))
+    {
+        return Decision::Deny("outside organization policy scope");
     }
+    evaluate(case, proposal, decision_seq, mode, now)
 }
 
 pub fn evaluate_with_context(

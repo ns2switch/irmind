@@ -26,7 +26,7 @@ from = "2026-10-23T00:00:00Z"
 to = "2026-10-23T23:59:59Z"
 ```
 
-The optional `[scope]` table is a ceiling for remote reads across cases. It can list accounts, projects, and hosts together, plus allowed sources and a UTC window. Both the case and policy scope must allow a read; otherwise it needs approval. The current AWS connector requires an account; project queries remain unavailable until a connector supports them. Policy can tighten fixed tool rules, not enable denied actions. External enrichment needs a signed analyst approval; containment is disabled. Unknown fields fail validation.
+The optional `[scope]` table is a hard ceiling for remote reads across cases. It can list accounts, projects, and hosts together, plus allowed sources and a UTC window. A read outside the case scope may need analyst approval; a read outside the policy ceiling is denied, even with approval. New cases and scope changes cannot exceed the ceiling. If a new policy narrows an existing case, its reads use the intersection and the TUI shows a warning. The current AWS connector requires an account; project queries remain unavailable until a connector supports them. Policy can tighten fixed tool rules, not enable denied actions. External enrichment needs a signed analyst approval; containment is disabled. Unknown fields fail validation.
 
 ## Non-secret settings
 

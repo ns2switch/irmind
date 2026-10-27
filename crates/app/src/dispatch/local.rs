@@ -165,7 +165,7 @@ impl Engine<'_> {
                         AppError::Fixed(crate::FixedAppError::PolicyMissingFindingEvidence)
                     })?,
                     details,
-                    "model",
+                    crate::AuditOrigin::Model,
                 )?
                 .into_bytes()
             }

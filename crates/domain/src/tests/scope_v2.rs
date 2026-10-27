@@ -56,7 +56,8 @@ fn version_two_scope_checks_accounts_projects_hosts_and_time() {
 }
 
 #[test]
-fn toml_policy_scope_tightens_case_scope_to_pending_approval() {
+#[allow(clippy::too_many_lines, clippy::panic)]
+fn toml_policy_scope_is_a_hard_ceiling_even_for_pending_approvals() {
     let mut scoped = case();
     scoped.scope = "v2;sources=cloud,edr,siem;accounts=account-a,account-b;projects=project-a,project-b;hosts=host-a,host-b;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z".into();
     let rules = PolicyRules {
@@ -95,33 +96,43 @@ fn toml_policy_scope_tightens_case_scope_to_pending_approval() {
             Tool::CloudAuditEvents,
             &cloud("project-b", "2026-10-23T12:00:00Z")
         ),
-        Decision::NeedsApproval(_)
+        Decision::Deny(_)
     ));
-    if let Decision::NeedsApproval(pending) = check(
-        Tool::CloudAuditEvents,
-        &cloud("project-b", "2026-10-23T12:00:00Z"),
-    ) {
-        assert!(
-            PendingApproval::recover_with_rules(
-                &scoped,
-                ExecutionMode::Attended,
-                &pending.challenge(),
-                1_700_000_000,
-                &rules
-            )
-            .is_ok()
-        );
-    }
+    let Decision::NeedsApproval(pending) = evaluate(
+        &scoped,
+        ProposedCall {
+            tool: Tool::CloudAuditEvents,
+            args: cloud("project-c", "2026-10-23T12:00:00Z")
+                .into_iter()
+                .map(|(key, value)| (key.into(), value.into()))
+                .collect(),
+        },
+        1,
+        ExecutionMode::Attended,
+        1_700_000_000,
+    ) else {
+        panic!("case scope must require approval");
+    };
+    assert!(
+        PendingApproval::recover_with_rules(
+            &scoped,
+            ExecutionMode::Attended,
+            &pending.challenge(),
+            1_700_000_000,
+            &rules
+        )
+        .is_err()
+    );
     assert!(matches!(
         check(
             Tool::CloudAuditEvents,
             &cloud("project-a", "2026-10-23T09:00:00Z")
         ),
-        Decision::NeedsApproval(_)
+        Decision::Deny(_)
     ));
     assert!(matches!(
         check(Tool::EdrHostInfo, &[("source", "edr"), ("host", "host-b")]),
-        Decision::NeedsApproval(_)
+        Decision::Deny(_)
     ));
     assert!(matches!(
         check(
@@ -134,6 +145,8 @@ fn toml_policy_scope_tightens_case_scope_to_pending_approval() {
                 ("query", "AssumeRole")
             ]
         ),
-        Decision::NeedsApproval(_)
+        Decision::Deny(_)
     ));
+    let case_scope = CaseScope::parse(&scoped.scope).unwrap();
+    assert!(!case_scope.is_within(rules.scope.as_ref().unwrap()));
 }

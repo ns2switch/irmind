@@ -41,7 +41,13 @@ impl Engine<'_> {
             return Err(AppError::Cancelled);
         }
         let manifest = self.evidence_store.evidence_hashes(id)?.join(",");
-        let entry = self.signed_entry(id, "analyst", "CaseSealed", &manifest, None)?;
+        let entry = self.signed_entry(
+            id,
+            crate::AuditOrigin::Analyst,
+            irmind_domain::AuditEventKind::CaseSealed,
+            &manifest,
+            None,
+        )?;
         let seal = CaseSeal {
             seq: entry.seq,
             hash: entry.hash,

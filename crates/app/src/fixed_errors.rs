@@ -49,6 +49,8 @@ pub enum FixedAppError {
     PolicyInternalIntelligenceSourceUnavailable,
     #[error("policy denied: invalid case scope")]
     PolicyInvalidCaseScope,
+    #[error("policy denied: case scope exceeds the organization policy ceiling")]
+    PolicyScopeExceedsOrganizationCeiling,
     #[error("policy denied: invalid dismissal reason")]
     PolicyInvalidDismissalReason,
     #[error("policy denied: invalid finding type")]

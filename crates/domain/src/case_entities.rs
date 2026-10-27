@@ -1,4 +1,4 @@
-use crate::valid_scope_time;
+use crate::{EvidenceHash, IocValue, UtcTimestamp};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IocType {
@@ -20,20 +20,17 @@ pub enum ThreatVerdict {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Ioc {
     pub kind: IocType,
-    pub value: String,
-    pub first_seen: String,
-    pub last_seen: String,
+    pub value: IocValue,
+    pub first_seen: UtcTimestamp,
+    pub last_seen: UtcTimestamp,
     pub verdict: ThreatVerdict,
-    pub evidence: Vec<String>,
+    pub evidence: Vec<EvidenceHash>,
     pub confirmed: bool,
 }
 
 impl Ioc {
     pub fn valid(&self) -> bool {
-        !self.value.trim().is_empty()
-            && self.value.len() <= 2_000
-            && valid_scope_time(&self.first_seen)
-            && valid_scope_time(&self.last_seen)
+        self.value.kind() == self.kind
             && self.first_seen <= self.last_seen
             && valid_evidence(&self.evidence)
     }
@@ -50,8 +47,8 @@ pub enum HypothesisState {
 pub struct Hypothesis {
     pub statement: String,
     pub state: HypothesisState,
-    pub supporting_evidence: Vec<String>,
-    pub refuting_evidence: Vec<String>,
+    pub supporting_evidence: Vec<EvidenceHash>,
+    pub refuting_evidence: Vec<EvidenceHash>,
 }
 
 impl Hypothesis {
@@ -59,14 +56,14 @@ impl Hypothesis {
         !self.statement.trim().is_empty()
             && self.statement.len() <= 2_000
             && valid_evidence(&self.supporting_evidence)
-            && self.refuting_evidence.iter().all(|hash| valid_hash(hash))
+            && self.refuting_evidence.len() <= 32
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AttackTechnique {
     pub id: String,
-    pub evidence: Vec<String>,
+    pub evidence: Vec<EvidenceHash>,
     pub confirmed: bool,
 }
 
@@ -92,55 +89,51 @@ impl AttackTechnique {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CaseTimelineEvent {
-    pub at: String,
+    pub at: UtcTimestamp,
     pub source: String,
     pub description: String,
-    pub evidence_hash: String,
+    pub evidence_hash: EvidenceHash,
     pub record_index: Option<usize>,
     pub confirmed: bool,
 }
 
 impl CaseTimelineEvent {
     pub fn valid(&self) -> bool {
-        valid_scope_time(&self.at)
-            && !self.source.trim().is_empty()
+        !self.source.trim().is_empty()
             && self.source.len() <= 128
             && !self.description.trim().is_empty()
             && self.description.len() <= 2_000
-            && valid_hash(&self.evidence_hash)
             && self.record_index.is_none_or(|index| index < 100_000)
     }
 }
 
 pub fn valid_hash(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    EvidenceHash::parse(value).is_ok()
 }
 
-fn valid_evidence(hashes: &[String]) -> bool {
-    !hashes.is_empty() && hashes.len() <= 32 && hashes.iter().all(|hash| valid_hash(hash))
+fn valid_evidence(hashes: &[EvidenceHash]) -> bool {
+    !hashes.is_empty() && hashes.len() <= 32
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
     #[test]
     fn entities_require_timestamps_evidence_and_attack_ids() {
-        let hash = "a".repeat(64);
+        let hash = EvidenceHash::parse(&"a".repeat(64)).unwrap();
         let mut ioc = Ioc {
             kind: IocType::Ip,
-            value: "203.0.113.8".into(),
-            first_seen: "2026-10-23T12:00:00Z".into(),
-            last_seen: "2026-10-23T13:00:00Z".into(),
+            value: IocValue::parse(IocType::Ip, "203.0.113.8").unwrap(),
+            first_seen: UtcTimestamp::parse("2026-10-23T12:00:00Z").unwrap(),
+            last_seen: UtcTimestamp::parse("2026-10-23T13:00:00Z").unwrap(),
             verdict: ThreatVerdict::Unknown,
             evidence: vec![hash.clone()],
             confirmed: false,
         };
         assert!(ioc.valid());
-        ioc.last_seen = "2026-10-22T13:00:00Z".into();
+        ioc.last_seen = UtcTimestamp::parse("2026-10-22T13:00:00Z").unwrap();
         assert!(!ioc.valid());
         let hypothesis = Hypothesis {
             statement: "Account compromise".into(),
@@ -167,7 +160,7 @@ mod tests {
         );
         assert!(
             CaseTimelineEvent {
-                at: "2026-10-23T12:00:00Z".into(),
+                at: UtcTimestamp::parse("2026-10-23T12:00:00Z").unwrap(),
                 source: "CloudTrail".into(),
                 description: "AssumeRole".into(),
                 evidence_hash: hash,

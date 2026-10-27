@@ -97,15 +97,15 @@ impl Engine<'_> {
         };
         self.audit(
             id,
-            "analyst",
-            "ApprovalDenied",
+            crate::AuditOrigin::Analyst,
+            irmind_domain::AuditEventKind::ApprovalDenied,
             &serde_json::to_string(&denied).map_err(|e| AppError::Storage(e.to_string()))?,
             None,
         )?;
         self.audit(
             id,
-            "analyst",
-            "Proposal",
+            crate::AuditOrigin::Analyst,
+            irmind_domain::AuditEventKind::Proposal,
             &format!("{} {:?}", proposal.tool.as_str(), proposal.args),
             None,
         )?;
@@ -136,8 +136,8 @@ impl Engine<'_> {
                 .map_err(|reason| AppError::Policy(reason.into()))?;
             self.audit(
                 id,
-                "system",
-                "PolicyActivated",
+                crate::AuditOrigin::System,
+                irmind_domain::AuditEventKind::PolicyActivated,
                 &self.policy_fingerprint,
                 None,
             )?;
@@ -158,7 +158,12 @@ impl Engine<'_> {
             pending.reject(&signature, &verifier).map_err(|_| {
                 AppError::Fixed(crate::FixedAppError::SignatureAnalystDenialSignatureIsInvalid)
             })?;
-            ("ApprovalDenied", signature, Some(reason.to_owned()), None)
+            (
+                irmind_domain::AuditEventKind::ApprovalDenied,
+                signature,
+                Some(reason.to_owned()),
+                None,
+            )
         } else {
             let signature = self.signer.sign(&pending.challenge())?;
             let authorized = pending
@@ -168,7 +173,12 @@ impl Engine<'_> {
                         crate::FixedAppError::SignatureAnalystApprovalSignatureIsInvalid,
                     )
                 })?;
-            ("ApprovalGranted", signature, None, Some(authorized))
+            (
+                irmind_domain::AuditEventKind::ApprovalGranted,
+                signature,
+                None,
+                Some(authorized),
+            )
         };
         let event = ApprovalEvent {
             version: 1,
@@ -179,7 +189,7 @@ impl Engine<'_> {
         };
         self.audit(
             id,
-            "analyst",
+            crate::AuditOrigin::Analyst,
             kind,
             &serde_json::to_string(&event).map_err(|e| AppError::Storage(e.to_string()))?,
             None,
@@ -209,8 +219,14 @@ impl Engine<'_> {
             .await?;
         if let Some(call) = authorized {
             if let Some(reason) = self.unavailable_reason(&call) {
-                self.audit_local(id, "policy", "Denied", reason, None)
-                    .await?;
+                self.audit_local(
+                    id,
+                    crate::AuditOrigin::Policy,
+                    irmind_domain::AuditEventKind::Denied,
+                    reason,
+                    None,
+                )
+                .await?;
                 return Ok(format!("approval recorded; {reason}; no request was sent"));
             }
             let (_, hash) = self.execute_authorized(id, &call, true, cancel).await?;

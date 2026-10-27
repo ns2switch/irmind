@@ -1,6 +1,7 @@
 use crate::{AppError, FixedAppError};
 use irmind_domain::{
-    AttackTechnique, CaseTimelineEvent, Hypothesis, HypothesisState, Ioc, IocType, ThreatVerdict,
+    AttackTechnique, CaseTimelineEvent, EvidenceHash, Hypothesis, HypothesisState, Ioc, IocType,
+    IocValue, ThreatVerdict, UtcTimestamp,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -119,10 +120,13 @@ impl EntityDetails {
                 known_evidence,
             ),
             (super::FindingKind::Technique, Self::Technique { technique_id }) => {
+                let Ok(hash) = EvidenceHash::parse(&finding.evidence_hash) else {
+                    return false;
+                };
                 finding.value == *technique_id
                     && AttackTechnique {
                         id: technique_id.clone(),
-                        evidence: vec![finding.evidence_hash.clone()],
+                        evidence: vec![hash],
                         confirmed: finding.confirmed,
                     }
                     .valid()
@@ -134,15 +138,23 @@ impl EntityDetails {
                     source,
                     record_index,
                 },
-            ) => CaseTimelineEvent {
-                at: at.clone(),
-                source: source.clone(),
-                description: finding.value.clone(),
-                evidence_hash: finding.evidence_hash.clone(),
-                record_index: *record_index,
-                confirmed: finding.confirmed,
+            ) => {
+                let (Ok(at), Ok(hash)) = (
+                    UtcTimestamp::parse(at),
+                    EvidenceHash::parse(&finding.evidence_hash),
+                ) else {
+                    return false;
+                };
+                CaseTimelineEvent {
+                    at,
+                    source: source.clone(),
+                    description: finding.value.clone(),
+                    evidence_hash: hash,
+                    record_index: *record_index,
+                    confirmed: finding.confirmed,
+                }
+                .valid()
             }
-            .valid(),
             _ => false,
         }
     }
@@ -155,16 +167,25 @@ fn valid_ioc(
     last_seen: &str,
     verdict: &str,
 ) -> bool {
-    let (Some(kind), Some(verdict)) = (ioc_type_value(ioc_type), verdict_value(verdict)) else {
+    let (Some(kind), Some(verdict), Ok(first_seen), Ok(last_seen), Ok(hash)) = (
+        ioc_type_value(ioc_type),
+        verdict_value(verdict),
+        UtcTimestamp::parse(first_seen),
+        UtcTimestamp::parse(last_seen),
+        EvidenceHash::parse(&finding.evidence_hash),
+    ) else {
+        return false;
+    };
+    let Ok(value) = IocValue::parse(kind, &finding.value) else {
         return false;
     };
     Ioc {
         kind,
-        value: finding.value.clone(),
-        first_seen: first_seen.to_owned(),
-        last_seen: last_seen.to_owned(),
+        value,
+        first_seen,
+        last_seen,
         verdict,
-        evidence: vec![finding.evidence_hash.clone()],
+        evidence: vec![hash],
         confirmed: finding.confirmed,
     }
     .valid()
@@ -181,6 +202,11 @@ fn valid_hypothesis(
     } else {
         supporting_evidence.to_vec()
     };
+    let (Some(supporting_hashes), Some(refuting_hashes)) =
+        (parse_hashes(&supporting), parse_hashes(refuting_evidence))
+    else {
+        return false;
+    };
     supporting.contains(&finding.evidence_hash)
         && supporting
             .iter()
@@ -195,10 +221,17 @@ fn valid_hypothesis(
             } else {
                 HypothesisState::Open
             },
-            supporting_evidence: supporting,
-            refuting_evidence: refuting_evidence.to_vec(),
+            supporting_evidence: supporting_hashes,
+            refuting_evidence: refuting_hashes,
         }
         .valid()
+}
+
+fn parse_hashes(values: &[String]) -> Option<Vec<EvidenceHash>> {
+    values
+        .iter()
+        .map(|value| EvidenceHash::parse(value).ok())
+        .collect()
 }
 
 fn split_hashes(value: &str) -> Vec<String> {

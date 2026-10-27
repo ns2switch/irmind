@@ -87,7 +87,14 @@ impl Engine<'_> {
             return Err(AppError::Sealed);
         }
         self.verify_unlocked(id)?;
-        self.propose_finding_unlocked(id, kind, value, evidence_hash, None, "analyst")
+        self.propose_finding_unlocked(
+            id,
+            kind,
+            value,
+            evidence_hash,
+            None,
+            crate::AuditOrigin::Analyst,
+        )
     }
 
     pub fn add_entity(
@@ -104,7 +111,14 @@ impl Engine<'_> {
             return Err(AppError::Sealed);
         }
         self.verify_unlocked(id)?;
-        self.propose_finding_unlocked(id, kind, value, evidence_hash, Some(details), "analyst")
+        self.propose_finding_unlocked(
+            id,
+            kind,
+            value,
+            evidence_hash,
+            Some(details),
+            crate::AuditOrigin::Analyst,
+        )
     }
 
     pub(crate) fn propose_finding_unlocked(
@@ -114,7 +128,7 @@ impl Engine<'_> {
         value: &str,
         evidence_hash: &str,
         details: Option<EntityDetails>,
-        origin: &str,
+        origin: crate::AuditOrigin,
     ) -> Result<String, AppError> {
         if value.trim().is_empty() || value.len() > 2_000 || value.contains('\0') {
             return Err(AppError::Fixed(
@@ -160,7 +174,7 @@ impl Engine<'_> {
         self.audit(
             id,
             origin,
-            "FindingProposed",
+            AuditEventKind::FindingProposed,
             &serde_json::to_string(&finding).map_err(|e| AppError::Storage(e.to_string()))?,
             Some(evidence_hash),
         )?;
@@ -183,7 +197,13 @@ impl Engine<'_> {
                 crate::FixedAppError::PolicyUnconfirmedFindingNotFound,
             ));
         }
-        self.audit(id, "analyst", "FindingConfirmed", finding_id, None)
+        self.audit(
+            id,
+            crate::AuditOrigin::Analyst,
+            irmind_domain::AuditEventKind::FindingConfirmed,
+            finding_id,
+            None,
+        )
     }
 
     pub fn dismiss_finding(
@@ -218,8 +238,8 @@ impl Engine<'_> {
         };
         self.audit(
             id,
-            "analyst",
-            "FindingDismissed",
+            crate::AuditOrigin::Analyst,
+            irmind_domain::AuditEventKind::FindingDismissed,
             &serde_json::to_string(&event).map_err(|error| AppError::Storage(error.to_string()))?,
             None,
         )

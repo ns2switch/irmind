@@ -182,18 +182,16 @@ impl<'a> Engine<'a> {
     pub(crate) async fn audit_local(
         &self,
         id: &CaseId,
-        origin: &str,
-        kind: &str,
+        origin: AuditOrigin,
+        kind: AuditEventKind,
         payload: &str,
         evidence: Option<&str>,
     ) -> Result<(), AppError> {
         let id = id.clone();
-        let origin = origin.to_owned();
-        let kind = kind.to_owned();
         let payload = payload.to_owned();
         let evidence = evidence.map(str::to_owned);
         self.blocking_local(move |local| {
-            local.audit(&id, &origin, &kind, &payload, evidence.as_deref())
+            local.audit(&id, origin, kind, &payload, evidence.as_deref())
         })
         .await
     }
@@ -328,8 +326,8 @@ impl Engine<'_> {
     pub(crate) fn audit(
         &self,
         id: &CaseId,
-        origin: &str,
-        kind: &str,
+        origin: AuditOrigin,
+        kind: AuditEventKind,
         payload: &str,
         evidence: Option<&str>,
     ) -> Result<(), AppError> {
@@ -340,8 +338,8 @@ impl Engine<'_> {
     pub(crate) fn signed_entry(
         &self,
         id: &CaseId,
-        origin: &str,
-        kind: &str,
+        origin: AuditOrigin,
+        kind: AuditEventKind,
         payload: &str,
         evidence: Option<&str>,
     ) -> Result<SignedEntry, AppError> {
@@ -352,8 +350,8 @@ impl Engine<'_> {
             case_id: id.as_str().to_owned(),
             at,
             actor: self.signer.actor(),
-            origin: origin.to_owned(),
-            kind: AuditEventKind::parse(kind).map_err(|_| AppError::InvalidChain(0))?,
+            origin: origin.as_str().to_owned(),
+            kind,
             payload: payload.to_owned(),
             evidence: evidence.map(str::to_owned),
             prev: last.map_or([0; 32], |e| e.hash),

@@ -21,6 +21,7 @@ pub use tokio_util::sync::CancellationToken;
 
 mod adapter_storage_errors;
 mod approvals;
+mod audit_origin;
 mod configuration;
 mod custody;
 mod dispatch;
@@ -42,6 +43,7 @@ pub use fixed_errors::FixedAppError;
 mod report;
 
 pub use approvals::ApprovalRequest;
+use audit_origin::AuditOrigin;
 pub use configuration::{
     ConfigChange, ConfigDifference, ConfigurationInspection, ConfigurationReview,
     ConfigurationStore, PersistentConfig, ProductSettings,
