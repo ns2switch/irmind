@@ -26,6 +26,15 @@ pub trait EvidenceStore: Send + Sync {
 }
 
 pub trait EvidenceGraph: Send + Sync {
+    fn index_from_parser(
+        &self,
+        id: &CaseId,
+        hash: &str,
+        source: &str,
+        bytes: &[u8],
+        parser: &dyn EventParser,
+        cancel: &CancellationToken,
+    ) -> Result<usize, AppError>;
     fn index_records(
         &self,
         id: &CaseId,
@@ -100,7 +109,22 @@ pub trait AuditLog: Send + Sync {
 
 pub trait EventParser: Send + Sync {
     fn version(&self) -> &'static str;
-    fn parse(&self, source: &str, bytes: &[u8]) -> Result<Vec<Tainted<GraphRecord>>, AppError>;
+    fn parse_each(
+        &self,
+        source: &str,
+        bytes: &[u8],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<usize, AppError>;
+
+    fn parse(&self, source: &str, bytes: &[u8]) -> Result<Vec<Tainted<GraphRecord>>, AppError> {
+        let mut records = Vec::new();
+        self.parse_each(source, bytes, &CancellationToken::new(), &mut |record| {
+            records.push(record);
+            Ok(())
+        })?;
+        Ok(records)
+    }
 }
 
 pub trait Signer: Send + Sync {

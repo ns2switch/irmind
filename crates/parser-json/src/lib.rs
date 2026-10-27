@@ -8,6 +8,8 @@ use irmind_app::{
 use irmind_domain::{Provenance, SourceKind, Tainted, classify_field};
 use serde_json::Value;
 
+mod stream;
+
 pub struct JsonParser;
 
 static MANIFEST: ModuleManifest = ModuleManifest {
@@ -34,9 +36,15 @@ impl Module for JsonParser {
 
 impl EventParser for JsonParser {
     fn version(&self) -> &'static str {
-        "json-cloudtrail-v4"
+        "json-cloudtrail-v5"
     }
-    fn parse(&self, source: &str, bytes: &[u8]) -> Result<Vec<Tainted<GraphRecord>>, AppError> {
+    fn parse_each(
+        &self,
+        source: &str,
+        bytes: &[u8],
+        cancel: &irmind_app::CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<usize, AppError> {
         if bytes.len() > 50 * 1024 * 1024 {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::JSONInputExceeds50MB,
@@ -44,59 +52,15 @@ impl EventParser for JsonParser {
         }
         let first = bytes.iter().copied().find(|b| !b.is_ascii_whitespace());
         if !matches!(first, Some(b'{' | b'[')) {
-            return Ok(Vec::new());
+            return Ok(0);
         }
-        let values = parse_values(bytes)?;
-        let mut records = Vec::with_capacity(values.len());
-        for (index, value) in values.into_iter().map(normalize_record).enumerate() {
-            records.push(parse_record(source, bytes, index, &value)?);
-        }
-        Ok(records)
+        stream::parse_each(source, bytes, cancel, emit)
     }
-}
-
-fn parse_values(bytes: &[u8]) -> Result<Vec<Value>, AppError> {
-    let values = match serde_json::from_slice::<Value>(bytes) {
-        Ok(Value::Array(items)) => items,
-        Ok(Value::Object(mut object)) => {
-            if let Some(Value::Array(items)) = object.remove("Records") {
-                items
-            } else if let Some(Value::Array(items)) = object.remove("events") {
-                items
-            } else {
-                vec![Value::Object(object)]
-            }
-        }
-        Ok(_) => Vec::new(),
-        Err(_) => {
-            let mut items = Vec::new();
-            for line in bytes.split(|byte| *byte == b'\n') {
-                if line.iter().all(u8::is_ascii_whitespace) {
-                    continue;
-                }
-                let item = serde_json::from_slice(line)
-                    .map_err(|e| AppError::Storage(format!("invalid JSON record: {e}")))?;
-                items.push(normalize_record(item));
-                if items.len() > 100_000 {
-                    return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
-                        irmind_app::AdapterPolicyError::TooManyJSONRecords,
-                    )));
-                }
-            }
-            items
-        }
-    };
-    if values.len() > 100_000 {
-        return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
-            irmind_app::AdapterPolicyError::TooManyJSONRecords,
-        )));
-    }
-    Ok(values)
 }
 
 fn parse_record(
     source: &str,
-    bytes: &[u8],
+    evidence_hash: [u8; 32],
     index: usize,
     value: &Value,
 ) -> Result<Tainted<GraphRecord>, AppError> {
@@ -130,7 +94,7 @@ fn parse_record(
             relations,
         },
         Provenance::new(
-            sha256(bytes),
+            evidence_hash,
             Some(index as u64),
             if source.starts_with("siem_")
                 || source.starts_with("cloud_")

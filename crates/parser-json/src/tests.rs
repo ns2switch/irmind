@@ -73,6 +73,42 @@ fn remote_envelopes_become_separate_timeline_records() {
 }
 
 #[test]
+fn cloudtrail_stream_stops_before_a_later_record() {
+    let bytes = br#"{"Records":[{"eventName":"First"},{"eventName":"Second"}]}"#;
+    let mut seen = Vec::new();
+    let result = JsonParser.parse_each(
+        "cloudtrail.json",
+        bytes,
+        &irmind_app::CancellationToken::new(),
+        &mut |record| {
+            record.inspect(|value| seen.push(value.event.clone()));
+            Err(AppError::Cancelled)
+        },
+    );
+    assert!(matches!(result, Err(AppError::Cancelled)));
+    assert_eq!(seen, ["First"]);
+}
+
+#[test]
+fn newline_json_stream_has_stable_record_pointers() {
+    let bytes = b"{\"eventName\":\"First\"}\n{\"eventName\":\"Second\"}\n";
+    let mut pointers = Vec::new();
+    let count = JsonParser
+        .parse_each(
+            "events.jsonl",
+            bytes,
+            &irmind_app::CancellationToken::new(),
+            &mut |record| {
+                record.inspect(|value| pointers.push(value.index));
+                Ok(())
+            },
+        )
+        .unwrap();
+    assert_eq!(count, 2);
+    assert_eq!(pointers, [0, 1]);
+}
+
+#[test]
 fn rejects_excessive_size_depth_and_record_count() {
     let oversized = vec![b' '; 50 * 1024 * 1024 + 1];
     assert!(JsonParser.parse("large.json", &oversized).is_err());

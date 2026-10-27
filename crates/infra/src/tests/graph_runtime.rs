@@ -8,12 +8,14 @@ fn graph_queries_keep_entity_context_and_source_records() {
         fn version(&self) -> &'static str {
             "json-cloudtrail-v1"
         }
-        fn parse(
+        fn parse_each(
             &self,
             _source: &str,
             _bytes: &[u8],
-        ) -> Result<Vec<Tainted<GraphRecord>>, AppError> {
-            Ok(Vec::new())
+            _cancel: &CancellationToken,
+            _emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+        ) -> Result<usize, AppError> {
+            Ok(0)
         }
     }
     struct GraphModel;
@@ -193,6 +195,18 @@ fn graph_queries_keep_entity_context_and_source_records() {
         .unwrap()
         .execute(
             "UPDATE record_texts SET text='tampered' WHERE hash=?1 AND record_index=0",
+            duckdb::params![hash],
+        )
+        .unwrap();
+    assert!(engine.verify_graph(&case.id).is_err());
+    assert_eq!(engine.rebuild_graph(&case.id).unwrap(), 3);
+    assert_eq!(engine.verify_graph(&case.id).unwrap(), 3);
+    store
+        .graph
+        .connect(&case.id)
+        .unwrap()
+        .execute(
+            "DELETE FROM record_terms WHERE hash=?1 AND term='rare'",
             duckdb::params![hash],
         )
         .unwrap();

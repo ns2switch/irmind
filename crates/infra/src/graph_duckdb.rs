@@ -1,6 +1,6 @@
 //! Derived, rebuildable graph index. The signed originals remain in the evidence store.
 
-use duckdb::{Connection, OptionalExt, Transaction, params};
+use duckdb::{Connection, OptionalExt, params};
 use irmind_app::{AppError, GraphRecord, GraphRelation, TimelineEvent};
 use irmind_domain::{CaseId, Tainted};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
@@ -14,12 +14,13 @@ fn storage(_error: impl std::fmt::Display) -> AppError {
 }
 
 mod format;
+mod index;
 mod queries;
 mod verify;
 use format::short;
 use verify::{
     accumulate_graph_expectations, attach_graph_relations, read_observed_records,
-    verify_graph_totals,
+    verify_graph_totals, verify_terms,
 };
 pub(crate) struct GraphStore {
     root: PathBuf,
@@ -53,6 +54,10 @@ impl GraphStore {
              CREATE TABLE IF NOT EXISTS record_texts (
                 hash VARCHAR NOT NULL, record_index BIGINT NOT NULL, text VARCHAR NOT NULL,
                 PRIMARY KEY(hash, record_index));
+             CREATE TABLE IF NOT EXISTS record_terms (
+                term VARCHAR NOT NULL, hash VARCHAR NOT NULL, record_index BIGINT NOT NULL,
+                PRIMARY KEY(term, hash, record_index));
+             CREATE TABLE IF NOT EXISTS fts_indexed (hash VARCHAR PRIMARY KEY);
              CREATE TABLE IF NOT EXISTS relations (
                 hash VARCHAR NOT NULL, record_index BIGINT NOT NULL, event_time VARCHAR NOT NULL,
                 from_kind VARCHAR NOT NULL, from_value VARCHAR NOT NULL, relation VARCHAR NOT NULL,
@@ -84,92 +89,6 @@ impl GraphStore {
         Ok(db)
     }
 
-    pub(crate) fn index_records(
-        &self,
-        id: &CaseId,
-        hash: &str,
-        records: &[Tainted<GraphRecord>],
-        cancel: &irmind_app::CancellationToken,
-    ) -> Result<(), AppError> {
-        let mut db = self.connect(id)?;
-        let tx = db.transaction().map_err(storage)?;
-        let indexed: i64 = tx
-            .query_row(
-                "SELECT COUNT(*) FROM indexed WHERE hash=?1",
-                params![hash],
-                |row| row.get(0),
-            )
-            .map_err(storage)?;
-        if indexed != 0 {
-            return Ok(());
-        }
-        Self::insert_records(&tx, hash, records, cancel)?;
-        tx.commit().map_err(storage)
-    }
-
-    fn insert_records(
-        tx: &Transaction<'_>,
-        hash: &str,
-        records: &[Tainted<GraphRecord>],
-        cancel: &irmind_app::CancellationToken,
-    ) -> Result<(), AppError> {
-        for (batch_index, record) in records.iter().enumerate() {
-            if batch_index % 256 == 0 && cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            let mut outcome = Ok(());
-            record.inspect(|record| {
-                outcome = (|| {
-            let index = i64::try_from(record.index)
-                .map_err(|_| storage("record index exceeds DuckDB BIGINT"))?;
-            tx.execute(
-                "INSERT INTO events (hash,record_index,event_time,event) VALUES (?1,?2,?3,?4)",
-                params![hash, index, record.at, record.event],
-            )
-            .map_err(storage)?;
-            tx.execute(
-                "INSERT INTO record_texts (hash,record_index,text) VALUES (?1,?2,?3)",
-                params![hash, index, record.text],
-            )
-            .map_err(storage)?;
-            for (kind, value) in &record.entities {
-                tx.execute(
-                    "INSERT INTO observations (hash,record_index,event_time,event,kind,value) VALUES (?1,?2,?3,?4,?5,?6)",
-                    params![hash, index, record.at, record.event, kind, value],
-                )
-                .map_err(storage)?;
-                tx.execute(
-                    "INSERT INTO nodes (kind,value,first_seen,last_seen,count) VALUES (?1,?2,?3,?3,1)
-                     ON CONFLICT (kind,value) DO UPDATE SET
-                       first_seen=LEAST(nodes.first_seen,excluded.first_seen),
-                       last_seen=GREATEST(nodes.last_seen,excluded.last_seen),
-                       count=nodes.count+1",
-                    params![kind, value, record.at],
-                )
-                .map_err(storage)?;
-            }
-            for relation in &record.relations {
-                tx.execute(
-                    "INSERT INTO relations (hash,record_index,event_time,from_kind,from_value,relation,to_kind,to_value) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
-                    params![hash, index, record.at, relation.from_kind, relation.from_value, relation.relation, relation.to_kind, relation.to_value],
-                )
-                .map_err(storage)?;
-            }
-                Ok(())
-                })();
-            });
-            outcome?;
-        }
-        let count = i64::try_from(records.len())
-            .map_err(|_| storage("record count exceeds DuckDB BIGINT"))?;
-        tx.execute(
-            "INSERT INTO indexed (hash,records) VALUES (?1,?2)",
-            params![hash, count],
-        )
-        .map_err(storage)?;
-        Ok(())
-    }
-
     pub(crate) fn rebuild<F>(
         &self,
         id: &CaseId,
@@ -182,7 +101,7 @@ impl GraphStore {
     {
         let mut db = self.connect(id)?;
         let tx = db.transaction().map_err(storage)?;
-        tx.execute_batch("DELETE FROM relations; DELETE FROM observations; DELETE FROM nodes; DELETE FROM record_texts; DELETE FROM events; DELETE FROM indexed;").map_err(storage)?;
+        tx.execute_batch("DELETE FROM relations; DELETE FROM observations; DELETE FROM nodes; DELETE FROM record_terms; DELETE FROM fts_indexed; DELETE FROM record_texts; DELETE FROM events; DELETE FROM indexed;").map_err(storage)?;
         let mut total = 0usize;
         for (hash, expected) in sources {
             if cancel.is_cancelled() {
@@ -244,6 +163,7 @@ impl GraphStore {
             if expected.len() != *expected_count {
                 return Err(storage(format!("signed record count differs for {hash}")));
             }
+            verify_terms(&db, hash, &expected, cancel)?;
             let mut actual = read_observed_records(&db, hash, cancel)?;
             attach_graph_relations(&db, hash, &mut actual, cancel)?;
             let mut equal = actual.len() == expected.len();

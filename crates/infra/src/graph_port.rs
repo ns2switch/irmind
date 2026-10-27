@@ -4,6 +4,19 @@ use crate::{
 };
 
 impl EvidenceGraph for LocalStore {
+    fn index_from_parser(
+        &self,
+        id: &CaseId,
+        hash: &str,
+        source: &str,
+        bytes: &[u8],
+        parser: &dyn EventParser,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<usize, AppError> {
+        self.graph
+            .index_from_parser(id, hash, source, bytes, parser, cancel)
+    }
+
     fn index_records(
         &self,
         id: &CaseId,
@@ -15,7 +28,7 @@ impl EvidenceGraph for LocalStore {
     }
 
     fn graph_version(&self) -> &'static str {
-        "duckdb-graph-v3"
+        "duckdb-graph-v4"
     }
 
     fn graph_summary(&self, id: &CaseId) -> Result<String, AppError> {
