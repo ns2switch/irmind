@@ -1,6 +1,85 @@
 use super::*;
 
 #[test]
+fn organization_ceiling_rejects_case_creation_and_expansion_and_limits_old_cases() {
+    let root = tempfile::tempdir().unwrap();
+    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let signer = Arc::new(LocalSigner {
+        key: SigningKey::from_bytes(&[91u8; 32]),
+        actor: Actor::Analyst,
+    });
+    let ports = EnginePorts::new(
+        store.clone(),
+        store.clone(),
+        store.clone(),
+        store.clone(),
+        CryptoPorts::new(
+            signer.clone(),
+            Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+        ),
+        Arc::new(MandatoryGuard::new().unwrap()),
+        Arc::new(JsonParser),
+    );
+    let broad = "v2;sources=cloud;accounts=account-a;projects=project-a,project-b;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z";
+    let narrow = "v2;sources=cloud;accounts=account-a;projects=project-a;hosts=;from=2026-10-23T10:00:00Z;to=2026-10-23T20:00:00Z";
+    let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock)).unwrap();
+    let old = engine.create_case("Existing", broad).unwrap();
+    let policy = PolicyRules {
+        scope: Some(irmind_domain::CaseScope::parse(narrow).unwrap()),
+        ..PolicyRules::default()
+    };
+    let engine = engine.with_policy(policy, "a".repeat(64)).unwrap();
+    assert!(engine.case_scope_exceeds_policy(&old).unwrap());
+    assert!(matches!(
+        engine.create_case("Too broad", broad),
+        Err(AppError::Fixed(
+            irmind_app::FixedAppError::PolicyScopeExceedsOrganizationCeiling
+        ))
+    ));
+    let limited = engine.create_case("Limited", narrow).unwrap();
+    assert!(matches!(
+        engine.change_scope(&limited.id, broad),
+        Err(AppError::Fixed(
+            irmind_app::FixedAppError::PolicyScopeExceedsOrganizationCeiling
+        ))
+    ));
+    let inside = irmind_domain::ProposedCall {
+        tool: Tool::CloudAuditEvents,
+        args: BTreeMap::from([
+            ("source".into(), "cloud".into()),
+            ("project".into(), "project-a".into()),
+            ("from".into(), "2026-10-23T12:00:00Z".into()),
+            ("to".into(), "2026-10-23T13:00:00Z".into()),
+            ("event_name".into(), "AssumeRole".into()),
+        ]),
+    };
+    assert!(matches!(
+        irmind_domain::evaluate_with_rules(
+            &old,
+            inside.clone(),
+            1,
+            ExecutionMode::Attended,
+            1_700_000_000,
+            &engine.policy
+        ),
+        Decision::Allow(_)
+    ));
+    let mut outside = inside;
+    outside.args.insert("project".into(), "project-b".into());
+    assert!(matches!(
+        irmind_domain::evaluate_with_rules(
+            &old,
+            outside,
+            1,
+            ExecutionMode::Attended,
+            1_700_000_000,
+            &engine.policy
+        ),
+        Decision::Deny(_)
+    ));
+}
+
+#[test]
 fn malicious_evidence_cannot_trigger_external_call() {
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(LocalStore::open(root.path()).unwrap());
@@ -134,7 +213,7 @@ fn analyst_scope_change_is_atomic_signed_and_exportable() {
     )
     .unwrap();
     let case = engine.create_case("Alert", "local only").unwrap();
-    let scope = "v1;sources=splunk-prod;accounts=123;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z";
+    let scope = "v2;sources=splunk-prod;accounts=123;projects=project-a;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z";
     engine.change_scope(&case.id, scope).unwrap();
     assert_eq!(store.get_case(&case.id).unwrap().scope, scope);
     assert_eq!(engine.verify(&case.id).unwrap(), 2);
@@ -142,6 +221,16 @@ fn analyst_scope_change_is_atomic_signed_and_exportable() {
         store.entries(&case.id).unwrap()[1].kind,
         irmind_domain::AuditEventKind::CaseScopeChanged
     );
+    let expanded = irmind_domain::CaseScope::parse(scope)
+        .unwrap()
+        .extend_target("project", "project-b")
+        .unwrap()
+        .to_v2_string()
+        .unwrap();
+    engine.change_scope(&case.id, &expanded).unwrap();
+    assert_eq!(store.get_case(&case.id).unwrap().scope, expanded);
+    assert_eq!(engine.verify(&case.id).unwrap(), 3);
+    assert_eq!(store.entries(&case.id).unwrap()[2].actor, Actor::Analyst);
     engine.seal(&case.id).unwrap();
     let path = root.path().join("case.json");
     CaseExporter::export_case(store.as_ref(), &case.id, &path, &CancellationToken::new()).unwrap();

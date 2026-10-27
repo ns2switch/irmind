@@ -55,7 +55,7 @@ pub(crate) struct HomeState {
     search: String,
     status_filter: Option<CaseStatus>,
     selected: usize,
-    form: [String; 7],
+    form: [String; 8],
     form_field: usize,
     verify_form: [String; 2],
     verify_field: usize,
@@ -88,6 +88,7 @@ impl HomeState {
             status_filter: None,
             selected: 0,
             form: [
+                String::new(),
                 String::new(),
                 "medium".into(),
                 String::new(),
@@ -145,14 +146,16 @@ impl HomeState {
     }
 
     fn scope(&self) -> String {
-        let [_, _, sources, accounts, hosts, from, to] = &self.form;
-        if [sources, accounts, hosts, from, to]
+        let [_, _, sources, accounts, projects, hosts, from, to] = &self.form;
+        if [sources, accounts, projects, hosts, from, to]
             .iter()
             .all(|part| part.is_empty())
         {
             return "local evidence only".into();
         }
-        format!("v1;sources={sources};accounts={accounts};hosts={hosts};from={from};to={to}")
+        format!(
+            "v2;sources={sources};accounts={accounts};projects={projects};hosts={hosts};from={from};to={to}"
+        )
     }
 }
 

@@ -49,6 +49,11 @@ impl CaseRuntime<'_, '_, '_> {
         } else {
             status
         };
+        let status = if self.engine.case_scope_exceeds_policy(&self.state.case)? {
+            format!("CASE SCOPE LIMITED BY ORGANIZATION POLICY | {status}")
+        } else {
+            status
+        };
         draw_case(
             self.terminal,
             &CaseFrame {

@@ -95,8 +95,9 @@ impl<'a> Engine<'a> {
                 crate::FixedAppError::PolicyTitleOrScopeIsInvalid,
             ));
         }
-        CaseScope::parse(scope)
+        let parsed_scope = CaseScope::parse(scope)
             .map_err(|_| AppError::Fixed(crate::FixedAppError::PolicyInvalidStructuredScope))?;
+        self.validate_policy_ceiling(&parsed_scope)?;
         let id = CaseId::parse(&uuid::Uuid::new_v4().to_string())
             .map_err(|_| AppError::InvalidCaseId)?;
         let _case_lock = self.repo.lock_case(&id)?;
@@ -109,8 +110,8 @@ impl<'a> Engine<'a> {
         };
         let entry = self.signed_entry(
             &case.id,
-            "system",
-            "CaseCreated",
+            crate::AuditOrigin::System,
+            irmind_domain::AuditEventKind::CaseCreated,
             &serde_json::to_string(&CaseCreatedEvent {
                 version: 3,
                 title: title.to_owned(),
@@ -132,8 +133,9 @@ impl<'a> Engine<'a> {
                 crate::FixedAppError::PolicyInvalidCaseScope,
             ));
         }
-        CaseScope::parse(new_scope)
+        let parsed_scope = CaseScope::parse(new_scope)
             .map_err(|_| AppError::Fixed(crate::FixedAppError::PolicyInvalidCaseScope))?;
+        self.validate_policy_ceiling(&parsed_scope)?;
         let _case_lock = self.repo.lock_case(id)?;
         self.verify_unlocked(id)?;
         let case = self.repo.get_case(id)?;
@@ -149,7 +151,13 @@ impl<'a> Engine<'a> {
             new_scope: new_scope.to_owned(),
         })
         .map_err(|error| AppError::Storage(error.to_string()))?;
-        let entry = self.signed_entry(id, "analyst", "CaseScopeChanged", &payload, None)?;
+        let entry = self.signed_entry(
+            id,
+            crate::AuditOrigin::Analyst,
+            irmind_domain::AuditEventKind::CaseScopeChanged,
+            &payload,
+            None,
+        )?;
         self.audit_log.transact(
             &entry,
             CaseMutation::Scope {
@@ -157,5 +165,28 @@ impl<'a> Engine<'a> {
                 new_scope: new_scope.to_owned(),
             },
         )
+    }
+
+    pub fn case_scope_exceeds_policy(&self, case: &Case) -> Result<bool, AppError> {
+        let Some(ceiling) = &self.policy.scope else {
+            return Ok(false);
+        };
+        let scope = CaseScope::parse(&case.scope)
+            .map_err(|_| AppError::Fixed(crate::FixedAppError::PolicyInvalidCaseScope))?;
+        Ok(!scope.is_within(ceiling))
+    }
+
+    fn validate_policy_ceiling(&self, scope: &CaseScope) -> Result<(), AppError> {
+        if self
+            .policy
+            .scope
+            .as_ref()
+            .is_some_and(|ceiling| !scope.is_within(ceiling))
+        {
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyScopeExceedsOrganizationCeiling,
+            ));
+        }
+        Ok(())
     }
 }

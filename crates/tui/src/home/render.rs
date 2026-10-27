@@ -99,11 +99,12 @@ fn home_items(
     let content = match state.mode {
         Mode::List | Mode::Search => case_items(state, engine)?,
         Mode::New => {
-            const NAMES: [&str; 7] = [
+            const NAMES: [&str; 8] = [
                 "Title",
                 "Severity (low/medium/high/critical)",
                 "Sources",
                 "Accounts",
+                "Projects",
                 "Hosts",
                 "From UTC",
                 "To UTC",

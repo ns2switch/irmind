@@ -1,10 +1,11 @@
+mod execution;
 mod local;
 mod remote;
 
 use crate::{
     AppError, AuditEventKind, AuthorizedCall, BTreeMap, CancellationToken, Case, CaseId, Decision,
-    Engine, PendingApproval, ProposedCall, Provenance, Screened, SourceKind, Tainted, Tool,
-    evaluate_tainted, hex, remote_tool_error, sha256,
+    Engine, PendingApproval, ProposedCall, Provenance, Screened, SourceKind, Tainted, Tool, hex,
+    remote_tool_error, sha256,
 };
 
 impl Engine<'_> {
@@ -15,48 +16,29 @@ impl Engine<'_> {
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
         let id = &case.id;
-        let proposal_payload = format!("{} {:?}", proposal.tool.as_str(), proposal.args);
-        let case_owned = case.clone();
-        let decision = self
-            .blocking_local(move |local| {
-                let id = &case_owned.id;
-                local.audit(id, "model", "Proposal", &proposal_payload, None)?;
-                let completed_calls = local.completed_calls_unlocked(id)?;
-                if let Err(reason) = local.policy.permits(&proposal.tool, completed_calls) {
-                    return Ok(Decision::Deny(reason));
-                }
-                let next_seq = local
-                    .audit_log
-                    .last_entry(id)?
-                    .map_or(1, |entry| entry.seq + 1);
-                let tainted = Tainted::from_external(
-                    proposal,
-                    Provenance::new(
-                        sha256(proposal_payload.as_bytes()),
-                        None,
-                        SourceKind::ModelProposal,
-                    ),
-                );
-                Ok(evaluate_tainted(
-                    &case_owned,
-                    tainted,
-                    next_seq,
-                    local.mode,
-                    local.turn_has_detections(id)?,
-                    local.clock.now()?,
-                ))
-            })
-            .await?;
+        let decision = self.evaluate_model_proposal(case, proposal).await?;
         match decision {
             Decision::Deny(reason) => {
-                self.audit_local(id, "policy", "Denied", reason, None)
-                    .await?;
+                self.audit_local(
+                    id,
+                    crate::AuditOrigin::Policy,
+                    AuditEventKind::Denied,
+                    reason,
+                    None,
+                )
+                .await?;
                 Ok(format!("denied: {reason}"))
             }
             Decision::NeedsApproval(pending) => {
                 if let Some(reason) = self.pending_unavailable_reason(&pending) {
-                    self.audit_local(id, "policy", "Denied", reason, None)
-                        .await?;
+                    self.audit_local(
+                        id,
+                        crate::AuditOrigin::Policy,
+                        AuditEventKind::Denied,
+                        reason,
+                        None,
+                    )
+                    .await?;
                     return Ok(format!("denied: {reason}"));
                 }
                 let id_owned = id.clone();
@@ -70,14 +52,65 @@ impl Engine<'_> {
             }
             Decision::Allow(call) => {
                 if let Some(reason) = self.unavailable_reason(&call) {
-                    self.audit_local(id, "policy", "Denied", reason, None)
-                        .await?;
+                    self.audit_local(
+                        id,
+                        crate::AuditOrigin::Policy,
+                        AuditEventKind::Denied,
+                        reason,
+                        None,
+                    )
+                    .await?;
                     return Ok(format!("denied: {reason}"));
                 }
                 let (screened, _) = self.execute_authorized(id, &call, false, cancel).await?;
                 Ok(screened)
             }
         }
+    }
+
+    async fn evaluate_model_proposal(
+        &self,
+        case: &Case,
+        proposal: ProposedCall,
+    ) -> Result<Decision, AppError> {
+        let proposal_payload = format!("{} {:?}", proposal.tool.as_str(), proposal.args);
+        let case_owned = case.clone();
+        self.blocking_local(move |local| {
+            let id = &case_owned.id;
+            local.audit(
+                id,
+                crate::AuditOrigin::Model,
+                irmind_domain::AuditEventKind::Proposal,
+                &proposal_payload,
+                None,
+            )?;
+            let completed_calls = local.completed_calls_unlocked(id)?;
+            if let Err(reason) = local.policy.permits(&proposal.tool, completed_calls) {
+                return Ok(Decision::Deny(reason));
+            }
+            let next_seq = local
+                .audit_log
+                .last_entry(id)?
+                .map_or(1, |entry| entry.seq + 1);
+            let tainted = Tainted::from_external(
+                proposal,
+                Provenance::new(
+                    sha256(proposal_payload.as_bytes()),
+                    None,
+                    SourceKind::ModelProposal,
+                ),
+            );
+            Ok(irmind_domain::evaluate_tainted_with_rules(
+                &case_owned,
+                tainted,
+                next_seq,
+                local.mode,
+                local.turn_has_detections(id)?,
+                local.clock.now()?,
+                &local.policy,
+            ))
+        })
+        .await
     }
 
     pub(crate) fn unavailable_reason(&self, call: &AuthorizedCall) -> Option<&'static str> {
@@ -125,142 +158,6 @@ impl Engine<'_> {
         Ok(false)
     }
 
-    pub(crate) async fn execute_authorized(
-        &self,
-        id: &CaseId,
-        call: &AuthorizedCall,
-        approved: bool,
-        cancel: &CancellationToken,
-    ) -> Result<(String, String), AppError> {
-        let payload = format!("{} {:?}", call.tool().as_str(), call.proposal_args());
-        let (origin, kind) = if approved {
-            ("analyst", "ToolDispatch")
-        } else {
-            ("policy", "Allowed")
-        };
-        self.audit_local(id, origin, kind, &payload, None).await?;
-        let local_tool = matches!(
-            call.tool(),
-            Tool::EvidenceSearch
-                | Tool::EvidenceRead
-                | Tool::GraphSummary
-                | Tool::EntityLookup
-                | Tool::Neighbors
-                | Tool::EntityTimeline
-                | Tool::GraphPath
-                | Tool::TextSearch
-                | Tool::RawRecords
-                | Tool::CaseAddFinding
-        );
-        let raw = self.run_authorized_tool(call, local_tool, cancel).await;
-        let raw = match raw {
-            Ok(raw) => raw,
-            Err(AppError::Cancelled) => {
-                self.audit_local(id, "system", "Cancelled", call.tool().as_str(), None)
-                    .await?;
-                return Err(AppError::Cancelled);
-            }
-            Err(error) => {
-                self.audit_local(id, "system", "ToolError", call.tool().as_str(), None)
-                    .await?;
-                return Err(if local_tool {
-                    error
-                } else {
-                    remote_tool_error(error)
-                });
-            }
-        };
-        if cancel.is_cancelled() {
-            self.audit_local(id, "system", "Cancelled", call.tool().as_str(), None)
-                .await?;
-            return Err(AppError::Cancelled);
-        }
-        if raw.len() > 5_000_000 {
-            self.audit_local(id, "system", "ToolError", "tool result exceeds 5 MB", None)
-                .await?;
-            return Err(AppError::Fixed(
-                crate::FixedAppError::PolicyToolResultExceeds5MB,
-            ));
-        }
-        self.persist_tool_result(id, call, raw, cancel).await
-    }
-
-    async fn persist_tool_result(
-        &self,
-        id: &CaseId,
-        call: &AuthorizedCall,
-        raw: Vec<u8>,
-        cancel: &CancellationToken,
-    ) -> Result<(String, String), AppError> {
-        let id = id.clone();
-        let call_owned = call.clone();
-        let cancel_owned = cancel.clone();
-        let stored = self
-            .blocking_local(move |local| {
-                let hash = hex(&sha256(&raw));
-                local.evidence_store.put_evidence(&id, &hash, &raw)?;
-                local.audit(
-                    &id,
-                    "system",
-                    "ToolResult",
-                    &format!("{} bytes from {}", raw.len(), call_owned.tool().as_str()),
-                    Some(&hash),
-                )?;
-                local.index_remote_result(&id, &call_owned, &hash, &raw, &cancel_owned)?;
-                let screened = local.screen_model_result(&id, &raw, "ToolResult", Some(&hash))?;
-                Ok((screened, hash))
-            })
-            .await;
-        if matches!(stored, Err(AppError::Cancelled)) {
-            self.audit_local(
-                call.case_id(),
-                "system",
-                "Cancelled",
-                call.tool().as_str(),
-                None,
-            )
-            .await?;
-        }
-        stored
-    }
-
-    async fn run_authorized_tool(
-        &self,
-        call: &AuthorizedCall,
-        local_tool: bool,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<u8>, AppError> {
-        if local_tool {
-            if cancel.is_cancelled() {
-                Err(AppError::Cancelled)
-            } else {
-                let call = call.clone();
-                self.blocking_local(move |local| local.execute_local_tool(&call))
-                    .await
-            }
-        } else {
-            tokio::select! {
-                biased;
-                () = cancel.cancelled() => Err(AppError::Cancelled),
-                result = async {
-                    Ok(match call.tool() {
-                    Tool::SiemSearch => self.dispatch_siem(call, cancel).await?,
-                    Tool::CloudAuditEvents | Tool::CloudIdentity => self.dispatch_cloud(call, cancel).await?,
-                    Tool::EdrHostInfo | Tool::EdrProcessTree | Tool::EdrDetections => {
-                        self.dispatch_edr(call, cancel).await?
-                    }
-                    Tool::ThreatIntelInternal => self.dispatch_internal_intel(call, cancel).await?,
-                    Tool::ThreatIntelExternal => self
-                        .threat_intel
-                        .ok_or(AppError::Fixed(crate::FixedAppError::PolicyExternalIntelUnavailable))?
-                        .execute(call, cancel).await?,
-                    _ => return Err(AppError::Fixed(crate::FixedAppError::PolicyInvalidRemoteTool)),
-                    })
-                } => result,
-            }
-        }
-    }
-
     pub(crate) fn screen_and_audit(
         &self,
         id: &CaseId,
@@ -276,8 +173,8 @@ impl Engine<'_> {
         for (rule, count) in counts {
             self.audit(
                 id,
-                "guard",
-                "InjectionDetected",
+                crate::AuditOrigin::Guard,
+                irmind_domain::AuditEventKind::InjectionDetected,
                 &format!("source={source};rule={rule};count={count}"),
                 evidence,
             )?;
@@ -297,7 +194,13 @@ impl Engine<'_> {
             Provenance::new(sha256(raw), None, SourceKind::ToolResult),
         );
         let Ok(text) = std::str::from_utf8(raw) else {
-            self.audit(id, "guard", "BinaryResultOmitted", source, evidence)?;
+            self.audit(
+                id,
+                crate::AuditOrigin::Guard,
+                irmind_domain::AuditEventKind::BinaryResultOmitted,
+                source,
+                evidence,
+            )?;
             let message = "[BINARY RESULT OMITTED]";
             return Ok(message[..message.len().min(self.policy.max_model_result_bytes)].into());
         };

@@ -35,7 +35,13 @@ impl DeclassificationAuthority for AuditedDeclassification<'_, '_> {
             hex(signature),
         );
         self.engine
-            .audit(self.case_id, "analyst", "TaintDeclassified", &payload, None)
+            .audit(
+                self.case_id,
+                crate::AuditOrigin::Analyst,
+                irmind_domain::AuditEventKind::TaintDeclassified,
+                &payload,
+                None,
+            )
             .is_ok()
     }
 }
@@ -91,8 +97,8 @@ impl Engine<'_> {
         };
         self.audit(
             id,
-            "policy",
-            "NeedsApproval",
+            crate::AuditOrigin::Policy,
+            irmind_domain::AuditEventKind::NeedsApproval,
             &serde_json::to_string(&event).map_err(|e| AppError::Storage(e.to_string()))?,
             None,
         )?;

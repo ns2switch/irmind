@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -124,9 +125,20 @@ def main() -> None:
     parser.add_argument("--function-limit", type=int, default=80)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--check-audit-literals", action="store_true")
     args = parser.parse_args()
     root = args.root.resolve()
     files = sorted((root / "crates").rglob("*.rs"))
+    audit_wire = (root / "crates/domain/src/audit_kind.rs").read_text(encoding="utf-8")
+    event_names = set(re.findall(r'Self::([A-Za-z]+) => "[A-Za-z]+"', audit_wire))
+    audit_literals = []
+    for path in files:
+        if path == root / "crates/domain/src/audit_kind.rs" or "tests" in path.parts:
+            continue
+        source = path.read_text(encoding="utf-8").split("#[cfg(test)]", 1)[0]
+        for line, content in enumerate(source.splitlines(), 1):
+            if any(f'"{name}"' in content for name in event_names):
+                audit_literals.append(f"{path.relative_to(root)}:{line}")
     long_files = []
     long_modules = []
     long_functions = []
@@ -153,6 +165,7 @@ def main() -> None:
         "files_over_limit": long_files,
         "modules_over_limit": long_modules,
         "functions_over_limit": long_functions,
+        "audit_event_literals": audit_literals,
     }
     if args.json:
         print(json.dumps(report, indent=2))
@@ -166,6 +179,12 @@ def main() -> None:
         print(f"Functions over {args.function_limit} lines: {len(long_functions)}")
         for name, count in long_functions:
             print(f"  {count:4} {name}")
+        if audit_literals:
+            print("Audit event wire literals outside the domain conversion point:")
+            for location in audit_literals:
+                print(f"  {location}")
+    if args.check_audit_literals and audit_literals:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

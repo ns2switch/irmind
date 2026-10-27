@@ -76,7 +76,13 @@ impl Engine<'_> {
         }
         let hash = hex(&sha256(bytes));
         self.evidence_store.put_evidence(id, &hash, bytes)?;
-        self.audit(id, "system", "EvidenceIngested", source, Some(&hash))?;
+        self.audit(
+            id,
+            crate::AuditOrigin::System,
+            irmind_domain::AuditEventKind::EvidenceIngested,
+            source,
+            Some(&hash),
+        )?;
         for chunk in bytes.chunks(250_000) {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
@@ -98,8 +104,8 @@ impl Engine<'_> {
         self.graph.index_records(id, &hash, &records, cancel)?;
         self.audit(
             id,
-            "system",
-            "GraphIndexed",
+            crate::AuditOrigin::System,
+            irmind_domain::AuditEventKind::GraphIndexed,
             &format!(
                 "parser={};graph={};records={}",
                 self.parser.version(),
@@ -138,8 +144,8 @@ impl Engine<'_> {
         self.graph.index_records(id, hash, &records, cancel)?;
         self.audit(
             id,
-            "system",
-            "GraphIndexed",
+            crate::AuditOrigin::System,
+            irmind_domain::AuditEventKind::GraphIndexed,
             &format!(
                 "parser={};graph={};records={}",
                 self.parser.version(),

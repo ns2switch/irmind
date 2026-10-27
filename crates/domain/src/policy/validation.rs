@@ -75,23 +75,39 @@ fn valid_local(proposal: &ProposedCall) -> bool {
                     .get("index")
                     .is_some_and(|index| index.parse::<usize>().is_ok_and(|index| index < 100_000))
         }
-        Tool::CaseAddFinding => {
-            valid_args(&proposal.args, &["kind", "value", "evidence_hash"])
-                && proposal.args.get("kind").is_some_and(|kind| {
-                    matches!(
-                        kind.as_str(),
-                        "ioc" | "hypothesis" | "technique" | "impact" | "recommendation"
-                    )
-                })
-                && proposal.args.get("value").is_some_and(|value| {
-                    !value.trim().is_empty() && value.len() <= 2_000 && !value.contains('\0')
-                })
-                && proposal.args.get("evidence_hash").is_some_and(|hash| {
-                    hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())
-                })
-        }
+        Tool::CaseAddFinding => valid_finding(&proposal.args),
         _ => false,
     }
+}
+
+fn valid_finding(args: &BTreeMap<String, String>) -> bool {
+    valid_args(
+        args,
+        &[
+            "kind",
+            "value",
+            "evidence_hash",
+            "ioc_type",
+            "first_seen",
+            "last_seen",
+            "verdict",
+            "supporting_evidence",
+            "refuting_evidence",
+            "technique_id",
+            "at",
+            "source",
+            "record_index",
+        ],
+    ) && args.get("kind").is_some_and(|kind| {
+        matches!(
+            kind.as_str(),
+            "ioc" | "hypothesis" | "technique" | "timeline" | "impact" | "recommendation"
+        )
+    }) && args.get("value").is_some_and(|value| {
+        !value.trim().is_empty() && value.len() <= 2_000 && !value.contains('\0')
+    }) && args
+        .get("evidence_hash")
+        .is_some_and(|hash| hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
 
 fn valid_event(proposal: &ProposedCall) -> bool {
@@ -102,16 +118,28 @@ fn valid_event(proposal: &ProposedCall) -> bool {
             } else {
                 "event_name"
             };
-            valid_args(
-                &proposal.args,
-                &["source", "account", "from", "to", query_key],
-            ) && proposal
-                .args
-                .get("source")
-                .is_some_and(|v| valid_scope_target(v))
-                && proposal
+            let allowed = if proposal.tool == Tool::CloudAuditEvents {
+                vec!["source", "account", "project", "from", "to", query_key]
+            } else {
+                vec!["source", "account", "from", "to", query_key]
+            };
+            let target_valid = if proposal.tool == Tool::CloudAuditEvents {
+                match (proposal.args.get("account"), proposal.args.get("project")) {
+                    (Some(account), None) => valid_scope_target(account),
+                    (None, Some(project)) => valid_scope_target(project),
+                    _ => false,
+                }
+            } else {
+                proposal
                     .args
                     .get("account")
+                    .is_some_and(|value| valid_scope_target(value))
+            };
+            valid_args(&proposal.args, &allowed)
+                && target_valid
+                && proposal
+                    .args
+                    .get("source")
                     .is_some_and(|v| valid_scope_target(v))
                 && proposal
                     .args

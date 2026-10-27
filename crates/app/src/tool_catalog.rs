@@ -65,8 +65,8 @@ fn local_catalog() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "case_add_finding",
-            description: "Propose an unconfirmed case finding linked to existing evidence; only the analyst can confirm it for the report",
-            parameters: json!({"type":"object","properties":{"kind":{"type":"string","enum":["ioc","hypothesis","technique","impact","recommendation"]},"value":{"type":"string"},"evidence_hash":{"type":"string","description":"SHA-256 of existing case evidence"}},"required":["kind","value","evidence_hash"],"additionalProperties":false}),
+            description: "Propose an unconfirmed evidence-linked case entity. For an IOC supply ioc_type, first_seen, last_seen and verdict; for a hypothesis supply supporting_evidence and optional refuting_evidence; for a technique supply technique_id; for a timeline event supply at and source. Evidence lists are comma-separated SHA-256 hashes. Only the analyst can confirm it for the report.",
+            parameters: json!({"type":"object","properties":{"kind":{"type":"string","enum":["ioc","hypothesis","technique","timeline","impact","recommendation"]},"value":{"type":"string"},"evidence_hash":{"type":"string","description":"SHA-256 of existing case evidence"},"ioc_type":{"type":"string","enum":["ip","domain","hash","user","key"]},"first_seen":{"type":"string"},"last_seen":{"type":"string"},"verdict":{"type":"string","enum":["unknown","benign","suspicious","malicious"]},"supporting_evidence":{"type":"string"},"refuting_evidence":{"type":"string"},"technique_id":{"type":"string"},"at":{"type":"string"},"source":{"type":"string"},"record_index":{"type":"integer","minimum":0,"maximum":99999}},"required":["kind","value","evidence_hash"],"additionalProperties":false}),
         },
     ]
 }
@@ -81,7 +81,7 @@ fn remote_catalog() -> Vec<ToolSpec> {
         ToolSpec {
             name: "cloud_audit_events",
             description: "Read at most 20 CloudTrail management events by exact event name from a scoped AWS account and UTC window of at most 24 hours",
-            parameters: json!({"type":"object","properties":{"source":{"type":"string"},"account":{"type":"string","description":"12-digit AWS account ID"},"from":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"to":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"event_name":{"type":"string","description":"Exact API event name, e.g. AssumeRole"}},"required":["source","account","from","to","event_name"],"additionalProperties":false}),
+            parameters: json!({"type":"object","properties":{"source":{"type":"string"},"account":{"type":"string","description":"12-digit AWS account ID"},"project":{"type":"string","description":"Cloud project ID where supported by the configured connector"},"from":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"to":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"event_name":{"type":"string","description":"Exact API event name, e.g. AssumeRole"}},"required":["source","from","to","event_name"],"oneOf":[{"required":["account"]},{"required":["project"]}],"additionalProperties":false}),
         },
         ToolSpec {
             name: "cloud_identity",

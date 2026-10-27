@@ -101,14 +101,26 @@ impl Engine<'_> {
                     crate::FixedAppError::PolicyModelTokenCountOverflow,
                 ))?;
         if used_tokens >= self.policy.max_model_tokens_per_case {
-            self.audit_local(id, "policy", "BudgetExceeded", "model token quota", None)
-                .await?;
+            self.audit_local(
+                id,
+                crate::AuditOrigin::Policy,
+                irmind_domain::AuditEventKind::BudgetExceeded,
+                "model token quota",
+                None,
+            )
+            .await?;
             return Err(AppError::Fixed(
                 crate::FixedAppError::PolicyCaseModelTokenQuotaReached,
             ));
         }
-        self.audit_local(id, "system", "ModelRequest", context, None)
-            .await?;
+        self.audit_local(
+            id,
+            crate::AuditOrigin::System,
+            irmind_domain::AuditEventKind::ModelRequest,
+            context,
+            None,
+        )
+        .await?;
         let request = CompletionRequest {
                 messages: vec![
                     CompletionMessage {
@@ -124,14 +136,25 @@ impl Engine<'_> {
         let (answer, usage) = self
             .complete_model_request(id, model, request, cancel)
             .await?;
-        self.audit_local(id, "model", "ModelReply", &answer.raw, None)
-            .await?;
+        self.audit_local(
+            id,
+            crate::AuditOrigin::Model,
+            irmind_domain::AuditEventKind::ModelReply,
+            &answer.raw,
+            None,
+        )
+        .await?;
         self.record_model_usage(id, usage, used_tokens).await?;
         if answer.calls.is_empty() {
             return Ok(Some(
-                self.screen_and_audit_local(id, &answer.text, "ModelReply", None)
-                    .await?
-                    .text,
+                self.screen_and_audit_local(
+                    id,
+                    &answer.text,
+                    AuditEventKind::ModelReply.as_str(),
+                    None,
+                )
+                .await?
+                .text,
             ));
         }
         for proposal in answer.calls {
@@ -157,8 +180,8 @@ impl Engine<'_> {
             };
             self.audit_local(
                 id,
-                "system",
-                "ModelUsage",
+                crate::AuditOrigin::System,
+                irmind_domain::AuditEventKind::ModelUsage,
                 &serde_json::to_string(&event)
                     .map_err(|error| AppError::Storage(error.to_string()))?,
                 None,
@@ -169,8 +192,14 @@ impl Engine<'_> {
                 .saturating_add(usage.output_tokens)
                 > self.policy.max_model_tokens_per_case
             {
-                self.audit_local(id, "policy", "BudgetExceeded", "model token quota", None)
-                    .await?;
+                self.audit_local(
+                    id,
+                    crate::AuditOrigin::Policy,
+                    irmind_domain::AuditEventKind::BudgetExceeded,
+                    "model token quota",
+                    None,
+                )
+                .await?;
                 return Err(AppError::Fixed(
                     crate::FixedAppError::PolicyCaseModelTokenQuotaReached,
                 ));
@@ -196,13 +225,25 @@ impl Engine<'_> {
         } {
             Ok(answer) => Ok(answer),
             Err(AppError::Cancelled) => {
-                self.audit_local(id, "system", "Cancelled", "model request cancelled", None)
-                    .await?;
+                self.audit_local(
+                    id,
+                    crate::AuditOrigin::System,
+                    irmind_domain::AuditEventKind::Cancelled,
+                    "model request cancelled",
+                    None,
+                )
+                .await?;
                 Err(AppError::Cancelled)
             }
             Err(error) => {
-                self.audit_local(id, "system", "ModelError", &error.to_string(), None)
-                    .await?;
+                self.audit_local(
+                    id,
+                    crate::AuditOrigin::System,
+                    irmind_domain::AuditEventKind::ModelError,
+                    &error.to_string(),
+                    None,
+                )
+                .await?;
                 Err(error)
             }
         }
@@ -221,32 +262,45 @@ impl Engine<'_> {
         self.verify_unlocked(id_owned)?;
         self.audit(
             id_owned,
-            "system",
-            "GuardActivated",
+            crate::AuditOrigin::System,
+            irmind_domain::AuditEventKind::GuardActivated,
             &self.guard.fingerprint(),
             None,
         )?;
         self.audit(
             id_owned,
-            "system",
-            "PolicyActivated",
+            crate::AuditOrigin::System,
+            irmind_domain::AuditEventKind::PolicyActivated,
             &self.policy_fingerprint,
             None,
         )?;
         self.audit(
             id_owned,
-            "system",
-            "ModulesActivated",
+            crate::AuditOrigin::System,
+            irmind_domain::AuditEventKind::ModulesActivated,
             &self.module_fingerprint,
             None,
         )?;
-        self.audit(id_owned, "system", "ModelSelected", descriptor, None)?;
+        self.audit(
+            id_owned,
+            crate::AuditOrigin::System,
+            irmind_domain::AuditEventKind::ModelSelected,
+            descriptor,
+            None,
+        )?;
         let prompt_origin = match self.signer.actor() {
-            Actor::Analyst => "analyst",
-            Actor::Agent(_) => "agent",
+            Actor::Analyst => AuditOrigin::Analyst,
+            Actor::Agent(_) => AuditOrigin::Agent,
         };
-        self.audit(id_owned, prompt_origin, "Prompt", alert_owned, None)?;
-        let screened = self.screen_and_audit(id_owned, alert_owned, "Prompt", None)?;
+        self.audit(
+            id_owned,
+            prompt_origin,
+            AuditEventKind::Prompt,
+            alert_owned,
+            None,
+        )?;
+        let screened =
+            self.screen_and_audit(id_owned, alert_owned, AuditEventKind::Prompt.as_str(), None)?;
         let title = self.screen_and_audit(id_owned, &case.title, "CaseTitle", None)?;
         let scope = self.screen_and_audit(id_owned, &case.scope, "CaseScope", None)?;
         let timeline_text = self

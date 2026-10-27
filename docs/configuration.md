@@ -4,7 +4,7 @@ This page is for operators setting up a controlled evaluation. It explains case 
 
 ## Case scope
 
-A case can remain local-only. To permit remote reads, the TUI's new-case form asks for sources, accounts, hosts, and a UTC start and end time. `/scope` edits the same fields. Changes are signed. Queries outside the scope require approval or are denied. The automation encoding is documented in the [CLI reference](development/cli.md). Project IDs are not supported in the form yet.
+A case can remain local-only. To permit remote reads, the TUI's new-case form asks for sources, accounts, projects, hosts, and a UTC start and end time. Add a target with `/scope add project <id>` (or `source`, `account`, or `host`), or widen the window with `/scope window <from> <to>`. Changes are signed by the analyst. Queries outside the case scope require approval or are denied. The automation encoding is documented in the [CLI reference](development/cli.md).
 
 ## Policy file
 
@@ -16,9 +16,17 @@ max_tool_calls_per_case = 100
 max_model_result_bytes = 10000
 max_model_tokens_per_case = 200000
 denied_tools = []
+
+[scope]
+sources = ["demo"]
+accounts = ["123456789012"]
+projects = []
+hosts = []
+from = "2026-10-23T00:00:00Z"
+to = "2026-10-23T23:59:59Z"
 ```
 
-Policy can tighten fixed tool rules, not enable denied actions. Read stays scoped; external enrichment needs a signed analyst approval; containment is disabled. Unknown fields fail validation.
+The optional `[scope]` table is a hard ceiling for remote reads across cases. It can list accounts, projects, and hosts together, plus allowed sources and a UTC window. A read outside the case scope may need analyst approval; a read outside the policy ceiling is denied, even with approval. New cases and scope changes cannot exceed the ceiling. If a new policy narrows an existing case, its reads use the intersection and the TUI shows a warning. The current AWS connector requires an account; project queries remain unavailable until a connector supports them. Policy can tighten fixed tool rules, not enable denied actions. External enrichment needs a signed analyst approval; containment is disabled. Unknown fields fail validation.
 
 ## Non-secret settings
 

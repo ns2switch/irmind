@@ -1,6 +1,6 @@
 use crate::{
-    BTreeMap, Case, CaseId, DomainError, ExecutionMode, Tool, canonical_args, evaluate, put,
-    take_field, take_u64,
+    BTreeMap, Case, CaseId, DomainError, ExecutionMode, Tool, canonical_args, put, take_field,
+    take_u64,
 };
 use sha2::{Digest as _, Sha256};
 
@@ -85,6 +85,16 @@ impl PendingApproval {
         encoded: &[u8],
         now: u64,
     ) -> Result<Self, DomainError> {
+        Self::recover_with_rules(case, mode, encoded, now, &crate::PolicyRules::default())
+    }
+
+    pub fn recover_with_rules(
+        case: &Case,
+        mode: ExecutionMode,
+        encoded: &[u8],
+        now: u64,
+        rules: &crate::PolicyRules,
+    ) -> Result<Self, DomainError> {
         let mut rest = encoded
             .strip_prefix(b"irmind-approval-v2\0")
             .ok_or(DomainError::InvalidApproval)?;
@@ -125,9 +135,14 @@ impl PendingApproval {
         }
         let mut open = case.clone();
         open.sealed = false;
-        let Decision::NeedsApproval(mut pending) =
-            evaluate(&open, ProposedCall { tool, args }, decision_seq, mode, now)
-        else {
+        let Decision::NeedsApproval(mut pending) = crate::evaluate_with_rules(
+            &open,
+            ProposedCall { tool, args },
+            decision_seq,
+            mode,
+            now,
+            rules,
+        ) else {
             return Err(DomainError::InvalidApproval);
         };
         pending.expires_at = expires_at;
