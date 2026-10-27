@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 3506de21def7f380096317087cf9310c33cd1d0d; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 9238838563f8cc31ff1523c7d8fe13ec9311a758; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -47,7 +47,7 @@ La ejecución diaria de CI en `main` publica binarios sin firma para Linux, macO
 2. Pulsa `n` para crear un caso. Indica título, severidad y ventana temporal. Deja vacías las fuentes remotas para trabajar solo con evidencia local.
 3. Abre el caso y escribe `/ingest`. Selecciona [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), que contiene únicamente datos sintéticos.
 4. Vuelve a la pantalla de inicio y pulsa `m`. Selecciona el módulo compatible con OpenAI, pulsa `e` para indicar un modelo instalado y una URL local como `http://127.0.0.1:11434/v1/`, y confirma el cambio. La sesión se recarga dentro de la TUI. Para un proveedor remoto, sigue [configuración](docs/es/configuration.md) y aprueba antes su tratamiento de datos.
-5. Abre de nuevo el caso, describe la alerta sintética y revisa las llamadas propuestas. `/help` y `Ctrl+K` muestran acciones; `/pause` cancela una tarea.
+5. Abre de nuevo el caso y describe la alerta sintética en la conversación. Enter envía; Alt+Enter añade una línea. Desplázate con PgUp/PgDn, abre el panel lateral con `Ctrl+B` y escribe `/` para ver comandos. `Ctrl+K` abre la paleta; `/pause` o Esc cancela una tarea activa.
 6. Revisa la cronología y la evidencia. Usa `/verify`, `/report`, `/seal` y `/export`. El sellado y la exportación muestran el hash y la huella de la clave antes de confirmar.
 
 Ningún LLM está habilitado por defecto. Puedes ingerir y verificar evidencia local sin uno.
