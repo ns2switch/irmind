@@ -1,5 +1,7 @@
 # Roadmap
 
+[Español](../es/roadmap.md)
+
 This page is for contributors and evaluators planning around current limitations. It describes intended work without promising a release date. Start with the [security model](../security-model.md) before using any integration.
 
 ## Available for synthetic evaluation
@@ -13,16 +15,21 @@ This page is for contributors and evaluators planning around current limitations
 - Case scopes with projects and an optional TOML policy ceiling for remote reads.
 - Automated contracts and synthetic end-to-end tests.
 
-## Next work
+## MVP scope
 
-1. Improve per-batch progress for long local tasks.
-2. Stream CloudTrail and JSON parsing for larger inputs, add full-text graph search, and benchmark at least 1 GB of synthetic evidence.
-3. Add SIEM alert retrieval and separate tracing from signed audit data.
+The MVP has a fixed scope:
+
+1. Stream CloudTrail and JSON ingestion, add full-text DuckDB graph search, and benchmark at least 1 GB of synthetic evidence.
+2. Retrieve SIEM alerts and keep diagnostic tracing separate from signed custody events.
+3. Replace free-form model-generated SIEM queries with structured fields, operators, time windows, and simple aggregations translated by the connector.
+4. Finish recorded-response tests, shared contracts, and setup guides for the cloud, SIEM, EDR, and threat-intelligence modules already in the workspace.
+
+Release `v0.1.0` only after every [reference-plan milestone](plan.md) passes, the model's manual test is documented, at least one connector is tested against a real test environment, and the tag includes a changelog and downloadable binaries. All current modules remain experimental until these checks pass. There is no release date yet.
 
 The merge matrix covers Linux, macOS, Windows, and cross-platform export verification. Release binaries are built once daily on `main` after code changes.
 
-## Later work
+## After the MVP
 
-A local gateway may run watches and unattended agents. It must use a separate Agent key, allow only scoped reads without an analyst, and keep every approval analyst-signed. Containment remains outside the current scope.
+Chronicle, GCP, Azure, and other product connectors may follow the shared ports. External anchoring of case seals is also deferred. A local gateway may run watches and unattended agents; it must use a separate Agent key, allow only scoped reads without an analyst, and keep every approval analyst-signed. Containment remains outside the current scope.
 
-Additional product connectors can follow shared ports after the structural and security work is reviewed. No provider should be enabled by default. Before any production use, the project also needs manual terminal testing, provider compliance approval, external trust anchoring for seals, and a decision on signed binary distribution.
+No provider should be enabled by default. Before production use, the project also needs manual terminal testing, provider compliance approval, and a decision on signed binary distribution.
