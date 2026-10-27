@@ -1,6 +1,8 @@
-Traducción de docs/configuration.md en el commit bf4274feeca1201cba4a52a09fe720025f8a56b9; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 9238838563f8cc31ff1523c7d8fe13ec9311a758; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
+
+La captura del ratón se puede desactivar con `mouse_capture = false` en `config.toml` para permitir la selección de texto del terminal. La TUI pide revisar y aceptar el cambio manual antes de abrir casos.
 
 Esta página es para quienes preparan una evaluación controlada. Explica el alcance de los casos, la política, los ajustes no secretos y la selección del backend. Los permisos de los conectores están en [módulos](modules.md).
 

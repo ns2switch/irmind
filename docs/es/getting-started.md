@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 073c237dc409755b6eeb7ad7fc29f51bcf3839f4; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 9238838563f8cc31ff1523c7d8fe13ec9311a758; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -34,10 +34,16 @@ Si `config.toml` requiere recuperación, la TUI ofrece restaurarlo o revisar los
 2. En el caso, escribe `/ingest` y selecciona [el archivo sintético de CloudTrail](../../examples/cloudtrail-alert.json). El original se guarda y se identifica por su hash.
 3. Usa `/timeline` o `/graph` para examinar los eventos indexados. Usa `/evidence <hash>` para ver un registro original.
 4. Vuelve a la pantalla de inicio, pulsa `m` y elige un modelo y sus ajustes públicos como explica [configuración](configuration.md). La sesión se recarga sin salir de IRMind. Abre el caso y pregunta: «¿Qué sugiere el evento AssumeRole sintético?».
-5. Revisa las llamadas propuestas antes de aprobarlas. `/pause` cancela una tarea activa; `/help` y `Ctrl+K` muestran las acciones.
+5. Revisa las llamadas propuestas en la conversación. Enter envía; Alt+Enter o Shift+Enter añade una línea. Escribe `/` para ver sugerencias o pulsa `Ctrl+K` para abrir la paleta. `/pause` o Esc cancela una tarea activa.
 6. Ejecuta `/verify`, revisa `/report` y usa `/seal` y `/export` solo después de comprobar el hash del caso y la huella de la clave de firma que se muestran.
 
 Puedes verificar el paquete en otro equipo con `irmind verify-export <PACKAGE> --expected-key <FINGERPRINT>`. Consulta la [referencia de la CLI](../development/cli.md) para automatización.
+
+## Navegar por el caso
+
+La conversación ocupa el espacio principal. Las propuestas, aprobaciones, resultados y hallazgos aparecen en tarjetas ordenadas. `Ctrl+B` muestra u oculta el panel lateral. Tab recorre cronología, evidencias, aprobaciones y hallazgos. `Ctrl+L` enfoca la conversación y `Ctrl+I` vuelve al campo de entrada. Enter o Espacio despliega una tarjeta seleccionada; `a`, `d` y `e` actúan sobre una aprobación seleccionada.
+
+PgUp/PgDn y Ctrl+U/Ctrl+D desplazan la vista enfocada. Inicio/Fin o `g`/`G` en la conversación saltan al principio/final. El texto nuevo del modelo sigue el final solo si ya estás allí; Fin quita el indicador de contenido nuevo. ↑/↓ recuperan entradas anteriores. `/help` o `?` muestran los comandos y atajos. La rueda del ratón funciona por defecto. Para seleccionar texto con el terminal, pon `mouse_capture = false` en la [configuración](configuration.md) y acepta el cambio desde la TUI.
 
 ## Siguientes pasos
 
