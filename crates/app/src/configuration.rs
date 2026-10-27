@@ -1,5 +1,5 @@
 use crate::{
-    AppError, Engine, FixedAppError, hex,
+    AppError, FixedAppError, hex,
     modules::{ModuleManifest, ModulePort},
     sha256,
 };
@@ -33,7 +33,7 @@ pub struct ProductSettings {
     pub values: BTreeMap<String, String>,
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ConfigChange {
     SelectLlm(Option<String>),
     SetEnabled {
@@ -182,7 +182,7 @@ impl PersistentConfig {
         Ok(next)
     }
 
-    fn active_egress_changed(&self, next: &Self) -> bool {
+    pub(super) fn active_egress_changed(&self, next: &Self) -> bool {
         if next.llm_module.is_some()
             && (self.llm_module != next.llm_module
                 || next
@@ -197,7 +197,7 @@ impl PersistentConfig {
             .any(|(id, settings)| settings.enabled && self.modules.get(id) != Some(settings))
     }
 
-    fn fingerprint(&self) -> Result<String, AppError> {
+    pub(super) fn fingerprint(&self) -> Result<String, AppError> {
         let bytes = serde_json::to_vec(self).map_err(|_| invalid())?;
         Ok(hex(&sha256(&bytes)))
     }
@@ -232,79 +232,9 @@ fn disallowed_char(ch: char) -> bool {
         || matches!(ch, '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{feff}')
 }
 
-impl Engine<'_> {
-    pub fn verify_configuration(
-        &self,
-        store: &dyn ConfigurationStore,
-        manifests: &[&ModuleManifest],
-    ) -> Result<(), AppError> {
-        let config = store.load()?;
-        config.validate(manifests)?;
-        self.verify_global_operations()?;
-        let entries = self.audit_log.global_operations()?;
-        let last = entries
-            .iter()
-            .rev()
-            .find(|entry| entry.operation.starts_with("configuration-approved:"));
-        match last {
-            Some(entry) => {
-                let mut fields = entry.operation.split(':');
-                let valid = fields.next() == Some("configuration-approved")
-                    && fields.next().is_some_and(valid_hash)
-                    && fields.next() == Some(config.fingerprint()?.as_str())
-                    && matches!(fields.next(), Some("true" | "false"))
-                    && fields.next().is_none();
-                if !valid {
-                    return Err(mismatch());
-                }
-            }
-            None if config != PersistentConfig::default() => return Err(mismatch()),
-            None => {}
-        }
-        Ok(())
-    }
-
-    pub fn apply_configuration_change(
-        &self,
-        store: &dyn ConfigurationStore,
-        manifests: &[&ModuleManifest],
-        change: ConfigChange,
-        confirmed: bool,
-    ) -> Result<bool, AppError> {
-        self.require_attended_analyst("change module configuration")?;
-        let _lock = self.audit_log.lock_global_operations()?;
-        self.verify_configuration(store, manifests)?;
-        let current = store.load()?;
-        let next = current.changed(change, manifests)?;
-        if current == next {
-            return Ok(false);
-        }
-        let egress = current.active_egress_changed(&next);
-        if egress && !confirmed {
-            return Err(AppError::Fixed(
-                FixedAppError::PolicyConfigurationConfirmationRequired,
-            ));
-        }
-        let operation = format!(
-            "configuration-approved:{}:{}:{egress}",
-            current.fingerprint()?,
-            next.fingerprint()?
-        );
-        self.append_global_operation_unlocked(operation)?;
-        store.save(&next)?;
-        if store.load()? != next {
-            return Err(invalid());
-        }
-        Ok(true)
-    }
-}
-
-fn valid_hash(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
+mod recovery;
+pub use recovery::{ConfigDifference, ConfigurationInspection, ConfigurationReview};
+mod session;
 
 #[cfg(test)]
 mod tests;

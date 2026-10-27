@@ -58,9 +58,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 macro_rules! register_configured {
-    ($registry:expr, $module:ty, $manifest:expr, $secrets:expr, $saved:expr, $interactive:expr, $issues:expr) => {{
+    ($registry:expr, $module:ty, $manifest:expr, $secrets:expr, $saved:expr, $allow_env:expr, $interactive:expr, $issues:expr) => {{
         let outcome = (|| -> Result<()> {
-            let config = load_module_config(&$manifest, $secrets, $saved)?;
+            let config = load_module_config(&$manifest, $secrets, $saved, $allow_env)?;
             $registry.register(Box::new(<$module>::from_config(&config)?), &config)?;
             Ok(())
         })();
@@ -68,7 +68,7 @@ macro_rules! register_configured {
             if $interactive {
                 $issues.insert(
                     $manifest.id,
-                    configuration_issue(&$manifest, $secrets, $saved),
+                    configuration_issue(&$manifest, $secrets, $saved, $allow_env),
                 );
             } else {
                 return Err(error);
@@ -122,6 +122,7 @@ struct RootWorkspaceIo {
     config_store: Arc<TomlConfigurationStore>,
     manifests: Vec<&'static ModuleManifest>,
     module_overrides: HashSet<String>,
+    allow_environment: bool,
     signer_id: String,
     secrets_id: String,
     #[cfg(feature = "keystore-file")]
@@ -352,7 +353,12 @@ impl WorkspaceIo for RootWorkspaceIo {
                 .copied()
                 .find(|manifest| manifest.id == id)
                 .ok_or_else(|| anyhow!("module is not compiled into this binary"))?;
-            load_module_config(manifest, self.secret_backend.as_ref(), &next)?;
+            load_module_config(
+                manifest,
+                self.secret_backend.as_ref(),
+                &next,
+                self.allow_environment,
+            )?;
         }
         Ok(engine.apply_configuration_change(
             self.config_store.as_ref(),

@@ -28,84 +28,203 @@ use super::{
 
 mod status;
 use status::module_statuses;
+mod preflight;
+use preflight::{decide_overrides, reconcile_configuration};
+
+struct PreparedStartup {
+    cli: Cli,
+    interactive: bool,
+    home: PathBuf,
+    store: Arc<LocalStore>,
+    active: keystore::ActiveKeystore,
+    config_store: Arc<TomlConfigurationStore>,
+    manifests: Vec<&'static irmind_app::modules::ModuleManifest>,
+    saved: PersistentConfig,
+    allow_environment: bool,
+    module_overrides: std::collections::HashSet<String>,
+    overrides_active: bool,
+    verifier: Arc<LocalVerifier>,
+    guard: Arc<MandatoryGuard>,
+}
 
 pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
-    let mut cli = Cli::parse();
+    let cli = Cli::parse();
     let interactive = matches!(&cli.command, None | Some(Command::Tui { .. }));
     if let Some(Command::VerifyExport { path, expected_key }) = &cli.command {
         return run_verify_export(path, expected_key.as_deref());
     }
-    let (home, store, active) = open_local(&cli, interactive)?;
-    let config_store = Arc::new(TomlConfigurationStore::new(&home));
-    let manifests = configuration::compiled_manifests();
-    let saved = config_store.load()?;
-    saved.validate(&manifests)?;
-    let module_overrides = configuration::selection_overrides(&cli);
-    configuration::resolve_cli(&mut cli, &saved)?;
-    let new_analyst_key = interactive && active.new_analyst_key;
-    let signer = active.signer;
-    let secrets = active.secret_backend;
-    let signer_backend = active.signer_backend;
-    let verifier = trusted_verifier(store.as_ref(), signer.as_ref(), signer_backend.as_ref())?;
-    let guard = Arc::new(MandatoryGuard::new()?);
-    let (registry, config_issues) =
-        configured_registry(&cli, &saved, secrets.as_ref(), interactive)?;
-    let mut engine = registry.bind(Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(signer.clone(), Arc::new(verifier)),
-            guard.clone(),
-            registry.parser()?,
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )?)?;
+    let Some(prepared) = PreparedStartup::new(cli, interactive)? else {
+        return Ok(false);
+    };
+    prepared.run(cancel)
+}
+
+impl PreparedStartup {
+    fn new(mut cli: Cli, interactive: bool) -> Result<Option<Self>> {
+        let (home, store, active) = open_local(&cli, interactive)?;
+        let config_store = Arc::new(TomlConfigurationStore::new(&home));
+        let manifests = configuration::compiled_manifests();
+        let verifier = Arc::new(trusted_verifier(
+            store.as_ref(),
+            active.signer.as_ref(),
+            active.signer_backend.as_ref(),
+        )?);
+        let guard = Arc::new(MandatoryGuard::new()?);
+        let preflight = Engine::new(
+            EnginePorts::new(
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                CryptoPorts::new(active.signer.clone(), verifier.clone()),
+                guard.clone(),
+                Arc::new(JsonParser),
+            ),
+            ExecutionMode::Attended,
+            Arc::new(SystemClock),
+        )?;
+        if !reconcile_configuration(
+            &preflight,
+            config_store.as_ref(),
+            &manifests,
+            &home,
+            interactive,
+            guard.as_ref(),
+        )? {
+            return Ok(None);
+        }
+        let saved = config_store.load()?;
+        saved.validate(&manifests)?;
+        let overrides = configuration::collect_egress_overrides(&cli, &saved);
+        let allow_environment = decide_overrides(
+            &preflight,
+            config_store.as_ref(),
+            &manifests,
+            &overrides,
+            interactive,
+            guard.as_ref(),
+        )?;
+        let module_overrides = if allow_environment {
+            configuration::selection_overrides(&cli)
+        } else {
+            std::collections::HashSet::default()
+        };
+        configuration::resolve_cli(&mut cli, &saved, allow_environment)?;
+        Ok(Some(Self {
+            cli,
+            interactive,
+            home,
+            store,
+            active,
+            config_store,
+            manifests,
+            saved,
+            allow_environment,
+            module_overrides,
+            overrides_active: allow_environment && !overrides.is_empty(),
+            verifier,
+            guard,
+        }))
+    }
+
+    fn run(self, cancel: &CancellationToken) -> Result<bool> {
+        let Self {
+            cli,
+            interactive,
+            home,
+            store,
+            active,
+            config_store,
+            manifests,
+            saved,
+            allow_environment,
+            module_overrides,
+            overrides_active,
+            verifier,
+            guard,
+        } = self;
+        let signer = active.signer;
+        let secrets = active.secret_backend;
+        let signer_backend = active.signer_backend;
+        let new_analyst_key = interactive && active.new_analyst_key;
+        let (registry, config_issues) = configured_registry(
+            &cli,
+            &saved,
+            secrets.as_ref(),
+            allow_environment,
+            interactive,
+        )?;
+        let engine = registry.bind(Engine::new(
+            EnginePorts::new(
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                CryptoPorts::new(signer.clone(), verifier),
+                guard.clone(),
+                registry.parser()?,
+            ),
+            ExecutionMode::Attended,
+            Arc::new(SystemClock),
+        )?)?;
+        let engine = apply_session_policy(engine, &cli, &saved, config_store.as_ref(), &manifests)?;
+        let workspace_io = RootWorkspaceIo {
+            home: home.clone(),
+            credential_fields: compiled_credential_fields(),
+            store: store.clone(),
+            signer_backend,
+            secret_backend: secrets.clone(),
+            config_store,
+            manifests,
+            module_overrides,
+            allow_environment,
+            signer_id: active.signer_id,
+            secrets_id: active.secrets_id,
+            #[cfg(feature = "keystore-file")]
+            file_backend: active.file_backend,
+        };
+        let module_statuses =
+            module_statuses(&cli, &registry, &config_issues, &workspace_io, &saved);
+        let selected_model = match cli.llm_module.as_deref() {
+            Some(id) if interactive => registry.llm(id).ok(),
+            Some(id) => Some(registry.llm(id)?),
+            None => None,
+        };
+        present(
+            cli.command,
+            cli::AutomationContext {
+                engine: &engine,
+                store: &store,
+                guard: &guard,
+                registry: &registry,
+                llm_module: cli.llm_module.as_deref(),
+                selected_model,
+                workspace_io: &workspace_io,
+                module_statuses: &module_statuses,
+                cancel,
+                new_analyst_key,
+                overrides_active,
+            },
+        )
+    }
+}
+
+fn apply_session_policy<'a>(
+    mut engine: Engine<'a>,
+    cli: &Cli,
+    saved: &PersistentConfig,
+    store: &dyn ConfigurationStore,
+    manifests: &[&irmind_app::modules::ModuleManifest],
+) -> Result<Engine<'a>> {
     if let Some(path) = &cli.policy {
         let (policy, fingerprint) = load_policy(path)?;
         engine = engine.with_policy(policy, fingerprint)?;
     }
-    if let Some(pricing) = load_pricing(&saved)? {
+    if let Some(pricing) = load_pricing(saved)? {
         engine = engine.with_pricing(pricing);
     }
-    engine.verify_configuration(config_store.as_ref(), &manifests)?;
-    let workspace_io = RootWorkspaceIo {
-        home: home.clone(),
-        credential_fields: compiled_credential_fields(),
-        store: store.clone(),
-        signer_backend,
-        secret_backend: secrets.clone(),
-        config_store,
-        manifests,
-        module_overrides,
-        signer_id: active.signer_id,
-        secrets_id: active.secrets_id,
-        #[cfg(feature = "keystore-file")]
-        file_backend: active.file_backend,
-    };
-    let module_statuses = module_statuses(&cli, &registry, &config_issues, &workspace_io, &saved);
-    let selected_model = match cli.llm_module.as_deref() {
-        Some(id) if interactive => registry.llm(id).ok(),
-        Some(id) => Some(registry.llm(id)?),
-        None => None,
-    };
-    present(
-        cli.command,
-        cli::AutomationContext {
-            engine: &engine,
-            store: &store,
-            guard: &guard,
-            registry: &registry,
-            llm_module: cli.llm_module.as_deref(),
-            selected_model,
-            workspace_io: &workspace_io,
-            module_statuses: &module_statuses,
-            cancel,
-            new_analyst_key,
-        },
-    )
+    engine.verify_configuration(store, manifests)?;
+    Ok(engine)
 }
 
 fn run_verify_export(path: &std::path::Path, expected_key: Option<&str>) -> Result<bool> {
@@ -123,8 +242,11 @@ fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) ->
             context.workspace_io,
             context.module_statuses,
             context.cancel,
-            None,
-            context.new_analyst_key,
+            irmind_tui::WorkspaceLaunch {
+                initial_case: None,
+                new_analyst_key: context.new_analyst_key,
+                overrides_active: context.overrides_active,
+            },
         ),
         Some(command) => context.run(command),
     }

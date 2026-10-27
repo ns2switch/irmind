@@ -122,12 +122,18 @@ impl StatusBuilder<'_> {
                 .filter(|field| !field.secret)
                 .map(|field| ModuleParameter {
                     name: field.name.into(),
-                    value: configuration::effective_value(id, field.name, self.saved)
-                        .ok()
-                        .flatten()
-                        .unwrap_or_default(),
+                    value: configuration::effective_value(
+                        id,
+                        field.name,
+                        self.saved,
+                        self.keystore.allow_environment,
+                    )
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default(),
                     required: field.required,
-                    overridden: std::env::var_os(field.name).is_some()
+                    overridden: (self.keystore.allow_environment
+                        && std::env::var_os(field.name).is_some())
                         || self.keystore.module_overrides.contains(id)
                         || (id.starts_with("llm-")
                             && self.keystore.module_overrides.contains("llm")),

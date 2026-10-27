@@ -2,6 +2,9 @@ use crate::{Cli, HashSet, ModuleManifest, PersistentConfig, Result, anyhow};
 use anyhow::Context as _;
 use irmind_app::{AppError, ModelPricing, SecretBackend, modules::ModuleConfig};
 
+mod overrides;
+pub(super) use overrides::{EgressOverride, collect_egress_overrides};
+
 pub(super) fn compiled_manifests() -> Vec<&'static ModuleManifest> {
     vec![
         &irmind_mod_llm_openai_compatible::MANIFEST,
@@ -62,7 +65,15 @@ pub(super) fn effective_value(
     module: &str,
     field: &str,
     saved: &PersistentConfig,
+    allow_environment: bool,
 ) -> Result<Option<String>> {
+    if !allow_environment {
+        return Ok(saved
+            .modules
+            .get(module)
+            .and_then(|settings| settings.values.get(field))
+            .cloned());
+    }
     match std::env::var(field) {
         Ok(value) => Ok(Some(value)),
         Err(std::env::VarError::NotPresent) => Ok(saved
@@ -97,7 +108,40 @@ fn enabled_from_values(flag: bool, environment: Option<&str>, saved: bool) -> Re
     }
 }
 
-pub(super) fn resolve_cli(cli: &mut Cli, saved: &PersistentConfig) -> Result<()> {
+pub(super) fn resolve_cli(
+    cli: &mut Cli,
+    saved: &PersistentConfig,
+    allow_overrides: bool,
+) -> Result<()> {
+    if !allow_overrides {
+        cli.llm_module.clone_from(&saved.llm_module);
+        cli.policy = saved.policy_path.as_ref().map(Into::into);
+        cli.enable_splunk = saved
+            .modules
+            .get("siem-splunk")
+            .is_some_and(|item| item.enabled);
+        cli.enable_aws = saved
+            .modules
+            .get("cloud-aws")
+            .is_some_and(|item| item.enabled);
+        cli.enable_crowdstrike = saved
+            .modules
+            .get("edr-crowdstrike")
+            .is_some_and(|item| item.enabled);
+        cli.enable_sentinelone = saved
+            .modules
+            .get("edr-sentinelone")
+            .is_some_and(|item| item.enabled);
+        cli.enable_misp = saved
+            .modules
+            .get("ti-misp")
+            .is_some_and(|item| item.enabled);
+        cli.enable_virustotal = saved
+            .modules
+            .get("ti-virustotal")
+            .is_some_and(|item| item.enabled);
+        return Ok(());
+    }
     if cli.llm_module.is_none() {
         cli.llm_module.clone_from(&saved.llm_module);
     }
@@ -139,6 +183,7 @@ pub(super) fn load_module_config(
     manifest: &ModuleManifest,
     secrets: &dyn SecretBackend,
     saved: &PersistentConfig,
+    allow_environment: bool,
 ) -> Result<ModuleConfig> {
     let mut config = ModuleConfig::new();
     for field in manifest.config {
@@ -154,7 +199,7 @@ pub(super) fn load_module_config(
                 }
             }
         } else {
-            match effective_value(manifest.id, field.name, saved)? {
+            match effective_value(manifest.id, field.name, saved, allow_environment)? {
                 Some(value) => config.insert_value(field.name, value),
                 None if !field.required => {}
                 None => return Err(anyhow!("required module setting {} is missing", field.name)),
@@ -168,6 +213,7 @@ pub(super) fn configuration_issue(
     manifest: &ModuleManifest,
     secrets: &dyn SecretBackend,
     saved: &PersistentConfig,
+    allow_environment: bool,
 ) -> String {
     let missing = manifest
         .config
@@ -177,7 +223,7 @@ pub(super) fn configuration_issue(
             if field.secret {
                 secrets.get(field.name).is_err()
             } else {
-                effective_value(manifest.id, field.name, saved)
+                effective_value(manifest.id, field.name, saved, allow_environment)
                     .ok()
                     .flatten()
                     .is_none()
@@ -231,6 +277,7 @@ pub(super) fn load_pricing(saved: &PersistentConfig) -> Result<Option<ModelPrici
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -241,5 +288,25 @@ mod tests {
         assert!(enabled_from_values(false, Some("true"), false).is_ok_and(|value| value));
         assert!(enabled_from_values(false, None, true).is_ok_and(|value| value));
         assert!(enabled_from_values(false, Some("maybe"), false).is_err());
+    }
+
+    #[test]
+    fn rejecting_tui_overrides_uses_only_saved_selection() {
+        use clap::Parser as _;
+        let mut cli = Cli::parse_from([
+            "irmind",
+            "--llm-module",
+            "llm-openai-compatible",
+            "--enable-splunk",
+        ]);
+        let saved = PersistentConfig::default();
+        resolve_cli(&mut cli, &saved, false).unwrap();
+        assert!(cli.llm_module.is_none());
+        assert!(!cli.enable_splunk);
+        assert!(
+            effective_value("llm-openai-compatible", "IRMIND_MODEL", &saved, false)
+                .unwrap()
+                .is_none()
+        );
     }
 }

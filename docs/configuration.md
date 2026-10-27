@@ -43,7 +43,9 @@ IRMIND_SPLUNK_SOURCE_ID = "demo"
 IRMIND_SPLUNK_INDEX = "security"
 ```
 
-This example describes the stored format. Change it through the TUI: a hand-edited file does not match the signed operational record and blocks startup. Restore the last approved file if an external edit was accidental.
+This example describes the stored format. Change it through the TUI. If the file is missing or differs from the last signed version, startup pauses before opening cases. The TUI can restore the approved version or show changed fields and sign the current valid file. It never accepts or restores silently. A secret field is always rejected. Automation exits with instructions to resolve the mismatch in the TUI.
+
+When a flag or environment variable changes a model, endpoint, connector selection, source ID, index, or region, the TUI first shows its effective and saved values. Accepting signs the overrides for that session and keeps an override indicator visible. Rejecting uses the saved settings. CLI automation accepts effective overrides without a prompt and records them in the signed global chain before running.
 
 These environment variables override their matching public fields. Set only values that match your approved endpoint and case scope.
 

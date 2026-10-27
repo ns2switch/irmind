@@ -1,4 +1,4 @@
-use crate::{KeystoreStatus, ModuleKind, ModuleStatus, WorkspaceIo, case};
+use crate::{KeystoreStatus, ModuleKind, ModuleStatus, WorkspaceIo, WorkspaceLaunch, case};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use irmind_app::{CancellationToken, CaseId, ConfigChange, Engine, LlmPort, hex, sha256};
@@ -65,6 +65,7 @@ pub(crate) struct HomeState {
     confirm_credential_delete: bool,
     pending_migration: Option<&'static str>,
     restart_required: bool,
+    overrides_active: bool,
     modules: Vec<ModuleStatus>,
     module_selected: usize,
     parameter_selected: usize,
@@ -104,6 +105,7 @@ impl HomeState {
             confirm_credential_delete: false,
             pending_migration: None,
             restart_required: false,
+            overrides_active: false,
             modules: Vec::new(),
             module_selected: 0,
             parameter_selected: 0,
@@ -204,12 +206,6 @@ mod state;
 use runtime::HomeRuntime;
 pub(crate) use state::{HomeAction, update};
 
-#[derive(Clone, Copy)]
-pub(crate) struct HomeLaunch<'a> {
-    pub initial_case: Option<&'a CaseId>,
-    pub new_analyst_key: bool,
-}
-
 pub(crate) fn run_home(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     engine: &Engine<'_>,
@@ -217,15 +213,24 @@ pub(crate) fn run_home(
     io_ops: &dyn WorkspaceIo,
     modules: &[ModuleStatus],
     shutdown: &CancellationToken,
-    launch: HomeLaunch<'_>,
+    launch: WorkspaceLaunch<'_>,
 ) -> Result<bool> {
     let mut state = HomeState::new(
         load_rows(engine)?,
         launch.new_analyst_key || engine.repo.list_cases()?.is_empty(),
     );
     state.set_modules(modules);
+    state.overrides_active = launch.overrides_active;
     if let Some(id) = launch.initial_case {
-        case::run_case(terminal, engine, model, io_ops, id, shutdown)?;
+        case::run_case(
+            terminal,
+            engine,
+            model,
+            io_ops,
+            id,
+            shutdown,
+            launch.overrides_active,
+        )?;
         state.rows = load_rows(engine)?;
     }
     let (tx, rx) = mpsc::channel::<(CaseId, CaseStatus)>();

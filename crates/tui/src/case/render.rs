@@ -44,6 +44,11 @@ impl CaseRuntime<'_, '_, '_> {
                 )
             },
         );
+        let status = if self.overrides_active {
+            format!("SESSION OVERRIDES ACTIVE | {status}")
+        } else {
+            status
+        };
         draw_case(
             self.terminal,
             &CaseFrame {

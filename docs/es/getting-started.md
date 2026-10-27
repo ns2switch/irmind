@@ -26,6 +26,8 @@ Si el backend elegido no está disponible, el arranque se detiene y la TUI ofrec
 
 Pulsa `m` para ver qué módulos están compilados, habilitados y configurados. Usa las flechas para elegir un módulo, Tab para elegir un campo público y `e` para editarlo. Enter selecciona un LLM o activa un conector. `k` abre sus credenciales en el llavero. Un cambio que pueda enviar datos fuera del equipo pide confirmación firmada. La TUI recarga la sesión tras aplicarlo. Ningún LLM se activa automáticamente.
 
+Si `config.toml` requiere recuperación, la TUI ofrece restaurarlo o revisar los cambios campo a campo antes de abrir casos. Los flags y variables de entorno que cambian los destinos se muestran y requieren confirmación; rechazarlos mantiene los ajustes guardados.
+
 ## Primer caso sintético
 
 1. Pulsa `n`, escribe un título como «Alerta de CloudTrail de prueba», elige una severidad y deja vacíos los campos de fuentes remotas. Se creará un caso local con un evento firmado.

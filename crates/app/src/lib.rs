@@ -42,7 +42,10 @@ pub use fixed_errors::FixedAppError;
 mod report;
 
 pub use approvals::ApprovalRequest;
-pub use configuration::{ConfigChange, ConfigurationStore, PersistentConfig, ProductSettings};
+pub use configuration::{
+    ConfigChange, ConfigDifference, ConfigurationInspection, ConfigurationReview,
+    ConfigurationStore, PersistentConfig, ProductSettings,
+};
 pub use custody::{SealPreview, export_case, verify_export};
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::{GraphRecord, GraphRelation, TimelineEvent};

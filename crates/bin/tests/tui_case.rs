@@ -36,6 +36,9 @@ use std::{
 };
 
 #[allow(clippy::wildcard_imports)]
+#[path = "tui_case/configuration_recovery.rs"]
+mod configuration_recovery;
+#[allow(clippy::wildcard_imports)]
 #[path = "tui_case/support.rs"]
 mod support;
 #[allow(clippy::wildcard_imports)]

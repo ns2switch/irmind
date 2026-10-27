@@ -72,7 +72,7 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
             .global_operations()
             .unwrap()
             .iter()
-            .any(|entry| entry.operation.starts_with("configuration-approved:"))
+            .any(|entry| entry.operation.starts_with("configuration-approved-v2:"))
     );
     assert!(screen(tui.terminal()).contains("Modules"));
 

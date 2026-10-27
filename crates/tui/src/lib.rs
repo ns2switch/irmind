@@ -4,6 +4,7 @@ mod case;
 mod home;
 pub mod scripted;
 mod setup;
+mod startup_review;
 mod workflow;
 
 use anyhow::Result;
@@ -77,6 +78,17 @@ pub struct KeystoreStatus {
 }
 
 pub use setup::{KeystoreChoice, choose_keystore};
+pub use startup_review::{
+    ConfigurationRecoveryChoice, OverrideReviewEntry, resolve_configuration_review,
+    resolve_override_review,
+};
+
+#[derive(Clone, Copy)]
+pub struct WorkspaceLaunch<'a> {
+    pub initial_case: Option<&'a irmind_app::CaseId>,
+    pub new_analyst_key: bool,
+    pub overrides_active: bool,
+}
 
 /// Filesystem selection is presentation I/O. The composition root supplies the
 /// same bounded, no-follow reader used by the noninteractive ingest command.
@@ -142,8 +154,7 @@ pub fn run_workspace(
     io_ops: &dyn WorkspaceIo,
     modules: &[ModuleStatus],
     shutdown: &CancellationToken,
-    initial_case: Option<&irmind_app::CaseId>,
-    new_analyst_key: bool,
+    launch: WorkspaceLaunch<'_>,
 ) -> Result<bool> {
     let _session = TerminalSession::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -154,10 +165,7 @@ pub fn run_workspace(
         io_ops,
         modules,
         shutdown,
-        home::HomeLaunch {
-            initial_case,
-            new_analyst_key,
-        },
+        launch,
     )
 }
 

@@ -19,6 +19,7 @@ pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub progress_rx: mpsc::Receiver<String>,
     pub seal_tx: mpsc::Sender<irmind_app::SealPreview>,
     pub seal_rx: mpsc::Receiver<irmind_app::SealPreview>,
+    pub overrides_active: bool,
 }
 
 impl<'scope> CaseRuntime<'scope, '_, '_> {

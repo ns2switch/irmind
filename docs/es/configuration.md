@@ -45,7 +45,9 @@ IRMIND_SPLUNK_SOURCE_ID = "demo"
 IRMIND_SPLUNK_INDEX = "security"
 ```
 
-El ejemplo describe el formato guardado. Cámbialo desde la TUI: una edición directa del archivo no coincide con el registro operativo firmado y bloquea el arranque. Si fue accidental, restaura el último archivo aprobado.
+El ejemplo describe el formato guardado. Cámbialo desde la TUI. Si falta el archivo o difiere de la última versión firmada, el arranque se detiene antes de abrir casos. La TUI permite restaurar la versión aprobada o revisar los campos cambiados y firmar el archivo actual si es válido. Nunca acepta ni restaura en silencio. Siempre rechaza los campos secretos. La automatización sale con instrucciones para resolver la diferencia en la TUI.
+
+Si un flag o una variable de entorno cambia el modelo, un destino, un conector, una fuente, un índice o una región, la TUI muestra primero el valor efectivo y el guardado. Aceptar firma los overrides de esa sesión y deja un indicador visible. Rechazar usa la configuración guardada. La CLI de automatización acepta los overrides efectivos sin diálogo y los registra en la cadena global firmada antes de ejecutarse.
 
 Estas variables de entorno prevalecen sobre los campos públicos correspondientes. Usa solo valores acordes con el destino aprobado y el alcance del caso.
 

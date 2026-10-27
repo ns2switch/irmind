@@ -24,6 +24,8 @@ If the selected backend is unavailable, startup stops and the TUI offers an expl
 
 Press `m` to see which modules are compiled, enabled, and configured. Use the arrow keys to select a module, Tab to select a public field, and `e` to edit its value. Enter selects an LLM or toggles a connector. Press `k` to reach its credentials in the keystore. A change that may send data off this computer asks for signed confirmation. The TUI reloads the session after applying a change. No LLM is enabled automatically.
 
+If `config.toml` needs recovery, the TUI offers restoration or a field-by-field review before any case opens. Session flags and environment overrides that change destinations are shown and require confirmation; rejecting them uses the saved settings.
+
 ## A synthetic first case
 
 1. Press `n`, enter a title such as “Demo CloudTrail alert,” select a severity, and leave remote source fields empty. That creates a local-only case with a signed event.

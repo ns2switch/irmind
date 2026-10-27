@@ -27,8 +27,13 @@ where
         Mode::VerifyExport => " Verify exported package ",
     };
     let filter = state.status_filter.map_or("all", CaseStatus::label);
+    let override_label = if state.overrides_active {
+        " | SESSION OVERRIDES ACTIVE"
+    } else {
+        ""
+    };
     let info = safe(&format!(
-        "Search: {} | Filter: {filter} | {}",
+        "Search: {} | Filter: {filter}{override_label} | {}",
         state.search, state.notice
     ))?;
     let mut list_state = ListState::default();

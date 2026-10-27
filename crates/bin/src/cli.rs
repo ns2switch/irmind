@@ -5,7 +5,7 @@ use super::{
     Subcommand, Write, anyhow,
 };
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 #[command(version, about = "IRMind: local, signed incident investigation")]
 #[allow(clippy::struct_excessive_bools)]
 pub(super) struct Cli {
@@ -33,7 +33,7 @@ pub(super) struct Cli {
     pub(super) command: Option<Command>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Clone)]
 pub(super) enum Command {
     Case {
         #[command(subcommand)]
@@ -160,7 +160,7 @@ pub(super) enum Command {
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Clone)]
 pub(super) enum CaseCommand {
     New {
         title: String,
@@ -338,6 +338,7 @@ pub(super) struct AutomationContext<'a, 'ports> {
     pub(super) module_statuses: &'a [ModuleStatus],
     pub(super) cancel: &'a CancellationToken,
     pub(super) new_analyst_key: bool,
+    pub(super) overrides_active: bool,
 }
 
 mod automation;

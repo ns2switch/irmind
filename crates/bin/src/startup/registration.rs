@@ -25,6 +25,7 @@ pub(super) fn configured_registry(
     cli: &Cli,
     saved: &PersistentConfig,
     secrets: &dyn SecretBackend,
+    allow_environment: bool,
     interactive: bool,
 ) -> Result<(ModuleRegistry, BTreeMap<&'static str, String>)> {
     let mut registry = ModuleRegistry::new();
@@ -34,6 +35,7 @@ pub(super) fn configured_registry(
         cli,
         saved,
         secrets,
+        allow_environment,
         interactive,
         &mut registry,
         &mut config_issues,
@@ -42,6 +44,7 @@ pub(super) fn configured_registry(
         cli,
         saved,
         secrets,
+        allow_environment,
         interactive,
         &mut registry,
         &mut config_issues,
@@ -50,6 +53,7 @@ pub(super) fn configured_registry(
         cli,
         saved,
         secrets,
+        allow_environment,
         interactive,
         &mut registry,
         &mut config_issues,
@@ -61,6 +65,7 @@ fn register_llm(
     cli: &Cli,
     saved: &PersistentConfig,
     secrets: &dyn SecretBackend,
+    allow_environment: bool,
     interactive: bool,
     registry: &mut ModuleRegistry,
     config_issues: &mut BTreeMap<&'static str, String>,
@@ -77,6 +82,7 @@ fn register_llm(
                 irmind_mod_llm_openai_compatible::MANIFEST,
                 secrets,
                 saved,
+                allow_environment,
                 interactive,
                 config_issues
             ),
@@ -88,6 +94,7 @@ fn register_llm(
                     irmind_mod_llm_anthropic::MANIFEST,
                     secrets,
                     saved,
+                    allow_environment,
                     interactive,
                     config_issues
                 );
@@ -100,6 +107,7 @@ fn register_llm(
                     irmind_mod_llm_deepseek::MANIFEST,
                     secrets,
                     saved,
+                    allow_environment,
                     interactive,
                     config_issues
                 );
@@ -112,6 +120,7 @@ fn register_llm(
                     irmind_mod_llm_openrouter::MANIFEST,
                     secrets,
                     saved,
+                    allow_environment,
                     interactive,
                     config_issues
                 );
@@ -127,11 +136,18 @@ fn register_security_products(
     cli: &Cli,
     saved: &PersistentConfig,
     secrets: &dyn SecretBackend,
+    allow_environment: bool,
     interactive: bool,
     registry: &mut ModuleRegistry,
     config_issues: &mut BTreeMap<&'static str, String>,
 ) -> Result<()> {
-    let _ = (&secrets, &registry, &config_issues, saved);
+    let _ = (
+        &secrets,
+        &registry,
+        &config_issues,
+        saved,
+        allow_environment,
+    );
     #[cfg(feature = "siem-splunk")]
     if cli.enable_splunk {
         register_configured!(
@@ -140,6 +156,7 @@ fn register_security_products(
             irmind_mod_siem_splunk::MANIFEST,
             secrets,
             saved,
+            allow_environment,
             interactive,
             config_issues
         );
@@ -158,6 +175,7 @@ fn register_security_products(
             irmind_mod_ti_misp::MANIFEST,
             secrets,
             saved,
+            allow_environment,
             interactive,
             config_issues
         );
@@ -174,6 +192,7 @@ fn register_security_products(
             irmind_mod_cloud_aws::MANIFEST,
             secrets,
             saved,
+            allow_environment,
             interactive,
             config_issues
         );
@@ -191,11 +210,18 @@ fn register_edr_and_intel(
     cli: &Cli,
     saved: &PersistentConfig,
     secrets: &dyn SecretBackend,
+    allow_environment: bool,
     interactive: bool,
     registry: &mut ModuleRegistry,
     config_issues: &mut BTreeMap<&'static str, String>,
 ) -> Result<()> {
-    let _ = (&secrets, &registry, &config_issues, saved);
+    let _ = (
+        &secrets,
+        &registry,
+        &config_issues,
+        saved,
+        allow_environment,
+    );
     #[cfg(feature = "edr-crowdstrike")]
     if cli.enable_crowdstrike {
         register_configured!(
@@ -204,6 +230,7 @@ fn register_edr_and_intel(
             irmind_mod_edr_crowdstrike::MANIFEST,
             secrets,
             saved,
+            allow_environment,
             interactive,
             config_issues
         );
@@ -222,6 +249,7 @@ fn register_edr_and_intel(
             irmind_mod_edr_sentinelone::MANIFEST,
             secrets,
             saved,
+            allow_environment,
             interactive,
             config_issues
         );
@@ -240,6 +268,7 @@ fn register_edr_and_intel(
             irmind_mod_ti_virustotal::MANIFEST,
             secrets,
             saved,
+            allow_environment,
             interactive,
             config_issues
         );

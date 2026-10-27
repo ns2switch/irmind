@@ -206,6 +206,7 @@ impl HomeRuntime<'_, '_, '_> {
             self.io_ops,
             id,
             self.shutdown,
+            self.state.overrides_active,
         )?;
         self.state.rows = load_rows(self.engine)?;
         self.state.notice = "Returned to case list".into();
@@ -239,6 +240,7 @@ impl HomeRuntime<'_, '_, '_> {
                     self.io_ops,
                     &case_id,
                     self.shutdown,
+                    self.state.overrides_active,
                 )?;
                 self.state.rows = load_rows(self.engine)?;
             }
