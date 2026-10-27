@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 731c0a1252612524a7200abfa1eb348723cff4a3; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit bf4274feeca1201cba4a52a09fe720025f8a56b9; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -28,7 +28,7 @@ from = "2026-10-23T00:00:00Z"
 to = "2026-10-23T23:59:59Z"
 ```
 
-La tabla opcional `[scope]` fija el límite de lecturas remotas para todos los casos. Puede contener cuentas, proyectos y hosts a la vez, además de fuentes y una ventana UTC. Tanto el alcance del caso como el de la política deben permitir la lectura; de lo contrario se requiere aprobación. El conector AWS actual exige una cuenta; las consultas por proyecto estarán disponibles cuando exista un conector que las admita. La política puede restringir las reglas fijas de las herramientas, pero no habilitar acciones denegadas. El enriquecimiento externo requiere aprobación firmada del analista; la contención está deshabilitada. Los campos desconocidos causan un error.
+La tabla opcional `[scope]` fija un techo estricto para las lecturas remotas de todos los casos. Puede contener cuentas, proyectos y hosts a la vez, además de fuentes y una ventana UTC. Una lectura fuera del alcance del caso puede requerir aprobación del analista; fuera del techo de la política se deniega, incluso con aprobación. Los casos nuevos y los cambios de alcance no pueden superar el techo. Si una política nueva reduce el alcance de un caso existente, sus lecturas usan la intersección y la TUI muestra un aviso. El conector AWS actual exige una cuenta; las consultas por proyecto estarán disponibles cuando exista un conector que las admita. La política puede restringir las reglas fijas de las herramientas, pero no habilitar acciones denegadas. El enriquecimiento externo requiere aprobación firmada del analista; la contención está deshabilitada. Los campos desconocidos causan un error.
 
 ## Ajustes no secretos
 
