@@ -1,3 +1,4 @@
+use super::super::index::terms;
 use super::{
     AppError, CaseId, Connection, GraphStore, HashMap, HashSet, VecDeque, params, short, storage,
 };
@@ -28,29 +29,46 @@ impl GraphStore {
         limit: usize,
     ) -> Result<String, AppError> {
         let db = self.connect(id)?;
-        let (events, texts, empty): (i64, i64, i64) = db
+        let (events, texts, empty, indexed, full_text): (i64, i64, i64, i64, i64) = db
             .query_row(
                 "SELECT (SELECT COUNT(*) FROM events),(SELECT COUNT(*) FROM record_texts),
-                (SELECT COUNT(*) FROM record_texts WHERE text='')",
+                (SELECT COUNT(*) FROM record_texts WHERE text=''),
+                (SELECT COUNT(*) FROM indexed),(SELECT COUNT(*) FROM fts_indexed)",
                 [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                    ))
+                },
             )
             .map_err(storage)?;
-        if events != texts || empty != 0 {
+        if events != texts || empty != 0 || indexed != full_text {
             return Err(storage("graph text index is incomplete; run graph-rebuild"));
         }
+        let query_terms = terms(query);
+        if query_terms.is_empty() {
+            return Ok("no indexed matches".into());
+        }
         let count = i64::try_from(limit).map_err(storage)?;
+        let term_count = i64::try_from(query_terms.len()).map_err(storage)?;
+        let joined = query_terms.into_iter().collect::<Vec<_>>().join(" ");
         let mut statement = db
             .prepare(
                 "SELECT e.event_time,e.event,e.hash,e.record_index
-                 FROM events e JOIN record_texts t
-                   ON t.hash=e.hash AND t.record_index=e.record_index
-             WHERE contains(lower(t.text),lower(?1))
-             ORDER BY e.event_time DESC,e.hash,e.record_index LIMIT ?2",
+                 FROM events e JOIN (
+                    SELECT hash,record_index FROM record_terms
+                    WHERE term IN (SELECT unnest(string_split(?1, ' ')))
+                    GROUP BY hash,record_index HAVING COUNT(DISTINCT term)=?2
+                 ) hits ON hits.hash=e.hash AND hits.record_index=e.record_index
+                 ORDER BY e.event_time DESC,e.hash,e.record_index LIMIT ?3",
             )
             .map_err(storage)?;
         let rows = statement
-            .query_map(params![query, count], |row| {
+            .query_map(params![joined, term_count, count], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,

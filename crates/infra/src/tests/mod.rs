@@ -67,6 +67,7 @@ mod approvals;
 mod case_findings_and_agent;
 mod concurrency_and_migrations;
 mod custody_operations;
+mod graph_benchmark;
 mod graph_runtime;
 mod injection_and_taint;
 mod remote_dispatch_edr_ti;

@@ -1,4 +1,48 @@
 use super::{AppError, BTreeMap, Connection, GraphRecord, GraphRelation, Tainted, params, storage};
+use std::collections::BTreeSet;
+
+pub(super) fn verify_terms(
+    db: &Connection,
+    hash: &str,
+    expected: &[Tainted<GraphRecord>],
+    cancel: &irmind_app::CancellationToken,
+) -> Result<(), AppError> {
+    let mut expected_terms = BTreeSet::new();
+    for tainted in expected {
+        let mut outcome = Ok(());
+        tainted.inspect(|record| {
+            outcome = i64::try_from(record.index).map_err(storage).map(|index| {
+                for term in super::index::terms(&record.text) {
+                    expected_terms.insert((term, index));
+                }
+            });
+        });
+        outcome?;
+    }
+    let mut statement = db
+        .prepare(
+            "SELECT term,record_index FROM record_terms WHERE hash=?1 ORDER BY term,record_index",
+        )
+        .map_err(storage)?;
+    let rows = statement
+        .query_map(params![hash], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
+        .map_err(storage)?;
+    let mut actual_terms = BTreeSet::new();
+    for (index, row) in rows.enumerate() {
+        if index.is_multiple_of(256) && cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        actual_terms.insert(row.map_err(storage)?);
+    }
+    if actual_terms != expected_terms {
+        return Err(storage(
+            "graph full-text index differs from signed evidence",
+        ));
+    }
+    Ok(())
+}
 
 pub(super) fn verify_graph_totals(
     db: &Connection,
@@ -26,12 +70,29 @@ pub(super) fn verify_graph_totals(
     if actual_nodes != *expected_nodes {
         return Err(storage("derived graph nodes differ from signed evidence"));
     }
-    let (event_count, text_count, observation_count, relation_count): (i64, i64, i64, i64) = db
+    let (event_count, text_count, observation_count, relation_count, indexed, full_text): (
+        i64,
+        i64,
+        i64,
+        i64,
+        i64,
+        i64,
+    ) = db
         .query_row(
             "SELECT (SELECT COUNT(*) FROM events),(SELECT COUNT(*) FROM record_texts),
-                (SELECT COUNT(*) FROM observations),(SELECT COUNT(*) FROM relations)",
+                (SELECT COUNT(*) FROM observations),(SELECT COUNT(*) FROM relations),
+                (SELECT COUNT(*) FROM indexed),(SELECT COUNT(*) FROM fts_indexed)",
             [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                ))
+            },
         )
         .map_err(storage)?;
     let expected_events = i64::try_from(total).map_err(storage)?;
@@ -40,6 +101,7 @@ pub(super) fn verify_graph_totals(
         || text_count != expected_events
         || observation_count != expected_observations
         || relation_count != expected_relations
+        || indexed != full_text
     {
         return Err(storage(
             "derived graph row counts differ from signed evidence",

@@ -30,6 +30,28 @@ pub struct TimelineEvent {
     pub record_index: usize,
 }
 
+fn validate_ingest_input(bytes: &[u8], source: &str) -> Result<(), AppError> {
+    if bytes.len() > 50_000_000 {
+        return Err(AppError::Fixed(
+            crate::FixedAppError::PolicyEvidenceExceeds50MB,
+        ));
+    }
+    if source.is_empty()
+        || source.len() > 1000
+        || source.starts_with('/')
+        || source.contains('\\')
+        || source.contains(':')
+        || source
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return Err(AppError::Fixed(
+            crate::FixedAppError::PolicySourceMustBeARelativeSlashSeparatedPath,
+        ));
+    }
+    Ok(())
+}
+
 impl Engine<'_> {
     pub fn ingest(&self, id: &CaseId, bytes: &[u8], source: &str) -> Result<String, AppError> {
         self.ingest_cancelable(id, bytes, source, &CancellationToken::new())
@@ -45,10 +67,9 @@ impl Engine<'_> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let _tainted = Tainted::from_external(
-            bytes,
-            Provenance::new(sha256(bytes), None, SourceKind::File),
-        );
+        let digest = sha256(bytes);
+        let _tainted =
+            Tainted::from_external(bytes, Provenance::new(digest, None, SourceKind::File));
         self.require_attended_analyst("ingest evidence")?;
         let _case_lock = self.repo.lock_case(id)?;
         let case = self.repo.get_case(id)?;
@@ -56,25 +77,8 @@ impl Engine<'_> {
             return Err(AppError::Sealed);
         }
         self.verify_unlocked(id)?;
-        if bytes.len() > 50_000_000 {
-            return Err(AppError::Fixed(
-                crate::FixedAppError::PolicyEvidenceExceeds50MB,
-            ));
-        }
-        if source.is_empty()
-            || source.len() > 1000
-            || source.starts_with('/')
-            || source.contains('\\')
-            || source.contains(':')
-            || source
-                .split('/')
-                .any(|part| part.is_empty() || part == "." || part == "..")
-        {
-            return Err(AppError::Fixed(
-                crate::FixedAppError::PolicySourceMustBeARelativeSlashSeparatedPath,
-            ));
-        }
-        let hash = hex(&sha256(bytes));
+        validate_ingest_input(bytes, source)?;
+        let hash = hex(&digest);
         self.evidence_store.put_evidence(id, &hash, bytes)?;
         self.audit(
             id,
@@ -83,6 +87,24 @@ impl Engine<'_> {
             source,
             Some(&hash),
         )?;
+        self.screen_ingested_chunks(id, bytes, &hash, cancel)?;
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        let count =
+            self.graph
+                .index_from_parser(id, &hash, source, bytes, self.parser.as_ref(), cancel)?;
+        self.audit_graph_indexed(id, &hash, count)?;
+        Ok(hash)
+    }
+
+    fn screen_ingested_chunks(
+        &self,
+        id: &CaseId,
+        bytes: &[u8],
+        hash: &str,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
         for chunk in bytes.chunks(250_000) {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
@@ -91,17 +113,13 @@ impl Engine<'_> {
                 id,
                 &String::from_utf8_lossy(chunk),
                 "IngestedEvidence",
-                Some(&hash),
+                Some(hash),
             )?;
         }
-        if cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        let records = self.parser.parse(source, bytes)?;
-        if cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        self.graph.index_records(id, &hash, &records, cancel)?;
+        Ok(())
+    }
+
+    fn audit_graph_indexed(&self, id: &CaseId, hash: &str, count: usize) -> Result<(), AppError> {
         self.audit(
             id,
             crate::AuditOrigin::System,
@@ -110,11 +128,10 @@ impl Engine<'_> {
                 "parser={};graph={};records={}",
                 self.parser.version(),
                 self.graph.graph_version(),
-                records.len()
+                count
             ),
-            Some(&hash),
-        )?;
-        Ok(hash)
+            Some(hash),
+        )
     }
 
     pub(crate) fn index_remote_result(
@@ -140,20 +157,10 @@ impl Engine<'_> {
             call.tool().as_str(),
             call.arg("source").unwrap_or("unknown")
         );
-        let records = self.parser.parse(&source, raw)?;
-        self.graph.index_records(id, hash, &records, cancel)?;
-        self.audit(
-            id,
-            crate::AuditOrigin::System,
-            irmind_domain::AuditEventKind::GraphIndexed,
-            &format!(
-                "parser={};graph={};records={}",
-                self.parser.version(),
-                self.graph.graph_version(),
-                records.len()
-            ),
-            Some(hash),
-        )
+        let count =
+            self.graph
+                .index_from_parser(id, hash, &source, raw, self.parser.as_ref(), cancel)?;
+        self.audit_graph_indexed(id, hash, count)
     }
 
     pub fn rebuild_graph(&self, id: &CaseId) -> Result<usize, AppError> {
@@ -210,10 +217,14 @@ impl Engine<'_> {
                         | "parser=json-cloudtrail-v2"
                         | "parser=json-cloudtrail-v3"
                         | "parser=json-cloudtrail-v4"
+                        | "parser=json-cloudtrail-v5"
                 )
                 || !matches!(
                     parts[1],
-                    "graph=duckdb-graph-v1" | "graph=duckdb-graph-v2" | "graph=duckdb-graph-v3"
+                    "graph=duckdb-graph-v1"
+                        | "graph=duckdb-graph-v2"
+                        | "graph=duckdb-graph-v3"
+                        | "graph=duckdb-graph-v4"
                 )
             {
                 return Err(AppError::Policy(format!(

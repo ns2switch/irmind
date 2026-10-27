@@ -57,7 +57,7 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
     );
     assert!(store.entries(&case.id).unwrap().iter().any(|entry| {
         entry.kind == irmind_domain::AuditEventKind::GraphIndexed
-            && entry.payload.contains("graph=duckdb-graph-v3")
+            && entry.payload.contains("graph=duckdb-graph-v4")
     }));
     assert!(
         store
