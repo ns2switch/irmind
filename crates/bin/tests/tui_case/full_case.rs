@@ -53,6 +53,7 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
         "v1;sources=siem-a;accounts=acct-a;hosts=;from=2026-10-23T10:00:00Z;to=2026-10-23T11:00:00Z").unwrap();
     tui.render_case(&id, "Case opened").unwrap();
     assert!(screen(tui.terminal()).contains("Synthetic incident"));
+    assert!(screen(tui.terminal()).contains("Ctrl+B sidebar"));
 
     let evidence = root.path().join("synthetic.json");
     std::fs::write(&evidence, br#"{"Records":[{"eventTime":"2026-10-23T10:10:00Z","eventName":"Login","sourceIPAddress":"203.0.113.9","domain":"example.com"}]}"#).unwrap();

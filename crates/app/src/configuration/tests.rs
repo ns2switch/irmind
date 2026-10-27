@@ -39,6 +39,22 @@ static SIEM: ModuleManifest = ModuleManifest {
 };
 
 #[test]
+fn unset_mouse_capture_preserves_signed_v1_configuration_bytes() {
+    let mut config = PersistentConfig::default();
+    assert_eq!(
+        serde_json::to_string(&config).unwrap(),
+        r#"{"version":1,"llm_module":null,"policy_path":null,"input_microusd_per_million":null,"output_microusd_per_million":null,"modules":{}}"#
+    );
+    config.mouse_capture = Some(false);
+    assert!(
+        serde_json::to_string(&config)
+            .unwrap()
+            .contains("\"mouse_capture\":false")
+    );
+    assert!(config.validate(&[]).is_ok());
+}
+
+#[test]
 fn persistent_configuration_rejects_secrets_and_unknown_fields() {
     let manifests = [&LLM];
     let base = PersistentConfig::default();

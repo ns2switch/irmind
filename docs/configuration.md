@@ -37,6 +37,7 @@ For automation, resolution order is **CLI flag > environment variable > config.t
 ```toml
 version = 1
 llm_module = "llm-openai-compatible"
+mouse_capture = false # optional: leave terminal text selection available
 
 [modules.llm-openai-compatible.values]
 IRMIND_MODEL = "your-local-model"

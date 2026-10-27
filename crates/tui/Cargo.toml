@@ -14,6 +14,7 @@ serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 secrecy = "0.10"
 rpassword = "7.5"
+unicode-width = "0.2"
 
 [lints]
 workspace = true

@@ -209,6 +209,7 @@ impl AutomationContext<'_, '_> {
             cancel,
             new_analyst_key,
             overrides_active,
+            mouse_capture,
             ..
         } = self;
         match command {
@@ -234,6 +235,7 @@ impl AutomationContext<'_, '_> {
                         initial_case: Some(&parse_id(&case_id)?),
                         new_analyst_key,
                         overrides_active,
+                        mouse_capture,
                     },
                 );
             }

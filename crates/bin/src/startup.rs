@@ -204,6 +204,7 @@ impl PreparedStartup {
                 cancel,
                 new_analyst_key,
                 overrides_active,
+                mouse_capture: saved.mouse_capture.unwrap_or(true),
             },
         )
     }
@@ -246,6 +247,7 @@ fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) ->
                 initial_case: None,
                 new_analyst_key: context.new_analyst_key,
                 overrides_active: context.overrides_active,
+                mouse_capture: context.mouse_capture,
             },
         ),
         Some(command) => context.run(command),

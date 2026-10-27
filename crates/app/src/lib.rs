@@ -6,11 +6,12 @@ pub mod tool_catalog;
 pub use async_trait::async_trait;
 use futures_util::{Stream, StreamExt};
 use irmind_domain::{
-    Actor, AnalystApprovalVerifier, AuditEventKind, AuthorizedCall, Decision,
-    DeclassificationAuthority, ExecutionMode, PendingApproval, PolicyRules, ProposedCall, Tainted,
-    Tool,
+    Actor, AnalystApprovalVerifier, AuthorizedCall, Decision, DeclassificationAuthority,
+    ExecutionMode, PendingApproval, PolicyRules, ProposedCall, Tainted, Tool,
 };
-pub use irmind_domain::{Case, CaseId, CaseScope, Provenance, Severity, SourceKind};
+pub use irmind_domain::{
+    AuditEventKind, Case, CaseId, CaseScope, Provenance, Severity, SourceKind,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;

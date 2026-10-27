@@ -339,6 +339,7 @@ pub(super) struct AutomationContext<'a, 'ports> {
     pub(super) cancel: &'a CancellationToken,
     pub(super) new_analyst_key: bool,
     pub(super) overrides_active: bool,
+    pub(super) mouse_capture: bool,
 }
 
 mod automation;

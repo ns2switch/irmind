@@ -88,6 +88,7 @@ pub struct WorkspaceLaunch<'a> {
     pub initial_case: Option<&'a irmind_app::CaseId>,
     pub new_analyst_key: bool,
     pub overrides_active: bool,
+    pub mouse_capture: bool,
 }
 
 /// Filesystem selection is presentation I/O. The composition root supplies the

@@ -1,3 +1,5 @@
+use super::command_registry;
+use super::conversation::{Card, CardKind};
 use super::runtime::CaseRuntime;
 use super::{
     CaseWorkflow, Confirmation, FindingKind, PathBuf, PathPicker, Result, confirmation_summary,
@@ -41,9 +43,6 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         {
             self.investigate_prompt(prompt);
         }
-        if self.state.messages.len() > 30 {
-            self.state.messages.drain(..self.state.messages.len() - 30);
-        }
         Ok(false)
     }
 
@@ -60,7 +59,21 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             self.state.messages.push("No LLM selected. Launch with --llm-module after approval, or use case commands without a model.".into());
             return;
         }
-        self.state.messages.push(format!("Analyst: {prompt}"));
+        match self.engine.guard.screen(&prompt) {
+            Ok(visible) => self.state.conversation.push(Card::new(
+                CardKind::Analyst,
+                "Analyst",
+                visible.text,
+                false,
+            )),
+            Err(error) => {
+                self.state.messages.push(format!("Guard error: {error}"));
+                return;
+            }
+        }
+        self.state.conversation.begin_preview();
+        self.state.live_reply_cutoff_seq =
+            Some(self.state.entries.last().map_or(0, |entry| entry.seq));
         self.state.model_preview.clear();
         let workflow = self.workflow();
         let id = self.id;
@@ -183,8 +196,28 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
 
     fn case_command(&mut self, prompt: &str) -> Result<bool> {
         match prompt {
-            "/help" => self.state.messages.push("Case: /ingest, /verify, /rebuild, /verify-graph, /report, /seal, /export [path], /scope, /scope add <source|account|project|host> <id>, /scope window <from> <to>, /evidence <hash>, /evidence-save <hash> <path>, /pause, /home. Graph: /graph, /timeline, /entity, /neighbors, /entity-timeline, /path, /search, /raw. Findings: /add, /confirm, /dismiss. Approvals: /approvals, /approve, /deny, /edit.".into()),
-            "/scope" => self.state.messages.push(format!("Scope: {}", self.state.case.scope)),
+            "/help" => self.state.messages.push(command_registry::help()),
+            "/scope" => self
+                .state
+                .messages
+                .push(format!("Scope: {}", self.state.case.scope)),
+            "/modules" => self.state.messages.push(
+                self.modules
+                    .iter()
+                    .map(|module| {
+                        format!(
+                            "{}: {}",
+                            module.id,
+                            if module.enabled {
+                                "enabled"
+                            } else {
+                                "disabled"
+                            }
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
             "/approvals" => {
                 self.state.approvals = self.engine.pending_approvals(self.id)?;
                 self.state.approval_sources =
@@ -209,63 +242,50 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             "/timeline" => self.state.tab = 0,
             _ => {
                 if let Some(scope) = prompt.strip_prefix("/scope ") {
-                    let changed = scope_expansion(&self.state.case.scope, scope);
-                    match changed.map_err(str::to_owned).and_then(|value| {
-                        self.engine.change_scope(self.id, &value).map_err(|error| error.to_string())
-                    }) {
-                        Ok(()) => {
-                            self.state.case = self.engine.repo.get_case(self.id)?;
-                            self.state.messages.push(format!("Scope updated: {}", self.state.case.scope));
-                            self.state.needs_refresh = true;
-                        }
-                        Err(error) => self.state.messages.push(format!("Scope error: {error}")),
-                    }
-                } else { return Ok(false); }
+                    self.expand_scope(scope)?;
+                } else if let Some(id) = prompt.strip_prefix("/module ") {
+                    self.show_module(id);
+                } else {
+                    return Ok(false);
+                }
             }
         }
         Ok(true)
     }
 
-    fn graph_command(&mut self, prompt: &str) -> bool {
-        if let Some(rest) = prompt.strip_prefix("/entity ") {
-            if let Some((kind, value)) = rest.split_once(' ') {
-                self.push_graph(self.engine.graph.entity_lookup(self.id, kind, value));
+    fn expand_scope(&mut self, scope: &str) -> Result<()> {
+        let changed = scope_expansion(&self.state.case.scope, scope);
+        match changed.map_err(str::to_owned).and_then(|value| {
+            self.engine
+                .change_scope(self.id, &value)
+                .map_err(|error| error.to_string())
+        }) {
+            Ok(()) => {
+                self.state.case = self.engine.repo.get_case(self.id)?;
+                self.state
+                    .messages
+                    .push(format!("Scope updated: {}", self.state.case.scope));
+                self.state.needs_refresh = true;
             }
-        } else if let Some(rest) = prompt.strip_prefix("/neighbors ") {
-            if let Some((kind, value)) = rest.split_once(' ') {
-                self.push_graph(self.engine.graph.neighbors(self.id, kind, value, 10));
-            }
-        } else if let Some(rest) = prompt.strip_prefix("/entity-timeline ") {
-            if let Some((kind, value)) = rest.split_once(' ') {
-                self.push_graph(self.engine.graph.entity_timeline(self.id, kind, value, 10));
-            }
-        } else if let Some(rest) = prompt.strip_prefix("/path ") {
-            let parts = rest.splitn(4, ' ').collect::<Vec<_>>();
-            if let [from_kind, from_value, to_kind, to_value] = parts.as_slice() {
-                self.push_graph(self.engine.graph.graph_path(
-                    self.id,
-                    (from_kind, from_value),
-                    (to_kind, to_value),
-                ));
-            }
-        } else if let Some(query) = prompt.strip_prefix("/search ") {
-            self.push_graph(self.engine.graph.text_search(self.id, query, 10));
-        } else if let Some(rest) = prompt.strip_prefix("/raw ") {
-            if let Some((hash, index)) = rest.split_once(' ')
-                && let Ok(index) = index.parse::<usize>()
-            {
-                self.push_graph(self.engine.graph.raw_record(self.id, hash, index));
-            }
-        } else {
-            return false;
+            Err(error) => self.state.messages.push(format!("Scope error: {error}")),
         }
-        true
+        Ok(())
     }
 
-    fn push_graph(&mut self, result: Result<String, irmind_app::AppError>) {
-        match result {
-            Ok(result) => self.state.messages.push(result),
-            Err(error) => self.state.messages.push(format!("Graph error: {error}")),
+    fn show_module(&mut self, id: &str) {
+        if let Some(module) = self.modules.iter().find(|module| module.id == id) {
+            self.state.messages.push(format!(
+                "{} · {} · {}",
+                module.id,
+                if module.enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                },
+                module.configuration
+            ));
+        } else {
+            self.state.messages.push("Unknown module".into());
         }
     }
 
@@ -344,6 +364,7 @@ fn scope_expansion(current: &str, command: &str) -> Result<String, &'static str>
     Ok(command.to_owned())
 }
 mod approval;
+mod graph;
 
 #[cfg(test)]
 mod tests {

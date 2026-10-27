@@ -20,6 +20,9 @@ pub struct PersistentConfig {
     pub input_microusd_per_million: Option<u64>,
     #[serde(default)]
     pub output_microusd_per_million: Option<u64>,
+    /// Presentation-only setting; omitted from the signed v1 representation when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mouse_capture: Option<bool>,
     #[serde(default)]
     pub modules: BTreeMap<String, ProductSettings>,
 }
@@ -64,6 +67,7 @@ impl Default for PersistentConfig {
             policy_path: None,
             input_microusd_per_million: None,
             output_microusd_per_million: None,
+            mouse_capture: None,
             modules: BTreeMap::new(),
         }
     }

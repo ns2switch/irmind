@@ -1,14 +1,40 @@
-use super::{Confirmation, Instant, KeyCode, PathPicker};
+use super::command_registry;
+use super::conversation::Conversation;
+use super::{Confirmation, Instant, KeyCode, KeyModifiers, PathPicker};
 use irmind_app::{
     ApprovalRequest, ApprovalSource, Case, Finding, FindingKind, SignedEntry, SignedOperation,
     TimelineEvent,
 };
 use std::collections::BTreeMap;
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(super) enum Focus {
+    Composer,
+    Conversation,
+    Sidebar,
+}
+
 pub(super) struct CaseState {
     pub case: Case,
     pub input: String,
+    pub input_history: Vec<String>,
+    pub history_index: Option<usize>,
     pub messages: Vec<String>,
+    pub conversation: Conversation,
+    pub audit_cursor: usize,
+    pub live_reply_cutoff_seq: Option<u64>,
+    pub pending_final_reply: Option<String>,
+    pub usage_cache_seq: u64,
+    pub usage_cache_tokens: u64,
+    pub usage_cache_cost: String,
+    pub turn_detection_count: usize,
+    pub sidebar_visible: bool,
+    pub sidebar_scroll: usize,
+    pub overlay_scroll: usize,
+    pub focus: Focus,
+    pub menu_open: bool,
+    pub menu_selected: usize,
+    pub menu_query: Option<String>,
     pub model_preview: String,
     pub approvals: Vec<ApprovalRequest>,
     pub approval_sources: BTreeMap<String, ApprovalSource>,
@@ -29,7 +55,7 @@ pub(super) struct CaseState {
 }
 
 pub(super) enum CaseMessage {
-    Key(KeyCode, bool),
+    Key(KeyCode, KeyModifiers, bool),
     Progress(String),
     ModelDelta(String),
     TaskFinished(String),
@@ -66,81 +92,157 @@ pub(crate) fn panel_findings_for(findings: &[Finding], tab: usize) -> Vec<&Findi
 pub(super) fn update(state: &mut CaseState, message: CaseMessage) -> CaseAction {
     match message {
         CaseMessage::ModelDelta(text) => {
-            if state.model_preview.len().saturating_add(text.len()) <= 200_000 {
+            if state.model_preview.len().saturating_add(text.len()) <= 16_384 {
                 state.model_preview.push_str(&text);
             }
             CaseAction::None
         }
         CaseMessage::Progress(text) | CaseMessage::TaskFinished(text) => {
             state.messages.push(text);
-            if state.messages.len() > 30 {
-                state.messages.drain(..state.messages.len() - 30);
-            }
             CaseAction::None
         }
-        CaseMessage::Key(code, busy) => match code {
-            KeyCode::Esc => CaseAction::Exit,
-            KeyCode::Tab => {
-                state.tab = (state.tab + 1) % TAB_COUNT;
-                state.selected_finding = 0;
-                CaseAction::None
-            }
-            KeyCode::Up if state.tab == 4 => {
-                state.selected_approval = state.selected_approval.saturating_sub(1);
-                CaseAction::None
-            }
-            KeyCode::Down
-                if state.tab == 4 && state.selected_approval + 1 < state.approvals.len() =>
-            {
-                state.selected_approval += 1;
-                CaseAction::None
-            }
-            KeyCode::Up if state.tab >= 5 => {
-                state.selected_finding = state.selected_finding.saturating_sub(1);
-                CaseAction::None
-            }
-            KeyCode::Down if state.tab >= 5 => {
-                state.selected_finding =
-                    (state.selected_finding + 1).min(panel_findings(state).len().saturating_sub(1));
-                CaseAction::None
-            }
-            KeyCode::Char('c') if state.tab >= 5 && state.input.is_empty() && !busy => {
+        CaseMessage::Key(code, modifiers, busy) => update_key(state, code, modifiers, busy),
+    }
+}
+
+fn update_key(
+    state: &mut CaseState,
+    code: KeyCode,
+    modifiers: KeyModifiers,
+    busy: bool,
+) -> CaseAction {
+    if code == KeyCode::Esc {
+        return CaseAction::Exit;
+    }
+    if code == KeyCode::Tab {
+        state.sidebar_visible = true;
+        state.focus = Focus::Sidebar;
+        state.tab = (state.tab + 1) % TAB_COUNT;
+        state.selected_finding = 0;
+        return CaseAction::None;
+    }
+    if state.focus == Focus::Sidebar
+        && let Some(action) = sidebar_action(state, code, modifiers, busy)
+    {
+        return action;
+    }
+    input_action(state, code, modifiers)
+}
+
+fn sidebar_action(
+    state: &mut CaseState,
+    code: KeyCode,
+    modifiers: KeyModifiers,
+    busy: bool,
+) -> Option<CaseAction> {
+    let shortcut = command_registry::shortcut_name(code, modifiers);
+    match code {
+        KeyCode::Up if state.tab == 4 => {
+            state.selected_approval = state.selected_approval.saturating_sub(1);
+        }
+        KeyCode::Down if state.tab == 4 => {
+            state.selected_approval =
+                (state.selected_approval + 1).min(state.approvals.len().saturating_sub(1));
+        }
+        KeyCode::Up if state.tab >= 5 => {
+            state.selected_finding = state.selected_finding.saturating_sub(1);
+        }
+        KeyCode::Down if state.tab >= 5 => {
+            state.selected_finding =
+                (state.selected_finding + 1).min(panel_findings(state).len().saturating_sub(1));
+        }
+        KeyCode::Char(_)
+            if shortcut == Some("confirm") && state.tab >= 5 && state.input.is_empty() && !busy =>
+        {
+            return Some(
                 panel_findings(state)
                     .get(state.selected_finding)
                     .filter(|finding| !finding.confirmed && !finding.dismissed)
                     .map_or(CaseAction::None, |finding| {
                         CaseAction::ConfirmFinding(finding.id.clone())
-                    })
+                    }),
+            );
+        }
+        KeyCode::Char(_)
+            if shortcut == Some("approve") && state.tab == 4 && state.input.is_empty() && !busy =>
+        {
+            return Some(
+                state
+                    .approvals
+                    .get(state.selected_approval)
+                    .map_or(CaseAction::None, |request| {
+                        CaseAction::Approve(request.id.clone())
+                    }),
+            );
+        }
+        KeyCode::Char(_)
+            if matches!(shortcut, Some("deny" | "edit"))
+                && state.tab == 4
+                && state.input.is_empty()
+                && !busy =>
+        {
+            if let Some(request) = state.approvals.get(state.selected_approval) {
+                let action = shortcut.unwrap_or("edit");
+                state.input = format!("/{action} {} ", request.id);
+                state.focus = Focus::Composer;
             }
-            KeyCode::Char('a') if state.tab == 4 && state.input.is_empty() && !busy => state
-                .approvals
-                .get(state.selected_approval)
-                .map_or(CaseAction::None, |request| {
-                    CaseAction::Approve(request.id.clone())
-                }),
-            KeyCode::Char('d') if state.tab == 4 && state.input.is_empty() && !busy => {
-                if let Some(request) = state.approvals.get(state.selected_approval) {
-                    state.input = format!("/deny {} ", request.id);
-                }
-                CaseAction::None
+        }
+        _ => return None,
+    }
+    Some(CaseAction::None)
+}
+
+fn input_action(state: &mut CaseState, code: KeyCode, modifiers: KeyModifiers) -> CaseAction {
+    match code {
+        KeyCode::Backspace => {
+            state.input.pop();
+            state.menu_open = state.input.starts_with('/');
+            CaseAction::None
+        }
+        KeyCode::Enter if modifiers.intersects(KeyModifiers::ALT | KeyModifiers::SHIFT) => {
+            if state.input.len() < 20_000 {
+                state.input.push('\n');
             }
-            KeyCode::Char('e') if state.tab == 4 && state.input.is_empty() && !busy => {
-                if let Some(request) = state.approvals.get(state.selected_approval) {
-                    state.input = format!("/edit {} ", request.id);
-                }
-                CaseAction::None
+            CaseAction::None
+        }
+        KeyCode::Up if state.input.is_empty() || !state.input.contains('\n') => {
+            if !state.input_history.is_empty() {
+                let next = state
+                    .history_index
+                    .unwrap_or(state.input_history.len())
+                    .saturating_sub(1);
+                state.history_index = Some(next);
+                state.input = state.input_history[next].clone();
             }
-            KeyCode::Backspace => {
-                state.input.pop();
-                CaseAction::None
+            CaseAction::None
+        }
+        KeyCode::Down if state.history_index.is_some() => {
+            let next = state.history_index.unwrap_or(0) + 1;
+            if let Some(value) = state.input_history.get(next) {
+                state.input = value.clone();
+                state.history_index = Some(next);
+            } else {
+                state.input.clear();
+                state.history_index = None;
             }
-            KeyCode::Char(ch) if state.input.len() < 20_000 => {
-                state.input.push(ch);
-                CaseAction::None
+            CaseAction::None
+        }
+        KeyCode::Char(ch) if state.input.len() < 20_000 => {
+            state.input.push(ch);
+            state.history_index = None;
+            state.menu_open = state.input.starts_with('/');
+            CaseAction::None
+        }
+        KeyCode::Enter => {
+            let input = std::mem::take(&mut state.input);
+            if !input.is_empty() && state.input_history.last() != Some(&input) {
+                state.input_history.push(input.clone());
             }
-            KeyCode::Enter => CaseAction::Submit(std::mem::take(&mut state.input)),
-            _ => CaseAction::None,
-        },
+            state.history_index = None;
+            state.menu_open = false;
+            CaseAction::Submit(input)
+        }
+        _ => CaseAction::None,
     }
 }
 
@@ -151,6 +253,7 @@ mod tests {
     use irmind_app::CaseId;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn input_update_is_pure_and_submits_exact_text() {
         let mut state = CaseState {
             case: irmind_app::Case {
@@ -161,7 +264,24 @@ mod tests {
                 sealed: false,
             },
             input: String::new(),
+            input_history: Vec::new(),
+            history_index: None,
             messages: Vec::new(),
+            conversation: Conversation::new(false),
+            audit_cursor: 0,
+            live_reply_cutoff_seq: None,
+            pending_final_reply: None,
+            usage_cache_seq: 0,
+            usage_cache_tokens: 0,
+            usage_cache_cost: "cost n/a".into(),
+            turn_detection_count: 0,
+            sidebar_visible: false,
+            sidebar_scroll: 0,
+            overlay_scroll: 0,
+            focus: Focus::Composer,
+            menu_open: false,
+            menu_selected: 0,
+            menu_query: None,
             model_preview: String::new(),
             approvals: Vec::new(),
             approval_sources: BTreeMap::new(),
@@ -180,12 +300,16 @@ mod tests {
             needs_refresh: false,
             running_since: None,
         };
-        update(&mut state, CaseMessage::Key(KeyCode::Char('x'), false));
+        update(
+            &mut state,
+            CaseMessage::Key(KeyCode::Char('x'), KeyModifiers::NONE, false),
+        );
         assert!(
-            matches!(update(&mut state, CaseMessage::Key(KeyCode::Enter, false)), CaseAction::Submit(value) if value == "x")
+            matches!(update(&mut state, CaseMessage::Key(KeyCode::Enter, KeyModifiers::NONE, false)), CaseAction::Submit(value) if value == "x")
         );
         assert!(state.input.is_empty());
         state.tab = 5;
+        state.focus = Focus::Sidebar;
         state.findings = vec![Finding {
             id: "ioc-1".into(),
             kind: FindingKind::Ioc,
@@ -196,15 +320,51 @@ mod tests {
             details: None,
         }];
         assert!(matches!(
-            update(&mut state, CaseMessage::Key(KeyCode::Char('c'), false)),
+            update(&mut state, CaseMessage::Key(KeyCode::Char('c'), KeyModifiers::NONE, false)),
             CaseAction::ConfirmFinding(id) if id == "ioc-1"
         ));
         state.findings[0].confirmed = true;
         assert!(matches!(
-            update(&mut state, CaseMessage::Key(KeyCode::Char('c'), false)),
+            update(
+                &mut state,
+                CaseMessage::Key(KeyCode::Char('c'), KeyModifiers::NONE, false)
+            ),
             CaseAction::None
         ));
         update(&mut state, CaseMessage::ModelDelta("partial answer".into()));
         assert_eq!(state.model_preview, "partial answer");
+        state.focus = Focus::Composer;
+        update(
+            &mut state,
+            CaseMessage::Key(KeyCode::Char('a'), KeyModifiers::NONE, false),
+        );
+        update(
+            &mut state,
+            CaseMessage::Key(KeyCode::Enter, KeyModifiers::ALT, false),
+        );
+        update(
+            &mut state,
+            CaseMessage::Key(KeyCode::Char('b'), KeyModifiers::NONE, false),
+        );
+        assert!(matches!(
+            update(&mut state, CaseMessage::Key(KeyCode::Enter, KeyModifiers::NONE, false)),
+            CaseAction::Submit(value) if value == "a\nb"
+        ));
+        update(
+            &mut state,
+            CaseMessage::Key(KeyCode::Up, KeyModifiers::NONE, false),
+        );
+        assert_eq!(state.input, "a\nb");
+        update(
+            &mut state,
+            CaseMessage::Key(KeyCode::Down, KeyModifiers::NONE, false),
+        );
+        assert!(state.input.is_empty());
+        update(
+            &mut state,
+            CaseMessage::Key(KeyCode::Char('/'), KeyModifiers::NONE, false),
+        );
+        assert!(state.menu_open);
+        assert!(crate::case::command_registry::matches(&state.input).len() > 5);
     }
 }

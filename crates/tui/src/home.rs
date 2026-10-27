@@ -232,7 +232,11 @@ pub(crate) fn run_home(
             io_ops,
             id,
             shutdown,
-            launch.overrides_active,
+            case::CasePresentation {
+                overrides_active: launch.overrides_active,
+                modules,
+                mouse_capture: launch.mouse_capture,
+            },
         )?;
         state.rows = load_rows(engine)?;
     }
@@ -275,6 +279,7 @@ pub(crate) fn run_home(
             state,
             statuses: rx,
             new_analyst_key: launch.new_analyst_key,
+            mouse_capture: launch.mouse_capture,
             verify_task: None,
             verify_started: None,
             migration_task: None,
