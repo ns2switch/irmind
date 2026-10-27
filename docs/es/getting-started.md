@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 4448e7cfd7e8c0353e5cc4192e2102be27a4ab03; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 4af19e6b45bbb8922d15c07eee86221715cd3f19; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -45,7 +45,15 @@ La conversación ocupa el espacio principal. Las propuestas, aprobaciones, resul
 
 Las consultas del grafo y las búsquedas locales también aparecen como tarjetas de resultado. Las respuestas largas empiezan plegadas; selecciona la tarjeta y pulsa Enter o Espacio para desplegarla, y desplázate por la conversación.
 
+![Conversación de un caso sintético de CloudTrail con una respuesta del modelo que aparece de forma incremental](../assets/conversation.png)
+
 PgUp/PgDn y Ctrl+U/Ctrl+D desplazan la vista enfocada. Inicio/Fin o `g`/`G` en la conversación saltan al principio/final. El texto nuevo del modelo sigue el final solo si ya estás allí; Fin quita el indicador de contenido nuevo. ↑/↓ recuperan entradas anteriores. `/help` o `?` muestran los comandos y atajos. La rueda del ratón funciona por defecto. Para seleccionar texto con el terminal, pon `mouse_capture = false` en la [configuración](configuration.md) y acepta el cambio desde la TUI.
+
+![Menú de comandos con sus descripciones sobre el campo de entrada](../assets/command-menu.png)
+
+Una consulta externa espera la aprobación firmada del analista. La tarjeta muestra los argumentos exactos y el fragmento de evidencia sintética del que procede el valor no confiable.
+
+![Tarjeta de aprobación con la consulta externa, sus argumentos y el fragmento de origen no confiable](../assets/approval-card.png)
 
 ## Siguientes pasos
 
