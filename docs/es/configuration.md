@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 073c237dc409755b6eeb7ad7fc29f51bcf3839f4; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 731c0a1252612524a7200abfa1eb348723cff4a3; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -6,7 +6,7 @@ Esta página es para quienes preparan una evaluación controlada. Explica el alc
 
 ## Alcance del caso
 
-Un caso puede ser solo local. Para permitir lecturas remotas, el formulario de caso nuevo pide fuentes, cuentas, hosts y el inicio y fin de la ventana UTC. `/scope` edita los mismos campos. Los cambios quedan firmados. Las consultas fuera del alcance requieren aprobación o se deniegan. La codificación para automatización está en la [referencia de la CLI](../development/cli.md). El formulario aún no admite IDs de proyecto.
+Un caso puede ser solo local. Para permitir lecturas remotas, el formulario de caso nuevo pide fuentes, cuentas, proyectos, hosts y el inicio y fin de la ventana UTC. Añade un destino con `/scope add project <id>` (o `source`, `account` o `host`), o amplía la ventana con `/scope window <from> <to>`. El analista firma los cambios. Las consultas fuera del alcance del caso requieren aprobación o se deniegan. La codificación para automatización está en la [referencia de la CLI](../development/cli.md).
 
 ## Archivo de política
 
@@ -18,9 +18,17 @@ max_tool_calls_per_case = 100
 max_model_result_bytes = 10000
 max_model_tokens_per_case = 200000
 denied_tools = []
+
+[scope]
+sources = ["demo"]
+accounts = ["123456789012"]
+projects = []
+hosts = []
+from = "2026-10-23T00:00:00Z"
+to = "2026-10-23T23:59:59Z"
 ```
 
-La política puede restringir las reglas fijas de las herramientas, pero no habilitar acciones denegadas. Las lecturas deben estar dentro del alcance; el enriquecimiento externo requiere aprobación firmada del analista; la contención está deshabilitada. Los campos desconocidos causan un error.
+La tabla opcional `[scope]` fija el límite de lecturas remotas para todos los casos. Puede contener cuentas, proyectos y hosts a la vez, además de fuentes y una ventana UTC. Tanto el alcance del caso como el de la política deben permitir la lectura; de lo contrario se requiere aprobación. El conector AWS actual exige una cuenta; las consultas por proyecto estarán disponibles cuando exista un conector que las admita. La política puede restringir las reglas fijas de las herramientas, pero no habilitar acciones denegadas. El enriquecimiento externo requiere aprobación firmada del analista; la contención está deshabilitada. Los campos desconocidos causan un error.
 
 ## Ajustes no secretos
 
