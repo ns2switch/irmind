@@ -1,9 +1,11 @@
-use super::state::{CaseAction, CaseMessage, CaseState, update};
+mod input;
+use super::state::{CaseMessage, CaseState, update};
 use super::{
     ActiveTask, CancellationToken, CaseId, CaseWorkflow, Confirmation, CrosstermBackend, Duration,
-    Engine, Event, Instant, KeyCode, KeyModifiers, LlmPort, Result, Terminal, WorkspaceIo,
-    cancelled_operation, event, io, mpsc, seal_confirmation,
+    Engine, Event, Instant, LlmPort, Result, Terminal, WorkspaceIo, cancelled_operation, event, io,
+    mpsc, seal_confirmation,
 };
+use crossterm::event::KeyEventKind;
 
 pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub terminal: &'env mut Terminal<CrosstermBackend<io::Stdout>>,
@@ -22,6 +24,7 @@ pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub seal_tx: mpsc::Sender<irmind_app::SealPreview>,
     pub seal_rx: mpsc::Receiver<irmind_app::SealPreview>,
     pub overrides_active: bool,
+    pub modules: &'env [crate::ModuleStatus],
 }
 
 impl<'scope> CaseRuntime<'scope, '_, '_> {
@@ -30,20 +33,38 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             if self.shutdown.is_cancelled() {
                 break;
             }
-            while let Ok(progress) = self.progress_rx.try_recv() {
+            for _ in 0..128 {
+                let Ok(progress) = self.progress_rx.try_recv() else {
+                    break;
+                };
                 update(&mut self.state, CaseMessage::Progress(progress));
             }
-            while let Ok(delta) = self.model_rx.try_recv() {
+            let mut preview_dirty = false;
+            for _ in 0..256 {
+                let Ok(delta) = self.model_rx.try_recv() else {
+                    break;
+                };
                 update(&mut self.state, CaseMessage::ModelDelta(delta));
+                preview_dirty = true;
+            }
+            if preview_dirty {
+                let safe = self.engine.guard.screen(&self.state.model_preview)?.text;
+                self.state.conversation.set_preview(safe);
             }
             self.finish_task()?;
             self.refresh()?;
             self.render()?;
-            if event::poll(Duration::from_millis(100))?
-                && let Event::Key(key) = event::read()?
-                && self.handle_key(key.code, key.modifiers)?
-            {
-                break;
+            if event::poll(Duration::from_millis(100))? {
+                match event::read()? {
+                    Event::Key(key)
+                        if key.kind != KeyEventKind::Release
+                            && self.handle_key(key.code, key.modifiers)? =>
+                    {
+                        break;
+                    }
+                    Event::Mouse(mouse) => self.handle_mouse(mouse),
+                    _ => {}
+                }
             }
         }
         if let Some((cancel, task, label)) = self.active.take() {
@@ -74,6 +95,11 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                 .map_err(|_| anyhow::anyhow!("investigation thread panicked"))?
             {
                 Ok(text) => {
+                    if label == "IRMind" {
+                        self.state.conversation.discard_preview();
+                        self.state.pending_final_reply =
+                            Some(self.engine.guard.screen(&text)?.text);
+                    }
                     if label == "Prepare seal" {
                         let preview = self.seal_rx.try_recv().map_err(|_| {
                             anyhow::anyhow!("signed seal preview was not delivered")
@@ -82,12 +108,17 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                         self.state.confirmation =
                             Some(Confirmation::Seal(Box::new(preview), summary));
                     }
-                    update(
-                        &mut self.state,
-                        CaseMessage::TaskFinished(format!("{label}: {text}")),
-                    );
+                    if label != "IRMind" {
+                        update(
+                            &mut self.state,
+                            CaseMessage::TaskFinished(format!("{label}: {text}")),
+                        );
+                    }
                 }
                 Err(irmind_app::AppError::Cancelled) => {
+                    if label == "IRMind" {
+                        self.state.conversation.discard_preview();
+                    }
                     self.engine
                         .record_cancellation(self.id, cancelled_operation(label))?;
                     update(
@@ -96,6 +127,9 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     );
                 }
                 Err(error) => {
+                    if label == "IRMind" {
+                        self.state.conversation.discard_preview();
+                    }
                     update(
                         &mut self.state,
                         CaseMessage::TaskFinished(format!("Error: {error}")),
@@ -132,157 +166,6 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             self.state.needs_refresh = false;
         }
         Ok(())
-    }
-
-    fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<bool> {
-        if modifiers.contains(KeyModifiers::CONTROL) && code == KeyCode::Char('c') {
-            return Ok(true);
-        }
-        if modifiers.contains(KeyModifiers::CONTROL) && code == KeyCode::Char('k') {
-            self.state.palette = Some(String::new());
-            self.state.picker = None;
-            self.state.confirmation = None;
-            return Ok(false);
-        }
-        let Some(code) = self.handle_overlay_key(code)? else {
-            return Ok(false);
-        };
-        match update(
-            &mut self.state,
-            CaseMessage::Key(code, self.active.is_some()),
-        ) {
-            CaseAction::None => Ok(false),
-            CaseAction::Exit => Ok(true),
-            CaseAction::Approve(request_id) => {
-                self.start_approval(request_id);
-                Ok(false)
-            }
-            CaseAction::ConfirmFinding(finding_id) => {
-                if let Some(finding) = self
-                    .state
-                    .findings
-                    .iter()
-                    .find(|item| item.id == finding_id)
-                {
-                    self.state.confirmation = Some(Confirmation::Finding(
-                        finding_id,
-                        format!(
-                            "Confirm {:?}: {}\nEvidence: {}\nPress y to sign confirmation or Esc to cancel",
-                            finding.kind, finding.value, finding.evidence_hash
-                        ),
-                    ));
-                }
-                Ok(false)
-            }
-            CaseAction::Submit(prompt) => self.submit(prompt),
-        }
-    }
-
-    fn handle_overlay_key(&mut self, code: KeyCode) -> Result<Option<KeyCode>> {
-        if let Some(mut query) = self.state.palette.take() {
-            match code {
-                KeyCode::Esc => return Ok(None),
-                KeyCode::Backspace => {
-                    query.pop();
-                    self.state.palette = Some(query);
-                    return Ok(None);
-                }
-                KeyCode::Char(ch) if query.len() < 80 => {
-                    query.push(ch);
-                    self.state.palette = Some(query);
-                    return Ok(None);
-                }
-                KeyCode::Enter => {
-                    const ACTIONS: [&str; 7] = [
-                        "ingest",
-                        "verify",
-                        "rebuild graph",
-                        "report",
-                        "export",
-                        "seal",
-                        "home",
-                    ];
-                    let selected = ACTIONS
-                        .iter()
-                        .find(|action| action.contains(query.as_str()));
-                    self.state.input = match selected.copied() {
-                        Some("ingest") => "/ingest".into(),
-                        Some("verify") => "/verify".into(),
-                        Some("rebuild graph") => "/rebuild".into(),
-                        Some("report") => "/report".into(),
-                        Some("export") => "/export".into(),
-                        Some("seal") => "/seal".into(),
-                        Some("home") => "/home".into(),
-                        _ => String::new(),
-                    };
-                    return Ok(Some(KeyCode::Enter));
-                }
-                _ => {
-                    self.state.palette = Some(query);
-                    return Ok(None);
-                }
-            }
-        }
-        if self.state.picker.is_some() {
-            return self.handle_picker_key(code);
-        }
-        if let Some(pending) = self.state.confirmation.take() {
-            if code == KeyCode::Char('y') {
-                self.state.input = match &pending {
-                    Confirmation::Seal(_, _) => "/seal".into(),
-                    Confirmation::Export(path, _) => format!("/export {}", path.to_string_lossy()),
-                    Confirmation::Finding(id, _) => format!("/confirm {id}"),
-                };
-                if !matches!(pending, Confirmation::Finding(_, _)) {
-                    self.state.confirmed_action = Some(pending);
-                }
-                return Ok(Some(KeyCode::Enter));
-            }
-            return Ok(None);
-        }
-        Ok(Some(code))
-    }
-
-    fn handle_picker_key(&mut self, code: KeyCode) -> Result<Option<KeyCode>> {
-        let Some(mut browser) = self.state.picker.take() else {
-            return Ok(Some(code));
-        };
-        match code {
-            KeyCode::Esc => return Ok(None),
-            KeyCode::Up => browser.selected = browser.selected.saturating_sub(1),
-            KeyCode::Down => {
-                browser.selected =
-                    (browser.selected + 1).min(browser.entries.len().saturating_sub(1));
-            }
-            KeyCode::Backspace => {
-                if let Some(parent) = browser.current.parent() {
-                    browser.current = parent.to_path_buf();
-                    browser.refresh()?;
-                }
-            }
-            KeyCode::Enter => {
-                let selected = browser.selected_path();
-                let metadata = std::fs::symlink_metadata(&selected)?;
-                if metadata.file_type().is_symlink() {
-                    self.state
-                        .messages
-                        .push("Symlink selection is not allowed".into());
-                } else if metadata.is_dir() {
-                    browser.current = selected;
-                    browser.refresh()?;
-                } else {
-                    self.state.input = format!("/ingest {}", selected.to_string_lossy());
-                    return Ok(Some(KeyCode::Enter));
-                }
-            }
-            KeyCode::Char('s') => {
-                self.state.input = format!("/ingest {}", browser.selected_path().to_string_lossy());
-                return Ok(Some(KeyCode::Enter));
-            }
-            _ => {}
-        }
-        self.state.picker = Some(browser);
-        Ok(None)
     }
 
     pub(super) fn start_approval(&mut self, request_id: String) {

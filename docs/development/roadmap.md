@@ -4,7 +4,7 @@ This page is for contributors and evaluators planning around current limitations
 
 ## Available for synthetic evaluation
 
-- A case-centered TUI with signed case creation, evidence ingestion, investigation, approval, verification, sealing, and export.
+- A conversation-first TUI with a multiline prompt, scrollable signed activity cards, command completion, and an optional case sidebar. Case creation, evidence ingestion, investigation, approval, verification, sealing, and export remain in the same workspace.
 - Incremental model text in the TUI, IOC/hypothesis/ATT&CK panels with analyst confirmation, and evidence excerpts beside matching approvals.
 - Policy-gated reads and analyst-approved external enrichment, with a mandatory content guard.
 - Local SQLite custody, a derived DuckDB graph, and Ed25519 signatures from an explicitly selected OS or encrypted-file backend.

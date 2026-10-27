@@ -1,15 +1,24 @@
+mod cards;
+mod menu;
+mod panels;
+use super::conversation::{Card, CardKind};
 use super::runtime::CaseRuntime;
-use super::state;
-use super::{CaseFrame, Confirmation, Engine, Result, draw_case, escape_display, summarize_usage};
-use irmind_app::{ApprovalRequest, ApprovalSource, Finding};
-use state::{CaseState, panel_findings_for};
-use std::collections::BTreeMap;
+use super::{CaseFrame, Result, draw_case, escape_display, summarize_usage};
+use cards::audit_card;
+use irmind_app::AuditEventKind;
+use menu::menu_text;
+pub(crate) use panels::{approval_panel, entity_panel};
+use panels::{overlay_text, panel_text};
 
 impl CaseRuntime<'_, '_, '_> {
-    pub(super) fn render(&mut self) -> Result<()> {
+    fn refresh_usage(&mut self) -> Result<()> {
+        let last_seq = self.state.entries.last().map_or(0, |entry| entry.seq);
+        if last_seq == self.state.usage_cache_seq {
+            return Ok(());
+        }
         let usage = summarize_usage(&self.state.entries)?;
-        let tokens = usage.input_tokens.saturating_add(usage.output_tokens);
-        let cost = usage.estimated_cost_microusd.map_or_else(
+        self.state.usage_cache_tokens = usage.input_tokens.saturating_add(usage.output_tokens);
+        self.state.usage_cache_cost = usage.estimated_cost_microusd.map_or_else(
             || "cost n/a".to_owned(),
             |micro| {
                 format!(
@@ -19,17 +28,82 @@ impl CaseRuntime<'_, '_, '_> {
                 )
             },
         );
-        let panel = panel_text(&self.state);
-        let title = self.engine.guard.screen(&self.state.case.title)?.text;
-        let mut visible_messages = self.state.messages.clone();
-        if !self.state.model_preview.is_empty() {
-            visible_messages.push(format!("IRMind (streaming): {}", self.state.model_preview));
-        }
-        let shown_messages = visible_messages
+        self.state.usage_cache_seq = last_seq;
+        self.state.turn_detection_count = self
+            .state
+            .entries
             .iter()
-            .map(|message| self.engine.guard.screen(message).map(|shown| shown.text))
-            .collect::<Result<Vec<_>, _>>()?
-            .join("\n\n");
+            .rev()
+            .take_while(|entry| entry.kind != AuditEventKind::Prompt)
+            .filter(|entry| entry.kind == AuditEventKind::InjectionDetected)
+            .count();
+        Ok(())
+    }
+
+    fn status_text(&self) -> Result<String> {
+        let mut status = self.active.as_ref().map_or_else(
+            || "idle".into(),
+            |(_, _, label)| {
+                format!(
+                    "{label}: {}s",
+                    self.state
+                        .running_since
+                        .map_or(0, |since| since.elapsed().as_secs())
+                )
+            },
+        );
+        if self.overrides_active {
+            status = format!("OVR {status}");
+        }
+        if self.engine.case_scope_exceeds_policy(&self.state.case)? {
+            status = format!("SCOPE LIMITED {status}");
+        }
+        Ok(status)
+    }
+
+    fn sync_conversation(&mut self) -> Result<()> {
+        for entry in self.state.entries.iter().skip(self.state.audit_cursor) {
+            if matches!(
+                entry.kind,
+                AuditEventKind::Prompt | AuditEventKind::ModelReply
+            ) && self
+                .state
+                .live_reply_cutoff_seq
+                .is_some_and(|seq| entry.seq > seq)
+            {
+                continue;
+            }
+            if let Some(card) = audit_card(entry, &self.state, self.engine)? {
+                self.state.conversation.push(card);
+            }
+        }
+        self.state.audit_cursor = self.state.entries.len();
+        if self.active.is_none() {
+            self.state.live_reply_cutoff_seq = None;
+        }
+        if let Some(reply) = self.state.pending_final_reply.take() {
+            self.state
+                .conversation
+                .push(Card::new(CardKind::Model, "IRMind", reply, true));
+        }
+        for message in std::mem::take(&mut self.state.messages) {
+            let visible = self.engine.guard.screen(&message)?.text;
+            self.state
+                .conversation
+                .push(Card::new(CardKind::Notice, "Activity", visible, false));
+        }
+        Ok(())
+    }
+
+    pub(super) fn render(&mut self) -> Result<()> {
+        self.sync_conversation()?;
+        self.refresh_usage()?;
+        let panel = if self.state.sidebar_visible {
+            panel_text(&self.state)
+        } else {
+            String::new()
+        };
+        let title = self.engine.guard.screen(&self.state.case.title)?.text;
         let shown_input = self.engine.guard.screen(&self.state.input)?.text;
         let shown_panel = if self.state.tab == 4 {
             escape_display(&panel)
@@ -37,223 +111,57 @@ impl CaseRuntime<'_, '_, '_> {
             self.engine.guard.screen(&panel)?.text
         };
         let overlay = overlay_text(&self.state, self.engine)?;
-        let status = self.active.as_ref().map_or_else(
-            || "a approve, d deny, e edit".into(),
-            |(_, _, label)| {
-                format!(
-                    "{label}: {}s elapsed",
-                    self.state
-                        .running_since
-                        .map_or(0, |since| since.elapsed().as_secs())
-                )
-            },
+        let menu = menu_text(&self.state, self.modules)
+            .map(|content| {
+                self.engine
+                    .guard
+                    .screen(&content)
+                    .map(|visible| visible.text)
+            })
+            .transpose()?;
+        let size = self.terminal.size()?;
+        let chat_area =
+            super::view::conversation_area(size.into(), &shown_input, self.state.sidebar_visible);
+        self.state.conversation.set_viewport(
+            usize::from(chat_area.width.saturating_sub(2)),
+            usize::from(chat_area.height.saturating_sub(2)),
         );
-        let status = if self.overrides_active {
-            format!("SESSION OVERRIDES ACTIVE | {status}")
-        } else {
-            status
-        };
-        let status = if self.engine.case_scope_exceeds_policy(&self.state.case)? {
-            format!("CASE SCOPE LIMITED BY ORGANIZATION POLICY | {status}")
-        } else {
-            status
-        };
+        let visible_lines = self.state.conversation.visible_lines();
+        let status = self.status_text()?;
+        let model_name = self
+            .engine
+            .guard
+            .screen(
+                &self
+                    .model
+                    .map_or_else(|| "no model".into(), irmind_app::LlmPort::descriptor),
+            )?
+            .text;
         draw_case(
             self.terminal,
             &CaseFrame {
                 id: self.id,
                 title: &title,
-                messages: &shown_messages,
+                messages: "",
+                visible_lines: Some(&visible_lines),
                 input: &shown_input,
+                input_focused: self.state.focus == super::state::Focus::Composer,
                 panel: &shown_panel,
                 overlay: overlay.as_deref(),
+                menu: menu.as_deref(),
                 tab: self.state.tab,
-                tokens,
-                cost: &cost,
+                sidebar_visible: self.state.sidebar_visible,
+                sidebar_scroll: u16::try_from(self.state.sidebar_scroll).unwrap_or(u16::MAX),
+                overlay_scroll: u16::try_from(self.state.overlay_scroll).unwrap_or(u16::MAX),
+                new_content: self.state.conversation.has_new_content(),
+                model: &model_name,
+                tokens: self.state.usage_cache_tokens,
+                cost: &self.state.usage_cache_cost,
                 pending: self.state.approvals.len(),
+                detections: self.state.turn_detection_count,
                 status: &status,
             },
         )?;
         Ok(())
     }
-}
-
-fn panel_text(state: &CaseState) -> String {
-    match state.tab {
-        0 => state
-            .timeline
-            .iter()
-            .map(|event| {
-                format!(
-                    "{} {}\n{}#{}",
-                    event.at, event.event, event.evidence_hash, event.record_index
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n"),
-        1 => format!(
-            "{} evidence items\n\n{}",
-            state.hashes.len(),
-            state.hashes.join("\n")
-        ),
-        2 => audit_panel(state),
-        3 => format!(
-            "Title: {}\nSeverity: {}\nScope: {}\nSealed: {}",
-            state.case.title,
-            state.case.severity.as_str(),
-            state.case.scope,
-            state.case.sealed
-        ),
-        4 => approval_panel(
-            &state.approvals,
-            &state.approval_sources,
-            state.selected_approval,
-        ),
-        _ => entity_panel(&state.findings, state.tab, state.selected_finding),
-    }
-}
-
-pub(crate) fn approval_panel(
-    approvals: &[ApprovalRequest],
-    sources: &BTreeMap<String, ApprovalSource>,
-    selected: usize,
-) -> String {
-    approvals
-        .iter()
-        .enumerate()
-        .map(|(index, request)| {
-            let source = sources.get(&request.id).map_or_else(
-                || "Source fragment unavailable".to_owned(),
-                |source| {
-                    format!(
-                        "Untrusted {:?} fragment {}\n{}",
-                        source.provenance.source_kind(),
-                        irmind_app::hex(source.provenance.evidence_hash()),
-                        source.excerpt,
-                    )
-                },
-            );
-            format!(
-                "{} [TAINTED] {}\n{:?} {} {:?}\n{}\n",
-                if index == selected { '>' } else { ' ' },
-                request.id,
-                request.mode,
-                request.tool.as_str(),
-                request.args,
-                source,
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-pub(crate) fn entity_panel(findings: &[Finding], tab: usize, selected: usize) -> String {
-    panel_findings_for(findings, tab)
-        .iter()
-        .enumerate()
-        .map(|(index, finding)| {
-            let status = if finding.confirmed {
-                "confirmed"
-            } else if finding.dismissed {
-                "dismissed"
-            } else {
-                "proposed"
-            };
-            format!(
-                "{} {} {:?} {}\n{}\n[evidence: {}]",
-                if index == selected { '>' } else { ' ' },
-                finding.id,
-                finding.kind,
-                status,
-                finding.value,
-                finding.evidence_hash
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n\n")
-}
-
-fn audit_panel(state: &CaseState) -> String {
-    let mut lines = state
-        .entries
-        .iter()
-        .rev()
-        .take(12)
-        .map(|entry| {
-            format!(
-                "#{} {} / {}: {}",
-                entry.seq,
-                entry.actor.as_storage(),
-                entry.origin,
-                entry.kind
-            )
-        })
-        .collect::<Vec<_>>();
-    lines.extend(state.operations.iter().rev().take(6).map(|entry| {
-        format!(
-            "operation #{} {}: cancelled {}",
-            entry.seq,
-            entry.actor.as_storage(),
-            entry.operation
-        )
-    }));
-    lines.join("\n")
-}
-
-fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Option<String>> {
-    if let Some(picker) = &state.picker {
-        let mut lines = vec![
-            format!("Select evidence · {}", picker.current.display()),
-            "Enter open directory · s select file/directory · Backspace parent · Esc close".into(),
-        ];
-        for (index, path) in picker
-            .entries
-            .iter()
-            .enumerate()
-            .skip(picker.selected.saturating_sub(8))
-            .take(16)
-        {
-            lines.push(format!(
-                "{} {}",
-                if index == picker.selected { '>' } else { ' ' },
-                path.file_name()
-                    .map_or_else(|| "?".into(), |name| name.to_string_lossy().into_owned())
-            ));
-        }
-        return Ok(Some(engine.guard.screen(&lines.join("\n"))?.text));
-    }
-    if let Some(confirm) = &state.confirmation {
-        let detail = match confirm {
-            Confirmation::Seal(_, info)
-            | Confirmation::Export(_, info)
-            | Confirmation::Finding(_, info) => info,
-        };
-        return Ok(Some(escape_display(detail)));
-    }
-    if let Some(search) = &state.palette {
-        const ACTIONS: [&str; 7] = [
-            "ingest",
-            "verify",
-            "rebuild graph",
-            "report",
-            "export",
-            "seal",
-            "home",
-        ];
-        let listed = ACTIONS
-            .iter()
-            .filter(|action| action.contains(search.as_str()))
-            .copied()
-            .collect::<Vec<_>>();
-        return Ok(Some(
-            engine
-                .guard
-                .screen(&format!(
-                    "Command palette · {search}\n{}\nEnter run first match · Esc close",
-                    listed.join("\n")
-                ))?
-                .text,
-        ));
-    }
-    Ok(None)
 }

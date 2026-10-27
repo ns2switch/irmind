@@ -20,6 +20,7 @@ pub(super) struct HomeRuntime<'scope, 'env, 'ports> {
     pub state: HomeState,
     pub statuses: mpsc::Receiver<(CaseId, CaseStatus)>,
     pub new_analyst_key: bool,
+    pub mouse_capture: bool,
     pub(super) verify_task: Option<Worker<'scope>>,
     pub(super) verify_started: Option<Instant>,
     pub(super) migration_task: Option<Worker<'scope>>,
@@ -206,7 +207,11 @@ impl HomeRuntime<'_, '_, '_> {
             self.io_ops,
             id,
             self.shutdown,
-            self.state.overrides_active,
+            case::CasePresentation {
+                overrides_active: self.state.overrides_active,
+                modules: self.modules,
+                mouse_capture: self.mouse_capture,
+            },
         )?;
         self.state.rows = load_rows(self.engine)?;
         self.state.notice = "Returned to case list".into();
@@ -240,7 +245,11 @@ impl HomeRuntime<'_, '_, '_> {
                     self.io_ops,
                     &case_id,
                     self.shutdown,
-                    self.state.overrides_active,
+                    case::CasePresentation {
+                        overrides_active: self.state.overrides_active,
+                        modules: self.modules,
+                        mouse_capture: self.mouse_capture,
+                    },
                 )?;
                 self.state.rows = load_rows(self.engine)?;
             }

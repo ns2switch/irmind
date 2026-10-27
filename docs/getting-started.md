@@ -32,10 +32,16 @@ If `config.toml` needs recovery, the TUI offers restoration or a field-by-field 
 2. In the case view, enter `/ingest` and select [the synthetic CloudTrail file](../examples/cloudtrail-alert.json). The original file is hashed and retained locally.
 3. Use `/timeline` or `/graph` to inspect the indexed events. Use `/evidence <hash>` to view an original record.
 4. Return to the home screen, press `m`, and choose a model and its public settings as described in [configuration](configuration.md). The session reloads without exiting IRMind. Open the case and ask: “What does the synthetic AssumeRole event suggest?”
-5. Review any proposed call before approval. `/pause` cancels an active task; `/help` and `Ctrl+K` show actions.
+5. Review proposed calls in the conversation. Enter sends; Alt+Enter or Shift+Enter adds a line. Type `/` for command suggestions or press `Ctrl+K` for the palette. `/pause` or Esc cancels an active task.
 6. Run `/verify`, review `/report`, and use `/seal` and `/export` only after checking the displayed case hash and signing-key fingerprint.
 
 The export can be checked on a second computer with `irmind verify-export <PACKAGE> --expected-key <FINGERPRINT>`. See the [CLI reference](development/cli.md) for automation.
+
+## Navigate the case
+
+The conversation fills the case workspace. Tool proposals, approvals, results, and findings appear as cards in order. `Ctrl+B` shows or hides the case sidebar. Tab cycles its timeline, evidence, approvals, and finding views. Use `Ctrl+L` to focus the conversation and `Ctrl+I` to return to the prompt. Enter or Space expands a selected card; `a`, `d`, and `e` act on a selected approval.
+
+PgUp/PgDn and Ctrl+U/Ctrl+D scroll the focused view. Home/End or `g`/`G` in the conversation move to the start/end. New model text follows the end only while you are there; End clears the new-content indicator. Up/Down recall prompts. `/help` or `?` lists commands and shortcuts. Mouse wheel scrolling is enabled by default. To keep terminal text selection, set `mouse_capture = false` in [configuration](configuration.md) and accept the file change in the TUI.
 
 ## Next
 

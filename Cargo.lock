@@ -2807,6 +2807,7 @@ dependencies = [
  "rpassword",
  "secrecy",
  "serde_json",
+ "unicode-width",
 ]
 
 [[package]]
