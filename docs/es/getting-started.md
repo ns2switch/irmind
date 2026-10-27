@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 9238838563f8cc31ff1523c7d8fe13ec9311a758; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 4448e7cfd7e8c0353e5cc4192e2102be27a4ab03; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -32,7 +32,7 @@ Si `config.toml` requiere recuperación, la TUI ofrece restaurarlo o revisar los
 
 1. Pulsa `n`, escribe un título como «Alerta de CloudTrail de prueba», elige una severidad y deja vacíos los campos de fuentes remotas. Se creará un caso local con un evento firmado.
 2. En el caso, escribe `/ingest` y selecciona [el archivo sintético de CloudTrail](../../examples/cloudtrail-alert.json). El original se guarda y se identifica por su hash.
-3. Usa `/timeline` o `/graph` para examinar los eventos indexados. Usa `/evidence <hash>` para ver un registro original.
+3. Usa `/timeline` o `/graph` para examinar los eventos indexados. `/search <palabras>` busca registros JSON coincidentes en este caso. Usa `/evidence <hash>` para ver un registro original.
 4. Vuelve a la pantalla de inicio, pulsa `m` y elige un modelo y sus ajustes públicos como explica [configuración](configuration.md). La sesión se recarga sin salir de IRMind. Abre el caso y pregunta: «¿Qué sugiere el evento AssumeRole sintético?».
 5. Revisa las llamadas propuestas en la conversación. Enter envía; Alt+Enter o Shift+Enter añade una línea. Escribe `/` para ver sugerencias o pulsa `Ctrl+K` para abrir la paleta. `/pause` o Esc cancela una tarea activa.
 6. Ejecuta `/verify`, revisa `/report` y usa `/seal` y `/export` solo después de comprobar el hash del caso y la huella de la clave de firma que se muestran.
@@ -42,6 +42,8 @@ Puedes verificar el paquete en otro equipo con `irmind verify-export <PACKAGE> -
 ## Navegar por el caso
 
 La conversación ocupa el espacio principal. Las propuestas, aprobaciones, resultados y hallazgos aparecen en tarjetas ordenadas. `Ctrl+B` muestra u oculta el panel lateral. Tab recorre cronología, evidencias, aprobaciones y hallazgos. `Ctrl+L` enfoca la conversación y `Ctrl+I` vuelve al campo de entrada. Enter o Espacio despliega una tarjeta seleccionada; `a`, `d` y `e` actúan sobre una aprobación seleccionada.
+
+Las consultas del grafo y las búsquedas locales también aparecen como tarjetas de resultado. Las respuestas largas empiezan plegadas; selecciona la tarjeta y pulsa Enter o Espacio para desplegarla, y desplázate por la conversación.
 
 PgUp/PgDn y Ctrl+U/Ctrl+D desplazan la vista enfocada. Inicio/Fin o `g`/`G` en la conversación saltan al principio/final. El texto nuevo del modelo sigue el final solo si ya estás allí; Fin quita el indicador de contenido nuevo. ↑/↓ recuperan entradas anteriores. `/help` o `?` muestran los comandos y atajos. La rueda del ratón funciona por defecto. Para seleccionar texto con el terminal, pon `mouse_capture = false` en la [configuración](configuration.md) y acepta el cambio desde la TUI.
 
