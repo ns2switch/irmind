@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 6e3a578cf21d91a90edee7afe9f0fa45c449e577; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit eb5780d3e4bbc6d5656a5058071f728583b3987f; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -114,7 +114,7 @@ Los módulos se compilan dentro del binario. En la TUI, pulsa `m` para seleccion
 
 **Configuración:** Incluido y activo en todos los binarios. Usa el selector `/ingest` de la TUI o el [comando de ingesta de la CLI](../development/cli.md).
 
-**Límites:** El parseo actual es acotado y en memoria. Rechaza archivos demasiado grandes, JSON muy anidado y demasiados registros. Otros formatos necesitan parsers futuros.
+**Límites:** Cada archivo se carga con un límite de 50 MB; después, los registros se procesan e indexan uno a uno. Se rechazan el JSON muy anidado, un número excesivo de registros y los registros con más de 2.048 términos de búsqueda distintos. La búsqueda en el grafo exige que coincidan todas las palabras, no busca subcadenas. Las palabras buscables tienen entre 2 y 64 bytes. Otros formatos necesitarán parsers futuros.
 
 ## Llavero del sistema
 
