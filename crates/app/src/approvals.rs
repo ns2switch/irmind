@@ -10,6 +10,21 @@ pub struct ApprovalRequest {
     pub(crate) challenge: Vec<u8>,
 }
 
+#[derive(Clone)]
+pub struct ApprovalSource {
+    pub provenance: Provenance,
+    pub excerpt: String,
+}
+
+impl std::fmt::Debug for ApprovalSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ApprovalSource")
+            .field("provenance", &self.provenance)
+            .field("excerpt_bytes", &self.excerpt.len())
+            .finish()
+    }
+}
+
 impl std::fmt::Debug for ApprovalRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ApprovalRequest")
@@ -53,3 +68,4 @@ impl AnalystApprovalVerifier for AnalystVerifierAdapter<'_> {
 
 mod request;
 mod resolution;
+mod source;

@@ -4,9 +4,13 @@
 use crate::{KeystoreChoice, ModuleStatus, WorkspaceIo, case, home, setup, workflow::CaseWorkflow};
 use anyhow::Result;
 use crossterm::event::KeyCode;
-use irmind_app::{CancellationToken, CaseId, Engine, LlmPort, Severity};
+use irmind_app::{
+    CancellationToken, CaseId, Engine, EntityDetails, FindingKind, LlmPort, Severity,
+};
 use ratatui::{Terminal, backend::Backend};
+use std::collections::BTreeMap;
 use std::path::Path;
+use std::sync::Mutex;
 
 pub fn render_keystore_setup<B: Backend>(
     terminal: &mut Terminal<B>,
@@ -162,6 +166,85 @@ where
         )
     }
 
+    pub fn render_entity_panel(&mut self, id: &CaseId, kind: FindingKind) -> Result<String> {
+        let tab = match kind {
+            FindingKind::Ioc => 5,
+            FindingKind::Hypothesis => 6,
+            FindingKind::Technique => 7,
+            _ => 8,
+        };
+        let findings = self.workflow.engine.findings(id)?;
+        let text = case::entity_panel(&findings, tab, 0);
+        self.render_detail_panel(id, tab, &text)?;
+        Ok(text)
+    }
+
+    pub fn render_model_preview(&mut self, id: &CaseId, preview: &str) -> Result<()> {
+        let safe = self.workflow.engine.guard.screen(preview)?.text;
+        self.render_detail_panel(id, 3, &format!("IRMind (streaming): {safe}"))
+    }
+
+    pub fn render_approval_panel(&mut self, id: &CaseId) -> Result<String> {
+        let approvals = self.workflow.engine.pending_approvals(id)?;
+        let sources = approvals
+            .iter()
+            .map(|request| {
+                self.workflow
+                    .engine
+                    .approval_source(id, request)
+                    .map(|source| (request.id.clone(), source))
+            })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        let text = case::approval_panel(&approvals, &sources, 0);
+        self.render_detail_panel(id, 4, &text)?;
+        Ok(text)
+    }
+
+    fn render_detail_panel(&mut self, id: &CaseId, tab: usize, text: &str) -> Result<()> {
+        let case = self.workflow.engine.repo.get_case(id)?;
+        let guard = self.workflow.engine.guard.as_ref();
+        let title = guard.screen(&case.title)?.text;
+        let panel = guard.screen(text)?.text;
+        case::draw_case(
+            &mut self.terminal,
+            &case::CaseFrame {
+                id,
+                title: &title,
+                messages: "",
+                input: "",
+                panel: &panel,
+                overlay: None,
+                tab,
+                tokens: 0,
+                cost: "cost n/a",
+                pending: self.workflow.engine.pending_approvals(id)?.len(),
+                status: "idle",
+            },
+        )
+    }
+
+    pub fn propose_entity(
+        &self,
+        id: &CaseId,
+        kind: FindingKind,
+        value: &str,
+        evidence_hash: &str,
+        details: EntityDetails,
+    ) -> Result<String> {
+        Ok(self
+            .workflow
+            .engine
+            .add_entity(id, kind, value, evidence_hash, details)?)
+    }
+
+    pub fn confirm_finding(&self, id: &CaseId, finding_id: &str) -> Result<()> {
+        Ok(self.workflow.engine.confirm_finding(id, finding_id)?)
+    }
+
+    pub fn report(&self, id: &CaseId) -> Result<String> {
+        Ok(self.workflow.engine.report(id)?)
+    }
+
     pub fn create_case(&self, title: &str, severity: Severity, scope: &str) -> Result<CaseId> {
         Ok(self.workflow.create_case(title, severity, scope)?)
     }
@@ -176,6 +259,25 @@ where
         Ok(self
             .workflow
             .investigate(id, alert, &CancellationToken::new())?)
+    }
+
+    pub fn investigate_with_deltas(
+        &self,
+        id: &CaseId,
+        alert: &str,
+    ) -> Result<(String, Vec<String>)> {
+        let deltas = Mutex::new(Vec::new());
+        let response = self.workflow.investigate_with_progress(
+            id,
+            alert,
+            &CancellationToken::new(),
+            &|part| {
+                if let Ok(mut output) = deltas.lock() {
+                    output.push(part.to_owned());
+                }
+            },
+        )?;
+        Ok((response, deltas.into_inner()?))
     }
 
     pub fn pending_approval_ids(&self, id: &CaseId) -> Result<Vec<String>> {

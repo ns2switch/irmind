@@ -7,6 +7,49 @@ use std::io::{BufRead as _, BufReader, Read};
 const MAX_STREAM_BYTES: usize = 2_000_000;
 
 #[derive(Default)]
+pub(super) struct TextPreview {
+    pending: Vec<u8>,
+}
+
+impl TextPreview {
+    pub(super) fn push(&mut self, chunk: &[u8]) -> Result<Vec<String>, AppError> {
+        self.pending.extend_from_slice(chunk);
+        if self.pending.len() > MAX_STREAM_BYTES {
+            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::ProviderStreamExceeds2MB,
+            )));
+        }
+        let mut text = Vec::new();
+        while let Some(end) = self.pending.iter().position(|byte| *byte == b'\n') {
+            let line = self.pending.drain(..=end).collect::<Vec<_>>();
+            let line = std::str::from_utf8(&line).map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                    irmind_app::AdapterModelError::UnexpectedProviderStreamField,
+                ))
+            })?;
+            let Some(data) = line.trim_end_matches(['\r', '\n']).strip_prefix("data:") else {
+                continue;
+            };
+            let data = data.trim_start();
+            if data == "[DONE]" {
+                continue;
+            }
+            let value: Value = serde_json::from_str(data).map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                    irmind_app::AdapterModelError::UnexpectedProviderStreamField,
+                ))
+            })?;
+            if let Some(part) = value["choices"][0]["delta"]["content"].as_str()
+                && !part.is_empty()
+            {
+                text.push(part.to_owned());
+            }
+        }
+        Ok(text)
+    }
+}
+
+#[derive(Default)]
 struct ToolDelta {
     id: Option<String>,
     name: String,
@@ -246,6 +289,14 @@ fn parse_tool(name: &str, arguments: &str) -> Result<ProposedCall, AppError> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preview_emits_only_complete_text_frames() {
+        let mut preview = TextPreview::default();
+        let first = b"data: {\"choices\":[{\"delta\":{\"content\":\"hel";
+        assert!(preview.push(first).unwrap().is_empty());
+        assert_eq!(preview.push(b"lo\"}}]}\n\n").unwrap(), ["hello"]);
+    }
 
     #[test]
     fn assembles_split_tool_call_before_authorization() {

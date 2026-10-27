@@ -17,6 +17,8 @@ pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub active: Option<ActiveTask<'scope>>,
     pub progress_tx: mpsc::Sender<String>,
     pub progress_rx: mpsc::Receiver<String>,
+    pub model_tx: mpsc::Sender<String>,
+    pub model_rx: mpsc::Receiver<String>,
     pub seal_tx: mpsc::Sender<irmind_app::SealPreview>,
     pub seal_rx: mpsc::Receiver<irmind_app::SealPreview>,
     pub overrides_active: bool,
@@ -30,6 +32,9 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             }
             while let Ok(progress) = self.progress_rx.try_recv() {
                 update(&mut self.state, CaseMessage::Progress(progress));
+            }
+            while let Ok(delta) = self.model_rx.try_recv() {
+                update(&mut self.state, CaseMessage::ModelDelta(delta));
             }
             self.finish_task()?;
             self.refresh()?;
@@ -63,6 +68,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             return Ok(());
         }
         if let Some((_, task, label)) = self.active.take() {
+            self.state.model_preview.clear();
             match task
                 .join()
                 .map_err(|_| anyhow::anyhow!("investigation thread panicked"))?
@@ -98,6 +104,8 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             }
             self.state.case = self.engine.repo.get_case(self.id)?;
             self.state.approvals = self.engine.pending_approvals(self.id)?;
+            self.state.approval_sources =
+                super::load_approval_sources(self.engine, self.id, &self.state.approvals)?;
             self.state.findings = self.engine.findings(self.id)?;
             self.state.needs_refresh = true;
         }
@@ -110,6 +118,11 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             .state
             .selected_approval
             .min(self.state.approvals.len().saturating_sub(1));
+        self.state.selected_finding = self.state.selected_finding.min(
+            super::state::panel_findings(&self.state)
+                .len()
+                .saturating_sub(1),
+        );
         if self.active.is_none() && self.state.needs_refresh {
             let _case_lock = self.engine.repo.lock_case(self.id)?;
             self.state.hashes = self.engine.evidence_store.evidence_hashes(self.id)?;
@@ -142,6 +155,23 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             CaseAction::Exit => Ok(true),
             CaseAction::Approve(request_id) => {
                 self.start_approval(request_id);
+                Ok(false)
+            }
+            CaseAction::ConfirmFinding(finding_id) => {
+                if let Some(finding) = self
+                    .state
+                    .findings
+                    .iter()
+                    .find(|item| item.id == finding_id)
+                {
+                    self.state.confirmation = Some(Confirmation::Finding(
+                        finding_id,
+                        format!(
+                            "Confirm {:?}: {}\nEvidence: {}\nPress y to sign confirmation or Esc to cancel",
+                            finding.kind, finding.value, finding.evidence_hash
+                        ),
+                    ));
+                }
                 Ok(false)
             }
             CaseAction::Submit(prompt) => self.submit(prompt),
@@ -201,8 +231,11 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                 self.state.input = match &pending {
                     Confirmation::Seal(_, _) => "/seal".into(),
                     Confirmation::Export(path, _) => format!("/export {}", path.to_string_lossy()),
+                    Confirmation::Finding(id, _) => format!("/confirm {id}"),
                 };
-                self.state.confirmed_action = Some(pending);
+                if !matches!(pending, Confirmation::Finding(_, _)) {
+                    self.state.confirmed_action = Some(pending);
+                }
                 return Ok(Some(KeyCode::Enter));
             }
             return Ok(None);

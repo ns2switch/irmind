@@ -5,6 +5,7 @@ This page is for contributors and evaluators planning around current limitations
 ## Available for synthetic evaluation
 
 - A case-centered TUI with signed case creation, evidence ingestion, investigation, approval, verification, sealing, and export.
+- Incremental model text in the TUI, IOC/hypothesis/ATT&CK panels with analyst confirmation, and evidence excerpts beside matching approvals.
 - Policy-gated reads and analyst-approved external enrichment, with a mandatory content guard.
 - Local SQLite custody, a derived DuckDB graph, and Ed25519 signatures from an explicitly selected OS or encrypted-file backend.
 - Explicitly selected LLM modules and optional Splunk, AWS, EDR, MISP, and VirusTotal connectors.
@@ -14,7 +15,7 @@ This page is for contributors and evaluators planning around current limitations
 
 ## Next work
 
-1. Show model streaming incrementally in the TUI and improve per-batch progress for long local tasks.
+1. Improve per-batch progress for long local tasks.
 2. Stream CloudTrail and JSON parsing for larger inputs, add full-text graph search, and benchmark at least 1 GB of synthetic evidence.
 3. Add SIEM alert retrieval and separate tracing from signed audit data.
 

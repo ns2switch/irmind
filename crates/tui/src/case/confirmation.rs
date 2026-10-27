@@ -5,6 +5,7 @@ use std::path::PathBuf;
 pub(super) enum Confirmation {
     Seal(Box<SealPreview>, String),
     Export(PathBuf, String),
+    Finding(String, String),
 }
 
 pub(super) fn seal_confirmation(preview: &SealPreview) -> String {

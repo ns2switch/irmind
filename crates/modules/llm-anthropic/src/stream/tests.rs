@@ -43,3 +43,10 @@ fn cached_input_counts_toward_case_limit() {
             .is_err()
     );
 }
+
+#[test]
+fn preview_emits_only_complete_text_events() {
+    let mut preview = TextPreview::default();
+    assert!(preview.push(b"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hel").unwrap().is_empty());
+    assert_eq!(preview.push(b"lo\"}}\n\n").unwrap(), ["hello"]);
+}

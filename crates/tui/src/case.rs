@@ -4,6 +4,7 @@ use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use irmind_app::{CancellationToken, CaseId, Engine, FindingKind, LlmPort, summarize_usage};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{
+    collections::BTreeMap,
     io,
     path::PathBuf,
     sync::mpsc,
@@ -15,6 +16,7 @@ mod confirmation;
 mod operation;
 mod picker;
 mod render;
+pub(crate) use render::{approval_panel, entity_panel};
 mod runtime;
 mod state;
 mod view;
@@ -43,8 +45,10 @@ pub(crate) fn run_case(
         case.scope
     )];
     let approvals = engine.pending_approvals(id)?;
+    let approval_sources = load_approval_sources(engine, id, &approvals)?;
     let findings = engine.findings(id)?;
     let (progress_tx, progress_rx) = mpsc::channel::<String>();
+    let (model_tx, model_rx) = mpsc::channel::<String>();
     let (seal_tx, seal_rx) = mpsc::channel::<irmind_app::SealPreview>();
     let (hashes, entries, operations, timeline) = {
         let _case_lock = engine.repo.lock_case(id)?;
@@ -59,10 +63,13 @@ pub(crate) fn run_case(
         case,
         input: String::new(),
         messages,
+        model_preview: String::new(),
         approvals,
+        approval_sources,
         findings,
         tab: 0,
         selected_approval: 0,
+        selected_finding: 0,
         palette: None,
         picker: None,
         confirmation: None,
@@ -87,10 +94,23 @@ pub(crate) fn run_case(
             active: None,
             progress_tx,
             progress_rx,
+            model_tx,
+            model_rx,
             seal_tx,
             seal_rx,
             overrides_active,
         };
         runtime.run()
     })
+}
+
+fn load_approval_sources(
+    engine: &Engine<'_>,
+    id: &CaseId,
+    approvals: &[irmind_app::ApprovalRequest],
+) -> Result<BTreeMap<String, irmind_app::ApprovalSource>> {
+    approvals
+        .iter()
+        .map(|request| Ok((request.id.clone(), engine.approval_source(id, request)?)))
+        .collect()
 }

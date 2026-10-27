@@ -152,6 +152,45 @@ async fn incomplete_or_repeated_model_completion_fails_closed() {
     ));
 }
 
+#[tokio::test]
+async fn streamed_text_is_incremental_and_must_match_the_final_reply() -> Result<(), super::AppError>
+{
+    use super::{
+        AppError, CancellationToken, FixedAppError, ModelEvent, ModelResponse,
+        collect_model_stream_with_progress,
+    };
+    let events = |final_text: &str| {
+        Box::pin(futures_util::stream::iter(vec![
+            Ok(ModelEvent::TextDelta("hello ".into())),
+            Ok(ModelEvent::TextDelta("world".into())),
+            Ok(ModelEvent::Completed {
+                response: ModelResponse {
+                    text: final_text.into(),
+                    calls: Vec::new(),
+                    raw: "synthetic".into(),
+                },
+                usage: None,
+            }),
+        ])) as super::ModelStream
+    };
+    let mut shown = Vec::new();
+    let (reply, _) = collect_model_stream_with_progress(
+        events("hello world"),
+        &CancellationToken::new(),
+        |part| shown.push(part.to_owned()),
+    )
+    .await?;
+    assert_eq!(shown, ["hello ", "world"]);
+    assert_eq!(reply.text, "hello world");
+    assert!(matches!(
+        collect_model_stream_with_progress(events("different"), &CancellationToken::new(), |_| {},)
+            .await,
+        Err(AppError::Fixed(FixedAppError::ModelStreamTextMismatch))
+    ));
+    assert!(!format!("{:?}", ModelEvent::TextDelta("SECRET".into())).contains("SECRET"));
+    Ok(())
+}
+
 #[test]
 fn fixed_application_errors_keep_their_public_messages() {
     assert_eq!(

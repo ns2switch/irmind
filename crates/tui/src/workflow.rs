@@ -71,6 +71,22 @@ impl CaseWorkflow<'_, '_> {
             .investigate_with_cancel(id, alert, model, cancel)
     }
 
+    pub(crate) fn investigate_with_progress(
+        &self,
+        id: &CaseId,
+        alert: &str,
+        cancel: &CancellationToken,
+        on_text: &(dyn Fn(&str) + Send + Sync),
+    ) -> Result<String, AppError> {
+        let model = self
+            .model
+            .ok_or(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                irmind_app::AdapterPolicyError::NoLLMSelected,
+            )))?;
+        self.engine
+            .investigate_with_progress(id, alert, model, cancel, on_text)
+    }
+
     pub(crate) fn approve(
         &self,
         id: &CaseId,

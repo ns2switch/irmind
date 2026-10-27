@@ -245,7 +245,7 @@ impl Engine<'_> {
         let verifier = AnalystVerifierAdapter(self.verifier.as_ref());
         for entry in entries {
             if entry.kind == irmind_domain::AuditEventKind::NeedsApproval {
-                let request = self.parse_pending_event(case, entry)?;
+                let request = Self::parse_pending_event(case, entry)?;
                 if open.insert(request.id.clone(), request).is_some() {
                     return Err(AppError::InvalidChain(entry.seq));
                 }
@@ -285,7 +285,6 @@ impl Engine<'_> {
     }
 
     pub(crate) fn parse_pending_event(
-        &self,
         case: &Case,
         entry: &SignedEntry,
     ) -> Result<ApprovalRequest, AppError> {
@@ -321,9 +320,10 @@ impl Engine<'_> {
                 None,
             )
         };
-        let pending =
-            PendingApproval::recover_with_rules(case, mode, &challenge, entry.at, &self.policy)
-                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+        // Historical signed requests remain readable when a later organization
+        // policy narrows its ceiling. Resolution rechecks the current policy.
+        let pending = PendingApproval::recover(case, mode, &challenge, entry.at)
+            .map_err(|_| AppError::InvalidChain(entry.seq))?;
         if pending.decision_seq() != entry.seq
             || id != hex(&sha256(&challenge))
             || structured.as_ref().is_some_and(|(seq, tool, args)| {
