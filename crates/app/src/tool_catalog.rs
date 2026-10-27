@@ -55,7 +55,7 @@ fn local_catalog() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "text_search",
-            description: "Search all indexed JSON record fields in this case using a literal substring",
+            description: "Search indexed JSON record fields by words; all query words must match",
             parameters: json!({"type":"object","properties":{"query":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":20}},"required":["query"],"additionalProperties":false}),
         },
         ToolSpec {

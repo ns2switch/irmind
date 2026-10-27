@@ -1,4 +1,5 @@
 use super::super::index::terms;
+use super::super::verify::fts_markers_complete;
 use super::{
     AppError, CaseId, Connection, GraphStore, HashMap, HashSet, VecDeque, params, short, storage,
 };
@@ -46,10 +47,10 @@ impl GraphStore {
                 },
             )
             .map_err(storage)?;
-        if events != texts || empty != 0 || indexed != full_text {
+        if events != texts || empty != 0 || indexed != full_text || !fts_markers_complete(&db)? {
             return Err(storage("graph text index is incomplete; run graph-rebuild"));
         }
-        let query_terms = terms(query);
+        let query_terms = terms(query)?;
         if query_terms.is_empty() {
             return Ok("no indexed matches".into());
         }

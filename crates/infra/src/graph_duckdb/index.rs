@@ -3,12 +3,19 @@ use duckdb::{OptionalExt, Transaction};
 use irmind_app::{CancellationToken, EventParser};
 use std::collections::BTreeSet;
 
-pub(super) fn terms(text: &str) -> BTreeSet<String> {
-    text.split(|character: char| !character.is_alphanumeric())
-        .filter(|word| (2..=64).contains(&word.len()))
-        .map(str::to_lowercase)
-        .take(2_048)
-        .collect()
+pub(super) fn terms(text: &str) -> Result<BTreeSet<String>, AppError> {
+    let mut terms = BTreeSet::new();
+    for word in text.split(|character: char| !character.is_alphanumeric()) {
+        if (2..=64).contains(&word.len()) {
+            terms.insert(word.to_lowercase());
+            if terms.len() > 2_048 {
+                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+                    irmind_app::AdapterPolicyError::TooManyGraphSearchTerms,
+                )));
+            }
+        }
+    }
+    Ok(terms)
 }
 
 impl GraphStore {
@@ -24,6 +31,16 @@ impl GraphStore {
         let mut db = self.connect(id)?;
         let tx = db.transaction().map_err(storage)?;
         if let Some(count) = Self::indexed_count(&tx, hash)? {
+            let full_text: i64 = tx
+                .query_row(
+                    "SELECT COUNT(*) FROM fts_indexed WHERE hash=?1",
+                    params![hash],
+                    |row| row.get(0),
+                )
+                .map_err(storage)?;
+            if full_text != 1 {
+                return Err(storage("graph text index is incomplete; run graph-rebuild"));
+            }
             return usize::try_from(count).map_err(storage);
         }
         let count = parser.parse_each(source, bytes, cancel, &mut |record| {
@@ -124,7 +141,7 @@ impl GraphStore {
         index: i64,
         text: &str,
     ) -> Result<(), AppError> {
-        for term in terms(text) {
+        for term in terms(text)? {
             tx.execute(
                 "INSERT INTO record_terms (term,hash,record_index) VALUES (?1,?2,?3)",
                 params![term, hash, index],

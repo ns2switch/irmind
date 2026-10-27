@@ -10,4 +10,10 @@ The test measures wall-clock ingestion and query time. Token counts are estimate
 
 ## Results
 
-The first 1 GB run must be recorded here from the workflow artifact before H7 is marked complete. Record the commit, runner, input bytes, ingestion time, query time, estimated raw tokens, and estimated indexed-result tokens. Do not extrapolate a smaller run into this table.
+| Date and revision | Environment | Input bytes | Ingestion | Query | Raw tokens, estimated | Indexed response tokens, estimated |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 2026-10-27, `70fc844` | Local Linux, one process, 6 GB address-space cap, no swap | 1,048,578,740 | 1,274.926 s | 1.369 s | 262,144,685 | 583 |
+
+The measurement includes custody verification before each file, evidence writes, content screening, parsing, and DuckDB indexing. The query returns at most 20 of the 25 synthetic records. The temporary 1 GB case directory was removed after the test.
+
+The scheduled workflow will publish its own log as an artifact. GitHub cannot dispatch a newly added workflow from a pull request branch before the workflow exists on `main`; its first CI measurement is therefore pending the merge. Do not extrapolate a smaller run into this table or treat these estimated tokens as a provider bill.
