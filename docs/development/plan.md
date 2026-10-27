@@ -30,6 +30,14 @@ This internal plan is for maintainers tracking acceptance criteria. Public reade
 | H7 Graph | DuckDB, hashed ingestion, streaming CloudTrail and JSON parsers, deterministic extraction, aggregated edges, text search, bounded Read tools. | A benchmark ingests at least 1 GB of synthetic data and measures time and tokens. |
 | H8 Integrations | Cloud, SIEM, EDR, and threat-intelligence modules passing shared port contracts. | Each module has recorded-response tests and a setup guide. |
 
+## MVP
+
+The MVP scope is closed. Complete C4 (streaming CloudTrail and JSON ingestion, DuckDB text search, and the 1 GB benchmark), C5 (SIEM alert retrieval and tracing separate from custody), C6 (structured SIEM queries, as proposed in [decisions](decisions.md)), and all H8 acceptance work for product modules already in the workspace. Do not add product modules to meet this scope.
+
+Chronicle, GCP, Azure, external anchoring of case seals, and the local gateway with watches belong after the MVP.
+
+Exit only when H0–H8 meet their stated acceptance criteria, the H5 manual test is documented, at least one connector has been tested against a real test environment, and a `v0.1.0` tag has a changelog and downloadable binaries. Synthetic recordings alone do not satisfy the connector test.
+
 ## Later unattended gateway
 
 Do not implement the gateway yet. Preserve distinct Analyst and Agent signing keys, `ExecutionMode`, unattended scoped reads only, analyst-signed approvals, and service-safe concurrent use cases.
