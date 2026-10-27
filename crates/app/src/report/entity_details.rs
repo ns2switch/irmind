@@ -83,7 +83,10 @@ impl EntityDetails {
                     .map(|value| value.parse().map_err(|_| invalid()))
                     .transpose()?,
             }),
-            _ => None,
+            super::FindingKind::Ioc
+            | super::FindingKind::Hypothesis
+            | super::FindingKind::Technique => return Err(invalid()),
+            super::FindingKind::Impact | super::FindingKind::Recommendation => None,
         };
         Ok(details)
     }
@@ -224,5 +227,28 @@ fn verdict_value(value: &str) -> Option<ThreatVerdict> {
         "suspicious" => Some(ThreatVerdict::Suspicious),
         "malicious" => Some(ThreatVerdict::Malicious),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_model_ioc_requires_typed_fields() {
+        let mut args = BTreeMap::from([
+            ("kind".into(), "ioc".into()),
+            ("value".into(), "203.0.113.8".into()),
+            ("evidence_hash".into(), "a".repeat(64)),
+        ]);
+        assert!(EntityDetails::from_args(super::super::FindingKind::Ioc, &args).is_err());
+        args.insert("ioc_type".into(), "ip".into());
+        args.insert("first_seen".into(), "2026-10-23T12:00:00Z".into());
+        args.insert("last_seen".into(), "2026-10-23T12:00:00Z".into());
+        args.insert("verdict".into(), "unknown".into());
+        assert!(matches!(
+            EntityDetails::from_args(super::super::FindingKind::Ioc, &args),
+            Ok(Some(EntityDetails::Ioc { .. }))
+        ));
     }
 }
