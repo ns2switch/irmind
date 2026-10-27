@@ -111,6 +111,9 @@ pub(super) fn argument_candidates(
     let Some((command, prefix)) = input.split_once(' ') else {
         return Vec::new();
     };
+    if command == "/ingest" {
+        return super::picker::safe_completions(prefix);
+    }
     let values: Vec<String> = match command {
         "/approve" | "/deny" | "/edit" => approvals.to_vec(),
         "/confirm" | "/dismiss" => findings.to_vec(),
@@ -119,7 +122,6 @@ pub(super) fn argument_candidates(
             .iter()
             .map(|value| (*value).into())
             .collect(),
-        "/ingest" => super::picker::safe_completions(prefix),
         "/module" => modules.to_vec(),
         _ => Vec::new(),
     };
