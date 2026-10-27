@@ -43,7 +43,15 @@ The conversation fills the case workspace. Tool proposals, approvals, results, a
 
 Graph queries and local searches also appear as result cards. Long results start folded; select a card and press Enter or Space to expand it, then scroll within the conversation.
 
+![Conversation showing a synthetic CloudTrail case and a streaming model reply](assets/conversation.png)
+
 PgUp/PgDn and Ctrl+U/Ctrl+D scroll the focused view. Home/End or `g`/`G` in the conversation move to the start/end. New model text follows the end only while you are there; End clears the new-content indicator. Up/Down recall prompts. `/help` or `?` lists commands and shortcuts. Mouse wheel scrolling is enabled by default. To keep terminal text selection, set `mouse_capture = false` in [configuration](configuration.md) and accept the file change in the TUI.
+
+![Slash-command menu with commands and descriptions above the input field](assets/command-menu.png)
+
+An external lookup waits for a signed approval. The card shows the exact arguments and the synthetic evidence fragment that supplied the tainted value.
+
+![Approval card showing an external lookup, its arguments, and the tainted source fragment](assets/approval-card.png)
 
 ## Next
 

@@ -21,6 +21,7 @@ NON_IRMIND_FLAGS = {
     "--amend",
     "--check",
     "--config",
+    "--example",
     "--features",
     "--ignore",
     "--locked",

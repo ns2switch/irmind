@@ -29,6 +29,9 @@
       "requestParameters": {
         "roleArn": "arn:aws:iam::000000000000:role/DemoReadOnly",
         "roleSessionName": "synthetic-session"
+      },
+      "additionalEventData": {
+        "investigatedDomain": "example.com"
       }
     }
   ]

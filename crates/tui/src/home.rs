@@ -89,8 +89,8 @@ impl HomeState {
             selected: 0,
             form: [
                 String::new(),
-                String::new(),
                 "medium".into(),
+                String::new(),
                 String::new(),
                 String::new(),
                 String::new(),
