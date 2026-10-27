@@ -201,7 +201,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             _ => {
                 if let Some(scope) = prompt.strip_prefix("/scope ") {
                     let changed = scope_expansion(&self.state.case.scope, scope);
-                    match changed.and_then(|value| self.engine.change_scope(self.id, &value).map_err(|_| "scope change failed")) {
+                    match changed.map_err(str::to_owned).and_then(|value| {
+                        self.engine.change_scope(self.id, &value).map_err(|error| error.to_string())
+                    }) {
                         Ok(()) => {
                             self.state.case = self.engine.repo.get_case(self.id)?;
                             self.state.messages.push(format!("Scope updated: {}", self.state.case.scope));
