@@ -63,7 +63,9 @@ pub struct MockServer {
 pub fn run_http_safety_contract() -> Result<(), String> {
     let runtime = contract_runtime()?;
     let redirect = MockServer::start(vec![MockResponse::redirect()])?;
-    let client = irmind_http::client_builder(Duration::from_millis(30), false)
+    // A short wall-clock timeout races with Windows runner scheduling while the
+    // suite compiles and runs in parallel. The delayed fixture still proves it.
+    let client = irmind_http::client_builder(Duration::from_secs(1), false)
         .build()
         .map_err(|error| error.to_string())?;
     let status = runtime
@@ -73,10 +75,7 @@ pub fn run_http_safety_contract() -> Result<(), String> {
     if !status.is_redirection() || redirect.finish()?.len() != 1 {
         return Err("HTTP client followed a redirect".into());
     }
-    let delayed = MockServer::start(vec![MockResponse::delayed(
-        "{}",
-        Duration::from_millis(120),
-    )])?;
+    let delayed = MockServer::start(vec![MockResponse::delayed("{}", Duration::from_secs(3))])?;
     let timed_out = runtime.block_on(async { client.get(delayed.origin()).send().await });
     if !timed_out.is_err_and(|error| error.is_timeout()) || delayed.finish()?.len() != 1 {
         return Err("HTTP client did not enforce its timeout".into());
