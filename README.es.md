@@ -1,8 +1,12 @@
-Traducción de README.md en el commit 142b75f3fbc31c518395ac93b3dcf02bdbdb7415; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 4af19e6b45bbb8922d15c07eee86221715cd3f19; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
 Cliente de IA en terminal para investigaciones de seguridad, con llamadas a herramientas sujetas a política y cadena de custodia firmada.
+
+![Demostración sintética de IRMind: caso, evidencia, propuesta del modelo, aprobación firmada y verificación](docs/assets/demo.gif)
+
+*Esta demostración sin conexión usa evidencia sintética, un llavero de archivo efímero y un modelo falso.*
 
 > [!WARNING]
 > IRMind está en desarrollo. Todavía no lo uses con incidentes reales ni datos sensibles.
