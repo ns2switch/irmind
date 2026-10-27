@@ -154,6 +154,12 @@ mod tests {
     fn slash_menu_filters_prefix_and_fuzzy_and_cycles_both_ways() {
         assert_eq!(matches("/ver")[0].name, "verify");
         assert!(
+            matches("/sear")
+                .iter()
+                .any(|command| command.name == "search")
+        );
+        assert_eq!(matches("/gra")[0].name, "graph");
+        assert!(
             matches("/aprv")
                 .iter()
                 .any(|command| command.name == "approve")

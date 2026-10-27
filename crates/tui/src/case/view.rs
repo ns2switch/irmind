@@ -312,8 +312,8 @@ mod tests {
         chat.set_viewport(48, 12);
         chat.push(Card::new(
             CardKind::ToolResult,
-            "Tool result",
-            "x".repeat(2_000),
+            "Evidence search",
+            format!("source=synthetic#0 {}", "x".repeat(2_000)),
             false,
         ));
         let id = CaseId::parse("00000000-0000-0000-0000-000000000000").unwrap();
@@ -342,6 +342,7 @@ mod tests {
             status: "idle",
         };
         draw_case(&mut terminal, &view).unwrap();
+        assert!(screen(&terminal).contains("Evidence search"));
         assert!(screen(&terminal).contains("hidden"));
         assert!(screen(&terminal).contains("line one"));
         chat.toggle_selected();

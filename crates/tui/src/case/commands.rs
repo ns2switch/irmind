@@ -236,7 +236,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 Err(error) => self.state.messages.push(format!("Report error: {error}")),
             },
             "/graph" => match self.engine.graph.graph_summary(self.id) {
-                Ok(summary) => self.state.messages.push(summary),
+                Ok(summary) => self.state.graph_results.push(("Evidence graph", summary)),
                 Err(error) => self.state.messages.push(format!("Graph error: {error}")),
             },
             "/timeline" => self.state.tab = 0,

@@ -92,6 +92,12 @@ impl CaseRuntime<'_, '_, '_> {
                 .conversation
                 .push(Card::new(CardKind::Notice, "Activity", visible, false));
         }
+        for (title, result) in std::mem::take(&mut self.state.graph_results) {
+            let visible = self.engine.guard.screen(&result)?.text;
+            self.state
+                .conversation
+                .push(Card::new(CardKind::ToolResult, title, visible, false));
+        }
         Ok(())
     }
 
