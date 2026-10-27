@@ -1,6 +1,19 @@
 use super::{AppError, BTreeMap, Connection, GraphRecord, GraphRelation, Tainted, params, storage};
 use std::collections::BTreeSet;
 
+pub(super) fn fts_markers_complete(db: &Connection) -> Result<bool, AppError> {
+    let missing: i64 = db
+        .query_row(
+            "SELECT
+                (SELECT COUNT(*) FROM indexed i LEFT JOIN fts_indexed f ON f.hash=i.hash WHERE f.hash IS NULL)
+              + (SELECT COUNT(*) FROM fts_indexed f LEFT JOIN indexed i ON i.hash=f.hash WHERE i.hash IS NULL)",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(storage)?;
+    Ok(missing == 0)
+}
+
 pub(super) fn verify_terms(
     db: &Connection,
     hash: &str,
@@ -11,11 +24,14 @@ pub(super) fn verify_terms(
     for tainted in expected {
         let mut outcome = Ok(());
         tainted.inspect(|record| {
-            outcome = i64::try_from(record.index).map_err(storage).map(|index| {
-                for term in super::index::terms(&record.text) {
-                    expected_terms.insert((term, index));
-                }
-            });
+            outcome = i64::try_from(record.index)
+                .map_err(storage)
+                .and_then(|index| {
+                    for term in super::index::terms(&record.text)? {
+                        expected_terms.insert((term, index));
+                    }
+                    Ok(())
+                });
         });
         outcome?;
     }
@@ -102,6 +118,7 @@ pub(super) fn verify_graph_totals(
         || observation_count != expected_observations
         || relation_count != expected_relations
         || indexed != full_text
+        || !fts_markers_complete(db)?
     {
         return Err(storage(
             "derived graph row counts differ from signed evidence",

@@ -188,6 +188,8 @@ pub enum AdapterPolicyError {
     SigningKeyAlreadyExists,
     #[error("policy denied: too many JSON records")]
     TooManyJSONRecords,
+    #[error("policy denied: graph record exceeds 2048 distinct search terms")]
+    TooManyGraphSearchTerms,
     #[error("policy denied: tool argument must be string or number")]
     ToolArgumentMustBeStringOrNumber,
     #[error("policy denied: tool arguments must be an object")]
