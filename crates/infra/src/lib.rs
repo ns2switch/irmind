@@ -1,6 +1,7 @@
 #![deny(unsafe_code)]
 
 mod clock;
+mod config_toml;
 mod evidence_fs;
 mod graph_duckdb;
 mod graph_port;
@@ -8,6 +9,7 @@ mod seal;
 mod signing;
 mod sqlite;
 pub use clock::SystemClock;
+pub use config_toml::TomlConfigurationStore;
 use irmind_fs::{private_dir, private_file};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};

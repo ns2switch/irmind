@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit ba25f5d9205890fc05649a84caaa003d08bc0116; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 073c237dc409755b6eeb7ad7fc29f51bcf3839f4; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -6,13 +6,7 @@ Esta página es para quienes preparan una evaluación controlada. Explica el alc
 
 ## Alcance del caso
 
-Un caso puede ser solo local. Para permitir lecturas remotas, define una fuente, un objetivo y una ventana UTC explícitos. El formato actual es:
-
-```text
-v1;sources=splunk-demo;accounts=000000000000;hosts=demo-host;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z
-```
-
-Separa con comas los valores de `sources`, `accounts` y `hosts`. El formulario de caso nuevo y el comando `/scope` de la TUI cambian el alcance; el cambio queda firmado. Las consultas fuera del alcance requieren aprobación o se deniegan. Un alcance heredado de texto libre no permite acceso remoto. Este formato aún no admite IDs de proyecto.
+Un caso puede ser solo local. Para permitir lecturas remotas, el formulario de caso nuevo pide fuentes, cuentas, hosts y el inicio y fin de la ventana UTC. `/scope` edita los mismos campos. Los cambios quedan firmados. Las consultas fuera del alcance requieren aprobación o se deniegan. La codificación para automatización está en la [referencia de la CLI](../development/cli.md). El formulario aún no admite IDs de proyecto.
 
 ## Archivo de política
 
@@ -30,13 +24,39 @@ La política puede restringir las reglas fijas de las herramientas, pero no habi
 
 ## Ajustes no secretos
 
-La raíz de composición lee estas variables de entorno. Usa solo valores acordes con el destino aprobado y el alcance del caso.
+La TUI guarda los ajustes no secretos en `config.toml` dentro del [directorio de datos estándar](platforms.md#datos-y-terminal). Pulsa `m` para seleccionar el LLM y el modelo, activar conectores compilados y editar sus campos públicos. Tab elige un campo y `e` lo edita. `k` abre sus credenciales en el llavero. La sesión se recarga dentro de la TUI tras un cambio. La activación o el cambio de destino que pueda enviar datos fuera del equipo requiere confirmación explícita y firmada.
+
+Para automatización, el orden es **flag de CLI > variable de entorno > config.toml > valor por defecto**. Un override solo dura esa ejecución; la TUI no lo sustituye en silencio. El archivo contiene IDs de módulos, modelos, URLs, fuentes, índices, regiones y precios opcionales, pero nunca credenciales ni passphrases. Se rechazan los campos desconocidos o secretos. Ejemplo:
+
+```toml
+version = 1
+llm_module = "llm-openai-compatible"
+
+[modules.llm-openai-compatible.values]
+IRMIND_MODEL = "modelo-local"
+IRMIND_LLM_BASE_URL = "http://127.0.0.1:11434/v1/"
+
+[modules.siem-splunk]
+enabled = false
+
+[modules.siem-splunk.values]
+IRMIND_SPLUNK_URL = "https://splunk.example.invalid/"
+IRMIND_SPLUNK_SOURCE_ID = "demo"
+IRMIND_SPLUNK_INDEX = "security"
+```
+
+El ejemplo describe el formato guardado. Cámbialo desde la TUI. Si falta el archivo o difiere de la última versión firmada, el arranque se detiene antes de abrir casos. La TUI permite restaurar la versión aprobada o revisar los campos cambiados y firmar el archivo actual si es válido. Nunca acepta ni restaura en silencio. Siempre rechaza los campos secretos. La automatización sale con instrucciones para resolver la diferencia en la TUI.
+
+Si un flag o una variable de entorno cambia el modelo, un destino, un conector, una fuente, un índice o una región, la TUI muestra primero el valor efectivo y el guardado. Aceptar firma los overrides de esa sesión y deja un indicador visible. Rechazar usa la configuración guardada. La CLI de automatización acepta los overrides efectivos sin diálogo y los registra en la cadena global firmada antes de ejecutarse.
+
+Estas variables de entorno prevalecen sobre los campos públicos correspondientes. Usa solo valores acordes con el destino aprobado y el alcance del caso.
 
 | Variable | Función |
 | --- | --- |
 | `IRMIND_HOME` | Directorio de datos local opcional. |
 | `IRMIND_POLICY` | Ruta del archivo TOML de política. |
 | `IRMIND_LLM_MODULE` | Selección explícita del módulo de modelo; alternativa a `--llm-module`. |
+| `IRMIND_ENABLE_SPLUNK`, `IRMIND_ENABLE_AWS`, `IRMIND_ENABLE_CROWDSTRIKE`, `IRMIND_ENABLE_SENTINELONE`, `IRMIND_ENABLE_MISP`, `IRMIND_ENABLE_VIRUSTOTAL` | Overrides temporales para activar conectores (`true` o `false`). |
 | `IRMIND_MODEL`, `IRMIND_LLM_BASE_URL` | Modelo compatible con OpenAI y URL base opcional. |
 | `IRMIND_ANTHROPIC_MODEL`, `IRMIND_DEEPSEEK_MODEL`, `IRMIND_OPENROUTER_MODEL` | IDs de modelos de esos proveedores. |
 | `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, `IRMIND_SPLUNK_ACCOUNT_FIELD` | Servicio Splunk y fuente de búsqueda acotada. |
@@ -85,11 +105,6 @@ Con `os`, las claves de firma usan otro servicio, `irmind`: `local-analyst` y `l
 
 ## Elegir un modelo
 
-No se selecciona ningún proveedor por defecto. El módulo compatible con OpenAI viene compilado, pero debes elegirlo:
-
-```sh
-IRMIND_MODEL=YOUR_LOCAL_MODEL IRMIND_LLM_BASE_URL=http://127.0.0.1:11434/v1/ \
-  ./target/release/irmind --llm-module llm-openai-compatible
-```
+No se selecciona ningún proveedor por defecto. En la TUI, pulsa `m`, selecciona el módulo compatible con OpenAI, edita `IRMIND_MODEL` y `IRMIND_LLM_BASE_URL`, y pulsa Enter. Confirma el cambio de destino. Para automatización, `--llm-module` y las variables de entorno correspondientes prevalecen sobre los ajustes guardados durante esa ejecución.
 
 Un servicio local sin clave puede usar HTTP solo en loopback; también admite HTTPS. Los servicios remotos requieren HTTPS y una clave propia del destino. Una URL personalizada nunca hereda `OPENAI_API_KEY`. Consulta [módulos](modules.md) para elegir otros proveedores compilados. Comprueba la retención, la región de procesamiento y la clasificación de datos antes de cualquier conexión externa.

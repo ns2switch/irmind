@@ -4,13 +4,7 @@ This page is for operators setting up a controlled evaluation. It explains case 
 
 ## Case scope
 
-A case can remain local-only. To permit remote reads, set an explicit source, target, and UTC window. The current wire format is:
-
-```text
-v1;sources=splunk-demo;accounts=000000000000;hosts=demo-host;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z
-```
-
-Use comma-separated values within `sources`, `accounts`, and `hosts`. The TUI's new-case form and `/scope` command edit the scope; the change is signed. Queries outside it require approval or are denied. A free-text legacy scope grants no remote access. Project IDs are not supported in this format yet.
+A case can remain local-only. To permit remote reads, the TUI's new-case form asks for sources, accounts, hosts, and a UTC start and end time. `/scope` edits the same fields. Changes are signed. Queries outside the scope require approval or are denied. The automation encoding is documented in the [CLI reference](development/cli.md). Project IDs are not supported in the form yet.
 
 ## Policy file
 
@@ -28,13 +22,39 @@ Policy can tighten fixed tool rules, not enable denied actions. Read stays scope
 
 ## Non-secret settings
 
-The composition root reads these environment variables. Set only values that match your approved endpoint and case scope.
+The TUI stores non-secret settings in `config.toml` in the [standard data directory](platforms.md#data-and-terminal-behavior). Press `m` to select the LLM and model, enable compiled connectors, and edit their public fields. Tab selects a field and `e` edits it. `k` opens its credentials in the keystore. The session reloads inside the TUI after a change. Activation or endpoint changes that may send data off this computer require explicit signed confirmation.
+
+For automation, resolution order is **CLI flag > environment variable > config.toml > default**. An override lasts only for that run; the TUI does not silently replace it. The file contains module IDs, models, URLs, source IDs, indexes, regions, and optional pricing, but never credentials or passphrases. Unknown or secret manifest fields fail validation. Example:
+
+```toml
+version = 1
+llm_module = "llm-openai-compatible"
+
+[modules.llm-openai-compatible.values]
+IRMIND_MODEL = "your-local-model"
+IRMIND_LLM_BASE_URL = "http://127.0.0.1:11434/v1/"
+
+[modules.siem-splunk]
+enabled = false
+
+[modules.siem-splunk.values]
+IRMIND_SPLUNK_URL = "https://splunk.example.invalid/"
+IRMIND_SPLUNK_SOURCE_ID = "demo"
+IRMIND_SPLUNK_INDEX = "security"
+```
+
+This example describes the stored format. Change it through the TUI. If the file is missing or differs from the last signed version, startup pauses before opening cases. The TUI can restore the approved version or show changed fields and sign the current valid file. It never accepts or restores silently. A secret field is always rejected. Automation exits with instructions to resolve the mismatch in the TUI.
+
+When a flag or environment variable changes a model, endpoint, connector selection, source ID, index, or region, the TUI first shows its effective and saved values. Accepting signs the overrides for that session and keeps an override indicator visible. Rejecting uses the saved settings. CLI automation accepts effective overrides without a prompt and records them in the signed global chain before running.
+
+These environment variables override their matching public fields. Set only values that match your approved endpoint and case scope.
 
 | Variable | Purpose |
 | --- | --- |
 | `IRMIND_HOME` | Optional local data directory override. |
 | `IRMIND_POLICY` | Path to a policy TOML file. |
 | `IRMIND_LLM_MODULE` | Explicit model module selection; alternative to `--llm-module`. |
+| `IRMIND_ENABLE_SPLUNK`, `IRMIND_ENABLE_AWS`, `IRMIND_ENABLE_CROWDSTRIKE`, `IRMIND_ENABLE_SENTINELONE`, `IRMIND_ENABLE_MISP`, `IRMIND_ENABLE_VIRUSTOTAL` | Temporary connector enable overrides (`true` or `false`). |
 | `IRMIND_MODEL`, `IRMIND_LLM_BASE_URL` | OpenAI-compatible model and optional base URL. |
 | `IRMIND_ANTHROPIC_MODEL`, `IRMIND_DEEPSEEK_MODEL`, `IRMIND_OPENROUTER_MODEL` | Provider model IDs. |
 | `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, `IRMIND_SPLUNK_ACCOUNT_FIELD` | Splunk endpoint and bounded search source. |
@@ -83,11 +103,6 @@ The OS backend stores signing keys under a separate `irmind` service: `local-ana
 
 ## Choose a model
 
-No provider is selected by default. The OpenAI-compatible module is compiled in but must be selected:
-
-```sh
-IRMIND_MODEL=YOUR_LOCAL_MODEL IRMIND_LLM_BASE_URL=http://127.0.0.1:11434/v1/ \
-  ./target/release/irmind --llm-module llm-openai-compatible
-```
+No provider is selected by default. In the TUI, press `m`, select the compiled OpenAI-compatible module, edit `IRMIND_MODEL` and `IRMIND_LLM_BASE_URL`, then press Enter to select it. Confirm the destination change. For an automated invocation, `--llm-module` and the matching environment variables override the saved selection and fields for that run.
 
 A keyless local service may use HTTP only on loopback; HTTPS works there too. Remote endpoints require HTTPS and a destination-specific key. A different custom URL never inherits `OPENAI_API_KEY`. Select other compiled providers with their module IDs and settings in [modules](modules.md). Confirm retention, processing region, and data classification before any external connection.

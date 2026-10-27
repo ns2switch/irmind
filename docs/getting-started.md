@@ -22,14 +22,16 @@ Running `irmind` without a subcommand opens the TUI. Choose `os` or `file` separ
 
 If the selected backend is unavailable, startup stops and the TUI offers an explicit new selection. The chosen backends are stored in `keystore.toml` inside the data directory. Press `k` on the home screen to see the selection and fingerprint, manage module credentials, change the file passphrase, or migrate. Replacing a credential leaves already-created connectors using the old value; press `r` in the keystore view to restart the session.
 
-Press `m` to see which modules are compiled, enabled, and configured. No LLM is enabled automatically. Local case work remains available without a model.
+Press `m` to see which modules are compiled, enabled, and configured. Use the arrow keys to select a module, Tab to select a public field, and `e` to edit its value. Enter selects an LLM or toggles a connector. Press `k` to reach its credentials in the keystore. A change that may send data off this computer asks for signed confirmation. The TUI reloads the session after applying a change. No LLM is enabled automatically.
+
+If `config.toml` needs recovery, the TUI offers restoration or a field-by-field review before any case opens. Session flags and environment overrides that change destinations are shown and require confirmation; rejecting them uses the saved settings.
 
 ## A synthetic first case
 
 1. Press `n`, enter a title such as “Demo CloudTrail alert,” select a severity, and leave remote source fields empty. That creates a local-only case with a signed event.
 2. In the case view, enter `/ingest` and select [the synthetic CloudTrail file](../examples/cloudtrail-alert.json). The original file is hashed and retained locally.
 3. Use `/timeline` or `/graph` to inspect the indexed events. Use `/evidence <hash>` to view an original record.
-4. If you have approved a provider, select it as described in [configuration](configuration.md), restart IRMind, open the case, and ask: “What does the synthetic AssumeRole event suggest?”
+4. Return to the home screen, press `m`, and choose a model and its public settings as described in [configuration](configuration.md). The session reloads without exiting IRMind. Open the case and ask: “What does the synthetic AssumeRole event suggest?”
 5. Review any proposed call before approval. `/pause` cancels an active task; `/help` and `Ctrl+K` show actions.
 6. Run `/verify`, review `/report`, and use `/seal` and `/export` only after checking the displayed case hash and signing-key fingerprint.
 

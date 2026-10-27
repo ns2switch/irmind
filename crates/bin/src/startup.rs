@@ -17,294 +17,243 @@ use super::Splunk;
 #[cfg(feature = "ti-virustotal")]
 use super::VirusTotal;
 use super::{
-    Arc, AuditLog, BTreeMap, CancellationToken, Cli, Command, Context, CryptoPorts,
-    DEFAULT_LLM_MODULE, Engine, EnginePorts, ExecutionMode, JsonParser, LocalExportVerifier,
-    LocalStore, LocalVerifier, MandatoryGuard, ModuleConfig, ModuleRegistry, ModuleStatus,
-    OpenAiCompatible, Parser, PathBuf, ProjectDirs, Repository, Result, RootWorkspaceIo,
-    SecretBackend, SignerBackend, SystemClock, anyhow, cli, compiled_credential_fields,
-    configuration_issue, keystore, load_module_config, load_policy, load_pricing,
+    Arc, AuditLog, BTreeMap, CancellationToken, Cli, Command, ConfigurationStore, Context,
+    CryptoPorts, DEFAULT_LLM_MODULE, Engine, EnginePorts, ExecutionMode, JsonParser,
+    LocalExportVerifier, LocalStore, LocalVerifier, MandatoryGuard, ModuleConfig, ModuleRegistry,
+    ModuleStatus, OpenAiCompatible, Parser, PathBuf, PersistentConfig, ProjectDirs, Repository,
+    Result, RootWorkspaceIo, SecretBackend, SignerBackend, SystemClock, TomlConfigurationStore,
+    anyhow, cli, compiled_credential_fields, configuration, configuration_issue, keystore,
+    load_module_config, load_policy, load_pricing,
 };
 
 mod status;
 use status::module_statuses;
+mod preflight;
+use preflight::{decide_overrides, reconcile_configuration};
+
+struct PreparedStartup {
+    cli: Cli,
+    interactive: bool,
+    home: PathBuf,
+    store: Arc<LocalStore>,
+    active: keystore::ActiveKeystore,
+    config_store: Arc<TomlConfigurationStore>,
+    manifests: Vec<&'static irmind_app::modules::ModuleManifest>,
+    saved: PersistentConfig,
+    allow_environment: bool,
+    module_overrides: std::collections::HashSet<String>,
+    overrides_active: bool,
+    verifier: Arc<LocalVerifier>,
+    guard: Arc<MandatoryGuard>,
+}
 
 pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
     let cli = Cli::parse();
     let interactive = matches!(&cli.command, None | Some(Command::Tui { .. }));
     if let Some(Command::VerifyExport { path, expected_key }) = &cli.command {
-        let (fingerprint, entries) =
-            irmind_app::verify_export(&LocalExportVerifier, path, expected_key.as_deref())?;
-        println!("verified {entries} audit entries; analyst key fingerprint {fingerprint}");
-        return Ok(false);
+        return run_verify_export(path, expected_key.as_deref());
     }
-    let (home, store, active) = open_local(&cli, interactive)?;
-    let new_analyst_key = interactive && active.new_analyst_key;
-    let signer = active.signer;
-    let secrets = active.secret_backend;
-    let signer_backend = active.signer_backend;
-    let verifier = trusted_verifier(store.as_ref(), signer.as_ref(), signer_backend.as_ref())?;
-    let guard = Arc::new(MandatoryGuard::new()?);
-    let (registry, config_issues) = configured_registry(&cli, secrets.as_ref(), interactive)?;
-    let mut engine = registry.bind(Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(signer.clone(), Arc::new(verifier)),
-            guard.clone(),
-            registry.parser()?,
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )?)?;
+    let Some(prepared) = PreparedStartup::new(cli, interactive)? else {
+        return Ok(false);
+    };
+    prepared.run(cancel)
+}
+
+impl PreparedStartup {
+    fn new(mut cli: Cli, interactive: bool) -> Result<Option<Self>> {
+        let (home, store, active) = open_local(&cli, interactive)?;
+        let config_store = Arc::new(TomlConfigurationStore::new(&home));
+        let manifests = configuration::compiled_manifests();
+        let verifier = Arc::new(trusted_verifier(
+            store.as_ref(),
+            active.signer.as_ref(),
+            active.signer_backend.as_ref(),
+        )?);
+        let guard = Arc::new(MandatoryGuard::new()?);
+        let preflight = Engine::new(
+            EnginePorts::new(
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                CryptoPorts::new(active.signer.clone(), verifier.clone()),
+                guard.clone(),
+                Arc::new(JsonParser),
+            ),
+            ExecutionMode::Attended,
+            Arc::new(SystemClock),
+        )?;
+        if !reconcile_configuration(
+            &preflight,
+            config_store.as_ref(),
+            &manifests,
+            &home,
+            interactive,
+            guard.as_ref(),
+        )? {
+            return Ok(None);
+        }
+        let saved = config_store.load()?;
+        saved.validate(&manifests)?;
+        let overrides = configuration::collect_egress_overrides(&cli, &saved);
+        let allow_environment = decide_overrides(
+            &preflight,
+            config_store.as_ref(),
+            &manifests,
+            &overrides,
+            interactive,
+            guard.as_ref(),
+        )?;
+        let module_overrides = if allow_environment {
+            configuration::selection_overrides(&cli)
+        } else {
+            std::collections::HashSet::default()
+        };
+        configuration::resolve_cli(&mut cli, &saved, allow_environment)?;
+        Ok(Some(Self {
+            cli,
+            interactive,
+            home,
+            store,
+            active,
+            config_store,
+            manifests,
+            saved,
+            allow_environment,
+            module_overrides,
+            overrides_active: allow_environment && !overrides.is_empty(),
+            verifier,
+            guard,
+        }))
+    }
+
+    fn run(self, cancel: &CancellationToken) -> Result<bool> {
+        let Self {
+            cli,
+            interactive,
+            home,
+            store,
+            active,
+            config_store,
+            manifests,
+            saved,
+            allow_environment,
+            module_overrides,
+            overrides_active,
+            verifier,
+            guard,
+        } = self;
+        let signer = active.signer;
+        let secrets = active.secret_backend;
+        let signer_backend = active.signer_backend;
+        let new_analyst_key = interactive && active.new_analyst_key;
+        let (registry, config_issues) = configured_registry(
+            &cli,
+            &saved,
+            secrets.as_ref(),
+            allow_environment,
+            interactive,
+        )?;
+        let engine = registry.bind(Engine::new(
+            EnginePorts::new(
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                CryptoPorts::new(signer.clone(), verifier),
+                guard.clone(),
+                registry.parser()?,
+            ),
+            ExecutionMode::Attended,
+            Arc::new(SystemClock),
+        )?)?;
+        let engine = apply_session_policy(engine, &cli, &saved, config_store.as_ref(), &manifests)?;
+        let workspace_io = RootWorkspaceIo {
+            home: home.clone(),
+            credential_fields: compiled_credential_fields(),
+            store: store.clone(),
+            signer_backend,
+            secret_backend: secrets.clone(),
+            config_store,
+            manifests,
+            module_overrides,
+            allow_environment,
+            signer_id: active.signer_id,
+            secrets_id: active.secrets_id,
+            #[cfg(feature = "keystore-file")]
+            file_backend: active.file_backend,
+        };
+        let module_statuses =
+            module_statuses(&cli, &registry, &config_issues, &workspace_io, &saved);
+        let selected_model = match cli.llm_module.as_deref() {
+            Some(id) if interactive => registry.llm(id).ok(),
+            Some(id) => Some(registry.llm(id)?),
+            None => None,
+        };
+        present(
+            cli.command,
+            cli::AutomationContext {
+                engine: &engine,
+                store: &store,
+                guard: &guard,
+                registry: &registry,
+                llm_module: cli.llm_module.as_deref(),
+                selected_model,
+                workspace_io: &workspace_io,
+                module_statuses: &module_statuses,
+                cancel,
+                new_analyst_key,
+                overrides_active,
+            },
+        )
+    }
+}
+
+fn apply_session_policy<'a>(
+    mut engine: Engine<'a>,
+    cli: &Cli,
+    saved: &PersistentConfig,
+    store: &dyn ConfigurationStore,
+    manifests: &[&irmind_app::modules::ModuleManifest],
+) -> Result<Engine<'a>> {
     if let Some(path) = &cli.policy {
         let (policy, fingerprint) = load_policy(path)?;
         engine = engine.with_policy(policy, fingerprint)?;
     }
-    if let Some(pricing) = load_pricing()? {
+    if let Some(pricing) = load_pricing(saved)? {
         engine = engine.with_pricing(pricing);
     }
-    let workspace_io = RootWorkspaceIo {
-        home: home.clone(),
-        credential_fields: compiled_credential_fields(),
-        store: store.clone(),
-        signer_backend,
-        secret_backend: secrets.clone(),
-        signer_id: active.signer_id,
-        secrets_id: active.secrets_id,
-        #[cfg(feature = "keystore-file")]
-        file_backend: active.file_backend,
-    };
-    let module_statuses = module_statuses(&cli, &registry, &config_issues, &workspace_io);
-    let selected_model = match cli.llm_module.as_deref() {
-        Some(id) if interactive => registry.llm(id).ok(),
-        Some(id) => Some(registry.llm(id)?),
-        None => None,
-    };
-    let restart = match cli.command {
+    engine.verify_configuration(store, manifests)?;
+    Ok(engine)
+}
+
+fn run_verify_export(path: &std::path::Path, expected_key: Option<&str>) -> Result<bool> {
+    let (fingerprint, entries) =
+        irmind_app::verify_export(&LocalExportVerifier, path, expected_key)?;
+    println!("verified {entries} audit entries; analyst key fingerprint {fingerprint}");
+    Ok(false)
+}
+
+fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) -> Result<bool> {
+    match command {
         None => irmind_tui::run_workspace(
-            &engine,
-            selected_model,
-            &workspace_io,
-            &module_statuses,
-            cancel,
-            None,
-            new_analyst_key,
-        )?,
-        Some(command) => cli::AutomationContext {
-            engine: &engine,
-            store: &store,
-            guard: &guard,
-            registry: &registry,
-            llm_module: cli.llm_module.as_deref(),
-            selected_model,
-            workspace_io: &workspace_io,
-            module_statuses: &module_statuses,
-            cancel,
-            new_analyst_key,
-        }
-        .run(command)?,
-    };
-    Ok(restart)
+            context.engine,
+            context.selected_model,
+            context.workspace_io,
+            context.module_statuses,
+            context.cancel,
+            irmind_tui::WorkspaceLaunch {
+                initial_case: None,
+                new_analyst_key: context.new_analyst_key,
+                overrides_active: context.overrides_active,
+            },
+        ),
+        Some(command) => context.run(command),
+    }
 }
 
-fn configured_registry(
-    cli: &Cli,
-    secrets: &dyn SecretBackend,
-    interactive: bool,
-) -> Result<(ModuleRegistry, BTreeMap<&'static str, String>)> {
-    let mut registry = ModuleRegistry::new();
-    let mut config_issues = BTreeMap::<&'static str, String>::new();
-    registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
-    register_llm(cli, secrets, interactive, &mut registry, &mut config_issues)?;
-    register_security_products(cli, secrets, interactive, &mut registry, &mut config_issues)?;
-    register_edr_and_intel(cli, secrets, interactive, &mut registry, &mut config_issues)?;
-    Ok((registry, config_issues))
-}
-
-fn register_llm(
-    cli: &Cli,
-    secrets: &dyn SecretBackend,
-    interactive: bool,
-    registry: &mut ModuleRegistry,
-    config_issues: &mut BTreeMap<&'static str, String>,
-) -> Result<()> {
-    if cli.llm_module.is_some() {
-        match cli
-            .llm_module
-            .as_deref()
-            .ok_or_else(|| anyhow!("select an approved LLM explicitly with --llm-module"))?
-        {
-            DEFAULT_LLM_MODULE => register_configured!(
-                registry,
-                OpenAiCompatible,
-                irmind_mod_llm_openai_compatible::MANIFEST,
-                secrets,
-                interactive,
-                config_issues
-            ),
-            #[cfg(feature = "llm-anthropic")]
-            irmind_mod_llm_anthropic::MODULE_ID => {
-                register_configured!(
-                    registry,
-                    Anthropic,
-                    irmind_mod_llm_anthropic::MANIFEST,
-                    secrets,
-                    interactive,
-                    config_issues
-                );
-            }
-            #[cfg(feature = "llm-deepseek")]
-            irmind_mod_llm_deepseek::MODULE_ID => {
-                register_configured!(
-                    registry,
-                    DeepSeek,
-                    irmind_mod_llm_deepseek::MANIFEST,
-                    secrets,
-                    interactive,
-                    config_issues
-                );
-            }
-            #[cfg(feature = "llm-openrouter")]
-            irmind_mod_llm_openrouter::MODULE_ID => {
-                register_configured!(
-                    registry,
-                    OpenRouter,
-                    irmind_mod_llm_openrouter::MANIFEST,
-                    secrets,
-                    interactive,
-                    config_issues
-                );
-            }
-            _ if interactive => {}
-            _ => return Err(anyhow!("LLM module is not compiled into this binary")),
-        }
-    }
-    Ok(())
-}
-
-fn register_security_products(
-    cli: &Cli,
-    secrets: &dyn SecretBackend,
-    interactive: bool,
-    registry: &mut ModuleRegistry,
-    config_issues: &mut BTreeMap<&'static str, String>,
-) -> Result<()> {
-    let _ = (&secrets, &registry, &config_issues);
-    #[cfg(feature = "siem-splunk")]
-    if cli.enable_splunk {
-        register_configured!(
-            registry,
-            Splunk,
-            irmind_mod_siem_splunk::MANIFEST,
-            secrets,
-            interactive,
-            config_issues
-        );
-    }
-    #[cfg(not(feature = "siem-splunk"))]
-    if cli.enable_splunk && !interactive {
-        return Err(anyhow!(
-            "this binary was built without the siem-splunk feature"
-        ));
-    }
-    #[cfg(feature = "ti-misp")]
-    if cli.enable_misp {
-        register_configured!(
-            registry,
-            Misp,
-            irmind_mod_ti_misp::MANIFEST,
-            secrets,
-            interactive,
-            config_issues
-        );
-    }
-    #[cfg(not(feature = "ti-misp"))]
-    if cli.enable_misp && !interactive {
-        return Err(anyhow!("this binary was built without the ti-misp feature"));
-    }
-    #[cfg(feature = "cloud-aws")]
-    if cli.enable_aws {
-        register_configured!(
-            registry,
-            AwsCloudTrail,
-            irmind_mod_cloud_aws::MANIFEST,
-            secrets,
-            interactive,
-            config_issues
-        );
-    }
-    #[cfg(not(feature = "cloud-aws"))]
-    if cli.enable_aws && !interactive {
-        return Err(anyhow!(
-            "this binary was built without the cloud-aws feature"
-        ));
-    }
-    Ok(())
-}
-
-fn register_edr_and_intel(
-    cli: &Cli,
-    secrets: &dyn SecretBackend,
-    interactive: bool,
-    registry: &mut ModuleRegistry,
-    config_issues: &mut BTreeMap<&'static str, String>,
-) -> Result<()> {
-    let _ = (&secrets, &registry, &config_issues);
-    #[cfg(feature = "edr-crowdstrike")]
-    if cli.enable_crowdstrike {
-        register_configured!(
-            registry,
-            CrowdStrike,
-            irmind_mod_edr_crowdstrike::MANIFEST,
-            secrets,
-            interactive,
-            config_issues
-        );
-    }
-    #[cfg(not(feature = "edr-crowdstrike"))]
-    if cli.enable_crowdstrike && !interactive {
-        return Err(anyhow!(
-            "this binary was built without the edr-crowdstrike feature"
-        ));
-    }
-    #[cfg(feature = "edr-sentinelone")]
-    if cli.enable_sentinelone {
-        register_configured!(
-            registry,
-            SentinelOne,
-            irmind_mod_edr_sentinelone::MANIFEST,
-            secrets,
-            interactive,
-            config_issues
-        );
-    }
-    #[cfg(not(feature = "edr-sentinelone"))]
-    if cli.enable_sentinelone && !interactive {
-        return Err(anyhow!(
-            "this binary was built without the edr-sentinelone feature"
-        ));
-    }
-    #[cfg(feature = "ti-virustotal")]
-    if cli.enable_virustotal {
-        register_configured!(
-            registry,
-            VirusTotal,
-            irmind_mod_ti_virustotal::MANIFEST,
-            secrets,
-            interactive,
-            config_issues
-        );
-    }
-    #[cfg(not(feature = "ti-virustotal"))]
-    if cli.enable_virustotal && !interactive {
-        return Err(anyhow!(
-            "this binary was built without the ti-virustotal feature"
-        ));
-    }
-    Ok(())
-}
+mod registration;
+use registration::configured_registry;
 
 fn open_local(
     cli: &Cli,

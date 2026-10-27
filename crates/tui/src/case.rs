@@ -33,6 +33,7 @@ pub(crate) fn run_case(
     io_ops: &dyn WorkspaceIo,
     id: &CaseId,
     shutdown: &CancellationToken,
+    overrides_active: bool,
 ) -> Result<()> {
     let case = engine.repo.get_case(id)?;
     let messages = vec![format!(
@@ -88,6 +89,7 @@ pub(crate) fn run_case(
             progress_rx,
             seal_tx,
             seal_rx,
+            overrides_active,
         };
         runtime.run()
     })

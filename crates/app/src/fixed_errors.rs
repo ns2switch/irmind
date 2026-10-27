@@ -57,6 +57,14 @@ pub enum FixedAppError {
     PolicyInvalidFindingValue,
     #[error("policy denied: invalid keystore migration")]
     PolicyInvalidKeystoreMigration,
+    #[error("policy denied: invalid public configuration")]
+    PolicyInvalidPublicConfiguration,
+    #[error(
+        "configuration does not match the signed operational record; restore the last approved config.toml"
+    )]
+    PolicyConfigurationAuditMismatch,
+    #[error("policy denied: configuration change requires explicit analyst confirmation")]
+    PolicyConfigurationConfirmationRequired,
     #[error("policy denied: invalid local tool")]
     PolicyInvalidLocalTool,
     #[error("policy denied: invalid module fingerprint")]

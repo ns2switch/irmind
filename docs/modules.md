@@ -2,7 +2,7 @@
 
 This page is for operators choosing a connector or keystore. Each section states what it does, the least privilege it needs, how to enable it, and what it cannot do. Store credentials as described in [configuration](configuration.md); product modules never read a keystore or environment themselves.
 
-Modules are compiled into the binary. A Cargo feature includes an optional module, while a CLI switch enables a connector for a session. A model is selected with `--llm-module`. Nothing is selected automatically.
+Modules are compiled into the binary. In the TUI, press `m` to select a compiled module, edit its public fields, and enable it; press `k` for its credentials. The changes persist and the session reloads inside the TUI. The environment variables and CLI switches below provide temporary automation overrides. Nothing is selected automatically.
 
 ## OpenAI-compatible
 

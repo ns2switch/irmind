@@ -1,10 +1,10 @@
-Traducción de docs/modules.md en el commit ba25f5d9205890fc05649a84caaa003d08bc0116; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit 6e3a578cf21d91a90edee7afe9f0fa45c449e577; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
 Esta página es para quienes eligen conectores o backends de llavero. Cada apartado explica qué hace el módulo, sus permisos, configuración y límites. Guarda las credenciales según [configuración](configuration.md); los conectores no leen el llavero ni el entorno por su cuenta.
 
-Los módulos se compilan dentro del binario. Una feature de Cargo incluye un módulo opcional; un interruptor de la CLI activa un conector en la sesión. El modelo se elige con `--llm-module`. Ninguno se selecciona automáticamente.
+Los módulos se compilan dentro del binario. En la TUI, pulsa `m` para seleccionar un módulo compilado, editar sus campos públicos y activarlo; pulsa `k` para sus credenciales. Los cambios persisten y la sesión se recarga dentro de la TUI. Las variables de entorno y los interruptores de la CLI indicados abajo son overrides temporales para automatización. Ninguno se selecciona automáticamente.
 
 ## Compatible con OpenAI
 

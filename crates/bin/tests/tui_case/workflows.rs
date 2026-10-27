@@ -1,6 +1,97 @@
 use super::support::*;
 use super::*;
 
+#[test]
+#[allow(clippy::too_many_lines)]
+fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
+    let root = tempfile::tempdir().unwrap();
+    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let signer = Arc::new(TestSigner(SigningKey::from_bytes(&[119u8; 32])));
+    let model = FakeModel(AtomicUsize::new(0));
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(
+                signer.clone(),
+                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            ),
+            Arc::new(MandatoryGuard::new().unwrap()),
+            Arc::new(JsonParser),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )
+    .unwrap();
+    let io_ops = TestIo(
+        store.clone(),
+        irmind_infra::TomlConfigurationStore::new(root.path()),
+    );
+    let terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    let mut tui = ScriptedWorkspace::new(terminal, &engine, None, &io_ops);
+    let mut module = ModuleStatus {
+        id: "llm-openai-compatible".into(),
+        compiled: true,
+        enabled: false,
+        configuration: "disabled".into(),
+        kind: ModuleKind::Llm,
+        selected: false,
+        selection_source: ModuleSelectionSource::Persistent,
+        parameters: vec![ModuleParameter {
+            name: "IRMIND_MODEL".into(),
+            value: String::new(),
+            required: true,
+            overridden: false,
+        }],
+        credentials: Vec::new(),
+    };
+    let mut edit = vec![KeyCode::Char('e')];
+    edit.extend("synthetic-model".chars().map(KeyCode::Char));
+    edit.push(KeyCode::Enter);
+    assert!(tui.drive_module_screen(&[module.clone()], &edit).unwrap());
+    module.parameters[0].value = "synthetic-model".into();
+    assert!(
+        !tui.drive_module_screen(&[module.clone()], &[KeyCode::Enter])
+            .unwrap()
+    );
+    assert!(screen(tui.terminal()).contains("Confirm egress change"));
+    assert!(io_ops.1.load().unwrap().llm_module.is_none());
+    assert!(
+        tui.drive_module_screen(&[module], &[KeyCode::Enter, KeyCode::Char('y')])
+            .unwrap()
+    );
+    let saved = io_ops.1.load().unwrap();
+    assert_eq!(saved.llm_module.as_deref(), Some("llm-openai-compatible"));
+    engine
+        .verify_configuration(&io_ops.1, &[&irmind_mod_llm_openai_compatible::MANIFEST])
+        .unwrap();
+    assert!(
+        store
+            .global_operations()
+            .unwrap()
+            .iter()
+            .any(|entry| entry.operation.starts_with("configuration-approved-v2:"))
+    );
+    assert!(screen(tui.terminal()).contains("Modules"));
+
+    tui.select_model(&model);
+    let id = tui
+        .create_case("Synthetic TUI model", Severity::Low, "local evidence only")
+        .unwrap();
+    tui.investigate(&id, "Explain the synthetic alert").unwrap();
+    assert_eq!(model.0.load(Ordering::SeqCst), 2);
+    assert_eq!(tui.pending_approval_ids(&id).unwrap().len(), 1);
+    std::fs::write(root.path().join("config.toml"), "version = 1\n").unwrap();
+    assert!(matches!(
+        engine.verify_configuration(&io_ops.1, &[&irmind_mod_llm_openai_compatible::MANIFEST]),
+        Err(AppError::Fixed(
+            irmind_app::FixedAppError::PolicyConfigurationAuditMismatch
+        ))
+    ));
+}
+
 #[cfg(feature = "keystore-file")]
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -38,7 +129,10 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
     )
     .unwrap()
     .with_threat_intel(&intel);
-    let io_ops = TestIo(store.clone());
+    let io_ops = TestIo(
+        store.clone(),
+        irmind_infra::TomlConfigurationStore::new(root.path()),
+    );
     let terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     let mut tui = ScriptedWorkspace::new(terminal, &engine, Some(&model), &io_ops);
 
@@ -230,7 +324,10 @@ async fn tui_renders_while_a_local_port_is_slow() {
         .create_case_with_severity("Synthetic slow port", Severity::Low, "local-only")
         .unwrap()
         .id;
-    let io_ops = TestIo(store);
+    let io_ops = TestIo(
+        store,
+        irmind_infra::TomlConfigurationStore::new(root.path()),
+    );
     let terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
     let mut tui = ScriptedWorkspace::new(terminal, &engine, Some(&model), &io_ops);
     slow_repo.delay_next_read.store(true, Ordering::SeqCst);

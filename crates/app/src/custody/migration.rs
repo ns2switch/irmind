@@ -126,6 +126,15 @@ impl Engine<'_> {
             ));
         }
         let _global_lock = self.audit_log.lock_global_operations()?;
+        self.append_global_operation_unlocked(format!(
+            "keystore-migration:{capability}:{from}:{to}"
+        ))
+    }
+
+    pub(crate) fn append_global_operation_unlocked(
+        &self,
+        operation: String,
+    ) -> Result<(), AppError> {
         self.verify_global_operations()?;
         let last = self.audit_log.global_operations()?.pop();
         let mut entry = SignedOperation {
@@ -139,7 +148,7 @@ impl Engine<'_> {
             })?,
             at: self.clock.now()?,
             actor: Actor::Analyst,
-            operation: format!("keystore-migration:{capability}:{from}:{to}"),
+            operation,
             prev: last.map_or([0u8; 32], |previous| previous.hash),
             hash: [0u8; 32],
             sig: Vec::new(),

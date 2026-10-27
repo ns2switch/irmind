@@ -13,6 +13,8 @@ cargo build --release --locked -p irmind
 
 CI tests Ubuntu Linux, macOS arm64, and Windows x64 with the MSVC toolchain. SQLite and DuckDB are built from bundled sources. Network TLS uses rustls with native certificate roots, including installed corporate CAs; IRMind does not link system OpenSSL. The native-root approach may differ from platform policy checks performed by a dedicated certificate verifier.
 
+Install a C/C++ compiler before building: GCC or Clang and `pkg-config` on Linux, Xcode Command Line Tools on macOS, or Visual Studio Build Tools with MSVC C++ on Windows. The bundled DuckDB build compiles C++ code locally. For a cold release build, budget roughly 20–60 minutes and 20–30 GB of free disk; the exact cost depends on CPU, compiler, and cache. The [duckdb-rs build instructions](https://github.com/duckdb/duckdb-rs) explain the bundled build.
+
 ## CI artifacts and checksums
 
 The daily `main` run publishes a binary for each platform only when code changed in the preceding 24 hours. Documentation-only changes do not trigger a release build. Each artifact includes both project licenses, third-party notices, and `SHA256SUMS`. Download from a trusted daily run and compare the checksum **before** executing the file:

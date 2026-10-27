@@ -208,6 +208,7 @@ impl AutomationContext<'_, '_> {
             module_statuses,
             cancel,
             new_analyst_key,
+            overrides_active,
             ..
         } = self;
         match command {
@@ -229,8 +230,11 @@ impl AutomationContext<'_, '_> {
                     workspace_io,
                     module_statuses,
                     cancel,
-                    Some(&parse_id(&case_id)?),
-                    new_analyst_key,
+                    irmind_tui::WorkspaceLaunch {
+                        initial_case: Some(&parse_id(&case_id)?),
+                        new_analyst_key,
+                        overrides_active,
+                    },
                 );
             }
             _ => return Err(anyhow!("invalid command dispatch")),

@@ -1,8 +1,9 @@
 //! Deterministic driver for the same presentation controller and renderers used
 //! by the interactive workspace. It accepts `ratatui::TestBackend` in tests.
 
-use crate::{KeystoreChoice, WorkspaceIo, case, home, setup, workflow::CaseWorkflow};
+use crate::{KeystoreChoice, ModuleStatus, WorkspaceIo, case, home, setup, workflow::CaseWorkflow};
 use anyhow::Result;
+use crossterm::event::KeyCode;
 use irmind_app::{CancellationToken, CaseId, Engine, LlmPort, Severity};
 use ratatui::{Terminal, backend::Backend};
 use std::path::Path;
@@ -52,6 +53,63 @@ where
 
     pub fn terminal(&self) -> &Terminal<B> {
         &self.terminal
+    }
+
+    pub fn select_model(&mut self, model: &'a dyn LlmPort) {
+        self.workflow.model = Some(model);
+    }
+
+    pub fn drive_module_screen(
+        &mut self,
+        modules: &[ModuleStatus],
+        keys: &[KeyCode],
+    ) -> Result<bool> {
+        let mut state = home::HomeState::new(home::load_rows(self.workflow.engine)?, false);
+        state.set_modules(modules);
+        state.mode = home::Mode::Modules;
+        for key in keys {
+            home::render_home(
+                &mut self.terminal,
+                &state,
+                self.workflow.engine,
+                modules,
+                self.workflow.model,
+                false,
+            )?;
+            if let home::HomeAction::ChangeModule(change, confirmed) =
+                home::update(&mut state, *key)
+            {
+                match self.workflow.io_ops.change_module_configuration(
+                    self.workflow.engine,
+                    change.clone(),
+                    confirmed,
+                ) {
+                    Ok(changed) if changed => return Ok(true),
+                    Ok(_) => {}
+                    Err(error)
+                        if error
+                            .downcast_ref::<irmind_app::AppError>()
+                            .is_some_and(|error| {
+                                matches!(error, irmind_app::AppError::Fixed(
+                            irmind_app::FixedAppError::PolicyConfigurationConfirmationRequired
+                        ))
+                            }) =>
+                    {
+                        state.pending_module_change = Some(change);
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+        home::render_home(
+            &mut self.terminal,
+            &state,
+            self.workflow.engine,
+            modules,
+            self.workflow.model,
+            false,
+        )?;
+        Ok(false)
     }
 
     pub fn render_home(&mut self) -> Result<()> {

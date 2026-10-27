@@ -4,6 +4,7 @@ mod case;
 mod home;
 pub mod scripted;
 mod setup;
+mod startup_review;
 mod workflow;
 
 use anyhow::Result;
@@ -19,11 +20,46 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum ModuleKind {
+    Llm,
+    Connector,
+    Local,
+    Keystore,
+}
+
+#[derive(Clone)]
+pub struct ModuleParameter {
+    pub name: String,
+    pub value: String,
+    pub required: bool,
+    pub overridden: bool,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum ModuleSelectionSource {
+    Persistent,
+    Override,
+}
+
+#[derive(Clone)]
 pub struct ModuleStatus {
     pub id: String,
     pub compiled: bool,
     pub enabled: bool,
     pub configuration: String,
+    pub kind: ModuleKind,
+    pub selected: bool,
+    pub selection_source: ModuleSelectionSource,
+    pub parameters: Vec<ModuleParameter>,
+    pub credentials: Vec<String>,
+}
+
+impl ModuleStatus {
+    #[must_use]
+    pub fn selection_overridden(&self) -> bool {
+        self.selection_source == ModuleSelectionSource::Override
+    }
 }
 
 #[derive(Clone)]
@@ -42,6 +78,17 @@ pub struct KeystoreStatus {
 }
 
 pub use setup::{KeystoreChoice, choose_keystore};
+pub use startup_review::{
+    ConfigurationRecoveryChoice, OverrideReviewEntry, resolve_configuration_review,
+    resolve_override_review,
+};
+
+#[derive(Clone, Copy)]
+pub struct WorkspaceLaunch<'a> {
+    pub initial_case: Option<&'a irmind_app::CaseId>,
+    pub new_analyst_key: bool,
+    pub overrides_active: bool,
+}
 
 /// Filesystem selection is presentation I/O. The composition root supplies the
 /// same bounded, no-follow reader used by the noninteractive ingest command.
@@ -63,6 +110,12 @@ pub trait WorkspaceIo: Send + Sync {
         target: &str,
         passphrase: Option<&SecretString>,
     ) -> Result<()>;
+    fn change_module_configuration(
+        &self,
+        engine: &Engine<'_>,
+        change: irmind_app::ConfigChange,
+        confirmed: bool,
+    ) -> Result<bool>;
 }
 
 struct TerminalSession;
@@ -101,8 +154,7 @@ pub fn run_workspace(
     io_ops: &dyn WorkspaceIo,
     modules: &[ModuleStatus],
     shutdown: &CancellationToken,
-    initial_case: Option<&irmind_app::CaseId>,
-    new_analyst_key: bool,
+    launch: WorkspaceLaunch<'_>,
 ) -> Result<bool> {
     let _session = TerminalSession::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -113,10 +165,7 @@ pub fn run_workspace(
         io_ops,
         modules,
         shutdown,
-        home::HomeLaunch {
-            initial_case,
-            new_analyst_key,
-        },
+        launch,
     )
 }
 

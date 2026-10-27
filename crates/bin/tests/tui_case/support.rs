@@ -83,7 +83,10 @@ impl ThreatIntelPort for FakeIntel {
     }
 }
 
-pub(super) struct TestIo(pub(super) Arc<LocalStore>);
+pub(super) struct TestIo(
+    pub(super) Arc<LocalStore>,
+    pub(super) irmind_infra::TomlConfigurationStore,
+);
 
 #[cfg(feature = "keystore-file")]
 pub(super) struct MigrationTarget(pub(super) FileKeystore);
@@ -191,6 +194,19 @@ impl WorkspaceIo for TestIo {
         _passphrase: Option<&secrecy::SecretString>,
     ) -> anyhow::Result<()> {
         Ok(())
+    }
+    fn change_module_configuration(
+        &self,
+        engine: &Engine<'_>,
+        change: irmind_app::ConfigChange,
+        confirmed: bool,
+    ) -> anyhow::Result<bool> {
+        Ok(engine.apply_configuration_change(
+            &self.1,
+            &[&irmind_mod_llm_openai_compatible::MANIFEST],
+            change,
+            confirmed,
+        )?)
     }
 }
 

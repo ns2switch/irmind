@@ -44,6 +44,8 @@ Do not implement the gateway yet. Preserve distinct Analyst and Agent signing ke
 - Signing and secret backends are selected independently as `os` or `file`. There is no silent fallback; a missing selected backend fails closed.
 - An encrypted file with Argon2id and XChaCha20-Poly1305 permits use over SSH without a graphical keyring. Migration preserves the analyst fingerprint and adds a signed global operational entry, even without a case.
 - Shared permission and durable-write helpers live in `irmind-fs`; production adapters cannot depend on one another.
+- New signed configuration changes carry the complete canonical non-secret configuration. Startup requires explicit restoration or reviewed acceptance when the file differs; CLI automation fails closed.
+- Effective egress overrides from flags or the environment are shown and signed before a TUI session, or signed before CLI automation runs. Rejection uses saved settings.
 - Rustls uses native roots; its platform-verification limits remain documented.
 
 ## Distribution
