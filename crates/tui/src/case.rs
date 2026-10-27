@@ -91,6 +91,7 @@ fn initial_state(engine: &Engine<'_>, id: &CaseId) -> Result<CaseState> {
         input_history: Vec::new(),
         history_index: None,
         messages: Vec::new(),
+        graph_results: Vec::new(),
         conversation,
         audit_cursor: 0,
         live_reply_cutoff_seq: None,

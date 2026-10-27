@@ -112,7 +112,7 @@ Modules are compiled into the binary. In the TUI, press `m` to select a compiled
 
 **Configure:** Included and active in every binary. Use the TUI's `/ingest` picker or the [CLI ingest command](development/cli.md).
 
-**Limits:** Each file is loaded within a 50 MB cap, then records are parsed and indexed one at a time. Deeply nested JSON, excessive record sets, and records with over 2,048 distinct search terms are rejected. Graph text search matches all query words rather than substrings. Searchable words are 2–64 bytes. Other log formats need future parsers.
+**Limits:** Each file is loaded within a 50 MB cap, then records are parsed in a stream and indexed in bounded batches. Deeply nested JSON, excessive record sets, and records with over 2,048 distinct search terms are rejected. Graph text search matches all query words rather than substrings. Searchable words are 2–64 bytes. Other log formats need future parsers.
 
 ## OS keystore
 

@@ -3,6 +3,11 @@ use duckdb::{OptionalExt, Transaction};
 use irmind_app::{CancellationToken, EventParser};
 use std::collections::BTreeSet;
 
+mod batch;
+
+const BATCH_RECORDS: usize = 2_048;
+const BATCH_BYTES: usize = 8 * 1024 * 1024;
+
 pub(super) fn terms(text: &str) -> Result<BTreeSet<String>, AppError> {
     let mut terms = BTreeSet::new();
     for word in text.split(|character: char| !character.is_alphanumeric()) {
@@ -43,9 +48,27 @@ impl GraphStore {
             }
             return usize::try_from(count).map_err(storage);
         }
+        let mut pending = Vec::new();
+        let mut pending_bytes = 0usize;
         let count = parser.parse_each(source, bytes, cancel, &mut |record| {
-            Self::insert_one(&tx, hash, &record)
+            let mut size = 0;
+            record.inspect(|value| size = value.text.len());
+            pending_bytes = pending_bytes.saturating_add(size);
+            pending.push(record);
+            if pending.len() >= BATCH_RECORDS || pending_bytes >= BATCH_BYTES {
+                if cancel.is_cancelled() {
+                    return Err(AppError::Cancelled);
+                }
+                batch::insert_batch(&tx, hash, &pending, cancel)?;
+                pending.clear();
+                pending_bytes = 0;
+            }
+            Ok(())
         })?;
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        batch::insert_batch(&tx, hash, &pending, cancel)?;
         Self::finish_index(&tx, hash, count)?;
         tx.commit().map_err(storage)?;
         Ok(count)
@@ -83,16 +106,27 @@ impl GraphStore {
         records: &[Tainted<GraphRecord>],
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
-        for (index, record) in records.iter().enumerate() {
-            if index.is_multiple_of(256) && cancel.is_cancelled() {
+        for pending in records.chunks(BATCH_RECORDS) {
+            if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            Self::insert_one(tx, hash, record)?;
+            batch::insert_batch(tx, hash, pending, cancel)?;
         }
         Self::finish_index(tx, hash, records.len())
     }
 
     fn finish_index(tx: &Transaction<'_>, hash: &str, count: usize) -> Result<(), AppError> {
+        tx.execute(
+            "INSERT INTO nodes (kind,value,first_seen,last_seen,count)
+             SELECT kind,value,MIN(event_time),MAX(event_time),COUNT(*)
+             FROM observations WHERE hash=?1 GROUP BY kind,value
+             ON CONFLICT (kind,value) DO UPDATE SET
+               first_seen=LEAST(nodes.first_seen,excluded.first_seen),
+               last_seen=GREATEST(nodes.last_seen,excluded.last_seen),
+               count=nodes.count+excluded.count",
+            params![hash],
+        )
+        .map_err(storage)?;
         let count = i64::try_from(count).map_err(storage)?;
         tx.execute(
             "INSERT INTO indexed (hash,records) VALUES (?1,?2)",
@@ -101,94 +135,6 @@ impl GraphStore {
         .map_err(storage)?;
         tx.execute("INSERT INTO fts_indexed (hash) VALUES (?1)", params![hash])
             .map_err(storage)?;
-        Ok(())
-    }
-
-    fn insert_one(
-        tx: &Transaction<'_>,
-        hash: &str,
-        tainted: &Tainted<GraphRecord>,
-    ) -> Result<(), AppError> {
-        let mut outcome = Ok(());
-        tainted.inspect(|record| outcome = Self::insert_record(tx, hash, record));
-        outcome
-    }
-
-    fn insert_record(
-        tx: &Transaction<'_>,
-        hash: &str,
-        record: &GraphRecord,
-    ) -> Result<(), AppError> {
-        let index = i64::try_from(record.index).map_err(storage)?;
-        tx.execute(
-            "INSERT INTO events (hash,record_index,event_time,event) VALUES (?1,?2,?3,?4)",
-            params![hash, index, record.at, record.event],
-        )
-        .map_err(storage)?;
-        tx.execute(
-            "INSERT INTO record_texts (hash,record_index,text) VALUES (?1,?2,?3)",
-            params![hash, index, record.text],
-        )
-        .map_err(storage)?;
-        Self::insert_terms(tx, hash, index, &record.text)?;
-        Self::insert_entities(tx, hash, index, record)?;
-        Self::insert_relations(tx, hash, index, record)
-    }
-
-    fn insert_terms(
-        tx: &Transaction<'_>,
-        hash: &str,
-        index: i64,
-        text: &str,
-    ) -> Result<(), AppError> {
-        for term in terms(text)? {
-            tx.execute(
-                "INSERT INTO record_terms (term,hash,record_index) VALUES (?1,?2,?3)",
-                params![term, hash, index],
-            )
-            .map_err(storage)?;
-        }
-        Ok(())
-    }
-
-    fn insert_entities(
-        tx: &Transaction<'_>,
-        hash: &str,
-        index: i64,
-        record: &GraphRecord,
-    ) -> Result<(), AppError> {
-        for (kind, value) in &record.entities {
-            tx.execute(
-                "INSERT INTO observations (hash,record_index,event_time,event,kind,value) VALUES (?1,?2,?3,?4,?5,?6)",
-                params![hash, index, record.at, record.event, kind, value],
-            )
-            .map_err(storage)?;
-            tx.execute(
-                "INSERT INTO nodes (kind,value,first_seen,last_seen,count) VALUES (?1,?2,?3,?3,1)
-                 ON CONFLICT (kind,value) DO UPDATE SET
-                   first_seen=LEAST(nodes.first_seen,excluded.first_seen),
-                   last_seen=GREATEST(nodes.last_seen,excluded.last_seen),
-                   count=nodes.count+1",
-                params![kind, value, record.at],
-            )
-            .map_err(storage)?;
-        }
-        Ok(())
-    }
-
-    fn insert_relations(
-        tx: &Transaction<'_>,
-        hash: &str,
-        index: i64,
-        record: &GraphRecord,
-    ) -> Result<(), AppError> {
-        for relation in &record.relations {
-            tx.execute(
-                "INSERT INTO relations (hash,record_index,event_time,from_kind,from_value,relation,to_kind,to_value) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
-                params![hash, index, record.at, relation.from_kind, relation.from_value, relation.relation, relation.to_kind, relation.to_value],
-            )
-            .map_err(storage)?;
-        }
         Ok(())
     }
 }
