@@ -73,3 +73,4 @@ mod remote_dispatch_edr_ti;
 mod remote_dispatch_siem_cloud;
 mod scope_and_graph;
 mod seal_export;
+mod seal_recovery;

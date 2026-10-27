@@ -3,6 +3,7 @@ use super::{
     CaseWorkflow, Confirmation, FindingKind, PathBuf, PathPicker, Result, confirmation_summary,
     parse_approval_args,
 };
+use irmind_app::CaseScope;
 
 impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     pub(super) fn submit(&mut self, prompt: String) -> Result<bool> {
@@ -178,7 +179,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
 
     fn case_command(&mut self, prompt: &str) -> Result<bool> {
         match prompt {
-            "/help" => self.state.messages.push("Case: /ingest, /verify, /rebuild, /verify-graph, /report, /seal, /export [path], /scope, /evidence <hash>, /evidence-save <hash> <path>, /pause, /home. Graph: /graph, /timeline, /entity, /neighbors, /entity-timeline, /path, /search, /raw. Findings: /add, /confirm, /dismiss. Approvals: /approvals, /approve, /deny, /edit.".into()),
+            "/help" => self.state.messages.push("Case: /ingest, /verify, /rebuild, /verify-graph, /report, /seal, /export [path], /scope, /scope add <source|account|project|host> <id>, /scope window <from> <to>, /evidence <hash>, /evidence-save <hash> <path>, /pause, /home. Graph: /graph, /timeline, /entity, /neighbors, /entity-timeline, /path, /search, /raw. Findings: /add, /confirm, /dismiss. Approvals: /approvals, /approve, /deny, /edit.".into()),
             "/scope" => self.state.messages.push(format!("Scope: {}", self.state.case.scope)),
             "/approvals" => {
                 self.state.approvals = self.engine.pending_approvals(self.id)?;
@@ -199,7 +200,8 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             "/timeline" => self.state.tab = 0,
             _ => {
                 if let Some(scope) = prompt.strip_prefix("/scope ") {
-                    match self.engine.change_scope(self.id, scope) {
+                    let changed = scope_expansion(&self.state.case.scope, scope);
+                    match changed.and_then(|value| self.engine.change_scope(self.id, &value).map_err(|_| "scope change failed")) {
                         Ok(()) => {
                             self.state.case = self.engine.repo.get_case(self.id)?;
                             self.state.messages.push(format!("Scope updated: {}", self.state.case.scope));
@@ -306,4 +308,44 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         Ok(())
     }
 }
+
+fn scope_expansion(current: &str, command: &str) -> Result<String, &'static str> {
+    if let Some(rest) = command.strip_prefix("add ") {
+        let (field, value) = rest
+            .split_once(' ')
+            .ok_or("use /scope add <field> <value>")?;
+        return CaseScope::parse(current)
+            .map_err(|_| "invalid current scope")?
+            .extend_target(field, value)
+            .and_then(|scope| scope.to_v2_string())
+            .map_err(|_| "invalid scope expansion");
+    }
+    if let Some(rest) = command.strip_prefix("window ") {
+        let (from, to) = rest
+            .split_once(' ')
+            .ok_or("use /scope window <from> <to>")?;
+        return CaseScope::parse(current)
+            .map_err(|_| "invalid current scope")?
+            .expand_window(from, to)
+            .and_then(|scope| scope.to_v2_string())
+            .map_err(|_| "invalid scope window");
+    }
+    Ok(command.to_owned())
+}
 mod approval;
+
+#[cfg(test)]
+mod tests {
+    use super::scope_expansion;
+
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    fn scope_command_expands_project_and_rejects_narrower_window() {
+        let current = "v2;sources=cloud;accounts=;projects=project-a;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z";
+        let expanded = scope_expansion(current, "add project project-b").unwrap();
+        assert!(expanded.contains("projects=project-a,project-b"));
+        assert!(
+            scope_expansion(current, "window 2026-10-24T00:00:00Z 2026-10-24T23:59:59Z").is_err()
+        );
+    }
+}

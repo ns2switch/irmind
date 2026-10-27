@@ -6,10 +6,8 @@ compile_error!("IRMind requires at least one signer and secret backend");
 mod cli;
 mod configuration;
 mod keystore;
-use cli::{
-    Cli, Command, audit_source_name, input_files, read_evidence, terminal_safe_path,
-    write_private_output,
-};
+mod policy_config;
+use cli::{Cli, Command, audit_source_name, input_files, read_evidence, write_private_output};
 use configuration::{configuration_issue, load_module_config, load_pricing};
 
 use anyhow::{Context, Result, anyhow};
@@ -21,7 +19,7 @@ use irmind_app::{
     SecretBackend, SignerBackend,
     modules::{ModuleConfig, ModuleManifest, ModuleRegistry},
 };
-use irmind_domain::{CaseId, ExecutionMode, PolicyRules, Severity, Tool};
+use irmind_domain::{CaseId, ExecutionMode, Severity};
 use irmind_infra::{
     LocalExportVerifier, LocalStore, LocalVerifier, SystemClock, TomlConfigurationStore,
 };
@@ -49,8 +47,8 @@ use irmind_mod_ti_misp::Misp;
 use irmind_mod_ti_virustotal::VirusTotal;
 use irmind_security::MandatoryGuard;
 use irmind_tui::{CredentialStatus, KeystoreStatus, ModuleStatus, WorkspaceIo};
+use policy_config::load_policy;
 use secrecy::{ExposeSecret as _, SecretString};
-use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
@@ -75,42 +73,6 @@ macro_rules! register_configured {
             }
         }
     }};
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PolicyFile {
-    version: u8,
-    max_tool_calls_per_case: usize,
-    max_model_result_bytes: usize,
-    max_model_tokens_per_case: u64,
-    denied_tools: Vec<String>,
-}
-
-fn load_policy(path: &std::path::Path) -> Result<(PolicyRules, String)> {
-    let raw =
-        std::fs::read(path).with_context(|| format!("read policy {}", terminal_safe_path(path)))?;
-    let source = std::str::from_utf8(&raw).context("policy must be UTF-8")?;
-    let file: PolicyFile = toml::from_str(source).context("parse policy TOML")?;
-    if file.version != 1 {
-        return Err(anyhow!("unsupported policy version"));
-    }
-    let denied_tools = file
-        .denied_tools
-        .iter()
-        .map(|name| Tool::parse(name).map_err(|_| anyhow!("unknown policy tool: {name}")))
-        .collect::<Result<Vec<_>>>()?;
-    let policy = PolicyRules {
-        denied_tools,
-        max_tool_calls_per_case: file.max_tool_calls_per_case,
-        max_model_result_bytes: file.max_model_result_bytes,
-        max_model_tokens_per_case: file.max_model_tokens_per_case,
-    };
-    policy
-        .validate()
-        .map_err(|_| anyhow!("invalid policy limits"))?;
-    let fingerprint = irmind_app::hex(&irmind_app::sha256(&raw));
-    Ok((policy, fingerprint))
 }
 
 struct RootWorkspaceIo {

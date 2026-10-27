@@ -1,4 +1,7 @@
 use crate::*;
+mod entity_details;
+mod render;
+pub use entity_details::EntityDetails;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -10,6 +13,8 @@ pub struct Finding {
     pub confirmed: bool,
     #[serde(default)]
     pub dismissed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<EntityDetails>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -19,12 +24,13 @@ struct FindingDismissal {
     reason: String,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FindingKind {
     Ioc,
     Hypothesis,
     Technique,
+    Timeline,
     Impact,
     Recommendation,
 }
@@ -35,6 +41,7 @@ impl FindingKind {
             "ioc" => Ok(Self::Ioc),
             "hypothesis" => Ok(Self::Hypothesis),
             "technique" => Ok(Self::Technique),
+            "timeline" => Ok(Self::Timeline),
             "impact" => Ok(Self::Impact),
             "recommendation" => Ok(Self::Recommendation),
             _ => Err(AppError::Fixed(
@@ -48,9 +55,21 @@ impl FindingKind {
             Self::Ioc => "IOCs",
             Self::Hypothesis => "Hypotheses",
             Self::Technique => "ATT&CK techniques",
+            Self::Timeline => "Timeline",
             Self::Impact => "Impact",
             Self::Recommendation => "Recommendations",
         }
+    }
+}
+
+impl Finding {
+    fn valid_for(&self, known_evidence: &std::collections::BTreeSet<String>) -> bool {
+        known_evidence.contains(&self.evidence_hash)
+            && self
+                .details
+                .as_ref()
+                .is_none_or(|details| details.valid_for(self, known_evidence))
+            && (self.kind != FindingKind::Timeline || self.details.is_some())
     }
 }
 
@@ -68,7 +87,24 @@ impl Engine<'_> {
             return Err(AppError::Sealed);
         }
         self.verify_unlocked(id)?;
-        self.propose_finding_unlocked(id, kind, value, evidence_hash, "analyst")
+        self.propose_finding_unlocked(id, kind, value, evidence_hash, None, "analyst")
+    }
+
+    pub fn add_entity(
+        &self,
+        id: &CaseId,
+        kind: FindingKind,
+        value: &str,
+        evidence_hash: &str,
+        details: EntityDetails,
+    ) -> Result<String, AppError> {
+        self.require_attended_analyst("add case entity")?;
+        let _case_lock = self.repo.lock_case(id)?;
+        if self.repo.get_case(id)?.sealed {
+            return Err(AppError::Sealed);
+        }
+        self.verify_unlocked(id)?;
+        self.propose_finding_unlocked(id, kind, value, evidence_hash, Some(details), "analyst")
     }
 
     pub(crate) fn propose_finding_unlocked(
@@ -77,6 +113,7 @@ impl Engine<'_> {
         kind: FindingKind,
         value: &str,
         evidence_hash: &str,
+        details: Option<EntityDetails>,
         origin: &str,
     ) -> Result<String, AppError> {
         if value.trim().is_empty() || value.len() > 2_000 || value.contains('\0') {
@@ -101,7 +138,25 @@ impl Engine<'_> {
             evidence_hash: evidence_hash.to_owned(),
             confirmed: false,
             dismissed: false,
+            details,
         };
+        let known_evidence = self
+            .evidence_store
+            .evidence_hashes(id)?
+            .into_iter()
+            .collect();
+        if !finding.valid_for(&known_evidence) {
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyInvalidFindingValue,
+            ));
+        }
+        if let Some(EntityDetails::Timeline {
+            record_index: Some(index),
+            ..
+        }) = &finding.details
+        {
+            self.graph.raw_record(id, evidence_hash, *index)?;
+        }
         self.audit(
             id,
             origin,
@@ -181,7 +236,11 @@ impl Engine<'_> {
         id: &CaseId,
         entries: &[SignedEntry],
     ) -> Result<Vec<Finding>, AppError> {
-        let known_evidence = self.evidence_store.evidence_hashes(id)?;
+        let known_evidence = self
+            .evidence_store
+            .evidence_hashes(id)?
+            .into_iter()
+            .collect();
         let mut findings = BTreeMap::<String, Finding>::new();
         for entry in entries {
             match entry.kind {
@@ -197,7 +256,7 @@ impl Engine<'_> {
                         || finding.value.len() > 2_000
                         || finding.value.contains('\0')
                         || entry.evidence.as_deref() != Some(finding.evidence_hash.as_str())
-                        || !known_evidence.contains(&finding.evidence_hash)
+                        || !finding.valid_for(&known_evidence)
                         || findings.insert(finding.id.clone(), finding).is_some()
                     {
                         return Err(AppError::InvalidChain(entry.seq));
@@ -237,56 +296,5 @@ impl Engine<'_> {
             }
         }
         Ok(findings.into_values().collect())
-    }
-
-    pub fn report(&self, id: &CaseId) -> Result<String, AppError> {
-        let _case_lock = self.repo.lock_case(id)?;
-        self.verify_unlocked(id)?;
-        let case = self.repo.get_case(id)?;
-        let findings = self.findings_unlocked(id, &self.audit_log.entries(id)?)?;
-        let mut report = format!(
-            "# IRMind incident report\n\nCase: {}\n\nTitle: {}\n\nSeverity: {}\n\nScope: {}\n\n",
-            id.as_str(),
-            safe_markdown(&case.title),
-            case.severity.as_str(),
-            safe_markdown(&case.scope)
-        );
-        let confirmed_count = findings.iter().filter(|finding| finding.confirmed).count();
-        let _ = writeln!(
-            report,
-            "## Summary\n\n{confirmed_count} analyst-confirmed findings with evidence links.\n"
-        );
-        report.push_str("## Timeline\n\n");
-        for event in self.graph.timeline(id, 100)? {
-            let _ = writeln!(
-                report,
-                "- {} — {} [evidence: {}#{}]",
-                safe_markdown(&event.at),
-                safe_markdown(&event.event),
-                event.evidence_hash,
-                event.record_index
-            );
-        }
-        for kind in [
-            FindingKind::Ioc,
-            FindingKind::Hypothesis,
-            FindingKind::Technique,
-            FindingKind::Impact,
-            FindingKind::Recommendation,
-        ] {
-            let _ = write!(report, "\n## {}\n\n", kind.heading());
-            for finding in findings
-                .iter()
-                .filter(|finding| finding.confirmed && finding.kind.heading() == kind.heading())
-            {
-                let _ = writeln!(
-                    report,
-                    "- {} [evidence: {}]",
-                    safe_markdown(&finding.value),
-                    finding.evidence_hash
-                );
-            }
-        }
-        Ok(report)
     }
 }

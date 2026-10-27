@@ -134,7 +134,7 @@ fn analyst_scope_change_is_atomic_signed_and_exportable() {
     )
     .unwrap();
     let case = engine.create_case("Alert", "local only").unwrap();
-    let scope = "v1;sources=splunk-prod;accounts=123;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z";
+    let scope = "v2;sources=splunk-prod;accounts=123;projects=project-a;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z";
     engine.change_scope(&case.id, scope).unwrap();
     assert_eq!(store.get_case(&case.id).unwrap().scope, scope);
     assert_eq!(engine.verify(&case.id).unwrap(), 2);
@@ -142,6 +142,16 @@ fn analyst_scope_change_is_atomic_signed_and_exportable() {
         store.entries(&case.id).unwrap()[1].kind,
         irmind_domain::AuditEventKind::CaseScopeChanged
     );
+    let expanded = irmind_domain::CaseScope::parse(scope)
+        .unwrap()
+        .extend_target("project", "project-b")
+        .unwrap()
+        .to_v2_string()
+        .unwrap();
+    engine.change_scope(&case.id, &expanded).unwrap();
+    assert_eq!(store.get_case(&case.id).unwrap().scope, expanded);
+    assert_eq!(engine.verify(&case.id).unwrap(), 3);
+    assert_eq!(store.entries(&case.id).unwrap()[2].actor, Actor::Analyst);
     engine.seal(&case.id).unwrap();
     let path = root.path().join("case.json");
     CaseExporter::export_case(store.as_ref(), &case.id, &path, &CancellationToken::new()).unwrap();

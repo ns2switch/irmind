@@ -11,4 +11,5 @@ fn case() -> Case {
 }
 
 mod scope;
+mod scope_v2;
 mod taint_and_unattended;

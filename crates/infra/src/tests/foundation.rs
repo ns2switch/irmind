@@ -144,6 +144,10 @@ impl LegacyModel for FindingModel {
                         ("kind".into(), "ioc".into()),
                         ("value".into(), "198.51.100.9".into()),
                         ("evidence_hash".into(), self.hash.clone()),
+                        ("ioc_type".into(), "ip".into()),
+                        ("first_seen".into(), "2026-10-23T12:00:00Z".into()),
+                        ("last_seen".into(), "2026-10-23T12:00:00Z".into()),
+                        ("verdict".into(), "unknown".into()),
                     ]),
                 }],
             }

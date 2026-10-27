@@ -1,8 +1,8 @@
 use super::{AnalystVerifierAdapter, ApprovalEvent, ApprovalRequest, PendingEvent};
 use crate::{
     Actor, AnalystApprovalVerifier, AppError, AuthorizedCall, BTreeMap, CancellationToken, Case,
-    CaseId, Decision, Engine, ExecutionMode, PendingApproval, ProposedCall, SignedEntry, evaluate,
-    hex, sha256,
+    CaseId, Decision, Engine, ExecutionMode, PendingApproval, ProposedCall, SignedEntry, hex,
+    sha256,
 };
 
 impl Engine<'_> {
@@ -40,12 +40,13 @@ impl Engine<'_> {
         let decision_seq = last.seq.checked_add(3).ok_or(AppError::Fixed(
             crate::FixedAppError::StorageAuditSequenceOverflow,
         ))?;
-        let Decision::NeedsApproval(replacement) = evaluate(
+        let Decision::NeedsApproval(replacement) = irmind_domain::evaluate_with_rules(
             &case,
             proposal.clone(),
             decision_seq,
             request.mode,
             self.clock.now()?,
+            &self.policy,
         ) else {
             return Err(AppError::Fixed(
                 crate::FixedAppError::PolicyEditedArgumentsDoNotProduceAPendingApproval,
@@ -72,11 +73,16 @@ impl Engine<'_> {
         replacement_id: &str,
     ) -> Result<(), AppError> {
         let case = self.repo.get_case(id)?;
-        let old =
-            PendingApproval::recover(&case, request.mode, &request.challenge, self.clock.now()?)
-                .map_err(|_| {
-                    AppError::Fixed(crate::FixedAppError::PolicyStoredApprovalChallengeIsInvalid)
-                })?;
+        let old = PendingApproval::recover_with_rules(
+            &case,
+            request.mode,
+            &request.challenge,
+            self.clock.now()?,
+            &self.policy,
+        )
+        .map_err(|_| {
+            AppError::Fixed(crate::FixedAppError::PolicyStoredApprovalChallengeIsInvalid)
+        })?;
         let signature = self.signer.sign(&old.rejection_challenge())?;
         old.reject(&signature, &AnalystVerifierAdapter(self.verifier.as_ref()))
             .map_err(|_| {
@@ -136,11 +142,16 @@ impl Engine<'_> {
                 None,
             )?;
         }
-        let pending =
-            PendingApproval::recover(&case, request.mode, &request.challenge, self.clock.now()?)
-                .map_err(|_| {
-                    AppError::Fixed(crate::FixedAppError::PolicyStoredApprovalChallengeIsInvalid)
-                })?;
+        let pending = PendingApproval::recover_with_rules(
+            &case,
+            request.mode,
+            &request.challenge,
+            self.clock.now()?,
+            &self.policy,
+        )
+        .map_err(|_| {
+            AppError::Fixed(crate::FixedAppError::PolicyStoredApprovalChallengeIsInvalid)
+        })?;
         let verifier = AnalystVerifierAdapter(self.verifier.as_ref());
         let (kind, signature, reason, authorized) = if let Some(reason) = denial {
             let signature = self.signer.sign(&pending.rejection_challenge())?;
@@ -218,7 +229,7 @@ impl Engine<'_> {
         let verifier = AnalystVerifierAdapter(self.verifier.as_ref());
         for entry in entries {
             if entry.kind == irmind_domain::AuditEventKind::NeedsApproval {
-                let request = Self::parse_pending_event(case, entry)?;
+                let request = self.parse_pending_event(case, entry)?;
                 if open.insert(request.id.clone(), request).is_some() {
                     return Err(AppError::InvalidChain(entry.seq));
                 }
@@ -258,6 +269,7 @@ impl Engine<'_> {
     }
 
     pub(crate) fn parse_pending_event(
+        &self,
         case: &Case,
         entry: &SignedEntry,
     ) -> Result<ApprovalRequest, AppError> {
@@ -293,8 +305,9 @@ impl Engine<'_> {
                 None,
             )
         };
-        let pending = PendingApproval::recover(case, mode, &challenge, entry.at)
-            .map_err(|_| AppError::InvalidChain(entry.seq))?;
+        let pending =
+            PendingApproval::recover_with_rules(case, mode, &challenge, entry.at, &self.policy)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
         if pending.decision_seq() != entry.seq
             || id != hex(&sha256(&challenge))
             || structured.as_ref().is_some_and(|(seq, tool, args)| {

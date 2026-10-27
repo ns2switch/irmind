@@ -3,8 +3,8 @@ mod remote;
 
 use crate::{
     AppError, AuditEventKind, AuthorizedCall, BTreeMap, CancellationToken, Case, CaseId, Decision,
-    Engine, PendingApproval, ProposedCall, Provenance, Screened, SourceKind, Tainted, Tool,
-    evaluate_tainted, hex, remote_tool_error, sha256,
+    Engine, PendingApproval, ProposedCall, Provenance, Screened, SourceKind, Tainted, Tool, hex,
+    remote_tool_error, sha256,
 };
 
 impl Engine<'_> {
@@ -37,13 +37,14 @@ impl Engine<'_> {
                         SourceKind::ModelProposal,
                     ),
                 );
-                Ok(evaluate_tainted(
+                Ok(irmind_domain::evaluate_tainted_with_rules(
                     &case_owned,
                     tainted,
                     next_seq,
                     local.mode,
                     local.turn_has_detections(id)?,
                     local.clock.now()?,
+                    &local.policy,
                 ))
             })
             .await?;

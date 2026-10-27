@@ -77,6 +77,10 @@ fn agent_can_propose_but_only_analyst_can_confirm_evidence_finding() {
     let findings = attended.findings(&case.id).unwrap();
     assert_eq!(findings.len(), 1);
     assert_eq!(findings[0].evidence_hash, hash);
+    assert!(matches!(
+        findings[0].details.as_ref(),
+        Some(irmind_app::EntityDetails::Ioc { .. })
+    ));
     assert!(!findings[0].confirmed);
     assert!(store.entries(&case.id).unwrap().iter().any(|entry| {
         entry.kind == irmind_domain::AuditEventKind::FindingProposed
@@ -101,6 +105,10 @@ fn agent_can_propose_but_only_analyst_can_confirm_evidence_finding() {
             .unwrap()
             .contains("- 198.51.100.9")
     );
+    assert!(store.entries(&case.id).unwrap().iter().any(|entry| {
+        entry.kind == irmind_domain::AuditEventKind::FindingConfirmed
+            && matches!(entry.actor, Actor::Analyst)
+    }));
 }
 
 #[test]

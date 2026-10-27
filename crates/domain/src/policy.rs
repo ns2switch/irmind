@@ -20,6 +20,7 @@ pub enum RiskLevel {
 #[derive(Clone, Debug)]
 pub struct PolicyRules {
     pub denied_tools: Vec<Tool>,
+    pub scope: Option<CaseScope>,
     pub max_tool_calls_per_case: usize,
     pub max_model_result_bytes: usize,
     pub max_model_tokens_per_case: u64,
@@ -29,6 +30,7 @@ impl Default for PolicyRules {
     fn default() -> Self {
         Self {
             denied_tools: Vec::new(),
+            scope: None,
             max_tool_calls_per_case: 100,
             max_model_result_bytes: 10_000,
             max_model_tokens_per_case: 200_000,
@@ -46,6 +48,20 @@ impl PolicyRules {
             || self.max_model_tokens_per_case > 10_000_000
         {
             return Err(DomainError::InvalidPolicy);
+        }
+        if let Some(scope) = &self.scope {
+            let CaseScope::Remote { version, .. } = scope else {
+                return Err(DomainError::InvalidPolicy);
+            };
+            if !matches!(*version, 1 | 2)
+                || scope
+                    .to_v2_string()
+                    .ok()
+                    .and_then(|encoded| CaseScope::parse(&encoded).ok())
+                    .is_none()
+            {
+                return Err(DomainError::InvalidPolicy);
+            }
         }
         Ok(())
     }
@@ -84,8 +100,10 @@ pub enum Tool {
 }
 
 mod dialect;
+mod scope;
 mod validation;
 pub use dialect::{SplQueryClass, classify_spl_query};
+use scope::{in_scope, scope_gate};
 pub use validation::valid_entity;
 use validation::valid_tool_arguments;
 
@@ -184,6 +202,56 @@ pub fn evaluate_tainted(
     )
 }
 
+pub fn evaluate_tainted_with_rules(
+    case: &Case,
+    proposal: Tainted<ProposedCall>,
+    decision_seq: u64,
+    mode: ExecutionMode,
+    turn_has_detections: bool,
+    now: u64,
+    rules: &PolicyRules,
+) -> Decision {
+    let decision = evaluate_tainted(case, proposal, decision_seq, mode, turn_has_detections, now);
+    apply_policy_scope(case, decision, decision_seq, now, rules)
+}
+
+pub fn evaluate_with_rules(
+    case: &Case,
+    proposal: ProposedCall,
+    decision_seq: u64,
+    mode: ExecutionMode,
+    now: u64,
+    rules: &PolicyRules,
+) -> Decision {
+    let decision = evaluate(case, proposal, decision_seq, mode, now);
+    apply_policy_scope(case, decision, decision_seq, now, rules)
+}
+
+fn apply_policy_scope(
+    case: &Case,
+    decision: Decision,
+    decision_seq: u64,
+    now: u64,
+    rules: &PolicyRules,
+) -> Decision {
+    match decision {
+        Decision::Allow(call)
+            if rules
+                .scope
+                .as_ref()
+                .is_some_and(|scope| !in_scope(scope, &call.proposal)) =>
+        {
+            Decision::NeedsApproval(PendingApproval::new(
+                case.id.clone(),
+                call.proposal,
+                decision_seq,
+                now,
+            ))
+        }
+        other => other,
+    }
+}
+
 pub fn evaluate_with_context(
     case: &Case,
     proposal: ProposedCall,
@@ -224,7 +292,7 @@ pub fn evaluate_with_context(
 }
 
 #[derive(Clone, Copy)]
-enum Gate {
+pub(super) enum Gate {
     Continue,
     Deny(&'static str),
     Approval,
@@ -244,76 +312,6 @@ fn siem_gate(proposal: &ProposedCall) -> Gate {
         Some(SplQueryClass::SafeLiteral) => Gate::Continue,
         None => Gate::Deny("missing SIEM query"),
     }
-}
-
-fn scope_gate(case: &Case, proposal: &ProposedCall) -> Gate {
-    let scoped = matches!(
-        proposal.tool,
-        Tool::SiemSearch
-            | Tool::CloudAuditEvents
-            | Tool::ThreatIntelInternal
-            | Tool::CloudIdentity
-            | Tool::EdrHostInfo
-            | Tool::EdrProcessTree
-            | Tool::EdrDetections
-    );
-    if !scoped {
-        return Gate::Continue;
-    }
-    let Ok(scope) = CaseScope::parse(&case.scope) else {
-        return Gate::Deny("invalid case scope");
-    };
-    let in_scope = match proposal.tool {
-        Tool::SiemSearch | Tool::CloudAuditEvents => scoped_event(&scope, proposal),
-        Tool::ThreatIntelInternal => proposal
-            .args
-            .get("source")
-            .is_some_and(|source| scope.allows_source(source)),
-        Tool::CloudIdentity => proposal
-            .args
-            .get("source")
-            .zip(proposal.args.get("account"))
-            .is_some_and(|(source, account)| scope.allows_account(source, account)),
-        Tool::EdrHostInfo | Tool::EdrProcessTree | Tool::EdrDetections => {
-            scoped_edr(&scope, proposal)
-        }
-        _ => false,
-    };
-    if in_scope {
-        Gate::Continue
-    } else {
-        Gate::Approval
-    }
-}
-
-fn scoped_event(scope: &CaseScope, proposal: &ProposedCall) -> bool {
-    proposal
-        .args
-        .get("source")
-        .zip(proposal.args.get("account"))
-        .zip(proposal.args.get("from"))
-        .zip(proposal.args.get("to"))
-        .is_some_and(|(((source, account), from), to)| {
-            scope.contains(source, Some(account), None, from, to)
-        })
-}
-
-fn scoped_edr(scope: &CaseScope, proposal: &ProposedCall) -> bool {
-    proposal
-        .args
-        .get("source")
-        .zip(proposal.args.get("host"))
-        .is_some_and(|(source, host)| {
-            if proposal.tool == Tool::EdrDetections {
-                proposal
-                    .args
-                    .get("from")
-                    .zip(proposal.args.get("to"))
-                    .is_some_and(|(from, to)| scope.contains(source, None, Some(host), from, to))
-            } else {
-                scope.allows_host(source, host)
-            }
-        })
 }
 
 fn risk_gate(proposal: &ProposedCall, mode: ExecutionMode, context: PolicyContext) -> Gate {

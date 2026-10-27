@@ -15,7 +15,7 @@ This page is for scripts and reviewers who need a non-interactive operation. Ana
 
 The [configuration guide](../configuration.md) lists non-secret environment settings, keystore selection, and credential names. A connector switch requires its Cargo feature in the binary.
 
-For automation, the scope argument uses `v1;sources=...;accounts=...;hosts=...;from=...;to=...`. Comma-separated source, account, and host values and UTC timestamps are required for remote access. Example: `v1;sources=splunk-demo;accounts=000000000000;hosts=demo-host;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z`. Flags override environment variables, which override `config.toml`, which overrides defaults. This encoding is internal to the CLI and case storage; use the TUI form for interactive work.
+For automation, the scope argument uses `v2;sources=...;accounts=...;projects=...;hosts=...;from=...;to=...`. Comma-separated values and UTC timestamps are required for remote access. Example: `v2;sources=splunk-demo;accounts=000000000000;projects=;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z`. Existing signed v1 scopes remain valid. Flags override environment variables, which override `config.toml`, which overrides defaults. This encoding is internal to the CLI and case storage; use the TUI form for interactive work.
 
 ## Cases and evidence
 

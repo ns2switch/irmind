@@ -6,11 +6,11 @@ pub mod tool_catalog;
 pub use async_trait::async_trait;
 use futures_util::{Stream, StreamExt};
 use irmind_domain::{
-    Actor, AnalystApprovalVerifier, AuditEventKind, AuthorizedCall, CaseScope, Decision,
+    Actor, AnalystApprovalVerifier, AuditEventKind, AuthorizedCall, Decision,
     DeclassificationAuthority, ExecutionMode, PendingApproval, PolicyRules, ProposedCall,
-    Provenance, SourceKind, Tainted, Tool, evaluate, evaluate_tainted,
+    Provenance, SourceKind, Tainted, Tool,
 };
-pub use irmind_domain::{Case, CaseId, Severity};
+pub use irmind_domain::{Case, CaseId, CaseScope, Severity};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -52,7 +52,7 @@ pub use ingest::{GraphRecord, GraphRelation, TimelineEvent};
 pub use keystore::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
 pub use ports::*;
 use ports::{isolate_untrusted, remote_tool_error, run_async, safe_markdown};
-pub use report::{Finding, FindingKind};
+pub use report::{EntityDetails, Finding, FindingKind};
 
 #[cfg(test)]
 mod tests;

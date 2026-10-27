@@ -1,4 +1,4 @@
-use crate::{AppError, AuthorizedCall, Engine, FindingKind, Tool};
+use crate::{AppError, AuthorizedCall, Engine, EntityDetails, FindingKind, Tool};
 
 impl Engine<'_> {
     pub(crate) fn execute_local_tool(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
@@ -154,6 +154,7 @@ impl Engine<'_> {
                     FindingKind::parse(call.arg("kind").ok_or({
                         AppError::Fixed(crate::FixedAppError::PolicyMissingFindingKind)
                     })?)?;
+                let details = EntityDetails::from_args(kind, call.proposal_args())?;
                 self.propose_finding_unlocked(
                     call.case_id(),
                     kind,
@@ -163,6 +164,7 @@ impl Engine<'_> {
                     call.arg("evidence_hash").ok_or({
                         AppError::Fixed(crate::FixedAppError::PolicyMissingFindingEvidence)
                     })?,
+                    details,
                     "model",
                 )?
                 .into_bytes()
