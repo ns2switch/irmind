@@ -6,7 +6,7 @@ use ratatui::{
     Terminal,
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Layout},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 use std::{io, time::Duration};
 
@@ -34,7 +34,10 @@ impl OverrideScreen {
             KeyCode::Char('y') => Some(true),
             KeyCode::Char('n' | 'q') | KeyCode::Esc => Some(false),
             KeyCode::Down => {
-                self.offset = self.offset.saturating_add(1).min(count);
+                self.offset = self
+                    .offset
+                    .saturating_add(1)
+                    .min(count.saturating_mul(1024));
                 None
             }
             KeyCode::Up => {
@@ -56,19 +59,17 @@ impl OverrideScreen {
     {
         let rows = entries
             .iter()
-            .skip(self.offset)
             .map(|entry| {
                 let line = format!(
-                    "{}: saved={} session={}",
+                    "{}\n  saved: {}\n  session: {}",
                     entry.field,
                     entry.saved.as_deref().unwrap_or("<unset>"),
                     entry.effective.as_deref().unwrap_or("<unset>")
                 );
-                guard
-                    .screen(&line)
-                    .map(|screened| ListItem::new(screened.text))
+                guard.screen(&line).map(|screened| screened.text)
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?
+            .join("\n\n");
         terminal.draw(|frame| {
             let areas = Layout::vertical([Constraint::Length(3), Constraint::Min(3), Constraint::Length(3)]).split(frame.area());
             frame.render_widget(
@@ -76,7 +77,13 @@ impl OverrideScreen {
                     .block(Block::default().title(" Session overrides ").borders(Borders::ALL)),
                 areas[0],
             );
-            frame.render_widget(List::new(rows).block(Block::default().title(" Saved and effective values ").borders(Borders::ALL)), areas[1]);
+            frame.render_widget(
+                Paragraph::new(rows)
+                    .wrap(Wrap { trim: false })
+                    .scroll((u16::try_from(self.offset).unwrap_or(u16::MAX), 0))
+                    .block(Block::default().title(" Saved and effective values ").borders(Borders::ALL)),
+                areas[1],
+            );
             frame.render_widget(
                 Paragraph::new("Up/Down inspect every field · y accept and sign for this session · n use saved configuration")
                     .block(Block::default().borders(Borders::ALL)),
@@ -141,7 +148,10 @@ impl RecoveryScreen {
             }
             KeyCode::Char('q') | KeyCode::Esc => Some(ConfigurationRecoveryChoice::Quit),
             KeyCode::Down => {
-                self.offset = self.offset.saturating_add(1).min(review.differences.len());
+                self.offset = self
+                    .offset
+                    .saturating_add(1)
+                    .min(review.differences.len().saturating_mul(1024));
                 None
             }
             KeyCode::Up => {
@@ -171,17 +181,17 @@ impl RecoveryScreen {
         let rows = review
             .differences
             .iter()
-            .skip(self.offset)
             .map(|item| {
                 let line = format!(
-                    "{}: approved={} current={}",
+                    "{}\n  approved: {}\n  current: {}",
                     item.field,
                     item.approved.as_deref().unwrap_or("<unset>"),
                     item.current.as_deref().unwrap_or("<unset>")
                 );
-                guard.screen(&line).map(|safe| ListItem::new(safe.text))
+                guard.screen(&line).map(|safe| safe.text)
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?
+            .join("\n\n");
         let help = if self.confirming_acceptance {
             "Accept the current file and sign it? It may change where case data is sent. y confirm · Esc cancel"
         } else if review.approved.is_none() {
@@ -205,11 +215,14 @@ impl RecoveryScreen {
                 areas[0],
             );
             frame.render_widget(
-                List::new(rows).block(
-                    Block::default()
-                        .title(" Field differences ")
-                        .borders(Borders::ALL),
-                ),
+                Paragraph::new(rows)
+                    .wrap(Wrap { trim: false })
+                    .scroll((u16::try_from(self.offset).unwrap_or(u16::MAX), 0))
+                    .block(
+                        Block::default()
+                            .title(" Field differences ")
+                            .borders(Borders::ALL),
+                    ),
                 areas[1],
             );
             frame.render_widget(
