@@ -8,15 +8,15 @@ This page is for contributors and evaluators planning around current limitations
 - Policy-gated reads and analyst-approved external enrichment, with a mandatory content guard.
 - Local SQLite custody, a derived DuckDB graph, and Ed25519 signatures from an explicitly selected OS or encrypted-file backend.
 - Explicitly selected LLM modules and optional Splunk, AWS, EDR, MISP, and VirusTotal connectors.
+- Typed IOC, hypothesis, ATT&CK technique, and timeline proposals with analyst confirmation; reports cite confirmed evidence.
+- Case scopes with projects and an optional TOML policy ceiling for remote reads.
 - Automated contracts and synthetic end-to-end tests.
 
 ## Next work
 
-1. Complete typed IOC, hypothesis, technique, and timeline entities. Generate reports only from confirmed claims linked to evidence.
-2. Expand policy scope to projects and improve its operator-facing form and tests.
-3. Show model streaming incrementally in the TUI and improve per-batch progress for long local tasks.
-4. Stream CloudTrail and JSON parsing for larger inputs, add full-text graph search, and benchmark at least 1 GB of synthetic evidence.
-5. Add SIEM alert retrieval and separate tracing from signed audit data.
+1. Show model streaming incrementally in the TUI and improve per-batch progress for long local tasks.
+2. Stream CloudTrail and JSON parsing for larger inputs, add full-text graph search, and benchmark at least 1 GB of synthetic evidence.
+3. Add SIEM alert retrieval and separate tracing from signed audit data.
 
 The merge matrix covers Linux, macOS, Windows, and cross-platform export verification. Release binaries are built once daily on `main` after code changes.
 
