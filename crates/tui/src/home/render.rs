@@ -187,32 +187,11 @@ fn module_items(
             module.configuration
         ))?));
         if index == state.module_selected {
-            for (parameter_index, parameter) in module.parameters.iter().enumerate() {
-                items.push(ListItem::new(safe(&format!(
-                    "   {} {} = {}{}{}",
-                    if parameter_index == state.parameter_selected {
-                        ">"
-                    } else {
-                        " "
-                    },
-                    parameter.name,
-                    if parameter.value.is_empty() {
-                        "<unset>"
-                    } else {
-                        &parameter.value
-                    },
-                    if parameter.required {
-                        " (required)"
-                    } else {
-                        ""
-                    },
-                    if parameter.overridden {
-                        " (environment override)"
-                    } else {
-                        ""
-                    },
-                ))?));
-            }
+            items.extend(module_parameter_items(
+                module,
+                state.parameter_selected,
+                safe,
+            )?);
             if !module.credentials.is_empty() {
                 items.push(ListItem::new(safe(&format!(
                     "   Credentials: {} (press k to open keystore)",
@@ -222,6 +201,40 @@ fn module_items(
         }
     }
     Ok(items)
+}
+
+fn module_parameter_items(
+    module: &ModuleStatus,
+    selected: usize,
+    safe: &impl Fn(&str) -> Result<String>,
+) -> Result<Vec<ListItem<'static>>> {
+    module
+        .parameters
+        .iter()
+        .enumerate()
+        .map(|(index, parameter)| {
+            Ok(ListItem::new(safe(&format!(
+                "   {} {} = {}{}{}",
+                if index == selected { ">" } else { " " },
+                parameter.name,
+                if parameter.value.is_empty() {
+                    "<unset>"
+                } else {
+                    &parameter.value
+                },
+                if parameter.required {
+                    " (required)"
+                } else {
+                    ""
+                },
+                if parameter.overridden {
+                    " (environment override)"
+                } else {
+                    ""
+                },
+            ))?))
+        })
+        .collect()
 }
 
 fn case_items(state: &HomeState, engine: &Engine<'_>) -> Result<Vec<ListItem<'static>>> {
