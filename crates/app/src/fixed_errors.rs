@@ -11,6 +11,10 @@ pub enum FixedAppError {
     ModelLLMModuleIsNotRegistered,
     #[error("model: provider stream ended without completion")]
     ModelProviderStreamEndedWithoutCompletion,
+    #[error("model: streamed text does not match the completed reply")]
+    ModelStreamTextMismatch,
+    #[error("model: streamed text preview exceeds 200 KB")]
+    ModelStreamPreviewExceedsLimit,
     #[error("policy denied: EDR source unavailable")]
     PolicyEDRSourceUnavailable,
     #[error("policy denied: SIEM source unavailable")]

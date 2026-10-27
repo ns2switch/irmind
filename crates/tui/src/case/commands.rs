@@ -61,10 +61,14 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return;
         }
         self.state.messages.push(format!("Analyst: {prompt}"));
+        self.state.model_preview.clear();
         let workflow = self.workflow();
         let id = self.id;
+        let model_tx = self.model_tx.clone();
         self.start_task("IRMind", move |cancel| {
-            workflow.investigate(id, &prompt, &cancel)
+            workflow.investigate_with_progress(id, &prompt, &cancel, &move |delta| {
+                let _ = model_tx.send(delta.to_owned());
+            })
         });
     }
 
@@ -183,12 +187,17 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             "/scope" => self.state.messages.push(format!("Scope: {}", self.state.case.scope)),
             "/approvals" => {
                 self.state.approvals = self.engine.pending_approvals(self.id)?;
+                self.state.approval_sources =
+                    super::load_approval_sources(self.engine, self.id, &self.state.approvals)?;
                 self.state.tab = 4;
             }
             "/findings" => {
                 self.state.findings = self.engine.findings(self.id)?;
-                self.state.tab = 5;
+                self.state.tab = 8;
             }
+            "/iocs" => self.state.tab = 5,
+            "/hypotheses" => self.state.tab = 6,
+            "/techniques" => self.state.tab = 7,
             "/report" => match self.engine.report(self.id) {
                 Ok(report) => self.state.messages.push(report),
                 Err(error) => self.state.messages.push(format!("Report error: {error}")),

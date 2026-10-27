@@ -7,10 +7,10 @@ pub use async_trait::async_trait;
 use futures_util::{Stream, StreamExt};
 use irmind_domain::{
     Actor, AnalystApprovalVerifier, AuditEventKind, AuthorizedCall, Decision,
-    DeclassificationAuthority, ExecutionMode, PendingApproval, PolicyRules, ProposedCall,
-    Provenance, SourceKind, Tainted, Tool,
+    DeclassificationAuthority, ExecutionMode, PendingApproval, PolicyRules, ProposedCall, Tainted,
+    Tool,
 };
-pub use irmind_domain::{Case, CaseId, CaseScope, Severity};
+pub use irmind_domain::{Case, CaseId, CaseScope, Provenance, Severity, SourceKind};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -42,7 +42,7 @@ mod ports;
 pub use fixed_errors::FixedAppError;
 mod report;
 
-pub use approvals::ApprovalRequest;
+pub use approvals::{ApprovalRequest, ApprovalSource};
 use audit_origin::AuditOrigin;
 pub use configuration::{
     ConfigChange, ConfigDifference, ConfigurationInspection, ConfigurationReview,

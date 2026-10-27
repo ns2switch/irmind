@@ -58,14 +58,18 @@ impl LlmPort for FakeModel {
         } else {
             Vec::new()
         };
-        Ok(single_completion_stream(
-            ModelResponse {
-                text: "Synthetic investigation".into(),
-                raw: "synthetic".into(),
-                calls,
-            },
-            None,
-        ))
+        Ok(Box::pin(futures_util::stream::iter([
+            Ok(ModelEvent::TextDelta("Synthetic ".into())),
+            Ok(ModelEvent::TextDelta("investigation".into())),
+            Ok(ModelEvent::Completed {
+                response: ModelResponse {
+                    text: "Synthetic investigation".into(),
+                    raw: "synthetic".into(),
+                    calls,
+                },
+                usage: None,
+            }),
+        ])))
     }
 }
 

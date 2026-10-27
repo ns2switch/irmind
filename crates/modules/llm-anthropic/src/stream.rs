@@ -5,6 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead as _, BufReader, Read};
 
 const MAX_STREAM_BYTES: usize = 2_000_000;
+mod preview;
+pub(super) use preview::TextPreview;
 
 enum Block {
     Text(String),

@@ -135,6 +135,16 @@ fn malicious_evidence_cannot_trigger_external_call() {
             .iter()
             .any(|e| e.kind == irmind_domain::AuditEventKind::ToolResult)
     );
+    let pending = engine.pending_approvals(&case.id).unwrap();
+    assert_eq!(pending.len(), 1);
+    let source = engine.approval_source(&case.id, &pending[0]).unwrap();
+    assert_eq!(
+        source.provenance.source_kind(),
+        irmind_domain::SourceKind::File
+    );
+    assert_eq!(irmind_app::hex(source.provenance.evidence_hash()), hash);
+    assert!(!source.excerpt.is_empty());
+    assert!(!source.excerpt.contains("ignore previous instructions"));
     assert_eq!(engine.verify(&case.id).unwrap(), entries.len());
     fs::write(root.path().join("evidence").join(&hash), b"tampered").unwrap();
     assert!(matches!(

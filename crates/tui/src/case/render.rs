@@ -1,7 +1,9 @@
 use super::runtime::CaseRuntime;
 use super::state;
 use super::{CaseFrame, Confirmation, Engine, Result, draw_case, escape_display, summarize_usage};
-use state::CaseState;
+use irmind_app::{ApprovalRequest, ApprovalSource, Finding};
+use state::{CaseState, panel_findings_for};
+use std::collections::BTreeMap;
 
 impl CaseRuntime<'_, '_, '_> {
     pub(super) fn render(&mut self) -> Result<()> {
@@ -19,9 +21,11 @@ impl CaseRuntime<'_, '_, '_> {
         );
         let panel = panel_text(&self.state);
         let title = self.engine.guard.screen(&self.state.case.title)?.text;
-        let shown_messages = self
-            .state
-            .messages
+        let mut visible_messages = self.state.messages.clone();
+        if !self.state.model_preview.is_empty() {
+            visible_messages.push(format!("IRMind (streaming): {}", self.state.model_preview));
+        }
+        let shown_messages = visible_messages
             .iter()
             .map(|message| self.engine.guard.screen(message).map(|shown| shown.text))
             .collect::<Result<Vec<_>, _>>()?
@@ -100,35 +104,54 @@ fn panel_text(state: &CaseState) -> String {
             state.case.scope,
             state.case.sealed
         ),
-        4 => state
-            .approvals
-            .iter()
-            .enumerate()
-            .map(|(index, request)| {
-                format!(
-                    "{} {}\n{:?} {} {:?}\n",
-                    if index == state.selected_approval {
-                        '>'
-                    } else {
-                        ' '
-                    },
-                    request.id,
-                    request.mode,
-                    request.tool.as_str(),
-                    request.args
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n"),
-        _ => findings_panel(state),
+        4 => approval_panel(
+            &state.approvals,
+            &state.approval_sources,
+            state.selected_approval,
+        ),
+        _ => entity_panel(&state.findings, state.tab, state.selected_finding),
     }
 }
 
-fn findings_panel(state: &CaseState) -> String {
-    state
-        .findings
+pub(crate) fn approval_panel(
+    approvals: &[ApprovalRequest],
+    sources: &BTreeMap<String, ApprovalSource>,
+    selected: usize,
+) -> String {
+    approvals
         .iter()
-        .map(|finding| {
+        .enumerate()
+        .map(|(index, request)| {
+            let source = sources.get(&request.id).map_or_else(
+                || "Source fragment unavailable".to_owned(),
+                |source| {
+                    format!(
+                        "Untrusted {:?} fragment {}\n{}",
+                        source.provenance.source_kind(),
+                        irmind_app::hex(source.provenance.evidence_hash()),
+                        source.excerpt,
+                    )
+                },
+            );
+            format!(
+                "{} [TAINTED] {}\n{:?} {} {:?}\n{}\n",
+                if index == selected { '>' } else { ' ' },
+                request.id,
+                request.mode,
+                request.tool.as_str(),
+                request.args,
+                source,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub(crate) fn entity_panel(findings: &[Finding], tab: usize, selected: usize) -> String {
+    panel_findings_for(findings, tab)
+        .iter()
+        .enumerate()
+        .map(|(index, finding)| {
             let status = if finding.confirmed {
                 "confirmed"
             } else if finding.dismissed {
@@ -137,8 +160,13 @@ fn findings_panel(state: &CaseState) -> String {
                 "proposed"
             };
             format!(
-                "{} {:?} {}\n{}\n[evidence: {}]",
-                finding.id, finding.kind, status, finding.value, finding.evidence_hash
+                "{} {} {:?} {}\n{}\n[evidence: {}]",
+                if index == selected { '>' } else { ' ' },
+                finding.id,
+                finding.kind,
+                status,
+                finding.value,
+                finding.evidence_hash
             )
         })
         .collect::<Vec<_>>()
@@ -196,7 +224,9 @@ fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Option<String>
     }
     if let Some(confirm) = &state.confirmation {
         let detail = match confirm {
-            Confirmation::Seal(_, info) | Confirmation::Export(_, info) => info,
+            Confirmation::Seal(_, info)
+            | Confirmation::Export(_, info)
+            | Confirmation::Finding(_, info) => info,
         };
         return Ok(Some(escape_display(detail)));
     }

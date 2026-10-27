@@ -191,6 +191,7 @@ impl LlmPort for ChatCompletionsClient {
         let cancel = cancel.clone();
         Ok(Box::pin(async_stream::try_stream! {
             let mut raw = Vec::new();
+            let mut preview = stream::TextPreview::default();
             loop {
                 let chunk = tokio::select! {
                     biased;
@@ -202,6 +203,9 @@ impl LlmPort for ChatCompletionsClient {
                     Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(irmind_app::AdapterModelError::ProviderStreamExceeds2MB)))?;
                 }
                 raw.extend_from_slice(&chunk);
+                for text in preview.push(&chunk)? {
+                    yield ModelEvent::TextDelta(text);
+                }
                 yield ModelEvent::Progress(chunk.len());
             }
             let (response, usage) = stream::parse(raw.as_slice())?;

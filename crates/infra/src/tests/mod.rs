@@ -72,5 +72,6 @@ mod injection_and_taint;
 mod remote_dispatch_edr_ti;
 mod remote_dispatch_siem_cloud;
 mod scope_and_graph;
+mod scope_pending;
 mod seal_export;
 mod seal_recovery;

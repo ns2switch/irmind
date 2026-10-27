@@ -71,13 +71,27 @@ pub fn summarize_usage(entries: &[SignedEntry]) -> Result<UsageEvent, AppError> 
 
 pub type ModelStream = std::pin::Pin<Box<dyn Stream<Item = Result<ModelEvent, AppError>> + Send>>;
 
-#[derive(Debug)]
 pub enum ModelEvent {
     Progress(usize),
+    TextDelta(String),
     Completed {
         response: ModelResponse,
         usage: Option<ModelUsage>,
     },
+}
+
+impl std::fmt::Debug for ModelEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Progress(bytes) => f.debug_tuple("Progress").field(bytes).finish(),
+            Self::TextDelta(text) => f.debug_tuple("TextDelta").field(&text.len()).finish(),
+            Self::Completed { response, usage } => f
+                .debug_struct("Completed")
+                .field("response", response)
+                .field("usage", usage)
+                .finish(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -146,10 +160,19 @@ pub trait LlmPort: Send + Sync {
 }
 
 pub async fn collect_model_stream(
-    mut events: ModelStream,
+    events: ModelStream,
     cancel: &CancellationToken,
 ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
+    collect_model_stream_with_progress(events, cancel, |_| {}).await
+}
+
+pub async fn collect_model_stream_with_progress(
+    mut events: ModelStream,
+    cancel: &CancellationToken,
+    mut on_text: impl FnMut(&str),
+) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
     let mut completed = None;
+    let mut preview = String::new();
     loop {
         let event = tokio::select! {
             biased;
@@ -159,7 +182,21 @@ pub async fn collect_model_stream(
         let Some(event) = event else { break };
         match event? {
             ModelEvent::Progress(_) if completed.is_none() => {}
+            ModelEvent::TextDelta(text) if completed.is_none() => {
+                if preview.len().saturating_add(text.len()) > 200_000 {
+                    return Err(AppError::Fixed(
+                        crate::FixedAppError::ModelStreamPreviewExceedsLimit,
+                    ));
+                }
+                preview.push_str(&text);
+                on_text(&text);
+            }
             ModelEvent::Completed { response, usage } if completed.is_none() => {
+                if !preview.is_empty() && preview != response.text {
+                    return Err(AppError::Fixed(
+                        crate::FixedAppError::ModelStreamTextMismatch,
+                    ));
+                }
                 completed = Some((response, usage));
             }
             _ => {

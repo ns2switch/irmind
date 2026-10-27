@@ -2456,6 +2456,7 @@ dependencies = [
  "crossterm 0.29.0",
  "directories",
  "ed25519-dalek",
+ "futures-util",
  "irmind-app",
  "irmind-domain",
  "irmind-fs",

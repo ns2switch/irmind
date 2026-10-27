@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Layout},
     style::{Color, Modifier, Style},
     text::Line,
-    widgets::{Block, Borders, Paragraph, Tabs, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 pub(crate) struct CaseFrame<'a> {
@@ -59,28 +59,21 @@ where
         frame.render_widget(conversation, columns[0]);
         let right =
             Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).split(columns[1]);
-        let tabs = Tabs::new(vec![
-            "Timeline",
-            "Evidence",
-            "Audit",
-            "Case",
-            "Approvals",
-            "Findings",
-        ])
-        .select(view.tab)
-        .block(Block::default().borders(Borders::ALL))
-        .highlight_style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        );
-        frame.render_widget(tabs, right[0]);
+        let titles = ["Timeline", "Evidence", "Audit", "Case", "Approvals", "IOCs", "Hypotheses", "ATT&CK", "All findings"];
+        let title = titles.get(view.tab).copied().unwrap_or("Case");
         frame.render_widget(
-            Paragraph::new(view.overlay.unwrap_or(view.panel))
-                .block(Block::default().borders(Borders::ALL))
-                .wrap(Wrap { trim: false }),
-            right[1],
+            Paragraph::new(format!("{}  ({}/{}) · Tab next", title, view.tab + 1, titles.len()))
+                .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                .block(Block::default().borders(Borders::ALL)),
+            right[0],
         );
+        let mut detail = Paragraph::new(view.overlay.unwrap_or(view.panel))
+            .block(Block::default().borders(Borders::ALL))
+            .wrap(Wrap { trim: false });
+        if view.tab == 4 && view.overlay.is_none() {
+            detail = detail.style(Style::default().fg(Color::Yellow));
+        }
+        frame.render_widget(detail, right[1]);
         frame.render_widget(
             Paragraph::new(view.input)
                 .block(Block::default().title(" Prompt ").borders(Borders::ALL)),
@@ -88,7 +81,7 @@ where
         );
         frame.render_widget(
             Paragraph::new(Line::from(format!(
-                "{} | {} tokens | {} | {} pending | {} | Ctrl+K commands | /help | /pause | Esc home",
+                "{} | {} tokens | {} | {} pending | {} | Tab panels | c confirm | Ctrl+K | /pause | Esc home",
                 view.id.as_str(),
                 view.tokens,
                 view.cost,

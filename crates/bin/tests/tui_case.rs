@@ -5,8 +5,8 @@ use crossterm::event::KeyCode;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CaseLock, CaseSeal, CompletionRequest,
-    ConfigurationStore, CryptoPorts, Engine, EnginePorts, EvidenceStore, LlmPort, ModelResponse,
-    ModelStream, Repository, Signer, ThreatIntelPort, single_completion_stream,
+    ConfigurationStore, CryptoPorts, Engine, EnginePorts, EvidenceStore, LlmPort, ModelEvent,
+    ModelResponse, ModelStream, Repository, Signer, ThreatIntelPort,
 };
 #[cfg(feature = "keystore-file")]
 use irmind_app::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
@@ -38,6 +38,10 @@ use std::{
 #[allow(clippy::wildcard_imports)]
 #[path = "tui_case/configuration_recovery.rs"]
 mod configuration_recovery;
+#[cfg(feature = "keystore-file")]
+#[allow(clippy::wildcard_imports)]
+#[path = "tui_case/full_case.rs"]
+mod full_case;
 #[allow(clippy::wildcard_imports)]
 #[path = "tui_case/support.rs"]
 mod support;
