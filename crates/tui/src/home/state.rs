@@ -238,6 +238,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn new_case_form_starts_with_a_valid_severity_and_local_scope() {
+        let mut state = HomeState::new(Vec::new(), false);
+        update(&mut state, KeyCode::Char('n'));
+        assert!(irmind_app::Severity::parse(&state.form[1]).is_ok());
+        assert!(state.form[2].is_empty());
+        assert_eq!(state.scope(), "local evidence only");
+    }
+
+    #[test]
     fn update_moves_between_list_search_and_new_case_without_io() {
         let mut state = HomeState::new(Vec::new(), false);
         assert!(matches!(

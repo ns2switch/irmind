@@ -1,0 +1,53 @@
+name: Regenerate synthetic demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: synthetic-demo
+      - name: Build offline TUI fixture
+        run: cargo build -p irmind --example demo --locked
+      - name: Pull the pinned VHS image with its rendering dependencies
+        run: docker pull ghcr.io/charmbracelet/vhs@sha256:9d5fc3dc0c160b0fb1d2212baff07e6bdf3fa9438c504a3237484567302fcf93
+      - name: Render and verify synthetic assets without network access
+        run: python3 docs/demo/generate.py
+      - name: Open a pull request if images changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet -- docs/assets; then
+            echo "The generated assets are unchanged."
+            exit 0
+          fi
+          branch="docs/refresh-demo-${GITHUB_RUN_ID}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add docs/assets/demo.gif docs/assets/conversation.png docs/assets/command-menu.png docs/assets/approval-card.png
+          git commit -m 'docs: refresh synthetic demo' -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title 'docs: refresh synthetic demo' --body 'VHS regenerated the offline synthetic GIF and screenshots. The tape, duration, size, flow and privacy checks passed.'

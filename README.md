@@ -4,6 +4,10 @@
 
 A terminal AI client for security investigations with policy-enforced tool calls and a signed chain of custody.
 
+![IRMind synthetic walkthrough: a case, evidence, a model proposal, signed approval, and verification](docs/assets/demo.gif)
+
+*This offline demo uses synthetic evidence, an ephemeral file keystore, and a fake model.*
+
 > [!WARNING]
 > IRMind is under development. Do not use it for real incidents or sensitive data yet.
 > The examples in this repository are synthetic.

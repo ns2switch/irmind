@@ -60,5 +60,9 @@ futures-util = { version = "0.3", default-features = false, features = ["std"] }
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 crossterm = "0.29"
 
+[[example]]
+name = "demo"
+required-features = ["keystore-file"]
+
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
