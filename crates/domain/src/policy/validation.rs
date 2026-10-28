@@ -1,4 +1,4 @@
-use crate::{BTreeMap, ProposedCall, Tool, valid_scope_target, valid_scope_time};
+use crate::{BTreeMap, ProposedCall, SiemQuery, Tool, valid_scope_target, valid_scope_time};
 
 pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
     match proposal.tool {
@@ -12,7 +12,8 @@ pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
         | Tool::TextSearch
         | Tool::RawRecords
         | Tool::CaseAddFinding => valid_local(proposal),
-        Tool::SiemSearch | Tool::SiemGetAlert | Tool::CloudAuditEvents => valid_event(proposal),
+        Tool::SiemSearch => valid_siem_search(proposal),
+        Tool::SiemGetAlert | Tool::CloudAuditEvents => valid_event(proposal),
         Tool::ThreatIntelInternal | Tool::CloudIdentity => valid_identity_and_intel(proposal),
         Tool::EdrHostInfo
         | Tool::EdrProcessTree
@@ -112,11 +113,11 @@ fn valid_finding(args: &BTreeMap<String, String>) -> bool {
 
 fn valid_event(proposal: &ProposedCall) -> bool {
     match proposal.tool {
-        Tool::SiemSearch | Tool::SiemGetAlert | Tool::CloudAuditEvents => {
-            let query_key = match proposal.tool {
-                Tool::SiemSearch => "query",
-                Tool::SiemGetAlert => "alert_id",
-                _ => "event_name",
+        Tool::SiemGetAlert | Tool::CloudAuditEvents => {
+            let query_key = if proposal.tool == Tool::SiemGetAlert {
+                "alert_id"
+            } else {
+                "event_name"
             };
             let allowed = if proposal.tool == Tool::CloudAuditEvents {
                 vec!["source", "account", "project", "from", "to", query_key]
@@ -148,21 +149,48 @@ fn valid_event(proposal: &ProposedCall) -> bool {
                 && proposal.args.get("to").is_some_and(|v| valid_scope_time(v))
                 && proposal.args.get(query_key).is_some_and(|v| {
                     !v.is_empty()
-                        && v.len()
-                            <= if proposal.tool == Tool::SiemSearch {
-                                1024
-                            } else {
-                                128
-                            }
+                        && v.len() <= 128
                         && !v.contains('\0')
-                        && (proposal.tool == Tool::SiemSearch
-                            || v.bytes().all(|byte| {
-                                byte.is_ascii_alphanumeric() || b"._-:@/".contains(&byte)
-                            }))
+                        && v.bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || b"._-:@/".contains(&byte))
                 })
         }
         _ => false,
     }
+}
+
+fn valid_siem_search(proposal: &ProposedCall) -> bool {
+    valid_args(
+        &proposal.args,
+        &[
+            "source",
+            "account",
+            "from",
+            "to",
+            "field",
+            "operator",
+            "value",
+            "aggregation",
+            "group_by",
+            "limit",
+        ],
+    ) && proposal
+        .args
+        .get("source")
+        .is_some_and(|value| valid_scope_target(value))
+        && proposal
+            .args
+            .get("account")
+            .is_some_and(|value| valid_scope_target(value))
+        && proposal
+            .args
+            .get("from")
+            .is_some_and(|value| valid_scope_time(value))
+        && proposal
+            .args
+            .get("to")
+            .is_some_and(|value| valid_scope_time(value))
+        && SiemQuery::parse(&proposal.args).is_some()
 }
 
 fn valid_identity_and_intel(proposal: &ProposedCall) -> bool {

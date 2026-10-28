@@ -16,7 +16,9 @@ pub fn run_siem_contract(port: &dyn SiemPort) -> Result<(), String> {
             ("account".into(), "123456789012".into()),
             ("from".into(), FROM.into()),
             ("to".into(), TO.into()),
-            ("query".into(), "AssumeRole".into()),
+            ("field".into(), "event_name".into()),
+            ("operator".into(), "eq".into()),
+            ("value".into(), "AssumeRole".into()),
         ])
     };
     let call = contract_call(Tool::SiemSearch, port.source_id(), args(port.source_id()))?;
@@ -107,7 +109,9 @@ pub fn run_siem_recorded(
             ("account".into(), "123456789012".into()),
             ("from".into(), FROM.into()),
             ("to".into(), TO.into()),
-            ("query".into(), "AssumeRole".into()),
+            ("field".into(), "event_name".into()),
+            ("operator".into(), "eq".into()),
+            ("value".into(), "AssumeRole".into()),
         ]),
     )?;
     let result = contract_runtime()?.block_on(port.execute(&call, &CancellationToken::new()));

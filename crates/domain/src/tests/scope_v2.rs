@@ -207,7 +207,9 @@ fn toml_policy_scope_is_a_hard_ceiling_even_for_pending_approvals() {
                 ("account", "account-b"),
                 ("from", "2026-10-23T12:00:00Z"),
                 ("to", "2026-10-23T13:00:00Z"),
-                ("query", "AssumeRole")
+                ("field", "event_name"),
+                ("operator", "eq"),
+                ("value", "AssumeRole")
             ]
         ),
         Decision::Deny(_)

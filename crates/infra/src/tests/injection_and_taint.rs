@@ -20,7 +20,9 @@ fn detected_injection_cannot_expand_next_read_scope() {
                             ("account".into(), account.into()),
                             ("from".into(), "2026-10-23T12:00:00Z".into()),
                             ("to".into(), "2026-10-23T13:00:00Z".into()),
-                            ("query".into(), "AssumeRole".into()),
+                            ("field".into(), "event_name".into()),
+                            ("operator".into(), "eq".into()),
+                            ("value".into(), "AssumeRole".into()),
                         ]),
                     }]
                 } else {

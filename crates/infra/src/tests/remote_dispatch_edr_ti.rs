@@ -165,7 +165,9 @@ fn malicious_siem_record_cannot_dispatch_external_intel() {
                         ("account".into(), "123".into()),
                         ("from".into(), "2026-10-23T12:00:00Z".into()),
                         ("to".into(), "2026-10-23T13:00:00Z".into()),
-                        ("query".into(), "AssumeRole".into()),
+                        ("field".into(), "event_name".into()),
+                        ("operator".into(), "eq".into()),
+                        ("value".into(), "AssumeRole".into()),
                     ]),
                 }],
                 2 => {

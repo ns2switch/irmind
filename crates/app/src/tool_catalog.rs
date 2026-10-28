@@ -75,8 +75,8 @@ fn remote_catalog() -> Vec<ToolSpec> {
     vec![
         ToolSpec {
             name: "siem_search",
-            description: "Search a configured SIEM source for a single literal term in one scoped account and UTC window; Splunk uses a restricted SPL query built by its module",
-            parameters: json!({"type":"object","properties":{"source":{"type":"string"},"account":{"type":"string"},"from":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"to":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"query":{"type":"string","description":"One literal term, no SPL operators"}},"required":["source","account","from","to","query"],"additionalProperties":false}),
+            description: "Search one approved SIEM field with an exact, unequal, or prefix comparison inside a scoped account and UTC window. Optional count_by, top, or distinct aggregation. Never send SPL.",
+            parameters: json!({"type":"object","properties":{"source":{"type":"string"},"account":{"type":"string"},"from":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"to":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"field":{"type":"string","enum":["event_name","user","source_ip","host"]},"operator":{"type":"string","enum":["eq","not_eq","prefix"]},"value":{"type":"string","minLength":1,"maxLength":128},"aggregation":{"type":"string","enum":["events","count_by","top","distinct"]},"group_by":{"type":"string","enum":["event_name","user","source_ip","host"]},"limit":{"type":"integer","minimum":1,"maximum":20}},"required":["source","account","from","to","field","operator","value"],"additionalProperties":false}),
         },
         ToolSpec {
             name: "siem_get_alert",
@@ -148,5 +148,20 @@ mod tests {
             }
         }
         assert_eq!(specs.len(), 19);
+    }
+
+    #[test]
+    fn siem_catalog_has_no_free_form_query_argument() {
+        let specs = catalog();
+        let siem = specs
+            .iter()
+            .find(|spec| spec.name == "siem_search")
+            .unwrap();
+        assert!(siem.parameters["properties"].get("query").is_none());
+        assert_eq!(siem.parameters["properties"]["operator"]["enum"][0], "eq");
+        assert_eq!(
+            siem.parameters["properties"]["aggregation"]["enum"][1],
+            "count_by"
+        );
     }
 }

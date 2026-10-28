@@ -100,11 +100,11 @@ pub enum Tool {
     ThreatIntelExternal,
 }
 
-mod dialect;
 mod scope;
+mod siem_query;
 mod validation;
-pub use dialect::{SplQueryClass, classify_spl_query};
 use scope::{in_scope, scope_gate};
+pub use siem_query::{SiemAggregation, SiemField, SiemOperator, SiemQuery};
 pub use validation::valid_entity;
 use validation::valid_tool_arguments;
 
@@ -257,7 +257,6 @@ pub fn evaluate_with_context(
         return Decision::Deny("invalid tool arguments");
     }
     for gate in [
-        siem_gate(&proposal),
         scope_gate(case, &proposal),
         risk_gate(&proposal, mode, context),
     ] {
@@ -286,22 +285,6 @@ pub(super) enum Gate {
     Continue,
     Deny(&'static str),
     Approval,
-}
-
-fn siem_gate(proposal: &ProposedCall) -> Gate {
-    if proposal.tool != Tool::SiemSearch {
-        return Gate::Continue;
-    }
-    match proposal
-        .args
-        .get("query")
-        .map(|query| classify_spl_query(query))
-    {
-        Some(SplQueryClass::Forbidden) => Gate::Deny("SPL side-effect command is forbidden"),
-        Some(SplQueryClass::Unparseable) => Gate::Approval,
-        Some(SplQueryClass::SafeLiteral) => Gate::Continue,
-        None => Gate::Deny("missing SIEM query"),
-    }
 }
 
 fn risk_gate(proposal: &ProposedCall, mode: ExecutionMode, context: PolicyContext) -> Gate {
