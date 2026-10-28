@@ -32,6 +32,6 @@ Every pull request and merge runs Linux checks. Pull requests touching platform 
 
 ## After the MVP
 
-Source-side queries are the next step after the MVP: Athena, CloudTrail Lake, and Security Lake for AWS; BigQuery and Cloud Logging Log Analytics for GCP; and Azure Data Explorer and Log Analytics for Azure. Only structured queries are planned, with scan budgets and signed results. Chronicle and other product connectors, external anchoring of case seals, and the local gateway with watches remain deferred. The gateway must use a separate Agent key, allow only scoped reads without an analyst, and keep every approval analyst-signed. Containment remains outside the current scope.
+[Source-side queries](cloud-query-design.md) are the next step after the MVP: Athena, CloudTrail Lake, and Security Lake for AWS; BigQuery and Cloud Logging Log Analytics for GCP; and Azure Data Explorer and Log Analytics for Azure. Only structured queries are planned, with scan budgets and signed results. Chronicle and other product connectors, external anchoring of case seals, and the local gateway with watches remain deferred. The gateway must use a separate Agent key, allow only scoped reads without an analyst, and keep every approval analyst-signed. Containment remains outside the current scope.
 
 No provider should be enabled by default. Before production use, the project also needs manual terminal testing, provider compliance approval, and a decision on signed binary distribution.

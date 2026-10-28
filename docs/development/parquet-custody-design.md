@@ -21,7 +21,11 @@ For local files, open without following symlinks, hash through the opened handle
 
 Full source verification reopens every source and streams a SHA-256 check against the manifest. Explicit sampled verification uses a fresh random selection and reports the sample size, failed sources, and that unchecked sources have **not** been verified. A missing source, unavailable object version, changed hash, or unsafe path is reported as a failed check. Modification time and provider checksums are diagnostic metadata; they never replace IRMind SHA-256.
 
+Opening a large case verifies the signed chain and manifest structure without silently claiming to have re-read hundreds of gigabytes. Full or sampled source verification is an explicit analyst action. A failed source check marks the affected source inconsistent and prevents it from being presented as verified evidence; the signed case metadata remains available for inspection.
+
 `verify_graph` checks each generated Parquet artifact hash, its source linkage, and a reproducible rebuild. It never reads arbitrary Parquet or raw evidence chosen by a model. A canceled rebuild leaves the last verified version usable or fails closed.
+
+Migration first fully verifies the legacy chain and every copied evidence blob. For an open case, it appends the new artifact records only after conversion succeeds, then fully verifies again. A sealed case cannot acquire case-chain entries: its Parquet remains a derived cache, and a separately signed operational migration record binds the artifact manifest to the existing seal hash. Verification checks that binding and the old chain without silently resealing or altering historical signatures.
 
 Export v4 is a bounded-memory, length-prefixed streaming package containing the audit chain, signed source manifest and Parquet metadata, seal, and optionally the original bytes. `verify-export` validates the signatures and package structure without a keyring. When originals are omitted it reports **manifest verified; source bytes unavailable**, never **evidence verified**. Legacy v3 packages retain their existing verifier. Package paths are relative slash-separated names and cannot contain traversal or symlinks.
 

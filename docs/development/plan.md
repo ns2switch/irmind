@@ -32,7 +32,7 @@ This internal plan is for maintainers tracking acceptance criteria. Public reade
 
 ## MVP
 
-The MVP includes P: signed source manifests, optional original copies, partitioned Parquet, bounded DuckDB queries over IRMind-produced Parquet, the four streaming source parsers, representative 1 GB and 15 GB benchmarks, and verified migration of existing cases. It also includes R: read-only S3, GCS, and Azure Blob ingestion with explicit credentials, case scope, transfer budgets, and a shared streaming contract. C5 (SIEM alert retrieval and tracing), C6 (structured SIEM queries), and the existing H8 module contracts remain in scope. Cloud query engines are designed now but implemented after the MVP.
+The MVP includes P: signed source manifests, optional original copies, partitioned Parquet, bounded DuckDB queries over IRMind-produced Parquet, the four streaming source parsers, representative 1 GB and 15 GB benchmarks, and verified migration of existing cases. It also includes R: read-only S3, GCS, and Azure Blob ingestion with explicit credentials, case scope, transfer budgets, and a shared streaming contract. C5 (SIEM alert retrieval and tracing), C6 (structured SIEM queries), and the existing H8 module contracts remain in scope. [Cloud query engines](cloud-query-design.md) are designed now but implemented after the MVP.
 
 GCP and Azure enter the MVP only as object-storage read sources and exported-log parsers. Source-side queries, Chronicle, other GCP and Azure product connectors, external anchoring of case seals, and the local gateway with watches remain after the MVP.
 

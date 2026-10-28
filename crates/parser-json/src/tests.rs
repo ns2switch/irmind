@@ -121,3 +121,66 @@ fn rejects_excessive_size_depth_and_record_count() {
     let many = format!("[{}]", "{},".repeat(100_000) + "{}");
     assert!(JsonParser.parse("many.json", many.as_bytes()).is_err());
 }
+
+#[test]
+fn streaming_reader_recognizes_exported_cloud_formats() {
+    let cases = [
+        (
+            "cloudtrail.json",
+            r#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole"}]}"#,
+            "AssumeRole",
+        ),
+        (
+            "gcp.jsonl",
+            r#"{"timestamp":"2026-10-23T12:00:00Z","protoPayload":{"methodName":"google.iam.admin.v1.CreateServiceAccount","authenticationInfo":{"principalEmail":"analyst@example.invalid"}},"resource":{"labels":{"project_id":"example-project"}}}"#,
+            "google.iam.admin.v1.CreateServiceAccount",
+        ),
+        (
+            "activity.json",
+            r#"{"records":[{"eventTimestamp":"2026-10-23T12:00:00Z","operationName":{"value":"Microsoft.Compute/virtualMachines/write"},"subscriptionId":"00000000-0000-0000-0000-000000000000"}]}"#,
+            "Microsoft.Compute/virtualMachines/write",
+        ),
+        (
+            "entra.jsonl",
+            r#"{"createdDateTime":"2026-10-23T12:00:00Z","operationName":"Sign-in activity","userPrincipalName":"analyst@example.invalid","ipAddress":"203.0.113.17"}"#,
+            "Sign-in activity",
+        ),
+    ];
+    for (source, json, event) in cases {
+        let mut parsed = Vec::new();
+        let count = JsonParser
+            .parse_reader(
+                source,
+                &mut json.as_bytes(),
+                sha256(json.as_bytes()),
+                &irmind_app::CancellationToken::new(),
+                &mut |record| {
+                    record.inspect(|value| parsed.push((value.at.clone(), value.event.clone())));
+                    Ok(())
+                },
+            )
+            .unwrap();
+        assert_eq!(count, 1, "{source}");
+        assert_eq!(parsed[0].0, "2026-10-23T12:00:00Z", "{source}");
+        assert_eq!(parsed[0].1, event, "{source}");
+    }
+}
+
+#[test]
+fn streaming_reader_rejects_oversized_record_before_emitting_it() {
+    let long_value = "x".repeat(4 * 1024 * 1024);
+    let json = format!("{{\"message\":\"{long_value}\"}}");
+    let mut emitted = 0;
+    let result = JsonParser.parse_reader(
+        "oversized.json",
+        &mut json.as_bytes(),
+        sha256(json.as_bytes()),
+        &irmind_app::CancellationToken::new(),
+        &mut |_| {
+            emitted += 1;
+            Ok(())
+        },
+    );
+    assert!(result.is_err());
+    assert_eq!(emitted, 0);
+}
