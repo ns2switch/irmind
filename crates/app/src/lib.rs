@@ -10,7 +10,8 @@ use irmind_domain::{
     ExecutionMode, PendingApproval, PolicyRules, Tainted,
 };
 pub use irmind_domain::{
-    AuditEventKind, Case, CaseId, CaseScope, ProposedCall, Provenance, Severity, SourceKind, Tool,
+    AuditEventKind, Case, CaseId, CaseScope, ProposedCall, Provenance, SealedParquetMigrationV1,
+    Severity, SourceKind, Tool,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -40,6 +41,7 @@ pub use adapter_policy_errors::AdapterPolicyError;
 mod fixed_errors;
 mod ingest;
 mod keystore;
+mod large_case;
 mod ports;
 pub use fixed_errors::FixedAppError;
 mod report;
@@ -50,10 +52,11 @@ pub use configuration::{
     ConfigChange, ConfigDifference, ConfigurationInspection, ConfigurationReview,
     ConfigurationStore, PersistentConfig, ProductSettings,
 };
-pub use custody::{SealPreview, export_case, verify_export};
+pub use custody::{SealPreview, export_case, export_case_v4, verify_export, verify_export_details};
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::{GraphRecord, GraphRelation, IngestProfile, TimelineEvent};
 pub use keystore::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
+pub use large_case::{LargeCaseUseCases, SourceCheckMode, SourceCheckReport};
 pub use ports::*;
 use ports::{isolate_untrusted, remote_tool_error, run_async, safe_markdown};
 pub use report::{EntityDetails, Finding, FindingKind};

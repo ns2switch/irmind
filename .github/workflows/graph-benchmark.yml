@@ -10,6 +10,7 @@ concurrency:
   cancel-in-progress: true
 env:
   CARGO_INCREMENTAL: 0
+  CARGO_BUILD_JOBS: 1
   RUSTFLAGS: -C link-arg=-fuse-ld=mold
 jobs:
   graph_benchmark:
@@ -27,6 +28,11 @@ jobs:
         run: |
           set -o pipefail
           cargo test -p irmind-infra graph_benchmark_ --profile ci --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee benchmark-results.txt
+      - name: Profile Parquet conversion with 1 GB and 15 GB synthetic corpora
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p irmind-infra parquet_benchmark_ --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee -a benchmark-results.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

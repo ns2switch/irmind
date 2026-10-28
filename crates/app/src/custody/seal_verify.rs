@@ -134,6 +134,7 @@ impl Engine<'_> {
             }
             prev = self.verify_chain_entry(id, index, prev, entry)?;
         }
+        crate::large_case::read_manifest_index(&entries)?;
         let evidence_hashes = self.evidence_store.evidence_hashes(id)?;
         for entry in &entries {
             if cancel.is_cancelled() {
@@ -180,6 +181,14 @@ impl Engine<'_> {
         self.findings_unlocked(id, &entries)?;
         summarize_usage(&entries)?;
         self.verify_operations_unlocked(id, cancel)?;
+        if case.sealed {
+            let seal = self.repo.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
+            crate::large_case::read_sealed_artifacts(
+                &entries,
+                &self.audit_log.operations(id)?,
+                seal.hash,
+            )?;
+        }
         self.remember_verified_checkpoint(id, entries.last())?;
         Ok(entries.len())
     }

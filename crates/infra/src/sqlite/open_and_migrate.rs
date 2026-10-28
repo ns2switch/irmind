@@ -7,6 +7,8 @@ impl LocalStore {
         let store = Self {
             db: Mutex::new(db),
             graph: GraphStore::new(&graph_dir)?,
+            parquet: ParquetStore::open(root)?,
+            graph_catalog: Mutex::new(std::collections::HashMap::new()),
             evidence_dir,
             seal_dir,
             lock_dir,

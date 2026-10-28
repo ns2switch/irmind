@@ -1,16 +1,16 @@
-# Proposed large-case custody format
+# Large-case custody format
 
-This page is for maintainers reviewing the signed-format change needed by phase P. It is a proposal, not an implemented format. The existing signed audit encoding, seal challenge, and v3 export remain valid for old cases.
+This page is for maintainers reviewing the versioned large-case custody format. The signed audit encoding and seal challenge remain unchanged. Legacy v3 exports remain verifiable; cases with source manifests use streaming v4 packages.
 
-## Current constraint
+## Legacy constraint
 
 The current ingest use case accepts a byte slice of at most 50 MB, writes a content-addressed local copy, and signs an `EvidenceIngested` entry. Verification expects that copy. Export v3 is a JSON document capped at 128 MiB and requires every audit evidence hash to be present in it. These rules cannot represent an uncopied 15–500 GB source or a manifest-only export.
 
-## Proposed signed records
+## Signed records
 
 Add two versioned event payloads to the existing case audit chain, without changing the canonical `SignedEntry` encoding or existing event names:
 
-- `SourceManifestV1`: case ID, normalized source identity (relative path under an explicitly selected root, or object URI), byte length, UTC modification instant when available, source version and provider checksum when available, and IRMind SHA-256. A copy flag states whether a local original was stored. The original is hashed in a bounded streaming pass. The record is signed by the active case signer as part of the audit chain. The path or URI is data, never a command or SQL fragment.
+- `SourceManifestV1`: normalized source identity (relative path under an explicitly selected root, or object URI), byte length, UTC modification instant when available, source version and provider checksum when available, and IRMind SHA-256. The enclosing audit entry supplies the case ID. A copy flag states whether a local original was stored. The original is hashed in a bounded streaming pass. The record is signed by the active case signer as part of the audit chain. The path or URI is data, never a command or SQL fragment.
 - `ParquetArtifactV1`: relative artifact path, byte length, SHA-256, parser and schema versions, partition keys, and sorted hashes of the source records that produced it. A hash of its canonical payload joins the same chain. An artifact is derived data, never a substitute for a source hash.
 
 Both payloads use a domain-tagged, length-prefixed binary encoding carried as ASCII in the current signed `payload` field. Fields, optionality, byte order, path separators, and sorting are fixed. Unknown versions fail closed. No new record can reinterpret a legacy `EvidenceIngested` entry. The existing case seal covers the final audit hash and therefore the new records; its signature challenge stays unchanged.
@@ -21,17 +21,17 @@ For local files, open without following symlinks, hash through the opened handle
 
 ## Verification and export
 
-Full source verification reopens every source and streams a SHA-256 check against the manifest. Explicit sampled verification uses a fresh random selection and reports the sample size, failed sources, and that unchecked sources have **not** been verified. A missing source, unavailable object version, changed hash, or unsafe path is reported as a failed check. Modification time and provider checksums are diagnostic metadata; they never replace IRMind SHA-256.
+Full source verification reopens every source and streams a SHA-256 check against the manifest. Explicit sampled verification uses a fresh random selection and reports the sample size, failed sources, and that unchecked sources have **not** been verified. A missing source, changed hash or modification time, or unsafe path is reported as a failed check. Provider checksums are diagnostic metadata; they never replace IRMind SHA-256.
 
 Opening a large case verifies the signed chain and manifest structure without silently claiming to have re-read hundreds of gigabytes. Full or sampled source verification is an explicit analyst action. A failed source check marks the affected source inconsistent and prevents it from being presented as verified evidence; the signed case metadata remains available for inspection.
 
 `verify_graph` checks each generated Parquet artifact hash, its source linkage, and a reproducible rebuild. It never reads arbitrary Parquet or raw evidence chosen by a model. A canceled rebuild leaves the last verified version usable or fails closed.
 
-Migration first fully verifies the legacy chain and every copied evidence blob. For an open case, it appends the new artifact records only after conversion succeeds, then fully verifies again. A sealed case cannot acquire case-chain entries: its Parquet remains a derived cache, and a separately signed operational migration record binds the artifact manifest to the existing seal hash. Verification checks that binding and the old chain without silently resealing or altering historical signatures.
+Migration first fully verifies the legacy chain and every copied evidence blob. For an open case, it appends the new artifact records only after conversion succeeds, then fully verifies again. A sealed case cannot acquire case-chain entries. Its derived artifact records instead enter the separate signed operational chain as `sealed-parquet-artifact-v1`, bound to the existing final seal hash. The seal and original case chain do not change. Export v4 carries and verifies the complete operational chain; an unmigrated sealed case can still use v3.
 
-Export v4 is a bounded-memory, length-prefixed streaming package containing the audit chain, signed source manifest and Parquet metadata, seal, and optionally the original bytes. `verify-export` validates the signatures and package structure without a keyring. When originals are omitted it reports **manifest verified; source bytes unavailable**, never **evidence verified**. Legacy v3 packages retain their existing verifier. Package paths are relative slash-separated names and cannot contain traversal or symlinks.
+Export v4 is a bounded-memory, length-prefixed streaming package containing the audit chain, signed source manifest and Parquet metadata, seal, signed operational chain, and optionally the original bytes. `verify-export` validates the signatures and package structure without a keyring. When originals are omitted it reports **manifest verified; source bytes unavailable**, never **evidence verified**. Legacy v3 packages retain their existing verifier. Package paths are relative slash-separated names and cannot contain traversal or symlinks.
 
-The proposed application result type distinguishes chain, manifest, source-byte, and derived-artifact verification. This requires extending the local export-verification port while preserving the existing v3 call for compatibility; the exact API must be reviewed before implementation.
+The export-verification result reports format version, signed source count, verified source-byte count, and sources whose bytes are unavailable in the package. The legacy v3 call remains available for compatibility.
 
 ## Benchmark storage
 

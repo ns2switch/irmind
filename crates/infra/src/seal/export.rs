@@ -24,12 +24,36 @@ impl ExportVerifier for LocalExportVerifier {
     ) -> Result<(String, usize), AppError> {
         verify_export_expected(path, expected_key)
     }
+
+    fn verify_export_details(
+        &self,
+        path: &Path,
+        expected_key: Option<&str>,
+    ) -> Result<irmind_app::ExportVerification, AppError> {
+        if is_v4(path)? {
+            super::verify_v4::verify_export_v4(path, expected_key)
+        } else {
+            let (analyst_key_fingerprint, entries) = verify_export_expected(path, expected_key)?;
+            Ok(irmind_app::ExportVerification {
+                analyst_key_fingerprint,
+                entries,
+                format_version: 3,
+                source_manifests: 0,
+                source_bytes_verified: 0,
+                source_bytes_unavailable: 0,
+            })
+        }
+    }
 }
 
 pub fn verify_export_expected(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<(String, usize), AppError> {
+    if is_v4(path)? {
+        let result = super::verify_v4::verify_export_v4(path, expected_key)?;
+        return Ok((result.analyst_key_fingerprint, result.entries));
+    }
     let bundle = read_export_bundle(path)?;
     let id =
         CaseId::parse(&bundle.case_id).map_err(|_| storage_reason("invalid case id in export"))?;
@@ -52,6 +76,13 @@ pub fn verify_export_expected(
         ));
     }
     Ok((fingerprint, bundle.audit.len()))
+}
+
+fn is_v4(path: &Path) -> Result<bool, AppError> {
+    let mut file = fs::File::open(path).map_err(storage)?;
+    let mut prefix = [0u8; super::export_v4::MAGIC_V4.len()];
+    file.read_exact(&mut prefix).map_err(storage)?;
+    Ok(prefix == super::export_v4::MAGIC_V4)
 }
 
 fn read_export_bundle(path: &Path) -> Result<ExportBundle, AppError> {

@@ -230,9 +230,17 @@ fn apply_session_policy<'a>(
 }
 
 fn run_verify_export(path: &std::path::Path, expected_key: Option<&str>) -> Result<bool> {
-    let (fingerprint, entries) =
-        irmind_app::verify_export(&LocalExportVerifier, path, expected_key)?;
-    println!("verified {entries} audit entries; analyst key fingerprint {fingerprint}");
+    let result = irmind_app::verify_export_details(&LocalExportVerifier, path, expected_key)?;
+    println!(
+        "verified {} audit entries; analyst key fingerprint {}",
+        result.entries, result.analyst_key_fingerprint
+    );
+    if result.format_version == 4 {
+        println!(
+            "signed source manifests: {}; original bytes verified: {}; originals unavailable in package: {}",
+            result.source_manifests, result.source_bytes_verified, result.source_bytes_unavailable
+        );
+    }
     Ok(false)
 }
 

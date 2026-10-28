@@ -18,7 +18,7 @@ Cliente de IA en terminal para investigaciones de seguridad, con llamadas a herr
 - Ingerir evidencia local y consultar la cronología y el grafo de entidades.
 - Pedir a un modelo seleccionado que proponga consultas de investigación.
 - Revisar y firmar aprobaciones antes de un enriquecimiento externo.
-- Ver la evidencia original mientras el modelo recibe una copia limitada y redactada.
+- Consultar registros indexados y originales disponibles mientras el modelo recibe datos limitados y redactados.
 - Verificar, sellar, exportar y volver a verificar un paquete de caso.
 
 ## Cómo funciona
@@ -49,10 +49,10 @@ Todavía no hay binarios publicados como versión. CI genera artefactos sin firm
 
 1. Ejecuta `irmind` sin subcomando. Elige el llavero del sistema o el archivo cifrado para las firmas y los secretos. El archivo funciona por SSH sin sesión gráfica. Guarda la huella de la clave pública del analista fuera de este equipo.
 2. Pulsa `n` para crear un caso. Indica título, severidad y ventana temporal. Deja vacías las fuentes remotas para trabajar solo con evidencia local.
-3. Abre el caso y escribe `/ingest`. Selecciona [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), que contiene únicamente datos sintéticos.
+3. Abre el caso y escribe `/ingest`. Selecciona [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), que contiene únicamente datos sintéticos. IRMind calcula el hash en su ubicación; copiar el original es una opción explícita.
 4. Vuelve a la pantalla de inicio y pulsa `m`. Selecciona el módulo compatible con OpenAI, pulsa `e` para indicar un modelo instalado y una URL local como `http://127.0.0.1:11434/v1/`, y confirma el cambio. La sesión se recarga dentro de la TUI. Para un proveedor remoto, sigue [configuración](docs/es/configuration.md) y aprueba antes su tratamiento de datos.
 5. Abre de nuevo el caso y describe la alerta sintética en la conversación. Enter envía; Alt+Enter añade una línea. Desplázate con PgUp/PgDn, abre el panel lateral con `Ctrl+B` y escribe `/` para ver comandos. `Ctrl+K` abre la paleta; `/pause` o Esc cancela una tarea activa.
-6. Revisa la cronología y la evidencia. Usa `/verify`, `/report`, `/seal` y `/export`. El sellado y la exportación muestran el hash y la huella de la clave antes de confirmar.
+6. Revisa la cronología y los registros indexados. Usa `/verify <directorio-origen>`, `/report`, `/seal` y `/export`. El sellado y la exportación muestran el hash y la huella de la clave antes de confirmar.
 
 Ningún LLM está habilitado por defecto. Puedes ingerir y verificar evidencia local sin uno.
 

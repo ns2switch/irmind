@@ -1,0 +1,332 @@
+use super::{
+    AppError, CancellationToken, CaseId, ParquetArtifactV1, ParquetStore, PathBuf, storage,
+};
+use duckdb::{Connection, Row, params_from_iter};
+use irmind_app::LargeCaseStore;
+use irmind_app::TimelineEvent;
+use std::sync::mpsc::{self, Sender};
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
+
+const QUERY_DEADLINE: Duration = Duration::from_secs(10);
+const MAX_QUERY_FILES: usize = 8192;
+
+struct QueryDeadline {
+    stop: Sender<()>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl QueryDeadline {
+    fn start(db: &Connection, cancel: CancellationToken) -> Self {
+        let interrupt = db.interrupt_handle();
+        let (stop, receive) = mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let start = Instant::now();
+            loop {
+                if cancel.is_cancelled() || start.elapsed() >= QUERY_DEADLINE {
+                    interrupt.interrupt();
+                    break;
+                }
+                if receive.recv_timeout(Duration::from_millis(50)).is_ok() {
+                    break;
+                }
+            }
+        });
+        Self {
+            stop,
+            thread: Some(thread),
+        }
+    }
+}
+
+impl Drop for QueryDeadline {
+    fn drop(&mut self) {
+        let _ = self.stop.send(());
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+impl ParquetStore {
+    fn verified_paths(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        cancel: &CancellationToken,
+    ) -> Result<Vec<PathBuf>, AppError> {
+        if artifacts.len() > MAX_QUERY_FILES {
+            return Err(AppError::Policy(
+                "too many Parquet partitions; narrow the query".into(),
+            ));
+        }
+        let case_dir = self.case_dir(id)?;
+        let mut paths = Vec::with_capacity(artifacts.len());
+        for artifact in artifacts {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            self.verify_artifact(id, artifact, cancel)?;
+            paths.push(case_dir.join(&artifact.path));
+        }
+        Ok(paths)
+    }
+
+    pub(crate) fn search_artifacts(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        term: &str,
+        limit: usize,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        if term.trim().is_empty() || term.len() > 128 || !(1..=20).contains(&limit) {
+            return Err(AppError::Policy("invalid Parquet search arguments".into()));
+        }
+        if artifacts.is_empty() {
+            return Ok("no indexed matches".into());
+        }
+        let count = limit.to_string();
+        let rows = self.query_rows(
+            id, artifacts,
+            "SELECT event_time,event,source_hash,record_index FROM {events} WHERE contains(lower(text), lower(?)) ORDER BY event_time DESC,source_hash,record_index LIMIT CAST(? AS BIGINT)",
+            &[term, &count], cancel,
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, u64>(3)?)),
+        )?;
+        let mut output = Vec::new();
+        for row in rows {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let (at, event, hash, index) = row;
+            let at = at.chars().take(32).collect::<String>();
+            let event = event.chars().take(160).collect::<String>();
+            output.push(format!("{at} {event} source={hash}#{index}"));
+        }
+        if output.is_empty() {
+            Ok("no indexed matches".into())
+        } else {
+            Ok(output.join("\n"))
+        }
+    }
+
+    pub(crate) fn timeline_artifacts(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        limit: usize,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<TimelineEvent>, AppError> {
+        let count = limit.min(100).to_string();
+        self.query_rows(id, artifacts,
+            "SELECT event_time,event,source_hash,record_index FROM {events} ORDER BY event_time DESC,source_hash,record_index LIMIT CAST(? AS BIGINT)",
+            &[&count], cancel,
+            |row| Ok(TimelineEvent {
+                at: row.get(0)?, event: row.get(1)?, evidence_hash: row.get(2)?,
+                record_index: usize::try_from(row.get::<_, u64>(3)?).map_err(|_| duckdb::Error::InvalidParameterName("record index overflow".into()))?,
+            }),
+        )
+    }
+
+    pub(crate) fn entity_timeline_artifacts(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        kind: &str,
+        value: &str,
+        limit: usize,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        let count = limit.min(20).to_string();
+        let rows = self.query_rows(id, artifacts,
+            "SELECT event_time,event,source_hash,record_index FROM {entities} WHERE entity_kind=? AND entity_value=? ORDER BY event_time DESC LIMIT CAST(? AS BIGINT)",
+            &[kind,value,&count], cancel,
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, u64>(3)?)),
+        )?;
+        if rows.is_empty() {
+            return Ok("no entity activity in Parquet".into());
+        }
+        Ok(rows
+            .into_iter()
+            .map(|(at, event, hash, index)| format!("{at} {event} source={hash}#{index}"))
+            .collect::<Vec<_>>()
+            .join("\n"))
+    }
+
+    pub(crate) fn entity_artifacts(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        kind: &str,
+        value: &str,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        let rows = self.query_rows(id, artifacts,
+            "SELECT COUNT(*),MIN(event_time),MAX(event_time) FROM {entities} WHERE entity_kind=? AND entity_value=?",
+            &[kind, value], cancel,
+            |row| Ok((row.get::<_, u64>(0)?, row.get::<_, Option<String>>(1)?, row.get::<_, Option<String>>(2)?)),
+        )?;
+        let Some((count, first, last)) = rows.into_iter().next() else {
+            return Ok("entity not found in Parquet".into());
+        };
+        Ok(format!(
+            "{kind} {value}: count={count}; first={}; last={}",
+            first.unwrap_or_default(),
+            last.unwrap_or_default()
+        ))
+    }
+
+    pub(crate) fn neighbors_artifacts(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        kind: &str,
+        value: &str,
+        limit: usize,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        let count = limit.min(20).to_string();
+        let rows = self.query_rows(id, artifacts,
+            "WITH records AS (SELECT * FROM {entities}) SELECT n.entity_kind,n.entity_value,COUNT(*) FROM records target JOIN records n USING (source_hash,record_index) WHERE target.entity_kind=? AND target.entity_value=? AND (n.entity_kind<>? OR n.entity_value<>?) GROUP BY 1,2 ORDER BY 3 DESC,1,2 LIMIT CAST(? AS BIGINT)",
+            &[kind, value, kind, value, &count], cancel,
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, u64>(2)?)),
+        )?;
+        if rows.is_empty() {
+            return Ok("no neighbors in Parquet".into());
+        }
+        Ok(rows
+            .into_iter()
+            .map(|(k, v, n)| format!("{k} {v} co-observed {n} times"))
+            .collect::<Vec<_>>()
+            .join("\n"))
+    }
+
+    pub(crate) fn raw_artifact(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        hash: &str,
+        index: usize,
+        cancel: &CancellationToken,
+    ) -> Result<Option<String>, AppError> {
+        let index = index.to_string();
+        let rows = self.query_rows(id, artifacts,
+            "SELECT text FROM {events} WHERE source_hash=? AND record_index=CAST(? AS UBIGINT) LIMIT 1",
+            &[hash, &index], cancel, |row| row.get::<_, String>(0))?;
+        Ok(rows.into_iter().next())
+    }
+
+    pub(crate) fn summary_artifacts(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        let rows = self.query_rows(
+            id,
+            artifacts,
+            "SELECT COUNT(*),MIN(event_time),MAX(event_time) FROM {events}",
+            &[],
+            cancel,
+            |row| {
+                Ok((
+                    row.get::<_, u64>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                ))
+            },
+        )?;
+        let Some((count, first, last)) = rows.into_iter().next() else {
+            return Ok("no Parquet records".into());
+        };
+        Ok(format!(
+            "Parquet records={count}; first={}; last={}",
+            first.unwrap_or_default(),
+            last.unwrap_or_default()
+        ))
+    }
+
+    pub(crate) fn path_artifacts(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        from: (&str, &str),
+        to: (&str, &str),
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        let rows = self.query_rows(id, artifacts,
+            "WITH records AS (SELECT * FROM {entities}) SELECT a.source_hash,a.record_index FROM records a JOIN records b USING (source_hash,record_index) WHERE a.entity_kind=? AND a.entity_value=? AND b.entity_kind=? AND b.entity_value=? LIMIT 1",
+            &[from.0,from.1,to.0,to.1], cancel,
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?)),
+        )?;
+        if let Some((hash, index)) = rows.into_iter().next() {
+            Ok(format!(
+                "{} {} --[co-observed in {hash}#{index}]--> {} {}",
+                from.0, from.1, to.0, to.1
+            ))
+        } else {
+            Ok("no direct co-observation path found within the query budget".into())
+        }
+    }
+
+    fn query_rows<T>(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        sql: &str,
+        arguments: &[&str],
+        cancel: &CancellationToken,
+        mut map: impl FnMut(&Row<'_>) -> duckdb::Result<T>,
+    ) -> Result<Vec<T>, AppError> {
+        if artifacts.is_empty() {
+            return Ok(Vec::new());
+        }
+        let (marker, schema) = if sql.contains("{events}") {
+            ("{events}", "irmind-events-v2")
+        } else if sql.contains("{entities}") {
+            ("{entities}", "irmind-entities-v1")
+        } else {
+            return Err(AppError::Policy("invalid Parquet query template".into()));
+        };
+        let selected = artifacts
+            .iter()
+            .filter(|artifact| artifact.schema_version == schema)
+            .cloned()
+            .collect::<Vec<_>>();
+        if selected.is_empty() {
+            return Ok(Vec::new());
+        }
+        let verify_started = Instant::now();
+        let paths = self.verified_paths(id, &selected, cancel)?;
+        if let Some(profile) = &self.profile {
+            profile.record_query_verify(verify_started.elapsed());
+        }
+        let sql_started = Instant::now();
+        let db = Connection::open_in_memory().map_err(storage)?;
+        db.execute_batch("SET threads=2; SET memory_limit='512MB'")
+            .map_err(storage)?;
+        let _deadline = QueryDeadline::start(&db, cancel.clone());
+        let placeholders = vec!["?"; paths.len()].join(",");
+        let statement = sql.replace(marker, &format!("read_parquet([{placeholders}])"));
+        let mut params = paths
+            .iter()
+            .map(|path| path.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        params.extend(arguments.iter().map(|value| (*value).to_owned()));
+        let mut query = db.prepare(&statement).map_err(storage)?;
+        let rows = query
+            .query_map(params_from_iter(params.iter()), |row| map(row))
+            .map_err(storage)?;
+        let mut output = Vec::new();
+        for row in rows {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            output.push(row.map_err(storage)?);
+        }
+        if let Some(profile) = &self.profile {
+            profile.record_query_sql(sql_started.elapsed());
+        }
+        Ok(output)
+    }
+}

@@ -2,6 +2,8 @@ use crate::{
     Actor, AppError, CancellationToken, Case, CaseId, CaseSeal, GraphRecord, SignedEntry,
     SignedOperation, Tainted, TimelineEvent,
 };
+use irmind_domain::{ParquetArtifactV1, SourceManifestV1};
+use std::io::Read;
 use std::path::Path;
 pub trait CaseLock: Send {}
 
@@ -127,6 +129,87 @@ pub trait EventParser: Send + Sync {
     }
 }
 
+/// Parser for large, pre-hashed sources. The caller verifies the same reader
+/// again while parsing before it commits any signed manifest entry.
+pub trait StreamingEventParser: Send + Sync {
+    fn streaming_version(&self) -> &'static str;
+    fn parse_reader(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        evidence_hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<usize, AppError>;
+}
+
+pub struct PreparedSource {
+    pub manifest: SourceManifestV1,
+    pub artifacts: Vec<ParquetArtifactV1>,
+    pub records: usize,
+}
+
+/// The local adapter owns all paths and derived files. The application signs
+/// the returned manifests before any derived file is exposed to model tools.
+pub trait LargeCaseStore: Send + Sync {
+    fn prepare_local(
+        &self,
+        case_id: &CaseId,
+        source_root: &Path,
+        relative_path: &str,
+        copy_original: bool,
+        parser: &dyn StreamingEventParser,
+        cancel: &CancellationToken,
+    ) -> Result<PreparedSource, AppError>;
+
+    fn prepare_legacy_evidence(
+        &self,
+        case_id: &CaseId,
+        hash: &str,
+        bytes: &[u8],
+        parser: &dyn StreamingEventParser,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<ParquetArtifactV1>, AppError>;
+
+    fn compact_artifacts(
+        &self,
+        case_id: &CaseId,
+        sources: &[ParquetArtifactV1],
+        cancel: &CancellationToken,
+    ) -> Result<ParquetArtifactV1, AppError>;
+
+    fn verify_local_source(
+        &self,
+        source_root: &Path,
+        manifest: &SourceManifestV1,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError>;
+
+    fn verify_copied_source(
+        &self,
+        case_id: &CaseId,
+        manifest: &SourceManifestV1,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError>;
+
+    fn verify_artifact(
+        &self,
+        case_id: &CaseId,
+        artifact: &ParquetArtifactV1,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError>;
+
+    fn rebuild_compare(
+        &self,
+        case_id: &CaseId,
+        source_root: &Path,
+        sources: &[SourceManifestV1],
+        artifacts: &[ParquetArtifactV1],
+        parser: &dyn StreamingEventParser,
+        cancel: &CancellationToken,
+    ) -> Result<usize, AppError>;
+}
+
 pub trait Signer: Send + Sync {
     fn actor(&self) -> Actor;
     fn public_key(&self) -> Vec<u8>;
@@ -144,6 +227,43 @@ pub trait ExportVerifier: Send + Sync {
         path: &Path,
         expected_key: Option<&str>,
     ) -> Result<(String, usize), AppError>;
+
+    fn verify_export_details(
+        &self,
+        path: &Path,
+        expected_key: Option<&str>,
+    ) -> Result<ExportVerification, AppError> {
+        let (analyst_key_fingerprint, entries) = self.verify_export(path, expected_key)?;
+        Ok(ExportVerification {
+            analyst_key_fingerprint,
+            entries,
+            format_version: 3,
+            source_manifests: 0,
+            source_bytes_verified: 0,
+            source_bytes_unavailable: 0,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExportVerification {
+    pub analyst_key_fingerprint: String,
+    pub entries: usize,
+    pub format_version: u32,
+    pub source_manifests: usize,
+    pub source_bytes_verified: usize,
+    pub source_bytes_unavailable: usize,
+}
+
+pub trait LargeCaseExporter: Send + Sync {
+    fn export_case_v4(
+        &self,
+        id: &CaseId,
+        path: &Path,
+        source_root: Option<&Path>,
+        include_originals: bool,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError>;
 }
 
 /// Writes a sealed case package to a new local path. The application verifies

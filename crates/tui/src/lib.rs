@@ -100,6 +100,15 @@ pub trait WorkspaceIo: Send + Sync {
     fn save_evidence(&self, path: &Path, bytes: &[u8]) -> Result<()>;
     fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String>;
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter;
+    fn large_case_exporter(&self) -> Option<&dyn irmind_app::LargeCaseExporter> {
+        None
+    }
+    fn large_case_store(&self) -> Option<&dyn irmind_app::LargeCaseStore> {
+        None
+    }
+    fn streaming_parser(&self) -> Option<&dyn irmind_app::StreamingEventParser> {
+        None
+    }
     fn keystore_status(&self) -> Result<KeystoreStatus>;
     fn put_credential(&self, name: &str, value: &SecretString) -> Result<()>;
     fn delete_credential(&self, name: &str) -> Result<()>;

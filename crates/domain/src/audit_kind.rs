@@ -30,6 +30,8 @@ pub enum AuditEventKind {
     PolicyActivated,
     Prompt,
     Proposal,
+    SourceManifestV1,
+    ParquetArtifactV1,
     TaintDeclassified,
     ToolDispatch,
     ToolError,
@@ -37,7 +39,7 @@ pub enum AuditEventKind {
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 31] = [
+    pub const ALL: [Self; 33] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -65,6 +67,8 @@ impl AuditEventKind {
         Self::PolicyActivated,
         Self::Prompt,
         Self::Proposal,
+        Self::SourceManifestV1,
+        Self::ParquetArtifactV1,
         Self::TaintDeclassified,
         Self::ToolDispatch,
         Self::ToolError,
@@ -100,6 +104,8 @@ impl AuditEventKind {
             Self::PolicyActivated => "PolicyActivated",
             Self::Prompt => "Prompt",
             Self::Proposal => "Proposal",
+            Self::SourceManifestV1 => "SourceManifestV1",
+            Self::ParquetArtifactV1 => "ParquetArtifactV1",
             Self::TaintDeclassified => "TaintDeclassified",
             Self::ToolDispatch => "ToolDispatch",
             Self::ToolError => "ToolError",
@@ -128,7 +134,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 31] = [
+        const EXPECTED: [&str; 33] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -156,6 +162,8 @@ mod tests {
             "PolicyActivated",
             "Prompt",
             "Proposal",
+            "SourceManifestV1",
+            "ParquetArtifactV1",
             "TaintDeclassified",
             "ToolDispatch",
             "ToolError",

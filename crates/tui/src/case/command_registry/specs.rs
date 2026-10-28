@@ -15,7 +15,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "verify",
-        description: "Verify case custody",
+        description: "Verify custody; add a source root for large cases",
         shortcut: "",
         slash: true,
     },
@@ -27,7 +27,13 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "verify-graph",
-        description: "Verify derived graph",
+        description: "Verify graph; add a source root for Parquet",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
+        name: "migrate",
+        description: "Convert copied evidence in an open case to Parquet",
         shortcut: "",
         slash: true,
     },

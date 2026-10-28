@@ -29,11 +29,11 @@ If `config.toml` needs recovery, the TUI offers restoration or a field-by-field 
 ## A synthetic first case
 
 1. Press `n`, enter a title such as “Demo CloudTrail alert,” select a severity, and leave remote source fields empty. That creates a local-only case with a signed event.
-2. In the case view, enter `/ingest` and select [the synthetic CloudTrail file](../examples/cloudtrail-alert.json). The original file is hashed and retained locally.
-3. Use `/timeline` or `/graph` to inspect the indexed events. `/search <words>` finds matching JSON records in this case. Use `/evidence <hash>` to view an original record.
+2. In the case view, enter `/ingest` and select [the synthetic CloudTrail file](../examples/cloudtrail-alert.json). IRMind hashes it in place and writes a derived Parquet index. The original is copied only if you explicitly use `/ingest --copy-original <path>`.
+3. Use `/timeline` or `/graph` to inspect the indexed events. `/search <words>` finds matching JSON records. Use `/raw <hash> <index>` to inspect one indexed record.
 4. Return to the home screen, press `m`, and choose a model and its public settings as described in [configuration](configuration.md). The session reloads without exiting IRMind. Open the case and ask: “What does the synthetic AssumeRole event suggest?”
 5. Review proposed calls in the conversation. Enter sends; Alt+Enter or Shift+Enter adds a line. Type `/` for command suggestions or press `Ctrl+K` for the palette. `/pause` or Esc cancels an active task.
-6. Run `/verify`, review `/report`, and use `/seal` and `/export` only after checking the displayed case hash and signing-key fingerprint.
+6. Run `/verify <source-root>` to check the original bytes, review `/report`, and use `/seal` and `/export` only after checking the displayed case hash and signing-key fingerprint.
 
 The export can be checked on a second computer with `irmind verify-export <PACKAGE> --expected-key <FINGERPRINT>`. See the [CLI reference](development/cli.md) for automation.
 

@@ -78,4 +78,5 @@ pub enum DomainError {
     InvalidIocValue,
     InvalidSeverity,
     UnknownAuditEvent,
+    InvalidManifest,
 }

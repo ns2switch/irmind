@@ -92,26 +92,25 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return Ok(true);
         }
         if let Some(path) = prompt.strip_prefix("/ingest ") {
+            let (copy_original, path) = path
+                .strip_prefix("--copy-original ")
+                .map_or((false, path), |selected| (true, selected));
             let path = PathBuf::from(path);
             let workflow = self.workflow();
             let id = self.id;
             let progress = self.progress_tx.clone();
             self.start_task("Ingest", move |cancel| {
                 workflow
-                    .ingest_path(id, &path, &cancel, |done, count, source| {
-                        let _ = progress.send(format!("Ingested {done}/{count}: {source}"));
-                    })
+                    .ingest_path_with_copy(
+                        id,
+                        &path,
+                        copy_original,
+                        &cancel,
+                        |done, count, source| {
+                            let _ = progress.send(format!("Ingested {done}/{count}: {source}"));
+                        },
+                    )
                     .map(|count| format!("Ingested {count} files"))
-            });
-            return Ok(true);
-        }
-        if prompt == "/verify" {
-            let workflow = self.workflow();
-            let id = self.id;
-            self.start_task("Verify", move |cancel| {
-                workflow
-                    .verify(id, &cancel)
-                    .map(|count| format!("Verified {count} audit entries"))
             });
             return Ok(true);
         }
@@ -125,17 +124,72 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             });
             return Ok(true);
         }
-        if prompt == "/verify-graph" {
-            let engine = self.engine;
+        if prompt == "/migrate" {
+            let workflow = self.workflow();
+            let id = self.id;
+            self.start_task("Migrate copied evidence", move |cancel| {
+                workflow
+                    .migrate_legacy(id, &cancel)
+                    .map(|count| format!("Converted {count} legacy copied sources to Parquet"))
+            });
+            return Ok(true);
+        }
+        if self.verify_command(prompt)? {
+            return Ok(true);
+        }
+        self.seal_or_export_command(prompt)
+    }
+
+    fn verify_command(&mut self, prompt: &str) -> Result<bool> {
+        if prompt == "/verify" {
+            let workflow = self.workflow();
             let id = self.id;
             self.start_task("Verify", move |cancel| {
-                engine
-                    .verify_graph_cancelable(id, &cancel)
+                workflow
+                    .verify(id, &cancel)
+                    .map(|count| format!("Verified {count} audit entries"))
+            });
+            return Ok(true);
+        }
+        if let Some(args) = prompt.strip_prefix("/verify ") {
+            let workflow = self.workflow();
+            let id = self.id;
+            let (mode, root) = if let Some(sample) = args.strip_prefix("--sample ") {
+                let (count, root) = sample
+                    .split_once(' ')
+                    .ok_or_else(|| anyhow::anyhow!("use /verify --sample <count> <source-root>"))?;
+                (irmind_app::SourceCheckMode::Sample(count.parse()?), root)
+            } else {
+                (irmind_app::SourceCheckMode::Full, args)
+            };
+            let root = PathBuf::from(root);
+            self.start_task("Verify originals", move |cancel| {
+                workflow.verify_with_source_root(id, &root, mode, &cancel)
+            });
+            return Ok(true);
+        }
+        if prompt == "/verify-graph" {
+            let workflow = self.workflow();
+            let id = self.id;
+            self.start_task("Verify", move |cancel| {
+                workflow
+                    .verify_graph(id, &cancel)
                     .map(|count| format!("Verified {count} graph records"))
             });
             return Ok(true);
         }
-        self.seal_or_export_command(prompt)
+        if let Some(root) = prompt.strip_prefix("/verify-graph ") {
+            let workflow = self.workflow();
+            let id = self.id;
+            let root = PathBuf::from(root);
+            self.start_task("Verify Parquet", move |cancel| {
+                workflow
+                    .verify_parquet_rebuild(id, &root, &cancel)
+                    .map(|count| format!("Rebuilt and compared {count} Parquet sources"))
+            });
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     fn seal_or_export_command(&mut self, prompt: &str) -> Result<bool> {

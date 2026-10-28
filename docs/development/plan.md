@@ -48,7 +48,7 @@ Do not implement the gateway yet. Preserve distinct Analyst and Agent signing ke
 
 - `ProposedCall` has no risk field. `Tool` determines risk.
 - The evidence graph uses DuckDB.
-- Parquet is the derived local event store for large cases; DuckDB reads only IRMind-produced Parquet. Original copies are an explicit option rather than an implicit requirement. The versioned custody format is subject to separate approval before implementation.
+- Parquet is the derived local event store for large cases; DuckDB reads only IRMind-produced Parquet. Original copies are an explicit option rather than an implicit requirement. The analyst approved the versioned source and artifact records and streaming v4 export; the existing signed entry encoding and v3 export remain valid.
 - `Actor` names the signer; event origin is separate.
 - No LLM is enabled by default. Use only synthetic data until provider compliance approval.
 - Local Ollama may use keyless loopback HTTP or HTTPS; remote models require HTTPS.

@@ -164,7 +164,7 @@ fn generate_corpus(root: &Path, corpus: Corpus, file_count: usize) -> usize {
     total
 }
 
-fn representative_records(file_index: usize) -> String {
+pub(super) fn representative_records(file_index: usize) -> String {
     let mut records = String::new();
     let mut index = 0usize;
     while records.len() < 1_045_000 {

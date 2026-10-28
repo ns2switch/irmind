@@ -89,3 +89,28 @@ The runner's representative DuckDB phase split into 218.715 s of term writes, 38
 
 The target of less than two minutes on a standard GitHub runner is indicative. The linked manual run and its artifact are the runner measurement.
 These are single runs under an 8 GB address-space cap with no swap; filesystem cache and other host activity can affect the comparison.
+
+## Partitioned Parquet prototype
+
+The new benchmark creates 1,000 CloudTrail-shaped files of about 1 MB each, signs source and artifact manifests, and compacts same-partition Parquet files into signed bundles. It deletes each four-file source batch immediately after conversion. The 15 GB variant repeats each file's synthetic records 15 times and also avoids keeping the full input corpus on disk. Both variants measure source hashing, conversion, compressed disk size, and five bounded DuckDB queries. They run in the release profile in the manual and weekly workflow, not in PR checks. The local diagnostics below used the unoptimized test profile and are not a substitute for the standard-runner result.
+
+The first two local 1 GB runs used the same Linux machine, unoptimized test profile, no swap, and the same 1,045,717,000 input bytes. The second run includes a per-case authenticated artifact catalog; the first query still validates the whole chain. It does **not** replace explicit full verification.
+
+| Local revision | Ingest wall time | Hash CPU sum | Conversion CPU sum | Parquet write CPU sum | Parquet disk bytes | First query |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Signed bundles, no catalog cache | 233.367 s | 21.758 s | 285.343 s | 103.016 s | 301,200,871 | 26.724 s term p95 |
+| Signed bundles, catalog cache | 246.755 s | 22.024 s | 286.021 s | 98.286 s | 301,200,871 | 24.710 s summary |
+
+The CPU sums overlap because four source files can be prepared in parallel. Host activity varied between runs, so the 13.388 s ingest difference is not evidence of a regression. The Parquet disk figure includes the signed single-source files retained for reconstruction and the active compact bundles. It is about 28.8% of the input size.
+
+| Warm 1 GB query | p50 | p95 | Errors |
+| --- | ---: | ---: | ---: |
+| Term | 4.138 s | 4.161 s | 0 |
+| Entity lookup | 0.653 s | 0.667 s | 0 |
+| Neighbors | 3.449 s | 3.483 s | 0 |
+| Timeline | 2.567 s | 2.571 s | 0 |
+| Direct path | 0.890 s | 0.908 s | 0 |
+
+Before the catalog cache, warm queries still spent 23–27 s each: around 21 s was repeated audit-chain validation, while Parquet hashing and SQL accounted for about 1.25 s and 1.10 s per query on average. The cache checks the signed head and SQLite `data_version`, and a test alters an earlier entry from another connection to ensure that change invalidates it. Each selected Parquet file is still hashed before DuckDB reads it.
+
+These measurements do not establish the 15 GB acceptance target. A 15 GB run on the standard GitHub runner, including cold and warm p50/p95 query latency, remains required. The local 1 GB ingestion time already exceeds the proportional 60 s target for 15 GB in 15 minutes, so H7 remains open until the runner result and any further optimization are reviewed.

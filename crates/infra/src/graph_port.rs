@@ -1,7 +1,9 @@
 use crate::{
-    AppError, CaseId, EventParser, EvidenceGraph, EvidenceStore, GraphRecord, LocalStore,
+    AppError, AuditLog, CaseId, EventParser, EvidenceGraph, EvidenceStore, GraphRecord, LocalStore,
     Repository, Tainted, TimelineEvent, Value, storage, storage_reason,
 };
+mod catalog;
+pub(crate) use catalog::CachedCatalog;
 
 impl EvidenceGraph for LocalStore {
     fn index_from_parser(
@@ -32,16 +34,59 @@ impl EvidenceGraph for LocalStore {
     }
 
     fn graph_summary(&self, id: &CaseId) -> Result<String, AppError> {
-        self.graph.summary(id)
+        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+            return self.graph.summary(id);
+        };
+        let newer = self.parquet.summary_artifacts(
+            id,
+            &artifacts,
+            &irmind_app::CancellationToken::new(),
+        )?;
+        if self.has_legacy_graph(id)? {
+            Ok(format!("{newer}\n{}", self.graph.summary(id)?))
+        } else {
+            Ok(newer)
+        }
     }
 
     fn timeline(&self, id: &CaseId, limit: usize) -> Result<Vec<TimelineEvent>, AppError> {
-        self.graph.timeline(id, limit)
+        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+            return self.graph.timeline(id, limit);
+        };
+        let mut events = self.parquet.timeline_artifacts(
+            id,
+            &artifacts,
+            limit,
+            &irmind_app::CancellationToken::new(),
+        )?;
+        if self.has_legacy_graph(id)? {
+            events.extend(self.graph.timeline(id, limit)?);
+            events.sort_by(|left, right| right.at.cmp(&left.at));
+            events.truncate(limit);
+        }
+        Ok(events)
     }
 
     fn entity_lookup(&self, id: &CaseId, kind: &str, value: &str) -> Result<String, AppError> {
         self.check_entity_query(id, kind, value, 1)?;
-        self.graph.entity_lookup(id, kind, value)
+        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+            return self.graph.entity_lookup(id, kind, value);
+        };
+        let newer = self.parquet.entity_artifacts(
+            id,
+            &artifacts,
+            kind,
+            value,
+            &irmind_app::CancellationToken::new(),
+        )?;
+        if self.has_legacy_graph(id)? {
+            Ok(format!(
+                "{newer}\n{}",
+                self.graph.entity_lookup(id, kind, value)?
+            ))
+        } else {
+            Ok(newer)
+        }
     }
 
     fn neighbors(
@@ -52,7 +97,25 @@ impl EvidenceGraph for LocalStore {
         limit: usize,
     ) -> Result<String, AppError> {
         self.check_entity_query(id, kind, value, limit)?;
-        self.graph.neighbors(id, kind, value, limit)
+        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+            return self.graph.neighbors(id, kind, value, limit);
+        };
+        let newer = self.parquet.neighbors_artifacts(
+            id,
+            &artifacts,
+            kind,
+            value,
+            limit,
+            &irmind_app::CancellationToken::new(),
+        )?;
+        if self.has_legacy_graph(id)? {
+            Ok(format!(
+                "{newer}\n{}",
+                self.graph.neighbors(id, kind, value, limit)?
+            ))
+        } else {
+            Ok(newer)
+        }
     }
 
     fn entity_timeline(
@@ -63,7 +126,25 @@ impl EvidenceGraph for LocalStore {
         limit: usize,
     ) -> Result<String, AppError> {
         self.check_entity_query(id, kind, value, limit)?;
-        self.graph.entity_timeline(id, kind, value, limit)
+        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+            return self.graph.entity_timeline(id, kind, value, limit);
+        };
+        let newer = self.parquet.entity_timeline_artifacts(
+            id,
+            &artifacts,
+            kind,
+            value,
+            limit,
+            &irmind_app::CancellationToken::new(),
+        )?;
+        if self.has_legacy_graph(id)? {
+            Ok(format!(
+                "{newer}\n{}",
+                self.graph.entity_timeline(id, kind, value, limit)?
+            ))
+        } else {
+            Ok(newer)
+        }
     }
 
     fn graph_path(
@@ -74,7 +155,21 @@ impl EvidenceGraph for LocalStore {
     ) -> Result<String, AppError> {
         self.check_entity_query(id, from.0, from.1, 1)?;
         self.check_entity_query(id, to.0, to.1, 1)?;
-        self.graph.path(id, from, to)
+        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+            return self.graph.path(id, from, to);
+        };
+        let newer = self.parquet.path_artifacts(
+            id,
+            &artifacts,
+            from,
+            to,
+            &irmind_app::CancellationToken::new(),
+        )?;
+        if self.has_legacy_graph(id)? {
+            Ok(format!("{newer}\n{}", self.graph.path(id, from, to)?))
+        } else {
+            Ok(newer)
+        }
     }
 
     fn text_search(&self, id: &CaseId, query: &str, limit: usize) -> Result<String, AppError> {
@@ -84,7 +179,23 @@ impl EvidenceGraph for LocalStore {
                 irmind_app::AdapterPolicyError::InvalidTextSearchArguments,
             )));
         }
-        self.graph.text_search(id, query, limit)
+        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+            return self.graph.text_search(id, query, limit);
+        };
+        let parquet = self.parquet.search_artifacts(
+            id,
+            &artifacts,
+            query,
+            limit,
+            &irmind_app::CancellationToken::new(),
+        )?;
+        let legacy = self.has_legacy_graph(id)?;
+        if legacy {
+            let older = self.graph.text_search(id, query, limit)?;
+            Ok(format!("{parquet}\n{older}"))
+        } else {
+            Ok(parquet)
+        }
     }
 
     fn raw_record(&self, id: &CaseId, hash: &str, index: usize) -> Result<String, AppError> {
@@ -95,6 +206,34 @@ impl EvidenceGraph for LocalStore {
             )));
         }
         let hash = hash.to_ascii_lowercase();
+        if let Some(artifacts) = self.signed_parquet_artifacts(id)?
+            && artifacts.iter().any(|artifact| {
+                artifact
+                    .source_hashes
+                    .iter()
+                    .any(|source| source.as_str() == hash)
+            })
+        {
+            let raw = self
+                .parquet
+                .raw_artifact(
+                    id,
+                    &artifacts,
+                    &hash,
+                    index,
+                    &irmind_app::CancellationToken::new(),
+                )?
+                .ok_or_else(|| storage_reason("record pointer missing from signed Parquet"))?;
+            let excerpt = raw.chars().take(2_000).collect::<String>();
+            return Ok(format!(
+                "source={hash}#{index} {excerpt}{}",
+                if raw.chars().count() > 2_000 {
+                    " [truncated]"
+                } else {
+                    ""
+                }
+            ));
+        }
         if !self.graph.has_record(id, &hash, index)? {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::RecordPointerIsNotIndexedInThisCase,

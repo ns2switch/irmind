@@ -5,12 +5,14 @@ mod config_toml;
 mod evidence_fs;
 mod graph_duckdb;
 mod graph_port;
+mod parquet_store;
 mod seal;
 mod signing;
 mod sqlite;
 pub use clock::SystemClock;
 pub use config_toml::TomlConfigurationStore;
 use irmind_fs::{private_dir, private_file};
+pub use parquet_store::ParquetStore;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use ed25519_dalek::{Signature, Signer as _, SigningKey, VerifyingKey};
@@ -48,6 +50,8 @@ fn storage_reason(message: &'static str) -> AppError {
 pub struct LocalStore {
     db: Mutex<Connection>,
     graph: GraphStore,
+    parquet: ParquetStore,
+    graph_catalog: Mutex<std::collections::HashMap<CaseId, graph_port::CachedCatalog>>,
     evidence_dir: PathBuf,
     seal_dir: PathBuf,
     lock_dir: PathBuf,

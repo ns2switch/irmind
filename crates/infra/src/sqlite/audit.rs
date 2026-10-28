@@ -187,3 +187,25 @@ impl AuditLog for LocalStore {
         tx.commit().map_err(storage)
     }
 }
+
+impl LocalStore {
+    pub(crate) fn for_each_audit_entry(
+        &self,
+        id: &CaseId,
+        mut visitor: impl FnMut(SignedEntry) -> Result<(), AppError>,
+    ) -> Result<usize, AppError> {
+        let conn = self.conn()?;
+        let mut statement = conn.prepare("SELECT case_id,seq,at,actor,origin,kind,payload,evidence,prev,hash,sig,public_key FROM audit WHERE case_id=?1 ORDER BY seq").map_err(storage)?;
+        let mut count = 0usize;
+        for row in statement
+            .query_map([id.as_str()], map_entry)
+            .map_err(storage)?
+        {
+            visitor(row.map_err(storage)?)?;
+            count = count
+                .checked_add(1)
+                .ok_or_else(|| storage_reason("too many audit entries"))?;
+        }
+        Ok(count)
+    }
+}
