@@ -23,6 +23,7 @@ The C4b measurements below use the same local Linux machine and test profile, wi
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | C4b, 2026-10-28 | Representative CloudTrail | 1,045,737,000 | 1,000 | 980.910 s | 0.470 s | 261,434,250 | 39 |
 | C4b, 2026-10-28 | Extreme large record | 1,048,578,740 | 25 | 188.033 s | 0.701 s | 262,144,685 | 583 |
+| C4b Arrow term batches, 2026-10-28 | Representative CloudTrail | 1,045,737,000 | 1,000 | 792.161 s | 0.506 s | 261,434,250 | 39 |
 
 ### Phase profile
 
@@ -40,6 +41,16 @@ Percentages use ingestion plus query time as the denominator. Guard time covers 
 | Representative | Audit write | 50.872 | 5.2% |
 | Representative | Query | 0.470 | 0.0% |
 | Representative | Other | 0.138 | 0.0% |
+| Representative, Arrow batches | Read and hash | 41.634 | 5.3% |
+| Representative, Arrow batches | Custody verification | 60.956 | 7.7% |
+| Representative, Arrow batches | Guard | 0.001 | 0.0% |
+| Representative, Arrow batches | JSON parse | 15.985 | 2.0% |
+| Representative, Arrow batches | Entity extraction | 43.589 | 5.5% |
+| Representative, Arrow batches | DuckDB insertion | 531.054 | 67.0% |
+| Representative, Arrow batches | Evidence write | 58.501 | 7.4% |
+| Representative, Arrow batches | Audit write | 40.294 | 5.1% |
+| Representative, Arrow batches | Query | 0.506 | 0.1% |
+| Representative, Arrow batches | Other | 0.148 | 0.0% |
 | Extreme | Read and hash | 41.637 | 22.1% |
 | Extreme | Custody verification | 40.590 | 21.5% |
 | Extreme | Guard | 0.003 | 0.0% |
@@ -55,4 +66,7 @@ Within the representative DuckDB insertion, commits took 378.418 s, text-term Ap
 
 The parser phase was small in local samples, so files remain in deterministic serial order. Parsing files in parallel would not address the measured DuckDB and storage costs. The 256 MiB DuckDB WAL checkpoint threshold reduces repeated small checkpoints while preserving committed writes and crash recovery; [DuckDB documents the setting](https://duckdb.org/docs/lts/configuration/overview).
 
+Arrow record batches cut local representative ingestion by 188.749 s (19.2%) on the same machine. DuckDB insertion fell by 168.909 s (24.1%): term writes fell from 171.678 to 128.957 s, and commits from 378.418 to 226.022 s. The per-file finish phase, including node aggregation, took 118.254 s after the change. Secondary indexes are absent during bulk loading and built on the first query that needs them; text search, graph summary, and record checks do not build unrelated indexes. The first text query remained near the baseline at 0.506 s versus 0.470 s. The 792.161 s ingestion remains 6.6 times above the indicative two-minute target locally. Even with DuckDB insertion eliminated, read/hash, custody, parsing, extraction, evidence writes, and audit writes would total 260.959 s on this machine; the target therefore cannot be met here by changing the term index alone.
+
 The target of less than two minutes on a standard GitHub runner is indicative. The workflow artifact provides the runner measurement; local timings alone do not establish runner performance.
+These are single runs under an 8 GB address-space cap with no swap; filesystem cache and other host activity can affect the comparison.
