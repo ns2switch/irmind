@@ -24,6 +24,8 @@ The C4b measurements below use the same local Linux machine and test profile, wi
 | C4b, 2026-10-28 | Representative CloudTrail | 1,045,737,000 | 1,000 | 980.910 s | 0.470 s | 261,434,250 | 39 |
 | C4b, 2026-10-28 | Extreme large record | 1,048,578,740 | 25 | 188.033 s | 0.701 s | 262,144,685 | 583 |
 | C4b Arrow term batches, 2026-10-28 | Representative CloudTrail | 1,045,737,000 | 1,000 | 792.161 s | 0.506 s | 261,434,250 | 39 |
+| C4b Arrow term batches, [GitHub Linux runner](https://github.com/ns2switch/irmind/actions/runs/40690758301) | Representative CloudTrail | 1,045,737,000 | 1,000 | 1,341.574 s | 2.604 s | 261,434,250 | 39 |
+| C4b Arrow term batches, [GitHub Linux runner](https://github.com/ns2switch/irmind/actions/runs/40690758301) | Extreme large record | 1,048,578,740 | 25 | 219.729 s | 1.689 s | 262,144,685 | 583 |
 
 ### Phase profile
 
@@ -62,11 +64,28 @@ Percentages use ingestion plus query time as the denominator. Guard time covers 
 | Extreme | Query | 0.701 | 0.4% |
 | Extreme | Other | 0.007 | 0.0% |
 
+The manual GitHub Linux run used the same `ci` profile and synthetic corpus as the local run. Its phase profile was:
+
+| Phase | Representative seconds | Representative share | Extreme seconds | Extreme share |
+| --- | ---: | ---: | ---: | ---: |
+| Read and hash | 57.840 | 4.3% | 58.396 | 26.4% |
+| Custody verification | 87.879 | 6.5% | 57.367 | 25.9% |
+| Guard | 0.002 | 0.0% | 0.005 | 0.0% |
+| JSON parse | 26.883 | 2.0% | 4.566 | 2.1% |
+| Entity extraction | 75.523 | 5.6% | 28.486 | 12.9% |
+| DuckDB insertion | 1,062.501 | 79.0% | 41.483 | 18.7% |
+| Evidence write | 29.561 | 2.2% | 29.343 | 13.3% |
+| Audit write | 1.213 | 0.1% | 0.030 | 0.0% |
+| Query | 2.604 | 0.2% | 1.689 | 0.8% |
+| Other | 0.174 | 0.0% | 0.059 | 0.0% |
+
 Within the representative DuckDB insertion, commits took 378.418 s, text-term Appender writes 171.678 s, and node aggregation 102.414 s. This measured cost prevents the indicative two-minute target locally. The two complete tests took 1,222.01 s together, including corpus generation and temporary cleanup; `ingest_seconds` excludes those costs. The extreme ingestion improved by 6.7x from the C4 Appender measurement on the same machine. Neither corpus met two minutes locally.
 
 The parser phase was small in local samples, so files remain in deterministic serial order. Parsing files in parallel would not address the measured DuckDB and storage costs. The 256 MiB DuckDB WAL checkpoint threshold reduces repeated small checkpoints while preserving committed writes and crash recovery; [DuckDB documents the setting](https://duckdb.org/docs/lts/configuration/overview).
 
 Arrow record batches cut local representative ingestion by 188.749 s (19.2%) on the same machine. DuckDB insertion fell by 168.909 s (24.1%): term writes fell from 171.678 to 128.957 s, and commits from 378.418 to 226.022 s. The per-file finish phase, including node aggregation, took 118.254 s after the change. Secondary indexes are absent during bulk loading and built on the first query that needs them; text search, graph summary, and record checks do not build unrelated indexes. The first text query remained near the baseline at 0.506 s versus 0.470 s. The 792.161 s ingestion remains 6.6 times above the indicative two-minute target locally. Even with DuckDB insertion eliminated, read/hash, custody, parsing, extraction, evidence writes, and audit writes would total 260.959 s on this machine; the target therefore cannot be met here by changing the term index alone.
 
-The target of less than two minutes on a standard GitHub runner is indicative. The workflow artifact provides the runner measurement; local timings alone do not establish runner performance.
+The runner's representative DuckDB phase split into 218.715 s of term writes, 382.680 s of per-file finish work, and 373.817 s of commits. Its non-DuckDB ingestion phases alone totaled 278.899 s. The representative result is 11.2 times the indicative two-minute target on this runner; changing the term writer alone cannot meet that target. There is no pre-change run on the same GitHub runner, so the 19.2% before/after comparison above is local only. Reaching two minutes requires a broader design change that reduces both per-file graph transactions and the non-graph custody and evidence I/O while preserving their guarantees.
+
+The target of less than two minutes on a standard GitHub runner is indicative. The linked manual run and its artifact are the runner measurement.
 These are single runs under an 8 GB address-space cap with no swap; filesystem cache and other host activity can affect the comparison.
