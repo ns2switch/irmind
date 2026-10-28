@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 9bf32f16bfbed60a22f6dac4fb9b674491459475; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit af9a0e42525fc5b8e2dd5fc17c5b1258e4b262cd; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -32,6 +32,6 @@ Cada PR y merge ejecuta los checks de Linux. Las PR que tocan código de platafo
 
 ## Después del MVP
 
-La consulta en origen queda para justo después del MVP: Athena, CloudTrail Lake y Security Lake en AWS; BigQuery y Log Analytics de Cloud Logging en GCP; Azure Data Explorer y Log Analytics en Azure. Solo se prevén consultas estructuradas, con presupuestos de escaneo y resultados firmados. Chronicle, otros conectores de producto, el anclaje externo de los sellos y el gateway con watches siguen aplazados. El gateway deberá usar una clave Agent distinta, permitir solo lecturas dentro del alcance sin analista y exigir la firma del analista para cada aprobación. La contención queda fuera del alcance actual.
+La [consulta en origen](../development/cloud-query-design.md) queda para justo después del MVP: Athena, CloudTrail Lake y Security Lake en AWS; BigQuery y Log Analytics de Cloud Logging en GCP; Azure Data Explorer y Log Analytics en Azure. Solo se prevén consultas estructuradas, con presupuestos de escaneo y resultados firmados. Chronicle, otros conectores de producto, el anclaje externo de los sellos y el gateway con watches siguen aplazados. El gateway deberá usar una clave Agent distinta, permitir solo lecturas dentro del alcance sin analista y exigir la firma del analista para cada aprobación. La contención queda fuera del alcance actual.
 
 Ningún proveedor se activa por defecto. Antes de usar el proyecto en producción también hacen falta pruebas manuales de la terminal, aprobación de compliance para el proveedor y una decisión sobre la firma de los binarios.
