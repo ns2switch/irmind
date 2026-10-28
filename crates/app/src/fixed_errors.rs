@@ -131,6 +131,8 @@ pub enum FixedAppError {
     PolicyOpenFindingNotFound,
     #[error("policy denied: operational audit sequence exhausted")]
     PolicyOperationalAuditSequenceExhausted,
+    #[error("policy denied: case audit sequence exhausted")]
+    PolicyAuditSequenceExhausted,
     #[error("policy denied: pending approval not found")]
     PolicyPendingApprovalNotFound,
     #[error("policy denied: seal preview is stale")]

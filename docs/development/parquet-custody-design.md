@@ -15,6 +15,8 @@ Add two versioned event payloads to the existing case audit chain, without chang
 
 Both payloads use a domain-tagged, length-prefixed binary encoding carried as ASCII in the current signed `payload` field. Fields, optionality, byte order, path separators, and sorting are fixed. Unknown versions fail closed. No new record can reinterpret a legacy `EvidenceIngested` entry. The existing case seal covers the final audit hash and therefore the new records; its signature challenge stays unchanged.
 
+Each file's source manifest and newly derived artifact records are signed first, then inserted as one SQLite transaction. An insert failure rolls back every record in that batch. Prepared Parquet files may remain on disk without a signed reference; retry verifies their hashes before reusing them.
+
 Object URIs contain only provider, bucket or container, and object key. Query strings, user information, bearer tokens, and SAS tokens are rejected. Source names may themselves contain sensitive information, so the export confirmation names this metadata as part of the package; the model sees only guarded, redacted source labels.
 
 For local files, open without following symlinks, hash through the opened handle, seek back, and hash again while parsing. Commit neither record nor Parquet artifact unless both hashes and stable file identity agree. This catches a source change between the two passes. Cloud objects are read by explicit version or conditional request when available and hashed during the conversion pass. Temporary derived files are renamed into place only after the hash and parser succeed; cancellation deletes them.

@@ -88,6 +88,16 @@ pub enum AdapterStorageError {
     InvalidSelectedEvidencePath,
     #[error("storage: local storage operation failed")]
     LocalStorageOperationFailed,
+    #[error("storage: cannot open Parquet source")]
+    CannotOpenParquetSource,
+    #[error("storage: cannot parse Parquet source")]
+    CannotParseParquetSource,
+    #[error("storage: cannot prepare Parquet output")]
+    CannotPrepareParquetOutput,
+    #[error("storage: cannot publish Parquet artifact")]
+    CannotPublishParquetArtifact,
+    #[error("storage: cannot verify Parquet artifact")]
+    CannotVerifyParquetArtifact,
     #[error("storage: module secret is empty")]
     ModuleSecretIsEmpty,
     #[error("storage: seal preview UI unavailable")]
