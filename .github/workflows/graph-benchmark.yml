@@ -1,6 +1,11 @@
 name: Synthetic graph benchmark
 on:
   workflow_dispatch:
+    inputs:
+      include_legacy:
+        description: Include the slow legacy DuckDB graph baseline
+        type: boolean
+        default: false
   schedule:
     - cron: '31 4 * * 1'
 permissions:
@@ -24,6 +29,7 @@ jobs:
         with: {key: graph-benchmark-linux}
       - run: sudo apt-get update && sudo apt-get install -y mold
       - name: Profile representative and large-record 1 GB corpora
+        if: github.event_name == 'schedule' || inputs.include_legacy == true
         shell: bash
         run: |
           set -o pipefail
