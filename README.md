@@ -43,7 +43,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-The daily `main` CI run publishes unsigned binaries for Linux, macOS, and Windows when code changed in the preceding 24 hours. Verify `SHA256SUMS` before running one. Follow the [platform guide](docs/platforms.md) for checksums, keystore backends, SSH, and terminal support.
+No released binaries are available yet. CI produces unsigned artifacts only on release tags and on nightly runs after code changes. Verify `SHA256SUMS` before running one. Follow the [platform guide](docs/platforms.md) for checksums, keystore backends, SSH, and terminal support.
 
 ## First case in the TUI
 

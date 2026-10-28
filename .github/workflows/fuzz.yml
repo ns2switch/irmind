@@ -21,8 +21,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with: {key: weekly-fuzz}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
-        with: {tool: 'cargo-audit,cargo-deny', fallback: none}
-      - run: cargo audit --file fuzz/Cargo.lock --ignore RUSTSEC-2026-0370 --ignore RUSTSEC-2026-0371 --ignore RUSTSEC-2026-0372
+        with: {tool: 'cargo-deny', fallback: none}
       - run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
       - name: Install verified upstream cargo-fuzz binary
         env:

@@ -17,7 +17,7 @@ Install a C/C++ compiler before building: GCC or Clang and `pkg-config` on Linux
 
 ## CI artifacts and checksums
 
-The daily `main` run publishes a binary for each platform only when code changed in the preceding 24 hours. Documentation-only changes do not trigger a release build. Each artifact includes both project licenses, third-party notices, and `SHA256SUMS`. Download from a trusted daily run and compare the checksum **before** executing the file:
+No released binaries are available yet. Release tags and nightly runs after code changes produce an unsigned artifact for each platform. Pull requests and merges to `main` do not publish binaries. Each artifact includes both project licenses, third-party notices, and `SHA256SUMS`. Download from a trusted run and compare the checksum **before** executing the file:
 
 | System | Check |
 | --- | --- |

@@ -26,7 +26,7 @@ The MVP has a fixed scope:
 
 Release `v0.1.0` only after every [reference-plan milestone](plan.md) passes, the model's manual test is documented, at least one connector is tested against a real test environment, and the tag includes a changelog and downloadable binaries. All current modules remain experimental until these checks pass. There is no release date yet.
 
-The merge matrix covers Linux, macOS, Windows, and cross-platform export verification. Release binaries are built once daily on `main` after code changes.
+Every pull request and merge runs Linux checks. Pull requests touching platform code or CI workflows also run Windows and macOS; the full matrix and cross-platform export verification run nightly after main changes and on release tags. Release binaries are built only on tags and qualifying nightly runs.
 
 ## After the MVP
 

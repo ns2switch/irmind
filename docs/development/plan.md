@@ -58,7 +58,7 @@ Do not implement the gateway yet. Preserve distinct Analyst and Agent signing ke
 
 ## Distribution
 
-The daily `main` CI run publishes unsigned binaries with `SHA256SUMS` when code changed in the preceding 24 hours. Signing, notarization, and Authenticode are deferred. Review this decision by 2027-04-24 or before external binary distribution.
+Release tags and nightly CI runs after code changes produce unsigned binaries with `SHA256SUMS`. Pull requests and merges to `main` run development checks without release builds. Signing, notarization, and Authenticode are deferred. Review this decision by 2027-04-24 or before external binary distribution.
 
 ## Documentation
 

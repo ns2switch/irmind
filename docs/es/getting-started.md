@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 7fce7687b188ee8cd1df5c41e9db437adfbc39c8; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 5f1c2bbaa4c1c2b3b8a72963693ae7f59b4314b2; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -16,7 +16,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. También puedes descargar un binario de CI y comprobar `SHA256SUMS` antes de usarlo. Consulta [plataformas](platforms.md) para los pasos de cada sistema. Los binarios aún no están firmados.
+En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Cuando haya un artefacto de CI disponible, también puedes descargarlo y comprobar `SHA256SUMS` antes de usarlo. Consulta [plataformas](platforms.md) para los pasos de cada sistema. Los binarios aún no están firmados.
 
 ## Primer arranque
 
