@@ -11,6 +11,22 @@ impl Engine<'_> {
         approved: bool,
         cancel: &CancellationToken,
     ) -> Result<(String, String), AppError> {
+        let started = std::time::Instant::now();
+        crate::diagnostics::tool_started(call.tool());
+        let result = self
+            .execute_authorized_inner(id, call, approved, cancel)
+            .await;
+        crate::diagnostics::tool_finished(call.tool(), result.is_ok(), started.elapsed());
+        result
+    }
+
+    async fn execute_authorized_inner(
+        &self,
+        id: &CaseId,
+        call: &AuthorizedCall,
+        approved: bool,
+        cancel: &CancellationToken,
+    ) -> Result<(String, String), AppError> {
         let payload = format!("{} {:?}", call.tool().as_str(), call.proposal_args());
         let (origin, kind) = if approved {
             (
@@ -171,7 +187,7 @@ impl Engine<'_> {
                 () = cancel.cancelled() => Err(AppError::Cancelled),
                 result = async {
                     Ok(match call.tool() {
-                    Tool::SiemSearch => self.dispatch_siem(call, cancel).await?,
+                    Tool::SiemSearch | Tool::SiemGetAlert => self.dispatch_siem(call, cancel).await?,
                     Tool::CloudAuditEvents | Tool::CloudIdentity => self.dispatch_cloud(call, cancel).await?,
                     Tool::EdrHostInfo | Tool::EdrProcessTree | Tool::EdrDetections => {
                         self.dispatch_edr(call, cancel).await?

@@ -3,6 +3,7 @@ use crate::{Case, CaseScope, ProposedCall, Tool};
 
 const SCOPED_TOOLS: &[Tool] = &[
     Tool::SiemSearch,
+    Tool::SiemGetAlert,
     Tool::CloudAuditEvents,
     Tool::ThreatIntelInternal,
     Tool::CloudIdentity,
@@ -34,7 +35,9 @@ pub(super) fn in_scope(scope: &CaseScope, proposal: &ProposedCall) -> bool {
         return true;
     }
     match proposal.tool {
-        Tool::SiemSearch | Tool::CloudAuditEvents => scoped_event(scope, proposal),
+        Tool::SiemSearch | Tool::SiemGetAlert | Tool::CloudAuditEvents => {
+            scoped_event(scope, proposal)
+        }
         Tool::ThreatIntelInternal => proposal
             .args
             .get("source")

@@ -77,3 +77,4 @@ mod scope_and_graph;
 mod scope_pending;
 mod seal_export;
 mod seal_recovery;
+mod siem_alert;

@@ -56,6 +56,71 @@ fn version_two_scope_checks_accounts_projects_hosts_and_time() {
 }
 
 #[test]
+fn siem_alert_is_bounded_by_case_and_organization_scope() {
+    let mut scoped = case();
+    scoped.scope = "v2;sources=siem;accounts=account-a,account-b;projects=;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z".into();
+    let rules = PolicyRules {
+        scope: Some(CaseScope::parse("v2;sources=siem;accounts=account-a;projects=;hosts=;from=2026-10-23T10:00:00Z;to=2026-10-23T20:00:00Z").unwrap()),
+        ..PolicyRules::default()
+    };
+    let alert = |account: &str, from: &str, id: &str| ProposedCall {
+        tool: Tool::SiemGetAlert,
+        args: [
+            ("source", "siem"),
+            ("account", account),
+            ("from", from),
+            ("to", "2026-10-23T13:00:00Z"),
+            ("alert_id", id),
+        ]
+        .into_iter()
+        .map(|(key, value)| (key.into(), value.into()))
+        .collect(),
+    };
+    assert!(matches!(
+        evaluate_with_rules(
+            &scoped,
+            alert("account-a", "2026-10-23T12:00:00Z", "alert-1"),
+            1,
+            ExecutionMode::Attended,
+            1_700_000_000,
+            &rules,
+        ),
+        Decision::Allow(_)
+    ));
+    assert!(matches!(
+        evaluate_with_rules(
+            &scoped,
+            alert("account-b", "2026-10-23T12:00:00Z", "alert-1"),
+            1,
+            ExecutionMode::Attended,
+            1_700_000_000,
+            &rules,
+        ),
+        Decision::Deny(_)
+    ));
+    assert!(matches!(
+        evaluate(
+            &scoped,
+            alert("account-a", "2026-10-24T12:00:00Z", "alert-1"),
+            1,
+            ExecutionMode::Attended,
+            1_700_000_000
+        ),
+        Decision::NeedsApproval(_)
+    ));
+    assert!(matches!(
+        evaluate(
+            &scoped,
+            alert("account-a", "2026-10-23T12:00:00Z", "x\"|collect"),
+            1,
+            ExecutionMode::Attended,
+            1_700_000_000
+        ),
+        Decision::Deny(_)
+    ));
+}
+
+#[test]
 #[allow(clippy::too_many_lines, clippy::panic)]
 fn toml_policy_scope_is_a_hard_ceiling_even_for_pending_approvals() {
     let mut scoped = case();

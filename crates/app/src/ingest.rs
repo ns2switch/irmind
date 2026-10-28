@@ -156,6 +156,7 @@ impl Engine<'_> {
         if !matches!(
             call.tool(),
             Tool::SiemSearch
+                | Tool::SiemGetAlert
                 | Tool::CloudAuditEvents
                 | Tool::EdrHostInfo
                 | Tool::EdrProcessTree

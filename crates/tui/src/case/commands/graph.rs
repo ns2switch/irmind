@@ -57,7 +57,7 @@ impl CaseRuntime<'_, '_, '_> {
 
     fn push_graph(&mut self, title: &'static str, result: Result<String, irmind_app::AppError>) {
         match result {
-            Ok(result) => self.state.graph_results.push((title, result)),
+            Ok(result) => self.state.result_cards.push((title, result)),
             Err(error) => self.state.messages.push(format!("Graph error: {error}")),
         }
     }

@@ -37,6 +37,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if !(self.long_command(&prompt)?
             || self.case_command(&prompt)?
             || self.graph_command(&prompt)
+            || self.siem_command(&prompt)
             || self.finding_command(&prompt)?
             || self.approval_command(&prompt)?
             || self.evidence_command(&prompt))
@@ -236,7 +237,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 Err(error) => self.state.messages.push(format!("Report error: {error}")),
             },
             "/graph" => match self.engine.graph.graph_summary(self.id) {
-                Ok(summary) => self.state.graph_results.push(("Evidence graph", summary)),
+                Ok(summary) => self.state.result_cards.push(("Evidence graph", summary)),
                 Err(error) => self.state.messages.push(format!("Graph error: {error}")),
             },
             "/timeline" => self.state.tab = 0,
@@ -365,6 +366,7 @@ fn scope_expansion(current: &str, command: &str) -> Result<String, &'static str>
 }
 mod approval;
 mod graph;
+mod siem;
 
 #[cfg(test)]
 mod tests {

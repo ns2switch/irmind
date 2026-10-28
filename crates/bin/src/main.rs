@@ -5,6 +5,7 @@ compile_error!("IRMind requires at least one signer and secret backend");
 
 mod cli;
 mod configuration;
+mod diagnostics;
 mod keystore;
 mod policy_config;
 use cli::{Cli, Command, audit_source_name, input_files, read_evidence, write_private_output};

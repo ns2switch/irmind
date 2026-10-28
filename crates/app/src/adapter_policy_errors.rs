@@ -124,7 +124,9 @@ pub enum AdapterPolicyError {
     InvalidSplunkEndpoint,
     #[error("policy denied: invalid Splunk search term")]
     InvalidSplunkSearchTerm,
-    #[error("policy denied: invalid Splunk source, index or account field")]
+    #[error("policy denied: invalid Splunk alert ID")]
+    InvalidSplunkAlertId,
+    #[error("policy denied: invalid Splunk source, index, account field or alert ID field")]
     InvalidSplunkSourceIndexOrAccountField,
     #[error("policy denied: invalid Splunk start time")]
     InvalidSplunkStartTime,

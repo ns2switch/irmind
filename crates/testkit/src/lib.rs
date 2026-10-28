@@ -38,6 +38,6 @@ pub use keystore_contract::{secret_backend_contract, signer_backend_contract};
 pub use mock_http::{MockResponse, MockServer, RecordedRequest, run_http_safety_contract};
 pub use product_contracts::{
     run_cloud_audit_contract, run_cloud_audit_recorded, run_internal_intel_contract,
-    run_internal_intel_recorded, run_llm_contract, run_siem_contract, run_siem_recorded,
-    run_threat_intel_contract, run_threat_intel_recorded,
+    run_internal_intel_recorded, run_llm_contract, run_siem_alert_recorded, run_siem_contract,
+    run_siem_recorded, run_threat_intel_contract, run_threat_intel_recorded,
 };

@@ -62,6 +62,7 @@ pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
 impl PreparedStartup {
     fn new(mut cli: Cli, interactive: bool) -> Result<Option<Self>> {
         let (home, store, active) = open_local(&cli, interactive)?;
+        super::diagnostics::init(&home)?;
         let config_store = Arc::new(TomlConfigurationStore::new(&home));
         let manifests = configuration::compiled_manifests();
         let verifier = Arc::new(trusted_verifier(

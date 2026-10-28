@@ -12,7 +12,7 @@ pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
         | Tool::TextSearch
         | Tool::RawRecords
         | Tool::CaseAddFinding => valid_local(proposal),
-        Tool::SiemSearch | Tool::CloudAuditEvents => valid_event(proposal),
+        Tool::SiemSearch | Tool::SiemGetAlert | Tool::CloudAuditEvents => valid_event(proposal),
         Tool::ThreatIntelInternal | Tool::CloudIdentity => valid_identity_and_intel(proposal),
         Tool::EdrHostInfo
         | Tool::EdrProcessTree
@@ -112,11 +112,11 @@ fn valid_finding(args: &BTreeMap<String, String>) -> bool {
 
 fn valid_event(proposal: &ProposedCall) -> bool {
     match proposal.tool {
-        Tool::SiemSearch | Tool::CloudAuditEvents => {
-            let query_key = if proposal.tool == Tool::SiemSearch {
-                "query"
-            } else {
-                "event_name"
+        Tool::SiemSearch | Tool::SiemGetAlert | Tool::CloudAuditEvents => {
+            let query_key = match proposal.tool {
+                Tool::SiemSearch => "query",
+                Tool::SiemGetAlert => "alert_id",
+                _ => "event_name",
             };
             let allowed = if proposal.tool == Tool::CloudAuditEvents {
                 vec!["source", "account", "project", "from", "to", query_key]

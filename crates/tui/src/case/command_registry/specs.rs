@@ -140,6 +140,12 @@ pub(super) const COMMANDS: &[Command] = &[
         slash: true,
     },
     Command {
+        name: "siem-alert",
+        description: "Read one scoped SIEM alert by ID",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
         name: "raw",
         description: "Show source record",
         shortcut: "",
