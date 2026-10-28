@@ -5,7 +5,9 @@ use irmind_app::{
     AppError, CancellationToken, SiemPort, async_trait,
     modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
-use irmind_domain::{AuthorizedCall, SplQueryClass, Tool, classify_spl_query};
+use irmind_domain::{AuthorizedCall, SiemQuery, Tool};
+mod query;
+use query::SearchFields;
 use secrecy::{ExposeSecret, SecretString};
 
 pub struct Splunk {
@@ -16,6 +18,7 @@ pub struct Splunk {
     index: String,
     account_field: String,
     alert_id_field: String,
+    search_fields: SearchFields,
 }
 
 pub static MANIFEST: ModuleManifest = ModuleManifest {
@@ -46,6 +49,26 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
         },
         ConfigField {
             name: "IRMIND_SPLUNK_ALERT_ID_FIELD",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_SPLUNK_EVENT_NAME_FIELD",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_SPLUNK_USER_FIELD",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_SPLUNK_SOURCE_IP_FIELD",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_SPLUNK_HOST_FIELD",
             required: false,
             secret: false,
         },
@@ -105,10 +128,12 @@ impl Splunk {
         let alert_id_field = config
             .value("IRMIND_SPLUNK_ALERT_ID_FIELD")
             .unwrap_or("alert_id");
+        let search_fields = SearchFields::from_config(config);
         if !safe_identifier(&source_id)
             || !safe_identifier(&index)
             || !safe_field(&account_field)
             || !safe_field(alert_id_field)
+            || !search_fields.valid()
         {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::InvalidSplunkSourceIndexOrAccountField,
@@ -138,31 +163,8 @@ impl Splunk {
             index,
             account_field,
             alert_id_field: alert_id_field.to_owned(),
+            search_fields,
         })
-    }
-
-    fn spl(&self, account: &str, term: &str) -> Result<String, AppError> {
-        if !safe_identifier(account) || classify_spl_query(term) != SplQueryClass::SafeLiteral {
-            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
-                irmind_app::AdapterPolicyError::InvalidSplunkSearchTerm,
-            )));
-        }
-        Ok(format!(
-            "search index={} {}=\"{}\" \"{}\" | head 20",
-            self.index, self.account_field, account, term
-        ))
-    }
-
-    fn spl_alert(&self, account: &str, alert_id: &str) -> Result<String, AppError> {
-        if !safe_identifier(account) || !safe_alert_id(alert_id) {
-            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
-                irmind_app::AdapterPolicyError::InvalidSplunkAlertId,
-            )));
-        }
-        Ok(format!(
-            "search index={} {}=\"{}\" {}=\"{}\" | head 1",
-            self.index, self.account_field, account, self.alert_id_field, alert_id
-        ))
     }
 }
 
@@ -173,7 +175,7 @@ impl SiemPort for Splunk {
     }
 
     fn dialect(&self) -> &'static str {
-        "SPL restricted literal search"
+        "SPL generated from structured fields"
     }
 
     async fn execute(
@@ -209,7 +211,14 @@ impl SiemPort for Splunk {
             )));
         }
         let spl = match call.tool() {
-            Tool::SiemSearch => self.spl(account, arg("query")?)?,
+            Tool::SiemSearch => {
+                let query = SiemQuery::parse(call.proposal_args()).ok_or(AppError::Fixed(
+                    irmind_app::FixedAppError::AdapterPolicy(
+                        irmind_app::AdapterPolicyError::InvalidStructuredSplunkQuery,
+                    ),
+                ))?;
+                self.spl_search(account, &query)?
+            }
             Tool::SiemGetAlert => self.spl_alert(account, arg("alert_id")?)?,
             _ => {
                 return Err(AppError::Fixed(
@@ -274,122 +283,4 @@ fn safe_alert_id(value: &str) -> bool {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn siem_contract() {
-        let mut config = ModuleConfig::new();
-        config.insert_value("IRMIND_SPLUNK_URL", "https://splunk.invalid/".into());
-        config.insert_value("IRMIND_SPLUNK_SOURCE_ID", "splunk-prod".into());
-        config.insert_value("IRMIND_SPLUNK_INDEX", "main".into());
-        config.insert_value("IRMIND_SPLUNK_ACCOUNT_FIELD", "account".into());
-        config.insert_secret(
-            "IRMIND_SPLUNK_TOKEN",
-            SecretString::from("test-token".to_owned()),
-        );
-        let port = Splunk::from_config(&config).unwrap();
-        irmind_testkit::run_siem_contract(&port).unwrap();
-        irmind_testkit::run_http_safety_contract().unwrap();
-    }
-
-    #[test]
-    fn recorded_siem_response_is_returned_as_evidence() {
-        const RESPONSE: &str =
-            "{\"result\":{\"eventName\":\"AssumeRole\",\"recipientAccountId\":\"123456789012\"}}\n";
-        let server =
-            irmind_testkit::MockServer::start(vec![irmind_testkit::MockResponse::json(RESPONSE)])
-                .unwrap();
-        let port = Splunk {
-            async_client: reqwest::Client::builder()
-                .use_rustls_tls()
-                .redirect(reqwest::redirect::Policy::none())
-                .build()
-                .unwrap(),
-            endpoint: reqwest::Url::parse(&format!(
-                "{}services/search/v2/jobs/export",
-                server.origin()
-            ))
-            .unwrap(),
-            token: SecretString::from("synthetic-token".to_owned()),
-            source_id: "splunk-prod".into(),
-            index: "cloudtrail".into(),
-            account_field: "recipientAccountId".into(),
-            alert_id_field: "alert_id".into(),
-        };
-        let requests =
-            irmind_testkit::run_siem_recorded(&port, server, RESPONSE.as_bytes()).unwrap();
-        assert_eq!(requests.len(), 1);
-        assert_eq!(requests[0].method, "POST");
-        assert!(String::from_utf8_lossy(&requests[0].body).contains("AssumeRole"));
-        assert!(String::from_utf8_lossy(&requests[0].body).contains("123456789012"));
-    }
-
-    #[test]
-    fn recorded_alert_uses_exact_id_and_server_side_scope() {
-        const RESPONSE: &str =
-            "{\"result\":{\"alert_id\":\"synthetic-alert-1\",\"severity\":\"high\"}}\n";
-        let server =
-            irmind_testkit::MockServer::start(vec![irmind_testkit::MockResponse::json(RESPONSE)])
-                .unwrap();
-        let port = Splunk {
-            async_client: reqwest::Client::builder()
-                .use_rustls_tls()
-                .redirect(reqwest::redirect::Policy::none())
-                .build()
-                .unwrap(),
-            endpoint: reqwest::Url::parse(&format!(
-                "{}services/search/v2/jobs/export",
-                server.origin()
-            ))
-            .unwrap(),
-            token: SecretString::from("synthetic-token".to_owned()),
-            source_id: "splunk-prod".into(),
-            index: "cloudtrail".into(),
-            account_field: "recipientAccountId".into(),
-            alert_id_field: "alert_id".into(),
-        };
-        let requests =
-            irmind_testkit::run_siem_alert_recorded(&port, server, RESPONSE.as_bytes()).unwrap();
-        assert_eq!(requests.len(), 1);
-        assert_eq!(requests[0].method, "POST");
-        let body = String::from_utf8_lossy(&requests[0].body);
-        assert!(body.contains("index%3Dcloudtrail"));
-        assert!(body.contains("recipientAccountId%3D%22123456789012%22"));
-        assert!(body.contains("alert_id%3D%22synthetic-alert-1%22"));
-        assert!(body.contains("earliest_time="));
-        assert!(body.contains("latest_time="));
-    }
-
-    #[test]
-    fn generated_spl_cannot_escape_literal_search() {
-        let splunk = Splunk {
-            async_client: reqwest::Client::new(),
-            endpoint: reqwest::Url::parse("https://splunk.example/services/search/v2/jobs/export")
-                .unwrap(),
-            token: SecretString::from("test".to_owned()),
-            source_id: "splunk-prod".into(),
-            index: "cloudtrail".into(),
-            account_field: "recipientAccountId".into(),
-            alert_id_field: "alert_id".into(),
-        };
-        assert_eq!(
-            splunk.spl("123456789012", "AssumeRole").unwrap(),
-            "search index=cloudtrail recipientAccountId=\"123456789012\" \"AssumeRole\" | head 20"
-        );
-        assert!(
-            splunk
-                .spl("123456789012", "foo | outputlookup bar")
-                .is_err()
-        );
-        assert!(splunk.spl("123\" | sendemail", "AssumeRole").is_err());
-        assert!(splunk.spl_alert("123456789012", "id\" | collect").is_err());
-        assert_eq!(
-            splunk
-                .spl_alert("123456789012", "synthetic-alert-1")
-                .unwrap(),
-            "search index=cloudtrail recipientAccountId=\"123456789012\" alert_id=\"synthetic-alert-1\" | head 1"
-        );
-    }
-}
+mod tests;

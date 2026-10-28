@@ -46,15 +46,15 @@ Modules are compiled into the binary. In the TUI, press `m` to select a compiled
 
 ## Splunk
 
-**Does:** Searches events from one configured index and retrieves an alert record by exact ID. Both return bounded evidence. The agent submits values, not free-form SPL.
+**Does:** Searches approved event fields in one configured index and retrieves an alert record by exact ID. Both return bounded evidence. The agent submits structured fields and values, never SPL.
 
 **Permission:** A dedicated read-only token with search access only to the configured index. Do not grant lookup writes, alert actions, or external output commands.
 
-**Configure:** Build with `--features siem-splunk`. Set `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, and `IRMIND_SPLUNK_ACCOUNT_FIELD`. Set optional `IRMIND_SPLUNK_ALERT_ID_FIELD` if the index uses a field other than `alert_id`. Store `IRMIND_SPLUNK_TOKEN`, then enable `--enable-splunk`. Include the source, account, and UTC window in the case scope. In the case TUI, `/siem-alert <source> <account> <alert-id> <from-UTC> <to-UTC>` retrieves one alert through the same policy and custody path as model proposals.
+**Configure:** Build with `--features siem-splunk`. Set `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, and `IRMIND_SPLUNK_ACCOUNT_FIELD`. Set optional `IRMIND_SPLUNK_ALERT_ID_FIELD` if the index uses a field other than `alert_id`. The search fields default to `eventName`, `user`, `sourceIPAddress`, and `host`; use `IRMIND_SPLUNK_EVENT_NAME_FIELD`, `IRMIND_SPLUNK_USER_FIELD`, `IRMIND_SPLUNK_SOURCE_IP_FIELD`, and `IRMIND_SPLUNK_HOST_FIELD` to match your index. Store `IRMIND_SPLUNK_TOKEN`, then enable `--enable-splunk`. Include the source, account, and UTC window in the case scope. In the case TUI, `/siem-alert <source> <account> <alert-id> <from-UTC> <to-UTC>` retrieves one alert through the same policy and custody path as model proposals.
 
-**Limits:** The module fixes index and time bounds server-side, caps results, requires HTTPS, and refuses unsafe or ambiguous queries. Alert lookup searches the configured index and alert ID field; it does not call a separate Splunk alert-management API. It does not expose general SPL.
+**Limits:** The model can compare only `event_name`, `user`, `source_ip`, or `host` using `eq`, `not_eq`, or `prefix`. It can request raw events, `count_by`, `top`, or `distinct` on one of those fields, with at most 20 results. The module fixes the index and a window of at most 24 hours on the server, escapes quotes and backslashes in values, rejects SPL control characters, requires HTTPS, and disables redirects. Alert lookup searches the configured index and alert ID field; it does not call a separate Splunk alert-management API. Existing pending calls with the old free-form `query` argument are denied; historical signed entries still verify.
 
-The module uses Splunk's [search export endpoint](https://help.splunk.com/en/splunk-enterprise/rest-api-reference/10.0/search-endpoints/search-endpoint-descriptions) and a generated [field-value search](https://help.splunk.com/en/splunk-enterprise/search/spl2-search-reference/search-command/search-command-usage).
+The module uses Splunk's [search export endpoint](https://help.splunk.com/en/splunk-enterprise/rest-api-reference/10.0/search-endpoints/search-endpoint-descriptions) and a generated [field-value search](https://help.splunk.com/en/splunk-cloud-platform/search/search-reference/10.6/search-commands/search).
 
 ## AWS CloudTrail and IAM
 

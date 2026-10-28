@@ -10,7 +10,7 @@ This page is for contributors and evaluators planning around current limitations
 - Incremental model text in the TUI, IOC/hypothesis/ATT&CK panels with analyst confirmation, and evidence excerpts beside matching approvals.
 - Policy-gated reads and analyst-approved external enrichment, with a mandatory content guard.
 - Local SQLite custody, a derived DuckDB graph, and Ed25519 signatures from an explicitly selected OS or encrypted-file backend.
-- Explicitly selected LLM modules and optional Splunk, AWS, EDR, MISP, and VirusTotal connectors.
+- Explicitly selected LLM modules and optional Splunk, AWS, EDR, MISP, and VirusTotal connectors; Splunk searches use structured fields and aggregations.
 - Typed IOC, hypothesis, ATT&CK technique, and timeline proposals with analyst confirmation; reports cite confirmed evidence.
 - Case scopes with projects and an optional TOML policy ceiling for remote reads.
 - Automated contracts and synthetic end-to-end tests.
@@ -21,7 +21,7 @@ The MVP has a fixed scope:
 
 1. Stream CloudTrail and JSON ingestion, add full-text DuckDB graph search, and benchmark at least 1 GB of synthetic evidence.
 2. Retrieve SIEM alerts and keep diagnostic tracing separate from signed custody events.
-3. Replace free-form model-generated SIEM queries with structured fields, operators, time windows, and simple aggregations translated by the connector.
+3. Keep SIEM searches limited to structured fields, operators, time windows, and simple aggregations translated by the connector.
 4. Finish recorded-response tests, shared contracts, and setup guides for the cloud, SIEM, EDR, and threat-intelligence modules already in the workspace.
 
 Release `v0.1.0` only after every [reference-plan milestone](plan.md) passes, the model's manual test is documented, at least one connector is tested against a real test environment, and the tag includes a changelog and downloadable binaries. All current modules remain experimental until these checks pass. There is no release date yet.

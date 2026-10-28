@@ -31,18 +31,19 @@ fn unknown_arguments_fail_closed() {
 }
 
 #[test]
-#[allow(clippy::panic)]
-fn spl_commands_are_denied_and_unparseable_queries_need_exact_approval() {
+fn structured_siem_queries_reject_free_form_spl() {
     let mut scoped = case();
     scoped.scope = "v1;sources=splunk-prod;accounts=123;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z".into();
-    let proposal = |query: &str| ProposedCall {
+    let proposal = |value: &str| ProposedCall {
         tool: Tool::SiemSearch,
         args: BTreeMap::from([
             ("source".into(), "splunk-prod".into()),
             ("account".into(), "123".into()),
             ("from".into(), "2026-10-23T12:00:00Z".into()),
             ("to".into(), "2026-10-23T13:00:00Z".into()),
-            ("query".into(), query.into()),
+            ("field".into(), "event_name".into()),
+            ("operator".into(), "eq".into()),
+            ("value".into(), value.into()),
         ]),
     };
     for command in [
@@ -59,10 +60,6 @@ fn spl_commands_are_denied_and_unparseable_queries_need_exact_approval() {
         "tscollect",
         "meventcollect",
     ] {
-        assert_eq!(
-            classify_spl_query(&format!("event | {command} target")),
-            SplQueryClass::Forbidden
-        );
         assert!(matches!(
             evaluate(
                 &scoped,
@@ -74,19 +71,25 @@ fn spl_commands_are_denied_and_unparseable_queries_need_exact_approval() {
             Decision::Deny(_)
         ));
     }
-    let exact = "event | stats count";
-    let Decision::NeedsApproval(pending) = evaluate(
-        &scoped,
-        proposal(exact),
-        2,
-        ExecutionMode::Attended,
-        1_700_000_000,
-    ) else {
-        panic!("expected approval")
-    };
-    assert_eq!(
-        pending.proposal().args.get("query").map(String::as_str),
-        Some(exact)
+    let mut legacy = proposal("AssumeRole");
+    legacy.args.remove("field");
+    legacy.args.remove("operator");
+    legacy.args.remove("value");
+    legacy.args.insert("query".into(), "AssumeRole".into());
+    let old_challenge =
+        PendingApproval::new(scoped.id.clone(), legacy.clone(), 2, 1_700_000_000).challenge();
+    assert!(matches!(
+        evaluate(&scoped, legacy, 2, ExecutionMode::Attended, 1_700_000_000),
+        Decision::Deny(_)
+    ));
+    assert!(
+        PendingApproval::recover(
+            &scoped,
+            ExecutionMode::Attended,
+            &old_challenge,
+            1_700_000_000
+        )
+        .is_err()
     );
     assert!(matches!(
         evaluate(
@@ -260,7 +263,9 @@ fn siem_read_is_allowed_only_inside_explicit_scope() {
             ("account".into(), "123".into()),
             ("from".into(), "2026-10-23T12:00:00Z".into()),
             ("to".into(), "2026-10-23T13:00:00Z".into()),
-            ("query".into(), "AssumeRole".into()),
+            ("field".into(), "event_name".into()),
+            ("operator".into(), "eq".into()),
+            ("value".into(), "AssumeRole".into()),
         ]),
     };
     assert!(matches!(

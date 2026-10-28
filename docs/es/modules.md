@@ -48,15 +48,15 @@ Los módulos se compilan dentro del binario. En la TUI, pulsa `m` para seleccion
 
 ## Splunk
 
-**Función:** Busca eventos en un índice configurado y obtiene una alerta por su ID exacto. Ambas operaciones devuelven evidencia acotada. El agente envía valores, no SPL libre.
+**Función:** Busca campos de evento permitidos en un índice configurado y obtiene una alerta por su ID exacto. Ambas operaciones devuelven evidencia acotada. El agente envía campos y valores estructurados, nunca SPL.
 
 **Permiso:** Token dedicado de solo lectura con acceso de búsqueda solo al índice configurado. No concedas escritura de lookups, acciones de alerta ni comandos de salida externa.
 
-**Configuración:** Compila con `--features siem-splunk`. Define `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX` y `IRMIND_SPLUNK_ACCOUNT_FIELD`. Define `IRMIND_SPLUNK_ALERT_ID_FIELD` si el índice usa un campo distinto de `alert_id`. Guarda `IRMIND_SPLUNK_TOKEN`, activa `--enable-splunk` e incluye fuente, cuenta y ventana UTC en el alcance del caso. En la TUI del caso, `/siem-alert <source> <account> <alert-id> <from-UTC> <to-UTC>` obtiene una alerta con la misma política y custodia que las propuestas del modelo.
+**Configuración:** Compila con `--features siem-splunk`. Define `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX` y `IRMIND_SPLUNK_ACCOUNT_FIELD`. Define `IRMIND_SPLUNK_ALERT_ID_FIELD` si el índice usa un campo distinto de `alert_id`. Los campos de búsqueda son por defecto `eventName`, `user`, `sourceIPAddress` y `host`; usa `IRMIND_SPLUNK_EVENT_NAME_FIELD`, `IRMIND_SPLUNK_USER_FIELD`, `IRMIND_SPLUNK_SOURCE_IP_FIELD` e `IRMIND_SPLUNK_HOST_FIELD` para adaptarlos al índice. Guarda `IRMIND_SPLUNK_TOKEN`, activa `--enable-splunk` e incluye fuente, cuenta y ventana UTC en el alcance del caso. En la TUI del caso, `/siem-alert <source> <account> <alert-id> <from-UTC> <to-UTC>` obtiene una alerta con la misma política y custodia que las propuestas del modelo.
 
-**Límites:** El módulo fija el índice y la ventana temporal en el servidor, limita los resultados, exige HTTPS y rechaza consultas inseguras o ambiguas. La búsqueda de alertas usa el índice y el campo de ID configurados; no consulta una API separada de administración de alertas. No ofrece SPL general.
+**Límites:** El modelo solo puede comparar `event_name`, `user`, `source_ip` o `host` con `eq`, `not_eq` o `prefix`. Puede pedir eventos, `count_by`, `top` o `distinct` sobre uno de esos campos, con un máximo de 20 resultados. El módulo fija en el servidor el índice y una ventana máxima de 24 horas, escapa comillas y barras inversas, rechaza caracteres de control de SPL, exige HTTPS y desactiva las redirecciones. Las alertas se buscan en el índice y campo de ID configurados; no se usa una API de administración de alertas. Las aprobaciones pendientes con el antiguo argumento libre `query` se deniegan; las entradas firmadas históricas siguen verificándose.
 
-El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://help.splunk.com/en/splunk-enterprise/rest-api-reference/10.0/search-endpoints/search-endpoint-descriptions) y una [búsqueda por campo y valor](https://help.splunk.com/en/splunk-enterprise/search/spl2-search-reference/search-command/search-command-usage) generada.
+El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://help.splunk.com/en/splunk-enterprise/rest-api-reference/10.0/search-endpoints/search-endpoint-descriptions) y una [búsqueda por campo y valor](https://help.splunk.com/en/splunk-cloud-platform/search/search-reference/10.6/search-commands/search) generada.
 
 ## AWS CloudTrail e IAM
 

@@ -24,7 +24,9 @@ fn every_port_family_dispatches_signed_approval_through_registry() {
                 ("account".into(), "123".into()),
                 ("from".into(), "2026-10-23T12:00:00Z".into()),
                 ("to".into(), "2026-10-23T13:00:00Z".into()),
-                ("query".into(), "AssumeRole".into()),
+                ("field".into(), "event_name".into()),
+                ("operator".into(), "eq".into()),
+                ("value".into(), "AssumeRole".into()),
             ]),
         ),
         (
@@ -185,7 +187,9 @@ fn scoped_siem_read_uses_authorized_port_and_keeps_raw_evidence_local() {
                             ("account".into(), "123".into()),
                             ("from".into(), "2026-10-23T12:00:00Z".into()),
                             ("to".into(), "2026-10-23T13:00:00Z".into()),
-                            ("query".into(), "AssumeRole".into()),
+                            ("field".into(), "event_name".into()),
+                            ("operator".into(), "eq".into()),
+                            ("value".into(), "AssumeRole".into()),
                         ]),
                     }]
                 } else {

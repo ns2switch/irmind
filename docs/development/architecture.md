@@ -41,6 +41,8 @@ LLM response
 
 `AuthorizedCall` has private fields. Only domain policy evaluation or signed approval resolution can create it. The module receives that type and cannot bypass the application dispatch by accepting a raw model proposal. Tool risk comes from the `Tool` enum; the model cannot choose it. External values carry typed provenance until an analyst signs a release.
 
+For SIEM searches, the domain parses a provider-neutral query with approved fields, operators, and bounded aggregations. The selected module maps those fields to its dialect and escapes values. A model cannot submit SPL text, and a pending call using the former `query` argument fails validation on recovery.
+
 The audit log and case state share a SQLite transaction. Case sealing signs a prepared final hash and evidence manifest. A separate case operational chain records cancellations after sealing. A global operational chain records keystore migrations and TUI configuration changes, including before any case exists. The versioned `config.toml` contains only manifest-approved public fields and is checked against its last signed configuration hash at startup. The DuckDB graph is derived from signed evidence and can be rebuilt.
 
 ## Add a product module
