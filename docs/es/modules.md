@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 6a6259ec56f1e8598e693f3593f38320b3d8bb0c; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit 7818a8dc3b6b695530b83601ad7ca589d2c69b85; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -108,15 +108,15 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Límites:** La consulta puede revelar a un tercero que investigas un IOC. Se rechazan direcciones internas o ambiguas; incluso los IOCs válidos requieren aprobación.
 
-## Parser JSON y CloudTrail
+## Parser en streaming de JSON y logs de nube exportados
 
-**Función:** Indexa registros locales JSON y CloudTrail en la cronología y el grafo DuckDB sin enviarlos a un modelo.
+**Función:** Procesa JSON genérico, AWS CloudTrail, GCP Cloud Audit Logs, Azure Activity y exportaciones de inicio de sesión de Entra ID en flujos acotados. Los casos grandes se convierten en Parquet particionado; DuckDB solo lee Parquet generado por IRMind. El parser no envía los registros a un modelo.
 
 **Permiso:** Lectura solo del archivo local seleccionado.
 
 **Configuración:** Incluido y activo en todos los binarios. Usa el selector `/ingest` de la TUI o el [comando de ingesta de la CLI](../development/cli.md).
 
-**Límites:** Cada archivo se carga con un límite de 50 MB; después, los registros se procesan en streaming y se indexan en lotes acotados. Se rechazan el JSON muy anidado, un número excesivo de registros y los registros con más de 2.048 términos de búsqueda distintos. La búsqueda en el grafo exige que coincidan todas las palabras, no busca subcadenas. Las palabras buscables tienen entre 2 y 64 bytes. Otros formatos necesitarán parsers futuros.
+**Límites:** Se rechazan el JSON muy anidado y los registros individuales demasiado grandes. Los originales se identifican por hash en su ubicación; copiarlos requiere una elección explícita. La búsqueda Parquet compara subcadenas con límites y acepta filtros de fecha, cuenta o proyecto y región. El índice DuckDB anterior para casos pequeños mantiene el límite de entrada de 50 MB y la búsqueda por palabras. Otros formatos necesitarán parsers futuros.
 
 ## Llavero del sistema
 

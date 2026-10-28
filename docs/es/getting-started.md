@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit e414ef4daed9af488f2f72ffce62e64331cc99ac; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 7818a8dc3b6b695530b83601ad7ca589d2c69b85; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -44,6 +44,8 @@ Puedes verificar el paquete en otro equipo con `irmind verify-export <PACKAGE> -
 La conversación ocupa el espacio principal. Las propuestas, aprobaciones, resultados y hallazgos aparecen en tarjetas ordenadas. `Ctrl+B` muestra u oculta el panel lateral. Tab recorre cronología, evidencias, aprobaciones y hallazgos. `Ctrl+L` enfoca la conversación y `Ctrl+I` vuelve al campo de entrada. Enter o Espacio despliega una tarjeta seleccionada; `a`, `d` y `e` actúan sobre una aprobación seleccionada.
 
 Las consultas del grafo y las búsquedas locales también aparecen como tarjetas de resultado. Las respuestas largas empiezan plegadas; selecciona la tarjeta y pulsa Enter o Espacio para desplegarla, y desplázate por la conversación.
+
+En casos Parquet grandes, añade `--from=<UTC> --to=<UTC>`, `--account=<ID>` o `--project=<ID>`, y `--region=<NOMBRE>` a `/search`, `/entity`, `/neighbors`, `/entity-timeline` o `/path`. Por ejemplo, `/search AssumeRole --from=2026-10-28T12:00:00Z --to=2026-10-28T13:00:00Z --account=123456789012 --region=eu-west-1` lee solo las particiones y horas coincidentes. Los dos límites UTC deben ir juntos y el filtro debe quedar dentro del alcance del caso. La tarjeta de vecinos indica cuándo su muestra de 4.096 registros es parcial.
 
 Con un SIEM configurado, `/siem-alert` obtiene una alerta dentro del alcance por su ID. El resultado aparece como una tarjeta protegida y plegable en la conversación. `/help` muestra el orden de los argumentos.
 

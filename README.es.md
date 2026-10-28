@@ -1,4 +1,4 @@
-Traducción de README.md en el commit e414ef4daed9af488f2f72ffce62e64331cc99ac; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 7818a8dc3b6b695530b83601ad7ca589d2c69b85; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -72,7 +72,7 @@ Una feature de Cargo incluye el módulo en el binario; activarlo es un paso dist
 | SentinelOne | EDR | `edr-sentinelone` | experimental | [Módulos](docs/es/modules.md) |
 | MISP | TI interna | `ti-misp` | experimental | [Módulos](docs/es/modules.md) |
 | VirusTotal | enriquecimiento externo | `ti-virustotal` | experimental | [Módulos](docs/es/modules.md) |
-| Parser JSON y CloudTrail | parser local | incluido | experimental | [Módulos](docs/es/modules.md) |
+| Parser JSON y logs de nube exportados | parser local | incluido | experimental | [Módulos](docs/es/modules.md) |
 | Llavero del sistema | firma y secretos | `keystore-os` (por defecto) | experimental | [Módulos](docs/es/modules.md#llavero-del-sistema) |
 | Archivo cifrado | firma y secretos | `keystore-file` (por defecto) | experimental | [Módulos](docs/es/modules.md#archivo-cifrado) |
 
