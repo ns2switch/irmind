@@ -10,6 +10,8 @@ use std::sync::mpsc::{self, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+mod path;
+
 const QUERY_DEADLINE: Duration = Duration::from_secs(10);
 const MAX_QUERY_FILES: usize = 8192;
 const MAX_NEIGHBOR_RECORDS: usize = 4096;
@@ -20,13 +22,13 @@ struct QueryDeadline {
 }
 
 impl QueryDeadline {
-    fn start(db: &Connection, cancel: CancellationToken) -> Self {
+    fn start(db: &Connection, cancel: CancellationToken, time_limit: Duration) -> Self {
         let interrupt = db.interrupt_handle();
         let (stop, receive) = mpsc::channel();
         let thread = std::thread::spawn(move || {
             let start = Instant::now();
             loop {
-                if cancel.is_cancelled() || start.elapsed() >= QUERY_DEADLINE {
+                if cancel.is_cancelled() || start.elapsed() >= time_limit {
                     interrupt.interrupt();
                     break;
                 }
@@ -262,29 +264,6 @@ impl ParquetStore {
         ))
     }
 
-    pub(crate) fn path_artifacts(
-        &self,
-        id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
-        filter: &GraphQueryFilter,
-        from: (&str, &str),
-        to: (&str, &str),
-        cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
-        let rows = self.query_rows(id, artifacts, filter,
-            ("WITH records AS (SELECT * FROM {entities}) SELECT a.source_hash,a.record_index FROM records a JOIN records b USING (source_hash,record_index) WHERE a.entity_kind=? AND a.entity_value=? AND b.entity_kind=? AND b.entity_value=? LIMIT 1", &[from.0,from.1,to.0,to.1]), cancel,
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?)),
-        )?;
-        if let Some((hash, index)) = rows.into_iter().next() {
-            Ok(format!(
-                "{} {} --[co-observed in {hash}#{index}]--> {} {}",
-                from.0, from.1, to.0, to.1
-            ))
-        } else {
-            Ok("no direct co-observation path found within the query budget".into())
-        }
-    }
-
     fn query_rows<T>(
         &self,
         id: &CaseId,
@@ -292,9 +271,28 @@ impl ParquetStore {
         filter: &GraphQueryFilter,
         template: (&str, &[&str]),
         cancel: &CancellationToken,
+        map: impl FnMut(&Row<'_>) -> duckdb::Result<T>,
+    ) -> Result<Vec<T>, AppError> {
+        self.query_rows_limited(
+            id,
+            artifacts,
+            filter,
+            (template.0, template.1, QUERY_DEADLINE),
+            cancel,
+            map,
+        )
+    }
+
+    fn query_rows_limited<T>(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        filter: &GraphQueryFilter,
+        template: (&str, &[&str], Duration),
+        cancel: &CancellationToken,
         mut map: impl FnMut(&Row<'_>) -> duckdb::Result<T>,
     ) -> Result<Vec<T>, AppError> {
-        let (sql, arguments) = template;
+        let (sql, arguments, time_limit) = template;
         if artifacts.is_empty() {
             return Ok(Vec::new());
         }
@@ -324,7 +322,7 @@ impl ParquetStore {
         let db = Connection::open_in_memory().map_err(storage)?;
         db.execute_batch("SET threads=2; SET memory_limit='512MB'")
             .map_err(storage)?;
-        let _deadline = QueryDeadline::start(&db, cancel.clone());
+        let _deadline = QueryDeadline::start(&db, cancel.clone(), time_limit);
         let placeholders = vec!["?"; paths.len()].join(",");
         let relation = if filter.time_range().is_some() {
             format!(
