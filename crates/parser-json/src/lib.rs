@@ -11,9 +11,26 @@ use serde_json::Value;
 mod profile;
 mod stream;
 pub use profile::{ParserProfile, ParserTiming};
+use std::io::Read;
 use std::sync::Arc;
 
 pub struct JsonParser;
+
+impl JsonParser {
+    /// Parse a pre-hashed source in bounded memory. The caller must rehash the
+    /// same opened source while parsing and compare it with `evidence_hash`
+    /// before committing derived records or custody metadata.
+    pub fn parse_reader(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        evidence_hash: [u8; 32],
+        cancel: &irmind_app::CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<usize, AppError> {
+        stream::parse_reader(source, reader, evidence_hash, cancel, emit)
+    }
+}
 
 pub struct ProfiledJsonParser {
     profile: Arc<ParserProfile>,
@@ -107,6 +124,8 @@ fn parse_record(
         .get("eventTime")
         .or_else(|| value.get("timestamp"))
         .or_else(|| value.get("time"))
+        .or_else(|| value.get("eventTimestamp"))
+        .or_else(|| value.get("createdDateTime"))
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_owned();
@@ -114,6 +133,9 @@ fn parse_record(
         .get("eventName")
         .or_else(|| value.get("eventType"))
         .or_else(|| value.get("action"))
+        .or_else(|| value.pointer("/protoPayload/methodName"))
+        .or_else(|| value.pointer("/operationName/value"))
+        .or_else(|| value.get("operationName"))
         .and_then(Value::as_str)
         .unwrap_or("record")
         .to_owned();

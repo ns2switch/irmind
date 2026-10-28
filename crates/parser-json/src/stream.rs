@@ -3,7 +3,36 @@ use super::{AppError, GraphRecord, Tainted, normalize_record, parse_record, sha2
 use irmind_app::CancellationToken;
 use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map, Value};
+use std::cell::Cell;
+use std::io::{self, BufReader, Read};
+use std::rc::Rc;
 use std::time::Instant;
+
+const MAX_STREAM_RECORD_BYTES: usize = 4 * 1024 * 1024;
+const MAX_STREAM_RECORDS: usize = 10_000_000;
+
+struct RecordLimitReader<R> {
+    inner: R,
+    record_bytes: Rc<Cell<usize>>,
+    max_record_bytes: usize,
+}
+
+impl<R: Read> Read for RecordLimitReader<R> {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        let used = self.record_bytes.get();
+        let remaining = self.max_record_bytes.saturating_sub(used);
+        let allowed = output.len().min(remaining.saturating_add(1));
+        let count = self.inner.read(&mut output[..allowed])?;
+        if count > remaining {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "JSON record exceeds size limit",
+            ));
+        }
+        self.record_bytes.set(used + count);
+        Ok(count)
+    }
+}
 
 struct RecordSink<'a> {
     source: &'a str,
@@ -11,13 +40,15 @@ struct RecordSink<'a> {
     cancel: &'a CancellationToken,
     emit: &'a mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
     count: usize,
+    max_records: usize,
     failure: Option<AppError>,
     profile: Option<&'a ParserProfile>,
+    record_bytes: Option<Rc<Cell<usize>>>,
 }
 
 impl RecordSink<'_> {
     fn accept(&mut self, value: Value) -> Result<(), AppError> {
-        if self.count >= 100_000 {
+        if self.count >= self.max_records {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::TooManyJSONRecords,
             )));
@@ -43,6 +74,12 @@ impl RecordSink<'_> {
         result?;
         self.count += 1;
         Ok(())
+    }
+
+    fn reset_record_limit(&self) {
+        if let Some(bytes) = &self.record_bytes {
+            bytes.set(0);
+        }
     }
 
     fn accept_json<E: de::Error>(&mut self, value: Value) -> Result<(), E> {
@@ -74,7 +111,11 @@ impl<'de> Visitor<'de> for RootVisitor<'_, '_> {
     }
 
     fn visit_seq<S: SeqAccess<'de>>(self, mut seq: S) -> Result<(), S::Error> {
-        while let Some(value) = seq.next_element::<Value>()? {
+        loop {
+            self.0.reset_record_limit();
+            let Some(value) = seq.next_element::<Value>()? else {
+                break;
+            };
             self.0.accept_json(value)?;
         }
         Ok(())
@@ -84,7 +125,7 @@ impl<'de> Visitor<'de> for RootVisitor<'_, '_> {
         let mut object = Map::new();
         let mut wrapped = false;
         while let Some(key) = map.next_key::<String>()? {
-            if key == "Records" || key == "events" {
+            if matches!(key.as_str(), "Records" | "records" | "events") {
                 if wrapped {
                     return Err(de::Error::custom("multiple JSON record arrays"));
                 }
@@ -130,8 +171,10 @@ pub(super) fn parse_each(
         cancel,
         emit,
         count: 0,
+        max_records: 100_000,
         failure: None,
         profile,
+        record_bytes: None,
     };
     let mut deserializer = serde_json::Deserializer::from_slice(bytes);
     loop {
@@ -147,6 +190,46 @@ pub(super) fn parse_each(
     }
     if let Some(profile) = profile {
         profile.total(total_started.elapsed());
+    }
+    Ok(sink.count)
+}
+
+pub(super) fn parse_reader(
+    source: &str,
+    reader: &mut dyn Read,
+    evidence_hash: [u8; 32],
+    cancel: &CancellationToken,
+    emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+) -> Result<usize, AppError> {
+    let record_bytes = Rc::new(Cell::new(0));
+    let bounded = RecordLimitReader {
+        inner: BufReader::new(reader),
+        record_bytes: Rc::clone(&record_bytes),
+        max_record_bytes: MAX_STREAM_RECORD_BYTES,
+    };
+    let mut sink = RecordSink {
+        source,
+        evidence_hash,
+        cancel,
+        emit,
+        count: 0,
+        max_records: MAX_STREAM_RECORDS,
+        failure: None,
+        profile: None,
+        record_bytes: Some(record_bytes),
+    };
+    let mut deserializer = serde_json::Deserializer::from_reader(bounded);
+    loop {
+        sink.reset_record_limit();
+        if let Err(error) = Root(&mut sink).deserialize(&mut deserializer) {
+            return Err(sink
+                .failure
+                .take()
+                .unwrap_or_else(|| AppError::Storage(format!("invalid JSON record: {error}"))));
+        }
+        if deserializer.end().is_ok() {
+            break;
+        }
     }
     Ok(sink.count)
 }
