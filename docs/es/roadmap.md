@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 99ce7d94afac7fca90cc06740ed4abf122793917; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 5f1c2bbaa4c1c2b3b8a72963693ae7f59b4314b2; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -26,7 +26,7 @@ El MVP tiene un alcance cerrado:
 
 La versión `v0.1.0` solo se publicará cuando todos los hitos del [plan de referencia](../development/plan.md) cumplan sus criterios, se documente la prueba manual del modelo, se pruebe al menos un conector contra un entorno real de pruebas y el tag incluya un registro de cambios y binarios descargables. Todos los módulos actuales siguen siendo experimentales hasta cumplir esas condiciones. Aún no hay fecha de publicación.
 
-La matriz de integración cubre Linux, macOS, Windows y la verificación de exportaciones entre sistemas. Los binarios de publicación se compilan una vez al día en `main` cuando hay cambios de código.
+Cada PR y merge ejecuta los checks de Linux. Las PR que tocan código de plataforma o CI también ejecutan Windows y macOS; la matriz completa y la verificación cruzada se ejecutan de noche tras cambios en `main` y en tags de versión. Los binarios solo se compilan para tags y ejecuciones nocturnas que incluyan cambios de código.
 
 ## Después del MVP
 

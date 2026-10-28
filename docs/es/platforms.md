@@ -1,4 +1,4 @@
-Traducción de docs/platforms.md en el commit 3506de21def7f380096317087cf9310c33cd1d0d; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit 5f1c2bbaa4c1c2b3b8a72963693ae7f59b4314b2; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
@@ -19,7 +19,7 @@ Instala un compilador de C/C++ antes de compilar: GCC o Clang y `pkg-config` en 
 
 ## Artefactos de CI y checksums
 
-La ejecución diaria de CI en `main` publica un binario por plataforma solo cuando hubo cambios de código en las 24 horas anteriores. Los cambios exclusivos de documentación no generan binarios de distribución. Cada artefacto incluye las dos licencias del proyecto, los avisos de terceros y `SHA256SUMS`. Descárgalo de una ejecución diaria de confianza y compara el checksum **antes** de ejecutar el archivo:
+Todavía no hay binarios publicados como versión. Los tags de versión y las ejecuciones nocturnas tras cambios de código generan un artefacto sin firma por plataforma. Las PR y los merges a `main` no publican binarios. Cada artefacto incluye las dos licencias del proyecto, los avisos de terceros y `SHA256SUMS`. Descárgalo de una ejecución de confianza y compara el checksum **antes** de ejecutar el archivo:
 
 | Sistema | Comprobación |
 | --- | --- |
