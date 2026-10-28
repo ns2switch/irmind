@@ -1,6 +1,6 @@
 # Evidence graph benchmarks
 
-This page is for maintainers measuring the local DuckDB graph. The [manual and weekly workflow](../../.github/workflows/graph-benchmark.yml) runs two ignored 1 GB tests with synthetic data and uploads the phase profile as an artifact. Neither test runs on a pull request.
+This page is for maintainers measuring local graph ingestion and queries. The [manual and weekly workflow](../../.github/workflows/graph-benchmark.yml) runs synthetic 1 GB and 15 GB Parquet benchmarks and uploads the results as an artifact. The older DuckDB graph baseline is optional in manual runs. These benchmarks do not run on pull requests.
 
 ## Corpora and method
 
@@ -90,7 +90,7 @@ The runner's representative DuckDB phase split into 218.715 s of term writes, 38
 The target of less than two minutes on a standard GitHub runner is indicative. The linked manual run and its artifact are the runner measurement.
 These are single runs under an 8 GB address-space cap with no swap; filesystem cache and other host activity can affect the comparison.
 
-## Partitioned Parquet prototype
+## Partitioned Parquet
 
 The new benchmark creates 1,000 CloudTrail-shaped files of about 1 MB each, signs source and artifact manifests, and compacts same-partition Parquet files into signed bundles. It deletes each four-file source batch immediately after conversion. The 15 GB variant repeats each file's synthetic records 15 times and also avoids keeping the full input corpus on disk. Both variants measure source hashing, conversion, compressed disk size, and five bounded DuckDB queries. They run in the release profile in the manual and weekly workflow, not in PR checks. The local diagnostics below used the unoptimized test profile and are not a substitute for the standard-runner result.
 
@@ -113,4 +113,25 @@ The CPU sums overlap because four source files can be prepared in parallel. Host
 
 Before the catalog cache, warm queries still spent 23–27 s each: around 21 s was repeated audit-chain validation, while Parquet hashing and SQL accounted for about 1.25 s and 1.10 s per query on average. The cache checks the signed head and SQLite `data_version`, and a test alters an earlier entry from another connection to ensure that change invalidates it. Each selected Parquet file is still hashed before DuckDB reads it.
 
-These measurements do not establish the 15 GB acceptance target. A 15 GB run on the standard GitHub runner, including cold and warm p50/p95 query latency, remains required. The local 1 GB ingestion time already exceeds the proportional 60 s target for 15 GB in 15 minutes, so H7 remains open until the runner result and any further optimization are reviewed.
+These local measurements preceded the signed catalog and compaction changes below. They do not measure the final large-case path.
+
+### Standard-runner Parquet result
+
+The [manual Linux run on the Phase P branch](https://github.com/ns2switch/irmind/actions/runs/40765451457) completed all three synthetic Parquet tests in the release profile. It generated each four-file batch on the runner, ingested it through the signed use case, and deleted that temporary batch. The 15 GB result measures conversion and custody on this runner; it does not include cloud transfer or reading a persistent 15 GB source tree. The workflow artifact contains the raw benchmark output.
+
+| Corpus | Input bytes | Files | Ingest wall time | Source hash CPU sum | Conversion CPU sum | Record conversion CPU sum | Parquet write CPU sum | Parquet disk bytes | Cold summary |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Representative 1 GB | 1,045,717,000 | 1,000 | 26.982 s | 1.344 s | 51.181 s | 8.759 s | 9.412 s | 301,108,413 | 0.293 s |
+| Representative 15 GB | 15,685,573,000 | 1,000 | 243.944 s | 17.955 s | 711.098 s | 132.677 s | 85.295 s | 1,803,559,114 | 0.988 s |
+
+The CPU sums overlap across four parallel source workers; they must not be added to infer wall time. The Parquet disk figures include signed single-source artifacts retained for reconstruction and active compact bundles. They are 28.8% and 11.5% of the respective input sizes. The lower 15 GB ratio reflects repeated synthetic records; it is not a compression forecast for real cases. The timed 15 GB ingestion is 4.07 minutes, below the 15-minute target.
+
+| Query | 1 GB p50 | 1 GB p95 | 15 GB p50 | 15 GB p95 | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Term search | 1.001 s | 1.007 s | 7.631 s | 7.650 s | 0 |
+| Entity lookup | 0.129 s | 0.129 s | 1.339 s | 1.400 s | 0 |
+| Neighbors | 0.074 s | 0.078 s | 0.454 s | 0.462 s | 0 |
+| Timeline | 0.155 s | 0.157 s | 1.034 s | 1.034 s | 0 |
+| Direct path | 0.206 s | 0.212 s | 2.461 s | 2.470 s | 0 |
+
+Each p50/p95 uses five warm calls after a cold summary. Across those 26 calls, 15 GB artifact verification took 10.244 s and DuckDB SQL took 53.147 s. Every measured p95 is below 10 seconds. Neighbor search samples at most 4,096 matching records and marks a truncated result as partial; the path query currently reports direct co-observation only. These bounds are part of the measured behavior, not evidence that an arbitrary multi-hop search stays below 10 seconds. The same workflow also ran a 50 MB diagnostic successfully.
