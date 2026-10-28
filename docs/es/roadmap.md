@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit fba2d869fa136190fa7debb05c7490b06f987277; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 99ce7d94afac7fca90cc06740ed4abf122793917; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -6,7 +6,7 @@ Esta página es para quienes contribuyen al proyecto o evalúan sus límites act
 
 ## Disponible para evaluación con datos sintéticos
 
-- Una TUI centrada en el caso para crearlo, ingerir evidencia, investigar, aprobar llamadas, verificar, sellar y exportar, con los cambios firmados.
+- Una TUI centrada en la conversación, con entrada multilínea, tarjetas desplazables de actividad firmada, autocompletado de comandos y un panel lateral opcional. En el mismo espacio se crean casos, se ingiere evidencia, se investiga, se aprueban llamadas, se verifica, se sella y se exporta.
 - Texto incremental del modelo, paneles de IOC, hipótesis y técnicas ATT&CK con confirmación del analista, y fragmentos de evidencia junto a las aprobaciones relacionadas.
 - Consultas de lectura sujetas a política y enriquecimiento externo aprobado por el analista, con un guard obligatorio.
 - Custodia local en SQLite, grafo derivado en DuckDB y firmas Ed25519 mediante un llavero del sistema o un archivo cifrado, seleccionados explícitamente.
