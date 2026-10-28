@@ -5,7 +5,9 @@ use irmind_app::{AppError, GraphRecord, GraphRelation, TimelineEvent};
 use irmind_domain::{CaseId, Tainted};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fs;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 fn storage(_error: impl std::fmt::Display) -> AppError {
     AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
@@ -15,6 +17,9 @@ fn storage(_error: impl std::fmt::Display) -> AppError {
 
 mod format;
 mod index;
+mod profile;
+#[cfg(test)]
+pub(crate) use profile::GraphInsertProfile;
 mod queries;
 mod verify;
 use format::short;
@@ -24,6 +29,21 @@ use verify::{
 };
 pub(crate) struct GraphStore {
     root: PathBuf,
+    writers: Mutex<HashMap<CaseId, Arc<Mutex<Connection>>>>,
+    profile: Option<std::sync::Arc<profile::GraphInsertProfile>>,
+}
+
+pub(crate) struct GraphReadConnection {
+    connection: Connection,
+    _writer: Arc<Mutex<Connection>>,
+}
+
+impl Deref for GraphReadConnection {
+    type Target = Connection;
+
+    fn deref(&self) -> &Self::Target {
+        &self.connection
+    }
 }
 
 impl GraphStore {
@@ -32,37 +52,55 @@ impl GraphStore {
         irmind_fs::private_dir(root).map_err(storage)?;
         Ok(Self {
             root: root.to_owned(),
+            writers: Mutex::new(HashMap::new()),
+            profile: None,
         })
     }
 
-    pub(crate) fn connect(&self, id: &CaseId) -> Result<Connection, AppError> {
+    #[cfg(test)]
+    pub(crate) fn attach_profile(&mut self, profile: std::sync::Arc<profile::GraphInsertProfile>) {
+        self.profile = Some(profile);
+    }
+
+    pub(crate) fn connect(&self, id: &CaseId) -> Result<GraphReadConnection, AppError> {
+        let writer = self.writer(id)?;
+        let connection = writer
+            .lock()
+            .map_err(storage)?
+            .try_clone()
+            .map_err(storage)?;
+        Ok(GraphReadConnection {
+            connection,
+            _writer: writer,
+        })
+    }
+
+    fn open_new(&self, id: &CaseId) -> Result<Connection, AppError> {
         let path = self.root.join(format!("{}.duckdb", id.as_str()));
         let db = Connection::open(&path).map_err(storage)?;
         irmind_fs::private_file(&path).map_err(storage)?;
+        db.execute_batch("SET checkpoint_threshold='256MB'")
+            .map_err(storage)?;
         db.execute_batch(
             "CREATE TABLE IF NOT EXISTS indexed (hash VARCHAR PRIMARY KEY, records BIGINT NOT NULL);
              CREATE TABLE IF NOT EXISTS events (
                 hash VARCHAR NOT NULL, record_index BIGINT NOT NULL, event_time VARCHAR NOT NULL,
-                event VARCHAR NOT NULL, PRIMARY KEY(hash, record_index));
+                event VARCHAR NOT NULL);
              CREATE TABLE IF NOT EXISTS observations (
                 hash VARCHAR NOT NULL, record_index BIGINT NOT NULL, event_time VARCHAR NOT NULL,
-                event VARCHAR NOT NULL, kind VARCHAR NOT NULL, value VARCHAR NOT NULL,
-                PRIMARY KEY(hash, record_index, kind, value));
+                event VARCHAR NOT NULL, kind VARCHAR NOT NULL, value VARCHAR NOT NULL);
              CREATE TABLE IF NOT EXISTS nodes (
                 kind VARCHAR NOT NULL, value VARCHAR NOT NULL, first_seen VARCHAR NOT NULL,
                 last_seen VARCHAR NOT NULL, count BIGINT NOT NULL, PRIMARY KEY(kind, value));
              CREATE TABLE IF NOT EXISTS record_texts (
-                hash VARCHAR NOT NULL, record_index BIGINT NOT NULL, text VARCHAR NOT NULL,
-                PRIMARY KEY(hash, record_index));
+                hash VARCHAR NOT NULL, record_index BIGINT NOT NULL, text VARCHAR NOT NULL);
              CREATE TABLE IF NOT EXISTS record_terms (
-                term VARCHAR NOT NULL, hash VARCHAR NOT NULL, record_index BIGINT NOT NULL,
-                PRIMARY KEY(term, hash, record_index));
+                term VARCHAR NOT NULL, hash VARCHAR NOT NULL, record_index BIGINT NOT NULL);
              CREATE TABLE IF NOT EXISTS fts_indexed (hash VARCHAR PRIMARY KEY);
              CREATE TABLE IF NOT EXISTS relations (
                 hash VARCHAR NOT NULL, record_index BIGINT NOT NULL, event_time VARCHAR NOT NULL,
                 from_kind VARCHAR NOT NULL, from_value VARCHAR NOT NULL, relation VARCHAR NOT NULL,
-                to_kind VARCHAR NOT NULL, to_value VARCHAR NOT NULL,
-                PRIMARY KEY(hash, record_index, from_kind, from_value, relation, to_kind, to_value));",
+                to_kind VARCHAR NOT NULL, to_value VARCHAR NOT NULL);",
         )
         .map_err(storage)?;
         for (name, statement) in [
@@ -89,6 +127,28 @@ impl GraphStore {
         Ok(db)
     }
 
+    fn writer(&self, id: &CaseId) -> Result<Arc<Mutex<Connection>>, AppError> {
+        const MAX_IDLE_WRITERS: usize = 8;
+        let mut writers = self.writers.lock().map_err(storage)?;
+        if let Some(writer) = writers.get(id) {
+            return Ok(Arc::clone(writer));
+        }
+        let writer = Arc::new(Mutex::new(self.open_new(id)?));
+        let stale = if writers.len() >= MAX_IDLE_WRITERS {
+            writers
+                .iter()
+                .find(|(_, writer)| Arc::strong_count(writer) == 1)
+                .map(|(key, _)| key.clone())
+                .and_then(|key| writers.remove(&key))
+        } else {
+            None
+        };
+        writers.insert(id.clone(), Arc::clone(&writer));
+        drop(writers);
+        drop(stale);
+        Ok(writer)
+    }
+
     pub(crate) fn rebuild<F>(
         &self,
         id: &CaseId,
@@ -99,7 +159,8 @@ impl GraphStore {
     where
         F: FnMut(&str) -> Result<Vec<Tainted<GraphRecord>>, AppError>,
     {
-        let mut db = self.connect(id)?;
+        let writer = self.writer(id)?;
+        let mut db = writer.lock().map_err(storage)?;
         let tx = db.transaction().map_err(storage)?;
         tx.execute_batch("DELETE FROM relations; DELETE FROM observations; DELETE FROM nodes; DELETE FROM record_terms; DELETE FROM fts_indexed; DELETE FROM record_texts; DELETE FROM events; DELETE FROM indexed;").map_err(storage)?;
         let mut total = 0usize;
@@ -111,7 +172,7 @@ impl GraphStore {
             if records.len() != *expected {
                 return Err(storage(format!("signed record count differs for {hash}")));
             }
-            Self::insert_records(&tx, hash, &records, cancel)?;
+            Self::insert_records(&tx, hash, &records, cancel, self.profile.as_deref())?;
             total = total
                 .checked_add(records.len())
                 .ok_or_else(|| storage("record count overflow"))?;

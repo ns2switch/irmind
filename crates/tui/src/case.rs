@@ -2,6 +2,7 @@ use crate::{WorkspaceIo, workflow::CaseWorkflow};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use irmind_app::{CancellationToken, CaseId, Engine, FindingKind, LlmPort, summarize_usage};
+use ratatui::widgets::Paragraph;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{
     collections::BTreeMap,
@@ -136,6 +137,7 @@ pub(crate) fn run_case(
     shutdown: &CancellationToken,
     presentation: CasePresentation<'_>,
 ) -> Result<()> {
+    verify_case_before_open(terminal, engine, id, shutdown)?;
     let state = initial_state(engine, id)?;
     let (progress_tx, progress_rx) = mpsc::channel::<String>();
     let (model_tx, model_rx) = mpsc::channel::<String>();
@@ -162,6 +164,54 @@ pub(crate) fn run_case(
         };
         let _mouse = MouseCapture::start(presentation.mouse_capture)?;
         runtime.run()
+    })
+}
+
+fn verify_case_before_open(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    engine: &Engine<'_>,
+    id: &CaseId,
+    shutdown: &CancellationToken,
+) -> Result<()> {
+    let cancel = shutdown.child_token();
+    std::thread::scope(|scope| -> Result<()> {
+        let worker_cancel = cancel.clone();
+        let worker = scope.spawn(move || engine.open_case_verified(id, &worker_cancel));
+        let started = Instant::now();
+        while !worker.is_finished() {
+            terminal.draw(|frame| {
+                frame.render_widget(
+                    Paragraph::new(format!(
+                        "Verifying case before opening · {}s · Esc cancels",
+                        started.elapsed().as_secs()
+                    )),
+                    frame.area(),
+                );
+            })?;
+            if shutdown.is_cancelled() {
+                cancel.cancel();
+            }
+            if event::poll(Duration::from_millis(100))?
+                && let Event::Key(key) = event::read()?
+                && (key.code == KeyCode::Esc
+                    || key.modifiers.contains(KeyModifiers::CONTROL)
+                        && key.code == KeyCode::Char('c'))
+            {
+                cancel.cancel();
+            }
+        }
+        let verified = worker
+            .join()
+            .map_err(|_| anyhow::anyhow!("case verification worker failed"))?;
+        if matches!(verified, Err(irmind_app::AppError::Cancelled)) {
+            engine.record_cancellation(id, irmind_app::CancelledOperation::Verify)?;
+        }
+        if cancel.is_cancelled() && verified.is_ok() {
+            engine.record_cancellation(id, irmind_app::CancelledOperation::Verify)?;
+            return Err(irmind_app::AppError::Cancelled.into());
+        }
+        verified?;
+        Ok(())
     })
 }
 

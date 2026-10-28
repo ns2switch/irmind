@@ -2,6 +2,16 @@ use crate::{
     AppError, AuthorizedCall, CancellationToken, CaseId, Engine, Provenance, SourceKind, Tainted,
     Tool, hex, sha256,
 };
+use std::time::{Duration, Instant};
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct IngestProfile {
+    pub hash: Duration,
+    pub custody: Duration,
+    pub evidence_write: Duration,
+    pub graph: Duration,
+    pub audit: Duration,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GraphRecord {
@@ -64,10 +74,23 @@ impl Engine<'_> {
         source: &str,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        self.ingest_profiled(id, bytes, source, cancel, &mut IngestProfile::default())
+    }
+
+    pub fn ingest_profiled(
+        &self,
+        id: &CaseId,
+        bytes: &[u8],
+        source: &str,
+        cancel: &CancellationToken,
+        profile: &mut IngestProfile,
+    ) -> Result<String, AppError> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
+        let started = Instant::now();
         let digest = sha256(bytes);
+        profile.hash += started.elapsed();
         let _tainted =
             Tainted::from_external(bytes, Provenance::new(digest, None, SourceKind::File));
         self.require_attended_analyst("ingest evidence")?;
@@ -76,10 +99,15 @@ impl Engine<'_> {
         if case.sealed {
             return Err(AppError::Sealed);
         }
-        self.verify_unlocked(id)?;
+        let started = Instant::now();
+        self.verify_ingest_checkpoint(id, cancel)?;
+        profile.custody += started.elapsed();
         validate_ingest_input(bytes, source)?;
         let hash = hex(&digest);
+        let started = Instant::now();
         self.evidence_store.put_evidence(id, &hash, bytes)?;
+        profile.evidence_write += started.elapsed();
+        let started = Instant::now();
         self.audit(
             id,
             crate::AuditOrigin::System,
@@ -87,36 +115,19 @@ impl Engine<'_> {
             source,
             Some(&hash),
         )?;
-        self.screen_ingested_chunks(id, bytes, &hash, cancel)?;
+        profile.audit += started.elapsed();
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
+        let started = Instant::now();
         let count =
             self.graph
                 .index_from_parser(id, &hash, source, bytes, self.parser.as_ref(), cancel)?;
+        profile.graph += started.elapsed();
+        let started = Instant::now();
         self.audit_graph_indexed(id, &hash, count)?;
+        profile.audit += started.elapsed();
         Ok(hash)
-    }
-
-    fn screen_ingested_chunks(
-        &self,
-        id: &CaseId,
-        bytes: &[u8],
-        hash: &str,
-        cancel: &CancellationToken,
-    ) -> Result<(), AppError> {
-        for chunk in bytes.chunks(250_000) {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            self.screen_and_audit(
-                id,
-                &String::from_utf8_lossy(chunk),
-                "IngestedEvidence",
-                Some(hash),
-            )?;
-        }
-        Ok(())
     }
 
     fn audit_graph_indexed(&self, id: &CaseId, hash: &str, count: usize) -> Result<(), AppError> {

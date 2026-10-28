@@ -174,3 +174,75 @@ fn failed_streaming_index_rolls_back_terms_and_records() {
         assert_eq!(count, 0, "{table} must roll back");
     }
 }
+
+#[test]
+fn graph_verification_rejects_duplicate_search_terms() {
+    let root = tempfile::tempdir().unwrap();
+    let graph = GraphStore::new(root.path()).unwrap();
+    let id = CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+    let hash = "a".repeat(64);
+    let bytes = br#"{"eventName":"Synthetic","message":"unique-term"}"#;
+    let parser = irmind_mod_parser_json::JsonParser;
+    let cancel = irmind_app::CancellationToken::new();
+    graph
+        .index_from_parser(&id, &hash, "synthetic.json", bytes, &parser, &cancel)
+        .unwrap();
+    graph
+        .connect(&id)
+        .unwrap()
+        .execute(
+            "INSERT INTO record_terms SELECT term,hash,record_index FROM record_terms LIMIT 1",
+            [],
+        )
+        .unwrap();
+    assert!(
+        graph
+            .verify(&id, &[(hash, 1)], &cancel, |_| {
+                irmind_app::EventParser::parse(&parser, "verify", bytes)
+            })
+            .is_err()
+    );
+}
+
+#[test]
+fn graph_verification_rejects_duplicate_record_rows() {
+    let root = tempfile::tempdir().unwrap();
+    let graph = GraphStore::new(root.path()).unwrap();
+    let id = CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+    let hash = "b".repeat(64);
+    let bytes = br#"{"eventTime":"2026-10-27T12:00:00Z","eventName":"Synthetic"}"#;
+    let parser = irmind_mod_parser_json::JsonParser;
+    let cancel = irmind_app::CancellationToken::new();
+    graph
+        .index_from_parser(&id, &hash, "synthetic.json", bytes, &parser, &cancel)
+        .unwrap();
+    graph
+        .connect(&id)
+        .unwrap()
+        .execute("INSERT INTO events SELECT * FROM events LIMIT 1", [])
+        .unwrap();
+    assert!(
+        graph
+            .verify(&id, &[(hash, 1)], &cancel, |_| {
+                irmind_app::EventParser::parse(&parser, "verify", bytes)
+            })
+            .is_err()
+    );
+}
+
+#[test]
+fn active_reader_keeps_its_database_handle_during_cache_eviction() {
+    let root = tempfile::tempdir().unwrap();
+    let graph = GraphStore::new(root.path()).unwrap();
+    let active_id = CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+    let active = graph.connect(&active_id).unwrap();
+    for index in 2..=10 {
+        let id = CaseId::parse(&format!("{index:08}-1111-1111-1111-111111111111")).unwrap();
+        drop(graph.connect(&id).unwrap());
+    }
+    assert!(graph.writers.lock().unwrap().contains_key(&active_id));
+    let count: i64 = active
+        .query_row("SELECT COUNT(*) FROM indexed", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(count, 0);
+}

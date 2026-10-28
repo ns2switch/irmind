@@ -69,6 +69,7 @@ mod concurrency_and_migrations;
 mod custody_operations;
 mod graph_benchmark;
 mod graph_runtime;
+mod incremental_custody;
 mod injection_and_taint;
 mod remote_dispatch_edr_ti;
 mod remote_dispatch_siem_cloud;

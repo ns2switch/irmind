@@ -1,7 +1,9 @@
+use super::ParserProfile;
 use super::{AppError, GraphRecord, Tainted, normalize_record, parse_record, sha256};
 use irmind_app::CancellationToken;
 use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map, Value};
+use std::time::Instant;
 
 struct RecordSink<'a> {
     source: &'a str,
@@ -10,6 +12,7 @@ struct RecordSink<'a> {
     emit: &'a mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
     count: usize,
     failure: Option<AppError>,
+    profile: Option<&'a ParserProfile>,
 }
 
 impl RecordSink<'_> {
@@ -22,13 +25,22 @@ impl RecordSink<'_> {
         if self.count.is_multiple_of(256) && self.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
+        let started = Instant::now();
         let record = parse_record(
             self.source,
             self.evidence_hash,
             self.count,
             &normalize_record(value),
         )?;
-        (self.emit)(record)?;
+        if let Some(profile) = self.profile {
+            profile.extraction(started.elapsed());
+        }
+        let started = Instant::now();
+        let result = (self.emit)(record);
+        if let Some(profile) = self.profile {
+            profile.emit(started.elapsed());
+        }
+        result?;
         self.count += 1;
         Ok(())
     }
@@ -104,14 +116,22 @@ pub(super) fn parse_each(
     bytes: &[u8],
     cancel: &CancellationToken,
     emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    profile: Option<&ParserProfile>,
 ) -> Result<usize, AppError> {
+    let total_started = Instant::now();
+    let hash_started = Instant::now();
+    let evidence_hash = sha256(bytes);
+    if let Some(profile) = profile {
+        profile.hash(hash_started.elapsed());
+    }
     let mut sink = RecordSink {
         source,
-        evidence_hash: sha256(bytes),
+        evidence_hash,
         cancel,
         emit,
         count: 0,
         failure: None,
+        profile,
     };
     let mut deserializer = serde_json::Deserializer::from_slice(bytes);
     loop {
@@ -124,6 +144,9 @@ pub(super) fn parse_each(
         if deserializer.end().is_ok() {
             break;
         }
+    }
+    if let Some(profile) = profile {
+        profile.total(total_started.elapsed());
     }
     Ok(sink.count)
 }

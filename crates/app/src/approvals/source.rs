@@ -59,7 +59,9 @@ impl Engine<'_> {
                             SourceKind::File
                         },
                     ),
-                    excerpt: self.guard.screen(&excerpt)?.text,
+                    excerpt: self
+                        .screen_and_audit(id, &excerpt, "ApprovalSource", Some(hash))?
+                        .text,
                 });
             }
         }
@@ -70,7 +72,9 @@ impl Engine<'_> {
                 None,
                 SourceKind::ModelProposal,
             ),
-            excerpt: self.guard.screen(&proposal)?.text,
+            excerpt: self
+                .screen_and_audit(id, &proposal, "ApprovalSource", None)?
+                .text,
         })
     }
 }

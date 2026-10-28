@@ -158,7 +158,7 @@ impl Engine<'_> {
         Ok(false)
     }
 
-    pub(crate) fn screen_and_audit(
+    pub fn screen_and_audit(
         &self,
         id: &CaseId,
         text: &str,

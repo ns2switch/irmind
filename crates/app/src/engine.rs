@@ -96,6 +96,11 @@ pub struct Engine<'a> {
     pub(crate) edrs: Vec<&'a dyn EdrPort>,
     pub(crate) internal_intel: Vec<&'a dyn InternalIntelPort>,
     pub(crate) pricing: Option<ModelPricing>,
+    pub(crate) verified_cases: Arc<
+        std::sync::Mutex<
+            std::collections::HashMap<CaseId, crate::custody::incremental::VerifiedCheckpoint>,
+        >,
+    >,
 }
 
 pub struct EnginePorts {
@@ -165,6 +170,7 @@ impl<'a> Engine<'a> {
             edrs: Vec::new(),
             internal_intel: Vec::new(),
             pricing: self.pricing,
+            verified_cases: Arc::clone(&self.verified_cases),
         }
     }
 

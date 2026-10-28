@@ -200,7 +200,7 @@ impl HomeRuntime<'_, '_, '_> {
     }
 
     fn open_case(&mut self, id: &CaseId) -> Result<()> {
-        case::run_case(
+        let result = case::run_case(
             self.terminal,
             self.engine,
             self.model,
@@ -212,9 +212,25 @@ impl HomeRuntime<'_, '_, '_> {
                 modules: self.modules,
                 mouse_capture: self.mouse_capture,
             },
-        )?;
+        );
         self.state.rows = load_rows(self.engine)?;
-        self.state.notice = "Returned to case list".into();
+        match result {
+            Ok(()) => self.state.notice = "Returned to case list".into(),
+            Err(error) => {
+                let Some(case_error) = error.downcast_ref::<irmind_app::AppError>() else {
+                    return Err(error);
+                };
+                if matches!(
+                    case_error,
+                    irmind_app::AppError::InvalidChain(_)
+                        | irmind_app::AppError::EvidenceMismatch(_)
+                ) && let Some(row) = self.state.rows.iter_mut().find(|row| row.id == *id)
+                {
+                    row.status = CaseStatus::Inconsistent;
+                }
+                self.state.notice = format!("Cannot open case: {case_error}");
+            }
+        }
         Ok(())
     }
 

@@ -8,9 +8,22 @@ use irmind_app::{
 use irmind_domain::{Provenance, SourceKind, Tainted, classify_field};
 use serde_json::Value;
 
+mod profile;
 mod stream;
+pub use profile::{ParserProfile, ParserTiming};
+use std::sync::Arc;
 
 pub struct JsonParser;
+
+pub struct ProfiledJsonParser {
+    profile: Arc<ParserProfile>,
+}
+
+impl ProfiledJsonParser {
+    pub fn new(profile: Arc<ParserProfile>) -> Self {
+        Self { profile }
+    }
+}
 
 static MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-json",
@@ -45,17 +58,43 @@ impl EventParser for JsonParser {
         cancel: &irmind_app::CancellationToken,
         emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
     ) -> Result<usize, AppError> {
-        if bytes.len() > 50 * 1024 * 1024 {
-            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
-                irmind_app::AdapterPolicyError::JSONInputExceeds50MB,
-            )));
-        }
-        let first = bytes.iter().copied().find(|b| !b.is_ascii_whitespace());
-        if !matches!(first, Some(b'{' | b'[')) {
-            return Ok(0);
-        }
-        stream::parse_each(source, bytes, cancel, emit)
+        parse_each_checked(source, bytes, cancel, emit, None)
     }
+}
+
+impl EventParser for ProfiledJsonParser {
+    fn version(&self) -> &'static str {
+        "json-cloudtrail-v5"
+    }
+
+    fn parse_each(
+        &self,
+        source: &str,
+        bytes: &[u8],
+        cancel: &irmind_app::CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<usize, AppError> {
+        parse_each_checked(source, bytes, cancel, emit, Some(&self.profile))
+    }
+}
+
+fn parse_each_checked(
+    source: &str,
+    bytes: &[u8],
+    cancel: &irmind_app::CancellationToken,
+    emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    profile: Option<&ParserProfile>,
+) -> Result<usize, AppError> {
+    if bytes.len() > 50 * 1024 * 1024 {
+        return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
+            irmind_app::AdapterPolicyError::JSONInputExceeds50MB,
+        )));
+    }
+    let first = bytes.iter().copied().find(|b| !b.is_ascii_whitespace());
+    if !matches!(first, Some(b'{' | b'[')) {
+        return Ok(0);
+    }
+    stream::parse_each(source, bytes, cancel, emit, profile)
 }
 
 fn parse_record(
