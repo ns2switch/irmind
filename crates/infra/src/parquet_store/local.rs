@@ -1,9 +1,12 @@
+mod stream;
+use stream::{StreamInput, initial_hash, stream_records};
+
 use super::{
-    AppError, BATCH_BYTES, BATCH_ROWS, BTreeMap, CancellationToken, CaseId, EvidenceHash,
+    AppError, BATCH_BYTES, BATCH_ROWS, BTreeMap, CancellationToken, CaseId, EvidenceHash, File,
     GraphRecord, HashingReader, Instant, LargeCaseStore, OpenOptions, ParquetArtifactV1,
-    ParquetStore, Partition, PartitionSinks, Path, PreparedSource, RecordRow, Seek, SeekFrom,
-    SourceManifestV1, StreamingEventParser, TempWorkspace, UNIX_EPOCH, Write, batch_to_parquet,
-    finish_parquet, invalid_source, parse_hash, storage,
+    ParquetProfile, ParquetStore, Partition, PartitionSinks, Path, PreparedSource, RecordRow, Seek,
+    SeekFrom, SourceManifestV1, StreamingEventParser, TempWorkspace, UNIX_EPOCH, Write,
+    batch_to_parquet, finish_parquet, invalid_source, parse_hash, storage, storage_phase,
 };
 
 impl LargeCaseStore for ParquetStore {
@@ -16,54 +19,39 @@ impl LargeCaseStore for ParquetStore {
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
     ) -> Result<PreparedSource, AppError> {
-        let mut source = Self::open_source(source_root, relative_path)?;
-        let metadata = source.metadata().map_err(storage)?;
-        let hash_started = Instant::now();
-        let (hash, size) = Self::hash_reader(&mut source, cancel)?;
-        if let Some(profile) = &self.profile {
-            profile.record_hash(hash_started.elapsed());
-        }
-        if size != metadata.len() {
-            return Err(invalid_source());
-        }
+        let mut source = Self::open_source(source_root, relative_path).map_err(|error| {
+            storage_phase(
+                error,
+                irmind_app::AdapterStorageError::CannotOpenParquetSource,
+            )
+        })?;
+        let (metadata, hash, size) = initial_hash(&mut source, cancel, self.profile.as_deref())?;
         let hash_value =
             EvidenceHash::parse(&irmind_app::hex(&hash)).map_err(|_| invalid_source())?;
         let conversion_started = Instant::now();
-        source.seek(SeekFrom::Start(0)).map_err(storage)?;
-        let mut second_pass = HashingReader::new(&mut source);
-        let mut open: BTreeMap<Partition, PartitionSinks> = BTreeMap::new();
-        let mut grouped: BTreeMap<Partition, Vec<RecordRow>> = BTreeMap::new();
-        let mut buffered = 0usize;
-        let case_dir = self.case_dir(case_id)?;
-        let mut emit = |tainted: irmind_domain::Tainted<GraphRecord>| {
-            let row_started = Instant::now();
-            let mut row = None;
-            tainted.inspect(|record| row = Some(RecordRow::from_record(record, &hash_value)));
-            let row = row.ok_or_else(invalid_source)??;
-            if let Some(profile) = &self.profile {
-                profile.record_row(row_started.elapsed());
-            }
-            buffered = buffered.saturating_add(row.estimated_bytes());
-            grouped.entry(row.partition.clone()).or_default().push(row);
-            if buffered >= BATCH_BYTES
-                || grouped.values().map(Vec::len).sum::<usize>() >= BATCH_ROWS
-            {
-                let parquet_started = Instant::now();
-                batch_to_parquet(&case_dir, &hash_value, &mut grouped, &mut open)?;
-                if let Some(profile) = &self.profile {
-                    profile.record_parquet(parquet_started.elapsed());
-                }
-                buffered = 0;
-            }
-            Ok(())
-        };
-        let records =
-            parser.parse_reader(relative_path, &mut second_pass, hash, cancel, &mut emit)?;
-        second_pass.drain(cancel)?;
-        if second_pass.bytes != size || second_pass.finish() != hash {
-            return Err(AppError::EvidenceMismatch(hash_value.as_str().into()));
-        }
-        let after = source.metadata().map_err(storage)?;
+        let case_dir = self.case_dir(case_id).map_err(|error| {
+            storage_phase(
+                error,
+                irmind_app::AdapterStorageError::CannotPrepareParquetOutput,
+            )
+        })?;
+        let (records, open) = stream_records(StreamInput {
+            source: &mut source,
+            relative_path,
+            hash,
+            hash_value: &hash_value,
+            size,
+            case_dir: &case_dir,
+            parser,
+            cancel,
+            profile: self.profile.as_deref(),
+        })?;
+        let after = source.metadata().map_err(|error| {
+            storage_phase(
+                storage(error),
+                irmind_app::AdapterStorageError::CannotOpenParquetSource,
+            )
+        })?;
         if after.len() != metadata.len() || after.modified().ok() != metadata.modified().ok() {
             return Err(AppError::EvidenceMismatch(hash_value.as_str().into()));
         }
@@ -71,15 +59,21 @@ impl LargeCaseStore for ParquetStore {
             return Err(AppError::Cancelled);
         }
         let parquet_started = Instant::now();
-        batch_to_parquet(&case_dir, &hash_value, &mut grouped, &mut open)?;
-        if records == 0 {
-            return Err(invalid_source());
-        }
         if copy_original {
             self.copy_source(case_id, &mut source, &hash_value, cancel)?;
         }
-        let staged = finish_parquet(open, &hash_value)?;
-        let artifacts = self.finish_artifacts(case_id, staged)?;
+        let staged = finish_parquet(open, &hash_value).map_err(|error| {
+            storage_phase(
+                error,
+                irmind_app::AdapterStorageError::CannotPrepareParquetOutput,
+            )
+        })?;
+        let artifacts = self.finish_artifacts(case_id, staged).map_err(|error| {
+            storage_phase(
+                error,
+                irmind_app::AdapterStorageError::CannotPublishParquetArtifact,
+            )
+        })?;
         if let Some(profile) = &self.profile {
             profile.record_parquet(parquet_started.elapsed());
         }
@@ -176,10 +170,24 @@ impl LargeCaseStore for ParquetStore {
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
         artifact.validate().map_err(|_| invalid_source())?;
-        let case_dir = self.case_dir(case_id)?;
+        let case_dir = self.case_dir(case_id).map_err(|error| {
+            storage_phase(
+                error,
+                irmind_app::AdapterStorageError::CannotVerifyParquetArtifact,
+            )
+        })?;
         let mut file = irmind_fs::open_regular_no_follow(&case_dir, Path::new(&artifact.path))
-            .map_err(storage)?;
-        let (hash, size) = Self::hash_reader(&mut file, cancel)?;
+            .map_err(|_| {
+                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                    irmind_app::AdapterStorageError::CannotVerifyParquetArtifact,
+                ))
+            })?;
+        let (hash, size) = Self::hash_reader(&mut file, cancel).map_err(|error| {
+            storage_phase(
+                error,
+                irmind_app::AdapterStorageError::CannotVerifyParquetArtifact,
+            )
+        })?;
         if size != artifact.size || hash != parse_hash(&artifact.sha256)? {
             return Err(AppError::EvidenceMismatch(artifact.sha256.as_str().into()));
         }

@@ -83,6 +83,29 @@ impl AuditLog for LocalStore {
         tx.commit().map_err(storage)
     }
 
+    fn append_batch(&self, entries: &[SignedEntry]) -> Result<(), AppError> {
+        let first = entries
+            .first()
+            .ok_or_else(|| storage_reason("empty audit batch"))?;
+        CaseId::parse(&first.case_id).map_err(|_| storage_reason("invalid audit batch case"))?;
+        if entries.iter().any(|entry| entry.case_id != first.case_id) {
+            return Err(storage_reason("audit batch spans multiple cases"));
+        }
+        if self
+            .seal_dir
+            .join(format!("{}.json", first.case_id))
+            .exists()
+        {
+            return Err(AppError::Sealed);
+        }
+        let mut conn = self.conn()?;
+        let tx = conn.transaction().map_err(storage)?;
+        for entry in entries {
+            append_entry_tx(&tx, entry)?;
+        }
+        tx.commit().map_err(storage)
+    }
+
     fn entries(&self, id: &CaseId) -> Result<Vec<SignedEntry>, AppError> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare("SELECT case_id,seq,at,actor,origin,kind,payload,evidence,prev,hash,sig,public_key FROM audit WHERE case_id=?1 ORDER BY seq").map_err(storage)?;

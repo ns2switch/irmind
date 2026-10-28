@@ -39,6 +39,15 @@ fn storage(_error: impl std::fmt::Display) -> AppError {
     ))
 }
 
+fn storage_phase(error: AppError, phase: irmind_app::AdapterStorageError) -> AppError {
+    match error {
+        AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+            irmind_app::AdapterStorageError::LocalStorageOperationFailed,
+        )) => AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(phase)),
+        other => other,
+    }
+}
+
 fn invalid_source() -> AppError {
     AppError::Policy("source path or content is invalid".into())
 }

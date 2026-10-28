@@ -96,6 +96,8 @@ pub enum CaseMutation {
 pub trait AuditLog: Send + Sync {
     fn last_entry(&self, id: &CaseId) -> Result<Option<SignedEntry>, AppError>;
     fn transact(&self, entry: &SignedEntry, mutation: CaseMutation) -> Result<(), AppError>;
+    /// Append every signed entry in one durable transaction, or none of them.
+    fn append_batch(&self, entries: &[SignedEntry]) -> Result<(), AppError>;
     /// Append-only events use the same transaction path without a case-state mutation.
     fn append(&self, entry: &SignedEntry) -> Result<(), AppError> {
         self.transact(entry, CaseMutation::None)

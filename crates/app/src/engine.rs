@@ -1,5 +1,6 @@
 use crate::*;
 
+mod audit;
 mod cases;
 mod investigation;
 mod model_request;
@@ -328,54 +329,5 @@ impl Engine<'_> {
             }
         }
         tools
-    }
-
-    pub(crate) fn audit(
-        &self,
-        id: &CaseId,
-        origin: AuditOrigin,
-        kind: AuditEventKind,
-        payload: &str,
-        evidence: Option<&str>,
-    ) -> Result<(), AppError> {
-        let entry = self.signed_entry(id, origin, kind, payload, evidence)?;
-        self.audit_log.append(&entry)
-    }
-
-    pub(crate) fn signed_entry(
-        &self,
-        id: &CaseId,
-        origin: AuditOrigin,
-        kind: AuditEventKind,
-        payload: &str,
-        evidence: Option<&str>,
-    ) -> Result<SignedEntry, AppError> {
-        let last = self.audit_log.last_entry(id)?;
-        let at = self.clock.now()?;
-        let mut entry = SignedEntry {
-            seq: last.as_ref().map_or(1, |e| e.seq + 1),
-            case_id: id.as_str().to_owned(),
-            at,
-            actor: self.signer.actor(),
-            origin: origin.as_str().to_owned(),
-            kind,
-            payload: payload.to_owned(),
-            evidence: evidence.map(str::to_owned),
-            prev: last.map_or([0; 32], |e| e.hash),
-            hash: [0; 32],
-            sig: Vec::new(),
-            public_key: self.signer.public_key(),
-        };
-        entry.hash = sha256(&entry.canonical());
-        entry.sig = self.signer.sign(&entry.hash)?;
-        Ok(entry)
-    }
-
-    pub(crate) fn require_attended_analyst(&self, operation: &str) -> Result<(), AppError> {
-        if self.mode == ExecutionMode::Attended && self.signer.actor() == Actor::Analyst {
-            Ok(())
-        } else {
-            Err(AppError::PendingApproval(operation.to_owned()))
-        }
     }
 }

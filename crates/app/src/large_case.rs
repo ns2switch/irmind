@@ -245,18 +245,39 @@ impl LargeCaseUseCases<'_, '_> {
             }
             self.store.verify_artifact(id, artifact, cancel)?;
         }
-        self.engine.audit(
-            id,
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        let mut events = vec![(
             AuditOrigin::System,
             AuditEventKind::SourceManifestV1,
-            &prepared.manifest.encode().map_err(|_| invalid_manifest())?,
-            None,
-        )?;
+            prepared.manifest.encode().map_err(|_| invalid_manifest())?,
+        )];
+        let mut new_artifacts = Vec::new();
+        let mut new_paths = BTreeSet::new();
         for artifact in prepared.artifacts {
-            // Once the source record is signed, finish the artifact records so
-            // cancellation cannot leave a valid source with no derived link.
-            self.audit_artifact(id, artifact, known_artifacts)?;
+            if let Some(previous) = known_artifacts.get(&artifact.path) {
+                if previous != &artifact {
+                    return Err(AppError::EvidenceMismatch(artifact.path));
+                }
+                continue;
+            }
+            if !new_paths.insert(artifact.path.clone()) {
+                return Err(invalid_manifest());
+            }
+            events.push((
+                AuditOrigin::System,
+                AuditEventKind::ParquetArtifactV1,
+                artifact.encode().map_err(|_| invalid_manifest())?,
+            ));
+            new_artifacts.push(artifact);
         }
+        self.engine.audit_batch(id, &events)?;
+        known_artifacts.extend(
+            new_artifacts
+                .into_iter()
+                .map(|artifact| (artifact.path.clone(), artifact)),
+        );
         Ok(source_hash)
     }
 }
