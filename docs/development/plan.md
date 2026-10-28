@@ -24,17 +24,19 @@ This internal plan is for maintainers tracking acceptance criteria. Public reade
 | H1 Domain | Typed IDs, risk and approval types, execution mode, actors, taint, scoped policy and quotas, case entities, pure hash-chain rules. | Tests cover every policy rule and chain failure. |
 | H2 Application | Cancelable async remote ports; synchronous local ports through `spawn_blocking` in async use cases; investigation, approval, reporting, seal, verify, ingest, export, and export verification; generic module dispatch and port contracts. | No local operation blocks the runtime; each remote family has an approved-call end-to-end test; no raw data reaches the fake LLM. |
 | H3 Security | Nonce isolation, normalization, injection detection, taint containment, safe output, startup corpus self-test, signed detection event. | An obedient fake LLM cannot execute an unapproved call; a broken rule blocks startup. |
-| H4 Signed storage | SQLite WAL, SHA-256 evidence, distinct Analyst and Agent keys in an explicitly selected OS or encrypted-file backend, verify, seal, export, expected-key verification. | Verification detects database and evidence tampering. |
+| H4 Signed storage | SQLite WAL, distinct Analyst and Agent keys in an explicitly selected OS or encrypted-file backend, signed source manifests with SHA-256 and optional original copies, verify, seal, export, expected-key verification. | Verification detects database tampering and reports missing or changed originals; a sampled check states its limited coverage. Legacy copied cases still verify. |
 | H5 LLM | Streaming tool calls, case-state context, per-case token and cost limits. | Recorded-response tests and a documented manual test pass. |
 | H6 TUI | Home case list and creation; chronological conversation with multiline input, scroll, command completion, optional case sidebar, and cards for calls and findings; cancelable work, first-run guide, module status, scope and evidence commands. | `ratatui::TestBackend` covers navigation, completion, cards, and a full case from creation through export without the CLI. |
-| H7 Graph | DuckDB, hashed ingestion, streaming CloudTrail and JSON parsers, deterministic extraction, aggregated edges, text search, bounded Read tools. | A benchmark ingests at least 1 GB of synthetic data and measures time and tokens. |
-| H8 Integrations | Cloud, SIEM, EDR, and threat-intelligence modules passing shared port contracts. | Each module has recorded-response tests and a setup guide. |
+| H7 Graph | Streaming custody manifests and partitioned Parquet for 15–500 GB investigations; DuckDB reads only IRMind-produced Parquet, with bounded term and graph queries. CloudTrail, GCP Cloud Audit Logs, Azure Activity and Entra ID sign-in logs, and generic JSON have streaming parsers. | Existing cases migrate without breaking verification; a standard runner converts 15 GB in under 15 minutes and query p95 stays under 10 seconds, with 1 GB and 15 GB phase profiles. |
+| H8 Integrations | Cloud, SIEM, EDR, and threat-intelligence modules passing shared port contracts; S3, GCS, and Azure Blob object storage are Read-only ingestion sources. | Each module has recorded-response tests and a setup guide; the three object backends pass a shared streaming contract and enforce case scope. |
 
 ## MVP
 
-The MVP scope is closed. Complete C4 (streaming CloudTrail and JSON ingestion, DuckDB text search, and the 1 GB benchmark), C5 (SIEM alert retrieval and tracing separate from custody), C6 (structured SIEM queries, as proposed in [decisions](decisions.md)), and all H8 acceptance work for product modules already in the workspace. Do not add product modules to meet this scope.
+The MVP includes P: signed source manifests, optional original copies, partitioned Parquet, bounded DuckDB queries over IRMind-produced Parquet, the four streaming source parsers, representative 1 GB and 15 GB benchmarks, and verified migration of existing cases. It also includes R: read-only S3, GCS, and Azure Blob ingestion with explicit credentials, case scope, transfer budgets, and a shared streaming contract. C5 (SIEM alert retrieval and tracing), C6 (structured SIEM queries), and the existing H8 module contracts remain in scope. Cloud query engines are designed now but implemented after the MVP.
 
-Chronicle, GCP, Azure, external anchoring of case seals, and the local gateway with watches belong after the MVP.
+GCP and Azure enter the MVP only as object-storage read sources and exported-log parsers. Source-side queries, Chronicle, other GCP and Azure product connectors, external anchoring of case seals, and the local gateway with watches remain after the MVP.
+
+For uncopied originals, the signed manifest proves what IRMind observed when it hashed each source, while later full verification requires access to that same source. Sampling verifies only selected originals. Neither mode claims that an unavailable source remains intact. Export without originals is verifiable as a signed manifest and case chain, not as a complete portable evidence package.
 
 Exit only when H0–H8 meet their stated acceptance criteria, the H5 manual test is documented, at least one connector has been tested against a real test environment, and a `v0.1.0` tag has a changelog and downloadable binaries. Synthetic recordings alone do not satisfy the connector test.
 
@@ -46,6 +48,7 @@ Do not implement the gateway yet. Preserve distinct Analyst and Agent signing ke
 
 - `ProposedCall` has no risk field. `Tool` determines risk.
 - The evidence graph uses DuckDB.
+- Parquet is the derived local event store for large cases; DuckDB reads only IRMind-produced Parquet. Original copies are an explicit option rather than an implicit requirement. The versioned custody format is subject to separate approval before implementation.
 - `Actor` names the signer; event origin is separate.
 - No LLM is enabled by default. Use only synthetic data until provider compliance approval.
 - Local Ollama may use keyless loopback HTTP or HTTPS; remote models require HTTPS.
