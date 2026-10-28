@@ -240,7 +240,12 @@ impl ArtifactSink {
         let writer = self.writer.take().ok_or_else(invalid_source)?;
         writer.close().map_err(storage)?;
         let temporary = self.temporary.as_ref().ok_or_else(invalid_source)?;
-        let mut file = File::open(temporary).map_err(storage)?;
+        // Windows FlushFileBuffers requires a writable handle.
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(temporary)
+            .map_err(storage)?;
         file.sync_all().map_err(storage)?;
         let (digest, size) = ParquetStore::hash_reader(&mut file, &CancellationToken::new())?;
         Ok(StagedArtifact {

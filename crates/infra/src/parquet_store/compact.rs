@@ -159,7 +159,12 @@ fn write_compact(
         .ok_or_else(invalid_source)?
         .close()
         .map_err(storage)?;
-    let mut file = File::open(output_path).map_err(storage)?;
+    // Windows FlushFileBuffers requires a writable handle.
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(output_path)
+        .map_err(storage)?;
     file.sync_all().map_err(storage)?;
     let (digest, size) = ParquetStore::hash_reader(&mut file, cancel)?;
     Ok((size, digest))

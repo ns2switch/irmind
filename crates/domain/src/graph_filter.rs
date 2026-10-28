@@ -115,7 +115,10 @@ fn valid_partition_value(value: &str) -> bool {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::{Case, CaseId, Decision, ExecutionMode, ProposedCall, Severity, Tool, evaluate};
+    use crate::{
+        Case, CaseId, CaseScope, Decision, ExecutionMode, PolicyRules, ProposedCall, Severity,
+        Tool, evaluate, evaluate_with_rules,
+    };
 
     #[test]
     fn rejects_invalid_or_ambiguous_filters() {
@@ -176,6 +179,32 @@ mod tests {
                 0
             ),
             Decision::Allow(_)
+        ));
+    }
+
+    #[test]
+    fn organization_ceiling_denies_a_filter_allowed_by_the_case() {
+        let case = Case {
+            id: CaseId::parse("00000000-0000-0000-0000-000000000002").unwrap(),
+            title: "synthetic".into(),
+            severity: Severity::Medium,
+            scope: "v2;sources=local;accounts=111111111111,222222222222;projects=;hosts=;from=2026-10-28T00:00:00Z;to=2026-10-29T00:00:00Z".into(),
+            sealed: false,
+        };
+        let rules = PolicyRules {
+            scope: Some(CaseScope::parse("v2;sources=local;accounts=111111111111;projects=;hosts=;from=2026-10-28T00:00:00Z;to=2026-10-29T00:00:00Z").unwrap()),
+            ..PolicyRules::default()
+        };
+        let proposal = ProposedCall {
+            tool: Tool::TextSearch,
+            args: BTreeMap::from([
+                ("query".into(), "AssumeRole".into()),
+                ("account".into(), "222222222222".into()),
+            ]),
+        };
+        assert!(matches!(
+            evaluate_with_rules(&case, proposal, 1, ExecutionMode::Attended, 0, &rules),
+            Decision::Deny("outside organization policy scope")
         ));
     }
 }
