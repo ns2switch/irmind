@@ -25,7 +25,8 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 | `irmind case list` | List cases. |
 | `irmind case show <CASE_ID>` | Show case details. |
 | `irmind case scope <CASE_ID> <SCOPE>` | Sign a new scope. |
-| `irmind ingest <CASE_ID> <PATH>` | Add a bounded file or directory without following symlinks. |
+| `irmind ingest <CASE_ID> <PATH> [--copy-original]` | Hash originals in place and index JSON as Parquet. Copy originals only when requested. Symlinks are rejected. |
+| `irmind migrate <CASE_ID>` | Verify an open legacy case, convert copied indexed JSON to signed Parquet artifacts, and verify again. |
 | `irmind evidence <CASE_ID> <HASH> [--output <PATH>]` | Display or save original evidence. |
 | `irmind findings <CASE_ID>` | List proposed and confirmed findings. |
 | `irmind add-finding <CASE_ID> <KIND> <VALUE> <EVIDENCE_HASH>` | Propose a finding. |
@@ -49,8 +50,8 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 | Command | Purpose |
 | --- | --- |
 | `irmind graph <CASE_ID>` | Show the case graph summary. |
-| `irmind graph-rebuild <CASE_ID>` | Rebuild the derived graph from signed originals. |
-| `irmind verify-graph <CASE_ID>` | Compare the graph with signed originals. |
+| `irmind graph-rebuild <CASE_ID>` | Rebuild the legacy DuckDB graph. Large cases use `verify-graph` with their source root. |
+| `irmind verify-graph <CASE_ID> [--source-root <PATH>]` | Rebuild and compare Parquet with originals, or verify a legacy graph. |
 | `irmind timeline <CASE_ID>` | List timeline events. |
 | `irmind entity <CASE_ID> <KIND> <VALUE>` | Look up an entity. |
 | `irmind neighbors <CASE_ID> <KIND> <VALUE> [--limit <N>]` | List bounded neighbors. |
@@ -63,9 +64,11 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 
 | Command | Purpose |
 | --- | --- |
-| `irmind verify <CASE_ID>` | Verify audit signatures and evidence hashes. |
+| `irmind verify <CASE_ID> [--source-root <PATH>] [--sample <N>]` | Verify the chain and copied evidence. Large cases also check all originals, or an explicit random sample, under the selected root. |
 | `irmind seal <CASE_ID>` | Make a verified case read-only. |
-| `irmind export <CASE_ID> <PATH>` | Verify and export a sealed case. |
+| `irmind export <CASE_ID> <PATH> [--include-originals --source-root <PATH>]` | Export a sealed case. Large cases use streaming v4; original bytes are included only on request. |
 | `irmind verify-export <PATH> --expected-key <FINGERPRINT>` | Verify a package without unlocking a local keystore. |
 
 Use `irmind <COMMAND> --help` to check positional arguments for the installed binary. Keep the expected key fingerprint outside the exported package and obtain it through a trusted channel.
+
+An export without large-case originals proves the signed manifest and seal, but cannot prove the source bytes are still available. `verify-export` reports that limit. Keep the source root available for a full `verify`. A sampled verification states how many sources remain unchecked.

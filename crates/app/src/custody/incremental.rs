@@ -89,6 +89,7 @@ impl Engine<'_> {
             }
         }
         self.verify_new_evidence(id, &new_evidence, cancel)?;
+        crate::large_case::read_manifest_index(&entries)?;
         self.pending_requests_unlocked(&case, &entries)?;
         self.findings_unlocked(id, &entries)?;
         summarize_usage(&entries)?;

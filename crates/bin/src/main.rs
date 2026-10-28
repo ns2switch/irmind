@@ -8,7 +8,9 @@ mod configuration;
 mod diagnostics;
 mod keystore;
 mod policy_config;
-use cli::{Cli, Command, audit_source_name, input_files, read_evidence, write_private_output};
+use cli::{
+    Cli, Command, audit_source_name, input_files_large, read_evidence, write_private_output,
+};
 use configuration::{configuration_issue, load_module_config, load_pricing};
 
 use anyhow::{Context, Result, anyhow};
@@ -16,8 +18,8 @@ use clap::{Parser, Subcommand};
 use directories::ProjectDirs;
 use irmind_app::{
     AppError, AuditLog, CancellationToken, ConfigChange, ConfigurationStore, CryptoPorts, Engine,
-    EnginePorts, EvidenceGraph, EvidenceStore, FindingKind, PersistentConfig, Repository,
-    SecretBackend, SignerBackend,
+    EnginePorts, EvidenceGraph, EvidenceStore, FindingKind, LargeCaseUseCases, PersistentConfig,
+    Repository, SecretBackend, SignerBackend,
     modules::{ModuleConfig, ModuleManifest, ModuleRegistry},
 };
 use irmind_domain::{CaseId, ExecutionMode, Severity};
@@ -55,6 +57,8 @@ use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+static STREAMING_JSON_PARSER: JsonParser = JsonParser;
 
 macro_rules! register_configured {
     ($registry:expr, $module:ty, $manifest:expr, $secrets:expr, $saved:expr, $allow_env:expr, $interactive:expr, $issues:expr) => {{
@@ -131,7 +135,7 @@ fn compiled_credential_fields() -> Vec<&'static str> {
 
 impl WorkspaceIo for RootWorkspaceIo {
     fn input_files(&self, root: &Path) -> Result<Vec<PathBuf>> {
-        input_files(root)
+        input_files_large(root)
     }
     fn read_evidence(&self, path: &Path) -> Result<Vec<u8>> {
         read_evidence(path)
@@ -143,14 +147,27 @@ impl WorkspaceIo for RootWorkspaceIo {
         write_private_output(path, bytes)
     }
     fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String> {
-        let (fingerprint, entries) =
-            irmind_app::verify_export(&LocalExportVerifier, path, Some(expected_key))?;
+        let result =
+            irmind_app::verify_export_details(&LocalExportVerifier, path, Some(expected_key))?;
         Ok(format!(
-            "Verified {entries} entries; analyst key {fingerprint}"
+            "Verified {} entries; analyst key {}; original bytes verified {}; unavailable {}",
+            result.entries,
+            result.analyst_key_fingerprint,
+            result.source_bytes_verified,
+            result.source_bytes_unavailable
         ))
     }
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter {
         self.store.as_ref()
+    }
+    fn large_case_exporter(&self) -> Option<&dyn irmind_app::LargeCaseExporter> {
+        Some(self.store.as_ref())
+    }
+    fn large_case_store(&self) -> Option<&dyn irmind_app::LargeCaseStore> {
+        Some(self.store.as_ref())
+    }
+    fn streaming_parser(&self) -> Option<&dyn irmind_app::StreamingEventParser> {
+        Some(&STREAMING_JSON_PARSER)
     }
     fn keystore_status(&self) -> Result<KeystoreStatus> {
         let credentials = self

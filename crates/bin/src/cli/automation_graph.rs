@@ -1,7 +1,10 @@
 use super::{
-    AutomationContext, Command, EvidenceGraph, EvidenceStore, Repository, Result, anyhow, parse_id,
-    write_private_output,
+    AuditLog, AutomationContext, Command, EvidenceGraph, EvidenceStore, Repository, Result, anyhow,
+    parse_id, write_private_output,
 };
+use irmind_app::{LargeCaseUseCases, SourceCheckMode};
+use irmind_mod_parser_json::JsonParser;
+use std::path::Path;
 
 impl AutomationContext<'_, '_> {
     pub(super) fn handle_custody(self, command: Command) -> Result<bool> {
@@ -9,7 +12,6 @@ impl AutomationContext<'_, '_> {
             engine,
             store,
             guard,
-            cancel,
             ..
         } = self;
         match command {
@@ -35,10 +37,6 @@ impl AutomationContext<'_, '_> {
                     );
                 }
             }
-            Command::Verify { case_id } => println!(
-                "verified {} audit entries",
-                engine.verify_cancelable(&parse_id(&case_id)?, cancel)?
-            ),
             Command::Seal { case_id } => {
                 let id = parse_id(&case_id)?;
                 engine.seal(&id)?;
@@ -51,6 +49,59 @@ impl AutomationContext<'_, '_> {
                 );
             }
             _ => return Err(anyhow!("invalid command dispatch")),
+        }
+        Ok(false)
+    }
+
+    pub(super) fn handle_verify(self, command: Command) -> Result<bool> {
+        let Self {
+            engine,
+            store,
+            cancel,
+            ..
+        } = self;
+        let Command::Verify {
+            case_id,
+            source_root,
+            sample,
+        } = command
+        else {
+            return Err(anyhow!("invalid command dispatch"));
+        };
+        let id = parse_id(&case_id)?;
+        let entries = engine.verify_cancelable(&id, cancel)?;
+        let has_sources = store
+            .entries(&id)?
+            .iter()
+            .any(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV1);
+        if has_sources {
+            let root = source_root.ok_or_else(|| {
+                anyhow!("source root required to verify originals; use --source-root")
+            })?;
+            let parser = JsonParser;
+            let large = LargeCaseUseCases {
+                engine,
+                store: store.as_ref(),
+                parser: &parser,
+            };
+            let mode = sample.map_or(SourceCheckMode::Full, SourceCheckMode::Sample);
+            let report = large.verify_sources(&id, &root, mode, cancel)?;
+            println!(
+                "verified {entries} audit entries; checked {} of {} original sources; {} unchanged; {} missing or changed",
+                report.checked,
+                report.total,
+                report.checked - report.missing_or_changed.len(),
+                report.missing_or_changed.len()
+            );
+            if !report.missing_or_changed.is_empty() {
+                return Err(anyhow!(
+                    "one or more original sources are missing or changed"
+                ));
+            }
+        } else if source_root.is_some() || sample.is_some() {
+            return Err(anyhow!("case has no source manifests to sample"));
+        } else {
+            println!("verified {entries} audit entries");
         }
         Ok(false)
     }
@@ -73,14 +124,46 @@ impl AutomationContext<'_, '_> {
                     irmind_app::ContentGuard::screen(guard.as_ref(), &summary)?.text
                 );
             }
-            Command::GraphRebuild { case_id } => println!(
-                "rebuilt {} graph records",
-                engine.rebuild_graph_cancelable(&parse_id(&case_id)?, cancel)?
-            ),
-            Command::VerifyGraph { case_id } => println!(
-                "verified {} graph records",
-                engine.verify_graph_cancelable(&parse_id(&case_id)?, cancel)?
-            ),
+            Command::GraphRebuild { case_id } => {
+                let id = parse_id(&case_id)?;
+                let (has_sources, has_artifacts) = parquet_status(store.as_ref(), &id)?;
+                if has_sources || has_artifacts {
+                    return Err(anyhow!(
+                        "use verify-graph to rebuild and compare signed Parquet"
+                    ));
+                }
+                println!(
+                    "rebuilt {} graph records",
+                    engine.rebuild_graph_cancelable(&id, cancel)?
+                );
+            }
+            Command::VerifyGraph {
+                case_id,
+                source_root,
+            } => {
+                let id = parse_id(&case_id)?;
+                let (has_sources, has_artifacts) = parquet_status(store.as_ref(), &id)?;
+                if has_sources || has_artifacts {
+                    let root = source_root.as_deref().or_else(|| {
+                        (!has_sources).then_some(Path::new("."))
+                    }).ok_or_else(|| anyhow!(
+                        "source root required to rebuild and verify Parquet; use --source-root"
+                    ))?;
+                    let parser = JsonParser;
+                    let large = LargeCaseUseCases {
+                        engine,
+                        store: store.as_ref(),
+                        parser: &parser,
+                    };
+                    let count = large.verify_parquet_rebuild(&id, root, cancel)?;
+                    println!("rebuilt and compared {count} Parquet sources");
+                } else {
+                    println!(
+                        "verified {} graph records",
+                        engine.verify_graph_cancelable(&id, cancel)?
+                    );
+                }
+            }
             Command::Timeline { case_id } => {
                 let id = parse_id(&case_id)?;
                 let _case_lock = store.lock_case(&id)?;
@@ -213,10 +296,31 @@ impl AutomationContext<'_, '_> {
             ..
         } = self;
         match command {
-            Command::Export { case_id, path } => {
+            Command::Export {
+                case_id,
+                path,
+                include_originals,
+                source_root,
+            } => {
                 let id = parse_id(&case_id)?;
-                let fingerprint =
-                    irmind_app::export_case(engine, store.as_ref(), &id, &path, cancel)?;
+                let (has_sources, has_artifacts) = parquet_status(store.as_ref(), &id)?;
+                let has_new_custody = has_sources || has_artifacts;
+                let fingerprint = if include_originals || has_new_custody {
+                    irmind_app::export_case_v4(
+                        engine,
+                        store.as_ref(),
+                        &id,
+                        &path,
+                        source_root.as_deref(),
+                        include_originals,
+                        cancel,
+                    )?
+                } else {
+                    if source_root.is_some() {
+                        return Err(anyhow!("--source-root requires --include-originals"));
+                    }
+                    irmind_app::export_case(engine, store.as_ref(), &id, &path, cancel)?
+                };
                 println!("exported case; analyst key fingerprint {fingerprint}");
             }
             Command::VerifyExport { .. } => {
@@ -243,4 +347,23 @@ impl AutomationContext<'_, '_> {
         }
         Ok(false)
     }
+}
+
+fn parquet_status(
+    store: &irmind_infra::LocalStore,
+    id: &irmind_app::CaseId,
+) -> Result<(bool, bool)> {
+    let entries = store.entries(id)?;
+    let has_sources = entries
+        .iter()
+        .any(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV1);
+    let mut has_artifacts = entries
+        .iter()
+        .any(|entry| entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV1);
+    for operation in store.operations(id)? {
+        has_artifacts |= irmind_domain::SealedParquetMigrationV1::decode(&operation.operation)
+            .map_err(|_| anyhow!("invalid sealed Parquet operation"))?
+            .is_some();
+    }
+    Ok((has_sources, has_artifacts))
 }

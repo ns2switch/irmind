@@ -10,7 +10,8 @@ pub use audit::{
 pub(crate) use audit::{isolate_untrusted, remote_tool_error, run_async, safe_markdown};
 pub use local::{
     AuditLog, CaseExporter, CaseLock, CaseMutation, Clock, ContentGuard, EventParser,
-    EvidenceGraph, EvidenceStore, ExportVerifier, Repository, Screened, Signer, Verifier,
+    EvidenceGraph, EvidenceStore, ExportVerification, ExportVerifier, LargeCaseExporter,
+    LargeCaseStore, PreparedSource, Repository, Screened, Signer, StreamingEventParser, Verifier,
     startup_check,
 };
 pub use model::{

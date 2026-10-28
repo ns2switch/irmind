@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use irmind_app::{
-    AppError, EventParser, GraphRecord, GraphRelation,
+    AppError, EventParser, GraphRecord, GraphRelation, StreamingEventParser,
     modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
     sha256,
 };
@@ -21,6 +21,23 @@ impl JsonParser {
     /// same opened source while parsing and compare it with `evidence_hash`
     /// before committing derived records or custody metadata.
     pub fn parse_reader(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        evidence_hash: [u8; 32],
+        cancel: &irmind_app::CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<usize, AppError> {
+        stream::parse_reader(source, reader, evidence_hash, cancel, emit)
+    }
+}
+
+impl StreamingEventParser for JsonParser {
+    fn streaming_version(&self) -> &'static str {
+        "json-stream-v2"
+    }
+
+    fn parse_reader(
         &self,
         source: &str,
         reader: &mut dyn Read,

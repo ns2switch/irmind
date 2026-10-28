@@ -179,6 +179,15 @@ impl LocalStore {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
+        if self.entries(id)?.iter().any(|entry| {
+            matches!(
+                entry.kind,
+                irmind_domain::AuditEventKind::SourceManifestV1
+                    | irmind_domain::AuditEventKind::ParquetArtifactV1
+            )
+        }) {
+            return self.export_v4(id, path, None, false, cancel);
+        }
         let case = self.get_case(id)?;
         if !case.sealed {
             return Err(storage_reason("seal the case before export"));

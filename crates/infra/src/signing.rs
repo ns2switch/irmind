@@ -80,6 +80,7 @@ impl Signer for LocalSigner {
     }
 }
 
+#[derive(Clone)]
 pub struct LocalVerifier {
     pub(crate) trusted: std::collections::BTreeMap<String, Vec<u8>>,
 }

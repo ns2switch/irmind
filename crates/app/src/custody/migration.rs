@@ -181,6 +181,14 @@ impl Engine<'_> {
 
     fn record_operational_event(&self, id: &CaseId, operation: &str) -> Result<(), AppError> {
         let _case_lock = self.repo.lock_case(id)?;
+        self.record_operational_event_unlocked(id, operation)
+    }
+
+    pub(crate) fn record_operational_event_unlocked(
+        &self,
+        id: &CaseId,
+        operation: &str,
+    ) -> Result<(), AppError> {
         self.repo.get_case(id)?;
         self.verify_operations_unlocked(id, &CancellationToken::new())?;
         let last = self.audit_log.last_operation(id)?;

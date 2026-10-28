@@ -111,7 +111,7 @@ pub(super) fn argument_candidates(
     let Some((command, prefix)) = input.split_once(' ') else {
         return Vec::new();
     };
-    if command == "/ingest" {
+    if matches!(command, "/ingest" | "/verify" | "/verify-graph") {
         return super::picker::safe_completions(prefix);
     }
     let values: Vec<String> = match command {

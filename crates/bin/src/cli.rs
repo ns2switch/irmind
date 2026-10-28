@@ -1,8 +1,8 @@
 use super::{
     Arc, AuditLog, BTreeMap, CancellationToken, CaseId, Context, Engine, EvidenceGraph,
-    EvidenceStore, FindingKind, HashSet, LocalStore, MandatoryGuard, ModuleRegistry, ModuleStatus,
-    OpenOptions, Parser, Path, PathBuf, Read, Repository, Result, RootWorkspaceIo, Severity,
-    Subcommand, Write, anyhow,
+    EvidenceStore, FindingKind, JsonParser, LargeCaseUseCases, LocalStore, MandatoryGuard,
+    ModuleRegistry, ModuleStatus, OpenOptions, Parser, Path, PathBuf, Read, Repository, Result,
+    RootWorkspaceIo, Severity, Subcommand, Write, anyhow,
 };
 
 #[derive(Parser, Clone)]
@@ -42,6 +42,11 @@ pub(super) enum Command {
     Ingest {
         case_id: String,
         path: PathBuf,
+        #[arg(long)]
+        copy_original: bool,
+    },
+    Migrate {
+        case_id: String,
     },
     Ask {
         case_id: String,
@@ -93,6 +98,10 @@ pub(super) enum Command {
     },
     Verify {
         case_id: String,
+        #[arg(long)]
+        source_root: Option<PathBuf>,
+        #[arg(long)]
+        sample: Option<usize>,
     },
     Seal {
         case_id: String,
@@ -105,6 +114,8 @@ pub(super) enum Command {
     },
     VerifyGraph {
         case_id: String,
+        #[arg(long)]
+        source_root: Option<PathBuf>,
     },
     Timeline {
         case_id: String,
@@ -149,6 +160,10 @@ pub(super) enum Command {
     Export {
         case_id: String,
         path: PathBuf,
+        #[arg(long)]
+        include_originals: bool,
+        #[arg(long)]
+        source_root: Option<PathBuf>,
     },
     VerifyExport {
         path: PathBuf,
@@ -193,7 +208,16 @@ pub(super) fn terminal_safe_path(path: &Path) -> String {
     format!("{path:?}")
 }
 
-pub(super) fn input_files(root: &Path) -> Result<Vec<PathBuf>> {
+pub(super) fn input_files_large(root: &Path) -> Result<Vec<PathBuf>> {
+    enumerate_input_files(root, 500_000_000_000, 500_000_000_000, 1_000_000)
+}
+
+fn enumerate_input_files(
+    root: &Path,
+    max_file: u64,
+    max_total: u64,
+    max_files: usize,
+) -> Result<Vec<PathBuf>> {
     let mut pending = vec![(root.to_path_buf(), 0usize)];
     let mut files = Vec::new();
     let mut total_bytes = 0u64;
@@ -216,21 +240,23 @@ pub(super) fn input_files(root: &Path) -> Result<Vec<PathBuf>> {
             children.sort();
             pending.extend(children.into_iter().rev().map(|child| (child, depth + 1)));
         } else if metadata.is_file() {
-            if metadata.len() > 50_000_000 {
+            if metadata.len() > max_file {
                 return Err(anyhow!(
-                    "evidence exceeds 50 MB: {}",
+                    "evidence exceeds configured size limit: {}",
                     terminal_safe_path(&path)
                 ));
             }
             total_bytes = total_bytes
                 .checked_add(metadata.len())
                 .ok_or_else(|| anyhow!("ingest size overflow"))?;
-            if total_bytes > 1_000_000_000 {
-                return Err(anyhow!("ingest directory exceeds 1 GB"));
+            if total_bytes > max_total {
+                return Err(anyhow!("ingest directory exceeds configured size limit"));
             }
             files.push(path);
-            if files.len() > 1_000 {
-                return Err(anyhow!("ingest directory exceeds 1000 files"));
+            if files.len() > max_files {
+                return Err(anyhow!(
+                    "ingest directory exceeds configured file count limit"
+                ));
             }
         } else {
             return Err(anyhow!(

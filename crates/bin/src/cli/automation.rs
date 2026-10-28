@@ -1,7 +1,7 @@
 use super::{
-    AuditLog, AutomationContext, CaseCommand, Command, FindingKind, HashSet, Repository, Result,
-    Severity, anyhow, audit_source_name, input_files, parse_approval_args, parse_id, read_evidence,
-    terminal_safe_path,
+    AuditLog, AutomationContext, CaseCommand, Command, FindingKind, JsonParser, LargeCaseUseCases,
+    Repository, Result, Severity, anyhow, audit_source_name, input_files_large,
+    parse_approval_args, parse_id, terminal_safe_path,
 };
 
 impl AutomationContext<'_, '_> {
@@ -9,6 +9,7 @@ impl AutomationContext<'_, '_> {
         match command {
             cmd @ Command::Case { .. } => self.handle_case(cmd),
             cmd @ Command::Ingest { .. } => self.handle_ingest(cmd),
+            cmd @ Command::Migrate { .. } => self.handle_migrate(cmd),
             cmd @ Command::Ask { .. } => self.handle_ask(cmd),
             cmd @ (Command::Approvals { .. }
             | Command::Approve { .. }
@@ -18,10 +19,10 @@ impl AutomationContext<'_, '_> {
             | Command::ConfirmFinding { .. }
             | Command::DismissFinding { .. }
             | Command::Findings { .. }) => self.handle_findings(cmd),
-            cmd @ (Command::Report { .. }
-            | Command::Evidence { .. }
-            | Command::Verify { .. }
-            | Command::Seal { .. }) => self.handle_custody(cmd),
+            cmd @ (Command::Report { .. } | Command::Evidence { .. } | Command::Seal { .. }) => {
+                self.handle_custody(cmd)
+            }
+            cmd @ Command::Verify { .. } => self.handle_verify(cmd),
             cmd @ (Command::Graph { .. }
             | Command::GraphRebuild { .. }
             | Command::VerifyGraph { .. }
@@ -97,41 +98,102 @@ impl AutomationContext<'_, '_> {
             ..
         } = self;
         match command {
-            Command::Ingest { case_id, path } => {
+            Command::Ingest {
+                case_id,
+                path,
+                copy_original,
+            } => {
                 let id = parse_id(&case_id)?;
                 engine.verify_cancelable(&id, cancel)?;
                 if store.get_case(&id)?.sealed {
                     return Err(anyhow!("case is sealed"));
                 }
-                let files = input_files(&path)?;
-                let mut indexed: HashSet<String> = store
-                    .entries(&id)?
-                    .into_iter()
-                    .filter(|entry| entry.kind == irmind_domain::AuditEventKind::GraphIndexed)
-                    .filter_map(|entry| entry.evidence)
-                    .collect();
-                for file in files {
-                    if cancel.is_cancelled() {
-                        return Err(anyhow!("ingest cancelled"));
+                let files = input_files_large(&path)?;
+                let indexed: std::collections::BTreeMap<String, irmind_domain::SourceManifestV1> =
+                    store
+                        .entries(&id)?
+                        .into_iter()
+                        .filter(|entry| {
+                            entry.kind == irmind_domain::AuditEventKind::SourceManifestV1
+                        })
+                        .filter_map(|entry| {
+                            irmind_domain::SourceManifestV1::decode(&entry.payload)
+                                .ok()
+                                .map(|source| (source.source.clone(), source))
+                        })
+                        .collect();
+                let parser = JsonParser;
+                let large = LargeCaseUseCases {
+                    engine,
+                    store: store.as_ref(),
+                    parser: &parser,
+                };
+                let source_root = if path.is_dir() {
+                    path.as_path()
+                } else {
+                    path.parent()
+                        .ok_or_else(|| anyhow!("source has no parent"))?
+                };
+                for files in files.chunks(4) {
+                    let mut pending = Vec::new();
+                    for file in files {
+                        let source = audit_source_name(&path, file)?;
+                        if let Some(existing) = indexed.get(&source) {
+                            large
+                                .store
+                                .verify_local_source(source_root, existing, cancel)?;
+                            println!("skipped {}", terminal_safe_path(file));
+                        } else {
+                            pending.push(source);
+                        }
                     }
-                    let bytes = read_evidence(&file)?;
-                    let hash = irmind_app::hex(&irmind_app::sha256(&bytes));
-                    if indexed.contains(&hash) {
-                        println!("skipped {hash} {}", terminal_safe_path(&file));
-                        continue;
-                    }
-                    let ingested = engine.ingest_cancelable(
+                    for (source, hash) in large.ingest_local_batch(
                         &id,
-                        &bytes,
-                        &audit_source_name(&path, &file)?,
+                        source_root,
+                        &pending,
+                        copy_original,
                         cancel,
-                    )?;
-                    indexed.insert(ingested.clone());
-                    println!("{ingested} {}", terminal_safe_path(&file));
+                    )? {
+                        println!(
+                            "{} {}",
+                            hash.as_str(),
+                            terminal_safe_path(&source_root.join(source))
+                        );
+                    }
                 }
+                let bundles = large.compact_case(&id, cancel)?;
+                println!("created {bundles} signed Parquet bundles");
             }
             _ => return Err(anyhow!("invalid command dispatch")),
         }
+        Ok(false)
+    }
+
+    fn handle_migrate(self, command: Command) -> Result<bool> {
+        let Self {
+            engine,
+            store,
+            cancel,
+            ..
+        } = self;
+        let Command::Migrate { case_id } = command else {
+            return Err(anyhow!("invalid command dispatch"));
+        };
+        let id = parse_id(&case_id)?;
+        let parser = JsonParser;
+        let large = LargeCaseUseCases {
+            engine,
+            store: store.as_ref(),
+            parser: &parser,
+        };
+        let count = large.migrate_legacy(&id, cancel)?;
+        let bundles = if engine.repo.get_case(&id)?.sealed {
+            0
+        } else {
+            large.compact_case(&id, cancel)?
+        };
+        println!("converted {count} legacy copied sources to signed Parquet artifacts");
+        println!("created {bundles} signed Parquet bundles");
         Ok(false)
     }
 

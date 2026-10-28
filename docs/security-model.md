@@ -12,14 +12,14 @@ The analyst controls the case, its scope, approvals, and signing key. Files, log
 
 ## What the build enforces
 
-- **Custody:** Original evidence is stored locally by SHA-256. Case changes and tool activity enter an append-only SQLite audit chain with Ed25519 signatures. Verification detects changed entries and evidence bytes.
+- **Custody:** Case changes and tool activity enter an append-only SQLite audit chain with Ed25519 signatures. Small legacy evidence has a local content-addressed copy. Large-file ingestion signs each original's source, size, modification time, and SHA-256; copying that original is an explicit choice. Verification checks signed entries and any bytes selected for full or sampled verification.
 - **Diagnostics:** A private, size-bounded `diagnostics.log` records operation names, result categories, and durations. It is separate from custody, contains no evidence or tool arguments, and is not part of exports or verification.
 - **Separate identities:** Analyst and Agent have distinct signing keys in the selected backend. Only an analyst signature can resolve a pending approval. A sealed case has a separate signed operational chain for task cancellations; backend migrations enter a global signed operational chain.
 - **Guarded model input:** External text is normalized, screened for prompt injection, redacted for known secret and PII patterns, bounded, and wrapped as untrusted data. The original remains local. A startup self-test blocks the application if the guard's known corpus fails.
 - **Constrained connectors:** Credentials come from the explicitly selected secret backend through the composition root. Remote clients require HTTPS, except keyless HTTP to an explicit loopback model service. Redirects are disabled and responses are bounded.
 - **Safe presentation:** The TUI removes terminal control characters from model output, evidence summaries, and filenames. Approval views show the exact proposed arguments after terminal escaping.
 
-A case export contains its signed log, seal, evidence, and public key. Use `verify-export --expected-key` with a fingerprint obtained through another trusted channel.
+A case export contains its signed log, seal, and public key. Streaming v4 exports can omit large originals; the verifier reports their bytes as unavailable in that package. Use `verify-export --expected-key` with a fingerprint obtained through another trusted channel.
 
 ## Threats considered
 
@@ -37,6 +37,7 @@ A case export contains its signed log, seal, evidence, and public key. Use `veri
 - File permission checks do not protect against a fully compromised user session. Some path components can change between directory traversal and file opening.
 - VirusTotal enrichment exposes the queried IOC to an outside service. It always needs approval. A read-only connector still depends on the permissions actually granted by its service.
 - The graph is a derived index, not original evidence. Verify or rebuild it from signed inputs when its correctness matters.
+- A manifest-only large-case export does not make the original bytes portable. A full source check needs the originals at the paths selected by the analyst; a sampled check says nothing about unchecked sources. If a source is gone or changed, the signed record still proves what was observed at ingestion but cannot restore those bytes.
 - CI binaries have checksums but are not code-signed, notarized, or Authenticode signed. See [platforms](platforms.md).
 - The OS keyring and encrypted-file backends are explicit choices, never silent fallbacks. The file backend works over SSH, but its security depends on a strong passphrase and a trustworthy host. Losing the signing key can prevent continued case work.
 

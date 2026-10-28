@@ -14,7 +14,7 @@ fn walks_ingest_directory_in_stable_order() {
     std::fs::write(root.path().join("b.json"), b"{}").unwrap();
     std::fs::write(root.path().join("a.json"), b"{}").unwrap();
     std::fs::write(root.path().join("nested/c.json"), b"{}").unwrap();
-    let files = input_files(root.path()).unwrap();
+    let files = input_files_large(root.path()).unwrap();
     let names = files
         .iter()
         .map(|path| path.strip_prefix(root.path()).unwrap().to_path_buf())
@@ -40,7 +40,7 @@ fn rejects_symlink_inside_ingest_directory() {
     let root = tempfile::tempdir().unwrap();
     std::fs::write(root.path().join("real.json"), b"{}").unwrap();
     std::os::unix::fs::symlink("real.json", root.path().join("link.json")).unwrap();
-    assert!(input_files(root.path()).is_err());
+    assert!(input_files_large(root.path()).is_err());
 }
 
 #[cfg(unix)]
@@ -62,7 +62,7 @@ fn ingest_errors_escape_control_characters_in_file_names() {
     std::fs::write(&target, b"synthetic").unwrap();
     let malicious = root.path().join("bad\u{1b}[31m.txt");
     std::os::unix::fs::symlink(&target, &malicious).unwrap();
-    let error = input_files(root.path()).unwrap_err().to_string();
+    let error = input_files_large(root.path()).unwrap_err().to_string();
     assert!(!error.contains('\u{1b}'));
     assert!(error.contains("\\u{1b}"));
 }
