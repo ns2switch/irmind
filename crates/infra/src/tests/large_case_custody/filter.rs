@@ -76,6 +76,24 @@ fn parquet_filters_prune_partitions_and_exact_utc_window() {
             .text_search_filtered(&case.id, &out_of_scope, "Event", 10)
             .is_err()
     );
+    assert_two_hop_path(&store, &case.id, &filter);
+}
+
+fn assert_two_hop_path(store: &LocalStore, id: &CaseId, filter: &GraphQueryFilter) {
+    let two_hop = store
+        .graph_path_filtered(
+            id,
+            &GraphQueryFilter::default(),
+            ("ip", "203.0.113.2"),
+            ("ip", "203.0.113.3"),
+        )
+        .unwrap();
+    assert!(two_hop.contains("account 222222222222"));
+    assert_eq!(two_hop.lines().count(), 2);
+    let filtered_path = store
+        .graph_path_filtered(id, filter, ("ip", "203.0.113.2"), ("ip", "203.0.113.3"))
+        .unwrap();
+    assert!(filtered_path.starts_with("no co-observation path"));
 }
 
 fn write_source(root: &Path) -> PathBuf {
