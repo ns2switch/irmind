@@ -4,6 +4,7 @@ use super::{
 use duckdb::{Connection, Row, params_from_iter};
 use irmind_app::LargeCaseStore;
 use irmind_app::TimelineEvent;
+use irmind_domain::GraphQueryFilter;
 use std::fmt::Write as _;
 use std::sync::mpsc::{self, Sender};
 use std::thread::JoinHandle;
@@ -78,6 +79,7 @@ impl ParquetStore {
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifactV1],
+        filter: &GraphQueryFilter,
         term: &str,
         limit: usize,
         cancel: &CancellationToken,
@@ -90,9 +92,8 @@ impl ParquetStore {
         }
         let count = limit.to_string();
         let rows = self.query_rows(
-            id, artifacts,
-            "SELECT event_time,event,source_hash,record_index FROM {events} WHERE contains(lower(text), lower(?)) ORDER BY event_time DESC,source_hash,record_index LIMIT CAST(? AS BIGINT)",
-            &[term, &count], cancel,
+            id, artifacts, filter,
+            ("SELECT event_time,event,source_hash,record_index FROM {events} WHERE contains(lower(text), lower(?)) ORDER BY event_time DESC,source_hash,record_index LIMIT CAST(? AS BIGINT)", &[term, &count]), cancel,
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, u64>(3)?)),
         )?;
         let mut output = Vec::new();
@@ -116,13 +117,13 @@ impl ParquetStore {
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifactV1],
+        filter: &GraphQueryFilter,
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<Vec<TimelineEvent>, AppError> {
         let count = limit.min(100).to_string();
-        self.query_rows(id, artifacts,
-            "SELECT event_time,event,source_hash,record_index FROM {events} ORDER BY event_time DESC,source_hash,record_index LIMIT CAST(? AS BIGINT)",
-            &[&count], cancel,
+        self.query_rows(id, artifacts, filter,
+            ("SELECT event_time,event,source_hash,record_index FROM {events} ORDER BY event_time DESC,source_hash,record_index LIMIT CAST(? AS BIGINT)", &[&count]), cancel,
             |row| Ok(TimelineEvent {
                 at: row.get(0)?, event: row.get(1)?, evidence_hash: row.get(2)?,
                 record_index: usize::try_from(row.get::<_, u64>(3)?).map_err(|_| duckdb::Error::InvalidParameterName("record index overflow".into()))?,
@@ -134,15 +135,15 @@ impl ParquetStore {
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifactV1],
-        kind: &str,
-        value: &str,
+        filter: &GraphQueryFilter,
+        entity: (&str, &str),
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        let (kind, value) = entity;
         let count = limit.min(20).to_string();
-        let rows = self.query_rows(id, artifacts,
-            "SELECT event_time,event,source_hash,record_index FROM {entities} WHERE entity_kind=? AND entity_value=? ORDER BY event_time DESC LIMIT CAST(? AS BIGINT)",
-            &[kind,value,&count], cancel,
+        let rows = self.query_rows(id, artifacts, filter,
+            ("SELECT event_time,event,source_hash,record_index FROM {entities} WHERE entity_kind=? AND entity_value=? ORDER BY event_time DESC LIMIT CAST(? AS BIGINT)", &[kind,value,&count]), cancel,
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, u64>(3)?)),
         )?;
         if rows.is_empty() {
@@ -159,13 +160,13 @@ impl ParquetStore {
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifactV1],
+        filter: &GraphQueryFilter,
         kind: &str,
         value: &str,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        let rows = self.query_rows(id, artifacts,
-            "SELECT COUNT(*),MIN(event_time),MAX(event_time) FROM {entities} WHERE entity_kind=? AND entity_value=?",
-            &[kind, value], cancel,
+        let rows = self.query_rows(id, artifacts, filter,
+            ("SELECT COUNT(*),MIN(event_time),MAX(event_time) FROM {entities} WHERE entity_kind=? AND entity_value=?", &[kind, value]), cancel,
             |row| Ok((row.get::<_, u64>(0)?, row.get::<_, Option<String>>(1)?, row.get::<_, Option<String>>(2)?)),
         )?;
         let Some((count, first, last)) = rows.into_iter().next() else {
@@ -182,17 +183,17 @@ impl ParquetStore {
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifactV1],
-        kind: &str,
-        value: &str,
+        filter: &GraphQueryFilter,
+        entity: (&str, &str),
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        let (kind, value) = entity;
         let count = limit.min(20).to_string();
         let target_limit = (MAX_NEIGHBOR_RECORDS + 1).to_string();
         let sample_limit = MAX_NEIGHBOR_RECORDS.to_string();
-        let rows = self.query_rows(id, artifacts,
-            "WITH records AS NOT MATERIALIZED (SELECT * FROM {entities}), targets AS MATERIALIZED (SELECT source_hash,record_index FROM records WHERE entity_kind=? AND entity_value=? LIMIT CAST(? AS BIGINT)), bounded AS (SELECT source_hash,record_index FROM targets LIMIT CAST(? AS BIGINT)) SELECT n.entity_kind,n.entity_value,COUNT(*),(SELECT COUNT(*) FROM targets)>CAST(? AS BIGINT) FROM records n JOIN bounded USING (source_hash,record_index) WHERE (n.entity_kind<>? OR n.entity_value<>?) GROUP BY 1,2 ORDER BY 3 DESC,1,2 LIMIT CAST(? AS BIGINT)",
-            &[kind, value, &target_limit, &sample_limit, &sample_limit, kind, value, &count], cancel,
+        let rows = self.query_rows(id, artifacts, filter,
+            ("WITH records AS NOT MATERIALIZED (SELECT * FROM {entities}), targets AS MATERIALIZED (SELECT source_hash,record_index FROM records WHERE entity_kind=? AND entity_value=? LIMIT CAST(? AS BIGINT)), bounded AS (SELECT source_hash,record_index FROM targets LIMIT CAST(? AS BIGINT)) SELECT n.entity_kind,n.entity_value,COUNT(*),(SELECT COUNT(*) FROM targets)>CAST(? AS BIGINT) FROM records n JOIN bounded USING (source_hash,record_index) WHERE (n.entity_kind<>? OR n.entity_value<>?) GROUP BY 1,2 ORDER BY 3 DESC,1,2 LIMIT CAST(? AS BIGINT)", &[kind, value, &target_limit, &sample_limit, &sample_limit, kind, value, &count]), cancel,
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, u64>(2)?, row.get::<_, bool>(3)?)),
         )?;
         if rows.is_empty() {
@@ -223,9 +224,8 @@ impl ParquetStore {
         cancel: &CancellationToken,
     ) -> Result<Option<String>, AppError> {
         let index = index.to_string();
-        let rows = self.query_rows(id, artifacts,
-            "SELECT text FROM {events} WHERE source_hash=? AND record_index=CAST(? AS UBIGINT) LIMIT 1",
-            &[hash, &index], cancel, |row| row.get::<_, String>(0))?;
+        let rows = self.query_rows(id, artifacts, &GraphQueryFilter::default(),
+            ("SELECT text FROM {events} WHERE source_hash=? AND record_index=CAST(? AS UBIGINT) LIMIT 1", &[hash, &index]), cancel, |row| row.get::<_, String>(0))?;
         Ok(rows.into_iter().next())
     }
 
@@ -238,8 +238,11 @@ impl ParquetStore {
         let rows = self.query_rows(
             id,
             artifacts,
-            "SELECT COUNT(*),MIN(event_time),MAX(event_time) FROM {events}",
-            &[],
+            &GraphQueryFilter::default(),
+            (
+                "SELECT COUNT(*),MIN(event_time),MAX(event_time) FROM {events}",
+                &[],
+            ),
             cancel,
             |row| {
                 Ok((
@@ -263,13 +266,13 @@ impl ParquetStore {
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifactV1],
+        filter: &GraphQueryFilter,
         from: (&str, &str),
         to: (&str, &str),
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        let rows = self.query_rows(id, artifacts,
-            "WITH records AS (SELECT * FROM {entities}) SELECT a.source_hash,a.record_index FROM records a JOIN records b USING (source_hash,record_index) WHERE a.entity_kind=? AND a.entity_value=? AND b.entity_kind=? AND b.entity_value=? LIMIT 1",
-            &[from.0,from.1,to.0,to.1], cancel,
+        let rows = self.query_rows(id, artifacts, filter,
+            ("WITH records AS (SELECT * FROM {entities}) SELECT a.source_hash,a.record_index FROM records a JOIN records b USING (source_hash,record_index) WHERE a.entity_kind=? AND a.entity_value=? AND b.entity_kind=? AND b.entity_value=? LIMIT 1", &[from.0,from.1,to.0,to.1]), cancel,
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?)),
         )?;
         if let Some((hash, index)) = rows.into_iter().next() {
@@ -286,11 +289,12 @@ impl ParquetStore {
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifactV1],
-        sql: &str,
-        arguments: &[&str],
+        filter: &GraphQueryFilter,
+        template: (&str, &[&str]),
         cancel: &CancellationToken,
         mut map: impl FnMut(&Row<'_>) -> duckdb::Result<T>,
     ) -> Result<Vec<T>, AppError> {
+        let (sql, arguments) = template;
         if artifacts.is_empty() {
             return Ok(Vec::new());
         }
@@ -303,7 +307,9 @@ impl ParquetStore {
         };
         let selected = artifacts
             .iter()
-            .filter(|artifact| artifact.schema_version == schema)
+            .filter(|artifact| {
+                artifact.schema_version == schema && partition_matches(artifact, filter)
+            })
             .cloned()
             .collect::<Vec<_>>();
         if selected.is_empty() {
@@ -320,11 +326,22 @@ impl ParquetStore {
             .map_err(storage)?;
         let _deadline = QueryDeadline::start(&db, cancel.clone());
         let placeholders = vec!["?"; paths.len()].join(",");
-        let statement = sql.replace(marker, &format!("read_parquet([{placeholders}])"));
+        let relation = if filter.time_range().is_some() {
+            format!(
+                "(SELECT * FROM read_parquet([{placeholders}]) WHERE event_time>=? AND event_time<=?)"
+            )
+        } else {
+            format!("read_parquet([{placeholders}])")
+        };
+        let statement = sql.replace(marker, &relation);
         let mut params = paths
             .iter()
             .map(|path| path.to_string_lossy().to_string())
             .collect::<Vec<_>>();
+        if let Some((from, to)) = filter.time_range() {
+            params.push(from.to_owned());
+            params.push(to.to_owned());
+        }
         params.extend(arguments.iter().map(|value| (*value).to_owned()));
         let mut query = db.prepare(&statement).map_err(storage)?;
         let rows = query
@@ -342,4 +359,17 @@ impl ParquetStore {
         }
         Ok(output)
     }
+}
+
+fn partition_matches(artifact: &ParquetArtifactV1, filter: &GraphQueryFilter) -> bool {
+    filter.time_range().is_none_or(|(from, to)| {
+        artifact.partition_date.len() == 10
+            && artifact.partition_date.as_str() >= &from[..10]
+            && artifact.partition_date.as_str() <= &to[..10]
+    }) && filter
+        .account_or_project()
+        .is_none_or(|value| artifact.partition_account == super::writer::safe_partition(value))
+        && filter
+            .region()
+            .is_none_or(|value| artifact.partition_region == super::writer::safe_partition(value))
 }

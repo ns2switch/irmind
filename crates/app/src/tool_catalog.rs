@@ -17,7 +17,7 @@ pub fn catalog() -> Vec<ToolSpec> {
 }
 
 fn local_catalog() -> Vec<ToolSpec> {
-    vec![
+    let mut tools = vec![
         ToolSpec {
             name: "evidence_search",
             description: "Search evidence in the active case only",
@@ -68,7 +68,46 @@ fn local_catalog() -> Vec<ToolSpec> {
             description: "Propose an unconfirmed evidence-linked case entity. For an IOC supply ioc_type, first_seen, last_seen and verdict; for a hypothesis supply supporting_evidence and optional refuting_evidence; for a technique supply technique_id; for a timeline event supply at and source. Evidence lists are comma-separated SHA-256 hashes. Only the analyst can confirm it for the report.",
             parameters: json!({"type":"object","properties":{"kind":{"type":"string","enum":["ioc","hypothesis","technique","timeline","impact","recommendation"]},"value":{"type":"string"},"evidence_hash":{"type":"string","description":"SHA-256 of existing case evidence"},"ioc_type":{"type":"string","enum":["ip","domain","hash","user","key"]},"first_seen":{"type":"string"},"last_seen":{"type":"string"},"verdict":{"type":"string","enum":["unknown","benign","suspicious","malicious"]},"supporting_evidence":{"type":"string"},"refuting_evidence":{"type":"string"},"technique_id":{"type":"string"},"at":{"type":"string"},"source":{"type":"string"},"record_index":{"type":"integer","minimum":0,"maximum":99999}},"required":["kind","value","evidence_hash"],"additionalProperties":false}),
         },
-    ]
+    ];
+    for spec in &mut tools {
+        if matches!(
+            spec.name,
+            "entity_lookup" | "neighbors" | "entity_timeline" | "path" | "text_search"
+        ) {
+            add_graph_filters(spec);
+        }
+    }
+    tools
+}
+
+fn add_graph_filters(spec: &mut ToolSpec) {
+    let Some(properties) = spec.parameters["properties"].as_object_mut() else {
+        return;
+    };
+    for (name, description) in [
+        (
+            "from",
+            "Optional UTC start, paired with to and within case scope",
+        ),
+        (
+            "to",
+            "Optional UTC end, paired with from and within case scope",
+        ),
+        (
+            "account",
+            "Optional account or subscription partition within case scope",
+        ),
+        (
+            "project",
+            "Optional project partition within case scope; exclusive with account",
+        ),
+        ("region", "Optional region partition"),
+    ] {
+        properties.insert(
+            name.into(),
+            json!({"type":"string","description":description}),
+        );
+    }
 }
 
 fn remote_catalog() -> Vec<ToolSpec> {
@@ -148,6 +187,30 @@ mod tests {
             }
         }
         assert_eq!(specs.len(), 19);
+    }
+
+    #[test]
+    fn graph_tools_expose_optional_partition_filters() {
+        for tool in [
+            "entity_lookup",
+            "neighbors",
+            "entity_timeline",
+            "path",
+            "text_search",
+        ] {
+            let spec = catalog()
+                .into_iter()
+                .find(|spec| spec.name == tool)
+                .unwrap();
+            for field in ["from", "to", "account", "project", "region"] {
+                assert_eq!(spec.parameters["properties"][field]["type"], "string");
+                assert!(
+                    !spec.parameters["required"]
+                        .as_array()
+                        .is_some_and(|required| required.iter().any(|value| value == field))
+                );
+            }
+        }
     }
 
     #[test]

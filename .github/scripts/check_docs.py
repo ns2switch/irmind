@@ -142,11 +142,12 @@ def source_command_names(source: str, enum_name: str) -> set[str]:
 
 def source_cli() -> tuple[set[str], set[str], set[str]]:
     source = (ROOT / "crates/bin/src/cli.rs").read_text(encoding="utf-8")
+    filter_source = (ROOT / "crates/bin/src/cli/graph_filter.rs").read_text(encoding="utf-8")
     root_commands = source_command_names(source, "Command")
     case_commands = source_command_names(source, "CaseCommand")
     fields = re.findall(
         r"#\[arg\(long(?:,|\))[^\]]*\]\s*(?:pub\([^)]*\)\s*)?([a-z][a-z0-9_]*)\s*:",
-        source,
+        source + filter_source,
     )
     flags = {"--help", "--version"} | {"--" + field.replace("_", "-") for field in fields}
     return root_commands, case_commands, flags

@@ -1,4 +1,6 @@
-use crate::{BTreeMap, ProposedCall, SiemQuery, Tool, valid_scope_target, valid_scope_time};
+use crate::{
+    BTreeMap, GraphQueryFilter, ProposedCall, SiemQuery, Tool, valid_scope_target, valid_scope_time,
+};
 
 pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
     match proposal.tool {
@@ -46,7 +48,17 @@ fn valid_local(proposal: &ProposedCall) -> bool {
         Tool::GraphPath => {
             valid_args(
                 &proposal.args,
-                &["from_kind", "from_value", "to_kind", "to_value"],
+                &[
+                    "from_kind",
+                    "from_value",
+                    "to_kind",
+                    "to_value",
+                    "from",
+                    "to",
+                    "account",
+                    "project",
+                    "region",
+                ],
             ) && proposal
                 .args
                 .get("from_kind")
@@ -57,14 +69,20 @@ fn valid_local(proposal: &ProposedCall) -> bool {
                     .get("to_kind")
                     .zip(proposal.args.get("to_value"))
                     .is_some_and(|(kind, value)| valid_entity(kind, value))
+                && GraphQueryFilter::from_args(&proposal.args).is_ok()
         }
         Tool::TextSearch => {
-            valid_args(&proposal.args, &["query", "limit"])
-                && proposal
-                    .args
-                    .get("query")
-                    .is_some_and(|query| !query.trim().is_empty() && query.len() <= 128)
+            valid_args(
+                &proposal.args,
+                &[
+                    "query", "limit", "from", "to", "account", "project", "region",
+                ],
+            ) && proposal
+                .args
+                .get("query")
+                .is_some_and(|query| !query.trim().is_empty() && query.len() <= 128)
                 && valid_limit(proposal.args.get("limit"))
+                && GraphQueryFilter::from_args(&proposal.args).is_ok()
         }
         Tool::RawRecords => {
             valid_args(&proposal.args, &["hash", "index"])
@@ -288,9 +306,13 @@ fn valid_limit(value: Option<&String>) -> bool {
 
 fn valid_entity_args(args: &BTreeMap<String, String>, allow_limit: bool) -> bool {
     let fields: &[&str] = if allow_limit {
-        &["kind", "value", "limit"]
+        &[
+            "kind", "value", "limit", "from", "to", "account", "project", "region",
+        ]
     } else {
-        &["kind", "value"]
+        &[
+            "kind", "value", "from", "to", "account", "project", "region",
+        ]
     };
     valid_args(args, fields)
         && args
@@ -298,6 +320,7 @@ fn valid_entity_args(args: &BTreeMap<String, String>, allow_limit: bool) -> bool
             .zip(args.get("value"))
             .is_some_and(|(kind, value)| valid_entity(kind, value))
         && valid_limit(args.get("limit"))
+        && GraphQueryFilter::from_args(args).is_ok()
 }
 
 pub fn valid_entity(kind: &str, value: &str) -> bool {

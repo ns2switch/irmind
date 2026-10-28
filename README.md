@@ -72,7 +72,7 @@ A Cargo feature includes a module in the binary; enabling a connector or selecti
 | SentinelOne | EDR | `edr-sentinelone` | experimental | [SentinelOne](docs/modules.md#sentinelone) |
 | MISP | internal threat intel | `ti-misp` | experimental | [MISP](docs/modules.md#misp) |
 | VirusTotal | external enrichment | `ti-virustotal` | experimental | [VirusTotal](docs/modules.md#virustotal) |
-| JSON and CloudTrail parser | local parser | included | experimental | [Local parser](docs/modules.md#json-and-cloudtrail-parser) |
+| JSON and exported cloud log parser | local parser | included | experimental | [Local parser](docs/modules.md#streaming-json-and-exported-cloud-log-parser) |
 | OS keystore | signing and secrets | `keystore-os` (default) | experimental | [OS keystore](docs/modules.md#os-keystore) |
 | Encrypted-file keystore | signing and secrets | `keystore-file` (default) | experimental | [File keystore](docs/modules.md#file-keystore) |
 

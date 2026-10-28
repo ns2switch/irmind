@@ -164,10 +164,10 @@ impl AutomationContext<'_, '_> {
                     );
                 }
             }
-            Command::Timeline { case_id } => {
+            Command::Timeline { case_id, filter } => {
                 let id = parse_id(&case_id)?;
                 let _case_lock = store.lock_case(&id)?;
-                for event in store.timeline(&id, 100)? {
+                for event in store.timeline_filtered(&id, &filter.parse()?, 100)? {
                     let line = format!(
                         "{} {} [{}#{}]",
                         event.at, event.event, event.evidence_hash, event.record_index
@@ -190,10 +190,11 @@ impl AutomationContext<'_, '_> {
                 case_id,
                 kind,
                 value,
+                filter,
             } => {
                 let id = parse_id(&case_id)?;
                 let _case_lock = store.lock_case(&id)?;
-                let result = store.entity_lookup(&id, &kind, &value)?;
+                let result = store.entity_lookup_filtered(&id, &filter.parse()?, &kind, &value)?;
                 println!(
                     "{}",
                     irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
@@ -204,10 +205,12 @@ impl AutomationContext<'_, '_> {
                 kind,
                 value,
                 limit,
+                filter,
             } => {
                 let id = parse_id(&case_id)?;
                 let _case_lock = store.lock_case(&id)?;
-                let result = store.neighbors(&id, &kind, &value, limit)?;
+                let result =
+                    store.neighbors_filtered(&id, &filter.parse()?, &kind, &value, limit)?;
                 println!(
                     "{}",
                     irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
@@ -218,10 +221,12 @@ impl AutomationContext<'_, '_> {
                 kind,
                 value,
                 limit,
+                filter,
             } => {
                 let id = parse_id(&case_id)?;
                 let _case_lock = store.lock_case(&id)?;
-                let result = store.entity_timeline(&id, &kind, &value, limit)?;
+                let result =
+                    store.entity_timeline_filtered(&id, &filter.parse()?, &kind, &value, limit)?;
                 println!(
                     "{}",
                     irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
@@ -233,11 +238,16 @@ impl AutomationContext<'_, '_> {
                 from_value,
                 to_kind,
                 to_value,
+                filter,
             } => {
                 let id = parse_id(&case_id)?;
                 let _case_lock = store.lock_case(&id)?;
-                let result =
-                    store.graph_path(&id, (&from_kind, &from_value), (&to_kind, &to_value))?;
+                let result = store.graph_path_filtered(
+                    &id,
+                    &filter.parse()?,
+                    (&from_kind, &from_value),
+                    (&to_kind, &to_value),
+                )?;
                 println!(
                     "{}",
                     irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text
@@ -255,10 +265,11 @@ impl AutomationContext<'_, '_> {
                 case_id,
                 query,
                 limit,
+                filter,
             } => {
                 let id = parse_id(&case_id)?;
                 let _case_lock = store.lock_case(&id)?;
-                let result = store.text_search(&id, &query, limit)?;
+                let result = store.text_search_filtered(&id, &filter.parse()?, &query, limit)?;
                 println!(
                     "{}",
                     irmind_app::ContentGuard::screen(guard.as_ref(), &result)?.text

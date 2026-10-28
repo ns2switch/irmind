@@ -115,7 +115,7 @@ fn first_string<'a>(value: &'a Value, pointers: &[&str]) -> &'a str {
         .unwrap_or("")
 }
 
-fn safe_partition(value: &str) -> String {
+pub(super) fn safe_partition(value: &str) -> String {
     if value.is_empty() {
         return "unknown".into();
     }

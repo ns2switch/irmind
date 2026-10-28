@@ -294,7 +294,6 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 Ok(summary) => self.state.result_cards.push(("Evidence graph", summary)),
                 Err(error) => self.state.messages.push(format!("Graph error: {error}")),
             },
-            "/timeline" => self.state.tab = 0,
             _ => {
                 if let Some(scope) = prompt.strip_prefix("/scope ") {
                     self.expand_scope(scope)?;

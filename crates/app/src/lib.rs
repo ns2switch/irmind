@@ -10,8 +10,8 @@ use irmind_domain::{
     ExecutionMode, PendingApproval, PolicyRules, Tainted,
 };
 pub use irmind_domain::{
-    AuditEventKind, Case, CaseId, CaseScope, ProposedCall, Provenance, SealedParquetMigrationV1,
-    Severity, SourceKind, Tool,
+    AuditEventKind, Case, CaseId, CaseScope, GraphQueryFilter, ProposedCall, Provenance,
+    SealedParquetMigrationV1, Severity, SourceKind, Tool,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};

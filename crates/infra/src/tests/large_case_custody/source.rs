@@ -232,8 +232,8 @@ fn neighbors_marks_bounded_results_instead_of_claiming_a_complete_count() {
         .neighbors_artifacts(
             &case_id,
             &prepared.artifacts,
-            "ip",
-            "203.0.113.8",
+            &irmind_domain::GraphQueryFilter::default(),
+            ("ip", "203.0.113.8"),
             10,
             &CancellationToken::new(),
         )

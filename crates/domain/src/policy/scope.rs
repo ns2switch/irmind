@@ -1,5 +1,5 @@
 use super::Gate;
-use crate::{Case, CaseScope, ProposedCall, Tool};
+use crate::{Case, CaseScope, GraphQueryFilter, ProposedCall, Tool};
 
 const SCOPED_TOOLS: &[Tool] = &[
     Tool::SiemSearch,
@@ -16,7 +16,30 @@ fn is_scoped(tool: &Tool) -> bool {
     SCOPED_TOOLS.contains(tool)
 }
 
+fn is_filtered_graph(tool: &Tool) -> bool {
+    matches!(
+        tool,
+        Tool::EntityLookup
+            | Tool::Neighbors
+            | Tool::EntityTimeline
+            | Tool::GraphPath
+            | Tool::TextSearch
+    )
+}
+
 pub(super) fn scope_gate(case: &Case, proposal: &ProposedCall) -> Gate {
+    if is_filtered_graph(&proposal.tool) {
+        let Ok(scope) = CaseScope::parse(&case.scope) else {
+            return Gate::Deny("invalid case scope");
+        };
+        return if GraphQueryFilter::from_args(&proposal.args)
+            .is_ok_and(|filter| filter.within_scope(&scope))
+        {
+            Gate::Continue
+        } else {
+            Gate::Deny("graph filter outside case scope")
+        };
+    }
     if !is_scoped(&proposal.tool) {
         return Gate::Continue;
     }
@@ -31,6 +54,10 @@ pub(super) fn scope_gate(case: &Case, proposal: &ProposedCall) -> Gate {
 }
 
 pub(super) fn in_scope(scope: &CaseScope, proposal: &ProposedCall) -> bool {
+    if is_filtered_graph(&proposal.tool) {
+        return GraphQueryFilter::from_args(&proposal.args)
+            .is_ok_and(|filter| filter.within_scope(scope));
+    }
     if !is_scoped(&proposal.tool) {
         return true;
     }

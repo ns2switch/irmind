@@ -4,6 +4,7 @@ use super::{
     ModuleRegistry, ModuleStatus, OpenOptions, Parser, Path, PathBuf, Read, Repository, Result,
     RootWorkspaceIo, Severity, Subcommand, Write, anyhow,
 };
+use graph_filter::GraphFilterArgs;
 
 #[derive(Parser, Clone)]
 #[command(version, about = "IRMind: local, signed incident investigation")]
@@ -119,11 +120,15 @@ pub(super) enum Command {
     },
     Timeline {
         case_id: String,
+        #[command(flatten)]
+        filter: GraphFilterArgs,
     },
     Entity {
         case_id: String,
         kind: String,
         value: String,
+        #[command(flatten)]
+        filter: GraphFilterArgs,
     },
     Neighbors {
         case_id: String,
@@ -131,6 +136,8 @@ pub(super) enum Command {
         value: String,
         #[arg(long, default_value_t = 10)]
         limit: usize,
+        #[command(flatten)]
+        filter: GraphFilterArgs,
     },
     EntityTimeline {
         case_id: String,
@@ -138,6 +145,8 @@ pub(super) enum Command {
         value: String,
         #[arg(long, default_value_t = 10)]
         limit: usize,
+        #[command(flatten)]
+        filter: GraphFilterArgs,
     },
     GraphPath {
         case_id: String,
@@ -145,12 +154,16 @@ pub(super) enum Command {
         from_value: String,
         to_kind: String,
         to_value: String,
+        #[command(flatten)]
+        filter: GraphFilterArgs,
     },
     TextSearch {
         case_id: String,
         query: String,
         #[arg(long, default_value_t = 10)]
         limit: usize,
+        #[command(flatten)]
+        filter: GraphFilterArgs,
     },
     RawRecords {
         case_id: String,
@@ -370,6 +383,7 @@ pub(super) struct AutomationContext<'a, 'ports> {
 
 mod automation;
 mod automation_graph;
+mod graph_filter;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]

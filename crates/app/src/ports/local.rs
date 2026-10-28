@@ -1,6 +1,6 @@
 use crate::{
-    Actor, AppError, CancellationToken, Case, CaseId, CaseSeal, GraphRecord, SignedEntry,
-    SignedOperation, Tainted, TimelineEvent,
+    Actor, AppError, CancellationToken, Case, CaseId, CaseSeal, GraphQueryFilter, GraphRecord,
+    SignedEntry, SignedOperation, Tainted, TimelineEvent,
 };
 use irmind_domain::{ParquetArtifactV1, SourceManifestV1};
 use std::io::Read;
@@ -46,11 +46,38 @@ pub trait EvidenceGraph: Send + Sync {
     ) -> Result<(), AppError>;
     fn graph_version(&self) -> &'static str;
     fn graph_summary(&self, id: &CaseId) -> Result<String, AppError>;
-    fn timeline(&self, id: &CaseId, limit: usize) -> Result<Vec<TimelineEvent>, AppError>;
-    fn entity_lookup(&self, id: &CaseId, kind: &str, value: &str) -> Result<String, AppError>;
+    fn timeline(&self, id: &CaseId, limit: usize) -> Result<Vec<TimelineEvent>, AppError> {
+        self.timeline_filtered(id, &GraphQueryFilter::default(), limit)
+    }
+    fn timeline_filtered(
+        &self,
+        id: &CaseId,
+        filter: &GraphQueryFilter,
+        limit: usize,
+    ) -> Result<Vec<TimelineEvent>, AppError>;
+    fn entity_lookup(&self, id: &CaseId, kind: &str, value: &str) -> Result<String, AppError> {
+        self.entity_lookup_filtered(id, &GraphQueryFilter::default(), kind, value)
+    }
+    fn entity_lookup_filtered(
+        &self,
+        id: &CaseId,
+        filter: &GraphQueryFilter,
+        kind: &str,
+        value: &str,
+    ) -> Result<String, AppError>;
     fn neighbors(
         &self,
         id: &CaseId,
+        kind: &str,
+        value: &str,
+        limit: usize,
+    ) -> Result<String, AppError> {
+        self.neighbors_filtered(id, &GraphQueryFilter::default(), kind, value, limit)
+    }
+    fn neighbors_filtered(
+        &self,
+        id: &CaseId,
+        filter: &GraphQueryFilter,
         kind: &str,
         value: &str,
         limit: usize,
@@ -61,14 +88,42 @@ pub trait EvidenceGraph: Send + Sync {
         kind: &str,
         value: &str,
         limit: usize,
+    ) -> Result<String, AppError> {
+        self.entity_timeline_filtered(id, &GraphQueryFilter::default(), kind, value, limit)
+    }
+    fn entity_timeline_filtered(
+        &self,
+        id: &CaseId,
+        filter: &GraphQueryFilter,
+        kind: &str,
+        value: &str,
+        limit: usize,
     ) -> Result<String, AppError>;
     fn graph_path(
         &self,
         id: &CaseId,
         from: (&str, &str),
         to: (&str, &str),
+    ) -> Result<String, AppError> {
+        self.graph_path_filtered(id, &GraphQueryFilter::default(), from, to)
+    }
+    fn graph_path_filtered(
+        &self,
+        id: &CaseId,
+        filter: &GraphQueryFilter,
+        from: (&str, &str),
+        to: (&str, &str),
     ) -> Result<String, AppError>;
-    fn text_search(&self, id: &CaseId, query: &str, limit: usize) -> Result<String, AppError>;
+    fn text_search(&self, id: &CaseId, query: &str, limit: usize) -> Result<String, AppError> {
+        self.text_search_filtered(id, &GraphQueryFilter::default(), query, limit)
+    }
+    fn text_search_filtered(
+        &self,
+        id: &CaseId,
+        filter: &GraphQueryFilter,
+        query: &str,
+        limit: usize,
+    ) -> Result<String, AppError>;
     fn raw_record(&self, id: &CaseId, hash: &str, index: usize) -> Result<String, AppError>;
     fn rebuild_graph(
         &self,

@@ -106,15 +106,15 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 **Limits:** An external lookup can reveal that an IOC is being investigated. Internal or ambiguous addresses are rejected; approval is required even for valid IOCs.
 
-## JSON and CloudTrail parser
+## Streaming JSON and exported cloud log parser
 
-**Does:** Indexes local JSON and CloudTrail records into the case timeline and DuckDB graph without sending them to a model.
+**Does:** Parses generic JSON, AWS CloudTrail, GCP Cloud Audit Logs, Azure Activity, and Entra ID sign-in exports in bounded streams. Large cases become partitioned Parquet; DuckDB reads only IRMind-produced Parquet. The parser does not send records to a model.
 
 **Permission:** Read access to the selected local file only.
 
 **Configure:** Included and active in every binary. Use the TUI's `/ingest` picker or the [CLI ingest command](development/cli.md).
 
-**Limits:** Each file is loaded within a 50 MB cap, then records are parsed in a stream and indexed in bounded batches. Deeply nested JSON, excessive record sets, and records with over 2,048 distinct search terms are rejected. Graph text search matches all query words rather than substrings. Searchable words are 2–64 bytes. Other log formats need future parsers.
+**Limits:** Deeply nested JSON and oversized individual records are rejected. Originals are hashed in place; copying one requires an explicit choice. Parquet searches use bounded substring matching and optional date, account or project, and region filters. Legacy small-case DuckDB indexing retains its 50 MB input limit and word-based search. Other log formats need future parsers.
 
 ## OS keystore
 
