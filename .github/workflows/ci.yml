@@ -61,10 +61,15 @@ jobs:
             case "$toolchain" in 1.95.0-*) ;; *) rustup toolchain uninstall "$toolchain" ;; esac
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        id: rust_cache
         with:
-          key: linux-duckdb-${{ needs.dco.outputs.duckdb_version }}
+          key: linux-mold-duckdb-${{ needs.dco.outputs.duckdb_version }}-${{ hashFiles('Cargo.lock') }}
+          add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Report dependency cache restoration
+        run: |
+          echo "Rust dependency cache exact hit: ${{ steps.rust_cache.outputs.cache-hit }}" >> "$GITHUB_STEP_SUMMARY"
       - run: sudo apt-get update && sudo apt-get install -y mold
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: 'cargo-nextest,cargo-deny', fallback: none}
@@ -142,7 +147,8 @@ jobs:
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: windows-msvc-duckdb-${{ needs.dco.outputs.duckdb_version }}
+          key: windows-msvc-duckdb-${{ needs.dco.outputs.duckdb_version }}-${{ hashFiles('Cargo.lock') }}
+          add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
@@ -220,7 +226,8 @@ jobs:
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: macos-arm64-duckdb-${{ needs.dco.outputs.duckdb_version }}
+          key: macos-arm64-duckdb-${{ needs.dco.outputs.duckdb_version }}-${{ hashFiles('Cargo.lock') }}
+          add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
