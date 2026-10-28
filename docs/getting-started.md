@@ -43,6 +43,8 @@ The conversation fills the case workspace. Tool proposals, approvals, results, a
 
 Graph queries and local searches also appear as result cards. Long results start folded; select a card and press Enter or Space to expand it, then scroll within the conversation.
 
+For large Parquet cases, add `--from=<UTC> --to=<UTC>`, `--account=<ID>` or `--project=<ID>`, and `--region=<NAME>` to `/search`, `/entity`, `/neighbors`, `/entity-timeline`, or `/path`. For example, `/search AssumeRole --from=2026-10-28T12:00:00Z --to=2026-10-28T13:00:00Z --account=123456789012 --region=eu-west-1` reads only matching partitions and timestamps. Both UTC bounds are required together, and the filter must remain inside the case scope. A neighbor card explicitly says when its 4,096-record sample is partial.
+
 With a configured SIEM, `/siem-alert` retrieves one scoped alert by ID. The result appears as a guarded, foldable card in the same conversation. `/help` shows the argument order.
 
 ![Conversation showing a synthetic CloudTrail case and a streaming model reply](assets/conversation.png)

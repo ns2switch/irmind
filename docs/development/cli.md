@@ -60,6 +60,8 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 | `irmind text-search <CASE_ID> <QUERY> [--limit <N>]` | Search indexed text. |
 | `irmind raw-records <CASE_ID> <HASH> <INDEX>` | Read one source record. |
 
+The timeline, entity, neighbors, entity-timeline, graph-path, and text-search commands accept optional `--from <UTC> --to <UTC>`, `--account <ID>` or `--project <ID>`, and `--region <NAME>`. The UTC bounds must be paired. A filtered query requires a fully migrated Parquet case and must stay within its case scope. Unfiltered calls retain the legacy graph behavior. Neighbor counts over more than 4,096 matching records are explicitly marked as partial.
+
 ## Custody
 
 | Command | Purpose |

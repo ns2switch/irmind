@@ -1,4 +1,4 @@
-use crate::{AppError, AuthorizedCall, Engine, EntityDetails, FindingKind, Tool};
+use crate::{AppError, AuthorizedCall, Engine, EntityDetails, FindingKind, GraphQueryFilter, Tool};
 
 impl Engine<'_> {
     pub(crate) fn execute_local_tool(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
@@ -50,12 +50,14 @@ impl Engine<'_> {
     }
 
     fn execute_graph_lookup_tool(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+        let filter = graph_filter(call)?;
         Ok(match call.tool() {
             Tool::GraphSummary => self.graph.graph_summary(call.case_id())?.into_bytes(),
             Tool::EntityLookup => self
                 .graph
-                .entity_lookup(
+                .entity_lookup_filtered(
                     call.case_id(),
+                    &filter,
                     call.arg("kind")
                         .ok_or(AppError::Fixed(crate::FixedAppError::PolicyMissingKind))?,
                     call.arg("value")
@@ -64,8 +66,9 @@ impl Engine<'_> {
                 .into_bytes(),
             Tool::Neighbors => self
                 .graph
-                .neighbors(
+                .neighbors_filtered(
                     call.case_id(),
+                    &filter,
                     call.arg("kind")
                         .ok_or(AppError::Fixed(crate::FixedAppError::PolicyMissingKind))?,
                     call.arg("value")
@@ -77,8 +80,9 @@ impl Engine<'_> {
                 .into_bytes(),
             Tool::EntityTimeline => self
                 .graph
-                .entity_timeline(
+                .entity_timeline_filtered(
                     call.case_id(),
+                    &filter,
                     call.arg("kind")
                         .ok_or(AppError::Fixed(crate::FixedAppError::PolicyMissingKind))?,
                     call.arg("value")
@@ -97,11 +101,13 @@ impl Engine<'_> {
     }
 
     fn execute_graph_search_tool(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+        let filter = graph_filter(call)?;
         Ok(match call.tool() {
             Tool::GraphPath => self
                 .graph
-                .graph_path(
+                .graph_path_filtered(
                     call.case_id(),
+                    &filter,
                     (
                         call.arg("from_kind")
                             .ok_or(AppError::Fixed(crate::FixedAppError::PolicyMissingFromKind))?,
@@ -119,8 +125,9 @@ impl Engine<'_> {
                 .into_bytes(),
             Tool::TextSearch => self
                 .graph
-                .text_search(
+                .text_search_filtered(
                     call.case_id(),
+                    &filter,
                     call.arg("query")
                         .ok_or(AppError::Fixed(crate::FixedAppError::PolicyMissingQuery))?,
                     call.arg("limit")
@@ -176,4 +183,15 @@ impl Engine<'_> {
             }
         })
     }
+}
+
+fn graph_filter(call: &AuthorizedCall) -> Result<GraphQueryFilter, AppError> {
+    GraphQueryFilter::parse(
+        call.arg("from"),
+        call.arg("to"),
+        call.arg("account"),
+        call.arg("project"),
+        call.arg("region"),
+    )
+    .map_err(|_| AppError::Policy("invalid graph filter".into()))
 }

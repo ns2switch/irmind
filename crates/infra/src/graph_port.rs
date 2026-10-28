@@ -2,6 +2,7 @@ use crate::{
     AppError, AuditLog, CaseId, EventParser, EvidenceGraph, EvidenceStore, GraphRecord, LocalStore,
     Repository, Tainted, TimelineEvent, Value, storage, storage_reason,
 };
+use irmind_domain::{CaseScope, GraphQueryFilter, ParquetArtifactV1};
 mod catalog;
 pub(crate) use catalog::CachedCatalog;
 
@@ -49,13 +50,19 @@ impl EvidenceGraph for LocalStore {
         }
     }
 
-    fn timeline(&self, id: &CaseId, limit: usize) -> Result<Vec<TimelineEvent>, AppError> {
-        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+    fn timeline_filtered(
+        &self,
+        id: &CaseId,
+        filter: &GraphQueryFilter,
+        limit: usize,
+    ) -> Result<Vec<TimelineEvent>, AppError> {
+        let Some(artifacts) = self.filtered_artifacts(id, filter)? else {
             return self.graph.timeline(id, limit);
         };
         let mut events = self.parquet.timeline_artifacts(
             id,
             &artifacts,
+            filter,
             limit,
             &irmind_app::CancellationToken::new(),
         )?;
@@ -67,14 +74,21 @@ impl EvidenceGraph for LocalStore {
         Ok(events)
     }
 
-    fn entity_lookup(&self, id: &CaseId, kind: &str, value: &str) -> Result<String, AppError> {
+    fn entity_lookup_filtered(
+        &self,
+        id: &CaseId,
+        filter: &GraphQueryFilter,
+        kind: &str,
+        value: &str,
+    ) -> Result<String, AppError> {
         self.check_entity_query(id, kind, value, 1)?;
-        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+        let Some(artifacts) = self.filtered_artifacts(id, filter)? else {
             return self.graph.entity_lookup(id, kind, value);
         };
         let newer = self.parquet.entity_artifacts(
             id,
             &artifacts,
+            filter,
             kind,
             value,
             &irmind_app::CancellationToken::new(),
@@ -89,22 +103,23 @@ impl EvidenceGraph for LocalStore {
         }
     }
 
-    fn neighbors(
+    fn neighbors_filtered(
         &self,
         id: &CaseId,
+        filter: &GraphQueryFilter,
         kind: &str,
         value: &str,
         limit: usize,
     ) -> Result<String, AppError> {
         self.check_entity_query(id, kind, value, limit)?;
-        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+        let Some(artifacts) = self.filtered_artifacts(id, filter)? else {
             return self.graph.neighbors(id, kind, value, limit);
         };
         let newer = self.parquet.neighbors_artifacts(
             id,
             &artifacts,
-            kind,
-            value,
+            filter,
+            (kind, value),
             limit,
             &irmind_app::CancellationToken::new(),
         )?;
@@ -118,22 +133,23 @@ impl EvidenceGraph for LocalStore {
         }
     }
 
-    fn entity_timeline(
+    fn entity_timeline_filtered(
         &self,
         id: &CaseId,
+        filter: &GraphQueryFilter,
         kind: &str,
         value: &str,
         limit: usize,
     ) -> Result<String, AppError> {
         self.check_entity_query(id, kind, value, limit)?;
-        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+        let Some(artifacts) = self.filtered_artifacts(id, filter)? else {
             return self.graph.entity_timeline(id, kind, value, limit);
         };
         let newer = self.parquet.entity_timeline_artifacts(
             id,
             &artifacts,
-            kind,
-            value,
+            filter,
+            (kind, value),
             limit,
             &irmind_app::CancellationToken::new(),
         )?;
@@ -147,20 +163,22 @@ impl EvidenceGraph for LocalStore {
         }
     }
 
-    fn graph_path(
+    fn graph_path_filtered(
         &self,
         id: &CaseId,
+        filter: &GraphQueryFilter,
         from: (&str, &str),
         to: (&str, &str),
     ) -> Result<String, AppError> {
         self.check_entity_query(id, from.0, from.1, 1)?;
         self.check_entity_query(id, to.0, to.1, 1)?;
-        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+        let Some(artifacts) = self.filtered_artifacts(id, filter)? else {
             return self.graph.path(id, from, to);
         };
         let newer = self.parquet.path_artifacts(
             id,
             &artifacts,
+            filter,
             from,
             to,
             &irmind_app::CancellationToken::new(),
@@ -172,19 +190,26 @@ impl EvidenceGraph for LocalStore {
         }
     }
 
-    fn text_search(&self, id: &CaseId, query: &str, limit: usize) -> Result<String, AppError> {
+    fn text_search_filtered(
+        &self,
+        id: &CaseId,
+        filter: &GraphQueryFilter,
+        query: &str,
+        limit: usize,
+    ) -> Result<String, AppError> {
         self.get_case(id)?;
         if query.trim().is_empty() || query.len() > 128 || !(1..=20).contains(&limit) {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::InvalidTextSearchArguments,
             )));
         }
-        let Some(artifacts) = self.signed_parquet_artifacts(id)? else {
+        let Some(artifacts) = self.filtered_artifacts(id, filter)? else {
             return self.graph.text_search(id, query, limit);
         };
         let parquet = self.parquet.search_artifacts(
             id,
             &artifacts,
+            filter,
             query,
             limit,
             &irmind_app::CancellationToken::new(),
@@ -303,5 +328,27 @@ impl EvidenceGraph for LocalStore {
             let bytes = self.get_evidence(id, hash)?;
             parser.parse("verify", &bytes)
         })
+    }
+}
+
+impl LocalStore {
+    fn filtered_artifacts(
+        &self,
+        id: &CaseId,
+        filter: &GraphQueryFilter,
+    ) -> Result<Option<Vec<ParquetArtifactV1>>, AppError> {
+        let case = self.get_case(id)?;
+        let scope = CaseScope::parse(&case.scope)
+            .map_err(|_| AppError::Policy("invalid case scope".into()))?;
+        if !filter.within_scope(&scope) {
+            return Err(AppError::Policy("graph filter outside case scope".into()));
+        }
+        let artifacts = self.signed_parquet_artifacts(id)?;
+        if !filter.is_empty() && (artifacts.is_none() || self.has_legacy_graph(id)?) {
+            return Err(AppError::Policy(
+                "partition filters require a fully migrated Parquet case".into(),
+            ));
+        }
+        Ok(artifacts)
     }
 }

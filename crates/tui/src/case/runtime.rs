@@ -109,11 +109,11 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                             Some(Confirmation::Seal(Box::new(preview), summary));
                     }
                     if label != "IRMind" {
-                        if label == "SIEM alert"
+                        if is_result_card_label(label)
                             && !text.starts_with("approval pending:")
                             && !text.starts_with("denied:")
                         {
-                            self.state.result_cards.push(("SIEM alert", text));
+                            self.state.result_cards.push((label, text));
                         } else {
                             update(
                                 &mut self.state,
@@ -196,4 +196,18 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
         let task = self.scope.spawn(move || work(worker_cancel));
         self.active = Some((cancel, task, label));
     }
+}
+
+fn is_result_card_label(label: &str) -> bool {
+    matches!(
+        label,
+        "SIEM alert"
+            | "Entity lookup"
+            | "Graph neighbors"
+            | "Entity timeline"
+            | "Graph path"
+            | "Evidence search"
+            | "Source record"
+            | "Case timeline"
+    )
 }
