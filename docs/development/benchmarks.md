@@ -117,21 +117,21 @@ These local measurements preceded the signed catalog and compaction changes belo
 
 ### Standard-runner Parquet result
 
-The [manual Linux run on the Phase P branch](https://github.com/ns2switch/irmind/actions/runs/40765451457) completed all three synthetic Parquet tests in the release profile. It generated each four-file batch on the runner, ingested it through the signed use case, and deleted that temporary batch. The 15 GB result measures conversion and custody on this runner; it does not include cloud transfer or reading a persistent 15 GB source tree. The workflow artifact contains the raw benchmark output.
+The [manual Linux run on the final Phase P implementation](https://github.com/ns2switch/irmind/actions/runs/40776509647) completed all three synthetic Parquet tests in the release profile. It generated each four-file batch on the runner, ingested it through the signed use case, and deleted that temporary batch. The 15 GB result measures conversion and custody on this runner; it does not include cloud transfer or reading a persistent 15 GB source tree. The workflow artifact contains the raw benchmark output.
 
 | Corpus | Input bytes | Files | Ingest wall time | Source hash CPU sum | Conversion CPU sum | Record conversion CPU sum | Parquet write CPU sum | Parquet disk bytes | Cold summary |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Representative 1 GB | 1,045,717,000 | 1,000 | 26.982 s | 1.344 s | 51.181 s | 8.759 s | 9.412 s | 301,108,413 | 0.293 s |
-| Representative 15 GB | 15,685,573,000 | 1,000 | 243.944 s | 17.955 s | 711.098 s | 132.677 s | 85.295 s | 1,803,559,114 | 0.988 s |
+| Representative 1 GB | 1,045,717,000 | 1,000 | 26.069 s | 0.765 s | 52.239 s | 7.261 s | 16.819 s | 301,108,413 | 0.254 s |
+| Representative 15 GB | 15,685,573,000 | 1,000 | 216.761 s | 10.351 s | 627.636 s | 109.694 s | 96.625 s | 1,803,559,114 | 0.812 s |
 
-The CPU sums overlap across four parallel source workers; they must not be added to infer wall time. The Parquet disk figures include signed single-source artifacts retained for reconstruction and active compact bundles. They are 28.8% and 11.5% of the respective input sizes. The lower 15 GB ratio reflects repeated synthetic records; it is not a compression forecast for real cases. The timed 15 GB ingestion is 4.07 minutes, below the 15-minute target.
+The CPU sums overlap across four parallel source workers; they must not be added to infer wall time. The Parquet disk figures include signed single-source artifacts retained for reconstruction and active compact bundles. They are 28.8% and 11.5% of the respective input sizes. The lower 15 GB ratio reflects repeated synthetic records; it is not a compression forecast for real cases. The timed 15 GB ingestion is 3.61 minutes, below the 15-minute target. An earlier run of the same corpus took 243.944 s; the difference between runs is not attributed to a code change.
 
 | Query | 1 GB p50 | 1 GB p95 | 15 GB p50 | 15 GB p95 | Errors |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Term search | 1.001 s | 1.007 s | 7.631 s | 7.650 s | 0 |
-| Entity lookup | 0.129 s | 0.129 s | 1.339 s | 1.400 s | 0 |
-| Neighbors | 0.074 s | 0.078 s | 0.454 s | 0.462 s | 0 |
-| Timeline | 0.155 s | 0.157 s | 1.034 s | 1.034 s | 0 |
-| Direct path | 0.206 s | 0.212 s | 2.461 s | 2.470 s | 0 |
+| Term search | 0.876 s | 0.877 s | 6.718 s | 6.742 s | 0 |
+| Entity lookup | 0.117 s | 0.118 s | 1.227 s | 1.229 s | 0 |
+| Neighbors | 0.065 s | 0.070 s | 0.399 s | 0.412 s | 0 |
+| Timeline | 0.142 s | 0.143 s | 0.965 s | 1.002 s | 0 |
+| Direct path | 0.072 s | 0.074 s | 0.403 s | 0.406 s | 0 |
 
-Each p50/p95 uses five warm calls after a cold summary. Across those 26 calls, 15 GB artifact verification took 10.244 s and DuckDB SQL took 53.147 s. Every measured p95 is below 10 seconds. Neighbor search samples at most 4,096 matching records and marks a truncated result as partial. The measured path connects entities in one record; the final path implementation also searches up to three hops with a 10-second budget and labels exhausted searches as truncated. That worst-case multi-hop path was not part of this benchmark. The same workflow also ran a 50 MB diagnostic successfully.
+Each p50/p95 uses five warm calls after a cold summary. Across those 26 calls, 15 GB artifact verification took 8.390 s and DuckDB SQL took 40.323 s. Every measured p95 is below 10 seconds. Neighbor search samples at most 4,096 matching records and marks a truncated result as partial. The measured path connects entities in one record; the same implementation also searches up to three hops with a 10-second budget and labels exhausted searches as truncated. That worst-case multi-hop path was not part of this benchmark. The same workflow also ran a 50 MB diagnostic successfully.
