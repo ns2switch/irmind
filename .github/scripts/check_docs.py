@@ -153,11 +153,17 @@ def source_cli() -> tuple[set[str], set[str], set[str]]:
     return root_commands, case_commands, flags
 
 
+def source_tui_flags() -> set[str]:
+    source = (ROOT / "crates/tui/src/case/commands/export.rs").read_text(encoding="utf-8")
+    return set(re.findall(r'strip_prefix\("/[a-z-]+ (--[a-z-]+)"\)', source))
+
+
 def check_cli(paths: list[Path], binary: Path | None) -> tuple[int, list[str]]:
     if binary is None:
         root_commands, case_commands, available_flags = source_cli()
     else:
         root_commands, case_commands, available_flags = binary_cli(binary)
+    available_flags |= source_tui_flags()
     text = "\n".join(path.read_text(encoding="utf-8") for path in paths)
     cited_flags = set(FLAG.findall(text)) - NON_IRMIND_FLAGS
     errors = [f"unknown IRMind flag {flag}" for flag in sorted(cited_flags - available_flags)]

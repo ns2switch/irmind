@@ -1,10 +1,9 @@
 use anyhow::Result;
 use irmind_app::{CaseId, Engine, SealPreview};
-use std::path::PathBuf;
 
 pub(super) enum Confirmation {
     Seal(Box<SealPreview>, String),
-    Export(PathBuf, String),
+    Export(String, String),
     Finding(String, String),
 }
 
