@@ -11,7 +11,7 @@ impl GraphStore {
         hash: &str,
         index: usize,
     ) -> Result<bool, AppError> {
-        let db = self.connect(id)?;
+        let db = self.connect_inner(id, false)?;
         let index = i64::try_from(index).map_err(storage)?;
         let exists: i64 = db
             .query_row(
@@ -29,7 +29,9 @@ impl GraphStore {
         query: &str,
         limit: usize,
     ) -> Result<String, AppError> {
-        let db = self.connect(id)?;
+        // The term table is scanned directly; these secondary indexes only help
+        // timeline and entity queries and can be built when those are requested.
+        let db = self.connect_inner(id, false)?;
         let (events, texts, empty, indexed, full_text): (i64, i64, i64, i64, i64) = db
             .query_row(
                 "SELECT (SELECT COUNT(*) FROM events),(SELECT COUNT(*) FROM record_texts),

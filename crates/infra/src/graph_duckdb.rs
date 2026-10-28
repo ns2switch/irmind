@@ -18,6 +18,7 @@ fn storage(_error: impl std::fmt::Display) -> AppError {
 mod format;
 mod index;
 mod profile;
+mod secondary_indexes;
 #[cfg(test)]
 pub(crate) use profile::GraphInsertProfile;
 mod queries;
@@ -63,12 +64,22 @@ impl GraphStore {
     }
 
     pub(crate) fn connect(&self, id: &CaseId) -> Result<GraphReadConnection, AppError> {
+        self.connect_inner(id, true)
+    }
+
+    fn connect_inner(
+        &self,
+        id: &CaseId,
+        build_indexes: bool,
+    ) -> Result<GraphReadConnection, AppError> {
         let writer = self.writer(id)?;
-        let connection = writer
-            .lock()
-            .map_err(storage)?
-            .try_clone()
-            .map_err(storage)?;
+        let connection = {
+            let db = writer.lock().map_err(storage)?;
+            if build_indexes && Arc::strong_count(&writer) <= 2 {
+                secondary_indexes::ensure(&db)?;
+            }
+            db.try_clone().map_err(storage)?
+        };
         Ok(GraphReadConnection {
             connection,
             _writer: writer,
@@ -103,27 +114,6 @@ impl GraphStore {
                 to_kind VARCHAR NOT NULL, to_value VARCHAR NOT NULL);",
         )
         .map_err(storage)?;
-        for (name, statement) in [
-            (
-                "events_time",
-                "CREATE INDEX events_time ON events(event_time)",
-            ),
-            (
-                "observations_entity",
-                "CREATE INDEX observations_entity ON observations(kind,value)",
-            ),
-        ] {
-            let existing: i64 = db
-                .query_row(
-                    "SELECT COUNT(*) FROM duckdb_indexes() WHERE index_name=?1",
-                    params![name],
-                    |row| row.get(0),
-                )
-                .map_err(storage)?;
-            if existing == 0 {
-                db.execute_batch(statement).map_err(storage)?;
-            }
-        }
         Ok(db)
     }
 
@@ -162,6 +152,9 @@ impl GraphStore {
         let writer = self.writer(id)?;
         let mut db = writer.lock().map_err(storage)?;
         let tx = db.transaction().map_err(storage)?;
+        if Arc::strong_count(&writer) <= 2 {
+            secondary_indexes::suspend(&tx)?;
+        }
         tx.execute_batch("DELETE FROM relations; DELETE FROM observations; DELETE FROM nodes; DELETE FROM record_terms; DELETE FROM fts_indexed; DELETE FROM record_texts; DELETE FROM events; DELETE FROM indexed;").map_err(storage)?;
         let mut total = 0usize;
         for (hash, expected) in sources {
@@ -177,6 +170,9 @@ impl GraphStore {
                 .checked_add(records.len())
                 .ok_or_else(|| storage("record count overflow"))?;
         }
+        if Arc::strong_count(&writer) <= 2 {
+            secondary_indexes::ensure(&tx)?;
+        }
         tx.commit().map_err(storage)?;
         Ok(total)
     }
@@ -191,7 +187,7 @@ impl GraphStore {
     where
         F: FnMut(&str) -> Result<Vec<Tainted<GraphRecord>>, AppError>,
     {
-        let db = self.connect(id)?;
+        let db = self.connect_inner(id, false)?;
         let mut indexed_statement = db
             .prepare("SELECT hash,records FROM indexed ORDER BY hash")
             .map_err(storage)?;

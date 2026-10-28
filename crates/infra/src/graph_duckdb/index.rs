@@ -3,6 +3,7 @@ use super::{AppError, CaseId, GraphRecord, GraphStore, Tainted, params, storage}
 use duckdb::{OptionalExt, Transaction};
 use irmind_app::{CancellationToken, EventParser};
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 mod batch;
 
@@ -55,6 +56,9 @@ impl GraphStore {
             }
             return usize::try_from(count).map_err(storage);
         }
+        if Arc::strong_count(&writer) <= 2 {
+            super::secondary_indexes::suspend(&tx)?;
+        }
         let mut pending = Vec::new();
         let mut pending_bytes = 0usize;
         let count = parser.parse_each(source, bytes, cancel, &mut |record| {
@@ -102,6 +106,9 @@ impl GraphStore {
         .is_some()
         {
             return Ok(());
+        }
+        if Arc::strong_count(&writer) <= 2 {
+            super::secondary_indexes::suspend(&tx)?;
         }
         Self::insert_records(&tx, hash, records, cancel, profile)?;
         measure(profile, GraphPhase::Commit, || tx.commit().map_err(storage))?;

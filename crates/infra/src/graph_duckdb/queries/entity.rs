@@ -4,7 +4,7 @@ use super::{
 
 impl GraphStore {
     pub(crate) fn summary(&self, id: &CaseId) -> Result<String, AppError> {
-        let db = self.connect(id)?;
+        let db = self.connect_inner(id, false)?;
         let records: i64 = db
             .query_row("SELECT COALESCE(SUM(records),0) FROM indexed", [], |row| {
                 row.get(0)

@@ -1,6 +1,13 @@
 use super::{AppError, GraphRecord, Tainted, Transaction, storage, terms};
 use crate::graph_duckdb::profile::{GraphInsertProfile, GraphPhase, measure};
+use duckdb::Appender;
+use duckdb::arrow::array::{Int64Builder, StringBuilder};
+use duckdb::arrow::datatypes::{DataType, Field, Schema};
+use duckdb::arrow::record_batch::RecordBatch;
 use irmind_app::CancellationToken;
+use std::sync::Arc;
+
+const TERM_BATCH_ROWS: usize = 16_384;
 
 fn each_record(
     records: &[Tainted<GraphRecord>],
@@ -92,6 +99,9 @@ fn append_terms(
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
     let mut appender = tx.appender("record_terms").map_err(storage)?;
+    let mut term_values = StringBuilder::new();
+    let mut hashes = StringBuilder::new();
+    let mut indices = Int64Builder::new();
     let mut rows = 0usize;
     each_record(records, |record| {
         let record_index = index(record)?;
@@ -99,14 +109,44 @@ fn append_terms(
             if rows.is_multiple_of(8_192) && cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            appender
-                .append_row((term.as_str(), hash, record_index))
-                .map_err(storage)?;
+            term_values.append_value(term);
+            hashes.append_value(hash);
+            indices.append_value(record_index);
             rows += 1;
+            if rows == TERM_BATCH_ROWS {
+                append_term_batch(&mut appender, &mut term_values, &mut hashes, &mut indices)?;
+                rows = 0;
+            }
         }
         Ok(())
     })?;
+    if rows > 0 {
+        append_term_batch(&mut appender, &mut term_values, &mut hashes, &mut indices)?;
+    }
     appender.flush().map_err(storage)
+}
+
+fn append_term_batch(
+    appender: &mut Appender<'_>,
+    terms: &mut StringBuilder,
+    hashes: &mut StringBuilder,
+    indices: &mut Int64Builder,
+) -> Result<(), AppError> {
+    let schema = Schema::new(vec![
+        Field::new("term", DataType::Utf8, false),
+        Field::new("hash", DataType::Utf8, false),
+        Field::new("record_index", DataType::Int64, false),
+    ]);
+    let batch = RecordBatch::try_new(
+        Arc::new(schema),
+        vec![
+            Arc::new(terms.finish()),
+            Arc::new(hashes.finish()),
+            Arc::new(indices.finish()),
+        ],
+    )
+    .map_err(storage)?;
+    appender.append_record_batch(batch).map_err(storage)
 }
 
 fn append_observations(
