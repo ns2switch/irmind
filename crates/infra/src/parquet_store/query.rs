@@ -4,12 +4,14 @@ use super::{
 use duckdb::{Connection, Row, params_from_iter};
 use irmind_app::LargeCaseStore;
 use irmind_app::TimelineEvent;
+use std::fmt::Write as _;
 use std::sync::mpsc::{self, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 const QUERY_DEADLINE: Duration = Duration::from_secs(10);
 const MAX_QUERY_FILES: usize = 8192;
+const MAX_NEIGHBOR_RECORDS: usize = 4096;
 
 struct QueryDeadline {
     stop: Sender<()>,
@@ -186,19 +188,30 @@ impl ParquetStore {
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
         let count = limit.min(20).to_string();
+        let target_limit = (MAX_NEIGHBOR_RECORDS + 1).to_string();
+        let sample_limit = MAX_NEIGHBOR_RECORDS.to_string();
         let rows = self.query_rows(id, artifacts,
-            "WITH records AS (SELECT * FROM {entities}) SELECT n.entity_kind,n.entity_value,COUNT(*) FROM records target JOIN records n USING (source_hash,record_index) WHERE target.entity_kind=? AND target.entity_value=? AND (n.entity_kind<>? OR n.entity_value<>?) GROUP BY 1,2 ORDER BY 3 DESC,1,2 LIMIT CAST(? AS BIGINT)",
-            &[kind, value, kind, value, &count], cancel,
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, u64>(2)?)),
+            "WITH records AS NOT MATERIALIZED (SELECT * FROM {entities}), targets AS MATERIALIZED (SELECT source_hash,record_index FROM records WHERE entity_kind=? AND entity_value=? LIMIT CAST(? AS BIGINT)), bounded AS (SELECT source_hash,record_index FROM targets LIMIT CAST(? AS BIGINT)) SELECT n.entity_kind,n.entity_value,COUNT(*),(SELECT COUNT(*) FROM targets)>CAST(? AS BIGINT) FROM records n JOIN bounded USING (source_hash,record_index) WHERE (n.entity_kind<>? OR n.entity_value<>?) GROUP BY 1,2 ORDER BY 3 DESC,1,2 LIMIT CAST(? AS BIGINT)",
+            &[kind, value, &target_limit, &sample_limit, &sample_limit, kind, value, &count], cancel,
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, u64>(2)?, row.get::<_, bool>(3)?)),
         )?;
         if rows.is_empty() {
-            return Ok("no neighbors in Parquet".into());
+            return Ok("no neighbors in the bounded Parquet query; refine the entity".into());
         }
-        Ok(rows
+        let sampled = rows[0].3;
+        let mut output = rows
             .into_iter()
-            .map(|(k, v, n)| format!("{k} {v} co-observed {n} times"))
+            .map(|(k, v, n, _)| format!("{k} {v} co-observed {n} times"))
             .collect::<Vec<_>>()
-            .join("\n"))
+            .join("\n");
+        if sampled {
+            write!(
+                output,
+                "\nPartial result: sampled {MAX_NEIGHBOR_RECORDS} matching records; refine the entity to narrow the search."
+            )
+            .map_err(storage)?;
+        }
+        Ok(output)
     }
 
     pub(crate) fn raw_artifact(

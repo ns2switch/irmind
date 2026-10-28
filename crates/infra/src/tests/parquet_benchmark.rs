@@ -107,6 +107,10 @@ fn benchmark(files: usize, multiplier: usize) {
         parquet_time.as_secs_f64(),
         ingest_time.as_secs_f64()
     );
+    assert!(
+        ingest_time < std::time::Duration::from_mins(15),
+        "Parquet ingestion exceeded the 15-minute benchmark target"
+    );
     let cold_started = Instant::now();
     let cold = store.graph_summary(&case.id);
     println!(
@@ -150,6 +154,11 @@ fn benchmark(files: usize, multiplier: usize) {
             "PARQUET_QUERY name={label} p50_seconds={:.3} p95_seconds={:.3} errors={errors}",
             timings[2].as_secs_f64(),
             timings[4].as_secs_f64()
+        );
+        assert_eq!(errors, 0, "{label} query failed");
+        assert!(
+            timings[4] < std::time::Duration::from_secs(10),
+            "{label} query exceeded the 10-second benchmark target"
         );
     }
     let [_, _, _, _, verify_time, sql_time] = profile.snapshot();

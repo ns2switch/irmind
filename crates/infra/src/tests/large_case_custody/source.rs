@@ -1,4 +1,5 @@
 use super::*;
+use irmind_app::LargeCaseStore;
 
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -111,6 +112,12 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
             .contains("account")
     );
     assert!(
+        !store
+            .neighbors(&case.id, "ip", "203.0.113.8", 10)
+            .unwrap()
+            .contains("Partial result")
+    );
+    assert!(
         store
             .entity_timeline(&case.id, "ip", "203.0.113.8", 10)
             .unwrap()
@@ -188,6 +195,51 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
         .unwrap();
     assert_eq!(changed.missing_or_changed, vec![hash.as_str().to_owned()]);
     assert_eq!(engine.verify(&case.id).unwrap(), 5);
+}
+
+#[test]
+fn neighbors_marks_bounded_results_instead_of_claiming_a_complete_count() {
+    let root = tempfile::tempdir().unwrap();
+    let source_root = root.path().join("inputs");
+    fs::create_dir(&source_root).unwrap();
+    let record = serde_json::json!({
+        "eventTime": "2026-10-28T12:00:00Z",
+        "eventName": "SyntheticNeighbor",
+        "recipientAccountId": "123456789012",
+        "sourceIPAddress": "203.0.113.8"
+    });
+    let body = std::iter::repeat_n(record.to_string(), 4097)
+        .collect::<Vec<_>>()
+        .join(",");
+    fs::write(
+        source_root.join("cloudtrail.json"),
+        format!("{{\"Records\":[{body}]}}"),
+    )
+    .unwrap();
+    let store = super::super::ParquetStore::open(root.path()).unwrap();
+    let case_id = CaseId::parse("00000000-0000-0000-0000-000000000001").unwrap();
+    let prepared = store
+        .prepare_local(
+            &case_id,
+            &source_root,
+            "cloudtrail.json",
+            false,
+            &JsonParser,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    let output = store
+        .neighbors_artifacts(
+            &case_id,
+            &prepared.artifacts,
+            "ip",
+            "203.0.113.8",
+            10,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    assert!(output.contains("account 123456789012 co-observed 4096 times"));
+    assert!(output.contains("Partial result: sampled 4096 matching records"));
 }
 
 #[test]
