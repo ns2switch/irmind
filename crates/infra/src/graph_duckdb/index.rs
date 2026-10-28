@@ -1,3 +1,4 @@
+use super::profile::{GraphInsertProfile, GraphPhase, measure};
 use super::{AppError, CaseId, GraphRecord, GraphStore, Tainted, params, storage};
 use duckdb::{OptionalExt, Transaction};
 use irmind_app::{CancellationToken, EventParser};
@@ -33,9 +34,15 @@ impl GraphStore {
         parser: &dyn EventParser,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
-        let mut db = self.connect(id)?;
-        let tx = db.transaction().map_err(storage)?;
-        if let Some(count) = Self::indexed_count(&tx, hash)? {
+        let profile = self.profile.as_deref();
+        let writer = measure(profile, GraphPhase::Connect, || self.writer(id))?;
+        let mut db = writer.lock().map_err(storage)?;
+        let tx = measure(profile, GraphPhase::Transaction, || {
+            db.transaction().map_err(storage)
+        })?;
+        if let Some(count) = measure(profile, GraphPhase::IndexLookup, || {
+            Self::indexed_count(&tx, hash)
+        })? {
             let full_text: i64 = tx
                 .query_row(
                     "SELECT COUNT(*) FROM fts_indexed WHERE hash=?1",
@@ -59,7 +66,7 @@ impl GraphStore {
                 if cancel.is_cancelled() {
                     return Err(AppError::Cancelled);
                 }
-                batch::insert_batch(&tx, hash, &pending, cancel)?;
+                batch::insert_batch(&tx, hash, &pending, cancel, profile)?;
                 pending.clear();
                 pending_bytes = 0;
             }
@@ -68,9 +75,11 @@ impl GraphStore {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        batch::insert_batch(&tx, hash, &pending, cancel)?;
-        Self::finish_index(&tx, hash, count)?;
-        tx.commit().map_err(storage)?;
+        batch::insert_batch(&tx, hash, &pending, cancel, profile)?;
+        measure(profile, GraphPhase::Finish, || {
+            Self::finish_index(&tx, hash, count)
+        })?;
+        measure(profile, GraphPhase::Commit, || tx.commit().map_err(storage))?;
         Ok(count)
     }
 
@@ -81,13 +90,22 @@ impl GraphStore {
         records: &[Tainted<GraphRecord>],
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
-        let mut db = self.connect(id)?;
-        let tx = db.transaction().map_err(storage)?;
-        if Self::indexed_count(&tx, hash)?.is_some() {
+        let profile = self.profile.as_deref();
+        let writer = measure(profile, GraphPhase::Connect, || self.writer(id))?;
+        let mut db = writer.lock().map_err(storage)?;
+        let tx = measure(profile, GraphPhase::Transaction, || {
+            db.transaction().map_err(storage)
+        })?;
+        if measure(profile, GraphPhase::IndexLookup, || {
+            Self::indexed_count(&tx, hash)
+        })?
+        .is_some()
+        {
             return Ok(());
         }
-        Self::insert_records(&tx, hash, records, cancel)?;
-        tx.commit().map_err(storage)
+        Self::insert_records(&tx, hash, records, cancel, profile)?;
+        measure(profile, GraphPhase::Commit, || tx.commit().map_err(storage))?;
+        Ok(())
     }
 
     fn indexed_count(tx: &Transaction<'_>, hash: &str) -> Result<Option<i64>, AppError> {
@@ -105,14 +123,17 @@ impl GraphStore {
         hash: &str,
         records: &[Tainted<GraphRecord>],
         cancel: &CancellationToken,
+        profile: Option<&GraphInsertProfile>,
     ) -> Result<(), AppError> {
         for pending in records.chunks(BATCH_RECORDS) {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            batch::insert_batch(tx, hash, pending, cancel)?;
+            batch::insert_batch(tx, hash, pending, cancel, profile)?;
         }
-        Self::finish_index(tx, hash, records.len())
+        measure(profile, GraphPhase::Finish, || {
+            Self::finish_index(tx, hash, records.len())
+        })
     }
 
     fn finish_index(tx: &Transaction<'_>, hash: &str, count: usize) -> Result<(), AppError> {

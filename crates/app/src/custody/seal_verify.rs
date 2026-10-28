@@ -123,6 +123,7 @@ impl Engine<'_> {
         id: &CaseId,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
+        self.clear_verified_checkpoint(id)?;
         let case = self.repo.get_case(id)?;
         let entries = self.audit_log.entries(id)?;
         verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
@@ -131,20 +132,7 @@ impl Engine<'_> {
             if index % 256 == 0 && cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            if entry.seq != index as u64 + 1
-                || entry.case_id != id.as_str()
-                || entry.prev != prev
-                || sha256(&entry.canonical()) != entry.hash
-            {
-                return Err(AppError::InvalidChain(entry.seq));
-            }
-            if entry.public_key != self.verifier.trusted_public_key(&entry.actor)? {
-                return Err(AppError::InvalidChain(entry.seq));
-            }
-            self.verifier
-                .verify(&entry.public_key, &entry.hash, &entry.sig)
-                .map_err(|_| AppError::InvalidChain(entry.seq))?;
-            prev = entry.hash;
+            prev = self.verify_chain_entry(id, index, prev, entry)?;
         }
         let evidence_hashes = self.evidence_store.evidence_hashes(id)?;
         for entry in &entries {
@@ -192,6 +180,7 @@ impl Engine<'_> {
         self.findings_unlocked(id, &entries)?;
         summarize_usage(&entries)?;
         self.verify_operations_unlocked(id, cancel)?;
+        self.remember_verified_checkpoint(id, entries.last())?;
         Ok(entries.len())
     }
 }

@@ -46,13 +46,15 @@ pub(super) fn verify_terms(
         })
         .map_err(storage)?;
     let mut actual_terms = BTreeSet::new();
+    let mut actual_rows = 0usize;
     for (index, row) in rows.enumerate() {
         if index.is_multiple_of(256) && cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
         actual_terms.insert(row.map_err(storage)?);
+        actual_rows += 1;
     }
-    if actual_terms != expected_terms {
+    if actual_terms != expected_terms || actual_rows != actual_terms.len() {
         return Err(storage(
             "graph full-text index differs from signed evidence",
         ));

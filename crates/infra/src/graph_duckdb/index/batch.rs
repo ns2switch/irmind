@@ -1,4 +1,5 @@
 use super::{AppError, GraphRecord, Tainted, Transaction, storage, terms};
+use crate::graph_duckdb::profile::{GraphInsertProfile, GraphPhase, measure};
 use irmind_app::CancellationToken;
 
 fn each_record(
@@ -22,6 +23,7 @@ pub(super) fn insert_batch(
     hash: &str,
     records: &[Tainted<GraphRecord>],
     cancel: &CancellationToken,
+    profile: Option<&GraphInsertProfile>,
 ) -> Result<(), AppError> {
     if records.is_empty() {
         return Ok(());
@@ -29,11 +31,21 @@ pub(super) fn insert_batch(
     if cancel.is_cancelled() {
         return Err(AppError::Cancelled);
     }
-    append_events(tx, hash, records)?;
-    append_texts(tx, hash, records)?;
-    append_terms(tx, hash, records, cancel)?;
-    append_observations(tx, hash, records)?;
-    append_relations(tx, hash, records)?;
+    measure(profile, GraphPhase::Events, || {
+        append_events(tx, hash, records)
+    })?;
+    measure(profile, GraphPhase::Texts, || {
+        append_texts(tx, hash, records)
+    })?;
+    measure(profile, GraphPhase::Terms, || {
+        append_terms(tx, hash, records, cancel)
+    })?;
+    measure(profile, GraphPhase::Observations, || {
+        append_observations(tx, hash, records)
+    })?;
+    measure(profile, GraphPhase::Relations, || {
+        append_relations(tx, hash, records)
+    })?;
     if cancel.is_cancelled() {
         return Err(AppError::Cancelled);
     }
@@ -84,11 +96,8 @@ fn append_terms(
     each_record(records, |record| {
         let record_index = index(record)?;
         for term in terms(&record.text)? {
-            if rows.is_multiple_of(8_192) {
-                if cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
-                }
-                appender.flush().map_err(storage)?;
+            if rows.is_multiple_of(8_192) && cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
             }
             appender
                 .append_row((term.as_str(), hash, record_index))

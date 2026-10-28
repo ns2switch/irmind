@@ -5,6 +5,16 @@ use crate::{
 };
 
 impl<'a> Engine<'a> {
+    pub fn open_case_verified(
+        &self,
+        id: &CaseId,
+        cancel: &crate::CancellationToken,
+    ) -> Result<Case, AppError> {
+        let _case_lock = self.repo.lock_case(id)?;
+        self.verify_unlocked_cancelable(id, cancel)?;
+        self.repo.get_case(id)
+    }
+
     pub fn new(
         ports: EnginePorts,
         mode: ExecutionMode,
@@ -36,6 +46,7 @@ impl<'a> Engine<'a> {
             edrs: Vec::new(),
             internal_intel: Vec::new(),
             pricing: None,
+            verified_cases: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         };
         engine.verify_global_operations()?;
         Ok(engine)

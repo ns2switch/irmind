@@ -52,5 +52,6 @@ impl SealPreview {
     }
 }
 
+pub(crate) mod incremental;
 mod migration;
 mod seal_verify;

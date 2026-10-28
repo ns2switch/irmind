@@ -1,20 +1,58 @@
-# Evidence graph benchmark
+# Evidence graph benchmarks
 
-This page is for maintainers measuring the local DuckDB graph. It records the method and results for the [manual and weekly workflow](../../.github/workflows/graph-benchmark.yml). The workflow uses synthetic data only and is never part of a pull request check.
+This page is for maintainers measuring the local DuckDB graph. The [manual and weekly workflow](../../.github/workflows/graph-benchmark.yml) runs two ignored 1 GB tests with synthetic data and uploads the phase profile as an artifact. Neither test runs on a pull request.
 
-## Method
+## Corpora and method
 
-The ignored `graph_benchmark_1gb` test ingests 25 distinct CloudTrail JSON files of just over 40 MiB each through the signed case use case. The total exceeds 1,000,000,000 input bytes. One file is built and ingested at a time; the temporary case directory is removed when the test ends. The query searches the indexed event name and returns at most 20 records.
+The representative corpus contains 1,000 CloudTrail-shaped files of approximately 1 MiB each. Each file has hundreds of 1–2 KiB JSON records with synthetic identities, requests, response metadata, TLS details, and reserved example IP addresses. Request IDs vary across files. The separate extreme corpus contains 25 files with one approximately 40 MiB JSON record each. Both exceed 1,000,000,000 input bytes.
 
-The test measures wall-clock ingestion and query time. Token counts are estimates of bytes divided by four, so they are useful only for comparing the raw input with this query response. They are not provider billing counts. The graph is derived from signed evidence, and the full-text term index is checked during graph verification.
+Each test creates a new case and ingests every file through the normal signed use case. The profile separates reading and hashing, custody verification, guard screening, JSON parsing, entity extraction, DuckDB insertion, evidence writes, audit writes, and the bounded text query. The representative query searches a selective synthetic request ID; the extreme query searches the event name. The original files, stored evidence, and derived graph all live in a temporary directory that the test removes on completion. The benchmark records input and returned tokens as bytes divided by four. These are comparison estimates, not provider billing counts.
 
 ## Results
 
-| Date and revision | Environment | Input bytes | Ingestion | Query | Raw tokens, estimated | Indexed response tokens, estimated |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| 2026-10-27, `70fc844` | Local Linux, one process, 6 GB address-space cap, no swap | 1,048,578,740 | 1,274.926 s | 1.369 s | 262,144,685 | 583 |
-| 2026-10-27, C4 Appender working tree | Same machine, dataset, test profile, and limits | 1,048,578,740 | 1,250.558 s | 0.790 s | 262,144,685 | 583 |
+The previous C4 benchmark measured the extreme corpus only. Its single 40 MiB record per file made it a poor proxy for normal CloudTrail ingestion.
 
-The Appender change improved end-to-end ingestion by 1.02x and this query by 1.73x. It did not reach the indicative 10x ingestion target. Each input file contains one 40 MiB record, so this benchmark exercises large-record handling more than batched row insertion. The measurement includes custody verification before each file, evidence writes, content screening, parsing, and DuckDB indexing. Repeated verification of prior evidence dominates the end-to-end path. A separate 40 MiB profiling run measured 6.260 s in content screening and 2.667 s in graph indexing; it does not substitute for the 1 GB comparison. The query returns at most 20 of the 25 synthetic records. Both temporary case directories were removed.
+| Revision | Environment | Corpus | Input bytes | Ingest | Query | Raw tokens, estimated | Returned tokens, estimated |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| C4 before Appender, `70fc844` | Local Linux, 6 GB address-space cap, test profile, no swap | Extreme | 1,048,578,740 | 1,274.926 s | 1.369 s | 262,144,685 | 583 |
+| C4 Appender working tree | Same machine, corpus, profile, and cap | Extreme | 1,048,578,740 | 1,250.558 s | 0.790 s | 262,144,685 | 583 |
 
-The scheduled workflow will publish its own log as an artifact. GitHub cannot dispatch a newly added workflow from a pull request branch before the workflow exists on `main`; its first CI measurement is therefore pending the merge. Do not extrapolate a smaller run into this table or treat these estimated tokens as a provider bill.
+The C4b measurements below use the same local Linux machine and test profile, with an 8 GB address-space cap and no swap. The first complete representative result is the baseline for future releases; no full-size representative result exists from C4.
+
+| Revision | Corpus | Input bytes | Files | Ingest | Query | Raw tokens, estimated | Returned tokens, estimated |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| C4b, 2026-10-28 | Representative CloudTrail | 1,045,737,000 | 1,000 | 980.910 s | 0.470 s | 261,434,250 | 39 |
+| C4b, 2026-10-28 | Extreme large record | 1,048,578,740 | 25 | 188.033 s | 0.701 s | 262,144,685 | 583 |
+
+### Phase profile
+
+Percentages use ingestion plus query time as the denominator. Guard time covers the bounded query result. The original evidence is stored without screening; text is screened before model or terminal display. DuckDB insertion includes Appender calls and transaction commits. A full `verify` remains available and is not replaced by the incremental ingestion checkpoint.
+
+| Corpus | Phase | Seconds | Percent |
+| --- | --- | ---: | ---: |
+| Representative | Read and hash | 42.144 | 4.3% |
+| Representative | Custody verification | 61.138 | 6.2% |
+| Representative | Guard | 0.001 | 0.0% |
+| Representative | JSON parse | 16.028 | 1.6% |
+| Representative | Entity extraction | 43.197 | 4.4% |
+| Representative | DuckDB insertion | 699.963 | 71.3% |
+| Representative | Evidence write | 67.430 | 6.9% |
+| Representative | Audit write | 50.872 | 5.2% |
+| Representative | Query | 0.470 | 0.0% |
+| Representative | Other | 0.138 | 0.0% |
+| Extreme | Read and hash | 41.637 | 22.1% |
+| Extreme | Custody verification | 40.590 | 21.5% |
+| Extreme | Guard | 0.003 | 0.0% |
+| Extreme | JSON parse | 2.513 | 1.3% |
+| Extreme | Entity extraction | 17.090 | 9.1% |
+| Extreme | DuckDB insertion | 49.875 | 26.4% |
+| Extreme | Evidence write | 25.994 | 13.8% |
+| Extreme | Audit write | 10.328 | 5.5% |
+| Extreme | Query | 0.701 | 0.4% |
+| Extreme | Other | 0.007 | 0.0% |
+
+Within the representative DuckDB insertion, commits took 378.418 s, text-term Appender writes 171.678 s, and node aggregation 102.414 s. This measured cost prevents the indicative two-minute target locally. The two complete tests took 1,222.01 s together, including corpus generation and temporary cleanup; `ingest_seconds` excludes those costs. The extreme ingestion improved by 6.7x from the C4 Appender measurement on the same machine. Neither corpus met two minutes locally.
+
+The parser phase was small in local samples, so files remain in deterministic serial order. Parsing files in parallel would not address the measured DuckDB and storage costs. The 256 MiB DuckDB WAL checkpoint threshold reduces repeated small checkpoints while preserving committed writes and crash recovery; [DuckDB documents the setting](https://duckdb.org/docs/lts/configuration/overview).
+
+The target of less than two minutes on a standard GitHub runner is indicative. The workflow artifact provides the runner measurement; local timings alone do not establish runner performance.
