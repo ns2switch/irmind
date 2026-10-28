@@ -1,4 +1,4 @@
-Traducción de docs/security-model.md en el commit b2bfd4d9b491669a462ed34dd6da802004af2a1e; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/security-model.md en el commit 7fce7687b188ee8cd1df5c41e9db437adfbc39c8; si hay diferencias, prevalece la versión en inglés.
 
 # Modelo de seguridad
 
@@ -15,6 +15,7 @@ El analista controla el caso, su alcance, las aprobaciones y su clave de firma. 
 ## Garantías de esta versión
 
 - **Custodia:** La evidencia original se guarda en local por SHA-256. Los cambios del caso y la actividad de herramientas entran en una cadena de auditoría SQLite de solo anexado, con firmas Ed25519. La verificación detecta entradas y bytes de evidencia modificados.
+- **Diagnóstico:** Un archivo privado y acotado, `diagnostics.log`, registra nombres de operaciones, categorías de resultado y duración. Está separado de la custodia, no contiene evidencia ni argumentos de herramientas y no forma parte de exportaciones ni de la verificación.
 - **Identidades separadas:** Analyst y Agent tienen claves distintas en el backend elegido. Solo la firma del analista puede resolver una aprobación pendiente. Un caso sellado tiene una cadena operativa firmada aparte para cancelaciones; las migraciones entran en una cadena operativa global firmada.
 - **Entrada protegida del modelo:** El texto externo se normaliza, se examina en busca de inyección de instrucciones, se redacta según patrones conocidos de secretos y datos personales, se limita y se envuelve como dato no confiable. El original queda en local. Un autotest de arranque bloquea la aplicación si falla el corpus conocido del guard.
 - **Conectores limitados:** Las credenciales llegan desde el backend de secretos elegido a través de la raíz de composición. Los clientes remotos exigen HTTPS, salvo HTTP sin clave hacia un servicio de modelo explícito en loopback. Las redirecciones están desactivadas y las respuestas tienen límites.

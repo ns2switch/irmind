@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 142b75f3fbc31c518395ac93b3dcf02bdbdb7415; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 7fce7687b188ee8cd1df5c41e9db437adfbc39c8; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -69,7 +69,7 @@ Estas variables de entorno prevalecen sobre los campos públicos correspondiente
 | `IRMIND_ENABLE_SPLUNK`, `IRMIND_ENABLE_AWS`, `IRMIND_ENABLE_CROWDSTRIKE`, `IRMIND_ENABLE_SENTINELONE`, `IRMIND_ENABLE_MISP`, `IRMIND_ENABLE_VIRUSTOTAL` | Overrides temporales para activar conectores (`true` o `false`). |
 | `IRMIND_MODEL`, `IRMIND_LLM_BASE_URL` | Modelo compatible con OpenAI y URL base opcional. |
 | `IRMIND_ANTHROPIC_MODEL`, `IRMIND_DEEPSEEK_MODEL`, `IRMIND_OPENROUTER_MODEL` | IDs de modelos de esos proveedores. |
-| `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, `IRMIND_SPLUNK_ACCOUNT_FIELD` | Servicio Splunk y fuente de búsqueda acotada. |
+| `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, `IRMIND_SPLUNK_ACCOUNT_FIELD`, `IRMIND_SPLUNK_ALERT_ID_FIELD` | Servicio Splunk, índice acotado y campo opcional del ID de alerta (por defecto `alert_id`). |
 | `IRMIND_AWS_SOURCE_ID`, `IRMIND_AWS_REGION`, `IRMIND_AWS_ROLE_NAME` | Fuente, región y rol de solo lectura de AWS. |
 | `IRMIND_CROWDSTRIKE_URL`, `IRMIND_CROWDSTRIKE_SOURCE_ID` | Servicio y fuente de CrowdStrike. |
 | `IRMIND_SENTINELONE_URL`, `IRMIND_SENTINELONE_SOURCE_ID`, `IRMIND_SENTINELONE_SITE_ID` | Servicio, fuente y sitio de SentinelOne. |
