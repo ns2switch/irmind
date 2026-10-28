@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 6a6259ec56f1e8598e693f3593f38320b3d8bb0c; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 9bf32f16bfbed60a22f6dac4fb9b674491459475; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -9,7 +9,7 @@ Esta página es para quienes contribuyen al proyecto o evalúan sus límites act
 - Una TUI centrada en la conversación, con entrada multilínea, tarjetas desplazables de actividad firmada, autocompletado de comandos y un panel lateral opcional. En el mismo espacio se crean casos, se ingiere evidencia, se investiga, se aprueban llamadas, se verifica, se sella y se exporta.
 - Texto incremental del modelo, paneles de IOC, hipótesis y técnicas ATT&CK con confirmación del analista, y fragmentos de evidencia junto a las aprobaciones relacionadas.
 - Consultas de lectura sujetas a política y enriquecimiento externo aprobado por el analista, con un guard obligatorio.
-- Custodia local en SQLite, grafo derivado en DuckDB y firmas Ed25519 mediante un llavero del sistema o un archivo cifrado, seleccionados explícitamente.
+- Custodia local en SQLite, grafo derivado en DuckDB y firmas Ed25519 mediante un llavero del sistema o un archivo cifrado, seleccionados explícitamente. La ingesta actual copia la evidencia y se limita a archivos pequeños; el almacenamiento para casos grandes se describe más abajo.
 - Módulos LLM seleccionados explícitamente y conectores opcionales de Splunk, AWS, EDR, MISP y VirusTotal; Splunk usa campos y agregaciones estructurados.
 - Propuestas tipadas de IOC, hipótesis, técnicas ATT&CK y eventos de cronología; los informes citan evidencia confirmada.
 - Alcance del caso con proyectos y techo opcional de política TOML para consultas remotas.
@@ -19,10 +19,12 @@ Esta página es para quienes contribuyen al proyecto o evalúan sus límites act
 
 El MVP tiene un alcance cerrado:
 
-1. Procesar CloudTrail y JSON en streaming, añadir búsqueda de texto completo en el grafo DuckDB y medir la ingesta de al menos 1 GB de evidencia sintética.
+1. Ingerir casos de 15 a 500 GB con manifiestos firmados de los originales, copia opcional y Parquet particionado. DuckDB consultará solo Parquet generado por IRMind. La verificación informará de originales ausentes o cambiados; el muestreo indicará su cobertura limitada. Medir 1 GB y 15 GB en un runner estándar.
 2. Obtener alertas del SIEM y mantener las trazas de diagnóstico separadas de los eventos firmados de custodia.
 3. Mantener las consultas SIEM limitadas a campos, operadores, ventanas temporales y agregaciones sencillas estructurados que traduce el conector.
-4. Completar las pruebas con respuestas grabadas, los contratos compartidos y las guías de configuración de los módulos de nube, SIEM, EDR e inteligencia de amenazas que ya existen en el workspace.
+4. Procesar en streaming exportaciones de CloudTrail, Cloud Audit Logs de GCP, Azure Activity y registros de inicio de sesión de Entra ID, además de JSON genérico. Migrar los casos existentes con verificación antes y después.
+5. Leer objetos de S3, GCS y Azure Blob en streaming mediante conectores explícitos de solo lectura. Aplicar el alcance y los presupuestos de transferencia, y probar cada backend con respuestas sintéticas.
+6. Completar las pruebas con respuestas grabadas, los contratos compartidos y las guías de los módulos de nube, SIEM, EDR e inteligencia de amenazas existentes.
 
 La versión `v0.1.0` solo se publicará cuando todos los hitos del [plan de referencia](../development/plan.md) cumplan sus criterios, se documente la prueba manual del modelo, se pruebe al menos un conector contra un entorno real de pruebas y el tag incluya un registro de cambios y binarios descargables. Todos los módulos actuales siguen siendo experimentales hasta cumplir esas condiciones. Aún no hay fecha de publicación.
 
@@ -30,6 +32,6 @@ Cada PR y merge ejecuta los checks de Linux. Las PR que tocan código de platafo
 
 ## Después del MVP
 
-Chronicle, GCP, Azure y otros conectores de producto podrán añadirse mediante los puertos compartidos. También se pospone el anclaje externo de los sellos de caso. Un gateway local podrá ejecutar watches y agentes desatendidos; deberá usar una clave Agent distinta, permitir solo lecturas dentro del alcance sin analista y exigir la firma del analista para cada aprobación. La contención queda fuera del alcance actual.
+La consulta en origen queda para justo después del MVP: Athena, CloudTrail Lake y Security Lake en AWS; BigQuery y Log Analytics de Cloud Logging en GCP; Azure Data Explorer y Log Analytics en Azure. Solo se prevén consultas estructuradas, con presupuestos de escaneo y resultados firmados. Chronicle, otros conectores de producto, el anclaje externo de los sellos y el gateway con watches siguen aplazados. El gateway deberá usar una clave Agent distinta, permitir solo lecturas dentro del alcance sin analista y exigir la firma del analista para cada aprobación. La contención queda fuera del alcance actual.
 
 Ningún proveedor se activa por defecto. Antes de usar el proyecto en producción también hacen falta pruebas manuales de la terminal, aprobación de compliance para el proveedor y una decisión sobre la firma de los binarios.

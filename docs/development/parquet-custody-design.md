@@ -15,6 +15,8 @@ Add two versioned event payloads to the existing case audit chain, without chang
 
 Both payloads use a domain-tagged, length-prefixed binary encoding carried as ASCII in the current signed `payload` field. Fields, optionality, byte order, path separators, and sorting are fixed. Unknown versions fail closed. No new record can reinterpret a legacy `EvidenceIngested` entry. The existing case seal covers the final audit hash and therefore the new records; its signature challenge stays unchanged.
 
+For local files, open without following symlinks, hash through the opened handle, seek back, and hash again while parsing. Commit neither record nor Parquet artifact unless both hashes and stable file identity agree. This catches a source change between the two passes. Cloud objects are read by explicit version or conditional request when available and hashed during the conversion pass. Temporary derived files are renamed into place only after the hash and parser succeed; cancellation deletes them.
+
 ## Verification and export
 
 Full source verification reopens every source and streams a SHA-256 check against the manifest. Explicit sampled verification uses a fresh random selection and reports the sample size, failed sources, and that unchecked sources have **not** been verified. A missing source, unavailable object version, changed hash, or unsafe path is reported as a failed check. Modification time and provider checksums are diagnostic metadata; they never replace IRMind SHA-256.
