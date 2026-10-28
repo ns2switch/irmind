@@ -4,6 +4,7 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
@@ -20,70 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      run_matrix: ${{ steps.scope.outputs.run_matrix }}
-      docs_only: ${{ steps.scope.outputs.docs_only }}
+      run_ci: ${{ steps.scope.outputs.run_ci }}
+      platforms: ${{ steps.scope.outputs.platforms }}
+      cross_verify: ${{ steps.scope.outputs.cross_verify }}
       release_build: ${{ steps.scope.outputs.release_build }}
+      duckdb_version: ${{ steps.scope.outputs.duckdb_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false, fetch-depth: 0}
       - name: Select CI scope and skip stale nightly runs
         id: scope
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          GIT_REF: ${{ github.ref }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BEFORE_SHA: ${{ github.event.before }}
-          CURRENT_SHA: ${{ github.sha }}
-        run: |
-          python3 - <<'PY'
-          import os
-          import subprocess
-          from pathlib import Path
-
-          event = os.environ['EVENT_NAME']
-          def documentation(path: bytes) -> bool:
-              return path.startswith(b'docs/') or path.endswith(b'.md')
-
-          def release_source(path: bytes) -> bool:
-              return path.startswith(b'crates/') or path in {
-                  b'Cargo.toml', b'Cargo.lock', b'rust-toolchain.toml',
-              }
-
-          docs_only = False
-          if event == 'pull_request' or (
-              event == 'push' and os.environ['GIT_REF'] == 'refs/heads/main'
-          ):
-              base = os.environ['BASE_SHA'] if event == 'pull_request' else os.environ['BEFORE_SHA']
-              head = os.environ['HEAD_SHA'] if event == 'pull_request' else os.environ['CURRENT_SHA']
-              changed = subprocess.check_output([
-                  'git', 'diff', '--name-only', '-z', base, head,
-              ]).split(b'\0')
-              changed = [path for path in changed if path]
-              docs_only = bool(changed) and all(documentation(path) for path in changed)
-          run_matrix = True
-          release_build = False
-          if event == 'schedule':
-              commits = subprocess.check_output([
-                  'git', 'log', '--since=24 hours ago', '--format=%H',
-              ], text=True).splitlines()
-              changed = [
-                  path
-                  for commit in commits
-                  for path in subprocess.check_output([
-                      'git', 'diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', commit,
-                  ]).split(b'\0')
-                  if path
-              ]
-              release_build = any(release_source(path) for path in changed)
-              run_matrix = release_build
-              if not run_matrix:
-                  print('Skipping daily build: main has no code commits in the last 24 hours.')
-          with Path(os.environ['GITHUB_OUTPUT']).open('a', encoding='ascii') as output:
-              output.write(f'docs_only={str(docs_only).lower()}\n')
-              output.write(f'run_matrix={str(run_matrix).lower()}\n')
-              output.write(f'release_build={str(release_build).lower()}\n')
-          PY
+        run: python3 .github/scripts/select_ci_scope.py
       - name: Verify DCO sign-off on every PR commit
         if: github.event_name == 'pull_request'
         env:
@@ -92,9 +40,7 @@ jobs:
         run: python3 .github/scripts/check_dco.py
   linux:
     needs: dco
-    if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_matrix == 'true' }}
-    outputs:
-      docs_only: ${{ needs.dco.outputs.docs_only }}
+    if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_ci == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -102,51 +48,39 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false, fetch-depth: 0}
-      - name: Check links and documented CLI commands
-        if: needs.dco.outputs.docs_only == 'true'
-        run: python3 .github/scripts/check_docs.py
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
-        if: needs.dco.outputs.docs_only != 'true'
         with: {components: 'rustfmt, clippy'}
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        if: needs.dco.outputs.docs_only != 'true'
-        with: {key: linux-checks}
-      - if: needs.dco.outputs.docs_only != 'true'
-        run: sudo apt-get update && sudo apt-get install -y mold
+        with:
+          key: linux-duckdb-${{ needs.dco.outputs.duckdb_version }}
+          cache-targets: true
+      - run: sudo apt-get update && sudo apt-get install -y mold
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
-        if: needs.dco.outputs.docs_only != 'true'
-        with: {tool: 'cargo-nextest,cargo-deny,cargo-audit', fallback: none}
-      - if: needs.dco.outputs.docs_only != 'true'
-        run: cargo fmt --all -- --check
-      - if: needs.dco.outputs.docs_only != 'true'
-        run: python3 scripts/check_no_rust_includes.py
-      - if: needs.dco.outputs.docs_only != 'true'
-        run: python3 scripts/code_metrics.py --check-audit-literals
-      - if: needs.dco.outputs.docs_only != 'true'
-        run: cargo fmt --manifest-path fuzz/Cargo.toml -- --check
-      - if: needs.dco.outputs.docs_only != 'true'
-        run: cargo clippy --workspace --all-targets --all-features --profile ci --locked -- -D warnings
-      - if: needs.dco.outputs.docs_only != 'true'
-        run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
-      - if: needs.dco.outputs.docs_only != 'true'
-        run: cargo test -p irmind-testkit --test dependency_direction --profile ci --locked
-      - if: needs.dco.outputs.docs_only != 'true'
-        run: cargo deny check --hide-inclusion-graph
-      - if: needs.dco.outputs.docs_only != 'true'
-        run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
-      - if: needs.dco.outputs.docs_only != 'true'
+        with: {tool: 'cargo-nextest,cargo-deny', fallback: none}
+      - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_select_ci_scope.py
+      - run: cargo fmt --all -- --check
+      - run: python3 scripts/check_no_rust_includes.py
+      - run: python3 scripts/code_metrics.py --check-audit-literals
+      - run: cargo fmt --manifest-path fuzz/Cargo.toml -- --check
+      - run: cargo clippy --workspace --all-targets --all-features --profile ci --locked -- -D warnings
+      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
+      - run: cargo deny check --hide-inclusion-graph
+      - run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        if: github.event_name == 'schedule'
+        with: {tool: 'cargo-audit', fallback: none}
+      - if: github.event_name == 'schedule'
         run: cargo audit --ignore RUSTSEC-2026-0370 --ignore RUSTSEC-2026-0371 --ignore RUSTSEC-2026-0372
       - name: Stage CLI test executable for cross-platform verification
-        if: needs.dco.outputs.docs_only != 'true'
+        if: needs.dco.outputs.cross_verify == 'true'
         run: mkdir -p verify-bin && cp target/ci/irmind verify-bin/irmind
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.dco.outputs.docs_only != 'true'
+        if: needs.dco.outputs.cross_verify == 'true'
         with: {name: verify-test-linux, path: verify-bin/, if-no-files-found: error}
-      - name: Build daily unsigned binary on main
+      - name: Build unsigned release binary for tag or nightly code change
         if: needs.dco.outputs.release_build == 'true'
         run: cargo build --release -p irmind --locked
-      - name: Check documented CLI commands against the built binary
-        if: needs.dco.outputs.docs_only != 'true'
+      - name: Check links and documented CLI commands against the built test binary
         run: python3 .github/scripts/check_docs.py --binary target/ci/irmind
       - name: Package unsigned binary and checksum
         if: needs.dco.outputs.release_build == 'true'
@@ -159,16 +93,16 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.release_build == 'true'
         with: {name: irmind-linux, path: dist/, if-no-files-found: error}
-      - if: needs.dco.outputs.docs_only != 'true'
+      - if: needs.dco.outputs.cross_verify == 'true'
         run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --all-features --profile ci --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.dco.outputs.docs_only != 'true'
+        if: needs.dco.outputs.cross_verify == 'true'
         with: {name: portable-export-linux, path: portable-export/, if-no-files-found: error}
       - name: Clean staging
-        if: ${{ always() && needs.dco.outputs.docs_only != 'true' }}
+        if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'portable-export', 'verify-bin')) if p.is_dir()]"
   windows:
-    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.linux.outputs.docs_only != 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')) }}
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' }}
     needs: [linux, dco]
     runs-on: windows-latest
     timeout-minutes: 120
@@ -183,15 +117,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
         with: {targets: x86_64-pc-windows-msvc}
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with: {key: windows-msvc-tests}
+        with:
+          key: windows-msvc-duckdb-${{ needs.dco.outputs.duckdb_version }}
+          cache-targets: true
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
       - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
       - name: Stage CLI test executable for cross-platform verification
+        if: needs.dco.outputs.cross_verify == 'true'
         run: mkdir -p verify-bin && cp target/x86_64-pc-windows-msvc/ci/irmind.exe verify-bin/irmind.exe
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.dco.outputs.cross_verify == 'true'
         with: {name: verify-test-windows, path: verify-bin/, if-no-files-found: error}
-      - name: Build daily unsigned binary on main
+      - name: Build unsigned release binary for tag or nightly code change
         if: needs.dco.outputs.release_build == 'true'
         run: cargo build --release -p irmind --locked
       - name: Package unsigned binary and checksum
@@ -207,19 +145,23 @@ jobs:
         if: needs.dco.outputs.release_build == 'true'
         with: {name: irmind-windows, path: dist/, if-no-files-found: error}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.dco.outputs.cross_verify == 'true'
         with: {name: portable-export-linux, path: foreign-export}
       - name: Verify Linux export on Windows
+        if: needs.dco.outputs.cross_verify == 'true'
         run: |
           ./verify-bin/irmind.exe verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
-      - run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --all-features --profile ci --locked
+      - if: needs.dco.outputs.cross_verify == 'true'
+        run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo test -p irmind --test verify_export_no_keyring portable_export_fixture --all-features --profile ci --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.dco.outputs.cross_verify == 'true'
         with: {name: portable-export-windows, path: portable-export/, if-no-files-found: error}
       - name: Clean staging
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export', 'portable-export', 'verify-bin')) if p.is_dir()]"
   linux_verify_windows:
-    if: ${{ !cancelled() && needs.windows.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')) }}
-    needs: windows
+    if: ${{ !cancelled() && needs.windows.result == 'success' && needs.dco.outputs.cross_verify == 'true' }}
+    needs: [windows, dco]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -232,7 +174,7 @@ jobs:
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('bin', 'foreign-export')) if p.is_dir()]"
   macos:
-    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.linux.outputs.docs_only != 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))) || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' }}
     needs: [linux, dco]
     runs-on: macos-latest
     timeout-minutes: 120
@@ -247,15 +189,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
         with: {targets: aarch64-apple-darwin}
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with: {key: macos-arm64-tests}
+        with:
+          key: macos-arm64-duckdb-${{ needs.dco.outputs.duckdb_version }}
+          cache-targets: true
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
       - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked --test-threads 4
       - name: Stage CLI test executable for cross-platform verification
+        if: needs.dco.outputs.cross_verify == 'true'
         run: mkdir -p verify-bin && cp target/aarch64-apple-darwin/ci/irmind verify-bin/irmind
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.dco.outputs.cross_verify == 'true'
         with: {name: verify-test-macos, path: verify-bin/, if-no-files-found: error}
-      - name: Build daily unsigned binary on main
+      - name: Build unsigned release binary for tag or nightly code change
         if: needs.dco.outputs.release_build == 'true'
         run: cargo build --release -p irmind --locked
       - name: Package unsigned binary and checksum
@@ -270,15 +216,17 @@ jobs:
         if: needs.dco.outputs.release_build == 'true'
         with: {name: irmind-macos-arm64, path: dist/, if-no-files-found: error}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.dco.outputs.cross_verify == 'true'
         with: {name: portable-export-linux, path: foreign-export}
       - name: Verify Linux export on macOS
+        if: needs.dco.outputs.cross_verify == 'true'
         run: verify-bin/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
       - name: Clean staging
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export', 'verify-bin')) if p.is_dir()]"
   macos_verify_windows:
-    if: ${{ !cancelled() && needs.macos.result == 'success' && needs.windows.result == 'success' }}
-    needs: [macos, windows]
+    if: ${{ !cancelled() && needs.macos.result == 'success' && needs.windows.result == 'success' && needs.dco.outputs.cross_verify == 'true' }}
+    needs: [macos, windows, dco]
     runs-on: macos-latest
     timeout-minutes: 15
     defaults:
