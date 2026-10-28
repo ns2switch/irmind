@@ -92,10 +92,10 @@ impl CaseRuntime<'_, '_, '_> {
                 .conversation
                 .push(Card::new(CardKind::Notice, "Activity", visible, false));
         }
-        for (title, result) in std::mem::take(&mut self.state.graph_results) {
+        for (title, result) in std::mem::take(&mut self.state.result_cards) {
             let visible = self
                 .engine
-                .screen_and_audit(self.id, &result, "GraphResult", None)?
+                .screen_and_audit(self.id, &result, title, None)?
                 .text;
             self.state
                 .conversation

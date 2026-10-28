@@ -13,6 +13,7 @@ The analyst controls the case, its scope, approvals, and signing key. Files, log
 ## What the build enforces
 
 - **Custody:** Original evidence is stored locally by SHA-256. Case changes and tool activity enter an append-only SQLite audit chain with Ed25519 signatures. Verification detects changed entries and evidence bytes.
+- **Diagnostics:** A private, size-bounded `diagnostics.log` records operation names, result categories, and durations. It is separate from custody, contains no evidence or tool arguments, and is not part of exports or verification.
 - **Separate identities:** Analyst and Agent have distinct signing keys in the selected backend. Only an analyst signature can resolve a pending approval. A sealed case has a separate signed operational chain for task cancellations; backend migrations enter a global signed operational chain.
 - **Guarded model input:** External text is normalized, screened for prompt injection, redacted for known secret and PII patterns, bounded, and wrapped as untrusted data. The original remains local. A startup self-test blocks the application if the guard's known corpus fails.
 - **Constrained connectors:** Credentials come from the explicitly selected secret backend through the composition root. Remote clients require HTTPS, except keyless HTTP to an explicit loopback model service. Redirects are disabled and responses are bounded.

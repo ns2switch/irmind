@@ -19,6 +19,7 @@ tokio-util = { version = "0.7", features = ["rt"] }
 futures-util = "0.3"
 secrecy = "0.10"
 url = "2"
+tracing = { version = "0.1", default-features = false, features = ["std"] }
 
 [lints]
 workspace = true

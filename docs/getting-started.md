@@ -43,6 +43,8 @@ The conversation fills the case workspace. Tool proposals, approvals, results, a
 
 Graph queries and local searches also appear as result cards. Long results start folded; select a card and press Enter or Space to expand it, then scroll within the conversation.
 
+With a configured SIEM, `/siem-alert` retrieves one scoped alert by ID. The result appears as a guarded, foldable card in the same conversation. `/help` shows the argument order.
+
 ![Conversation showing a synthetic CloudTrail case and a streaming model reply](assets/conversation.png)
 
 PgUp/PgDn and Ctrl+U/Ctrl+D scroll the focused view. Home/End or `g`/`G` in the conversation move to the start/end. New model text follows the end only while you are there; End clears the new-content indicator. Up/Down recall prompts. `/help` or `?` lists commands and shortcuts. Mouse wheel scrolling is enabled by default. To keep terminal text selection, set `mouse_capture = false` in [configuration](configuration.md) and accept the file change in the TUI.

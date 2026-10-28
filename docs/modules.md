@@ -46,13 +46,15 @@ Modules are compiled into the binary. In the TUI, press `m` to select a compiled
 
 ## Splunk
 
-**Does:** Searches events from one configured index and returns bounded evidence. The agent submits a literal search term, not free-form SPL.
+**Does:** Searches events from one configured index and retrieves an alert record by exact ID. Both return bounded evidence. The agent submits values, not free-form SPL.
 
 **Permission:** A dedicated read-only token with search access only to the configured index. Do not grant lookup writes, alert actions, or external output commands.
 
-**Configure:** Build with `--features siem-splunk`. Set `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, and `IRMIND_SPLUNK_ACCOUNT_FIELD`. Store `IRMIND_SPLUNK_TOKEN`, then enable `--enable-splunk`. Include the source, account, and UTC window in the case scope.
+**Configure:** Build with `--features siem-splunk`. Set `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, and `IRMIND_SPLUNK_ACCOUNT_FIELD`. Set optional `IRMIND_SPLUNK_ALERT_ID_FIELD` if the index uses a field other than `alert_id`. Store `IRMIND_SPLUNK_TOKEN`, then enable `--enable-splunk`. Include the source, account, and UTC window in the case scope. In the case TUI, `/siem-alert <source> <account> <alert-id> <from-UTC> <to-UTC>` retrieves one alert through the same policy and custody path as model proposals.
 
-**Limits:** The module fixes index and time bounds server-side, caps results, requires HTTPS, and refuses unsafe or ambiguous queries. It does not expose general SPL.
+**Limits:** The module fixes index and time bounds server-side, caps results, requires HTTPS, and refuses unsafe or ambiguous queries. Alert lookup searches the configured index and alert ID field; it does not call a separate Splunk alert-management API. It does not expose general SPL.
+
+The module uses Splunk's [search export endpoint](https://help.splunk.com/en/splunk-enterprise/rest-api-reference/10.0/search-endpoints/search-endpoint-descriptions) and a generated [field-value search](https://help.splunk.com/en/splunk-enterprise/search/spl2-search-reference/search-command/search-command-usage).
 
 ## AWS CloudTrail and IAM
 

@@ -109,10 +109,17 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                             Some(Confirmation::Seal(Box::new(preview), summary));
                     }
                     if label != "IRMind" {
-                        update(
-                            &mut self.state,
-                            CaseMessage::TaskFinished(format!("{label}: {text}")),
-                        );
+                        if label == "SIEM alert"
+                            && !text.starts_with("approval pending:")
+                            && !text.starts_with("denied:")
+                        {
+                            self.state.result_cards.push(("SIEM alert", text));
+                        } else {
+                            update(
+                                &mut self.state,
+                                CaseMessage::TaskFinished(format!("{label}: {text}")),
+                            );
+                        }
                     }
                 }
                 Err(irmind_app::AppError::Cancelled) => {

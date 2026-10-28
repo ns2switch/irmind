@@ -248,48 +248,6 @@ impl Engine<'_> {
         Ok(())
     }
 
-    async fn complete_model_request(
-        &self,
-        id: &CaseId,
-        model: &dyn LlmPort,
-        request: CompletionRequest,
-        cancel: &CancellationToken,
-        on_text: &(dyn Fn(&str) + Send + Sync),
-    ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
-        match tokio::select! {
-            biased;
-            () = cancel.cancelled() => Err(AppError::Cancelled),
-            answer = async {
-                let events = model.complete(request, cancel).await?;
-                collect_model_stream_with_progress(events, cancel, on_text).await
-            } => answer,
-        } {
-            Ok(answer) => Ok(answer),
-            Err(AppError::Cancelled) => {
-                self.audit_local(
-                    id,
-                    crate::AuditOrigin::System,
-                    irmind_domain::AuditEventKind::Cancelled,
-                    "model request cancelled",
-                    None,
-                )
-                .await?;
-                Err(AppError::Cancelled)
-            }
-            Err(error) => {
-                self.audit_local(
-                    id,
-                    crate::AuditOrigin::System,
-                    irmind_domain::AuditEventKind::ModelError,
-                    &error.to_string(),
-                    None,
-                )
-                .await?;
-                Err(error)
-            }
-        }
-    }
-
     fn prepare_investigation_local(
         &self,
         id_owned: &CaseId,

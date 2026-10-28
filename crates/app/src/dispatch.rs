@@ -9,14 +9,66 @@ use crate::{
 };
 
 impl Engine<'_> {
+    pub fn request_tool_as_analyst(
+        &self,
+        id: &CaseId,
+        proposal: ProposedCall,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        crate::run_async(self.request_tool_as_analyst_cancelable(id, proposal, cancel))
+    }
+
+    pub async fn request_tool_as_analyst_cancelable(
+        &self,
+        id: &CaseId,
+        proposal: ProposedCall,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        if self.mode != irmind_domain::ExecutionMode::Attended
+            || self.signer.actor() != irmind_domain::Actor::Analyst
+        {
+            return Err(AppError::Policy(
+                "manual tool request requires an attended analyst".into(),
+            ));
+        }
+        let id_owned = id.clone();
+        let _case_lock = self
+            .blocking_local(move |local| local.repo.lock_case(&id_owned))
+            .await?;
+        let id_owned = id.clone();
+        let local_cancel = cancel.clone();
+        let case = self
+            .blocking_local(move |local| {
+                local.verify_unlocked_cancelable(&id_owned, &local_cancel)?;
+                local.repo.get_case(&id_owned)
+            })
+            .await?;
+        if case.sealed {
+            return Err(AppError::Sealed);
+        }
+        self.execute_proposal_from_origin(&case, proposal, crate::AuditOrigin::Analyst, cancel)
+            .await
+    }
+
     pub(crate) async fn execute_proposal(
         &self,
         case: &Case,
         proposal: ProposedCall,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        self.execute_proposal_from_origin(case, proposal, crate::AuditOrigin::Model, cancel)
+            .await
+    }
+
+    async fn execute_proposal_from_origin(
+        &self,
+        case: &Case,
+        proposal: ProposedCall,
+        origin: crate::AuditOrigin,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
         let id = &case.id;
-        let decision = self.evaluate_model_proposal(case, proposal).await?;
+        let decision = self.evaluate_proposal(case, proposal, origin).await?;
         match decision {
             Decision::Deny(reason) => {
                 self.audit_local(
@@ -68,10 +120,11 @@ impl Engine<'_> {
         }
     }
 
-    async fn evaluate_model_proposal(
+    async fn evaluate_proposal(
         &self,
         case: &Case,
         proposal: ProposedCall,
+        origin: crate::AuditOrigin,
     ) -> Result<Decision, AppError> {
         let proposal_payload = format!("{} {:?}", proposal.tool.as_str(), proposal.args);
         let case_owned = case.clone();
@@ -79,7 +132,7 @@ impl Engine<'_> {
             let id = &case_owned.id;
             local.audit(
                 id,
-                crate::AuditOrigin::Model,
+                origin,
                 irmind_domain::AuditEventKind::Proposal,
                 &proposal_payload,
                 None,
@@ -92,23 +145,35 @@ impl Engine<'_> {
                 .audit_log
                 .last_entry(id)?
                 .map_or(1, |entry| entry.seq + 1);
-            let tainted = Tainted::from_external(
-                proposal,
-                Provenance::new(
-                    sha256(proposal_payload.as_bytes()),
-                    None,
-                    SourceKind::ModelProposal,
-                ),
-            );
-            Ok(irmind_domain::evaluate_tainted_with_rules(
-                &case_owned,
-                tainted,
-                next_seq,
-                local.mode,
-                local.turn_has_detections(id)?,
-                local.clock.now()?,
-                &local.policy,
-            ))
+            let now = local.clock.now()?;
+            if origin == crate::AuditOrigin::Model {
+                let tainted = Tainted::from_external(
+                    proposal,
+                    Provenance::new(
+                        sha256(proposal_payload.as_bytes()),
+                        None,
+                        SourceKind::ModelProposal,
+                    ),
+                );
+                Ok(irmind_domain::evaluate_tainted_with_rules(
+                    &case_owned,
+                    tainted,
+                    next_seq,
+                    local.mode,
+                    local.turn_has_detections(id)?,
+                    now,
+                    &local.policy,
+                ))
+            } else {
+                Ok(irmind_domain::evaluate_with_rules(
+                    &case_owned,
+                    proposal,
+                    next_seq,
+                    local.mode,
+                    now,
+                    &local.policy,
+                ))
+            }
         })
         .await
     }
@@ -130,7 +195,9 @@ impl Engine<'_> {
 
     fn source_unavailable_reason(&self, tool: &Tool, source: Option<&str>) -> Option<&'static str> {
         match tool {
-            Tool::SiemSearch if !self.siem_available(source) => Some("SIEM source unavailable"),
+            Tool::SiemSearch | Tool::SiemGetAlert if !self.siem_available(source) => {
+                Some("SIEM source unavailable")
+            }
             Tool::CloudAuditEvents | Tool::CloudIdentity if !self.cloud_available(source) => {
                 Some("cloud audit source unavailable")
             }

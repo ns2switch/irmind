@@ -21,14 +21,36 @@ pub fn run_siem_contract(port: &dyn SiemPort) -> Result<(), String> {
     };
     let call = contract_call(Tool::SiemSearch, port.source_id(), args(port.source_id()))?;
     let wrong = contract_call(Tool::SiemSearch, "other-source", args("other-source"))?;
+    let alert_args = |source: &str| {
+        BTreeMap::from([
+            ("source".into(), source.into()),
+            ("account".into(), "123456789012".into()),
+            ("from".into(), FROM.into()),
+            ("to".into(), TO.into()),
+            ("alert_id".into(), "synthetic-alert-1".into()),
+        ])
+    };
+    let alert = contract_call(
+        Tool::SiemGetAlert,
+        port.source_id(),
+        alert_args(port.source_id()),
+    )?;
+    let wrong_alert = contract_call(
+        Tool::SiemGetAlert,
+        "other-source",
+        alert_args("other-source"),
+    )?;
     contract_runtime()?.block_on(async {
         let cancelled = CancellationToken::new();
         cancelled.cancel();
         if !matches!(
             port.execute(&call, &cancelled).await,
             Err(AppError::Cancelled)
+        ) || !matches!(
+            port.execute(&alert, &cancelled).await,
+            Err(AppError::Cancelled)
         ) {
-            return Err("SIEM did not cancel a scoped search".into());
+            return Err("SIEM did not cancel a scoped read".into());
         }
         if port
             .execute(&wrong, &CancellationToken::new())
@@ -37,8 +59,39 @@ pub fn run_siem_contract(port: &dyn SiemPort) -> Result<(), String> {
         {
             return Err("SIEM accepted another source".into());
         }
+        if port
+            .execute(&wrong_alert, &CancellationToken::new())
+            .await
+            .is_ok()
+        {
+            return Err("SIEM accepted another source for an alert".into());
+        }
         Ok(())
     })
+}
+
+pub fn run_siem_alert_recorded(
+    port: &dyn SiemPort,
+    server: MockServer,
+    expected_body: &[u8],
+) -> Result<Vec<RecordedRequest>, String> {
+    let call = contract_call(
+        Tool::SiemGetAlert,
+        port.source_id(),
+        BTreeMap::from([
+            ("source".into(), port.source_id().into()),
+            ("account".into(), "123456789012".into()),
+            ("from".into(), FROM.into()),
+            ("to".into(), TO.into()),
+            ("alert_id".into(), "synthetic-alert-1".into()),
+        ]),
+    )?;
+    let result = contract_runtime()?.block_on(port.execute(&call, &CancellationToken::new()));
+    let requests = server.finish()?;
+    if result.map_err(|error| error.to_string())? != expected_body {
+        return Err("SIEM recorded alert differs".into());
+    }
+    Ok(requests)
 }
 
 pub fn run_siem_recorded(

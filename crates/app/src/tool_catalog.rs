@@ -79,6 +79,11 @@ fn remote_catalog() -> Vec<ToolSpec> {
             parameters: json!({"type":"object","properties":{"source":{"type":"string"},"account":{"type":"string"},"from":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"to":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"query":{"type":"string","description":"One literal term, no SPL operators"}},"required":["source","account","from","to","query"],"additionalProperties":false}),
         },
         ToolSpec {
+            name: "siem_get_alert",
+            description: "Retrieve one alert record by exact alert ID from a configured SIEM source within a scoped account and UTC window; the module builds the bounded query",
+            parameters: json!({"type":"object","properties":{"source":{"type":"string"},"account":{"type":"string"},"from":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"to":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"alert_id":{"type":"string","description":"Exact alert ID, not a query"}},"required":["source","account","from","to","alert_id"],"additionalProperties":false}),
+        },
+        ToolSpec {
             name: "cloud_audit_events",
             description: "Read at most 20 CloudTrail management events by exact event name from a scoped AWS account and UTC window of at most 24 hours",
             parameters: json!({"type":"object","properties":{"source":{"type":"string"},"account":{"type":"string","description":"12-digit AWS account ID"},"project":{"type":"string","description":"Cloud project ID where supported by the configured connector"},"from":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"to":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"event_name":{"type":"string","description":"Exact API event name, e.g. AssumeRole"}},"required":["source","from","to","event_name"],"oneOf":[{"required":["account"]},{"required":["project"]}],"additionalProperties":false}),
@@ -142,6 +147,6 @@ mod tests {
                 }
             }
         }
-        assert_eq!(specs.len(), 18);
+        assert_eq!(specs.len(), 19);
     }
 }

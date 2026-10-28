@@ -7,10 +7,10 @@ pub use async_trait::async_trait;
 use futures_util::{Stream, StreamExt};
 use irmind_domain::{
     Actor, AnalystApprovalVerifier, AuthorizedCall, Decision, DeclassificationAuthority,
-    ExecutionMode, PendingApproval, PolicyRules, ProposedCall, Tainted, Tool,
+    ExecutionMode, PendingApproval, PolicyRules, Tainted,
 };
 pub use irmind_domain::{
-    AuditEventKind, Case, CaseId, CaseScope, Provenance, Severity, SourceKind,
+    AuditEventKind, Case, CaseId, CaseScope, ProposedCall, Provenance, Severity, SourceKind, Tool,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -25,6 +25,7 @@ mod approvals;
 mod audit_origin;
 mod configuration;
 mod custody;
+mod diagnostics;
 mod dispatch;
 mod engine;
 pub use adapter_storage_errors::AdapterStorageError;

@@ -118,7 +118,9 @@ impl SiemPort for FakeSiem {
         call: &irmind_domain::AuthorizedCall,
         _cancel: &CancellationToken,
     ) -> Result<Vec<u8>, AppError> {
-        if call.tool() != &Tool::SiemSearch || call.arg("source") != Some("splunk-prod") {
+        if !matches!(call.tool(), Tool::SiemSearch | Tool::SiemGetAlert)
+            || call.arg("source") != Some("splunk-prod")
+        {
             return Err(AppError::Policy("unexpected SIEM call".into()));
         }
         *self.calls.lock().map_err(storage)? += 1;

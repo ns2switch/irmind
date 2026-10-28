@@ -2,6 +2,7 @@ use crate::*;
 
 mod cases;
 mod investigation;
+mod model_request;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -290,7 +291,7 @@ impl Engine<'_> {
         let mut tools: Vec<_> = tool_catalog::catalog()
             .into_iter()
             .filter(|spec| match spec.name {
-                "siem_search" => !self.siems.is_empty(),
+                "siem_search" | "siem_get_alert" => !self.siems.is_empty(),
                 "cloud_audit_events" | "cloud_identity" => !self.cloud_audits.is_empty(),
                 "edr_host_info" => self
                     .edrs
