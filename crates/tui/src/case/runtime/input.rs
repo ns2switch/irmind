@@ -339,7 +339,7 @@ impl CaseRuntime<'_, '_, '_> {
             if code == KeyCode::Char('y') {
                 self.state.input = match &pending {
                     Confirmation::Seal(_, _) => "/seal".into(),
-                    Confirmation::Export(path, _) => format!("/export {}", path.to_string_lossy()),
+                    Confirmation::Export(command, _) => command.clone(),
                     Confirmation::Finding(id, _) => format!("/confirm {id}"),
                 };
                 if !matches!(pending, Confirmation::Finding(_, _)) {

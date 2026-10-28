@@ -37,6 +37,8 @@ Migration first fully verifies the legacy chain and every copied evidence blob. 
 
 Export v4 is a bounded-memory, length-prefixed streaming package containing the audit chain, signed source manifest and Parquet metadata, seal, signed operational chain, and optionally the original bytes. `verify-export` validates the signatures and package structure without a keyring. When originals are omitted it reports **manifest verified; source bytes unavailable**, never **evidence verified**. Legacy v3 packages retain their existing verifier. Package paths are relative slash-separated names and cannot contain traversal or symlinks.
 
+In the TUI, `/export` creates a manifest-only v4 package. `/export --with-originals <source-root>` explicitly includes the original bytes and shows that choice and the root in the confirmation dialog. It uses the same application export use case as the automation CLI.
+
 The export-verification result reports format version, signed source count, verified source-byte count, and sources whose bytes are unavailable in the package. The legacy v3 call remains available for compatibility.
 
 ## Benchmark storage

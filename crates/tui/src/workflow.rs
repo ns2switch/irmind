@@ -313,13 +313,37 @@ impl CaseWorkflow<'_, '_> {
         path: &Path,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        self.export_with_options(id, path, None, false, cancel)
+    }
+
+    pub(crate) fn export_with_options(
+        &self,
+        id: &CaseId,
+        path: &Path,
+        source_root: Option<&Path>,
+        include_originals: bool,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
         if self.has_source_manifests(id)? || self.has_parquet_artifacts(id)? {
             let exporter = self
                 .io_ops
                 .large_case_exporter()
                 .ok_or(AppError::Policy("large-case export is unavailable".into()))?;
-            irmind_app::export_case_v4(self.engine, exporter, id, path, None, false, cancel)
+            irmind_app::export_case_v4(
+                self.engine,
+                exporter,
+                id,
+                path,
+                source_root,
+                include_originals,
+                cancel,
+            )
         } else {
+            if include_originals {
+                return Err(AppError::Policy(
+                    "this case already uses the copied-evidence export format".into(),
+                ));
+            }
             irmind_app::export_case(self.engine, self.io_ops.case_exporter(), id, path, cancel)
         }
     }

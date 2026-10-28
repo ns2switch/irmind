@@ -51,7 +51,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "export",
-        description: "Export this case",
+        description: "Export case; optional originals with --with-originals <source-root>",
         shortcut: "",
         slash: true,
     },

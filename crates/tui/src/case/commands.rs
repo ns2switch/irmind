@@ -1,11 +1,10 @@
 use super::command_registry;
 use super::conversation::{Card, CardKind};
 use super::runtime::CaseRuntime;
-use super::{
-    CaseWorkflow, Confirmation, FindingKind, PathBuf, PathPicker, Result, confirmation_summary,
-    parse_approval_args,
-};
+use super::{CaseWorkflow, FindingKind, PathBuf, PathPicker, Result, parse_approval_args};
 use irmind_app::CaseScope;
+
+mod export;
 
 impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     pub(super) fn submit(&mut self, prompt: String) -> Result<bool> {
@@ -187,63 +186,6 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                     .verify_parquet_rebuild(id, &root, &cancel)
                     .map(|count| format!("Rebuilt and compared {count} Parquet sources"))
             });
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    fn seal_or_export_command(&mut self, prompt: &str) -> Result<bool> {
-        if prompt == "/seal" {
-            if let Some(Confirmation::Seal(preview, _)) = self.state.confirmed_action.take() {
-                let workflow = self.workflow();
-                self.start_task("Seal", move |cancel| {
-                    if cancel.is_cancelled() {
-                        return Err(irmind_app::AppError::Cancelled);
-                    }
-                    workflow.seal_prepared(&preview)?;
-                    Ok("Case sealed".into())
-                });
-            } else {
-                let workflow = self.workflow();
-                let id = self.id;
-                let sender = self.seal_tx.clone();
-                self.start_task("Prepare seal", move |cancel| {
-                    let preview = workflow.prepare_seal(id, &cancel)?;
-                    sender.send(preview).map_err(|_| {
-                        irmind_app::AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
-                            irmind_app::AdapterStorageError::SealPreviewUIUnavailable,
-                        ))
-                    })?;
-                    Ok("review the signed preview".into())
-                });
-            }
-            return Ok(true);
-        }
-        if prompt == "/export" || prompt.starts_with("/export ") {
-            let path = prompt.strip_prefix("/export ").map_or_else(
-                || PathBuf::from(format!("{}.irmind.json", self.id.as_str())),
-                PathBuf::from,
-            );
-            if let Some(Confirmation::Export(approved, _)) = self.state.confirmed_action.take()
-                && approved == path
-            {
-                let workflow = self.workflow();
-                let id = self.id;
-                self.start_task("Export", move |cancel| {
-                    if cancel.is_cancelled() {
-                        return Err(irmind_app::AppError::Cancelled);
-                    }
-                    workflow
-                        .export(id, &path, &cancel)
-                        .map(|fingerprint| format!("Exported case; analyst key {fingerprint}"))
-                });
-            } else {
-                let summary = confirmation_summary(self.engine, self.id, "Export")?;
-                self.state.confirmation = Some(Confirmation::Export(
-                    path.clone(),
-                    format!("{summary}\nDestination: {}", path.display()),
-                ));
-            }
             return Ok(true);
         }
         Ok(false)
