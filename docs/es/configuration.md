@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 1062ed9ecebb5f0c6cbe3fbccb335de723e20dbe; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 170dd1fdae1738e7a1a347a2e98c850cf1d4a400; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -126,6 +126,6 @@ Con `os`, las claves de firma usan otro servicio, `irmind`: `local-analyst` y `l
 
 ## Elegir un modelo
 
-No se selecciona ningún proveedor por defecto. En la TUI, pulsa `m`, selecciona el módulo compatible con OpenAI, edita `IRMIND_MODEL` y `IRMIND_LLM_BASE_URL`, y pulsa Enter. Confirma el cambio de destino. Para automatización, `--llm-module` y las variables de entorno correspondientes prevalecen sobre los ajustes guardados durante esa ejecución.
+No se selecciona ningún proveedor por defecto. En la TUI, escribe `/model` para elegir Ollama o un proveedor remoto, selecciona el modelo, prueba opcionalmente la conexión con texto sintético y confirma cualquier salida remota de datos. Usa `/modules` y `/edit-param` para los ajustes públicos avanzados. Para automatización, `--llm-module` y las variables de entorno correspondientes prevalecen sobre los ajustes guardados durante esa ejecución.
 
 Un servicio local sin clave puede usar HTTP solo en loopback; también admite HTTPS. Los servicios remotos requieren HTTPS y una clave propia del destino. Una URL personalizada nunca hereda `OPENAI_API_KEY`. Consulta [módulos](modules.md) para elegir otros proveedores compilados. Comprueba la retención, la región de procesamiento y la clasificación de datos antes de cualquier conexión externa.
