@@ -5,6 +5,7 @@ pub(super) enum Confirmation {
     Seal(Box<SealPreview>, String),
     Export(String, String),
     Finding(String, String),
+    ObjectRead(String, String),
 }
 
 pub(super) fn seal_confirmation(preview: &SealPreview) -> String {

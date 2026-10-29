@@ -13,6 +13,7 @@ serde_json = "1"
 ed25519-dalek = "2"
 secrecy = "0.10"
 tokio = { version = "1", default-features = false, features = ["rt", "time"] }
+futures-util = "0.3"
 
 [dev-dependencies]
 cargo_metadata = "0.19"

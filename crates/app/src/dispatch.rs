@@ -1,5 +1,7 @@
 mod execution;
+mod listing;
 mod local;
+mod object_read;
 mod remote;
 
 use crate::{
@@ -211,6 +213,11 @@ impl Engine<'_> {
             }
             Tool::ObjectList | Tool::ObjectRead if !self.object_source_available(source) => {
                 Some("object source unavailable")
+            }
+            Tool::ObjectRead
+                if self.large_case_store.is_none() || self.streaming_parser.is_none() =>
+            {
+                Some("large case pipeline unavailable")
             }
             _ => None,
         }

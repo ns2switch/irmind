@@ -10,6 +10,8 @@ const SCOPED_TOOLS: &[Tool] = &[
     Tool::EdrHostInfo,
     Tool::EdrProcessTree,
     Tool::EdrDetections,
+    Tool::ObjectList,
+    Tool::ObjectRead,
 ];
 
 fn is_scoped(tool: &Tool) -> bool {
@@ -48,6 +50,8 @@ pub(super) fn scope_gate(case: &Case, proposal: &ProposedCall) -> Gate {
     };
     if in_scope(&scope, proposal) {
         Gate::Continue
+    } else if matches!(proposal.tool, Tool::ObjectList | Tool::ObjectRead) {
+        Gate::Deny("object outside case scope")
     } else {
         Gate::Approval
     }
@@ -77,8 +81,33 @@ pub(super) fn in_scope(scope: &CaseScope, proposal: &ProposedCall) -> bool {
         Tool::EdrHostInfo | Tool::EdrProcessTree | Tool::EdrDetections => {
             scoped_edr(scope, proposal)
         }
+        Tool::ObjectList | Tool::ObjectRead => scoped_object(scope, proposal),
         _ => false,
     }
+}
+
+fn scoped_object(scope: &CaseScope, proposal: &ProposedCall) -> bool {
+    let Some(source) = proposal.args.get("source") else {
+        return false;
+    };
+    let Some(scheme) = proposal.args.get("scheme") else {
+        return false;
+    };
+    let Some(container) = proposal.args.get("container") else {
+        return false;
+    };
+    let Some(path) = proposal.args.get(if proposal.tool == Tool::ObjectList {
+        "prefix"
+    } else {
+        "key"
+    }) else {
+        return false;
+    };
+    let (Some(from), Some(to)) = (proposal.args.get("from"), proposal.args.get("to")) else {
+        return false;
+    };
+    let uri = format!("{scheme}://{container}/{path}");
+    scope.allows_object(source, &uri, from, to)
 }
 
 fn scoped_event(scope: &CaseScope, proposal: &ProposedCall) -> bool {

@@ -24,6 +24,9 @@ pub struct PolicyRules {
     pub max_tool_calls_per_case: usize,
     pub max_model_result_bytes: usize,
     pub max_model_tokens_per_case: u64,
+    pub max_object_read_bytes: u64,
+    pub max_object_bytes_per_case: u64,
+    pub object_transfer_approval_bytes: u64,
 }
 
 impl Default for PolicyRules {
@@ -34,6 +37,9 @@ impl Default for PolicyRules {
             max_tool_calls_per_case: 100,
             max_model_result_bytes: 10_000,
             max_model_tokens_per_case: 200_000,
+            max_object_read_bytes: 1_073_741_824,
+            max_object_bytes_per_case: 536_870_912_000,
+            object_transfer_approval_bytes: 67_108_864,
         }
     }
 }
@@ -46,6 +52,12 @@ impl PolicyRules {
             || self.max_model_result_bytes > 100_000
             || self.max_model_tokens_per_case == 0
             || self.max_model_tokens_per_case > 10_000_000
+            || self.max_object_read_bytes == 0
+            || self.max_object_read_bytes > 1_073_741_824
+            || self.max_object_bytes_per_case < self.max_object_read_bytes
+            || self.max_object_bytes_per_case > 10_995_116_277_760
+            || self.object_transfer_approval_bytes == 0
+            || self.object_transfer_approval_bytes > self.max_object_read_bytes
         {
             return Err(DomainError::InvalidPolicy);
         }
@@ -53,9 +65,9 @@ impl PolicyRules {
             let CaseScope::Remote { version, .. } = scope else {
                 return Err(DomainError::InvalidPolicy);
             };
-            if !matches!(*version, 1 | 2)
+            if !matches!(*version, 1..=3)
                 || scope
-                    .to_v2_string()
+                    .to_current_string()
                     .ok()
                     .and_then(|encoded| CaseScope::parse(&encoded).ok())
                     .is_none()
@@ -227,7 +239,13 @@ pub fn evaluate_tainted_with_rules(
     {
         return Decision::Deny("outside organization policy scope");
     }
-    evaluate_tainted(case, proposal, decision_seq, mode, turn_has_detections, now)
+    let transfer = transfer_gate(&proposal.value, rules);
+    if let Gate::Deny(reason) = transfer {
+        return Decision::Deny(reason);
+    }
+    let proposal_value = proposal.value.clone();
+    let decision = evaluate_tainted(case, proposal, decision_seq, mode, turn_has_detections, now);
+    apply_transfer_approval(case, proposal_value, decision_seq, now, transfer, decision)
 }
 
 pub fn evaluate_with_rules(
@@ -245,7 +263,58 @@ pub fn evaluate_with_rules(
     {
         return Decision::Deny("outside organization policy scope");
     }
-    evaluate(case, proposal, decision_seq, mode, now)
+    let transfer = transfer_gate(&proposal, rules);
+    if let Gate::Deny(reason) = transfer {
+        return Decision::Deny(reason);
+    }
+    let proposal_value = proposal.clone();
+    let decision = evaluate(case, proposal, decision_seq, mode, now);
+    apply_transfer_approval(case, proposal_value, decision_seq, now, transfer, decision)
+}
+
+fn transfer_gate(proposal: &ProposedCall, rules: &PolicyRules) -> Gate {
+    if proposal.tool != Tool::ObjectRead {
+        return Gate::Continue;
+    }
+    let Some(bytes) = proposal
+        .args
+        .get("max_bytes")
+        .and_then(|value| value.parse::<u64>().ok())
+    else {
+        return Gate::Deny("invalid object transfer size");
+    };
+    if bytes > rules.max_object_read_bytes {
+        Gate::Deny("object exceeds policy read limit")
+    } else if bytes > rules.object_transfer_approval_bytes
+        || proposal
+            .args
+            .get("copy_original")
+            .is_some_and(|value| value == "true")
+    {
+        Gate::Approval
+    } else {
+        Gate::Continue
+    }
+}
+
+fn apply_transfer_approval(
+    case: &Case,
+    proposal: ProposedCall,
+    decision_seq: u64,
+    now: u64,
+    transfer: Gate,
+    decision: Decision,
+) -> Decision {
+    if matches!(transfer, Gate::Approval) && matches!(decision, Decision::Allow(_)) {
+        Decision::NeedsApproval(PendingApproval::new(
+            case.id.clone(),
+            proposal,
+            decision_seq,
+            now,
+        ))
+    } else {
+        decision
+    }
 }
 
 pub fn evaluate_with_context(

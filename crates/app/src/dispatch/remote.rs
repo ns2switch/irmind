@@ -1,6 +1,19 @@
-use crate::{AppError, AuthorizedCall, CancellationToken, Engine, Tool};
+use crate::{AppError, AuthorizedCall, CancellationToken, Engine, ObjectSourceOutput, Tool};
 
 impl Engine<'_> {
+    pub(crate) async fn dispatch_object_source(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &CancellationToken,
+    ) -> Result<ObjectSourceOutput, AppError> {
+        let source = call.arg("source").ok_or(AppError::RemoteTool)?;
+        let port = self
+            .object_sources
+            .iter()
+            .find(|port| port.source_id() == source)
+            .ok_or(AppError::RemoteTool)?;
+        port.execute(call, cancel).await
+    }
     pub(crate) fn object_source_available(&self, source: Option<&str>) -> bool {
         source.is_some_and(|source| {
             self.object_sources

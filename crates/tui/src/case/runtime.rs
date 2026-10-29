@@ -123,7 +123,12 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                         self.state.confirmation =
                             Some(Confirmation::Seal(Box::new(preview), summary));
                     }
-                    if label != "IRMind" && label != "Ingest" {
+                    if label == "Cloud objects" && self.capture_object_listing().is_err() {
+                        self.state.messages.push(
+                            "Cloud object listing could not be displayed safely; retry or narrow the prefix".into(),
+                        );
+                    }
+                    if label != "IRMind" && label != "Ingest" && label != "Cloud objects" {
                         if is_result_card_label(label)
                             && !text.starts_with("approval pending:")
                             && !text.starts_with("denied:")
@@ -218,6 +223,8 @@ fn is_result_card_label(label: &str) -> bool {
     matches!(
         label,
         "SIEM alert"
+            | "Cloud objects"
+            | "Cloud object"
             | "Entity lookup"
             | "Graph neighbors"
             | "Entity timeline"

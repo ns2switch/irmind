@@ -157,6 +157,16 @@ fn remote_catalog() -> Vec<ToolSpec> {
             description: "Look up a public IOC with external threat intelligence. This always pauses for analyst approval; querying can disclose the IOC to the provider.",
             parameters: json!({"type":"object","properties":{"ioc":{"type":"string","description":"Public IPv4, domain, or file hash"}},"required":["ioc"],"additionalProperties":false}),
         },
+        ToolSpec {
+            name: "object_list",
+            description: "List at most 1000 versioned cloud objects under an approved bucket or container prefix and UTC modification window. A truncated listing must be narrowed before ingestion.",
+            parameters: json!({"type":"object","properties":{"source":{"type":"string"},"scheme":{"type":"string","enum":["s3","gs","az"]},"container":{"type":"string"},"prefix":{"type":"string"},"from":{"type":"string"},"to":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":1000}},"required":["source","scheme","container","prefix","from","to","limit"],"additionalProperties":false}),
+        },
+        ToolSpec {
+            name: "object_read",
+            description: "Read one previously listed, versioned object inside the signed case scope, bounded by bytes and a UTC modification window. Large transfers require analyst approval. The original is hashed while streamed and converted locally to Parquet; raw bytes never enter the model context.",
+            parameters: json!({"type":"object","properties":{"source":{"type":"string"},"scheme":{"type":"string","enum":["s3","gs","az"]},"container":{"type":"string"},"key":{"type":"string"},"from":{"type":"string"},"to":{"type":"string"},"version":{"type":"string"},"etag":{"type":"string"},"max_bytes":{"type":"integer","minimum":1,"maximum":1_073_741_824},"copy_original":{"type":"string","enum":["false","true"]}},"required":["source","scheme","container","key","from","to","max_bytes"],"anyOf":[{"required":["version"]},{"required":["etag"]}],"additionalProperties":false}),
+        },
     ]
 }
 
@@ -186,7 +196,7 @@ mod tests {
                 }
             }
         }
-        assert_eq!(specs.len(), 19);
+        assert_eq!(specs.len(), 21);
     }
 
     #[test]

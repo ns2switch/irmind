@@ -20,6 +20,18 @@ pub(super) const COMMANDS: &[Command] = &[
         slash: true,
     },
     Command {
+        name: "objects",
+        description: "List scoped cloud objects with an estimated transfer size",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
+        name: "object-read",
+        description: "Confirm a numbered cloud object; --copy-original keeps a local copy",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
         name: "verify",
         description: "Verify custody; add a source root for large cases",
         shortcut: "",

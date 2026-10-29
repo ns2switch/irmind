@@ -27,7 +27,11 @@ impl Engine<'_> {
         approved: bool,
         cancel: &CancellationToken,
     ) -> Result<(String, String), AppError> {
-        let payload = format!("{} {:?}", call.tool().as_str(), call.proposal_args());
+        let payload = if call.tool() == &Tool::ObjectRead {
+            self.object_reservation_payload(id, call).await?
+        } else {
+            format!("{} {:?}", call.tool().as_str(), call.proposal_args())
+        };
         let (origin, kind) = if approved {
             (
                 crate::AuditOrigin::Analyst,
@@ -40,6 +44,9 @@ impl Engine<'_> {
             )
         };
         self.audit_local(id, origin, kind, &payload, None).await?;
+        if call.tool() == &Tool::ObjectRead {
+            return self.execute_object_read(id, call, cancel).await;
+        }
         let local_tool = matches!(
             call.tool(),
             Tool::EvidenceSearch
@@ -197,6 +204,11 @@ impl Engine<'_> {
                         .threat_intel
                         .ok_or(AppError::Fixed(crate::FixedAppError::PolicyExternalIntelUnavailable))?
                         .execute(call, cancel).await?,
+                    Tool::ObjectList => match self.dispatch_object_source(call, cancel).await? {
+                        crate::ObjectSourceOutput::Listing { objects, total_bytes, truncated } =>
+                            super::listing::validated_listing(call, &objects, total_bytes, truncated)?,
+                        crate::ObjectSourceOutput::Object { .. } => return Err(AppError::RemoteTool),
+                    },
                     _ => return Err(AppError::Fixed(crate::FixedAppError::PolicyInvalidRemoteTool)),
                     })
                 } => result,

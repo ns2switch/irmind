@@ -46,8 +46,11 @@ impl<'a> Engine<'a> {
             edrs: Vec::new(),
             internal_intel: Vec::new(),
             object_sources: Vec::new(),
+            large_case_store: None,
+            streaming_parser: None,
             pricing: None,
             verified_cases: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            object_progress: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         };
         engine.verify_global_operations()?;
         Ok(engine)

@@ -2,7 +2,7 @@ use crate::{CaseId, DomainError};
 
 mod scope;
 pub use scope::CaseScope;
-pub(crate) use scope::{valid_scope_target, valid_scope_time};
+pub(crate) use scope::{valid_object_scope, valid_scope_target, valid_scope_time};
 
 #[derive(Clone, Debug)]
 pub struct Case {

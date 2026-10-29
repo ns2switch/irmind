@@ -3,7 +3,7 @@ use futures_util::stream::BoxStream;
 
 /// Metadata returned by a versioned object store. The URI never contains
 /// credentials or query parameters and is validated before it is signed.
-#[derive(Clone, Eq, PartialEq, serde::Serialize)]
+#[derive(Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ObjectEntry {
     pub uri: String,
     pub key: String,

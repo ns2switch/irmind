@@ -3,6 +3,9 @@ version = 1
 max_tool_calls_per_case = 100
 max_model_result_bytes = 10000
 max_model_tokens_per_case = 200000
+max_object_read_bytes = 1073741824
+max_object_bytes_per_case = 536870912000
+object_transfer_approval_bytes = 67108864
 denied_tools = []
 
 # Optional ceiling for remote reads. A case may grant less, never more.
@@ -11,5 +14,6 @@ denied_tools = []
 # accounts = ["123456789012"]
 # projects = []
 # hosts = []
+# objects = ["s3://audit-bucket/AWSLogs/123/CloudTrail/"]
 # from = "2026-10-23T00:00:00Z"
 # to = "2026-10-23T23:59:59Z"

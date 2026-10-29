@@ -172,19 +172,22 @@ impl PreparedStartup {
             allow_environment,
             interactive,
         )?;
-        let engine = registry.bind(Engine::new(
-            EnginePorts::new(
-                store.clone(),
-                store.clone(),
-                store.clone(),
-                store.clone(),
-                CryptoPorts::new(signer.clone(), verifier),
-                guard.clone(),
-                registry.parser()?,
-            ),
-            ExecutionMode::Attended,
-            Arc::new(SystemClock),
-        )?)?;
+        let engine = registry.bind(
+            Engine::new(
+                EnginePorts::new(
+                    store.clone(),
+                    store.clone(),
+                    store.clone(),
+                    store.clone(),
+                    CryptoPorts::new(signer.clone(), verifier),
+                    guard.clone(),
+                    registry.parser()?,
+                ),
+                ExecutionMode::Attended,
+                Arc::new(SystemClock),
+            )?
+            .with_large_case_pipeline(store.clone(), Arc::new(JsonParser)),
+        )?;
         let engine = apply_session_policy(engine, &cli, &saved, config_store.as_ref(), &manifests)?;
         let workspace_io = RootWorkspaceIo {
             home: home.clone(),

@@ -76,7 +76,9 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 **Credentials:** S3 reuses the dedicated `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` from the selected secret backend. GCS uses `GCP_SERVICE_ACCOUNT_JSON` with the service account private key. Azure uses `AZURE_CLIENT_SECRET` for the configured service principal. These values never belong in `config.toml` or environment variables.
 
-**Limits:** Reads require an object version or ETag observed during listing, a per-read byte ceiling, and the case transfer budget. A listing truncated at its bound must be narrowed before ingest. Rechecking an uncopied cloud original downloads it again and may incur provider charges. No ambient cloud profiles, CLI sessions, or instance credentials are used.
+**Use in the TUI:** Run `/objects <source> <s3|gs|az> <bucket-or-container> <prefix> <from-UTC> <to-UTC>` to list up to 20 objects and see the estimated bytes. Narrow a truncated listing. Run `/object-read <number>` to confirm the selected version and transfer. Add `--copy-original` to keep an explicit local original. The activity indicator shows transferred bytes and elapsed time; Esc or `/pause` cancels. A repeated read checks an already signed original against its manifest.
+
+**Limits:** Reads require a complete signed listing of the exact object and version, a per-read byte ceiling, and the case transfer budget. Above `object_transfer_approval_bytes`, a second signed analyst approval is required. Failed transfers consume their reserved budget. Cloud bytes are spooled once into a private temporary directory and removed after local conversion. A repeated read in an open case rechecks the signed original and may incur provider charges. For offline verification after sealing, explicitly retain a local copy before sealing. No ambient cloud profiles, CLI sessions, or instance credentials are used. `object_store` exposes ETags but not a portable native provider checksum; the manifest records the ETag as an opaque version guard and signs IRMind's own SHA-256.
 
 ## CrowdStrike
 

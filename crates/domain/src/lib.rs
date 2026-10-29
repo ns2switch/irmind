@@ -22,7 +22,7 @@ pub use case_entities::*;
 pub use case_values::*;
 pub use custody_manifest::*;
 pub use entities::*;
-use entities::{valid_scope_target, valid_scope_time};
+use entities::{valid_object_scope, valid_scope_target, valid_scope_time};
 pub use graph_filter::*;
 pub use ids::*;
 pub use policy::*;

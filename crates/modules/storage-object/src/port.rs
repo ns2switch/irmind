@@ -22,7 +22,9 @@ fn remote_error() -> AppError {
 fn valid_object_key(key: &str) -> bool {
     !key.is_empty()
         && key.len() <= 900
-        && !key.contains(['?', '#', '\\', '@', '\0'])
+        && key
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"-._/".contains(&byte))
         && !key.starts_with('/')
         && key
             .split('/')
@@ -31,6 +33,13 @@ fn valid_object_key(key: &str) -> bool {
 
 fn valid_object_prefix(prefix: &str) -> bool {
     valid_object_key(prefix.trim_end_matches('/')) && !prefix.ends_with("//")
+}
+
+fn within_prefix(key: &str, prefix: &str) -> bool {
+    key == prefix.trim_end_matches('/')
+        || key
+            .strip_prefix(prefix)
+            .is_some_and(|rest| prefix.ends_with('/') || rest.starts_with('/'))
 }
 
 impl StorageObject {
@@ -102,6 +111,7 @@ impl StorageObject {
             }
             if meta.last_modified.timestamp() < from.unix_seconds()
                 || meta.last_modified.timestamp() > to.unix_seconds()
+                || !within_prefix(meta.location.as_ref(), prefix)
             {
                 continue;
             }
@@ -130,6 +140,10 @@ impl StorageObject {
         cancel: &CancellationToken,
     ) -> Result<ObjectSourceOutput, AppError> {
         let key = call.arg("key").ok_or_else(invalid_request)?;
+        let from = UtcTimestamp::parse(call.arg("from").ok_or_else(invalid_request)?)
+            .map_err(|_| invalid_request())?;
+        let to = UtcTimestamp::parse(call.arg("to").ok_or_else(invalid_request)?)
+            .map_err(|_| invalid_request())?;
         let version = call.arg("version");
         let etag = call.arg("etag");
         let max_bytes = call
@@ -141,6 +155,7 @@ impl StorageObject {
             || max_bytes == 0
             || max_bytes > MAX_OBJECT_BYTES
             || (version.is_none() && etag.is_none())
+            || from > to
         {
             return Err(invalid_request());
         }
@@ -156,6 +171,8 @@ impl StorageObject {
             response = self.store.get_opts(&path, options) => response.map_err(|_| remote_error())?,
         };
         if result.meta.size > max_bytes
+            || result.meta.last_modified.timestamp() < from.unix_seconds()
+            || result.meta.last_modified.timestamp() > to.unix_seconds()
             || version.is_some_and(|expected| result.meta.version.as_deref() != Some(expected))
             || etag.is_some_and(|expected| result.meta.e_tag.as_deref() != Some(expected))
         {
@@ -204,6 +221,7 @@ impl ObjectSource for StorageObject {
     ) -> Result<ObjectSourceOutput, AppError> {
         if call.arg("source") != Some(self.source_id())
             || call.arg("container") != Some(self.container.as_str())
+            || call.arg("scheme") != Some(self.scheme)
         {
             return Err(invalid_request());
         }
@@ -230,5 +248,13 @@ mod tests {
             path.map(|value| value.to_string()).as_deref(),
             Some("AWSLogs/123/CloudTrail")
         );
+        assert!(within_prefix(
+            "AWSLogs/123/CloudTrail/a.json",
+            "AWSLogs/123/CloudTrail/"
+        ));
+        assert!(!within_prefix(
+            "AWSLogs/123/CloudTrailOther/a.json",
+            "AWSLogs/123/CloudTrail/"
+        ));
     }
 }

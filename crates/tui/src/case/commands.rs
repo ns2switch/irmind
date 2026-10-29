@@ -36,6 +36,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if !(self.long_command(&prompt)?
             || self.case_command(&prompt)?
             || self.graph_command(&prompt)
+            || self.objects_command(&prompt)
             || self.siem_command(&prompt)
             || self.finding_command(&prompt)?
             || self.approval_command(&prompt)?
@@ -346,7 +347,7 @@ fn scope_expansion(current: &str, command: &str) -> Result<String, &'static str>
         return CaseScope::parse(current)
             .map_err(|_| "invalid current scope")?
             .extend_target(field, value)
-            .and_then(|scope| scope.to_v2_string())
+            .and_then(|scope| scope.to_current_string())
             .map_err(|_| "invalid scope expansion");
     }
     if let Some(rest) = command.strip_prefix("window ") {
@@ -356,13 +357,14 @@ fn scope_expansion(current: &str, command: &str) -> Result<String, &'static str>
         return CaseScope::parse(current)
             .map_err(|_| "invalid current scope")?
             .expand_window(from, to)
-            .and_then(|scope| scope.to_v2_string())
+            .and_then(|scope| scope.to_current_string())
             .map_err(|_| "invalid scope window");
     }
     Ok(command.to_owned())
 }
 mod approval;
 mod graph;
+mod objects;
 mod siem;
 
 #[cfg(test)]

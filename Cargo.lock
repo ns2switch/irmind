@@ -2753,6 +2753,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "tempfile",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -2798,6 +2799,7 @@ dependencies = [
  "duckdb",
  "ed25519-dalek",
  "fs4",
+ "futures-util",
  "hex",
  "irmind-app",
  "irmind-domain",
@@ -3063,6 +3065,7 @@ version = "0.1.0"
 dependencies = [
  "cargo_metadata",
  "ed25519-dalek",
+ "futures-util",
  "irmind-app",
  "irmind-domain",
  "irmind-http",

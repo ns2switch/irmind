@@ -11,9 +11,25 @@ struct PolicyFile {
     max_tool_calls_per_case: usize,
     max_model_result_bytes: usize,
     max_model_tokens_per_case: u64,
+    #[serde(default = "default_object_read_bytes")]
+    max_object_read_bytes: u64,
+    #[serde(default = "default_object_case_bytes")]
+    max_object_bytes_per_case: u64,
+    #[serde(default = "default_object_approval_bytes")]
+    object_transfer_approval_bytes: u64,
     denied_tools: Vec<String>,
     #[serde(default)]
     scope: Option<ScopePolicyFile>,
+}
+
+fn default_object_read_bytes() -> u64 {
+    PolicyRules::default().max_object_read_bytes
+}
+fn default_object_case_bytes() -> u64 {
+    PolicyRules::default().max_object_bytes_per_case
+}
+fn default_object_approval_bytes() -> u64 {
+    PolicyRules::default().object_transfer_approval_bytes
 }
 
 #[derive(Deserialize)]
@@ -26,6 +42,8 @@ struct ScopePolicyFile {
     projects: Vec<String>,
     #[serde(default)]
     hosts: Vec<String>,
+    #[serde(default)]
+    objects: Vec<String>,
     from: String,
     to: String,
 }
@@ -33,11 +51,17 @@ struct ScopePolicyFile {
 impl ScopePolicyFile {
     fn parse(self) -> Result<CaseScope> {
         let encoded = format!(
-            "v2;sources={};accounts={};projects={};hosts={};from={};to={}",
+            "v{};sources={};accounts={};projects={};hosts={};{}from={};to={}",
+            if self.objects.is_empty() { 2 } else { 3 },
             self.sources.join(","),
             self.accounts.join(","),
             self.projects.join(","),
             self.hosts.join(","),
+            if self.objects.is_empty() {
+                String::new()
+            } else {
+                format!("objects={};", self.objects.join(","))
+            },
             self.from,
             self.to
         );
@@ -67,6 +91,9 @@ pub(crate) fn load_policy(path: &Path) -> Result<(PolicyRules, String)> {
         max_tool_calls_per_case: file.max_tool_calls_per_case,
         max_model_result_bytes: file.max_model_result_bytes,
         max_model_tokens_per_case: file.max_model_tokens_per_case,
+        max_object_read_bytes: file.max_object_read_bytes,
+        max_object_bytes_per_case: file.max_object_bytes_per_case,
+        object_transfer_approval_bytes: file.object_transfer_approval_bytes,
     };
     policy
         .validate()
@@ -93,6 +120,7 @@ sources = ["source-a"]
 accounts = ["account-a"]
 projects = ["project-a"]
 hosts = ["host-a"]
+objects = ["s3://audit-bucket/AWSLogs/123/"]
 from = "2026-10-23T00:00:00Z"
 to = "2026-10-23T23:59:59Z"
 "#;
@@ -102,6 +130,12 @@ to = "2026-10-23T23:59:59Z"
             .ok_or_else(|| anyhow!("scope missing"))?
             .parse()?;
         assert!(matches!(scope, CaseScope::Remote { .. }));
+        assert!(scope.allows_object(
+            "source-a",
+            "s3://audit-bucket/AWSLogs/123/a.json",
+            "2026-10-23T12:00:00Z",
+            "2026-10-23T13:00:00Z"
+        ));
         Ok(())
     }
 }

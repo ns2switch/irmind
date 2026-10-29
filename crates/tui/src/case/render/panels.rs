@@ -152,7 +152,8 @@ pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Opt
         let detail = match confirm {
             Confirmation::Seal(_, info)
             | Confirmation::Export(_, info)
-            | Confirmation::Finding(_, info) => info,
+            | Confirmation::Finding(_, info)
+            | Confirmation::ObjectRead(_, info) => info,
         };
         return Ok(Some(escape_display(detail)));
     }
