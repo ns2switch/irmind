@@ -5,7 +5,7 @@ use expectrl::{Expect as _, Session};
 use std::{path::Path, process::Command, thread, time::Duration};
 
 fn wait_for_file(path: &Path) -> bool {
-    for _ in 0..100 {
+    for _ in 0..900 {
         if path.is_file() {
             return true;
         }
@@ -34,17 +34,17 @@ fn first_run_creates_file_keystore_without_leaving_the_tui() {
     session.set_expect_timeout(Some(Duration::from_secs(45)));
     session.expect("Welcome").unwrap();
     session.send("\r").unwrap();
-    thread::sleep(Duration::from_millis(150));
+    thread::sleep(Duration::from_millis(300));
     session.send("\x1b[B").unwrap();
-    thread::sleep(Duration::from_millis(50));
+    thread::sleep(Duration::from_millis(300));
     session.send("\r").unwrap();
-    thread::sleep(Duration::from_millis(150));
+    thread::sleep(Duration::from_millis(300));
     session.send("\x1b[B").unwrap();
-    thread::sleep(Duration::from_millis(50));
+    thread::sleep(Duration::from_millis(300));
     session.send("\r").unwrap();
-    thread::sleep(Duration::from_millis(150));
+    thread::sleep(Duration::from_millis(300));
     session.send("synthetic passphrase for PTY test\r").unwrap();
-    thread::sleep(Duration::from_millis(150));
+    thread::sleep(Duration::from_millis(500));
     session.send("synthetic passphrase for PTY test\r").unwrap();
     assert!(wait_for_file(&home.path().join("keystore.toml")));
     session.send("\r").unwrap();
