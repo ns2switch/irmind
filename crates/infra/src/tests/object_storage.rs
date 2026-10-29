@@ -170,6 +170,10 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     let approval = engine.pending_approvals(&case.id).unwrap();
     assert!(engine.approve(&case.id, &approval[0].id).is_err());
     assert_eq!(source.reads.load(Ordering::SeqCst), 2);
+    assert!(store.entries(&case.id).unwrap().iter().any(|entry| {
+        entry.kind == irmind_domain::AuditEventKind::Denied
+            && entry.payload == "object read blocked before transfer"
+    }));
     assert!(engine.verify(&case.id).is_ok());
     assert!(engine.verify_graph(&case.id).is_ok());
     let entries = store.entries(&case.id).unwrap();
