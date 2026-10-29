@@ -146,6 +146,14 @@ impl PreparedStartup {
     }
 
     fn run(self, cancel: &CancellationToken) -> Result<bool> {
+        let (registry, config_issues) = configured_registry(
+            &self.cli,
+            &self.saved,
+            self.active.secret_backend.as_ref(),
+            self.allow_environment,
+            self.interactive,
+        )?;
+        let engine = self.compose_engine(&registry)?;
         let Self {
             cli,
             interactive,
@@ -158,37 +166,12 @@ impl PreparedStartup {
             allow_environment,
             module_overrides,
             overrides_active,
-            verifier,
+            verifier: _,
             guard,
         } = self;
-        let signer = active.signer;
         let secrets = active.secret_backend;
         let signer_backend = active.signer_backend;
         let new_analyst_key = interactive && active.new_analyst_key;
-        let (registry, config_issues) = configured_registry(
-            &cli,
-            &saved,
-            secrets.as_ref(),
-            allow_environment,
-            interactive,
-        )?;
-        let engine = registry.bind(
-            Engine::new(
-                EnginePorts::new(
-                    store.clone(),
-                    store.clone(),
-                    store.clone(),
-                    store.clone(),
-                    CryptoPorts::new(signer.clone(), verifier),
-                    guard.clone(),
-                    registry.parser()?,
-                ),
-                ExecutionMode::Attended,
-                Arc::new(SystemClock),
-            )?
-            .with_large_case_pipeline(store.clone(), Arc::new(JsonParser)),
-        )?;
-        let engine = apply_session_policy(engine, &cli, &saved, config_store.as_ref(), &manifests)?;
         let workspace_io = RootWorkspaceIo {
             home: home.clone(),
             credential_fields: compiled_credential_fields(),
@@ -227,6 +210,32 @@ impl PreparedStartup {
                 overrides_active,
                 mouse_capture: saved.mouse_capture.unwrap_or(true),
             },
+        )
+    }
+
+    fn compose_engine<'a>(&self, registry: &'a ModuleRegistry) -> Result<Engine<'a>> {
+        let engine = registry.bind(
+            Engine::new(
+                EnginePorts::new(
+                    self.store.clone(),
+                    self.store.clone(),
+                    self.store.clone(),
+                    self.store.clone(),
+                    CryptoPorts::new(self.active.signer.clone(), self.verifier.clone()),
+                    self.guard.clone(),
+                    registry.parser()?,
+                ),
+                ExecutionMode::Attended,
+                Arc::new(SystemClock),
+            )?
+            .with_large_case_pipeline(self.store.clone(), Arc::new(JsonParser)),
+        )?;
+        apply_session_policy(
+            engine,
+            &self.cli,
+            &self.saved,
+            self.config_store.as_ref(),
+            &self.manifests,
         )
     }
 }

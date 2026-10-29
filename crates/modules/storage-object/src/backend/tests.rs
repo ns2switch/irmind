@@ -94,6 +94,35 @@ async fn s3_reads_recorded_object_from_local_server() {
     assert_recorded_requests(&server.finish().unwrap());
 }
 
+#[cfg(feature = "s3")]
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn s3_rejects_an_oversized_listing_before_parsing() {
+    use futures_util::TryStreamExt as _;
+    use irmind_testkit::{MockResponse, MockServer};
+    use object_store::{ObjectStore as _, path::Path};
+
+    let mut response = MockResponse::json("").allow_early_close();
+    response.body = vec![b'X'; 8 * 1024 * 1024 + 1];
+    let server = MockServer::start(vec![response]).unwrap();
+    let store = object_store::aws::AmazonS3Builder::new()
+        .with_bucket_name("synthetic-audit")
+        .with_region("us-east-1")
+        .with_endpoint(server.origin())
+        .with_allow_http(true)
+        .with_skip_signature(true)
+        .with_http_connector(SafeConnector)
+        .build()
+        .unwrap();
+    let error = store
+        .list(Some(&Path::from("AWSLogs/123/")))
+        .try_next()
+        .await
+        .unwrap_err();
+    assert!(error.to_string().contains("8 MiB"));
+    assert_eq!(server.finish().unwrap().len(), 1);
+}
+
 #[cfg(feature = "gcs")]
 #[tokio::test]
 #[allow(clippy::unwrap_used)]
