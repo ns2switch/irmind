@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 6a6259ec56f1e8598e693f3593f38320b3d8bb0c; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 6932516a9fafe79d5e05e2fb1c3d049d3d62637f; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -8,7 +8,7 @@ Esta página es para quienes preparan una evaluación controlada. Explica el alc
 
 ## Alcance del caso
 
-Un caso puede ser solo local. Para permitir lecturas remotas, el formulario de caso nuevo pide fuentes, cuentas, proyectos, hosts y el inicio y fin de la ventana UTC. Añade un destino con `/scope add project <id>` (o `source`, `account` o `host`), o amplía la ventana con `/scope window <from> <to>`. El analista firma los cambios. Las consultas fuera del alcance del caso requieren aprobación o se deniegan. La codificación para automatización está en la [referencia de la CLI](../development/cli.md).
+Un caso puede ser solo local. Para permitir lecturas remotas, el formulario de caso nuevo pide fuentes, cuentas, proyectos, hosts, prefijos de objetos y una ventana UTC. Un prefijo tiene la forma `s3://bucket/AWSLogs/123/`, `gs://bucket/export/` o `az://contenedor/export/`. Añádelo con `/scope add object <URI>`; el ID de fuente también debe estar en el alcance. Los demás destinos usan `/scope add project <id>` (o `source`, `account`, `host`). Amplía la ventana con `/scope window <from> <to>`. El analista firma los cambios. Las lecturas de objetos fuera del prefijo del caso o de la organización se deniegan. La codificación para automatización está en la [referencia de la CLI](../development/cli.md).
 
 ## Archivo de política
 
@@ -19,6 +19,9 @@ version = 1
 max_tool_calls_per_case = 100
 max_model_result_bytes = 10000
 max_model_tokens_per_case = 200000
+max_object_read_bytes = 1073741824
+max_object_bytes_per_case = 536870912000
+object_transfer_approval_bytes = 67108864
 denied_tools = []
 
 [scope]
@@ -26,11 +29,12 @@ sources = ["demo"]
 accounts = ["123456789012"]
 projects = []
 hosts = []
+objects = ["s3://audit-bucket/AWSLogs/123/CloudTrail/"]
 from = "2026-10-23T00:00:00Z"
 to = "2026-10-23T23:59:59Z"
 ```
 
-La tabla opcional `[scope]` fija un techo estricto para las lecturas remotas de todos los casos. Puede contener cuentas, proyectos y hosts a la vez, además de fuentes y una ventana UTC. Una lectura fuera del alcance del caso puede requerir aprobación del analista; fuera del techo de la política se deniega, incluso con aprobación. Los casos nuevos y los cambios de alcance no pueden superar el techo. Si una política nueva reduce el alcance de un caso existente, sus lecturas usan la intersección y la TUI muestra un aviso. El conector AWS actual exige una cuenta; las consultas por proyecto estarán disponibles cuando exista un conector que las admita. La política puede restringir las reglas fijas de las herramientas, pero no habilitar acciones denegadas. El enriquecimiento externo requiere aprobación firmada del analista; la contención está deshabilitada. Los campos desconocidos causan un error.
+La tabla opcional `[scope]` fija un techo estricto para las lecturas remotas de todos los casos. Puede contener cuentas, proyectos, hosts y prefijos de objetos, además de fuentes y una ventana UTC. Una lectura de objetos fuera del prefijo del caso o del techo de la política se deniega, incluso con aprobación. Otras lecturas fuera del caso pueden requerir aprobación; fuera del techo se deniegan. Los casos nuevos y los cambios de alcance no pueden superar el techo. Si una política nueva reduce el alcance de un caso existente, sus lecturas usan la intersección y la TUI muestra un aviso. El conector AWS actual exige una cuenta; las consultas por proyecto estarán disponibles cuando exista un conector que las admita. La política puede restringir las reglas fijas de las herramientas, pero no habilitar acciones denegadas. El enriquecimiento externo requiere aprobación firmada del analista; la contención está deshabilitada. Los campos desconocidos causan un error.
 
 ## Ajustes no secretos
 
