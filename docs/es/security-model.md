@@ -1,4 +1,4 @@
-Traducción de docs/security-model.md en el commit e414ef4daed9af488f2f72ffce62e64331cc99ac; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/security-model.md en el commit aacbe6481dec2d871b48017aa981d1d76f528146; si hay diferencias, prevalece la versión en inglés.
 
 # Modelo de seguridad
 
