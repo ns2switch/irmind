@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit af9a0e42525fc5b8e2dd5fc17c5b1258e4b262cd; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 3d01b913eb7fc403c585785643af2bd385010ef5; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -9,7 +9,7 @@ Esta página es para quienes contribuyen al proyecto o evalúan sus límites act
 - Una TUI centrada en la conversación, con entrada multilínea, tarjetas desplazables de actividad firmada, autocompletado de comandos y un panel lateral opcional. En el mismo espacio se crean casos, se ingiere evidencia, se investiga, se aprueban llamadas, se verifica, se sella y se exporta.
 - Texto incremental del modelo, paneles de IOC, hipótesis y técnicas ATT&CK con confirmación del analista, y fragmentos de evidencia junto a las aprobaciones relacionadas.
 - Consultas de lectura sujetas a política y enriquecimiento externo aprobado por el analista, con un guard obligatorio.
-- Custodia local en SQLite, grafo derivado en DuckDB y firmas Ed25519 mediante un llavero del sistema o un archivo cifrado, seleccionados explícitamente. La ingesta actual copia la evidencia y se limita a archivos pequeños; el almacenamiento para casos grandes se describe más abajo.
+- Custodia local en SQLite y almacenamiento derivado en Parquet consultado con DuckDB, con firmas Ed25519 mediante un llavero del sistema o un archivo cifrado seleccionados explícitamente. Los manifiestos firmados permiten casos grandes sin copiar cada original de forma implícita; la copia es una opción expresa. Los benchmarks sintéticos de 1 GB y 15 GB cumplen los objetivos de ingesta y consulta locales.
 - Módulos LLM seleccionados explícitamente y conectores opcionales de Splunk, AWS, EDR, MISP y VirusTotal; Splunk usa campos y agregaciones estructurados.
 - Propuestas tipadas de IOC, hipótesis, técnicas ATT&CK y eventos de cronología; los informes citan evidencia confirmada.
 - Alcance del caso con proyectos y techo opcional de política TOML para consultas remotas.
