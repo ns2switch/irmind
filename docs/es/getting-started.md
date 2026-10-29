@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 7818a8dc3b6b695530b83601ad7ca589d2c69b85; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit f233cbdeb0b82ef5eb4a521c58170fc48c6907b6; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -20,9 +20,9 @@ En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Cuando
 
 ## Primer arranque
 
-Al ejecutar `irmind` sin subcomando se abre la TUI. Elige `os` o `file` por separado para la firma y los secretos. Ambos se compilan por defecto; IRMind nunca cambia de backend en silencio. El archivo cifrado pide una passphrase sin eco y funciona por SSH con un terminal interactivo, sin sesión gráfica. En el primer uso, IRMind crea la clave de firma del analista y muestra su huella pública. Guárdala por otro canal de confianza. Un paquete exportado no permite recuperar una clave perdida.
+Al ejecutar `irmind` sin subcomando se abre la TUI. El asistente explica por qué se firman los casos y permite elegir `os` o `file` por separado para la firma y los secretos. Ambos se compilan por defecto; IRMind nunca cambia de backend en silencio. Recomienda `file` si no hay llavero del sistema. Pide dos veces la passphrase en campos enmascarados dentro de la TUI, comprueba su longitud y funciona por SSH sin sesión gráfica. Esc retrocede y Ctrl+C pide confirmación para salir. En el primer uso se crea la clave del analista y se muestra su huella pública. Guárdala fuera del equipo por un canal de confianza.
 
-Si el backend elegido no está disponible, el arranque se detiene y la TUI ofrece cambiarlo explícitamente. La selección queda en `keystore.toml`, dentro del directorio de datos. Pulsa `k` en la pantalla de inicio para ver los backends y la huella, gestionar credenciales, cambiar la passphrase del archivo o migrar. Tras sustituir una credencial, los conectores activos conservan el valor anterior; pulsa `r` en esta vista para reiniciar la sesión.
+Si falla el desbloqueo, el asistente muestra el motivo y permite reintentar o elegir otro backend. Una passphrase errónea no cierra la TUI. Los errores inesperados apuntan a `diagnostics.log` en el directorio de datos. La selección queda en `keystore.toml`. Pulsa `k` en la pantalla de inicio para ver los backends y la huella, gestionar credenciales, cambiar la passphrase o migrar. La entrada de secretos permanece enmascarada dentro de la TUI. Tras sustituir una credencial, los conectores activos conservan el valor anterior; pulsa `r` para reiniciar la sesión.
 
 Pulsa `m` para ver qué módulos están compilados, habilitados y configurados. Usa las flechas para elegir un módulo, Tab para elegir un campo público y `e` para editarlo. Enter selecciona un LLM o activa un conector. `k` abre sus credenciales en el llavero. Un cambio que pueda enviar datos fuera del equipo pide confirmación firmada. La TUI recarga la sesión tras aplicarlo. Ningún LLM se activa automáticamente.
 
@@ -41,7 +41,7 @@ Puedes verificar el paquete en otro equipo con `irmind verify-export <PACKAGE> -
 
 ## Navegar por el caso
 
-La conversación ocupa el espacio principal. Las propuestas, aprobaciones, resultados y hallazgos aparecen en tarjetas ordenadas. `Ctrl+B` muestra u oculta el panel lateral. Tab recorre cronología, evidencias, aprobaciones y hallazgos. `Ctrl+L` enfoca la conversación y `Ctrl+I` vuelve al campo de entrada. Enter o Espacio despliega una tarjeta seleccionada; `a`, `d` y `e` actúan sobre una aprobación seleccionada.
+La conversación ocupa el espacio principal. La tarjeta inicial muestra el caso, el modelo y el llavero. Las propuestas, aprobaciones, resultados y hallazgos aparecen en orden. Los resultados largos empiezan plegados con un resumen. `Ctrl+B` muestra u oculta el panel lateral. Tab recorre cronología, evidencias, aprobaciones y hallazgos. `Ctrl+L` enfoca la conversación y `Ctrl+I` vuelve a la entrada. Enter, Espacio o `Ctrl+O` despliegan un resultado. En una aprobación seleccionada, usa ↑/↓ y Enter o 1/2/3 para aprobar, denegar indicando motivo o editar argumentos. Esc pide el motivo de denegación.
 
 Las consultas del grafo y las búsquedas locales también aparecen como tarjetas de resultado. Las respuestas largas empiezan plegadas; selecciona la tarjeta y pulsa Enter o Espacio para desplegarla, y desplázate por la conversación.
 
