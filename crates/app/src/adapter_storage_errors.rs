@@ -72,6 +72,8 @@ pub enum AdapterStorageError {
     EncryptedKeystoreNotFound,
     #[error("storage: encrypted keystore operation failed")]
     EncryptedKeystoreOperationFailed,
+    #[error("storage: encrypted keystore file or directory is not accessible by this user")]
+    EncryptedKeystorePermissionDenied,
     #[error("storage: encrypted keystore parameters are unsafe")]
     EncryptedKeystoreParametersAreUnsafe,
     #[error("storage: evidence save failed")]

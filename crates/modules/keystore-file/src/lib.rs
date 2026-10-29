@@ -80,6 +80,16 @@ fn failure() -> AppError {
     ))
 }
 
+fn file_error(error: &std::io::Error) -> AppError {
+    if error.kind() == std::io::ErrorKind::PermissionDenied {
+        AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+            irmind_app::AdapterStorageError::EncryptedKeystorePermissionDenied,
+        ))
+    } else {
+        failure()
+    }
+}
+
 fn open_private(path: &Path, create: bool) -> Result<File, AppError> {
     let mut options = OpenOptions::new();
     options.read(true).write(true).create(create);
@@ -93,7 +103,7 @@ fn open_private(path: &Path, create: bool) -> Result<File, AppError> {
         use std::os::windows::fs::OpenOptionsExt as _;
         options.custom_flags(0x0020_0000);
     }
-    let file = options.open(path).map_err(|_| failure())?;
+    let file = options.open(path).map_err(|error| file_error(&error))?;
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt as _;
@@ -101,7 +111,7 @@ fn open_private(path: &Path, create: bool) -> Result<File, AppError> {
             return Err(failure());
         }
     }
-    irmind_fs::private_file(path).map_err(|_| failure())?;
+    irmind_fs::private_file(path).map_err(|error| file_error(&error))?;
     Ok(file)
 }
 

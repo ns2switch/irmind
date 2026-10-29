@@ -59,18 +59,25 @@ pub(crate) struct CasePresentation<'a> {
     pub mouse_capture: bool,
 }
 
-fn initial_state(engine: &Engine<'_>, id: &CaseId) -> Result<CaseState> {
+fn initial_state(
+    engine: &Engine<'_>,
+    id: &CaseId,
+    model: Option<&dyn LlmPort>,
+    io_ops: &dyn WorkspaceIo,
+) -> Result<CaseState> {
     let case = engine.repo.get_case(id)?;
+    let backend = io_ops.keystore_status()?.signer_backend;
     let case_summary = format!(
-        "Case: {}\nSeverity: {}\nScope: {}",
+        "{} · {}\nModel: {} · Keystore: {}\n/ingest adds evidence · ? opens help",
         case.title,
         case.severity.as_str(),
-        case.scope
+        model.map_or_else(|| "no model".into(), LlmPort::descriptor),
+        backend,
     );
     let mut conversation = Conversation::new(std::env::var_os("NO_COLOR").is_none());
     conversation.push(Card::new(
-        CardKind::Notice,
-        "Case opened",
+        CardKind::Welcome,
+        concat!("IRMind v", env!("CARGO_PKG_VERSION")),
         engine.guard.screen(&case_summary)?.text,
         false,
     ));
@@ -114,6 +121,7 @@ fn initial_state(engine: &Engine<'_>, id: &CaseId) -> Result<CaseState> {
         findings,
         tab: 0,
         selected_approval: 0,
+        approval_option: 0,
         selected_finding: 0,
         palette: None,
         picker: None,
@@ -125,6 +133,7 @@ fn initial_state(engine: &Engine<'_>, id: &CaseId) -> Result<CaseState> {
         timeline,
         needs_refresh: false,
         running_since: None,
+        progress_status: None,
     })
 }
 
@@ -138,7 +147,7 @@ pub(crate) fn run_case(
     presentation: CasePresentation<'_>,
 ) -> Result<()> {
     verify_case_before_open(terminal, engine, id, shutdown)?;
-    let state = initial_state(engine, id)?;
+    let state = initial_state(engine, id, model, io_ops)?;
     let (progress_tx, progress_rx) = mpsc::channel::<String>();
     let (model_tx, model_rx) = mpsc::channel::<String>();
     let (seal_tx, seal_rx) = mpsc::channel::<irmind_app::SealPreview>();

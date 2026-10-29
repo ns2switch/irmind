@@ -25,6 +25,7 @@ use super::{
     anyhow, cli, compiled_credential_fields, configuration, configuration_issue, keystore,
     load_module_config, load_policy, load_pricing,
 };
+use irmind_app::ContentGuard as _;
 
 mod status;
 use status::module_statuses;
@@ -53,7 +54,13 @@ pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
     if let Some(Command::VerifyExport { path, expected_key }) = &cli.command {
         return run_verify_export(path, expected_key.as_deref());
     }
-    let Some(prepared) = PreparedStartup::new(cli, interactive)? else {
+    let prepared = match PreparedStartup::new(cli, interactive) {
+        Err(error) if error.downcast_ref::<keystore::SetupCancelled>().is_some() => {
+            return Ok(false);
+        }
+        other => other?,
+    };
+    let Some(prepared) = prepared else {
         return Ok(false);
     };
     prepared.run(cancel)
@@ -62,7 +69,6 @@ pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
 impl PreparedStartup {
     fn new(mut cli: Cli, interactive: bool) -> Result<Option<Self>> {
         let (home, store, active) = open_local(&cli, interactive)?;
-        super::diagnostics::init(&home)?;
         let config_store = Arc::new(TomlConfigurationStore::new(&home));
         let manifests = configuration::compiled_manifests();
         let verifier = Arc::new(trusted_verifier(
@@ -84,27 +90,38 @@ impl PreparedStartup {
             ExecutionMode::Attended,
             Arc::new(SystemClock),
         )?;
-        if !reconcile_configuration(
+        let Some(saved) = load_approved_config(
             &preflight,
             config_store.as_ref(),
             &manifests,
             &home,
             interactive,
             guard.as_ref(),
-        )? {
+        )?
+        else {
             return Ok(None);
-        }
-        let saved = config_store.load()?;
-        saved.validate(&manifests)?;
+        };
         let overrides = configuration::collect_egress_overrides(&cli, &saved);
-        let allow_environment = decide_overrides(
-            &preflight,
-            config_store.as_ref(),
-            &manifests,
-            &overrides,
-            interactive,
+        let Some(allow_environment) = retry_startup(
+            || {
+                decide_overrides(
+                    &preflight,
+                    config_store.as_ref(),
+                    &manifests,
+                    &overrides,
+                    interactive,
+                    guard.as_ref(),
+                )
+            },
+            &home,
             guard.as_ref(),
-        )?;
+            interactive,
+            "override-review",
+            "Correct the override or restart without it",
+        )?
+        else {
+            return Ok(None);
+        };
         let module_overrides = if allow_environment {
             configuration::selection_overrides(&cli)
         } else {
@@ -211,6 +228,66 @@ impl PreparedStartup {
     }
 }
 
+fn load_approved_config(
+    preflight: &Engine<'_>,
+    config_store: &TomlConfigurationStore,
+    manifests: &[&irmind_app::modules::ModuleManifest],
+    home: &std::path::Path,
+    interactive: bool,
+    guard: &MandatoryGuard,
+) -> Result<Option<PersistentConfig>> {
+    let reconciled = retry_startup(
+        || reconcile_configuration(preflight, config_store, manifests, home, interactive, guard),
+        home,
+        guard,
+        interactive,
+        "config-recovery",
+        "Review or restore config.toml",
+    )?;
+    if reconciled != Some(true) {
+        return Ok(None);
+    }
+    retry_startup(
+        || {
+            let saved = config_store.load()?;
+            saved.validate(manifests)?;
+            Ok(saved)
+        },
+        home,
+        guard,
+        interactive,
+        "config-load",
+        "Restore the approved copy or correct config.toml",
+    )
+}
+
+fn retry_startup<T>(
+    mut operation: impl FnMut() -> Result<T>,
+    home: &std::path::Path,
+    guard: &MandatoryGuard,
+    interactive: bool,
+    stage: &str,
+    advice: &str,
+) -> Result<Option<T>> {
+    loop {
+        match operation() {
+            Ok(value) => return Ok(Some(value)),
+            Err(error) if interactive => {
+                let reason = guard.screen(&format!("{error:#}"))?.text;
+                tracing::error!(target: "irmind::operations", stage, causes = %reason, "startup operation failed");
+                let message = format!(
+                    "{reason}. {advice}, then retry. Diagnostics: {}",
+                    home.join("diagnostics.log").display()
+                );
+                if !irmind_tui::show_startup_error(&message)? {
+                    return Ok(None);
+                }
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
 fn apply_session_policy<'a>(
     mut engine: Engine<'a>,
     cli: &Cli,
@@ -277,31 +354,44 @@ fn open_local(
             .data_local_dir()
             .to_path_buf(),
     };
-    let store = Arc::new(match LocalStore::open(&home) {
-        Ok(store) => store,
-        Err(error) => {
-            if interactive {
-                let _ = irmind_tui::show_startup_error(
-                    "Local case storage is unavailable. Check the data directory permissions.",
+    let store = loop {
+        match LocalStore::open(&home) {
+            Ok(store) => break Arc::new(store),
+            Err(error) if interactive => {
+                let message = format!(
+                    "Cannot open the private data directory {}: {error}. Check ownership and permissions, then retry.",
+                    home.display()
                 );
+                if !irmind_tui::show_startup_error(&message)? {
+                    return Err(error.into());
+                }
             }
-            return Err(error.into());
+            Err(error) => return Err(error.into()),
         }
-    });
-    let active = match keystore::load_or_configure(
-        &home,
-        cli.passphrase_fd,
-        interactive,
-        !store.list_cases()?.is_empty(),
-    ) {
-        Ok(active) => active,
-        Err(error) => {
-            if interactive {
-                let _ = irmind_tui::show_startup_error(
-                    "The selected keystore cannot be unlocked or configured. No investigation can start.",
-                );
+    };
+    super::diagnostics::init(&home)?;
+    let active = loop {
+        match keystore::load_or_configure(
+            &home,
+            cli.passphrase_fd,
+            interactive,
+            !store.list_cases()?.is_empty(),
+        ) {
+            Ok(active) => break active,
+            Err(error) if error.downcast_ref::<keystore::SetupCancelled>().is_some() => {
+                return Err(error);
             }
-            return Err(error);
+            Err(error) if interactive => {
+                let message = format!(
+                    "Cannot read keystore configuration in {}: {error:#}. Repair the file or restore a backup, then retry.",
+                    home.display()
+                );
+                tracing::error!(target: "irmind::operations", stage = "keystore-config", causes = %error, "startup operation failed");
+                if !irmind_tui::show_startup_error(&message)? {
+                    return Err(error);
+                }
+            }
+            Err(error) => return Err(error),
         }
     };
     Ok((home, store, active))

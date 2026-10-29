@@ -13,6 +13,7 @@ pub struct ApprovalRequest {
 #[derive(Clone)]
 pub struct ApprovalSource {
     pub provenance: Provenance,
+    pub source_label: String,
     pub excerpt: String,
 }
 
@@ -20,6 +21,7 @@ impl std::fmt::Debug for ApprovalSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ApprovalSource")
             .field("provenance", &self.provenance)
+            .field("source_label_bytes", &self.source_label.len())
             .field("excerpt_bytes", &self.excerpt.len())
             .finish()
     }

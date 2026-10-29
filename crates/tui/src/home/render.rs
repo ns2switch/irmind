@@ -1,8 +1,9 @@
 use super::{
-    Backend, Block, Borders, CaseStatus, Color, Constraint, Engine, HomeState, Layout, Line, List,
+    Backend, Block, Borders, CaseStatus, Constraint, Engine, HomeState, Layout, Line, List,
     ListItem, LlmPort, Mode, Modifier, ModuleStatus, Paragraph, Result, Style, Terminal, Wrap,
     case, hex, sha256,
 };
+use crate::theme::Theme;
 use ratatui::widgets::ListState;
 
 pub(crate) fn render_home<B: Backend>(
@@ -49,6 +50,7 @@ where
         list_state.select(Some(prefix + state.module_selected + field_offset));
     }
     terminal.draw(|frame| {
+        let theme = Theme::detect();
         let areas = Layout::vertical([
             Constraint::Length(3),
             Constraint::Min(4),
@@ -58,29 +60,34 @@ where
         .split(frame.area());
         frame.render_widget(
             Paragraph::new("IRMind · incident workspace")
-                .block(Block::default().borders(Borders::ALL)),
+                .style(theme.accent())
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(theme.border)),
+                ),
             areas[0],
         );
         frame.render_stateful_widget(
             List::new(content)
                 .block(Block::default().title(header).borders(Borders::ALL))
-                .highlight_style(Style::default().fg(Color::Yellow)),
+                .highlight_style(theme.accent().add_modifier(Modifier::BOLD)),
             areas[1],
             &mut list_state,
         );
         frame.render_widget(
             Paragraph::new(info)
-                .block(Block::default().borders(Borders::ALL))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(theme.border)),
+                )
                 .wrap(Wrap { trim: false }),
             areas[2],
         );
         let help = help_line(state);
         frame.render_widget(
-            Paragraph::new(Line::from(help)).style(
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
+            Paragraph::new(Line::from(help)).style(theme.accent().add_modifier(Modifier::BOLD)),
             areas[3],
         );
     })?;

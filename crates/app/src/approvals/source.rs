@@ -44,7 +44,7 @@ impl Engine<'_> {
             let Ok(text) = std::str::from_utf8(&raw) else {
                 continue;
             };
-            if let Some(excerpt) = matching_excerpt(text, request) {
+            if let Some((excerpt, record)) = matching_excerpt(text, request) {
                 let decoded = hex::decode(hash).map_err(|_| AppError::InvalidChain(entry.seq))?;
                 let hash_bytes: [u8; 32] = decoded
                     .try_into()
@@ -52,13 +52,14 @@ impl Engine<'_> {
                 return Ok(ApprovalSource {
                     provenance: Provenance::new(
                         hash_bytes,
-                        None,
+                        Some(record),
                         if entry.kind == AuditEventKind::ToolResult {
                             SourceKind::ToolResult
                         } else {
                             SourceKind::File
                         },
                     ),
+                    source_label: entry.payload.clone(),
                     excerpt: self
                         .screen_and_audit(id, &excerpt, "ApprovalSource", Some(hash))?
                         .text,
@@ -72,6 +73,7 @@ impl Engine<'_> {
                 None,
                 SourceKind::ModelProposal,
             ),
+            source_label: "model proposal".into(),
             excerpt: self
                 .screen_and_audit(id, &proposal, "ApprovalSource", None)?
                 .text,
@@ -79,7 +81,7 @@ impl Engine<'_> {
     }
 }
 
-fn matching_excerpt(text: &str, request: &ApprovalRequest) -> Option<String> {
+fn matching_excerpt(text: &str, request: &ApprovalRequest) -> Option<(String, u64)> {
     let match_at = request
         .args
         .iter()
@@ -87,17 +89,19 @@ fn matching_excerpt(text: &str, request: &ApprovalRequest) -> Option<String> {
             !matches!(key.as_str(), "source" | "from" | "to") && (4..=256).contains(&value.len())
         })
         .find_map(|(_, value)| text.find(value).map(|at| (at, value.len())))?;
-    let mut start = match_at.0.saturating_sub(80);
-    let mut end = text
-        .len()
-        .min(match_at.0.saturating_add(match_at.1).saturating_add(80));
-    while !text.is_char_boundary(start) {
-        start += 1;
+    let start = text[..match_at.0].rfind('\n').map_or(0, |at| at + 1);
+    let record = text[..start].bytes().filter(|byte| *byte == b'\n').count() as u64;
+    let end = text[match_at.0..]
+        .find('\n')
+        .map_or(text.len(), |at| match_at.0 + at);
+    if end.saturating_sub(start) > 16_384 {
+        return Some((
+            "The matching record is too long to display safely. Open the original with /evidence."
+                .into(),
+            record,
+        ));
     }
-    while !text.is_char_boundary(end) {
-        end -= 1;
-    }
-    Some(text[start..end].to_owned())
+    Some((text[start..end].to_owned(), record))
 }
 
 #[cfg(test)]
@@ -117,8 +121,25 @@ mod tests {
             challenge: Vec::new(),
         };
         let text = format!("{}example.org{}", "a".repeat(500), "b".repeat(500));
-        let excerpt = matching_excerpt(&text, &request).unwrap_or_default();
+        let excerpt = matching_excerpt(&text, &request).unwrap_or_default().0;
         assert!(excerpt.contains("example.org"));
-        assert!(excerpt.len() <= 171);
+        assert_eq!(excerpt, text);
+    }
+
+    #[test]
+    fn matching_excerpt_keeps_complete_json_record_line() {
+        let request = ApprovalRequest {
+            id: "synthetic".into(),
+            tool: Tool::ThreatIntelExternal,
+            args: BTreeMap::from([("ioc".into(), "example.org".into())]),
+            mode: ExecutionMode::Attended,
+            decision_seq: 1,
+            challenge: Vec::new(),
+        };
+        let line = r#"{"detail":{"ioc":"example.org","source":"synthetic"}}"#;
+        assert_eq!(
+            matching_excerpt(&format!("before\n{line}\nafter"), &request),
+            Some((line.into(), 1))
+        );
     }
 }

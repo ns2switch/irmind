@@ -108,7 +108,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                         self.state.confirmation =
                             Some(Confirmation::Seal(Box::new(preview), summary));
                     }
-                    if label != "IRMind" {
+                    if label != "IRMind" && label != "Ingest" {
                         if is_result_card_label(label)
                             && !text.starts_with("approval pending:")
                             && !text.starts_with("denied:")
@@ -151,6 +151,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             self.state.needs_refresh = true;
         }
         self.state.running_since = None;
+        self.state.progress_status = None;
         Ok(())
     }
 
