@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit f233cbdeb0b82ef5eb4a521c58170fc48c6907b6; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit a0cc9b27c0cb2641fc1f735d4f2ba1be3851c6b1; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -20,7 +20,7 @@ En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Cuando
 
 ## Primer arranque
 
-Al ejecutar `irmind` sin subcomando se abre la TUI. El asistente explica por qué se firman los casos y permite elegir `os` o `file` por separado para la firma y los secretos. Ambos se compilan por defecto; IRMind nunca cambia de backend en silencio. Recomienda `file` si no hay llavero del sistema. Pide dos veces la passphrase en campos enmascarados dentro de la TUI, comprueba su longitud y funciona por SSH sin sesión gráfica. Esc retrocede y Ctrl+C pide confirmación para salir. En el primer uso se crea la clave del analista y se muestra su huella pública. Guárdala fuera del equipo por un canal de confianza.
+Al ejecutar `irmind` sin subcomando se abre la TUI. El asistente explica por qué se firman los casos y permite elegir `os` o `file` por separado para la firma y los secretos. Usa las flechas y Enter para elegir cada backend; las opciones no disponibles aparecen atenuadas con el motivo y no se pueden seleccionar. Ambos se compilan por defecto; IRMind nunca cambia de backend en silencio. Preselecciona `file` si no hay llavero del sistema. Pide dos veces la passphrase en campos enmascarados dentro de la TUI, comprueba su longitud y funciona por SSH sin sesión gráfica. Esc retrocede y Ctrl+C pide confirmación para salir. En el primer uso se crea la clave del analista y se muestra su huella pública. Guárdala fuera del equipo por un canal de confianza.
 
 Si falla el desbloqueo, el asistente muestra el motivo y permite reintentar o elegir otro backend. Una passphrase errónea no cierra la TUI. Los errores inesperados apuntan a `diagnostics.log` en el directorio de datos. La selección queda en `keystore.toml`. Pulsa `k` en la pantalla de inicio para ver los backends y la huella, gestionar credenciales, cambiar la passphrase o migrar. La entrada de secretos permanece enmascarada dentro de la TUI. Tras sustituir una credencial, los conectores activos conservan el valor anterior; pulsa `r` para reiniciar la sesión.
 

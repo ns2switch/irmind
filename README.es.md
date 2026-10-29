@@ -1,4 +1,4 @@
-Traducción de README.md en el commit f233cbdeb0b82ef5eb4a521c58170fc48c6907b6; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit a0cc9b27c0cb2641fc1f735d4f2ba1be3851c6b1; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -47,7 +47,7 @@ Todavía no hay binarios publicados como versión. CI genera artefactos sin firm
 
 ## Primer caso en la TUI
 
-1. Ejecuta `irmind` sin subcomando. El asistente explica la firma, recomienda el archivo cifrado si no hay llavero del sistema y pide dos veces la passphrase en campos enmascarados de la TUI. Funciona por SSH. Guarda la huella de la clave pública del analista fuera de este equipo.
+1. Ejecuta `irmind` sin subcomando. El asistente explica la firma y recomienda el archivo cifrado si no hay llavero del sistema. Elige los backends de firma y secretos con las flechas y Enter; después introduce y confirma la passphrase en campos enmascarados de la TUI. Funciona por SSH. Guarda la huella de la clave pública del analista fuera de este equipo.
 2. Pulsa `n` para crear un caso. Indica título, severidad y ventana temporal. Deja vacías las fuentes remotas para trabajar solo con evidencia local.
 3. Abre el caso y escribe `/ingest`. Selecciona [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), que contiene únicamente datos sintéticos. IRMind calcula el hash en su ubicación; copiar el original es una opción explícita.
 4. Vuelve a la pantalla de inicio y pulsa `m`. Selecciona el módulo compatible con OpenAI, pulsa `e` para indicar un modelo instalado y una URL local como `http://127.0.0.1:11434/v1/`, y confirma el cambio. La sesión se recarga dentro de la TUI. Para un proveedor remoto, sigue [configuración](docs/es/configuration.md) y aprueba antes su tratamiento de datos.
