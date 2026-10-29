@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 442408ee735a02a97d17b3f97ecbc74729601305; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit 6932516a9fafe79d5e05e2fb1c3d049d3d62637f; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -78,7 +78,9 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Credenciales:** S3 reutiliza `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y, si procede, `AWS_SESSION_TOKEN`. GCS usa `GCP_SERVICE_ACCOUNT_JSON`; Azure usa `AZURE_CLIENT_SECRET`. Se guardan en el backend de secretos seleccionado, nunca en `config.toml` ni en variables de entorno.
 
-**Límites:** La lectura requiere la versión o ETag observado al enumerar, un límite de bytes por objeto y el presupuesto de transferencia del caso. Hay que acotar una enumeración truncada antes de ingerir. Verificar de nuevo un original remoto no copiado vuelve a descargarlo y puede generar costes. No se usan perfiles, sesiones de CLI ni credenciales de instancia ambientales.
+**Uso en la TUI:** Ejecuta `/objects <fuente> <s3|gs|az> <bucket-o-contenedor> <prefijo> <desde-UTC> <hasta-UTC>` para ver hasta 20 objetos y el volumen estimado. Acota una lista truncada. Ejecuta `/object-read <número>` para confirmar la versión y la transferencia. Añade `--copy-original` si quieres conservar una copia local explícita. El indicador de actividad muestra los bytes transferidos y el tiempo transcurrido; Esc o `/pause` cancela. Una segunda lectura compara el original con su manifiesto firmado.
+
+**Límites:** La lectura exige una lista completa y firmada del objeto y su versión, un límite de bytes por objeto y el presupuesto del caso. Por encima de `object_transfer_approval_bytes` exige otra aprobación firmada del analista. Las transferencias fallidas consumen la reserva. Los bytes descargados se guardan una vez en un directorio temporal privado y se eliminan tras la conversión local. Una segunda lectura con el caso abierto compara el original firmado y puede generar costes. Para verificar sin red después del sellado, conserva una copia local explícita antes de sellar. No se usan credenciales ambientales. `object_store` expone ETags, pero no un checksum nativo portable; el manifiesto guarda el ETag como control opaco de versión y firma el SHA-256 propio de IRMind.
 
 ## CrowdStrike
 
