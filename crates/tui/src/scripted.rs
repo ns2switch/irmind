@@ -20,12 +20,9 @@ where
     B::Error: std::error::Error + Send + Sync + 'static,
 {
     let choice = KeystoreChoice::initial(os_available, true)?;
-    setup::render_setup(
+    setup::render(
         terminal,
-        "Choose a keystore explicitly",
-        choice,
-        os_available,
-        true,
+        &setup::KeystoreWizard::new(None, os_available, true, false),
     )?;
     Ok(choice)
 }
@@ -151,7 +148,6 @@ where
         case::draw_case(
             &mut self.terminal,
             &case::CaseFrame {
-                id,
                 title: &title,
                 messages: &message,
                 visible_lines: None,
@@ -217,7 +213,6 @@ where
         case::draw_case(
             &mut self.terminal,
             &case::CaseFrame {
-                id,
                 title: &title,
                 messages: "",
                 visible_lines: None,

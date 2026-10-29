@@ -7,7 +7,7 @@ use ratatui::{
     backend::Backend,
     backend::CrosstermBackend,
     layout::{Constraint, Layout},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
 };
@@ -298,7 +298,7 @@ pub(crate) fn run_home(
 pub(crate) fn show_startup_error(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     message: &str,
-) -> Result<()> {
+) -> Result<bool> {
     let visible = message
         .chars()
         .flat_map(char::escape_default)
@@ -306,13 +306,14 @@ pub(crate) fn show_startup_error(
     loop {
         terminal.draw(|frame| {
             let block = Block::default().title(" IRMind startup blocked ").borders(Borders::ALL);
-            frame.render_widget(Paragraph::new(format!("The selected keystore or local storage is unavailable.\n\n{visible}\n\nNo investigation can start. Press q or Esc to exit.")).block(block).wrap(Wrap { trim: false }), frame.area());
+            frame.render_widget(Paragraph::new(format!("Startup needs attention.\n\n{visible}\n\nPress r to retry, or q/Esc to exit safely.")).block(block).wrap(Wrap { trim: false }), frame.area());
         })?;
-        if let Event::Key(key) = event::read()?
-            && matches!(key.code, KeyCode::Esc | KeyCode::Char('q') | KeyCode::Enter)
-        {
-            break;
+        if let Event::Key(key) = event::read()? {
+            match key.code {
+                KeyCode::Char('r') => return Ok(true),
+                KeyCode::Esc | KeyCode::Char('q') => return Ok(false),
+                _ => {}
+            }
         }
     }
-    Ok(())
 }

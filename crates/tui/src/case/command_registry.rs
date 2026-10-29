@@ -7,6 +7,31 @@ pub(super) struct Command {
     pub slash: bool,
 }
 
+impl Command {
+    pub(super) fn category(&self) -> &'static str {
+        match self.name {
+            "ingest" | "verify" | "seal" | "export" | "report" | "scope" | "home" => "Case",
+            "evidence" | "evidence-save" | "raw" | "graph" | "timeline" | "entity"
+            | "neighbors" | "path" | "search" => "Evidence",
+            "approve" | "deny" | "edit" => "Approvals",
+            "findings" | "iocs" | "hypotheses" | "techniques" | "confirm" | "dismiss" | "add" => {
+                "Findings"
+            }
+            _ => "System",
+        }
+    }
+
+    pub(super) fn syntax(&self) -> &'static str {
+        match self.name {
+            "approve" | "deny" | "edit" | "module" => " <id>",
+            "evidence" | "raw" => " <hash>",
+            "ingest" => " <path>",
+            "search" => " <words>",
+            _ => "",
+        }
+    }
+}
+
 mod specs;
 use specs::COMMANDS;
 
@@ -73,6 +98,7 @@ pub(super) fn shortcut_name(code: KeyCode, modifiers: KeyModifiers) -> Option<&'
             KeyCode::Char('k') => "Ctrl+K",
             KeyCode::Char('l') => "Ctrl+L",
             KeyCode::Char('i') => "Ctrl+I",
+            KeyCode::Char('o') => "Ctrl+O",
             KeyCode::Char('c') => "Ctrl+C",
             KeyCode::Char('u') => "Ctrl+U",
             KeyCode::Char('d') => "Ctrl+D",

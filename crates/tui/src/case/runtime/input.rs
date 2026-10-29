@@ -9,6 +9,10 @@ impl CaseRuntime<'_, '_, '_> {
         let page = self.state.conversation.viewport().saturating_sub(2).max(1);
         let page = isize::try_from(page).unwrap_or(isize::MAX);
         let shortcut = command_registry::shortcut_name(code, modifiers);
+        if shortcut == Some("expand") && self.state.focus == Focus::Conversation {
+            self.state.conversation.toggle_selected();
+            return true;
+        }
         let delta = match shortcut {
             Some("scroll-up") => Some(-page),
             Some("scroll-down") => Some(page),
@@ -43,40 +47,86 @@ impl CaseRuntime<'_, '_, '_> {
             && self.state.palette.is_none()
             && self.state.confirmation.is_none()
         {
-            match code {
-                KeyCode::Up => self.state.conversation.select_by(-1),
-                KeyCode::Down => self.state.conversation.select_by(1),
-                KeyCode::Enter | KeyCode::Char(' ') => self.state.conversation.toggle_selected(),
-                KeyCode::Char(_) if shortcut == Some("approve") && self.active.is_none() => {
-                    if let Some(id) = self
-                        .state
-                        .conversation
-                        .selected_approval()
-                        .map(str::to_owned)
-                    {
-                        self.start_approval(id);
-                    }
-                }
-                KeyCode::Char(_)
-                    if matches!(shortcut, Some("deny" | "edit")) && self.active.is_none() =>
-                {
-                    if let Some(id) = self.state.conversation.selected_approval() {
-                        self.state.input = format!(
-                            "/{} {id} ",
-                            if shortcut == Some("deny") {
-                                "deny"
-                            } else {
-                                "edit"
-                            }
-                        );
-                        self.state.focus = Focus::Composer;
-                    }
-                }
-                _ => return false,
-            }
-            return true;
+            return self.navigate_focused_card(code, shortcut);
         }
         false
+    }
+
+    fn navigate_focused_card(&mut self, code: KeyCode, shortcut: Option<&str>) -> bool {
+        if let Some(id) = self
+            .state
+            .conversation
+            .selected_approval()
+            .map(str::to_owned)
+            && self.approval_card_key(&id, code)
+        {
+            return true;
+        }
+        match code {
+            KeyCode::Up => self.state.conversation.select_by(-1),
+            KeyCode::Down => self.state.conversation.select_by(1),
+            KeyCode::Enter | KeyCode::Char(' ') => self.state.conversation.toggle_selected(),
+            KeyCode::Char(_) if shortcut == Some("approve") && self.active.is_none() => {
+                if let Some(id) = self
+                    .state
+                    .conversation
+                    .selected_approval()
+                    .map(str::to_owned)
+                {
+                    self.start_approval(id);
+                }
+            }
+            KeyCode::Char(_)
+                if matches!(shortcut, Some("deny" | "edit")) && self.active.is_none() =>
+            {
+                if let Some(id) = self.state.conversation.selected_approval() {
+                    self.state.input = format!(
+                        "/{} {id} ",
+                        if shortcut == Some("deny") {
+                            "deny"
+                        } else {
+                            "edit"
+                        }
+                    );
+                    self.state.focus = Focus::Composer;
+                }
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    fn approval_card_key(&mut self, id: &str, code: KeyCode) -> bool {
+        match code {
+            KeyCode::Up => {
+                self.state.approval_option = self.state.approval_option.saturating_sub(1);
+            }
+            KeyCode::Down => self.state.approval_option = (self.state.approval_option + 1).min(2),
+            KeyCode::Char('1' | 'a') => self.state.approval_option = 0,
+            KeyCode::Char('2' | 'd') | KeyCode::Esc => self.state.approval_option = 1,
+            KeyCode::Char('3' | 'e') => self.state.approval_option = 2,
+            KeyCode::Enter => {}
+            _ => return false,
+        }
+        if matches!(code, KeyCode::Up | KeyCode::Down) {
+            return true;
+        }
+        match self.state.approval_option {
+            0 => self.start_approval(id.to_owned()),
+            1 | 2 => {
+                self.state.input = format!(
+                    "/{} {id} ",
+                    if self.state.approval_option == 1 {
+                        "deny"
+                    } else {
+                        "edit"
+                    }
+                );
+                self.state.focus = Focus::Composer;
+            }
+            _ => {}
+        }
+        true
     }
 
     fn handle_menu(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<Option<bool>> {
@@ -205,6 +255,17 @@ impl CaseRuntime<'_, '_, '_> {
     }
 
     pub(super) fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<bool> {
+        if code == KeyCode::Esc
+            && self.state.focus == Focus::Conversation
+            && let Some(id) = self
+                .state
+                .conversation
+                .selected_approval()
+                .map(str::to_owned)
+        {
+            self.approval_card_key(&id, code);
+            return Ok(false);
+        }
         let shortcut = command_registry::shortcut_name(code, modifiers);
         if shortcut == Some("exit") {
             return Ok(true);

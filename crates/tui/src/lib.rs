@@ -5,6 +5,7 @@ mod home;
 pub mod scripted;
 mod setup;
 mod startup_review;
+mod theme;
 mod workflow;
 
 use anyhow::Result;
@@ -77,7 +78,7 @@ pub struct KeystoreStatus {
     pub file_backend_active: bool,
 }
 
-pub use setup::{KeystoreChoice, choose_keystore};
+pub use setup::{KeystoreChoice, KeystoreWizard, run_keystore_wizard};
 pub use startup_review::{
     ConfigurationRecoveryChoice, OverrideReviewEntry, resolve_configuration_review,
     resolve_override_review,
@@ -134,13 +135,7 @@ pub(crate) fn prompt_hidden(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     prompt: &str,
 ) -> Result<SecretString> {
-    disable_raw_mode()?;
-    execute!(io::stdout(), LeaveAlternateScreen)?;
-    let answer = rpassword::prompt_password(prompt);
-    execute!(io::stdout(), EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    terminal.clear()?;
-    Ok(SecretString::from(answer?))
+    setup::prompt_secret(terminal, prompt)
 }
 
 impl TerminalSession {
@@ -181,7 +176,7 @@ pub fn run_workspace(
 
 /// A startup failure is rendered inside the TUI without constructing an engine.
 /// A missing configured backend never triggers a silent backend change.
-pub fn show_startup_error(message: &str) -> Result<()> {
+pub fn show_startup_error(message: &str) -> Result<bool> {
     let _session = TerminalSession::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     home::show_startup_error(&mut terminal, message)

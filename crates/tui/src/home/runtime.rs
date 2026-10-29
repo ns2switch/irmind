@@ -151,10 +151,10 @@ impl HomeRuntime<'_, '_, '_> {
                 );
                 self.verify_started = Some(Instant::now());
             }
-            HomeAction::Migrate(capability) => self.start_migration(capability)?,
+            HomeAction::Migrate(capability) => self.start_migration(capability),
             HomeAction::AddCredential => self.add_credential()?,
             HomeAction::DeleteCredential => self.delete_credential()?,
-            HomeAction::ChangePassphrase => self.change_passphrase()?,
+            HomeAction::ChangePassphrase => self.change_passphrase(),
             HomeAction::ChangeModule(change, confirmed) => {
                 return Ok(self.change_module(change, confirmed));
             }
@@ -274,7 +274,7 @@ impl HomeRuntime<'_, '_, '_> {
         Ok(())
     }
 
-    fn start_migration(&mut self, capability: &'static str) -> Result<()> {
+    fn start_migration(&mut self, capability: &'static str) {
         if let Some(status) = self.state.keystore.as_ref() {
             let current = if capability == "signer" {
                 &status.signer_backend
@@ -283,10 +283,17 @@ impl HomeRuntime<'_, '_, '_> {
             };
             let target = if current == "os" { "file" } else { "os" };
             let phrase = if target == "file" && !status.file_backend_active {
-                Some(prompt_hidden(
+                let value = prompt_hidden(
                     self.terminal,
                     "Target file keystore passphrase (input hidden): ",
-                )?)
+                );
+                match value {
+                    Ok(value) => Some(value),
+                    Err(error) => {
+                        self.state.notice = format!("Migration was not started: {error}");
+                        return;
+                    }
+                }
             } else {
                 None
             };
@@ -300,7 +307,6 @@ impl HomeRuntime<'_, '_, '_> {
             }));
             self.migration_started = Some(Instant::now());
         }
-        Ok(())
     }
 
     fn delete_credential(&mut self) -> Result<()> {
@@ -331,7 +337,13 @@ impl HomeRuntime<'_, '_, '_> {
             .and_then(|item| item.credentials.get(self.state.keystore_selected))
             .map(|item| (item.name.clone(), item.present))
         {
-            let value = prompt_hidden(self.terminal, &format!("{name} (input hidden): "))?;
+            let value = match prompt_hidden(self.terminal, &format!("{name} (input hidden): ")) {
+                Ok(value) => value,
+                Err(error) => {
+                    self.state.notice = format!("Credential entry was cancelled: {error}");
+                    return Ok(());
+                }
+            };
             self.state.restart_required = true;
             self.state.notice = match self.io_ops.put_credential(&name, &value) {
                 Ok(()) if replacing => format!(
@@ -347,12 +359,25 @@ impl HomeRuntime<'_, '_, '_> {
         Ok(())
     }
 
-    fn change_passphrase(&mut self) -> Result<()> {
-        let value = prompt_hidden(
+    fn change_passphrase(&mut self) {
+        let value = match prompt_hidden(
             self.terminal,
             "New file keystore passphrase (input hidden): ",
-        )?;
-        let repeated = prompt_hidden(self.terminal, "Repeat new passphrase (input hidden): ")?;
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                self.state.notice = format!("Passphrase change cancelled: {error}");
+                return;
+            }
+        };
+        let repeated = match prompt_hidden(self.terminal, "Repeat new passphrase (input hidden): ")
+        {
+            Ok(value) => value,
+            Err(error) => {
+                self.state.notice = format!("Passphrase change cancelled: {error}");
+                return;
+            }
+        };
         self.state.notice = if value.expose_secret() == repeated.expose_secret() {
             match self.io_ops.change_keystore_passphrase(&value) {
                 Ok(()) => "File keystore passphrase changed".into(),
@@ -361,6 +386,5 @@ impl HomeRuntime<'_, '_, '_> {
         } else {
             "Passphrases differ; the keystore was not changed".into()
         };
-        Ok(())
     }
 }

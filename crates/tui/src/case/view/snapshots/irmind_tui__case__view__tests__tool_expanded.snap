@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/case/view/tests.rs
+expression: screen(&terminal)
+---
+╭─ IRMind v0.1.0 ──────────────────────────────────────────────────────────────╮
+│ Synthetic case · high                                                        │
+│ Model: no model · Keystore: file                                             │
+│ /ingest adds evidence · ? opens help                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+⏺ IRMind
+Streaming answer with bold text.
+
+⏺ Splunk search(user=alice, 24h)
+12 events · 3 hosts
+full synthetic detail
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│Ask about the case… · / for commands · ? help                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Synthetic case · synthetic-model · 18 tok · $0
+Ctrl+B sidebar · Ctrl+K commands · PgUp scroll up · ? help · Esc cancel task

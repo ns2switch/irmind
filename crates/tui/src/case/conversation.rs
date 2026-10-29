@@ -1,18 +1,20 @@
 use super::markdown;
+use crate::theme::Theme;
 use ratatui::{
     style::{Modifier, Style},
     text::{Line, Span},
 };
+use unicode_width::UnicodeWidthStr;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum CardKind {
+    Welcome,
     Analyst,
     Model,
     Proposal,
     Approval(String),
     ToolResult,
     Finding,
-    Evidence,
     Notice,
 }
 
@@ -22,6 +24,7 @@ pub(super) struct Card {
     body: String,
     markdown: bool,
     collapsed: bool,
+    approval_option: usize,
     lines: Vec<Line<'static>>,
 }
 
@@ -33,16 +36,16 @@ impl Card {
         markdown: bool,
     ) -> Self {
         let body = body.into();
-        let collapsed = matches!(
-            kind,
-            CardKind::ToolResult | CardKind::Evidence | CardKind::Notice
-        ) && (body.len() > 1_200 || body.lines().count() > 10);
+        let collapsed = matches!(kind, CardKind::ToolResult)
+            || matches!(kind, CardKind::Notice)
+                && (body.len() > 1_200 || body.lines().count() > 10);
         Self {
             kind,
             title: title.into(),
             body,
             markdown,
             collapsed,
+            approval_option: 0,
             lines: Vec::new(),
         }
     }
@@ -51,23 +54,54 @@ impl Card {
         if !self.collapsed {
             return self.body.clone();
         }
-        let excerpt = self.body.chars().take(220).collect::<String>();
-        format!(
-            "{excerpt}…\n[{} bytes hidden · Enter/Space to expand]",
-            self.body.len().saturating_sub(excerpt.len())
-        )
+        let first = self.body.lines().next().unwrap_or("");
+        let summary = if first.len() > 120 {
+            "Detail available"
+        } else {
+            first
+        };
+        format!("⎿ {summary}  (ctrl+o to expand)")
     }
 
     fn layout(&mut self, width: usize, color: bool) {
-        let mut style = Style::default().add_modifier(Modifier::BOLD);
-        if color && matches!(self.kind, CardKind::Approval(_)) {
-            style = style.add_modifier(Modifier::REVERSED);
+        let theme = if color {
+            Theme::detect()
+        } else {
+            Theme::plain()
+        };
+        if matches!(self.kind, CardKind::Approval(_)) {
+            self.layout_approval(width, theme);
+            return;
         }
-        let marker = if self.collapsed { "▸" } else { "▾" };
-        self.lines = vec![Line::from(Span::styled(
-            format!("{marker} {}", self.title),
-            style,
-        ))];
+        if matches!(self.kind, CardKind::Welcome) {
+            self.layout_welcome(width, theme);
+            return;
+        }
+        let (heading, style) = match self.kind {
+            CardKind::Analyst => (
+                ">".into(),
+                Style::default().bg(theme.user_background).fg(theme.text),
+            ),
+            CardKind::Model => (
+                "⏺ IRMind".into(),
+                theme.accent().add_modifier(Modifier::BOLD),
+            ),
+            CardKind::Welcome => (
+                format!("╭─ {} ─", self.title),
+                theme.accent().add_modifier(Modifier::BOLD),
+            ),
+            CardKind::Approval(_) => ("Approval".into(), theme.warning()),
+            CardKind::Proposal | CardKind::ToolResult => {
+                (format!("⏺ {}", self.title), theme.accent())
+            }
+            CardKind::Notice => (self.body.lines().next().unwrap_or("").into(), theme.muted()),
+            CardKind::Finding => (format!("⏺ {}", self.title), theme.muted()),
+        };
+        self.lines = vec![Line::from(Span::styled(heading, style))];
+        if matches!(self.kind, CardKind::Notice) {
+            self.lines.push(Line::default());
+            return;
+        }
         self.lines.extend(markdown::render(
             &self.preview(),
             width,
@@ -76,10 +110,93 @@ impl Card {
         self.lines.push(Line::default());
     }
 
+    fn layout_approval(&mut self, width: usize, theme: Theme) {
+        let width = width.max(20);
+        let heading = " Approval required ";
+        self.lines = vec![Line::from(Span::styled(
+            format!(
+                "╭─{heading}{}╮",
+                "─".repeat(width.saturating_sub(UnicodeWidthStr::width(heading) + 3))
+            ),
+            theme.warning(),
+        ))];
+        for line in markdown::render(&self.body, width.saturating_sub(4), false) {
+            self.lines
+                .push(bordered_line(&line.to_string(), width, theme));
+        }
+        let labels = ["Approve", "Deny with reason", "Edit arguments"];
+        for (index, label) in labels.iter().enumerate() {
+            let marker = if index == self.approval_option {
+                "›"
+            } else {
+                " "
+            };
+            self.lines.push(bordered_line(
+                &format!("{marker} {}. {label}", index + 1),
+                width,
+                theme,
+            ));
+        }
+        self.lines.push(Line::from(Span::styled(
+            format!("╰{}╯", "─".repeat(width.saturating_sub(2))),
+            theme.warning(),
+        )));
+        self.lines.push(Line::default());
+    }
+
+    fn layout_welcome(&mut self, width: usize, theme: Theme) {
+        let width = width.max(20);
+        let heading = format!(" {} ", self.title);
+        self.lines = vec![Line::from(Span::styled(
+            format!(
+                "╭─{heading}{}╮",
+                "─".repeat(width.saturating_sub(UnicodeWidthStr::width(heading.as_str()) + 3))
+            ),
+            theme.accent(),
+        ))];
+        for line in markdown::render(&self.body, width.saturating_sub(4), false) {
+            let text = line.to_string();
+            let padding = width.saturating_sub(UnicodeWidthStr::width(text.as_str()) + 4);
+            self.lines.push(Line::from(vec![
+                Span::styled("│ ", theme.accent()),
+                Span::raw(text),
+                Span::styled(format!("{} │", " ".repeat(padding)), theme.accent()),
+            ]));
+        }
+        self.lines.push(Line::from(Span::styled(
+            format!("╰{}╯", "─".repeat(width.saturating_sub(2))),
+            theme.accent(),
+        )));
+        self.lines.push(Line::default());
+    }
+
     fn toggle(&mut self, width: usize, color: bool) {
         self.collapsed = !self.collapsed;
         self.layout(width, color);
     }
+}
+
+fn bordered_line(text: &str, width: usize, theme: Theme) -> Line<'static> {
+    let visible = text.replace(['⟦', '⟧'], "");
+    let padding = width.saturating_sub(UnicodeWidthStr::width(visible.as_str()).saturating_add(4));
+    let mut spans = vec![Span::styled("│ ", theme.warning())];
+    if let Some((before, rest)) = text.split_once('⟦')
+        && let Some((value, after)) = rest.split_once('⟧')
+    {
+        spans.push(Span::raw(before.to_owned()));
+        spans.push(Span::styled(
+            value.to_owned(),
+            theme.warning().add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::raw(after.to_owned()));
+    } else {
+        spans.push(Span::raw(text.to_owned()));
+    }
+    spans.push(Span::styled(
+        format!("{} │", " ".repeat(padding)),
+        theme.warning(),
+    ));
+    Line::from(spans)
 }
 
 pub(super) struct Conversation {
@@ -259,6 +376,20 @@ impl Conversation {
         match &self.selected.and_then(|index| self.cards.get(index))?.kind {
             CardKind::Approval(id) => Some(id),
             _ => None,
+        }
+    }
+
+    pub(super) fn set_approval_option(&mut self, option: usize) {
+        let Some(index) = self.selected else {
+            return;
+        };
+        let Some(card) = self.cards.get_mut(index) else {
+            return;
+        };
+        if matches!(card.kind, CardKind::Approval(_)) && card.approval_option != option {
+            card.approval_option = option.min(2);
+            card.layout(self.width, self.color);
+            self.recalculate_from(index);
         }
     }
 

@@ -2,6 +2,12 @@ use super::Command;
 
 pub(super) const COMMANDS: &[Command] = &[
     Command {
+        name: "expand",
+        description: "Expand or fold the selected card",
+        shortcut: "Ctrl+O",
+        slash: false,
+    },
+    Command {
         name: "help",
         description: "help",
         shortcut: "?",

@@ -47,11 +47,11 @@ No released binaries are available yet. CI produces unsigned artifacts only on r
 
 ## First case in the TUI
 
-1. Run `irmind` without a subcommand. Choose the OS keyring or encrypted-file backend for signing and module secrets. The file backend works over SSH without a graphical session. Save the analyst public-key fingerprint outside this computer.
+1. Run `irmind` without a subcommand. The first-run wizard explains signing, recommends the encrypted-file backend when no system keyring is available, and asks for a passphrase twice in masked TUI fields. It works over SSH. Save the analyst public-key fingerprint outside this computer.
 2. Press `n` to create a case. Give it a title, severity, and a time window. Leave remote sources empty for a local-only case.
 3. Open the case and enter `/ingest`. Select [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), which contains only synthetic data. IRMind hashes the file in place; copying the original is an explicit option.
 4. Return to the home screen and press `m`. Select the OpenAI-compatible module, press `e` to set an installed model and a local base URL such as `http://127.0.0.1:11434/v1/`, then confirm the change. The session reloads inside the TUI. For a remote provider, follow [configuration](docs/configuration.md) and approve its data handling first.
-5. Open the case again and describe the synthetic alert in the conversation. Enter sends; Alt+Enter adds a line. Scroll with PgUp/PgDn, use `Ctrl+B` for the case sidebar, and type `/` for command suggestions. `Ctrl+K` opens the command palette; `/pause` or Esc cancels a running task.
+5. Open the case again and describe the synthetic alert in the conversation. Enter sends; Alt+Enter adds a line. Scroll with PgUp/PgDn, use `Ctrl+B` for the case sidebar, and type `/` for grouped command suggestions. `Ctrl+K` opens the command palette; `Ctrl+O` expands a selected result. On a selected approval, use the arrow keys and Enter or 1/2/3. `/pause` or Esc cancels a running task.
 6. Review the timeline and indexed records, then use `/verify <source-root>`, `/report`, `/seal`, and `/export`. Sealing and export show the case hash and signing-key fingerprint before confirmation.
 
 No LLM is enabled by default. You can ingest, inspect, and verify local evidence without one.

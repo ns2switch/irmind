@@ -44,21 +44,36 @@ impl CaseRuntime<'_, '_, '_> {
         let mut status = self.active.as_ref().map_or_else(
             || "idle".into(),
             |(_, _, label)| {
-                format!(
-                    "{label}: {}s",
-                    self.state
-                        .running_since
-                        .map_or(0, |since| since.elapsed().as_secs())
-                )
+                let elapsed = self
+                    .state
+                    .running_since
+                    .map_or(0, |since| since.elapsed().as_secs());
+                let frame = self
+                    .state
+                    .running_since
+                    .map_or(0, |since| (since.elapsed().as_millis() / 150) as usize % 4);
+                let spinner = ["◐", "◓", "◑", "◒"][frame];
+                let verb = match *label {
+                    "IRMind" => "Thinking",
+                    "SIEM alert" => "Consulting SIEM",
+                    "Ingest" => "Ingesting evidence",
+                    "Verify" => "Verifying custody",
+                    other => other,
+                };
+                format!("{spinner} {verb}… {elapsed}s · esc to interrupt")
             },
         );
         if self.overrides_active {
             status = format!("OVR {status}");
         }
+        if let Some(progress) = &self.state.progress_status {
+            status.push_str(" · ");
+            status.push_str(progress);
+        }
         if self.engine.case_scope_exceeds_policy(&self.state.case)? {
             status = format!("SCOPE LIMITED {status}");
         }
-        Ok(status)
+        Ok(self.engine.guard.screen(&status)?.text)
     }
 
     fn sync_conversation(&mut self) -> Result<()> {
@@ -131,10 +146,12 @@ impl CaseRuntime<'_, '_, '_> {
         let size = self.terminal.size()?;
         let chat_area =
             super::view::conversation_area(size.into(), &shown_input, self.state.sidebar_visible);
-        self.state.conversation.set_viewport(
-            usize::from(chat_area.width.saturating_sub(2)),
-            usize::from(chat_area.height.saturating_sub(2)),
-        );
+        self.state
+            .conversation
+            .set_viewport(usize::from(chat_area.width), usize::from(chat_area.height));
+        self.state
+            .conversation
+            .set_approval_option(self.state.approval_option);
         let visible_lines = self.state.conversation.visible_lines();
         let status = self.status_text()?;
         let model_name = self
@@ -149,7 +166,6 @@ impl CaseRuntime<'_, '_, '_> {
         draw_case(
             self.terminal,
             &CaseFrame {
-                id: self.id,
                 title: &title,
                 messages: "",
                 visible_lines: Some(&visible_lines),

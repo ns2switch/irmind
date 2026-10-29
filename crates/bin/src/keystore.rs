@@ -15,6 +15,16 @@ use std::{
 
 #[cfg(feature = "keystore-file")]
 use irmind_mod_keystore_file::FileKeystore;
+#[derive(Debug)]
+pub(super) struct SetupCancelled;
+
+impl std::fmt::Display for SetupCancelled {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("keystore setup cancelled by analyst")
+    }
+}
+
+impl std::error::Error for SetupCancelled {}
 #[cfg(feature = "keystore-file")]
 type FilePorts = (
     Arc<dyn SignerBackend>,
@@ -66,7 +76,8 @@ fn read_config(home: &Path) -> Result<Option<Selection>> {
     }
     irmind_fs::private_file(&path).context("restrict keystore configuration")?;
     let source = fs::read_to_string(&path).context("read keystore configuration")?;
-    let parsed: Configuration = toml::from_str(&source).context("parse keystore configuration")?;
+    let parsed: Configuration = toml::from_str(&source)
+        .map_err(|_| anyhow!("keystore.toml has invalid syntax or unknown fields"))?;
     if !matches!(parsed.keystore.signer.as_str(), "os" | "file")
         || !matches!(parsed.keystore.secrets.as_str(), "os" | "file")
     {
@@ -160,8 +171,20 @@ fn os_backend() -> Result<(Arc<dyn SignerBackend>, Arc<dyn SecretBackend>)> {
 }
 
 #[cfg(feature = "keystore-file")]
-fn file_backend(home: &Path, fd: Option<u32>, create: bool) -> Result<FilePorts> {
-    let backend = Arc::new(FileKeystore::open(home, &read_passphrase(fd)?, create)?);
+fn file_backend(
+    home: &Path,
+    fd: Option<u32>,
+    passphrase: Option<&SecretString>,
+    create: bool,
+) -> Result<FilePorts> {
+    let cli_passphrase;
+    let passphrase = if let Some(value) = passphrase {
+        value
+    } else {
+        cli_passphrase = read_passphrase(fd)?;
+        &cli_passphrase
+    };
+    let backend = Arc::new(FileKeystore::open(home, passphrase, create)?);
     Ok((backend.clone(), backend.clone(), backend))
 }
 
@@ -189,6 +212,7 @@ fn activate(
     fd: Option<u32>,
     allow_create: bool,
     has_cases: bool,
+    passphrase: Option<&SecretString>,
 ) -> Result<ActiveKeystore> {
     #[cfg(not(feature = "keystore-file"))]
     let _ = (home, fd);
@@ -197,6 +221,7 @@ fn activate(
         let (signer, secrets, admin) = file_backend(
             home,
             fd,
+            passphrase,
             allow_create && !home.join("keystore.enc").exists(),
         )?;
         (Some((signer, secrets)), Some(admin))
@@ -250,52 +275,98 @@ pub(super) fn load_or_configure(
     has_cases: bool,
 ) -> Result<ActiveKeystore> {
     let configured = read_config(home)?;
-    if let Some(selection) = &configured {
-        match activate(home, selection, fd, false, has_cases) {
-            Ok(active) => return Ok(active),
-            Err(error) if !interactive => return Err(error),
-            Err(error) => {
-                let reason = format!(
-                    "Configured backend unavailable: {error}. Select explicitly to change it."
-                );
-                let choice = irmind_tui::choose_keystore(
-                    &reason,
-                    os_backend().is_ok(),
-                    cfg!(feature = "keystore-file"),
-                )?
-                .ok_or_else(|| anyhow!("keystore setup cancelled"))?;
-                let mut revised = Selection {
-                    signer: choice.signer.into(),
-                    secrets: choice.secrets.into(),
-                    analyst_key_fingerprint: selection.analyst_key_fingerprint.clone(),
-                };
-                let active = activate(home, &revised, fd, true, has_cases)?;
-                revised.analyst_key_fingerprint = Some(hex(&sha256(&active.signer.public_key())));
-                write_config(home, &revised)?;
-                return Ok(active);
-            }
-        }
+    if interactive {
+        return interactive_setup(home, configured.as_ref(), has_cases);
     }
-    if !interactive {
-        return Err(anyhow!(
-            "keystore backend is not configured; run irmind interactively first"
-        ));
-    }
-    let choice = irmind_tui::choose_keystore(
-        "Select signer and secret backends. No backend is chosen automatically.",
+    let selection = configured.ok_or_else(|| {
+        anyhow!("keystore backend is not configured; run irmind interactively first")
+    })?;
+    activate(home, &selection, fd, false, has_cases, None)
+}
+
+fn interactive_setup(
+    home: &Path,
+    configured: Option<&Selection>,
+    has_cases: bool,
+) -> Result<ActiveKeystore> {
+    let configured_choice = configured.map(|selection| irmind_tui::KeystoreChoice {
+        signer: if selection.signer == "os" {
+            "os"
+        } else {
+            "file"
+        },
+        secrets: if selection.secrets == "os" {
+            "os"
+        } else {
+            "file"
+        },
+    });
+    let wizard = irmind_tui::KeystoreWizard::new(
+        configured_choice,
         os_backend().is_ok(),
         cfg!(feature = "keystore-file"),
-    )?
-    .ok_or_else(|| anyhow!("keystore setup cancelled"))?;
-    let mut selection = Selection {
-        signer: choice.signer.into(),
-        secrets: choice.secrets.into(),
-        analyst_key_fingerprint: None,
-    };
-    let active = activate(home, &selection, fd, true, has_cases)?;
-    selection.analyst_key_fingerprint = Some(hex(&sha256(&active.signer.public_key())));
-    write_config(home, &selection)?;
-    Ok(active)
+        home.join("keystore.enc").exists(),
+    );
+    let active = irmind_tui::run_keystore_wizard(wizard, |choice, passphrase| {
+        let mut selection = Selection {
+            signer: choice.signer.into(),
+            secrets: choice.secrets.into(),
+            analyst_key_fingerprint: configured
+                .and_then(|value| value.analyst_key_fingerprint.clone()),
+        };
+        match activate(home, &selection, None, true, has_cases, passphrase) {
+            Ok(active) => {
+                let fingerprint = hex(&sha256(&active.signer.public_key()));
+                selection.analyst_key_fingerprint = Some(fingerprint.clone());
+                write_config(home, &selection).map_err(|error| setup_error(home, &error))?;
+                Ok((fingerprint, active))
+            }
+            Err(error) => Err(setup_error(home, &error)),
+        }
+    })?;
+    active.ok_or_else(|| anyhow!(SetupCancelled))
+}
+
+fn setup_error(home: &Path, error: &anyhow::Error) -> String {
+    let detail = format!("{error:#}");
+    tracing::error!(target: "irmind::operations", stage = "keystore", causes = %detail, "startup operation failed");
+    if detail.contains("encrypted keystore file or directory is not accessible") {
+        format!(
+            "The vault at {} cannot be accessed with your user permissions. Check ownership and access, then retry.",
+            home.join("keystore.enc").display()
+        )
+    } else if detail.contains("cannot unlock encrypted keystore")
+        || detail.contains("encrypted keystore operation failed")
+    {
+        format!(
+            "The passphrase is incorrect or the vault at {} is damaged. Retry; if this persists, restore a known-good vault. Details: {}",
+            home.join("keystore.enc").display(),
+            home.join("diagnostics.log").display()
+        )
+    } else if detail.contains("open in another process") {
+        "The encrypted file is already open in another IRMind process. Close that session, then retry.".into()
+    } else if detail.contains("encrypted keystore not found") {
+        format!(
+            "The configured vault at {} is missing. Restore it or select another backend; no key was generated silently.",
+            home.join("keystore.enc").display()
+        )
+    } else if detail.contains("unknown encrypted keystore version") {
+        "The vault format is newer than this IRMind build. Upgrade IRMind; the file was not modified.".into()
+    } else if detail.contains("encrypted keystore parameters are unsafe") {
+        "The vault uses weak or invalid encryption parameters. Restore a valid vault; IRMind will not lower its minimums.".into()
+    } else if detail.contains("Permission denied") || detail.contains("permission denied") {
+        format!(
+            "The data directory {} cannot be accessed with your user permissions. Check ownership and access, then retry.",
+            home.display()
+        )
+    } else if detail.contains("keyring") || detail.contains("secret service") {
+        "The OS keyring is unavailable in this session. Choose the encrypted file backend; it works over SSH.".into()
+    } else {
+        format!(
+            "Keystore setup failed: {detail}. Retry or choose another backend. Diagnostics: {}",
+            home.join("diagnostics.log").display()
+        )
+    }
 }
 
 pub(super) fn select_migrated_backend(

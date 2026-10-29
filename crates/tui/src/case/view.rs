@@ -1,18 +1,17 @@
 use super::command_registry;
 use super::markdown;
+use crate::theme::Theme;
 use anyhow::Result;
-use irmind_app::CaseId;
 use ratatui::{
     Terminal,
     layout::{Constraint, Layout, Rect},
-    style::{Modifier, Style},
-    text::Line,
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    style::Style,
+    text::{Line, Span},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
 pub(crate) struct CaseFrame<'a> {
-    pub id: &'a CaseId,
     pub title: &'a str,
     pub messages: &'a str,
     pub visible_lines: Option<&'a [Line<'static>]>,
@@ -67,22 +66,29 @@ where
 {
     terminal.draw(|frame| {
         let area = frame.area();
+        let theme = Theme::detect();
         let sections = Layout::vertical([
             Constraint::Min(3),
             Constraint::Length(composer_height(view.input, area.width)),
             Constraint::Length(2),
         ])
         .split(area);
-        draw_thread(frame, view, area, sections[0]);
-        draw_prompt(frame, view, sections[1]);
-        draw_footer(frame, view, sections[2]);
-        draw_menu(frame, view, area, sections[1]);
-        draw_overlay(frame, view, area);
+        draw_thread(frame, view, area, sections[0], theme);
+        draw_prompt(frame, view, sections[1], theme);
+        draw_footer(frame, view, sections[2], theme);
+        draw_menu(frame, view, area, sections[1], theme);
+        draw_overlay(frame, view, area, theme);
     })?;
     Ok(())
 }
 
-fn draw_thread(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect, section: Rect) {
+fn draw_thread(
+    frame: &mut ratatui::Frame<'_>,
+    view: &CaseFrame<'_>,
+    area: Rect,
+    section: Rect,
+    theme: Theme,
+) {
     let columns = if view.sidebar_visible && area.width >= 110 {
         Some(
             Layout::horizontal([Constraint::Percentage(68), Constraint::Percentage(32)])
@@ -102,15 +108,21 @@ fn draw_thread(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect,
             },
             <[Line<'static>]>::to_vec,
         );
-        let title = if view.new_content {
-            format!(" {} · new content ↓ ", view.title)
-        } else {
-            format!(" {} ", view.title)
-        };
         frame.render_widget(
-            Paragraph::new(lines).block(Block::default().title(title).borders(Borders::ALL)),
+            Paragraph::new(lines).style(Style::default().fg(theme.text)),
             chat_area,
         );
+        if view.new_content {
+            frame.render_widget(
+                Paragraph::new(" new content ↓ End ").style(theme.warning()),
+                Rect::new(
+                    chat_area.right().saturating_sub(22),
+                    chat_area.y,
+                    chat_area.width.min(22),
+                    1,
+                ),
+            );
+        }
     }
     if view.sidebar_visible {
         let side_area = columns.as_ref().map_or(section, |columns| columns[1]);
@@ -131,7 +143,8 @@ fn draw_thread(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect,
                 .block(
                     Block::default()
                         .title(format!(" {title} · Tab next · Ctrl+B close "))
-                        .borders(Borders::ALL),
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(theme.border)),
                 )
                 .wrap(Wrap { trim: false })
                 .scroll((view.sidebar_scroll, 0)),
@@ -140,7 +153,7 @@ fn draw_thread(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect,
     }
 }
 
-fn draw_prompt(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Rect) {
+fn draw_prompt(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Rect, theme: Theme) {
     let input_width = usize::from(section.width.saturating_sub(2)).max(1);
     let input_rows = markdown::render(view.input, input_width, false);
     let visible_count = usize::from(section.height.saturating_sub(2));
@@ -151,12 +164,20 @@ fn draw_prompt(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
         .cloned()
         .collect::<Vec<_>>();
     let input_visible = input_visible.into_iter().rev().collect::<Vec<_>>();
+    let shown = if view.input.is_empty() {
+        vec![Line::from("Ask about the case… · / for commands · ? help")]
+    } else {
+        input_visible.clone()
+    };
     frame.render_widget(
-        Paragraph::new(input_visible.clone()).block(
-            Block::default()
-                .title(" Prompt · Enter send · Alt/Shift+Enter newline ")
-                .borders(Borders::ALL),
-        ),
+        Paragraph::new(shown)
+            .style(Style::default().fg(theme.text).bg(theme.user_background))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(theme.border)),
+            ),
         section,
     );
     if view.input_focused && view.overlay.is_none() && visible_count > 0 {
@@ -174,28 +195,53 @@ fn draw_prompt(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
     }
 }
 
-fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Rect) {
-    let case_short = view.id.as_str().chars().take(8).collect::<String>();
-    let model_short = view.model.chars().take(12).collect::<String>();
-    let status = format!(
-        "{case_short} | {model_short} | {} tok | {} | {} appr | {} det | {}{}",
-        view.tokens,
-        view.cost,
-        view.pending,
-        view.detections,
-        view.status,
-        if view.new_content { " | End↓" } else { "" }
-    );
+fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Rect, theme: Theme) {
+    let title = if view.title.chars().count() > 18 {
+        format!("{}…", view.title.chars().take(17).collect::<String>())
+    } else {
+        view.title.to_owned()
+    };
+    let mut spans = vec![Span::styled(
+        format!(
+            "{title} · {} · {} tok · {}",
+            view.model, view.tokens, view.cost
+        ),
+        theme.muted(),
+    )];
+    if view.pending > 0 {
+        spans.push(Span::styled(
+            format!(" · {} approvals", view.pending),
+            theme.warning(),
+        ));
+    }
+    if view.detections > 0 {
+        spans.push(Span::styled(
+            format!(" · {} detections", view.detections),
+            theme.warning(),
+        ));
+    }
+    if view.status != "idle" {
+        spans.push(Span::styled(
+            format!(" · {}", view.status),
+            if view.status.contains("OVR") || view.status.contains("SCOPE LIMITED") {
+                theme.warning()
+            } else {
+                theme.muted()
+            },
+        ));
+    }
+    if view.new_content {
+        spans.push(Span::styled(" · End ↓", theme.warning()));
+    }
     frame.render_widget(
-        Paragraph::new(status),
+        Paragraph::new(Line::from(spans)),
         Rect {
             height: 1,
             ..section
         },
     );
     frame.render_widget(
-        Paragraph::new(command_registry::help_bar())
-            .style(Style::default().add_modifier(Modifier::DIM)),
+        Paragraph::new(command_registry::help_bar()).style(theme.muted()),
         Rect {
             y: section.y.saturating_add(1),
             height: 1,
@@ -204,7 +250,13 @@ fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
     );
 }
 
-fn draw_menu(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect, prompt_area: Rect) {
+fn draw_menu(
+    frame: &mut ratatui::Frame<'_>,
+    view: &CaseFrame<'_>,
+    area: Rect,
+    prompt_area: Rect,
+    theme: Theme,
+) {
     if let Some(menu) = view.menu {
         let width = area.width.clamp(1, 72);
         let height = u16::try_from(menu.lines().count().saturating_add(2))
@@ -212,14 +264,33 @@ fn draw_menu(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect, p
             .min(10);
         let menu_area = Rect::new(area.x, prompt_area.y.saturating_sub(height), width, height);
         frame.render_widget(Clear, menu_area);
+        let lines = menu
+            .lines()
+            .map(|line| {
+                Line::styled(
+                    line.to_owned(),
+                    if line.starts_with('>') {
+                        theme.accent()
+                    } else {
+                        theme.muted()
+                    },
+                )
+            })
+            .collect::<Vec<_>>();
         frame.render_widget(
-            Paragraph::new(menu).block(Block::default().title(" Commands ").borders(Borders::ALL)),
+            Paragraph::new(lines).block(
+                Block::default()
+                    .title(" Commands ")
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(theme.border)),
+            ),
             menu_area,
         );
     }
 }
 
-fn draw_overlay(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect) {
+fn draw_overlay(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect, theme: Theme) {
     if let Some(overlay) = view.overlay {
         let width = area.width.saturating_sub(4).clamp(1, 90);
         let height = area.height.saturating_sub(4).clamp(1, 20);
@@ -235,7 +306,8 @@ fn draw_overlay(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect
                 .block(
                     Block::default()
                         .title(" Detail · PgUp/PgDn scroll · Esc close ")
-                        .borders(Borders::ALL),
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(theme.border)),
                 )
                 .wrap(Wrap { trim: false })
                 .scroll((view.overlay_scroll, 0)),
@@ -246,110 +318,4 @@ fn draw_overlay(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
-mod tests {
-    use super::*;
-    use ratatui::backend::TestBackend;
-
-    fn screen(terminal: &Terminal<TestBackend>) -> String {
-        let buffer = terminal.backend().buffer();
-        (0..buffer.area.height)
-            .map(|y| {
-                (0..buffer.area.width)
-                    .map(|x| buffer[(x, y)].symbol())
-                    .collect::<String>()
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
-    #[test]
-    fn narrow_terminal_keeps_prompt_and_new_content_indicator() {
-        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
-        let id = CaseId::parse("00000000-0000-0000-0000-000000000000").unwrap();
-        let lines = vec![
-            Line::from("Analyst: synthetic alert"),
-            Line::from("IRMind: finding"),
-        ];
-        let view = CaseFrame {
-            id: &id,
-            title: "Synthetic",
-            messages: "",
-            visible_lines: Some(&lines),
-            input: "first line\nsecond line",
-            input_focused: true,
-            panel: "timeline",
-            overlay: None,
-            menu: Some("> /verify verify custody"),
-            tab: 0,
-            sidebar_visible: false,
-            sidebar_scroll: 0,
-            overlay_scroll: 0,
-            new_content: true,
-            model: "fake",
-            tokens: 12,
-            cost: "$0",
-            pending: 1,
-            detections: 1,
-            status: "idle",
-        };
-        draw_case(&mut terminal, &view).unwrap();
-        let shown = screen(&terminal);
-        assert!(shown.contains("new content"));
-        assert!(shown.contains("Analyst: synthetic alert"));
-        assert!(shown.contains("second line"));
-        assert!(shown.contains("/verify"));
-        assert!(shown.contains("fake"));
-        assert_eq!(
-            conversation_area(Rect::new(0, 0, 80, 24), view.input, false).width,
-            80
-        );
-    }
-
-    #[test]
-    fn expanded_card_and_scrolled_sidebar_are_visible_in_test_backend() {
-        use crate::case::conversation::{Card, CardKind, Conversation};
-        let mut chat = Conversation::new(false);
-        chat.set_viewport(48, 12);
-        chat.push(Card::new(
-            CardKind::ToolResult,
-            "Evidence search",
-            format!("source=synthetic#0 {}", "x".repeat(2_000)),
-            false,
-        ));
-        let id = CaseId::parse("00000000-0000-0000-0000-000000000000").unwrap();
-        let mut terminal = Terminal::new(TestBackend::new(120, 24)).unwrap();
-        let lines = chat.visible_lines();
-        let mut view = CaseFrame {
-            id: &id,
-            title: "Synthetic",
-            messages: "",
-            visible_lines: Some(&lines),
-            input: "",
-            input_focused: false,
-            panel: "line zero\nline one\nline two",
-            overlay: None,
-            menu: None,
-            tab: 0,
-            sidebar_visible: true,
-            sidebar_scroll: 1,
-            overlay_scroll: 0,
-            new_content: false,
-            model: "fake",
-            tokens: 0,
-            cost: "n/a",
-            pending: 0,
-            detections: 0,
-            status: "idle",
-        };
-        draw_case(&mut terminal, &view).unwrap();
-        assert!(screen(&terminal).contains("Evidence search"));
-        assert!(screen(&terminal).contains("hidden"));
-        assert!(screen(&terminal).contains("line one"));
-        chat.toggle_selected();
-        let expanded_lines = chat.visible_lines();
-        view.visible_lines = Some(&expanded_lines);
-        draw_case(&mut terminal, &view).unwrap();
-        assert!(!screen(&terminal).contains("hidden"));
-        assert!(screen(&terminal).contains("xxxxxxxx"));
-    }
-}
+mod tests;

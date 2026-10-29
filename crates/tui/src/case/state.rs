@@ -42,6 +42,7 @@ pub(super) struct CaseState {
     pub findings: Vec<Finding>,
     pub tab: usize,
     pub selected_approval: usize,
+    pub approval_option: usize,
     pub selected_finding: usize,
     pub palette: Option<String>,
     pub picker: Option<PathPicker>,
@@ -53,6 +54,7 @@ pub(super) struct CaseState {
     pub timeline: Vec<TimelineEvent>,
     pub needs_refresh: bool,
     pub running_since: Option<Instant>,
+    pub progress_status: Option<String>,
 }
 
 pub(super) enum CaseMessage {
@@ -98,7 +100,11 @@ pub(super) fn update(state: &mut CaseState, message: CaseMessage) -> CaseAction 
             }
             CaseAction::None
         }
-        CaseMessage::Progress(text) | CaseMessage::TaskFinished(text) => {
+        CaseMessage::Progress(text) => {
+            state.progress_status = Some(text);
+            CaseAction::None
+        }
+        CaseMessage::TaskFinished(text) => {
             state.messages.push(text);
             CaseAction::None
         }
@@ -290,6 +296,7 @@ mod tests {
             findings: Vec::new(),
             tab: 0,
             selected_approval: 0,
+            approval_option: 0,
             selected_finding: 0,
             palette: None,
             picker: None,
@@ -301,6 +308,7 @@ mod tests {
             timeline: Vec::new(),
             needs_refresh: false,
             running_since: None,
+            progress_status: None,
         };
         update(
             &mut state,
@@ -335,6 +343,13 @@ mod tests {
         ));
         update(&mut state, CaseMessage::ModelDelta("partial answer".into()));
         assert_eq!(state.model_preview, "partial answer");
+        state.model_preview.clear();
+        update(&mut state, CaseMessage::ModelDelta("enrichment.".into()));
+        update(&mut state, CaseMessage::ModelDelta(" The".into()));
+        assert_eq!(state.model_preview, "enrichment. The");
+        update(&mut state, CaseMessage::Progress("Ingested 1/1".into()));
+        assert_eq!(state.progress_status.as_deref(), Some("Ingested 1/1"));
+        assert!(state.messages.is_empty());
         state.focus = Focus::Composer;
         update(
             &mut state,

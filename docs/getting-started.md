@@ -18,9 +18,9 @@ On Windows, run `.\target\release\irmind.exe` in Windows Terminal. When a CI art
 
 ## First launch
 
-Running `irmind` without a subcommand opens the TUI. Choose `os` or `file` separately for signing and module secrets. Both backends are compiled by default; IRMind never switches between them silently. The file backend asks for a passphrase without echo and works through an interactive SSH terminal without a graphical session. On first use IRMind creates an analyst signing key and shows its public-key fingerprint. Save the fingerprint through a separate trusted channel. A lost key cannot be recovered from a case export.
+Running `irmind` without a subcommand opens the TUI. The first-run wizard explains why cases are signed and lets you choose `os` or `file` separately for signing and module secrets. Both backends are compiled by default; IRMind never switches between them silently. The wizard recommends `file` when the system keyring is unavailable. It asks for the file passphrase twice in masked fields inside the TUI, checks its length, and works through an interactive SSH terminal without a graphical session. Esc goes back; Ctrl+C asks before exiting. On first use IRMind creates an analyst signing key and shows its public-key fingerprint. Save the fingerprint through a separate trusted channel. A lost key cannot be recovered from a case export.
 
-If the selected backend is unavailable, startup stops and the TUI offers an explicit new selection. The chosen backends are stored in `keystore.toml` inside the data directory. Press `k` on the home screen to see the selection and fingerprint, manage module credentials, change the file passphrase, or migrate. Replacing a credential leaves already-created connectors using the old value; press `r` in the keystore view to restart the session.
+If unlocking fails, the wizard shows an actionable reason and lets you retry or choose another backend. A wrong passphrase never exits the TUI. Unexpected startup errors point to the private `diagnostics.log` in the data directory. The chosen backends are stored in `keystore.toml`. Press `k` on the home screen to see the selection and fingerprint, manage module credentials, change the file passphrase, or migrate. Secret entry stays masked inside the TUI. Replacing a credential leaves already-created connectors using the old value; press `r` in the keystore view to restart the session.
 
 Press `m` to see which modules are compiled, enabled, and configured. Use the arrow keys to select a module, Tab to select a public field, and `e` to edit its value. Enter selects an LLM or toggles a connector. Press `k` to reach its credentials in the keystore. A change that may send data off this computer asks for signed confirmation. The TUI reloads the session after applying a change. No LLM is enabled automatically.
 
@@ -39,7 +39,7 @@ The export can be checked on a second computer with `irmind verify-export <PACKA
 
 ## Navigate the case
 
-The conversation fills the case workspace. Tool proposals, approvals, results, and findings appear as cards in order. `Ctrl+B` shows or hides the case sidebar. Tab cycles its timeline, evidence, approvals, and finding views. Use `Ctrl+L` to focus the conversation and `Ctrl+I` to return to the prompt. Enter or Space expands a selected card; `a`, `d`, and `e` act on a selected approval.
+The conversation fills the case workspace. The opening card shows the case, model, and signing backend. Tool proposals, approvals, results, and findings appear in order. Long results start folded with a one-line summary. `Ctrl+B` shows or hides the case sidebar. Tab cycles its timeline, evidence, approvals, and finding views. Use `Ctrl+L` to focus the conversation and `Ctrl+I` to return to the prompt. Enter, Space, or `Ctrl+O` expands a selected result. On a selected approval, use Up/Down and Enter or press 1/2/3 to approve, deny with a reason, or edit arguments. Esc asks for a denial reason.
 
 Graph queries and local searches also appear as result cards. Long results start folded; select a card and press Enter or Space to expand it, then scroll within the conversation.
 
