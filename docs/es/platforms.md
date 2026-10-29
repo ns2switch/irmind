@@ -1,4 +1,4 @@
-Traducción de docs/platforms.md en el commit 5f1c2bbaa4c1c2b3b8a72963693ae7f59b4314b2; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit 1062ed9ecebb5f0c6cbe3fbccb335de723e20dbe; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
@@ -45,4 +45,4 @@ Usa Windows Terminal y el binario x64 MSVC. `os` utiliza Credential Manager; `fi
 
 Sin `--home`, los datos se guardan en el directorio estándar de datos locales de cada plataforma: XDG en Linux, Application Support en macOS y LocalAppData en Windows. Los nombres de evidencia son hashes en minúsculas; las rutas de auditoría y exportación son relativas y usan `/`. Cada caso tiene una base SQLite de auditoría y un grafo derivado DuckDB.
 
-La TUI usa la pantalla alternativa y sanea el texto externo antes de mostrarlo. Los tests automáticos comprueban secuencias de control y controles bidireccionales en los tres sistemas. La interacción visual aún requiere revisión manual en cada terminal antes de usarse en producción. Por SSH, solicita un terminal con `ssh -t`, elige `file` y escribe la passphrase en el prompt sin eco. IRMind no cambia de backend en silencio. `verify-export` funciona sin desbloquear un llavero.
+La TUI usa la pantalla alternativa y sanea el texto externo antes de mostrarlo. Los tests automáticos comprueban secuencias de control y controles bidireccionales en los tres sistemas. La interacción visual aún requiere revisión manual en cada terminal antes de usarse en producción. Por SSH, solicita un terminal con `ssh -t`, elige `file` y escribe la passphrase en el campo enmascarado de la TUI. IRMind no cambia de backend en silencio. `verify-export` funciona sin desbloquear un llavero.

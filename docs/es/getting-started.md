@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit ddcb3f112871a561de22eb725b98882c3e0df37a; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 1062ed9ecebb5f0c6cbe3fbccb335de723e20dbe; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -22,28 +22,28 @@ En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Cuando
 
 Al ejecutar `irmind` sin subcomando se abre la TUI. El asistente explica por qué se firman los casos y permite elegir `os` o `file` por separado para la firma y los secretos. Usa las flechas y Enter para elegir cada backend; las opciones no disponibles aparecen atenuadas con el motivo y no se pueden seleccionar. Ambos se compilan por defecto; IRMind nunca cambia de backend en silencio. Preselecciona `file` si no hay llavero del sistema. Pide dos veces la passphrase en campos enmascarados dentro de la TUI, comprueba su longitud y funciona por SSH sin sesión gráfica. Esc retrocede y Ctrl+C pide confirmación para salir. En el primer uso se crea la clave del analista y se muestra su huella pública. Guárdala fuera del equipo por un canal de confianza.
 
-Si falla el desbloqueo, el asistente muestra el motivo y permite reintentar o elegir otro backend. Una passphrase errónea no cierra la TUI. Los errores inesperados apuntan a `diagnostics.log` en el directorio de datos. La selección queda en `keystore.toml`. Pulsa `k` en la pantalla de inicio para ver los backends y la huella, gestionar credenciales, cambiar la passphrase o migrar. La entrada de secretos permanece enmascarada dentro de la TUI. Tras sustituir una credencial, los conectores activos conservan el valor anterior; pulsa `r` para reiniciar la sesión.
+Si falla el desbloqueo, el asistente muestra el motivo y permite reintentar o elegir otro backend. Una passphrase errónea no cierra la TUI. Los errores inesperados apuntan a `diagnostics.log` en el directorio de datos. La selección queda en `keystore.toml`. Escribe `/keystore` para ver los backends y la huella, gestionar credenciales, cambiar la passphrase o migrar. La entrada de secretos permanece enmascarada dentro de la TUI. Tras sustituir una credencial, los conectores activos conservan el valor anterior; escribe `/restart` para reiniciar la sesión.
 
-Pulsa `m` para ver qué módulos están compilados, habilitados y configurados. Usa las flechas para elegir un módulo, Tab para elegir un campo público y `e` para editarlo. Enter selecciona un LLM o activa un conector. `k` abre sus credenciales en el llavero. Un cambio que pueda enviar datos fuera del equipo pide confirmación firmada. La TUI recarga la sesión tras aplicarlo. Ningún LLM se activa automáticamente.
+La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no habilita ningún LLM ni conector. El paso opcional «Modelo de IA» del primer arranque, o `/model` después, ofrece Ollama local, compatible con OpenAI, Anthropic, DeepSeek y OpenRouter. Ollama comprueba `http://127.0.0.1:11434` y muestra los modelos instalados; si no responde, arráncalo con `ollama serve` y reintenta. Para un proveedor remoto, indica la URL, el modelo y la clave enmascarada. «Probar conexión» envía solo texto sintético. La salida remota de datos requiere confirmación firmada. Escribe `/modules` para ver los módulos, usa las flechas para seleccionarlos, Tab para elegir campos, `/edit-param` para editarlos y `/keystore` para gestionar credenciales. La sesión se recarga tras aprobar un cambio.
 
 Si `config.toml` requiere recuperación, la TUI ofrece restaurarlo o revisar los cambios campo a campo antes de abrir casos. Los flags y variables de entorno que cambian los destinos se muestran y requieren confirmación; rechazarlos mantiene los ajustes guardados.
 
 ## Primer caso sintético
 
-1. Pulsa `n`, escribe un título como «Alerta de CloudTrail de prueba», elige una severidad y deja vacíos los campos de fuentes remotas. Se creará un caso local con un evento firmado.
+1. Escribe `/new`, introduce un título como «Alerta de CloudTrail de prueba», elige una severidad y deja vacíos los campos de fuentes remotas. Se creará un caso local con un evento firmado.
 2. En el caso, escribe `/ingest` y selecciona [el archivo sintético de CloudTrail](../../examples/cloudtrail-alert.json). IRMind lo identifica por su hash en su ubicación y crea un índice Parquet. Solo copia el original si usas expresamente `/ingest --copy-original <ruta>`.
 3. Usa `/timeline` o `/graph` para examinar los eventos indexados. `/search <palabras>` busca registros JSON coincidentes. Usa `/raw <hash> <índice>` para consultar un registro indexado.
-4. Vuelve a la pantalla de inicio, pulsa `m` y elige un modelo y sus ajustes públicos como explica [configuración](configuration.md). La sesión se recarga sin salir de IRMind. Abre el caso y pregunta: «¿Qué sugiere el evento AssumeRole sintético?».
-5. Revisa las llamadas propuestas en la conversación. Enter envía; Alt+Enter o Shift+Enter añade una línea. Escribe `/` para ver sugerencias o pulsa `Ctrl+K` para abrir la paleta. `/pause` o Esc cancela una tarea activa.
+4. Escribe `/model` para elegir y probar un modelo como explica [configuración](configuration.md). La sesión se recarga sin salir de IRMind. Abre el caso y pregunta: «¿Qué sugiere el evento AssumeRole sintético?».
+5. Revisa las llamadas propuestas en la conversación. Enter envía. Escribe `/` para ver sugerencias o pulsa `Ctrl+K` para abrir la paleta. `/pause` o Esc cancela una tarea activa.
 6. Ejecuta `/verify <directorio-origen>` para comprobar los bytes originales, revisa `/report` y usa `/seal` y `/export` solo después de comprobar el hash del caso y la huella de la clave de firma que se muestran.
 
 Puedes verificar el paquete en otro equipo con `irmind verify-export <PACKAGE> --expected-key <FINGERPRINT>`. Consulta la [referencia de la CLI](../development/cli.md) para automatización.
 
 ## Navegar por el caso
 
-La conversación ocupa el espacio principal. La tarjeta inicial muestra el caso, el modelo y el llavero. Las propuestas, aprobaciones, resultados y hallazgos aparecen en orden. Los resultados largos empiezan plegados con un resumen. `Ctrl+B` muestra u oculta el panel lateral. Tab recorre cronología, evidencias, aprobaciones y hallazgos. `Ctrl+L` enfoca la conversación y `Ctrl+I` vuelve a la entrada. Enter, Espacio o `Ctrl+O` despliegan un resultado. En una aprobación seleccionada, usa ↑/↓ y Enter o 1/2/3 para aprobar, denegar indicando motivo o editar argumentos. Esc pide el motivo de denegación.
+La conversación ocupa el espacio principal. La tarjeta inicial muestra el caso, el modelo y el llavero. Las propuestas, aprobaciones, resultados y hallazgos aparecen en orden. Los resultados largos empiezan plegados con un resumen. `/sidebar` muestra u oculta los paneles. Tab mueve el foco desde la entrada a la conversación y por los paneles visibles; Esc vuelve. `Ctrl+O` despliega un resultado seleccionado. En una aprobación, usa ↑/↓ y Enter, o escribe 1/2/3 y después Enter para aprobar, denegar con motivo o editar argumentos.
 
-Las consultas del grafo y las búsquedas locales también aparecen como tarjetas de resultado. Las respuestas largas empiezan plegadas; selecciona la tarjeta y pulsa Enter o Espacio para desplegarla, y desplázate por la conversación.
+Las consultas del grafo y las búsquedas locales también aparecen como tarjetas de resultado. Selecciona la tarjeta y pulsa Enter o `Ctrl+O` para desplegarla, y desplázate por la conversación.
 
 En casos Parquet grandes, añade `--from=<UTC> --to=<UTC>`, `--account=<ID>` o `--project=<ID>`, y `--region=<NOMBRE>` a `/search`, `/entity`, `/neighbors`, `/entity-timeline` o `/path`. Por ejemplo, `/search AssumeRole --from=2026-10-28T12:00:00Z --to=2026-10-28T13:00:00Z --account=123456789012 --region=eu-west-1` lee solo las particiones y horas coincidentes. Los dos límites UTC deben ir juntos y el filtro debe quedar dentro del alcance del caso. La tarjeta de vecinos indica cuándo su muestra de 4.096 registros es parcial.
 
@@ -51,7 +51,7 @@ Con un SIEM configurado, `/siem-alert` obtiene una alerta dentro del alcance por
 
 ![Conversación de un caso sintético de CloudTrail con una respuesta del modelo que aparece de forma incremental](../assets/conversation.png)
 
-PgUp/PgDn y Ctrl+U/Ctrl+D desplazan la vista enfocada. Inicio/Fin o `g`/`G` en la conversación saltan al principio/final. El texto nuevo del modelo sigue el final solo si ya estás allí; Fin quita el indicador de contenido nuevo. ↑/↓ recuperan entradas anteriores. `/help` o `?` muestran los comandos y atajos. La rueda del ratón funciona por defecto. Para seleccionar texto con el terminal, pon `mouse_capture = false` en la [configuración](configuration.md) y acepta el cambio desde la TUI.
+PgUp/PgDn desplazan la vista enfocada. El texto nuevo del modelo sigue el final solo si ya estás allí. ↑/↓ recuperan entradas anteriores cuando el campo está vacío. `/help` lista todos los comandos y las teclas reservadas. Los caracteres imprimibles siempre se escriben en el campo; ninguna letra ejecuta un atajo. La rueda del ratón funciona por defecto. Para seleccionar texto con el terminal, pon `mouse_capture = false` en la [configuración](configuration.md) y acepta el cambio desde la TUI.
 
 ![Menú de comandos con sus descripciones sobre el campo de entrada](../assets/command-menu.png)
 
