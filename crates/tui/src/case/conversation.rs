@@ -22,6 +22,7 @@ pub(super) struct Card {
     pub kind: CardKind,
     title: String,
     body: String,
+    summary: Option<String>,
     markdown: bool,
     collapsed: bool,
     approval_option: usize,
@@ -36,13 +37,14 @@ impl Card {
         markdown: bool,
     ) -> Self {
         let body = body.into();
-        let collapsed = matches!(kind, CardKind::ToolResult)
+        let collapsed = matches!(kind, CardKind::Proposal | CardKind::ToolResult)
             || matches!(kind, CardKind::Notice)
                 && (body.len() > 1_200 || body.lines().count() > 10);
         Self {
             kind,
             title: title.into(),
             body,
+            summary: None,
             markdown,
             collapsed,
             approval_option: 0,
@@ -50,16 +52,16 @@ impl Card {
         }
     }
 
+    pub(super) fn with_summary(mut self, summary: impl Into<String>) -> Self {
+        self.summary = Some(summary.into());
+        self
+    }
+
     fn preview(&self) -> String {
         if !self.collapsed {
             return self.body.clone();
         }
-        let first = self.body.lines().next().unwrap_or("");
-        let summary = if first.len() > 120 {
-            "Detail available"
-        } else {
-            first
-        };
+        let summary = self.summary.as_deref().unwrap_or("Detail available");
         format!("⎿ {summary}  (ctrl+o to expand)")
     }
 
@@ -77,15 +79,12 @@ impl Card {
             self.layout_welcome(width, theme);
             return;
         }
+        if matches!(self.kind, CardKind::Analyst | CardKind::Model) {
+            self.layout_message(width, theme);
+            return;
+        }
         let (heading, style) = match self.kind {
-            CardKind::Analyst => (
-                ">".into(),
-                Style::default().bg(theme.user_background).fg(theme.text),
-            ),
-            CardKind::Model => (
-                "⏺ IRMind".into(),
-                theme.accent().add_modifier(Modifier::BOLD),
-            ),
+            CardKind::Analyst | CardKind::Model => (String::new(), theme.muted()),
             CardKind::Welcome => (
                 format!("╭─ {} ─", self.title),
                 theme.accent().add_modifier(Modifier::BOLD),
@@ -102,11 +101,54 @@ impl Card {
             self.lines.push(Line::default());
             return;
         }
+        if matches!(self.kind, CardKind::Proposal | CardKind::ToolResult) {
+            if self.collapsed {
+                self.lines.push(Line::styled(self.preview(), theme.muted()));
+            } else {
+                if let Some(summary) = &self.summary {
+                    self.lines
+                        .push(Line::styled(format!("⎿ {summary}"), theme.muted()));
+                }
+                for line in markdown::render(&self.body, width.saturating_sub(2), false) {
+                    self.lines
+                        .push(Line::styled(format!("  {line}"), theme.muted()));
+                }
+            }
+            self.lines.push(Line::default());
+            return;
+        }
         self.lines.extend(markdown::render(
             &self.preview(),
             width,
             self.markdown && !self.collapsed,
         ));
+        self.lines.push(Line::default());
+    }
+
+    fn layout_message(&mut self, width: usize, theme: Theme) {
+        let analyst = matches!(self.kind, CardKind::Analyst);
+        let prefix = if analyst { "> " } else { "⏺ " };
+        let base = Style::default().fg(theme.text).bg(theme.user_background);
+        self.lines = markdown::render(&self.body, width.saturating_sub(2), self.markdown)
+            .into_iter()
+            .enumerate()
+            .map(|(index, line)| {
+                let marker = if index == 0 { prefix } else { "  " };
+                let mut spans = vec![Span::styled(
+                    marker,
+                    if analyst { base } else { theme.accent() },
+                )];
+                spans.extend(line.spans);
+                let mut output = Line::from(spans);
+                if analyst {
+                    let padding =
+                        width.saturating_sub(UnicodeWidthStr::width(output.to_string().as_str()));
+                    output.spans.push(Span::raw(" ".repeat(padding)));
+                    output = output.style(base);
+                }
+                output
+            })
+            .collect();
         self.lines.push(Line::default());
     }
 
@@ -199,6 +241,12 @@ fn bordered_line(text: &str, width: usize, theme: Theme) -> Line<'static> {
     Line::from(spans)
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum SelectionState {
+    Passive,
+    Navigating,
+}
+
 pub(super) struct Conversation {
     cards: Vec<Card>,
     offsets: Vec<usize>,
@@ -207,6 +255,7 @@ pub(super) struct Conversation {
     viewport: usize,
     scroll: usize,
     selected: Option<usize>,
+    selection_state: SelectionState,
     preview: Option<usize>,
     follow_tail: bool,
     new_content: bool,
@@ -223,6 +272,7 @@ impl Conversation {
             viewport: 20,
             scroll: 0,
             selected: None,
+            selection_state: SelectionState::Passive,
             preview: None,
             follow_tail: true,
             new_content: false,
@@ -238,6 +288,7 @@ impl Conversation {
         if self.follow_tail {
             self.scroll = self.max_scroll();
             self.selected = Some(self.cards.len() - 1);
+            self.selection_state = SelectionState::Passive;
         } else {
             self.new_content = true;
         }
@@ -320,6 +371,7 @@ impl Conversation {
     }
 
     pub(super) fn scroll_by(&mut self, delta: isize) {
+        self.selection_state = SelectionState::Navigating;
         self.scroll = self
             .scroll
             .saturating_add_signed(delta)
@@ -332,12 +384,14 @@ impl Conversation {
     }
 
     pub(super) fn jump_start(&mut self) {
+        self.selection_state = SelectionState::Navigating;
         self.scroll = 0;
         self.follow_tail = self.max_scroll() == 0;
         self.selected = (!self.cards.is_empty()).then_some(0);
     }
 
     pub(super) fn jump_end(&mut self) {
+        self.selection_state = SelectionState::Navigating;
         self.scroll = self.max_scroll();
         self.follow_tail = true;
         self.new_content = false;
@@ -348,6 +402,7 @@ impl Conversation {
         if self.cards.is_empty() {
             return;
         }
+        self.selection_state = SelectionState::Navigating;
         let current = self.selected.unwrap_or(0);
         let next = current
             .saturating_add_signed(delta)
@@ -365,6 +420,7 @@ impl Conversation {
 
     pub(super) fn toggle_selected(&mut self) {
         let Some(index) = self.selected else { return };
+        self.selection_state = SelectionState::Navigating;
         if let Some(card) = self.cards.get_mut(index) {
             card.toggle(self.width, self.color);
             self.recalculate_from(index);
@@ -403,7 +459,10 @@ impl Conversation {
             let card = &self.cards[card_index];
             while line_index < card.lines.len() && lines.len() < self.viewport {
                 let mut line = card.lines[line_index].clone();
-                if line_index == 0 && self.selected == Some(card_index) {
+                if line_index == 0
+                    && self.selection_state == SelectionState::Navigating
+                    && self.selected == Some(card_index)
+                {
                     let modifier = if self.color {
                         Modifier::REVERSED
                     } else {
@@ -491,5 +550,73 @@ mod tests {
         assert!(chat.total_lines > folded);
         chat.push(Card::new(CardKind::Notice, "Next", "done", false));
         assert_eq!(chat.cards.len(), 2);
+    }
+
+    #[test]
+    fn messages_start_on_marker_line_and_selection_appears_only_after_navigation() {
+        let mut chat = Conversation::new(false);
+        chat.set_viewport(60, 12);
+        chat.push(Card::new(
+            CardKind::Analyst,
+            "Analyst",
+            "What happened?",
+            false,
+        ));
+        chat.push(Card::new(
+            CardKind::Model,
+            "IRMind",
+            "The role changed.",
+            true,
+        ));
+        let lines = chat.visible_lines();
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.to_string().starts_with("> What happened?"))
+        );
+        assert!(
+            lines
+                .iter()
+                .filter(|line| line.to_string().starts_with("> What happened?"))
+                .all(|line| UnicodeWidthStr::width(line.to_string().as_str()) == 60)
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.to_string().starts_with("⏺ The role changed."))
+        );
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.to_string().contains("⏺ IRMind"))
+        );
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.style.add_modifier.contains(Modifier::BOLD))
+        );
+        chat.select_by(-1);
+        assert!(chat.visible_lines().iter().any(|line| {
+            line.to_string().starts_with("> What happened?")
+                && line.style.add_modifier.contains(Modifier::BOLD)
+        }));
+    }
+
+    #[test]
+    fn folded_tool_uses_status_and_keeps_exact_arguments_in_detail() {
+        let mut card = Card::new(
+            CardKind::Proposal,
+            "VirusTotal lookup(example.com)",
+            r#"ti_lookup_external {"ioc":"example.com"}"#,
+            false,
+        )
+        .with_summary("waiting for approval");
+        card.layout(80, false);
+        let folded = card.lines.iter().map(Line::to_string).collect::<String>();
+        assert!(folded.contains("⎿ waiting for approval"));
+        assert!(!folded.contains("{\"ioc\""));
+        card.toggle(80, false);
+        let expanded = card.lines.iter().map(Line::to_string).collect::<String>();
+        assert!(expanded.contains(r#"{"ioc":"example.com"}"#));
     }
 }

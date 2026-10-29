@@ -15,17 +15,27 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "docs" / "assets"
+UX_AFTER = ROOT / "docs" / "ux" / "after"
 IMAGE = (
     "ghcr.io/charmbracelet/vhs@"
     "sha256:9d5fc3dc0c160b0fb1d2212baff07e6bdf3fa9438c504a3237484567302fcf93"
 )
 EXAMPLE_SHA256 = "0b7f3a97647d64d5d917b09002f069f2cf15a058ea2406bceaf2d5fe5f02d055"
 FILES = ("demo.gif", "conversation.png", "command-menu.png", "approval-card.png")
+UX_FILES = (
+    "home.png",
+    "conversation.png",
+    "command-menu.png",
+    "approval-card.png",
+    "backend.png",
+    "os-unavailable.png",
+    "passphrase-error.png",
+)
 EXPECTED_FLOW = (
     "Demo CloudTrail alert",
     "Evidence ingested",
     "Commands",
-    "⏺ IRMind",
+    "⏺ The synthetic record",
     "Approval required",
     "UNTRUSTED",
     "example.com",
@@ -44,11 +54,7 @@ def docker(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def validate_transcript(path: Path) -> None:
-    text = path.read_text(encoding="utf-8", errors="replace")
-    missing = [item for item in EXPECTED_FLOW if item not in text]
-    if missing:
-        raise ValueError(f"demo flow is incomplete: {', '.join(missing)}")
+def validate_privacy(text: str) -> None:
     personal = (
         str(Path.home()),
         getpass.getuser(),
@@ -61,6 +67,14 @@ def validate_transcript(path: Path) -> None:
     )
     if any(value and value in text for value in personal):
         raise ValueError("demo capture contains a personal path, identity or key fingerprint")
+
+
+def validate_transcript(path: Path) -> None:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    missing = [item for item in EXPECTED_FLOW if item not in text]
+    if missing:
+        raise ValueError(f"demo flow is incomplete: {', '.join(missing)}")
+    validate_privacy(text)
 
 
 def validate_images(directory: Path) -> None:
@@ -90,10 +104,27 @@ def validate_images(directory: Path) -> None:
         raise ValueError(f"demo duration must be 20–30 seconds, got {duration:.2f}")
 
 
-def install_images(directory: Path) -> None:
-    ASSETS.mkdir(parents=True, exist_ok=True)
-    for name in FILES:
-        with tempfile.NamedTemporaryFile(prefix=".demo-", dir=ASSETS, delete=False) as item:
+def validate_ux_images(directory: Path) -> None:
+    for name in UX_FILES:
+        path = directory / name
+        raw = path.read_bytes()[:24]
+        if raw[:8] != b"\x89PNG\r\n\x1a\n" or struct.unpack(">II", raw[16:24]) != (
+            1230,
+            660,
+        ):
+            raise ValueError(f"wrong UX screenshot dimensions: {name}")
+    transcript = (directory / "wizard.ascii").read_text(
+        encoding="utf-8", errors="replace"
+    )
+    validate_privacy(transcript)
+    if "Encrypted file" not in transcript or "passphrase" not in transcript:
+        raise ValueError("first-run screenshots do not show backend and passphrase steps")
+
+
+def install_images(directory: Path, names: tuple[str, ...], destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        with tempfile.NamedTemporaryFile(prefix=".demo-", dir=destination, delete=False) as item:
             staged = Path(item.name)
             try:
                 with (directory / name).open("rb") as source:
@@ -104,7 +135,7 @@ def install_images(directory: Path) -> None:
                 staged.unlink(missing_ok=True)
                 raise
         try:
-            staged.replace(ASSETS / name)
+            staged.replace(destination / name)
         finally:
             staged.unlink(missing_ok=True)
 
@@ -130,10 +161,28 @@ def main() -> None:
         )
         validate_transcript(output / "demo.ascii")
         validate_images(output)
-        install_images(output)
-        print("Generated synthetic demo: 20–30 s, <5 MB, three screenshots; privacy scan passed.")
+        docker(
+            "--user", f"{os.getuid()}:{os.getgid()}",
+            "--mount", f"type=bind,src={output},dst=/out",
+            "--entrypoint", "ffmpeg", IMAGE,
+            "-y", "-v", "error", "-i", "/out/demo.gif",
+            "-ss", "0.5", "-frames:v", "1", "/out/home.png",
+        )
+        wizard = docker(
+            "--init", "--user", f"{os.getuid()}:{os.getgid()}",
+            "--env", "HOME=/tmp/irmind-ux-home",
+            "--mount", f"type=bind,src={ROOT},dst=/vhs,readonly",
+            "--mount", f"type=bind,src={output},dst=/vhs/docs/ux/after",
+            "--workdir", "/vhs", IMAGE, "docs/ux/after-wizard.tape",
+        )
+        validate_ux_images(output)
+        install_images(output, FILES, ASSETS)
+        install_images(output, UX_FILES, UX_AFTER)
+        print("Generated synthetic demo and UX captures; privacy scan passed.")
         if result.stderr.strip():
             print(result.stderr.strip())
+        if wizard.stderr.strip():
+            print(wizard.stderr.strip())
 
 
 if __name__ == "__main__":

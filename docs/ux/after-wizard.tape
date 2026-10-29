@@ -1,0 +1,43 @@
+# Synthetic, offline first-run screens for PR review.
+Output docs/ux/after/wizard.gif
+Output docs/ux/after/wizard.ascii
+
+Set Shell "bash"
+Set FontFamily "Source Code Pro"
+Set FontSize 16
+Set Width 1230
+Set Height 660
+Set Padding 0
+Set Theme "Catppuccin Mocha"
+Set Framerate 12
+Set TypingSpeed 15 ms
+Set CursorBlink false
+
+Env HOME "/tmp/irmind-ux-home"
+Env USER "demo"
+Env LOGNAME "demo"
+Env HOSTNAME "demo"
+Env PS1 "demo$ "
+Env TERM "xterm-256color"
+
+Hide
+Type "mkdir -p /tmp/irmind-ux-home && clear && env -i HOME=/tmp/irmind-ux-home USER=demo LOGNAME=demo HOSTNAME=demo PATH=/usr/local/bin:/usr/bin:/bin TERM=xterm-256color /vhs/target/debug/irmind --home /tmp/irmind-ux-home/data"
+Enter
+Sleep 2 s
+Show
+
+Enter
+Sleep 700 ms
+Screenshot docs/ux/after/backend.png
+Up
+Sleep 500 ms
+Screenshot docs/ux/after/os-unavailable.png
+Enter
+Sleep 700 ms
+Enter
+Sleep 700 ms
+Type "short"
+Enter
+Sleep 700 ms
+Screenshot docs/ux/after/passphrase-error.png
+Sleep 1 s

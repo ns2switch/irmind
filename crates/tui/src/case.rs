@@ -106,7 +106,7 @@ fn initial_state(
         pending_final_reply: None,
         usage_cache_seq: 0,
         usage_cache_tokens: 0,
-        usage_cache_cost: "cost n/a".into(),
+        usage_cache_cost: String::new(),
         turn_detection_count: 0,
         sidebar_visible: false,
         sidebar_scroll: 0,

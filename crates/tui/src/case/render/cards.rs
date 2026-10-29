@@ -15,12 +15,9 @@ pub(super) fn audit_card(
             engine.guard.screen(&entry.payload)?.text,
             false,
         )),
-        AuditEventKind::Proposal | AuditEventKind::ToolDispatch => Some(Card::new(
-            CardKind::Proposal,
-            engine.guard.screen(&friendly_call(&entry.payload))?.text,
-            engine.guard.screen(&entry.payload)?.text,
-            false,
-        )),
+        AuditEventKind::Proposal | AuditEventKind::ToolDispatch => {
+            Some(call_card(entry, state, engine)?)
+        }
         AuditEventKind::ModelReply => Some(Card::new(
             CardKind::Model,
             "IRMind",
@@ -28,25 +25,10 @@ pub(super) fn audit_card(
             true,
         )),
         AuditEventKind::NeedsApproval => return approval_card(entry, state, engine),
-        AuditEventKind::ApprovalGranted | AuditEventKind::ApprovalDenied => Some(Card::new(
-            CardKind::Notice,
-            entry.kind.as_str(),
-            engine.guard.screen(&entry.payload)?.text,
-            false,
-        )),
-        AuditEventKind::ToolResult => Some(Card::new(
-            CardKind::ToolResult,
-            "Tool result",
-            format!(
-                "{}\nEvidence: {}",
-                engine.guard.screen(&entry.payload)?.text,
-                entry
-                    .evidence
-                    .as_deref()
-                    .map_or_else(|| "none".into(), short_hash)
-            ),
-            false,
-        )),
+        AuditEventKind::ApprovalGranted | AuditEventKind::ApprovalDenied => {
+            Some(decision_card(entry, state, engine)?)
+        }
+        AuditEventKind::ToolResult => Some(result_card(entry, state, engine)?),
         AuditEventKind::EvidenceIngested => Some(Card::new(
             CardKind::Notice,
             "Evidence ingested",
@@ -77,6 +59,61 @@ pub(super) fn audit_card(
         _ => None,
     };
     Ok(card)
+}
+
+fn call_card(entry: &SignedEntry, state: &CaseState, engine: &Engine<'_>) -> Result<Card> {
+    let summary = if entry.kind == AuditEventKind::ToolDispatch {
+        "approved"
+    } else {
+        proposal_status(entry, state)
+    };
+    Ok(Card::new(
+        CardKind::Proposal,
+        engine.guard.screen(&friendly_call(&entry.payload))?.text,
+        engine.guard.screen(&entry.payload)?.text,
+        false,
+    )
+    .with_summary(summary))
+}
+
+fn decision_card(entry: &SignedEntry, state: &CaseState, engine: &Engine<'_>) -> Result<Card> {
+    let summary = if entry.kind == AuditEventKind::ApprovalGranted {
+        "approved".to_owned()
+    } else {
+        let reason = serde_json::from_str::<serde_json::Value>(&entry.payload)
+            .ok()
+            .and_then(|value| value.get("reason")?.as_str().map(str::to_owned))
+            .unwrap_or_else(|| "analyst decision".into());
+        format!("denied: {reason}")
+    };
+    Ok(Card::new(
+        CardKind::Proposal,
+        engine
+            .guard
+            .screen(&approval_tool_title(entry, state))?
+            .text,
+        engine.guard.screen(&entry.payload)?.text,
+        false,
+    )
+    .with_summary(engine.guard.screen(&summary)?.text))
+}
+
+fn result_card(entry: &SignedEntry, state: &CaseState, engine: &Engine<'_>) -> Result<Card> {
+    let title = related_dispatch_title(entry, state);
+    Ok(Card::new(
+        CardKind::ToolResult,
+        engine.guard.screen(&title)?.text,
+        format!(
+            "{}\nEvidence: {}",
+            engine.guard.screen(&entry.payload)?.text,
+            entry
+                .evidence
+                .as_deref()
+                .map_or_else(|| "none".into(), short_hash)
+        ),
+        false,
+    )
+    .with_summary("approved · result stored"))
 }
 
 fn approval_card(
@@ -157,6 +194,70 @@ fn short_hash(hash: &str) -> String {
         return hash.to_owned();
     }
     format!("{}…{}", &hash[..8], &hash[hash.len() - 7..])
+}
+
+fn proposal_status(entry: &SignedEntry, state: &CaseState) -> &'static str {
+    let mut later = state
+        .entries
+        .iter()
+        .filter(|candidate| candidate.seq > entry.seq)
+        .take_while(|candidate| candidate.kind != AuditEventKind::Proposal);
+    if later
+        .clone()
+        .any(|candidate| candidate.kind == AuditEventKind::NeedsApproval)
+    {
+        "waiting for approval"
+    } else if later.any(|candidate| {
+        matches!(
+            candidate.kind,
+            AuditEventKind::Allowed | AuditEventKind::ToolDispatch
+        )
+    }) {
+        "approved"
+    } else {
+        "proposed"
+    }
+}
+
+fn approval_tool_title(entry: &SignedEntry, state: &CaseState) -> String {
+    let id = serde_json::from_str::<serde_json::Value>(&entry.payload)
+        .ok()
+        .and_then(|value| value.get("id")?.as_str().map(str::to_owned));
+    state
+        .entries
+        .iter()
+        .rev()
+        .filter(|candidate| {
+            candidate.seq < entry.seq && candidate.kind == AuditEventKind::NeedsApproval
+        })
+        .find_map(|candidate| {
+            let value = serde_json::from_str::<serde_json::Value>(&candidate.payload).ok()?;
+            if value.get("id")?.as_str()? != id.as_deref()? {
+                return None;
+            }
+            let tool = value.get("tool")?.as_str()?;
+            let args = value.get("args")?;
+            Some(friendly_call(&format!("{tool} {args}")))
+        })
+        .unwrap_or_else(|| "Tool call".into())
+}
+
+fn related_dispatch_title(entry: &SignedEntry, state: &CaseState) -> String {
+    state
+        .entries
+        .iter()
+        .rev()
+        .find(|candidate| {
+            candidate.seq < entry.seq
+                && matches!(
+                    candidate.kind,
+                    AuditEventKind::Allowed | AuditEventKind::ToolDispatch
+                )
+        })
+        .map_or_else(
+            || "Tool result".into(),
+            |candidate| friendly_call(&candidate.payload),
+        )
 }
 
 fn friendly_tool(value: &str) -> String {

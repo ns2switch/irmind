@@ -18,16 +18,16 @@ impl CaseRuntime<'_, '_, '_> {
         }
         let usage = summarize_usage(&self.state.entries)?;
         self.state.usage_cache_tokens = usage.input_tokens.saturating_add(usage.output_tokens);
-        self.state.usage_cache_cost = usage.estimated_cost_microusd.map_or_else(
-            || "cost n/a".to_owned(),
-            |micro| {
-                format!(
-                    "cost ${}.{:04}",
-                    micro / 1_000_000,
-                    (micro % 1_000_000) / 100
-                )
-            },
-        );
+        self.state.usage_cache_cost =
+            usage
+                .estimated_cost_microusd
+                .map_or_else(String::new, |micro| {
+                    format!(
+                        "cost ${}.{:04}",
+                        micro / 1_000_000,
+                        (micro % 1_000_000) / 100
+                    )
+                });
         self.state.usage_cache_seq = last_seq;
         self.state.turn_detection_count = self
             .state
@@ -112,9 +112,10 @@ impl CaseRuntime<'_, '_, '_> {
                 .engine
                 .screen_and_audit(self.id, &result, title, None)?
                 .text;
-            self.state
-                .conversation
-                .push(Card::new(CardKind::ToolResult, title, visible, false));
+            self.state.conversation.push(
+                Card::new(CardKind::ToolResult, title, &visible, false)
+                    .with_summary(result_summary(&visible)),
+            );
         }
         Ok(())
     }
@@ -188,5 +189,43 @@ impl CaseRuntime<'_, '_, '_> {
             },
         )?;
         Ok(())
+    }
+}
+
+fn result_summary(text: &str) -> String {
+    let count = serde_json::from_str::<serde_json::Value>(text)
+        .ok()
+        .and_then(|value| match value {
+            serde_json::Value::Array(items) => Some(items.len()),
+            serde_json::Value::Object(fields) => ["results", "events", "items"]
+                .iter()
+                .find_map(|key| fields.get(*key)?.as_array().map(Vec::len)),
+            _ => None,
+        });
+    count.map_or_else(
+        || "approved · result available".into(),
+        |count| {
+            format!(
+                "approved · {count} result{}",
+                if count == 1 { "" } else { "s" }
+            )
+        },
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::result_summary;
+
+    #[test]
+    fn result_summary_counts_records_without_showing_json() {
+        assert_eq!(
+            result_summary(r#"{"results":[{"id":1},{"id":2},{"id":3}]}"#),
+            "approved · 3 results"
+        );
+        assert_eq!(
+            result_summary("private raw text"),
+            "approved · result available"
+        );
     }
 }

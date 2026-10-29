@@ -9,7 +9,7 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
     let mut setup_terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     let choice = render_keystore_setup(&mut setup_terminal, false).unwrap();
     assert_eq!((choice.signer, choice.secrets), ("file", "file"));
-    assert!(screen(&setup_terminal).contains("first-run keystore"));
+    assert!(screen(&setup_terminal).contains("Step 1 of 4"));
     let store = Arc::new(LocalStore::open(root.path()).unwrap());
     let file_backend = FileKeystore::open(
         root.path(),
@@ -53,7 +53,7 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
         "v1;sources=siem-a;accounts=acct-a;hosts=;from=2026-10-23T10:00:00Z;to=2026-10-23T11:00:00Z").unwrap();
     tui.render_case(&id, "Case opened").unwrap();
     assert!(screen(tui.terminal()).contains("Synthetic incident"));
-    assert!(screen(tui.terminal()).contains("Ctrl+B sidebar"));
+    assert!(screen(tui.terminal()).contains("Ask about the case"));
 
     let evidence = root.path().join("synthetic.json");
     std::fs::write(&evidence, br#"{"Records":[{"eventTime":"2026-10-23T10:10:00Z","eventName":"Login","sourceIPAddress":"203.0.113.9","domain":"example.com"}]}"#).unwrap();

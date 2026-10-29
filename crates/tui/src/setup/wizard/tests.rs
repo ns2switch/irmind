@@ -42,6 +42,7 @@ fn file_creation_rejects_short_and_mismatched_passphrases() {
     let mut wizard = KeystoreWizard::new(None, false, true, false);
     assert_eq!(enter(&mut wizard), WizardAction::None);
     assert_eq!(enter(&mut wizard), WizardAction::None);
+    assert_eq!(enter(&mut wizard), WizardAction::None);
     assert_eq!(wizard.step, Step::Passphrase);
     type_text(&mut wizard, "short");
     enter(&mut wizard);
@@ -72,12 +73,18 @@ fn unavailable_os_backend_can_switch_to_file_and_retry_unlock() {
         true,
     );
     wizard.key(key(KeyCode::Esc));
+    assert_eq!(wizard.step, Step::Backend);
+    assert_eq!(wizard.backend_cursor, "file");
+    wizard.key(key(KeyCode::Up));
+    assert_eq!(wizard.backend_cursor, "file");
     enter(&mut wizard);
-    assert!(wizard.error.as_deref().unwrap().contains("unavailable"));
-    wizard.key(key(KeyCode::Char('s')));
-    wizard.key(key(KeyCode::Char('c')));
     enter(&mut wizard);
     assert_eq!(wizard.step, Step::Unlock);
+    assert_eq!(
+        (wizard.choice.signer, wizard.choice.secrets),
+        ("file", "file")
+    );
+    assert!(wizard.error.is_none());
     type_text(&mut wizard, "incorrect phrase");
     assert_eq!(enter(&mut wizard), WizardAction::Attempt);
     wizard.attempted(Err("Incorrect passphrase or damaged vault".into()));
@@ -92,6 +99,7 @@ fn unavailable_os_backend_can_switch_to_file_and_retry_unlock() {
 #[test]
 fn password_never_reaches_test_backend_or_debug() {
     let mut wizard = KeystoreWizard::new(None, false, true, false);
+    enter(&mut wizard);
     enter(&mut wizard);
     enter(&mut wizard);
     type_text(&mut wizard, "synthetic super secret");
@@ -158,6 +166,7 @@ fn unwritable_directory_error_stays_in_wizard_with_retry() {
     let mut wizard = KeystoreWizard::new(None, false, true, false);
     enter(&mut wizard);
     enter(&mut wizard);
+    enter(&mut wizard);
     type_text(&mut wizard, "synthetic long passphrase");
     enter(&mut wizard);
     type_text(&mut wizard, "synthetic long passphrase");
@@ -184,4 +193,20 @@ fn unwritable_directory_error_stays_in_wizard_with_retry() {
         .collect::<String>();
     assert!(screen.contains("Retry"));
     assert!(!screen.contains("synthetic long passphrase"));
+}
+
+#[test]
+fn backend_list_selects_each_capability_with_arrows_and_enter() {
+    let mut wizard = KeystoreWizard::new(None, true, true, false);
+    enter(&mut wizard);
+    assert_eq!(wizard.backend_cursor, "os");
+    wizard.key(key(KeyCode::Down));
+    assert_eq!(wizard.backend_cursor, "file");
+    enter(&mut wizard);
+    assert_eq!(wizard.backend_field, BackendField::Secrets);
+    assert_eq!(wizard.choice.signer, "file");
+    wizard.key(key(KeyCode::Down));
+    enter(&mut wizard);
+    assert_eq!(wizard.choice.secrets, "file");
+    assert_eq!(wizard.step, Step::Passphrase);
 }

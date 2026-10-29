@@ -1,4 +1,3 @@
-use super::command_registry;
 use super::markdown;
 use crate::theme::Theme;
 use anyhow::Result;
@@ -46,7 +45,7 @@ pub(crate) fn conversation_area(area: Rect, input: &str, sidebar_visible: bool) 
     let sections = Layout::vertical([
         Constraint::Min(3),
         Constraint::Length(composer_height(input, area.width)),
-        Constraint::Length(2),
+        Constraint::Length(1),
     ])
     .split(area);
     if sidebar_visible && area.width >= 110 {
@@ -70,7 +69,7 @@ where
         let sections = Layout::vertical([
             Constraint::Min(3),
             Constraint::Length(composer_height(view.input, area.width)),
-            Constraint::Length(2),
+            Constraint::Length(1),
         ])
         .split(area);
         draw_thread(frame, view, area, sections[0], theme);
@@ -201,16 +200,19 @@ fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
     } else {
         view.title.to_owned()
     };
-    let mut spans = vec![Span::styled(
-        format!(
-            "{title} · {} · {} tok · {}",
-            view.model, view.tokens, view.cost
-        ),
-        theme.muted(),
-    )];
+    let mut label = format!("{title} · {} · {} tok", view.model, view.tokens);
+    if !view.cost.is_empty() && !matches!(view.cost, "n/a" | "cost n/a") {
+        label.push_str(" · ");
+        label.push_str(view.cost);
+    }
+    let mut spans = vec![Span::styled(label, theme.muted())];
     if view.pending > 0 {
         spans.push(Span::styled(
-            format!(" · {} approvals", view.pending),
+            format!(
+                " · {} approval{} pending",
+                view.pending,
+                if view.pending == 1 { "" } else { "s" }
+            ),
             theme.warning(),
         ));
     }
@@ -240,14 +242,6 @@ fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
             ..section
         },
     );
-    frame.render_widget(
-        Paragraph::new(command_registry::help_bar()).style(theme.muted()),
-        Rect {
-            y: section.y.saturating_add(1),
-            height: 1,
-            ..section
-        },
-    );
 }
 
 fn draw_menu(
@@ -260,8 +254,9 @@ fn draw_menu(
     if let Some(menu) = view.menu {
         let width = area.width.clamp(1, 72);
         let height = u16::try_from(menu.lines().count().saturating_add(2))
-            .unwrap_or(10)
-            .min(10);
+            .unwrap_or(16)
+            .min(16)
+            .min(area.height.saturating_sub(3));
         let menu_area = Rect::new(area.x, prompt_area.y.saturating_sub(height), width, height);
         frame.render_widget(Clear, menu_area);
         let lines = menu
@@ -271,8 +266,10 @@ fn draw_menu(
                     line.to_owned(),
                     if line.starts_with('>') {
                         theme.accent()
-                    } else {
+                    } else if line.starts_with("· ") {
                         theme.muted()
+                    } else {
+                        Style::default().fg(theme.text)
                     },
                 )
             })

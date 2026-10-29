@@ -12,6 +12,9 @@ docker pull ghcr.io/charmbracelet/vhs@sha256:9d5fc3dc0c160b0fb1d2212baff07e6bdf3
 python3 docs/demo/generate.py
 ```
 
+The generator also drives the versioned [first-run wizard tape](../ux/after-wizard.tape)
+and updates the review captures in `docs/ux/after/`.
+
 The generator uses the official VHS v0.11.0 container pinned by digest
 `sha256:9d5fc3dc0c160b0fb1d2212baff07e6bdf3fa9438c504a3237484567302fcf93`.
 That immutable image includes VHS, `ttyd`, Chromium, `ffmpeg`, and the Source

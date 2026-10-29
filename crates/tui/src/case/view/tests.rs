@@ -50,6 +50,8 @@ fn narrow_terminal_keeps_prompt_and_new_content_indicator() {
     assert!(shown.contains("second line"));
     assert!(shown.contains("/verify"));
     assert!(shown.contains("fake"));
+    assert!(shown.contains("1 approval pending"));
+    assert!(!shown.contains("Ctrl+B sidebar"));
     assert_eq!(
         conversation_area(Rect::new(0, 0, 80, 24), view.input, false).width,
         80
@@ -94,6 +96,7 @@ fn expanded_card_and_scrolled_sidebar_are_visible_in_test_backend() {
     assert!(screen(&terminal).contains("Evidence search"));
     assert!(screen(&terminal).contains("expand"));
     assert!(screen(&terminal).contains("line one"));
+    assert!(!screen(&terminal).contains("n/a"));
     chat.toggle_selected();
     let expanded_lines = chat.visible_lines();
     view.visible_lines = Some(&expanded_lines);
@@ -134,6 +137,12 @@ fn visual_states_have_versioned_terminal_snapshots() {
     draw_case(&mut terminal, &view).unwrap();
     insta::assert_snapshot!("welcome", screen(&terminal));
 
+    chat.push(Card::new(
+        CardKind::Analyst,
+        "Analyst",
+        "What does the synthetic alert show?",
+        false,
+    ));
     chat.begin_preview();
     chat.set_preview("Streaming answer with **bold** text.".into());
     let lines1 = chat.visible_lines();
@@ -143,12 +152,15 @@ fn visual_states_have_versioned_terminal_snapshots() {
     draw_case(&mut terminal, &view).unwrap();
     insta::assert_snapshot!("streaming", screen(&terminal));
 
-    chat.push(Card::new(
-        CardKind::ToolResult,
-        "Splunk search(user=alice, 24h)",
-        "12 events · 3 hosts\nfull synthetic detail",
-        false,
-    ));
+    chat.push(
+        Card::new(
+            CardKind::ToolResult,
+            "Splunk search(user=alice, 24h)",
+            "12 events · 3 hosts\nfull synthetic detail",
+            false,
+        )
+        .with_summary("approved · 12 results"),
+    );
     let lines2 = chat.visible_lines();
     view.visible_lines = Some(&lines2);
     draw_case(&mut terminal, &view).unwrap();
@@ -168,8 +180,15 @@ fn visual_states_have_versioned_terminal_snapshots() {
     draw_case(&mut terminal, &view).unwrap();
     insta::assert_snapshot!("tainted_approval_and_warnings", screen(&terminal));
 
-    view.menu = Some("> /approve <id>  Sign a pending call\n  /ingest <path>  Add evidence");
+    view.menu = Some(
+        "· Case\n  /ingest <path>  Add evidence\n· Approvals\n> /approve <id>  Sign a pending call",
+    );
     view.input = "/";
     draw_case(&mut terminal, &view).unwrap();
     insta::assert_snapshot!("command_menu", screen(&terminal));
+
+    view.menu = None;
+    view.pending = 2;
+    draw_case(&mut terminal, &view).unwrap();
+    assert!(screen(&terminal).contains("2 approvals pending"));
 }

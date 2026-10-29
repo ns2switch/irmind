@@ -1,0 +1,12 @@
+---
+source: crates/tui/src/case/render/menu.rs
+expression: menu
+---
+· Case
+  /ingest             Add evidence
+  /verify             Check custody
+· Evidence
+  /evidence           View evidence
+  /raw                Read record
+· Approvals
+> /approve            Approve call
