@@ -123,6 +123,6 @@ The OS backend stores signing keys under a separate `irmind` service: `local-ana
 
 ## Choose a model
 
-No provider is selected by default. In the TUI, press `m`, select the compiled OpenAI-compatible module, edit `IRMIND_MODEL` and `IRMIND_LLM_BASE_URL`, then press Enter to select it. Confirm the destination change. For an automated invocation, `--llm-module` and the matching environment variables override the saved selection and fields for that run.
+No provider is selected by default. In the TUI, type `/model` to choose Ollama or a remote provider, select its model, optionally test the connection with synthetic text, and confirm any remote data transfer. Use `/modules` and `/edit-param` for advanced public settings. For automation, `--llm-module` and the matching environment variables override the saved selection and fields for that run.
 
 A keyless local service may use HTTP only on loopback; HTTPS works there too. Remote endpoints require HTTPS and a destination-specific key. A different custom URL never inherits `OPENAI_API_KEY`. Select other compiled providers with their module IDs and settings in [modules](modules.md). Confirm retention, processing region, and data classification before any external connection.

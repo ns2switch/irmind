@@ -84,6 +84,9 @@ impl ModelSetup {
         self.notice.clear();
         self.selected_action = 0;
         self.url_edited = false;
+        self.name.clear();
+        self.models.clear();
+        self.key = SecretString::from(String::new());
         match self.provider {
             0 => HomeAction::None,
             1 => {
@@ -346,6 +349,10 @@ mod tests {
             state.model_setup.choose_provider(),
             HomeAction::DiscoverOllama
         ));
+        state.model_setup.key = SecretString::from("previous-provider-key");
+        state.model_setup.provider = 3;
+        state.model_setup.choose_provider();
+        assert!(state.model_setup.draft().key.is_none());
     }
 
     #[test]
