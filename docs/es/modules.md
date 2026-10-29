@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 6932516a9fafe79d5e05e2fb1c3d049d3d62637f; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit f9e66f15df1200e1c71e7c0f1ae413ff1e4cdba8; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -80,7 +80,7 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Uso en la TUI:** Ejecuta `/objects <fuente> <s3|gs|az> <bucket-o-contenedor> <prefijo> <desde-UTC> <hasta-UTC>` para ver hasta 20 objetos y el volumen estimado. Acota una lista truncada. Ejecuta `/object-read <número>` para confirmar la versión y la transferencia. Añade `--copy-original` si quieres conservar una copia local explícita. El indicador de actividad muestra los bytes transferidos y el tiempo transcurrido; Esc o `/pause` cancela. Una segunda lectura compara el original con su manifiesto firmado.
 
-**Límites:** La lectura exige una lista completa y firmada del objeto y su versión, un límite de bytes por objeto y el presupuesto del caso. Por encima de `object_transfer_approval_bytes` exige otra aprobación firmada del analista. Las transferencias fallidas consumen la reserva. Los bytes descargados se guardan una vez en un directorio temporal privado y se eliminan tras la conversión local. Una segunda lectura con el caso abierto compara el original firmado y puede generar costes. Para verificar sin red después del sellado, conserva una copia local explícita antes de sellar. No se usan credenciales ambientales. `object_store` expone ETags, pero no un checksum nativo portable; el manifiesto guarda el ETag como control opaco de versión y firma el SHA-256 propio de IRMind.
+**Límites:** La lectura exige una lista completa y firmada del objeto y su versión, un límite de bytes por objeto y el presupuesto del caso. Las páginas de listado de más de 8 MiB se rechazan antes de analizarlas. Por encima de `object_transfer_approval_bytes` exige otra aprobación firmada del analista. Las transferencias fallidas consumen la reserva. Los bytes descargados se guardan una vez en un directorio temporal privado y se eliminan tras la conversión local. Una segunda lectura con el caso abierto compara el original firmado y puede generar costes. Para verificar sin red después del sellado, conserva una copia local explícita antes de sellar. No se usan credenciales ambientales. `object_store` expone ETags, pero no un checksum nativo portable; el manifiesto guarda el ETag como control opaco de versión y firma el SHA-256 propio de IRMind.
 
 ## CrowdStrike
 
