@@ -60,7 +60,16 @@ impl CaseRuntime<'_, '_, '_> {
                     "Verify" => "Verifying custody",
                     other => other,
                 };
-                format!("{spinner} {verb}… {elapsed}s · esc to interrupt")
+                let transferred = if *label == "Cloud object" {
+                    match self.engine.object_transfer_progress(self.id) {
+                        Ok(Some((seen, total))) => format!(" · {seen}/{total} bytes"),
+                        Ok(None) => String::new(),
+                        Err(_) => " · progress unavailable".into(),
+                    }
+                } else {
+                    String::new()
+                };
+                format!("{spinner} {verb}… {elapsed}s{transferred} · esc to interrupt")
             },
         );
         if self.overrides_active {

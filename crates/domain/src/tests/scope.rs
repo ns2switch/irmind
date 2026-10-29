@@ -199,6 +199,7 @@ fn policy_limits_cannot_enable_a_denied_tool_or_exceed_quota() {
         max_tool_calls_per_case: 2,
         max_model_result_bytes: 100,
         max_model_tokens_per_case: 200,
+        ..PolicyRules::default()
     };
     assert!(rules.validate().is_ok());
     assert!(rules.permits(&Tool::ThreatIntelExternal, 0).is_err());

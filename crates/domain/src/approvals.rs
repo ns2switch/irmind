@@ -85,7 +85,14 @@ impl PendingApproval {
         encoded: &[u8],
         now: u64,
     ) -> Result<Self, DomainError> {
-        Self::recover_with_rules(case, mode, encoded, now, &crate::PolicyRules::default())
+        // Historical verification must recognize a request that was pending
+        // under a stricter transfer threshold than today's policy. Resolution
+        // always uses recover_with_rules and rechecks the current ceiling.
+        let historical = crate::PolicyRules {
+            object_transfer_approval_bytes: 1,
+            ..crate::PolicyRules::default()
+        };
+        Self::recover_with_rules(case, mode, encoded, now, &historical)
     }
 
     pub fn recover_with_rules(

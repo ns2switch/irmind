@@ -23,7 +23,7 @@ The MVP has a fixed scope:
 2. Retrieve SIEM alerts and keep diagnostic tracing separate from signed custody events.
 3. Keep SIEM searches limited to structured fields, operators, time windows, and simple aggregations translated by the connector.
 4. Parse exported CloudTrail, GCP Cloud Audit Logs, Azure Activity and Entra ID sign-in logs, and generic JSON in streaming mode. Migrate existing cases with verification before and after.
-5. Read S3, GCS, and Azure Blob objects in streaming mode through explicitly enabled, read-only connectors. Enforce scope and transfer budgets, and test each backend against synthetic recordings.
+5. Read S3, GCS, and Azure Blob objects in streaming mode through explicitly enabled, read-only connectors. Signed case scope v3 names allowed buckets, containers, prefixes, and UTC windows. A complete signed listing precedes each version-bound read; transfer budgets and explicit confirmation limit cost. Test each backend against synthetic recordings.
 6. Finish recorded-response tests, shared contracts, and setup guides for the existing cloud, SIEM, EDR, and threat-intelligence modules.
 
 Release `v0.1.0` only after every [reference-plan milestone](plan.md) passes, the model's manual test is documented, at least one connector is tested against a real test environment, and the tag includes a changelog and downloadable binaries. All current modules remain experimental until these checks pass. There is no release date yet.

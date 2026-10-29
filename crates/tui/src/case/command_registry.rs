@@ -15,7 +15,7 @@ impl Command {
             }
             "evidence" | "evidence-save" | "raw" | "graph" | "timeline" | "entity"
             | "neighbors" | "path" | "search" | "entity-timeline" | "siem-alert"
-            | "verify-graph" => "Evidence",
+            | "verify-graph" | "objects" | "object-read" => "Evidence",
             "approve" | "deny" | "edit" => "Approvals",
             "findings" | "iocs" | "hypotheses" | "techniques" | "confirm" | "dismiss" | "add" => {
                 "Findings"
@@ -29,6 +29,8 @@ impl Command {
             "approve" | "deny" | "edit" | "module" => " <id>",
             "evidence" | "raw" => " <hash>",
             "ingest" => " <path>",
+            "objects" => " <source> <scheme> <container> <prefix> <from> <to>",
+            "object-read" => " <number> [--copy-original]",
             "search" => " <words>",
             _ => "",
         }

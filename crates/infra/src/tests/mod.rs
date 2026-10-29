@@ -72,6 +72,7 @@ mod graph_runtime;
 mod incremental_custody;
 mod injection_and_taint;
 mod large_case_custody;
+mod object_storage;
 mod parquet_benchmark;
 mod remote_dispatch_edr_ti;
 mod remote_dispatch_siem_cloud;

@@ -78,6 +78,10 @@ pub fn verify_case_metadata(
     Ok(())
 }
 
+type ObjectProgressMap = Arc<
+    std::sync::Mutex<std::collections::HashMap<CaseId, (u64, Arc<std::sync::atomic::AtomicU64>)>>,
+>;
+
 pub struct Engine<'a> {
     pub repo: Arc<dyn Repository>,
     pub evidence_store: Arc<dyn EvidenceStore>,
@@ -98,12 +102,15 @@ pub struct Engine<'a> {
     pub(crate) edrs: Vec<&'a dyn EdrPort>,
     pub(crate) internal_intel: Vec<&'a dyn InternalIntelPort>,
     pub(crate) object_sources: Vec<&'a dyn ObjectSource>,
+    pub(crate) large_case_store: Option<Arc<dyn LargeCaseStore>>,
+    pub(crate) streaming_parser: Option<Arc<dyn StreamingEventParser>>,
     pub(crate) pricing: Option<ModelPricing>,
     pub(crate) verified_cases: Arc<
         std::sync::Mutex<
             std::collections::HashMap<CaseId, crate::custody::incremental::VerifiedCheckpoint>,
         >,
     >,
+    pub(crate) object_progress: ObjectProgressMap,
 }
 
 pub struct EnginePorts {
@@ -173,8 +180,11 @@ impl<'a> Engine<'a> {
             edrs: Vec::new(),
             internal_intel: Vec::new(),
             object_sources: Vec::new(),
+            large_case_store: self.large_case_store.clone(),
+            streaming_parser: self.streaming_parser.clone(),
             pricing: self.pricing,
             verified_cases: Arc::clone(&self.verified_cases),
+            object_progress: Arc::clone(&self.object_progress),
         }
     }
 
@@ -299,6 +309,17 @@ impl<'a> Engine<'a> {
         self.object_sources.push(port);
         Ok(self)
     }
+
+    #[must_use]
+    pub fn with_large_case_pipeline(
+        mut self,
+        store: Arc<dyn LargeCaseStore>,
+        parser: Arc<dyn StreamingEventParser>,
+    ) -> Self {
+        self.large_case_store = Some(store);
+        self.streaming_parser = Some(parser);
+        self
+    }
 }
 
 impl Engine<'_> {
@@ -322,6 +343,8 @@ impl Engine<'_> {
                     .any(|port| port.supports(&Tool::EdrDetections)),
                 "ti_lookup_internal" => !self.internal_intel.is_empty(),
                 "ti_lookup_external" => self.threat_intel.is_some(),
+                "object_list" => !self.object_sources.is_empty(),
+                "object_read" => !self.object_sources.is_empty() && self.large_case_store.is_some(),
                 _ => true,
             })
             .collect();

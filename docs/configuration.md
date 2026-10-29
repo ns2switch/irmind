@@ -4,7 +4,7 @@ This page is for operators setting up a controlled evaluation. It explains case 
 
 ## Case scope
 
-A case can remain local-only. To permit remote reads, the TUI's new-case form asks for sources, accounts, projects, hosts, and a UTC start and end time. Add a target with `/scope add project <id>` (or `source`, `account`, or `host`), or widen the window with `/scope window <from> <to>`. Changes are signed by the analyst. Queries outside the case scope require approval or are denied. The automation encoding is documented in the [CLI reference](development/cli.md).
+A case can remain local-only. To permit remote reads, the TUI's new-case form asks for sources, accounts, projects, hosts, object prefixes, and a UTC start and end time. An object prefix looks like `s3://audit-bucket/AWSLogs/123/CloudTrail/`, `gs://bucket/export/`, or `az://container/export/`. Add one with `/scope add object <URI>`; the source ID must also be in the case scope. Other targets use `/scope add project <id>` (or `source`, `account`, `host`). Widen the window with `/scope window <from> <to>`. Changes are signed by the analyst. Object reads outside the case or organization prefix are denied. The automation encoding is documented in the [CLI reference](development/cli.md).
 
 ## Policy file
 
@@ -15,6 +15,9 @@ version = 1
 max_tool_calls_per_case = 100
 max_model_result_bytes = 10000
 max_model_tokens_per_case = 200000
+max_object_read_bytes = 1073741824
+max_object_bytes_per_case = 536870912000
+object_transfer_approval_bytes = 67108864
 denied_tools = []
 
 [scope]
@@ -22,11 +25,12 @@ sources = ["demo"]
 accounts = ["123456789012"]
 projects = []
 hosts = []
+objects = ["s3://audit-bucket/AWSLogs/123/CloudTrail/"]
 from = "2026-10-23T00:00:00Z"
 to = "2026-10-23T23:59:59Z"
 ```
 
-The optional `[scope]` table is a hard ceiling for remote reads across cases. It can list accounts, projects, and hosts together, plus allowed sources and a UTC window. A read outside the case scope may need analyst approval; a read outside the policy ceiling is denied, even with approval. New cases and scope changes cannot exceed the ceiling. If a new policy narrows an existing case, its reads use the intersection and the TUI shows a warning. The current AWS connector requires an account; project queries remain unavailable until a connector supports them. Policy can tighten fixed tool rules, not enable denied actions. External enrichment needs a signed analyst approval; containment is disabled. Unknown fields fail validation.
+The optional `[scope]` table is a hard ceiling for remote reads across cases. It can list accounts, projects, hosts, and object prefixes together, plus allowed sources and a UTC window. An object read outside either the case prefix or policy ceiling is denied, even with approval. Other remote reads outside the case scope may need analyst approval; a read outside the policy ceiling is denied. New cases and scope changes cannot exceed the ceiling. If a new policy narrows an existing case, its reads use the intersection and the TUI shows a warning. The current AWS connector requires an account; project queries remain unavailable until a connector supports them. Policy can tighten fixed tool rules, not enable denied actions. External enrichment needs a signed analyst approval; containment is disabled. Unknown fields fail validation.
 
 ## Non-secret settings
 

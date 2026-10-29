@@ -226,7 +226,7 @@ impl LargeCaseUseCases<'_, '_> {
         Ok(ingested)
     }
 
-    fn sign_prepared(
+    pub(crate) fn sign_prepared(
         &self,
         id: &CaseId,
         prepared: crate::PreparedSource,

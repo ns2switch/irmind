@@ -1,5 +1,6 @@
 use crate::{
-    BTreeMap, GraphQueryFilter, ProposedCall, SiemQuery, Tool, valid_scope_target, valid_scope_time,
+    BTreeMap, GraphQueryFilter, ProposedCall, SiemQuery, Tool, valid_object_scope,
+    valid_scope_target, valid_scope_time,
 };
 
 pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
@@ -21,8 +22,96 @@ pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
         | Tool::EdrProcessTree
         | Tool::EdrDetections
         | Tool::ThreatIntelExternal => valid_edr_and_external_intel(proposal),
-        Tool::ObjectList | Tool::ObjectRead => false,
+        Tool::ObjectList | Tool::ObjectRead => valid_object_request(proposal),
     }
+}
+
+fn valid_object_request(proposal: &ProposedCall) -> bool {
+    let allowed: &[&str] = if proposal.tool == Tool::ObjectList {
+        &[
+            "source",
+            "scheme",
+            "container",
+            "prefix",
+            "from",
+            "to",
+            "limit",
+        ]
+    } else {
+        &[
+            "source",
+            "scheme",
+            "container",
+            "key",
+            "from",
+            "to",
+            "version",
+            "etag",
+            "max_bytes",
+            "copy_original",
+        ]
+    };
+    if !valid_args(&proposal.args, allowed) {
+        return false;
+    }
+    let args = &proposal.args;
+    if !valid_object_target(args, proposal.tool == Tool::ObjectList) {
+        return false;
+    }
+    if proposal.tool == Tool::ObjectList {
+        args.get("limit").is_some_and(|value| {
+            value
+                .parse::<usize>()
+                .is_ok_and(|limit| (1..=1_000).contains(&limit))
+        })
+    } else {
+        (args.contains_key("version") || args.contains_key("etag"))
+            && args
+                .get("copy_original")
+                .is_none_or(|value| matches!(value.as_str(), "true" | "false"))
+            && args.get("version").is_none_or(|value| {
+                !value.is_empty() && value.len() <= 256 && !value.contains(['\n', '\r', '\0'])
+            })
+            && args.get("etag").is_none_or(|value| {
+                !value.is_empty() && value.len() <= 256 && !value.contains(['\n', '\r', '\0'])
+            })
+            && args.get("max_bytes").is_some_and(|value| {
+                value
+                    .parse::<u64>()
+                    .is_ok_and(|bytes| (1..=1_073_741_824).contains(&bytes))
+            })
+    }
+}
+
+fn valid_object_target(args: &BTreeMap<String, String>, listing: bool) -> bool {
+    let Some((source, scheme, container, from, to)) = args
+        .get("source")
+        .zip(args.get("scheme"))
+        .zip(args.get("container"))
+        .zip(args.get("from"))
+        .zip(args.get("to"))
+        .map(|((((source, scheme), container), from), to)| (source, scheme, container, from, to))
+    else {
+        return false;
+    };
+    if !valid_scope_target(source)
+        || !matches!(scheme.as_str(), "s3" | "gs" | "az")
+        || !valid_scope_target(container)
+        || container.contains(':')
+        || !valid_scope_time(from)
+        || !valid_scope_time(to)
+        || crate::UtcTimestamp::parse(from)
+            .ok()
+            .zip(crate::UtcTimestamp::parse(to).ok())
+            .is_none_or(|(a, b)| a > b)
+    {
+        return false;
+    }
+    let path_key = if listing { "prefix" } else { "key" };
+    let Some(path) = args.get(path_key) else {
+        return false;
+    };
+    valid_object_scope(&format!("{scheme}://{container}/{path}")) && (listing || !path.is_empty())
 }
 
 fn valid_local(proposal: &ProposedCall) -> bool {
