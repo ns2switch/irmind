@@ -80,6 +80,11 @@ pub enum ModelEvent {
     },
 }
 
+pub enum ModelProgress {
+    RoundStarted,
+    TextDelta(String),
+}
+
 impl std::fmt::Debug for ModelEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

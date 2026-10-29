@@ -284,9 +284,11 @@ where
             id,
             alert,
             &CancellationToken::new(),
-            &|part| {
-                if let Ok(mut output) = deltas.lock() {
-                    output.push(part.to_owned());
+            &|progress| {
+                if let irmind_app::ModelProgress::TextDelta(part) = progress
+                    && let Ok(mut output) = deltas.lock()
+                {
+                    output.push(part);
                 }
             },
         )?;

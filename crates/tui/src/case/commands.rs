@@ -74,7 +74,6 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 return;
             }
         }
-        self.state.conversation.begin_preview();
         self.state.live_reply_cutoff_seq =
             Some(self.state.entries.last().map_or(0, |entry| entry.seq));
         self.state.model_preview.clear();
@@ -82,8 +81,8 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         let id = self.id;
         let model_tx = self.model_tx.clone();
         self.start_task("IRMind", move |cancel| {
-            workflow.investigate_with_progress(id, &prompt, &cancel, &move |delta| {
-                let _ = model_tx.send(delta.to_owned());
+            workflow.investigate_with_progress(id, &prompt, &cancel, &move |progress| {
+                let _ = model_tx.send(progress);
             })
         });
     }

@@ -131,7 +131,7 @@ impl CaseWorkflow<'_, '_> {
         id: &CaseId,
         alert: &str,
         cancel: &CancellationToken,
-        on_text: &(dyn Fn(&str) + Send + Sync),
+        on_text: &(dyn Fn(irmind_app::ModelProgress) + Send + Sync),
     ) -> Result<String, AppError> {
         let model = self
             .model

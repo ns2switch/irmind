@@ -1,0 +1,20 @@
+---
+source: crates/tui/src/case/view/tests.rs
+expression: shown
+---
+> Investigate example.com
+
+⏺ Review the evidence before enrichment.
+
+⏺ The external lookup needs approval.
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│Ask about the case… · / for commands · ? help                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Synthetic case · synthetic-model · 42 tok · Thinking…
