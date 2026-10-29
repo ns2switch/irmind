@@ -10,9 +10,12 @@ pub(super) struct Command {
 impl Command {
     pub(super) fn category(&self) -> &'static str {
         match self.name {
-            "ingest" | "verify" | "seal" | "export" | "report" | "scope" | "home" => "Case",
+            "ingest" | "verify" | "seal" | "export" | "report" | "scope" | "home" | "rebuild" => {
+                "Case"
+            }
             "evidence" | "evidence-save" | "raw" | "graph" | "timeline" | "entity"
-            | "neighbors" | "path" | "search" => "Evidence",
+            | "neighbors" | "path" | "search" | "entity-timeline" | "siem-alert"
+            | "verify-graph" => "Evidence",
             "approve" | "deny" | "edit" => "Approvals",
             "findings" | "iocs" | "hypotheses" | "techniques" | "confirm" | "dismiss" | "add" => {
                 "Findings"
@@ -29,6 +32,17 @@ impl Command {
             "search" => " <words>",
             _ => "",
         }
+    }
+}
+
+pub(super) fn category_rank(category: &str) -> usize {
+    match category {
+        "Case" => 0,
+        "Evidence" => 1,
+        "Approvals" => 2,
+        "Findings" => 3,
+        "System" => 4,
+        _ => 5,
     }
 }
 
@@ -51,7 +65,7 @@ pub(super) fn matches(query: &str) -> Vec<&'static Command> {
             next.is_none()
         })
         .collect::<Vec<_>>();
-    found.sort_by_key(|command| (!command.name.starts_with(&needle), command.name));
+    found.sort_by_key(|command| (category_rank(command.category()), command.name));
     found
 }
 
@@ -77,15 +91,6 @@ pub(super) fn help() -> String {
         );
     }
     output
-}
-
-pub(super) fn help_bar() -> String {
-    ["sidebar", "palette", "scroll-up", "help", "pause"]
-        .iter()
-        .filter_map(|name| COMMANDS.iter().find(|command| command.name == *name))
-        .map(|command| format!("{} {}", command.shortcut, command.description))
-        .collect::<Vec<_>>()
-        .join(" · ")
 }
 
 pub(super) fn shortcut_name(code: KeyCode, modifiers: KeyModifiers) -> Option<&'static str> {
@@ -203,7 +208,12 @@ mod tests {
             Some("sidebar")
         );
         assert!(matches("/side").is_empty());
-        assert!(help_bar().contains("Ctrl+B"));
+        assert!(help().contains("Ctrl+B"));
+        let all = matches("/");
+        assert!(all.windows(2).all(|pair| {
+            (category_rank(pair[0].category()), pair[0].name)
+                <= (category_rank(pair[1].category()), pair[1].name)
+        }));
     }
 
     #[test]

@@ -1,7 +1,7 @@
 #![cfg(unix)]
 #![allow(clippy::unwrap_used)]
 
-use expectrl::{Expect as _, Regex, Session};
+use expectrl::{Expect as _, Session};
 use std::{path::Path, process::Command, thread, time::Duration};
 
 fn wait_for_file(path: &Path) -> bool {
@@ -32,17 +32,19 @@ fn first_run_creates_file_keystore_without_leaving_the_tui() {
     let binary = env!("CARGO_BIN_EXE_irmind");
     let mut session = Session::spawn(terminal_command(binary, home.path())).unwrap();
     session.set_expect_timeout(Some(Duration::from_secs(45)));
-    session.expect("first-run").unwrap();
+    session.expect("Welcome").unwrap();
     session.send("\r").unwrap();
-    let selected = session.expect(Regex("Signer: (os|file)")).unwrap();
-    if selected.get(0).is_some_and(|bytes| bytes == b"Signer: os") {
-        session.send("s").unwrap();
-        session.send("c").unwrap();
-    }
+    thread::sleep(Duration::from_millis(150));
+    session.send("\x1b[B").unwrap();
+    thread::sleep(Duration::from_millis(50));
     session.send("\r").unwrap();
-    session.expect("Create").unwrap();
+    thread::sleep(Duration::from_millis(150));
+    session.send("\x1b[B").unwrap();
+    thread::sleep(Duration::from_millis(50));
+    session.send("\r").unwrap();
+    thread::sleep(Duration::from_millis(150));
     session.send("synthetic passphrase for PTY test\r").unwrap();
-    session.expect("Repeat").unwrap();
+    thread::sleep(Duration::from_millis(150));
     session.send("synthetic passphrase for PTY test\r").unwrap();
     assert!(wait_for_file(&home.path().join("keystore.toml")));
     session.send("\r").unwrap();

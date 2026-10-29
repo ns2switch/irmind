@@ -47,7 +47,7 @@ No released binaries are available yet. CI produces unsigned artifacts only on r
 
 ## First case in the TUI
 
-1. Run `irmind` without a subcommand. The first-run wizard explains signing, recommends the encrypted-file backend when no system keyring is available, and asks for a passphrase twice in masked TUI fields. It works over SSH. Save the analyst public-key fingerprint outside this computer.
+1. Run `irmind` without a subcommand. The first-run wizard explains signing and recommends the encrypted-file backend when no system keyring is available. Choose the signing and secrets backends with the arrow keys and Enter, then enter and confirm a passphrase in masked TUI fields. It works over SSH. Save the analyst public-key fingerprint outside this computer.
 2. Press `n` to create a case. Give it a title, severity, and a time window. Leave remote sources empty for a local-only case.
 3. Open the case and enter `/ingest`. Select [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), which contains only synthetic data. IRMind hashes the file in place; copying the original is an explicit option.
 4. Return to the home screen and press `m`. Select the OpenAI-compatible module, press `e` to set an installed model and a local base URL such as `http://127.0.0.1:11434/v1/`, then confirm the change. The session reloads inside the TUI. For a remote provider, follow [configuration](docs/configuration.md) and approve its data handling first.

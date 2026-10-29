@@ -2,12 +2,12 @@
 source: crates/tui/src/case/view/tests.rs
 expression: screen(&terminal)
 ---
-⏺ IRMind
-Streaming answer with bold text.
+⏺ Streaming answer with bold text.
 
 ⏺ Splunk search(user=alice, 24h)
-12 events · 3 hosts
-full synthetic detail
+⎿ approved · 12 results
+  12 events · 3 hosts
+  full synthetic detail
 
 ╭─ Approval required ──────────────────────────────────────────────────────────╮
 │ Allow IRMind to send example.com to VirusTotal? This value leaves this       │
@@ -21,8 +21,8 @@ full synthetic detail
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
 
+
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │Ask about the case… · / for commands · ? help                                 │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-Synthetic case · synthetic-model · 18 tok · $0 · 1 approvals · 1 detections · OV
-Ctrl+B sidebar · Ctrl+K commands · PgUp scroll up · ? help · Esc cancel task
+Synthetic case · synthetic-model · 18 tok · $0 · 1 approval pending · 1 detectio

@@ -6,7 +6,9 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 use ratatui::{
     Terminal,
     backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Rect},
+    style::Style,
+    text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph},
 };
 use secrecy::{ExposeSecret as _, SecretString};
@@ -25,10 +27,18 @@ enum Step {
     Complete,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BackendField {
+    Signer,
+    Secrets,
+}
+
 pub struct KeystoreWizard {
     step: Step,
     existing: bool,
     choice: KeystoreChoice,
+    backend_field: BackendField,
+    backend_cursor: &'static str,
     availability: BackendAvailability,
     password: SecretString,
     confirmation: SecretString,
@@ -45,6 +55,16 @@ struct BackendAvailability {
 }
 
 impl KeystoreWizard {
+    fn step_heading(&self) -> &'static str {
+        match self.step {
+            Step::Welcome => "Step 1 of 4 · Welcome",
+            Step::Backend => "Step 2 of 4 · Backend",
+            Step::Passphrase | Step::Confirm => "Step 3 of 4 · Passphrase",
+            Step::Unlock => "Step 3 of 4 · Unlock",
+            Step::Complete => "Step 4 of 4 · Fingerprint",
+        }
+    }
+
     #[must_use]
     pub fn new(
         configured: Option<KeystoreChoice>,
@@ -53,6 +73,17 @@ impl KeystoreWizard {
         vault_exists: bool,
     ) -> Self {
         let preferred = if os_available { "os" } else { "file" };
+        let choice = configured.unwrap_or(KeystoreChoice {
+            signer: preferred,
+            secrets: preferred,
+        });
+        let backend_cursor = if choice.signer == "os" && os_available {
+            "os"
+        } else if file_compiled {
+            "file"
+        } else {
+            "os"
+        };
         Self {
             step: if configured.is_some() {
                 Step::Unlock
@@ -60,10 +91,9 @@ impl KeystoreWizard {
                 Step::Welcome
             },
             existing: configured.is_some(),
-            choice: configured.unwrap_or(KeystoreChoice {
-                signer: preferred,
-                secrets: preferred,
-            }),
+            choice,
+            backend_field: BackendField::Signer,
+            backend_cursor,
             availability: BackendAvailability {
                 os: os_available,
                 file: file_compiled,
@@ -90,11 +120,56 @@ impl KeystoreWizard {
     fn previous(&mut self) {
         self.error = None;
         self.step = match self.step {
+            Step::Backend if self.backend_field == BackendField::Secrets => {
+                self.backend_field = BackendField::Signer;
+                self.select_available(self.choice.signer);
+                Step::Backend
+            }
+            Step::Backend if self.existing => Step::Unlock,
             Step::Welcome | Step::Backend => Step::Welcome,
-            Step::Passphrase | Step::Unlock => Step::Backend,
+            Step::Passphrase => {
+                self.backend_field = BackendField::Secrets;
+                self.select_available(self.choice.secrets);
+                Step::Backend
+            }
+            Step::Unlock => {
+                self.backend_field = BackendField::Signer;
+                self.select_available(self.choice.signer);
+                Step::Backend
+            }
             Step::Confirm => Step::Passphrase,
             Step::Complete => Step::Complete,
         };
+    }
+
+    fn available(&self, backend: &str) -> bool {
+        match backend {
+            "os" => self.availability.os,
+            "file" => self.availability.file,
+            _ => false,
+        }
+    }
+
+    fn select_available(&mut self, preferred: &str) {
+        self.backend_cursor = if self.available(preferred) {
+            if preferred == "os" { "os" } else { "file" }
+        } else if self.availability.file {
+            "file"
+        } else {
+            "os"
+        };
+    }
+
+    fn move_backend(&mut self, direction: KeyCode) {
+        let target = match direction {
+            KeyCode::Up => "os",
+            KeyCode::Down => "file",
+            _ => return,
+        };
+        if self.available(target) {
+            self.backend_cursor = target;
+            self.error = None;
+        }
     }
 
     fn strength(&self) -> &'static str {
@@ -118,25 +193,12 @@ impl KeystoreWizard {
     fn description(&self) -> String {
         match self.step {
             Step::Welcome => "IRMind signs every investigation with your analyst key.\nThe keystore protects that key and connector credentials.\n\nEnter to choose a backend.".into(),
-            Step::Backend => format!(
-                "Signer: {}  (s to change)\nSecrets: {}  (c to change)\n\nOS keyring: {}. Uses the desktop key service.\nEncrypted file: {}. Works locally and over SSH.\n\nEnter to continue.",
-                self.choice.signer,
-                self.choice.secrets,
-                if self.availability.os { "available" } else { "unavailable in this session" },
-                if self.availability.file { "available" } else { "not compiled" },
-            ),
+            Step::Backend => "Choose a backend with ↑/↓ and Enter. Signing and module secrets are selected separately.".into(),
             Step::Passphrase => format!(
-                "Create a passphrase for the encrypted file.\nAt least {MIN_PASSPHRASE_CHARS} characters; use several unrelated words.\n\nPassphrase: {}\nStrength: {}",
-                Self::masked(&self.password), self.strength(),
+                "Create a passphrase for the encrypted file.\nAt least {MIN_PASSPHRASE_CHARS} characters; use several unrelated words."
             ),
-            Step::Confirm => format!(
-                "Repeat the passphrase to prevent a typing mistake.\n\nConfirmation: {}",
-                Self::masked(&self.confirmation),
-            ),
-            Step::Unlock if self.needs_password() => format!(
-                "Unlock the configured file keystore.\n\nPassphrase: {}\n\nEnter to unlock · Esc to choose another backend",
-                Self::masked(&self.password),
-            ),
+            Step::Confirm => "Repeat the passphrase to prevent a typing mistake.".into(),
+            Step::Unlock if self.needs_password() => "Unlock the configured file keystore.\nEnter to unlock · Esc to choose another backend.".into(),
             Step::Unlock => "Connect to the configured OS keyring.\n\nEnter to continue · Esc to choose another backend".into(),
             Step::Complete => format!(
                 "Analyst public-key fingerprint:\n{}\n\nSave this fingerprint outside this computer. You can use it to verify exported cases.\n\nEnter to continue.",
@@ -160,23 +222,26 @@ impl KeystoreWizard {
         self.error = None;
         match self.step {
             Step::Welcome => self.step = Step::Backend,
-            Step::Backend if !self.availability.file && self.needs_password() => {
-                self.error = Some(
-                    "The encrypted file backend was not compiled. Select the OS keyring.".into(),
-                );
+            Step::Backend if !self.available(self.backend_cursor) => {
+                self.error = Some("No selectable backend is available. Check the system keyring or use a build with the encrypted-file backend.".into());
             }
-            Step::Backend
-                if !self.availability.os
-                    && (self.choice.signer == "os" || self.choice.secrets == "os") =>
-            {
-                self.error = Some("The OS keyring is unavailable in this session. Select file for both capabilities; it also works over SSH.".into());
-            }
-            Step::Backend if self.needs_password() => {
-                self.step = if self.creating_file() {
-                    Step::Passphrase
+            Step::Backend => {
+                if self.backend_field == BackendField::Signer {
+                    self.choice.signer = self.backend_cursor;
+                    self.backend_field = BackendField::Secrets;
+                    self.select_available(self.choice.secrets);
                 } else {
-                    Step::Unlock
-                };
+                    self.choice.secrets = self.backend_cursor;
+                    if self.needs_password() {
+                        self.step = if self.creating_file() {
+                            Step::Passphrase
+                        } else {
+                            Step::Unlock
+                        };
+                    } else {
+                        return true;
+                    }
+                }
             }
             Step::Passphrase
                 if self.password.expose_secret().chars().count() < MIN_PASSPHRASE_CHARS =>
@@ -191,7 +256,7 @@ impl KeystoreWizard {
                     Some("The passphrases do not match. Re-enter the confirmation.".into());
                 self.confirmation = SecretString::from(String::new());
             }
-            Step::Backend | Step::Confirm | Step::Unlock | Step::Complete => return true,
+            Step::Confirm | Step::Unlock | Step::Complete => return true,
         }
         false
     }
@@ -215,19 +280,8 @@ impl KeystoreWizard {
         }
         match key.code {
             KeyCode::Esc => self.previous(),
-            KeyCode::Char('s') if self.step == Step::Backend => {
-                self.choice.signer = if self.choice.signer == "os" {
-                    "file"
-                } else {
-                    "os"
-                };
-            }
-            KeyCode::Char('c') if self.step == Step::Backend => {
-                self.choice.secrets = if self.choice.secrets == "os" {
-                    "file"
-                } else {
-                    "os"
-                };
+            KeyCode::Up | KeyCode::Down if self.step == Step::Backend => {
+                self.move_backend(key.code);
             }
             KeyCode::Enter if self.advance() => {
                 return if self.step == Step::Complete {
@@ -288,45 +342,206 @@ where
             Constraint::Length(3),
         ])
         .split(frame.area());
-        let heading = if wizard.existing {
-            "IRMind · unlock keystore"
-        } else {
-            "IRMind · first-run keystore"
-        };
+        let heading = format!("IRMind · {}", wizard.step_heading());
         frame.render_widget(Paragraph::new(heading).style(theme.accent()), rows[0]);
-        let mut text = wizard.description();
-        if let Some(error) = &wizard.error {
-            let _ = write!(
-                text,
-                "\n\nError: {error}\nRetry, Esc to go back, or choose another backend."
-            );
-        }
-        if wizard.confirm_exit {
-            text.push_str("\n\nExit setup? Enter/y confirms; any other key stays.");
-        }
         frame.render_widget(
-            Paragraph::new(escape_display(&text)).block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Rounded)
-                    .border_style(
-                        ratatui::style::Style::default().fg(if wizard.error.is_some() {
-                            theme.error
-                        } else if wizard.step == Step::Complete {
-                            theme.success
-                        } else {
-                            theme.border
-                        }),
-                    ),
-            ),
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(if wizard.error.is_some() {
+                    theme.error
+                } else if wizard.step == Step::Complete {
+                    theme.success
+                } else {
+                    theme.border
+                })),
             rows[1],
         );
+        let inner = Rect::new(
+            rows[1].x.saturating_add(2),
+            rows[1].y.saturating_add(2),
+            rows[1].width.saturating_sub(4),
+            rows[1].height.saturating_sub(4),
+        );
+        match wizard.step {
+            Step::Backend => render_backends(frame, wizard, inner, theme),
+            Step::Passphrase | Step::Confirm => render_secret_field(frame, wizard, inner, theme),
+            Step::Unlock if wizard.needs_password() => {
+                render_secret_field(frame, wizard, inner, theme);
+            }
+            _ => render_explanation(frame, wizard, inner, theme),
+        }
         frame.render_widget(
-            Paragraph::new("Enter continue · Esc back · Ctrl+C exit").style(theme.muted()),
+            Paragraph::new(if wizard.step == Step::Backend {
+                "↑/↓ choose · Enter select · Esc back · Ctrl+C exit"
+            } else {
+                "Enter continue · Esc back · Ctrl+C exit"
+            })
+            .style(theme.muted()),
             rows[2],
         );
     })?;
     Ok(())
+}
+
+fn render_backends(
+    frame: &mut ratatui::Frame<'_>,
+    wizard: &KeystoreWizard,
+    area: Rect,
+    theme: Theme,
+) {
+    let focus = if wizard.backend_field == BackendField::Signer {
+        "signing key"
+    } else {
+        "module secrets"
+    };
+    let mut lines = vec![
+        Line::from(format!("Choose a backend for the {focus}:")),
+        Line::default(),
+    ];
+    for (id, label, description, unavailable) in [
+        (
+            "os",
+            "OS keyring",
+            "Uses the system key service.",
+            "Unavailable in this session: no system keyring.",
+        ),
+        (
+            "file",
+            "Encrypted file",
+            "Works locally and over SSH.",
+            "Unavailable: not compiled in this build.",
+        ),
+    ] {
+        let available = wizard.available(id);
+        let selected = wizard.backend_cursor == id && available;
+        lines.push(Line::from(Span::styled(
+            format!(
+                "{} {label} — {}",
+                if selected { '›' } else { ' ' },
+                if available { description } else { unavailable }
+            ),
+            if !available {
+                theme.muted()
+            } else if selected {
+                theme.accent()
+            } else {
+                Style::default().fg(theme.text)
+            },
+        )));
+    }
+    lines.extend([
+        Line::default(),
+        Line::styled(format!("Signing: {}", wizard.choice.signer), theme.muted()),
+        Line::styled(format!("Secrets: {}", wizard.choice.secrets), theme.muted()),
+    ]);
+    if let Some(error) = &wizard.error {
+        lines.push(Line::default());
+        lines.push(Line::styled(
+            escape_display(error),
+            Style::default().fg(theme.error),
+        ));
+    }
+    if wizard.confirm_exit {
+        lines.push(Line::styled(
+            "Exit setup? Enter/y confirms.",
+            theme.warning(),
+        ));
+    }
+    frame.render_widget(Paragraph::new(lines), area);
+}
+
+fn render_secret_field(
+    frame: &mut ratatui::Frame<'_>,
+    wizard: &KeystoreWizard,
+    area: Rect,
+    theme: Theme,
+) {
+    frame.render_widget(Paragraph::new(wizard.description()), area);
+    let (label, value) = if wizard.step == Step::Confirm {
+        (" Confirmation ", &wizard.confirmation)
+    } else {
+        (" Passphrase ", &wizard.password)
+    };
+    let field = Rect::new(
+        area.x,
+        area.y.saturating_add(4),
+        area.width,
+        3.min(area.height.saturating_sub(4)),
+    );
+    frame.render_widget(
+        Paragraph::new(KeystoreWizard::masked(value)).block(
+            Block::default()
+                .title(label)
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(theme.border)),
+        ),
+        field,
+    );
+    let strength = if wizard.step == Step::Unlock {
+        "Input is hidden from the terminal scrollback.".to_owned()
+    } else {
+        format!("Strength: {}", wizard.strength())
+    };
+    frame.render_widget(
+        Paragraph::new(strength).style(theme.muted()),
+        Rect::new(area.x, field.bottom().saturating_add(1), area.width, 1),
+    );
+    render_feedback(frame, wizard, area, field.bottom().saturating_add(3), theme);
+}
+
+fn render_explanation(
+    frame: &mut ratatui::Frame<'_>,
+    wizard: &KeystoreWizard,
+    area: Rect,
+    theme: Theme,
+) {
+    let mut text = wizard.description();
+    if let Some(error) = &wizard.error {
+        let _ = write!(
+            text,
+            "\n\nError: {error}\nRetry or go back to choose another backend."
+        );
+    }
+    if wizard.confirm_exit {
+        text.push_str("\n\nExit setup? Enter/y confirms; any other key stays.");
+    }
+    frame.render_widget(
+        Paragraph::new(escape_display(&text)).style(Style::default().fg(theme.text)),
+        area,
+    );
+}
+
+fn render_feedback(
+    frame: &mut ratatui::Frame<'_>,
+    wizard: &KeystoreWizard,
+    area: Rect,
+    start: u16,
+    theme: Theme,
+) {
+    let text = if let Some(error) = &wizard.error {
+        format!("Error: {error}\nRetry, Esc to go back, or choose another backend.")
+    } else if wizard.confirm_exit {
+        "Exit setup? Enter/y confirms; any other key stays.".into()
+    } else {
+        String::new()
+    };
+    frame.render_widget(
+        Paragraph::new(escape_display(&text)).style(Style::default().fg(
+            if wizard.error.is_some() {
+                theme.error
+            } else {
+                theme.warning
+            },
+        )),
+        Rect::new(
+            area.x,
+            start,
+            area.width,
+            area.bottom().saturating_sub(start),
+        ),
+    );
 }
 
 /// The caller owns the keystore; the wizard keeps secret input in the alternate screen.
