@@ -222,7 +222,9 @@ fn activate(
             home,
             fd,
             passphrase,
-            allow_create && !home.join("keystore.enc").exists(),
+            allow_create
+                && selection.analyst_key_fingerprint.is_none()
+                && !home.join("keystore.enc").exists(),
         )?;
         (Some((signer, secrets)), Some(admin))
     } else {
@@ -245,6 +247,11 @@ fn activate(
     let new_analyst_key = loaded.is_err();
     let signer = match loaded {
         Ok(signer) => signer,
+        Err(_) if selection.analyst_key_fingerprint.is_some() => {
+            return Err(anyhow!(
+                "configured analyst signing key is unavailable; restore it or migrate explicitly"
+            ));
+        }
         Err(_) if allow_create && !has_cases => signer_backend.create(Actor::Analyst)?,
         Err(error) => return Err(error.into()),
     };
@@ -330,17 +337,22 @@ fn interactive_setup(
 fn setup_error(home: &Path, error: &anyhow::Error) -> String {
     let detail = format!("{error:#}");
     tracing::error!(target: "irmind::operations", stage = "keystore", causes = %detail, "startup operation failed");
-    if detail.contains("encrypted keystore file or directory is not accessible") {
+    if detail.contains("configured analyst signing key is unavailable") {
+        "The configured analyst signing key is missing from this backend. Restore the key or use an explicit migration; no replacement key was created.".into()
+    } else if detail.contains("encrypted keystore file or directory is not accessible") {
         format!(
             "The vault at {} cannot be accessed with your user permissions. Check ownership and access, then retry.",
             home.join("keystore.enc").display()
         )
-    } else if detail.contains("cannot unlock encrypted keystore")
-        || detail.contains("encrypted keystore operation failed")
-    {
+    } else if detail.contains("cannot unlock encrypted keystore") {
         format!(
             "The passphrase is incorrect or the vault at {} is damaged. Retry; if this persists, restore a known-good vault. Details: {}",
             home.join("keystore.enc").display(),
+            home.join("diagnostics.log").display()
+        )
+    } else if detail.contains("encrypted keystore operation failed") {
+        format!(
+            "The vault operation failed. Check directory access and free disk space, then retry. Diagnostics: {}",
             home.join("diagnostics.log").display()
         )
     } else if detail.contains("open in another process") {
@@ -385,4 +397,59 @@ pub(super) fn select_migrated_backend(
         _ => return Err(anyhow!("invalid keystore capability")),
     }
     write_config(home, &selection)
+}
+
+#[cfg(all(test, feature = "keystore-file"))]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn configured_fingerprint_never_creates_a_missing_vault() {
+        let home = tempfile::tempdir().unwrap();
+        let passphrase = SecretString::from("synthetic test passphrase".to_owned());
+        let selection = Selection {
+            signer: "file".into(),
+            secrets: "file".into(),
+            analyst_key_fingerprint: Some("00".repeat(32)),
+        };
+        let error = activate(
+            home.path(),
+            &selection,
+            None,
+            true,
+            false,
+            Some(&passphrase),
+        )
+        .err()
+        .unwrap();
+        assert!(format!("{error:#}").contains("encrypted keystore not found"));
+        assert!(!home.path().join("keystore.enc").exists());
+    }
+
+    #[test]
+    fn configured_fingerprint_never_creates_a_replacement_key() {
+        let home = tempfile::tempdir().unwrap();
+        let passphrase = SecretString::from("synthetic test passphrase".to_owned());
+        let empty_vault = FileKeystore::open(home.path(), &passphrase, true).unwrap();
+        drop(empty_vault);
+        let selection = Selection {
+            signer: "file".into(),
+            secrets: "file".into(),
+            analyst_key_fingerprint: Some("00".repeat(32)),
+        };
+        let error = activate(
+            home.path(),
+            &selection,
+            None,
+            true,
+            false,
+            Some(&passphrase),
+        )
+        .err()
+        .unwrap();
+        assert!(format!("{error:#}").contains("restore it or migrate explicitly"));
+        let reopened = FileKeystore::open(home.path(), &passphrase, false).unwrap();
+        assert!(reopened.load(Actor::Analyst).is_err());
+    }
 }

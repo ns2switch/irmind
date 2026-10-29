@@ -9,7 +9,7 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
     let mut setup_terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     let choice = render_keystore_setup(&mut setup_terminal, false).unwrap();
     assert_eq!((choice.signer, choice.secrets), ("file", "file"));
-    assert!(screen(&setup_terminal).contains("OS keyring: unavailable"));
+    assert!(screen(&setup_terminal).contains("first-run keystore"));
     let store = Arc::new(LocalStore::open(root.path()).unwrap());
     let file_backend = FileKeystore::open(
         root.path(),
