@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 6932516a9fafe79d5e05e2fb1c3d049d3d62637f; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 1062ed9ecebb5f0c6cbe3fbccb335de723e20dbe; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -38,7 +38,7 @@ La tabla opcional `[scope]` fija un techo estricto para las lecturas remotas de 
 
 ## Ajustes no secretos
 
-La TUI guarda los ajustes no secretos en `config.toml` dentro del [directorio de datos estándar](platforms.md#datos-y-terminal). Pulsa `m` para seleccionar el LLM y el modelo, activar conectores compilados y editar sus campos públicos. Tab elige un campo y `e` lo edita. `k` abre sus credenciales en el llavero. La sesión se recarga dentro de la TUI tras un cambio. La activación o el cambio de destino que pueda enviar datos fuera del equipo requiere confirmación explícita y firmada.
+La TUI guarda los ajustes no secretos en `config.toml` dentro del [directorio de datos estándar](platforms.md#datos-y-terminal). La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no activa ninguno. Escribe `/model` para elegir un proveedor y modelo; usa `/modules` para activar conectores y consultar sus campos públicos. Tab elige un campo, `/edit-param` lo edita y `/keystore` abre sus credenciales. La sesión se recarga tras un cambio. La salida de datos del equipo requiere confirmación explícita y firmada. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre debe existir un backend de firma y secretos.
 
 Para automatización, el orden es **flag de CLI > variable de entorno > config.toml > valor por defecto**. Un override solo dura esa ejecución; la TUI no lo sustituye en silencio. El archivo contiene IDs de módulos, modelos, URLs, fuentes, índices, regiones y precios opcionales, pero nunca credenciales ni passphrases. Se rechazan los campos desconocidos o secretos. Ejemplo:
 
@@ -100,7 +100,7 @@ analyst_key_fingerprint = "<huella mostrada por IRMind>"
 
 Elige `os` o `file` por separado para cada capacidad. `os` usa Keychain, Credential Manager o Secret Service. `file` guarda ambas capacidades en `keystore.enc`, pide una passphrase sin eco una vez por sesión y funciona por SSH. Emplea Argon2id y XChaCha20-Poly1305; sigue siendo necesaria una passphrase sólida y una máquina protegida. Si el backend elegido no se abre, IRMind falla cerrado y ofrece un cambio explícito en la TUI. Nunca cambia en silencio.
 
-Pulsa `k` en la pantalla de inicio para ver los backends, comprobar qué credenciales existen, añadir o sustituir (`a`), eliminar (`d`), cambiar la passphrase (`p`) o migrar una capacidad (`s` o `x`). La migración conserva la huella pública del analista y deja un evento operativo global firmado incluso antes del primer caso. Tras cambiar una credencial, los conectores activos pueden conservar el valor anterior: pulsa `r` para reiniciar la sesión. No escribas secretos en el texto del caso.
+Escribe `/keystore` para ver los backends y comprobar qué credenciales existen. Usa `/cred-add`, `/cred-delete`, `/passphrase`, `/migrate-signer` o `/migrate-secrets` para cambiarlos. La migración conserva la huella pública del analista y deja un evento operativo global firmado incluso antes del primer caso. Tras cambiar una credencial, los conectores activos pueden conservar el valor anterior: escribe `/restart` para reiniciar la sesión. No escribas secretos en el texto del caso.
 
 La CLI lee la passphrase del terminal sin eco o de un descriptor abierto explícitamente con `--passphrase-fd <FD>`; Windows admite actualmente solo el descriptor `0`. IRMind no acepta passphrases ni secretos por argumentos o variables de entorno. `verify-export` no necesita desbloquear ningún backend.
 

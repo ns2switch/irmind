@@ -1,10 +1,10 @@
-Traducción de docs/modules.md en el commit f9e66f15df1200e1c71e7c0f1ae413ff1e4cdba8; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit 1062ed9ecebb5f0c6cbe3fbccb335de723e20dbe; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
 Esta página es para quienes eligen conectores o backends de llavero. Cada apartado explica qué hace el módulo, sus permisos, configuración y límites. Guarda las credenciales según [configuración](configuration.md); los conectores no leen el llavero ni el entorno por su cuenta.
 
-Los módulos se compilan dentro del binario. En la TUI, pulsa `m` para seleccionar un módulo compilado, editar sus campos públicos y activarlo; pulsa `k` para sus credenciales. Los cambios persisten y la sesión se recarga dentro de la TUI. Las variables de entorno y los interruptores de la CLI indicados abajo son overrides temporales para automatización. Ninguno se selecciona automáticamente.
+La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Ninguno se activa automáticamente. En la TUI, usa `/model` para seleccionar y probar un proveedor, `/modules` para activar conectores y editar campos públicos, y `/keystore` para las credenciales. Los cambios persisten y la sesión se recarga. Una compilación mínima usa `--no-default-features --features keystore-file`; siempre se requiere un backend de firma y secretos. Las variables y flags de la CLI ofrecen overrides temporales para automatización.
 
 ## Compatible con OpenAI
 
@@ -138,7 +138,7 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Permiso:** Acceso al almacén de credenciales del usuario actual. En Linux, Secret Service suele necesitar una sesión D-Bus.
 
-**Configuración:** Se compila por defecto con `keystore-os`. Elige `os` explícitamente para `signer`, `secrets` o ambos en el primer arranque. Pulsa `k` para gestionar credenciales sin mostrar sus valores.
+**Configuración:** Se compila por defecto con `keystore-os`. Elige `os` explícitamente para `signer`, `secrets` o ambos en el primer arranque. Usa `/keystore` para gestionar credenciales sin mostrar sus valores.
 
 **Límites:** Una sesión SSH sin entorno gráfico puede no tener el llavero desbloqueado. Si este backend está seleccionado y no funciona, IRMind se detiene; la selección o migración a `file` debe ser explícita.
 
@@ -148,7 +148,7 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Permiso:** Escritura en el directorio privado de datos del usuario; no requiere red ni sesión gráfica.
 
-**Configuración:** Se compila por defecto con `keystore-file`. Elige `file` explícitamente para `signer`, `secrets` o ambos. La TUI pide la passphrase sin eco; la CLI admite `--passphrase-fd`. Pulsa `k` para cambiar la passphrase o migrar.
+**Configuración:** Se compila por defecto con `keystore-file`. Elige `file` explícitamente para `signer`, `secrets` o ambos. La TUI pide la passphrase sin eco; la CLI admite `--passphrase-fd`. Usa `/keystore` para cambiar la passphrase o migrar.
 
 **Límites:** Argon2id y XChaCha20-Poly1305 protegen el archivo en reposo, pero una passphrase débil o una sesión comprometida pueden exponerlo desbloqueado. Conserva fuera de la máquina la huella pública. La migración queda en la cadena operativa global firmada y requiere reiniciar la sesión para activarse.
 
