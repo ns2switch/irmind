@@ -9,10 +9,16 @@ const RECORDED_S3_LIST: &str = r"<ListBucketResult><Contents><Key>AWSLogs/123/a.
 const RECORDED_AZURE_LIST: &str = r"<EnumerationResults><Blobs><Blob><Name>AWSLogs/123/a.json</Name><Properties><Last-Modified>Fri, 23 Oct 2026 12:00:00 GMT</Last-Modified><Etag>synthetic-etag</Etag><Content-Length>7</Content-Length><Content-Type>application/json</Content-Type></Properties></Blob></Blobs></EnumerationResults>";
 
 #[cfg(any(feature = "s3", feature = "gcs", feature = "azure"))]
-fn recorded_object() -> irmind_testkit::MockResponse {
-    irmind_testkit::MockResponse::json(r#"{"x":1}"#)
+fn recorded_object(scheme: &str) -> irmind_testkit::MockResponse {
+    let response = irmind_testkit::MockResponse::json(r#"{"x":1}"#)
         .with_header("ETag", "synthetic-etag")
-        .with_header("Last-Modified", "Fri, 23 Oct 2026 12:00:00 GMT")
+        .with_header("Last-Modified", "Fri, 23 Oct 2026 12:00:00 GMT");
+    match scheme {
+        "s3" => response.with_header("x-amz-version-id", "s3-v1"),
+        "gs" => response.with_header("x-goog-generation", "12345"),
+        "az" => response.with_header("x-ms-version-id", "azure-v1"),
+        _ => response,
+    }
 }
 
 #[cfg(any(feature = "s3", feature = "gcs", feature = "azure"))]
@@ -44,7 +50,7 @@ async fn recorded_provider_round_trip(
         store,
         manifest,
     };
-    irmind_testkit::run_object_source_contract(
+    let metadata = irmind_testkit::run_object_source_contract(
         &module,
         scheme,
         "synthetic-audit",
@@ -54,6 +60,13 @@ async fn recorded_provider_round_trip(
     )
     .await
     .unwrap();
+    let expected = match scheme {
+        "s3" => "s3-v1",
+        "gs" => "12345",
+        "az" => "azure-v1",
+        _ => unreachable!(),
+    };
+    assert_eq!(metadata.version.as_deref(), Some(expected));
 }
 
 #[cfg(feature = "s3")]
@@ -63,7 +76,7 @@ async fn s3_reads_recorded_object_from_local_server() {
     use irmind_testkit::{MockResponse, MockServer};
     let server = MockServer::start(vec![
         MockResponse::json(RECORDED_S3_LIST),
-        recorded_object(),
+        recorded_object("s3"),
     ])
     .unwrap();
     // Plain HTTP exists only in this synthetic protocol fixture. Production
@@ -88,7 +101,7 @@ async fn gcs_reads_recorded_object_from_local_server() {
     use irmind_testkit::{MockResponse, MockServer};
     let server = MockServer::start(vec![
         MockResponse::json(RECORDED_S3_LIST),
-        recorded_object(),
+        recorded_object("gs"),
     ])
     .unwrap();
     let store = object_store::gcp::GoogleCloudStorageBuilder::new()
@@ -109,7 +122,7 @@ async fn azure_reads_recorded_object_from_local_server() {
     use irmind_testkit::{MockResponse, MockServer};
     let server = MockServer::start(vec![
         MockResponse::json(RECORDED_AZURE_LIST),
-        recorded_object(),
+        recorded_object("az"),
     ])
     .unwrap();
     let store = object_store::azure::MicrosoftAzureBuilder::new()

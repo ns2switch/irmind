@@ -106,6 +106,49 @@ fn expanded_card_and_scrolled_sidebar_are_visible_in_test_backend() {
 }
 
 #[test]
+fn cloud_listing_and_transfer_confirmation_fit_in_a_narrow_terminal() {
+    use crate::case::conversation::{Card, CardKind, Conversation};
+    let mut chat = Conversation::new(false);
+    chat.set_viewport(80, 18);
+    chat.push(Card::new(
+        CardKind::ToolResult,
+        "Cloud objects",
+        "1 object · estimated 512 bytes\n1. AWSLogs/123/a.json · 512 bytes · v1",
+        false,
+    ));
+    let lines = chat.visible_lines();
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let view = CaseFrame {
+        title: "Synthetic cloud case",
+        messages: "",
+        visible_lines: Some(&lines),
+        input: "",
+        input_focused: false,
+        panel: "",
+        overlay: Some(
+            "Read cloud object?\ns3://synthetic-audit/AWSLogs/123/a.json\nEstimated transfer: 512 bytes\nVersion: v1\nPress y to confirm or Esc to cancel",
+        ),
+        menu: None,
+        tab: 0,
+        sidebar_visible: false,
+        sidebar_scroll: 0,
+        overlay_scroll: 0,
+        new_content: false,
+        model: "no model",
+        tokens: 0,
+        cost: "",
+        pending: 0,
+        detections: 0,
+        status: "◐ Cloud object… 2s · 256/512 bytes · esc to interrupt",
+    };
+    draw_case(&mut terminal, &view).unwrap();
+    let shown = screen(&terminal);
+    assert!(shown.contains("Read cloud object?"));
+    assert!(shown.contains("Estimated transfer: 512 bytes"));
+    assert!(shown.contains("256/512 bytes"));
+}
+
+#[test]
 fn visual_states_have_versioned_terminal_snapshots() {
     use crate::case::conversation::{Card, CardKind, Conversation};
     let mut chat = Conversation::new(false);

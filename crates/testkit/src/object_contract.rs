@@ -16,7 +16,7 @@ pub async fn run_object_source_contract(
     prefix: &str,
     key: &str,
     expected: &[u8],
-) -> Result<(), AppError> {
+) -> Result<irmind_app::ObjectEntry, AppError> {
     let scope = format!(
         "v3;sources={};accounts=;projects=;hosts=;objects={scheme}://{container}/{prefix};from={FROM};to={TO}",
         port.source_id()
@@ -69,8 +69,10 @@ pub async fn run_object_source_contract(
         return Err(AppError::RemoteTool);
     }
     let read_call = authorize(&case, Tool::ObjectRead, args, 2)?;
-    let ObjectSourceOutput::Object { mut chunks, .. } =
-        port.execute(&read_call, &CancellationToken::new()).await?
+    let ObjectSourceOutput::Object {
+        metadata,
+        mut chunks,
+    } = port.execute(&read_call, &CancellationToken::new()).await?
     else {
         return Err(AppError::RemoteTool);
     };
@@ -79,7 +81,7 @@ pub async fn run_object_source_contract(
         bytes.extend_from_slice(&chunk?);
     }
     if bytes == expected {
-        Ok(())
+        Ok(metadata)
     } else {
         Err(AppError::RemoteTool)
     }
