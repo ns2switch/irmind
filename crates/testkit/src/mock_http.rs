@@ -8,6 +8,7 @@ pub struct MockResponse {
     pub location: Option<&'static str>,
     pub delay: Duration,
     pub headers: Vec<(&'static str, &'static str)>,
+    pub allow_early_close: bool,
 }
 
 impl MockResponse {
@@ -19,6 +20,7 @@ impl MockResponse {
             location: None,
             delay: Duration::ZERO,
             headers: Vec::new(),
+            allow_early_close: false,
         }
     }
     #[must_use]
@@ -29,6 +31,7 @@ impl MockResponse {
             location: None,
             delay: Duration::ZERO,
             headers: Vec::new(),
+            allow_early_close: false,
         }
     }
     #[must_use]
@@ -39,6 +42,7 @@ impl MockResponse {
             location: Some("/unexpected-redirect"),
             delay: Duration::ZERO,
             headers: Vec::new(),
+            allow_early_close: false,
         }
     }
 
@@ -53,6 +57,12 @@ impl MockResponse {
     #[must_use]
     pub fn with_header(mut self, name: &'static str, value: &'static str) -> Self {
         self.headers.push((name, value));
+        self
+    }
+
+    #[must_use]
+    pub fn allow_early_close(mut self) -> Self {
+        self.allow_early_close = true;
         self
     }
 }
@@ -164,6 +174,9 @@ fn serve(listener: &TcpListener, script: &[MockResponse]) -> Result<Vec<Recorded
                 stream
                     .set_read_timeout(Some(Duration::from_secs(2)))
                     .map_err(|error| error.to_string())?;
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(2)))
+                    .map_err(|error| error.to_string())?;
                 let request = read_request(&stream)?;
                 let response = &script[requests.len()];
                 requests.push(request);
@@ -256,9 +269,22 @@ fn write_response(stream: &mut TcpStream, response: &MockResponse) -> Result<(),
         }
         return Err(error.to_string());
     }
-    stream
-        .write_all(&response.body)
-        .map_err(|error| error.to_string())
+    match stream.write_all(&response.body) {
+        Ok(()) => Ok(()),
+        Err(error)
+            if response.allow_early_close
+                && matches!(
+                    error.kind(),
+                    std::io::ErrorKind::BrokenPipe
+                        | std::io::ErrorKind::ConnectionReset
+                        | std::io::ErrorKind::TimedOut
+                        | std::io::ErrorKind::WouldBlock
+                ) =>
+        {
+            Ok(())
+        }
+        Err(error) => Err(error.to_string()),
+    }
 }
 
 #[cfg(test)]

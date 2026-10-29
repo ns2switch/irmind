@@ -1,6 +1,7 @@
 [workspace]
 members = ["crates/domain", "crates/app", "crates/security", "crates/infra", "crates/fs", "crates/http", "crates/keystore-transfer", "crates/parser-json", "crates/testkit", "crates/llm-chat-completions", "crates/modules/llm-openai-compatible", "crates/modules/llm-anthropic", "crates/modules/llm-deepseek", "crates/modules/llm-openrouter", "crates/modules/edr-crowdstrike", "crates/modules/edr-sentinelone", "crates/modules/ti-virustotal", "crates/modules/ti-misp", "crates/modules/siem-splunk", "crates/modules/cloud-aws", "crates/modules/storage-object", "crates/modules/keystore-os", "crates/modules/keystore-file", "crates/tui", "crates/bin"]
 resolver = "3"
+exclude = ["vendor/object_store"]
 
 [workspace.package]
 edition = "2024"
@@ -34,3 +35,7 @@ incremental = false
 inherits = "test"
 debug = "line-tables-only"
 incremental = false
+
+[patch.crates-io]
+# Pin the reviewed 0.13.2 source with bounded metadata response collection.
+object_store = { path = "vendor/object_store" }

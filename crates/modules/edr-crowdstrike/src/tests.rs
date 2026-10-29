@@ -47,7 +47,7 @@ impl EdrFixture for Fixture {
                     responses.push(MockResponse::json(&format!(r#"{{"resources":[{{"agent_id":"{aid}","created_timestamp":"{at}","email":"alice@example.com"}}]}}"#)));
                 }
                 EdrScenario::HttpError => responses.push(MockResponse::status(503)),
-                EdrScenario::OversizedResponse => responses.push(MockResponse { status: 200, body: vec![b'X'; 5_000_001], location: None, delay: Duration::ZERO, headers: Vec::new() }),
+                EdrScenario::OversizedResponse => responses.push(MockResponse { status: 200, body: vec![b'X'; 5_000_001], location: None, delay: Duration::ZERO, headers: Vec::new(), allow_early_close: false }),
                 EdrScenario::Redirect => responses.push(MockResponse::redirect()),
                 EdrScenario::ProcessTree | EdrScenario::ProcessTreeCrossHost => responses.clear(),
             }

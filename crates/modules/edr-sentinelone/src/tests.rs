@@ -73,6 +73,7 @@ impl EdrFixture for Fixture {
                 location: None,
                 delay: Duration::ZERO,
                 headers: Vec::new(),
+                allow_early_close: false,
             }],
             EdrScenario::Redirect => vec![MockResponse::redirect()],
             EdrScenario::ProcessTree => vec![
