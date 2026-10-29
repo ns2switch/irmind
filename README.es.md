@@ -1,4 +1,4 @@
-Traducción de README.md en el commit a0cc9b27c0cb2641fc1f735d4f2ba1be3851c6b1; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit feab9f40922364971110fd8270c9bca4d5d8b8fd; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -68,6 +68,9 @@ Una feature de Cargo incluye el módulo en el binario; activarlo es un paso dist
 | OpenRouter | LLM | `llm-openrouter` | experimental | [Módulos](docs/es/modules.md) |
 | Splunk | SIEM | `siem-splunk` | experimental | [Módulos](docs/es/modules.md) |
 | AWS CloudTrail e IAM | nube | `cloud-aws` | experimental | [Módulos](docs/es/modules.md) |
+| Almacenamiento S3 | almacenamiento en nube | `storage-s3` | experimental | [Objetos](docs/es/modules.md#almacenamiento-de-objetos-en-la-nube-s3-gcs-y-azure-blob) |
+| Almacenamiento GCS | almacenamiento en nube | `storage-gcs` | experimental | [Objetos](docs/es/modules.md#almacenamiento-de-objetos-en-la-nube-s3-gcs-y-azure-blob) |
+| Almacenamiento Azure Blob | almacenamiento en nube | `storage-azure` | experimental | [Objetos](docs/es/modules.md#almacenamiento-de-objetos-en-la-nube-s3-gcs-y-azure-blob) |
 | Objetos S3 | almacenamiento en la nube | `storage-s3` | experimental | [Módulos](docs/es/modules.md) |
 | Objetos GCS | almacenamiento en la nube | `storage-gcs` | experimental | [Módulos](docs/es/modules.md) |
 | Azure Blob | almacenamiento en la nube | `storage-azure` | experimental | [Módulos](docs/es/modules.md) |

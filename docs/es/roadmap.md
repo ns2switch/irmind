@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 3af189106bf6b0d971c0f1a6ea2076107dfd5c9e; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 6932516a9fafe79d5e05e2fb1c3d049d3d62637f; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -23,7 +23,7 @@ El MVP tiene un alcance cerrado:
 2. Obtener alertas del SIEM y mantener las trazas de diagnóstico separadas de los eventos firmados de custodia.
 3. Mantener las consultas SIEM limitadas a campos, operadores, ventanas temporales y agregaciones sencillas estructurados que traduce el conector.
 4. Procesar en streaming exportaciones de CloudTrail, Cloud Audit Logs de GCP, Azure Activity y registros de inicio de sesión de Entra ID, además de JSON genérico. Migrar los casos existentes con verificación antes y después.
-5. Leer objetos de S3, GCS y Azure Blob en streaming mediante conectores explícitos de solo lectura. Aplicar el alcance y los presupuestos de transferencia, y probar cada backend con respuestas sintéticas.
+5. Leer objetos de S3, GCS y Azure Blob en streaming mediante conectores explícitos de solo lectura. El alcance firmado v3 delimita buckets, contenedores, prefijos y ventanas UTC. Cada lectura de una versión requiere antes una lista completa firmada; los presupuestos de transferencia y la confirmación explícita limitan el coste. Probar cada backend con respuestas sintéticas grabadas.
 6. Completar las pruebas con respuestas grabadas, los contratos compartidos y las guías de los módulos de nube, SIEM, EDR e inteligencia de amenazas existentes.
 
 La versión `v0.1.0` solo se publicará cuando todos los hitos del [plan de referencia](../development/plan.md) cumplan sus criterios, se documente la prueba manual del modelo, se pruebe al menos un conector contra un entorno real de pruebas y el tag incluya un registro de cambios y binarios descargables. Todos los módulos actuales siguen siendo experimentales hasta cumplir esas condiciones. Aún no hay fecha de publicación.
