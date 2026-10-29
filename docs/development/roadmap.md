@@ -9,7 +9,7 @@ This page is for contributors and evaluators planning around current limitations
 - A conversation-first TUI with a multiline prompt, scrollable signed activity cards, command completion, and an optional case sidebar. Case creation, evidence ingestion, investigation, approval, verification, sealing, and export remain in the same workspace.
 - Incremental model text in the TUI, IOC/hypothesis/ATT&CK panels with analyst confirmation, and evidence excerpts beside matching approvals.
 - Policy-gated reads and analyst-approved external enrichment, with a mandatory content guard.
-- Local SQLite custody, a derived DuckDB graph, and Ed25519 signatures from an explicitly selected OS or encrypted-file backend. The current ingestion path copies evidence and is limited to small files; large-case storage below is planned.
+- Local SQLite custody and a derived Parquet store queried by DuckDB, with Ed25519 signatures from an explicitly selected OS or encrypted-file backend. Signed source manifests support large cases without an implicit copy of each original; a copy is an explicit option. The 1 GB and 15 GB synthetic benchmarks meet the local ingestion and query targets.
 - Explicitly selected LLM modules and optional Splunk, AWS, EDR, MISP, and VirusTotal connectors; Splunk searches use structured fields and aggregations.
 - Typed IOC, hypothesis, ATT&CK technique, and timeline proposals with analyst confirmation; reports cite confirmed evidence.
 - Case scopes with projects and an optional TOML policy ceiling for remote reads.
