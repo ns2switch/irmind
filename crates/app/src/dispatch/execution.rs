@@ -28,7 +28,20 @@ impl Engine<'_> {
         cancel: &CancellationToken,
     ) -> Result<(String, String), AppError> {
         let payload = if call.tool() == &Tool::ObjectRead {
-            self.object_reservation_payload(id, call).await?
+            match self.object_reservation_payload(id, call).await {
+                Ok(payload) => payload,
+                Err(error) => {
+                    self.audit_local(
+                        id,
+                        crate::AuditOrigin::Policy,
+                        AuditEventKind::Denied,
+                        "object read blocked before transfer",
+                        None,
+                    )
+                    .await?;
+                    return Err(error);
+                }
+            }
         } else {
             format!("{} {:?}", call.tool().as_str(), call.proposal_args())
         };

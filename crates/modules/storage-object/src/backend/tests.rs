@@ -138,6 +138,23 @@ async fn azure_reads_recorded_object_from_local_server() {
     assert_recorded_requests(&server.finish().unwrap());
 }
 
+#[cfg(feature = "azure")]
+#[test]
+fn azure_requires_an_explicit_service_principal_secret() {
+    let mut config = ModuleConfig::new();
+    config.insert_value("IRMIND_STORAGE_AZURE_SOURCE_ID", "storage-test".into());
+    config.insert_value("IRMIND_STORAGE_AZURE_CONTAINER", "synthetic-audit".into());
+    config.insert_value("IRMIND_STORAGE_AZURE_ACCOUNT", "syntheticaccount".into());
+    config.insert_value("IRMIND_STORAGE_AZURE_CLIENT_ID", "syntheticclient".into());
+    config.insert_value("IRMIND_STORAGE_AZURE_TENANT_ID", "synthetictenant".into());
+    assert!(StorageObject::from_azure_config(&config).is_err());
+    config.insert_secret(
+        "AZURE_CLIENT_SECRET",
+        secrecy::SecretString::from("synthetic-secret".to_owned()),
+    );
+    assert!(StorageObject::from_azure_config(&config).is_ok());
+}
+
 #[allow(clippy::unwrap_used)]
 async fn synthetic_object_contract(
     scheme: &'static str,
