@@ -152,15 +152,15 @@ fn serve(listener: &TcpListener, script: &[MockResponse]) -> Result<Vec<Recorded
         None
     };
     loop {
-        if Instant::now() >= deadline {
+        if quiet_until.is_some_and(|until| Instant::now() >= until) {
+            return Ok(requests);
+        }
+        if quiet_until.is_none() && Instant::now() >= deadline {
             return Err(format!(
                 "mock server received {} of {} expected requests",
                 requests.len(),
                 script.len()
             ));
-        }
-        if quiet_until.is_some_and(|until| Instant::now() >= until) {
-            return Ok(requests);
         }
         match listener.accept() {
             Ok((mut stream, _)) => {
