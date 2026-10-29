@@ -1,4 +1,5 @@
 mod input;
+use super::CaseExit;
 use super::state::{CaseMessage, CaseState, update};
 use super::{
     ActiveTask, CancellationToken, CaseId, CaseWorkflow, Confirmation, CrosstermBackend, Duration,
@@ -25,10 +26,11 @@ pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub seal_rx: mpsc::Receiver<irmind_app::SealPreview>,
     pub overrides_active: bool,
     pub modules: &'env [crate::ModuleStatus],
+    pub exit_to: CaseExit,
 }
 
 impl<'scope> CaseRuntime<'scope, '_, '_> {
-    pub(super) fn run(&mut self) -> Result<()> {
+    pub(super) fn run(&mut self) -> Result<CaseExit> {
         loop {
             if self.shutdown.is_cancelled() {
                 break;
@@ -89,7 +91,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     .record_cancellation(self.id, cancelled_operation(label))?;
             }
         }
-        Ok(())
+        Ok(self.exit_to.clone())
     }
 
     fn finish_task(&mut self) -> Result<()> {
@@ -109,39 +111,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                 .join()
                 .map_err(|_| anyhow::anyhow!("investigation thread panicked"))?
             {
-                Ok(text) => {
-                    if label == "IRMind" {
-                        self.state.conversation.discard_preview();
-                        self.state.pending_final_reply =
-                            Some(self.engine.guard.screen(&text)?.text);
-                    }
-                    if label == "Prepare seal" {
-                        let preview = self.seal_rx.try_recv().map_err(|_| {
-                            anyhow::anyhow!("signed seal preview was not delivered")
-                        })?;
-                        let summary = seal_confirmation(&preview);
-                        self.state.confirmation =
-                            Some(Confirmation::Seal(Box::new(preview), summary));
-                    }
-                    if label == "Cloud objects" && self.capture_object_listing().is_err() {
-                        self.state.messages.push(
-                            "Cloud object listing could not be displayed safely; retry or narrow the prefix".into(),
-                        );
-                    }
-                    if label != "IRMind" && label != "Ingest" && label != "Cloud objects" {
-                        if is_result_card_label(label)
-                            && !text.starts_with("approval pending:")
-                            && !text.starts_with("denied:")
-                        {
-                            self.state.result_cards.push((label, text));
-                        } else {
-                            update(
-                                &mut self.state,
-                                CaseMessage::TaskFinished(format!("{label}: {text}")),
-                            );
-                        }
-                    }
-                }
+                Ok(text) => self.finish_success(label, text)?,
                 Err(irmind_app::AppError::Cancelled) => {
                     if label == "IRMind" {
                         self.state.conversation.discard_preview();
@@ -172,6 +142,42 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
         }
         self.state.running_since = None;
         self.state.progress_status = None;
+        Ok(())
+    }
+
+    fn finish_success(&mut self, label: &'static str, text: String) -> Result<()> {
+        if label == "IRMind" {
+            self.state.conversation.discard_preview();
+            self.state.pending_final_reply = Some(self.engine.guard.screen(&text)?.text);
+        }
+        if label == "Prepare seal" {
+            let preview = self
+                .seal_rx
+                .try_recv()
+                .map_err(|_| anyhow::anyhow!("signed seal preview was not delivered"))?;
+            let summary = seal_confirmation(&preview);
+            self.state.confirmation_option = 0;
+            self.state.confirmation = Some(Confirmation::Seal(Box::new(preview), summary));
+        }
+        if label == "Cloud objects" && self.capture_object_listing().is_err() {
+            self.state.messages.push(
+                "Cloud object listing could not be displayed safely; retry or narrow the prefix"
+                    .into(),
+            );
+        }
+        if label != "IRMind" && label != "Ingest" && label != "Cloud objects" {
+            if is_result_card_label(label)
+                && !text.starts_with("approval pending:")
+                && !text.starts_with("denied:")
+            {
+                self.state.result_cards.push((label, text));
+            } else {
+                update(
+                    &mut self.state,
+                    CaseMessage::TaskFinished(format!("{label}: {text}")),
+                );
+            }
+        }
         Ok(())
     }
 

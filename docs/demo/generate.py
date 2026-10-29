@@ -24,6 +24,7 @@ EXAMPLE_SHA256 = "0b7f3a97647d64d5d917b09002f069f2cf15a058ea2406bceaf2d5fe5f02d0
 FILES = ("demo.gif", "conversation.png", "command-menu.png", "approval-card.png")
 UX_FILES = (
     "home.png",
+    "model.png",
     "conversation.png",
     "command-menu.png",
     "approval-card.png",
@@ -46,12 +47,15 @@ EXPECTED_FLOW = (
 
 
 def docker(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    result = subprocess.run(
         ["docker", "run", "--rm", "--network", "none", "--pull=never", *args],
-        check=True,
+        check=False,
         text=True,
         capture_output=True,
     )
+    if result.returncode:
+        raise ValueError(f"VHS container failed: {result.stderr.strip()}")
+    return result
 
 
 def validate_privacy(text: str) -> None:
@@ -161,13 +165,6 @@ def main() -> None:
         )
         validate_transcript(output / "demo.ascii")
         validate_images(output)
-        docker(
-            "--user", f"{os.getuid()}:{os.getgid()}",
-            "--mount", f"type=bind,src={output},dst=/out",
-            "--entrypoint", "ffmpeg", IMAGE,
-            "-y", "-v", "error", "-i", "/out/demo.gif",
-            "-ss", "0.5", "-frames:v", "1", "/out/home.png",
-        )
         wizard = docker(
             "--init", "--user", f"{os.getuid()}:{os.getgid()}",
             "--env", "HOME=/tmp/irmind-ux-home",

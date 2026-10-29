@@ -1,0 +1,6 @@
+---
+source: crates/tui/src/home/model.rs
+expression: screen(&state)
+---
+Installed Ollama models (Tab edits HTTP/HTTPS loopback URL):
+> 1. synthetic:latest

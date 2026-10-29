@@ -2965,9 +2965,13 @@ name = "irmind-mod-llm-openai-compatible"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
+ "irmind-http",
  "irmind-llm-chat-completions",
  "irmind-testkit",
+ "reqwest",
  "secrecy",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

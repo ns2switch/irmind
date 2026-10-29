@@ -6,6 +6,9 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+irmind-http = { path = "../../http", version = "0.1.0" }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots"] }
+serde_json = "1"
 irmind-app = { path = "../../app", version = "0.1.0" }
 irmind-llm-chat-completions = { path = "../../llm-chat-completions", version = "0.1.0" }
 
@@ -13,6 +16,7 @@ secrecy = "0.10"
 
 [dev-dependencies]
 irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+tokio = { version = "1", default-features = false, features = ["rt"] }
 
 [lints]
 workspace = true

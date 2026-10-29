@@ -12,7 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-mod command_registry;
+pub(crate) mod command_registry;
 mod commands;
 mod confirmation;
 mod conversation;
@@ -32,6 +32,17 @@ use picker::PathPicker;
 use runtime::CaseRuntime;
 use state::{CaseState, Focus};
 pub(crate) use view::{CaseFrame, draw_case};
+
+#[derive(Clone)]
+pub(crate) enum CaseExit {
+    Home,
+    New,
+    Model,
+    Modules,
+    Keystore,
+    Quit,
+    Open(String),
+}
 
 struct MouseCapture(bool);
 
@@ -68,7 +79,7 @@ fn initial_state(
     let case = engine.repo.get_case(id)?;
     let backend = io_ops.keystore_status()?.signer_backend;
     let case_summary = format!(
-        "{} · {}\nModel: {} · Keystore: {}\n/ingest adds evidence · ? opens help",
+        "{} · {}\nModel: {} · Keystore: {}\n/ingest adds evidence · /help opens help",
         case.title,
         case.severity.as_str(),
         model.map_or_else(|| "no model".into(), LlmPort::descriptor),
@@ -96,6 +107,7 @@ fn initial_state(
     Ok(CaseState {
         case,
         input: String::new(),
+        confirm_exit: crate::ExitConfirmation::Inactive,
         input_history: Vec::new(),
         history_index: None,
         messages: Vec::new(),
@@ -126,6 +138,7 @@ fn initial_state(
         tab: 0,
         selected_approval: 0,
         approval_option: 0,
+        confirmation_option: 0,
         selected_finding: 0,
         palette: None,
         picker: None,
@@ -149,7 +162,7 @@ pub(crate) fn run_case(
     id: &CaseId,
     shutdown: &CancellationToken,
     presentation: CasePresentation<'_>,
-) -> Result<()> {
+) -> Result<CaseExit> {
     verify_case_before_open(terminal, engine, id, shutdown)?;
     let state = initial_state(engine, id, model, io_ops)?;
     let (progress_tx, progress_rx) = mpsc::channel::<String>();
@@ -174,6 +187,7 @@ pub(crate) fn run_case(
             seal_rx,
             overrides_active: presentation.overrides_active,
             modules: presentation.modules,
+            exit_to: CaseExit::Home,
         };
         let _mouse = MouseCapture::start(presentation.mouse_capture)?;
         runtime.run()

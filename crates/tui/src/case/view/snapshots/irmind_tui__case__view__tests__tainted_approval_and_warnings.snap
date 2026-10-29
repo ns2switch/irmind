@@ -23,6 +23,6 @@ expression: screen(&terminal)
 
 
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│Ask about the case… · / for commands · ? help                                 │
+│Ask about the case… · / for commands · /help for help                         │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Synthetic case · synthetic-model · 18 tok · $0 · 1 approval pending · 1 detectio

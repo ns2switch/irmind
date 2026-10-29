@@ -39,6 +39,7 @@ pub struct KeystoreWizard {
     choice: KeystoreChoice,
     backend_field: BackendField,
     backend_cursor: &'static str,
+    backend_input: String,
     availability: BackendAvailability,
     password: SecretString,
     confirmation: SecretString,
@@ -94,6 +95,7 @@ impl KeystoreWizard {
             choice,
             backend_field: BackendField::Signer,
             backend_cursor,
+            backend_input: String::new(),
             availability: BackendAvailability {
                 os: os_available,
                 file: file_compiled,
@@ -193,7 +195,7 @@ impl KeystoreWizard {
     fn description(&self) -> String {
         match self.step {
             Step::Welcome => "IRMind signs every investigation with your analyst key.\nThe keystore protects that key and connector credentials.\n\nEnter to choose a backend.".into(),
-            Step::Backend => "Choose a backend with ↑/↓ and Enter. Signing and module secrets are selected separately.".into(),
+            Step::Backend => "Choose a backend with ↑/↓ and Enter, or type 1/2 then Enter. Signing and module secrets are selected separately.".into(),
             Step::Passphrase => format!(
                 "Create a passphrase for the encrypted file.\nAt least {MIN_PASSPHRASE_CHARS} characters; use several unrelated words."
             ),
@@ -219,6 +221,22 @@ impl KeystoreWizard {
     }
 
     fn advance(&mut self) -> bool {
+        if self.step == Step::Backend && !self.backend_input.is_empty() {
+            let requested = match self.backend_input.as_str() {
+                "1" => "os",
+                "2" => "file",
+                _ => {
+                    self.error = Some("Choose option 1 or 2.".into());
+                    return false;
+                }
+            };
+            self.backend_input.clear();
+            if !self.available(requested) {
+                self.error = Some("That backend is unavailable in this session.".into());
+                return false;
+            }
+            self.backend_cursor = requested;
+        }
         self.error = None;
         match self.step {
             Step::Welcome => self.step = Step::Backend,
@@ -266,12 +284,11 @@ impl KeystoreWizard {
             return WizardAction::None;
         }
         if self.confirm_exit {
-            return match key.code {
-                KeyCode::Char('y') | KeyCode::Enter => WizardAction::Exit,
-                _ => {
-                    self.confirm_exit = false;
-                    WizardAction::None
-                }
+            return if key.code == KeyCode::Enter {
+                WizardAction::Exit
+            } else {
+                self.confirm_exit = false;
+                WizardAction::None
             };
         }
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
@@ -282,6 +299,16 @@ impl KeystoreWizard {
             KeyCode::Esc => self.previous(),
             KeyCode::Up | KeyCode::Down if self.step == Step::Backend => {
                 self.move_backend(key.code);
+            }
+            KeyCode::Backspace if self.step == Step::Backend => {
+                self.backend_input.pop();
+            }
+            KeyCode::Char(ch)
+                if self.step == Step::Backend
+                    && !ch.is_control()
+                    && self.backend_input.len() < 4 =>
+            {
+                self.backend_input.push(ch);
             }
             KeyCode::Enter if self.advance() => {
                 return if self.step == Step::Complete {
@@ -399,14 +426,16 @@ fn render_backends(
         Line::from(format!("Choose a backend for the {focus}:")),
         Line::default(),
     ];
-    for (id, label, description, unavailable) in [
+    for (number, id, label, description, unavailable) in [
         (
+            1,
             "os",
             "OS keyring",
             "Uses the system key service.",
             "Unavailable in this session: no system keyring.",
         ),
         (
+            2,
             "file",
             "Encrypted file",
             "Works locally and over SSH.",
@@ -417,7 +446,7 @@ fn render_backends(
         let selected = wizard.backend_cursor == id && available;
         lines.push(Line::from(Span::styled(
             format!(
-                "{} {label} — {}",
+                "{} {number}. {label} — {}",
                 if selected { '›' } else { ' ' },
                 if available { description } else { unavailable }
             ),
@@ -432,6 +461,7 @@ fn render_backends(
     }
     lines.extend([
         Line::default(),
+        Line::from(format!("Choice: {}", wizard.backend_input)),
         Line::styled(format!("Signing: {}", wizard.choice.signer), theme.muted()),
         Line::styled(format!("Secrets: {}", wizard.choice.secrets), theme.muted()),
     ]);
@@ -505,7 +535,7 @@ fn render_explanation(
         );
     }
     if wizard.confirm_exit {
-        text.push_str("\n\nExit setup? Enter/y confirms; any other key stays.");
+        text.push_str("\n\nExit setup? Enter confirms; Esc stays.");
     }
     frame.render_widget(
         Paragraph::new(escape_display(&text)).style(Style::default().fg(theme.text)),
@@ -523,7 +553,7 @@ fn render_feedback(
     let text = if let Some(error) = &wizard.error {
         format!("Error: {error}\nRetry, Esc to go back, or choose another backend.")
     } else if wizard.confirm_exit {
-        "Exit setup? Enter/y confirms; any other key stays.".into()
+        "Exit setup? Enter confirms; Esc stays.".into()
     } else {
         String::new()
     };

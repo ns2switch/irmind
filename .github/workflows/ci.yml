@@ -101,7 +101,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.cross_verify == 'true'
         with: {name: verify-test-linux, path: verify-bin/, if-no-files-found: error}
-      - name: Build unsigned release binary for tag or nightly code change
+      - name: Build unsigned release binary with default product modules for tag or nightly code change
         if: needs.dco.outputs.release_build == 'true'
         run: cargo build --release -p irmind --locked
       - name: Check links and documented CLI commands against the built test binary

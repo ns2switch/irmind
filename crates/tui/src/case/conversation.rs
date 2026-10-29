@@ -387,21 +387,6 @@ impl Conversation {
         self.selected = self.card_at(self.scroll);
     }
 
-    pub(super) fn jump_start(&mut self) {
-        self.selection_state = SelectionState::Navigating;
-        self.scroll = 0;
-        self.follow_tail = self.max_scroll() == 0;
-        self.selected = (!self.cards.is_empty()).then_some(0);
-    }
-
-    pub(super) fn jump_end(&mut self) {
-        self.selection_state = SelectionState::Navigating;
-        self.scroll = self.max_scroll();
-        self.follow_tail = true;
-        self.new_content = false;
-        self.selected = self.cards.len().checked_sub(1);
-    }
-
     pub(super) fn select_by(&mut self, delta: isize) {
         if self.cards.is_empty() {
             return;
@@ -528,7 +513,7 @@ mod tests {
         chat.push(Card::new(CardKind::Model, "IRMind", "new reply", true));
         assert_eq!(chat.scroll, before);
         assert!(chat.has_new_content());
-        chat.jump_end();
+        chat.scroll_by(isize::MAX);
         assert!(!chat.has_new_content());
         assert!(
             chat.visible_lines()

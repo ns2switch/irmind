@@ -7,6 +7,7 @@ mod cli;
 mod configuration;
 mod diagnostics;
 mod keystore;
+mod model_probe;
 mod policy_config;
 use cli::{
     Cli, Command, audit_source_name, input_files_large, read_evidence, write_private_output,
@@ -352,6 +353,24 @@ impl WorkspaceIo for RootWorkspaceIo {
             change,
             confirmed,
         )?)
+    }
+    fn list_ollama_models(&self, base_url: &str) -> Result<Vec<String>> {
+        model_probe::list_ollama_models(base_url)
+    }
+    fn test_model_connection(
+        &self,
+        provider: &str,
+        base_url: &str,
+        model: &str,
+        key: Option<&SecretString>,
+    ) -> Result<String> {
+        model_probe::test_model_connection(
+            provider,
+            base_url,
+            model,
+            key,
+            self.secret_backend.as_ref(),
+        )
     }
 }
 

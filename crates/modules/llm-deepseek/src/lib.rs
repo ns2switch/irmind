@@ -17,6 +17,11 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
     tools: &[],
     config: &[
         ConfigField {
+            name: "IRMIND_DEEPSEEK_BASE_URL",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "IRMIND_DEEPSEEK_MODEL",
             required: true,
             secret: false,
@@ -39,7 +44,7 @@ impl DeepSeek {
             .expose_secret()
             .to_owned();
         Ok(Self(ChatCompletionsClient::new_with_profile(
-            BASE_URL,
+            config.value("IRMIND_DEEPSEEK_BASE_URL").unwrap_or(BASE_URL),
             model,
             Some(key),
             ChatProfile::DeepSeek,

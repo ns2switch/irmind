@@ -11,8 +11,34 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if prompt.is_empty() {
             return Ok(false);
         }
-        if prompt == "/quit" || prompt == "/home" {
+        if prompt == "/quit" {
+            self.exit_to = super::CaseExit::Quit;
             return Ok(true);
+        }
+        if prompt == "/home" || prompt == "/cases" {
+            return Ok(true);
+        }
+        if let Some(destination) = match prompt.as_str() {
+            "/new" => Some(super::CaseExit::New),
+            "/model" => Some(super::CaseExit::Model),
+            "/modules" | "/config" => Some(super::CaseExit::Modules),
+            "/keystore" => Some(super::CaseExit::Keystore),
+            "/open" => Some(super::CaseExit::Home),
+            _ => prompt
+                .strip_prefix("/open ")
+                .map(|value| super::CaseExit::Open(value.into())),
+        } {
+            self.exit_to = destination;
+            return Ok(true);
+        }
+        if prompt == "/sidebar" {
+            self.state.sidebar_visible = !self.state.sidebar_visible;
+            self.state.focus = if self.state.sidebar_visible {
+                super::Focus::Sidebar
+            } else {
+                super::Focus::Composer
+            };
+            return Ok(false);
         }
         if prompt == "/pause" {
             if let Some((cancel, _, _)) = &self.active {
@@ -57,10 +83,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
 
     fn investigate_prompt(&mut self, prompt: String) {
         if self.model.is_none() {
-            self.state.messages.push(
-                "No LLM selected. Open the Modules view (m), choose a model, then try again."
-                    .into(),
-            );
+            self.state
+                .messages
+                .push("No LLM selected. Use /model to configure one, then try again.".into());
             return;
         }
         match self.engine.guard.screen(&prompt) {

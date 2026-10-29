@@ -47,7 +47,8 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
         }],
         credentials: Vec::new(),
     };
-    let mut edit = vec![KeyCode::Char('e')];
+    let mut edit = "/edit-param".chars().map(KeyCode::Char).collect::<Vec<_>>();
+    edit.push(KeyCode::Enter);
     edit.extend("synthetic-model".chars().map(KeyCode::Char));
     edit.push(KeyCode::Enter);
     assert!(tui.drive_module_screen(&[module.clone()], &edit).unwrap());
@@ -59,7 +60,7 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
     assert!(screen(tui.terminal()).contains("Confirm egress change"));
     assert!(io_ops.1.load().unwrap().llm_module.is_none());
     assert!(
-        tui.drive_module_screen(&[module], &[KeyCode::Enter, KeyCode::Char('y')])
+        tui.drive_module_screen(&[module], &[KeyCode::Enter, KeyCode::Down, KeyCode::Enter])
             .unwrap()
     );
     let saved = io_ops.1.load().unwrap();

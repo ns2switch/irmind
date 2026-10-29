@@ -3,11 +3,30 @@ use super::{ConfigChange, HomeState, KeyCode, Mode, ModuleEdit, ModuleKind, stat
 pub(super) fn update_module_screen(state: &mut HomeState, key: KeyCode) -> HomeAction {
     if let Some(change) = state.pending_module_change.clone() {
         match key {
-            KeyCode::Esc => state.pending_module_change = None,
-            KeyCode::Char('y') => {
+            KeyCode::Esc => {
+                state.pending_module_change = None;
+                state.input.clear();
+            }
+            KeyCode::Up | KeyCode::Down => state.selected_option = 1 - state.selected_option,
+            KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4 => state.input.push(ch),
+            KeyCode::Backspace => {
+                state.input.pop();
+            }
+            KeyCode::Enter if state.input == "2" => {
+                state.input.clear();
                 state.pending_module_change = None;
                 return HomeAction::ChangeModule(change, true);
             }
+            KeyCode::Enter if state.input == "1" => {
+                state.input.clear();
+                state.pending_module_change = None;
+            }
+            KeyCode::Enter if state.input.is_empty() && state.selected_option == 1 => {
+                state.input.clear();
+                state.pending_module_change = None;
+                return HomeAction::ChangeModule(change, true);
+            }
+            KeyCode::Enter if state.input.is_empty() => state.pending_module_change = None,
             _ => {}
         }
         return HomeAction::None;
@@ -28,13 +47,12 @@ pub(super) fn update_module_screen(state: &mut HomeState, key: KeyCode) -> HomeA
         }
         KeyCode::Tab => select_parameter(state, true),
         KeyCode::BackTab => select_parameter(state, false),
-        KeyCode::Char('e') => begin_edit(state),
-        KeyCode::Char('k') => {
-            state.mode = Mode::Keystore;
-            return HomeAction::LoadKeystore;
+        KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4096 => state.input.push(ch),
+        KeyCode::Backspace => {
+            state.input.pop();
         }
-        KeyCode::Char('r') if state.restart_required => return HomeAction::Restart,
-        KeyCode::Enter | KeyCode::Char(' ') => return toggle_selected(state),
+        KeyCode::Enter if !state.input.is_empty() => return super::state::execute_command(state),
+        KeyCode::Enter => return toggle_selected(state),
         _ => {}
     }
     HomeAction::None
@@ -54,7 +72,7 @@ fn select_parameter(state: &mut HomeState, forward: bool) {
     }
 }
 
-fn begin_edit(state: &mut HomeState) {
+pub(super) fn begin_edit(state: &mut HomeState) {
     let Some(module) = state.modules.get(state.module_selected) else {
         return;
     };
@@ -63,7 +81,7 @@ fn begin_edit(state: &mut HomeState) {
         return;
     }
     let Some(field) = module.parameters.get(state.parameter_selected) else {
-        state.notice = "This module has no public parameters; use k for credentials".into();
+        state.notice = "This module has no public parameters; use /keystore for credentials".into();
         return;
     };
     if field.overridden {

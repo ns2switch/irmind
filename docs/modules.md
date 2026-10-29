@@ -2,7 +2,7 @@
 
 This page is for operators choosing a connector or keystore. Each section states what it does, the least privilege it needs, how to enable it, and what it cannot do. Store credentials as described in [configuration](configuration.md); product modules never read a keystore or environment themselves.
 
-Modules are compiled into the binary. In the TUI, press `m` to select a compiled module, edit its public fields, and enable it; press `k` for its credentials. The changes persist and the session reloads inside the TUI. The environment variables and CLI switches below provide temporary automation overrides. Nothing is selected automatically.
+The normal binary includes every current product module and both keystores. None is enabled automatically. In the TUI, use `/model` to select and test an AI provider, `/modules` to enable connectors and edit public fields, and `/keystore` for credentials. The changes persist and the session reloads inside the TUI. Use `--no-default-features --features keystore-file` for a minimal binary; at least one signer and secrets backend is required. The environment variables and CLI switches below provide temporary automation overrides.
 
 ## OpenAI-compatible
 
@@ -136,7 +136,7 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 **Permission:** Access to the current user's OS credential store. Linux Secret Service normally needs a D-Bus session.
 
-**Configure:** Compiled by default with `keystore-os`. Choose `os` explicitly for `signer`, `secrets`, or both on first launch. Press `k` to manage credentials without displaying their values.
+**Configure:** Compiled by default with `keystore-os`. Choose `os` explicitly for `signer`, `secrets`, or both on first launch. Use `/keystore` to manage credentials without displaying their values.
 
 **Limits:** A headless SSH session may lack an unlocked OS keyring. IRMind stops if this backend is selected but unavailable; select and migrate to `file` explicitly.
 
@@ -146,7 +146,7 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 **Permission:** Write access to the current user's private application-data directory; no network or graphical session is needed.
 
-**Configure:** Compiled by default with `keystore-file`. Choose `file` explicitly for `signer`, `secrets`, or both. The TUI prompts for a passphrase without echo; use `--passphrase-fd` for CLI automation. Press `k` to change the passphrase or migrate a capability.
+**Configure:** Compiled by default with `keystore-file`. Choose `file` explicitly for `signer`, `secrets`, or both. The TUI prompts for a passphrase without echo; use `--passphrase-fd` for CLI automation. Use `/keystore` to change the passphrase or migrate a capability.
 
 **Limits:** Argon2id and XChaCha20-Poly1305 protect data at rest, but a weak passphrase or a compromised user session can expose an unlocked store. Keep the public-key fingerprint outside the machine. Migration is signed in the global operational chain and requires a session restart to take effect.
 

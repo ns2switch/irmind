@@ -41,11 +41,12 @@ pub(crate) struct CaseRow {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Mode {
     List,
-    Search,
     New,
+    Model,
     Modules,
     Keystore,
     Setup,
+    Help,
     VerifyExport,
 }
 
@@ -60,6 +61,15 @@ pub(crate) struct HomeState {
     verify_form: [String; 2],
     verify_field: usize,
     notice: String,
+    input: String,
+    menu_selected: usize,
+    menu_query: Option<String>,
+    palette_return: Option<Mode>,
+    help_return: Mode,
+    help_selected: usize,
+    confirm_exit: crate::ExitConfirmation,
+    selected_option: usize,
+    model_setup: model::ModelSetup,
     keystore: Option<KeystoreStatus>,
     keystore_selected: usize,
     confirm_credential_delete: bool,
@@ -102,6 +112,15 @@ impl HomeState {
             verify_form: Default::default(),
             verify_field: 0,
             notice: String::new(),
+            input: String::new(),
+            menu_selected: 0,
+            menu_query: None,
+            palette_return: None,
+            help_return: Mode::List,
+            help_selected: 0,
+            confirm_exit: crate::ExitConfirmation::Inactive,
+            selected_option: 0,
+            model_setup: model::ModelSetup::new(),
             keystore: None,
             keystore_selected: 0,
             confirm_credential_delete: false,
@@ -210,6 +229,7 @@ where
 
 mod render;
 pub(crate) use render::render_home;
+mod model;
 mod modules;
 mod runtime;
 mod state;
@@ -232,7 +252,7 @@ pub(crate) fn run_home(
     state.set_modules(modules);
     state.overrides_active = launch.overrides_active;
     if let Some(id) = launch.initial_case {
-        case::run_case(
+        let exit = case::run_case(
             terminal,
             engine,
             model,
@@ -245,6 +265,7 @@ pub(crate) fn run_home(
                 mouse_capture: launch.mouse_capture,
             },
         )?;
+        apply_case_exit(&mut state, &exit);
         state.rows = load_rows(engine)?;
     }
     let (tx, rx) = mpsc::channel::<(CaseId, CaseStatus)>();
@@ -291,6 +312,8 @@ pub(crate) fn run_home(
             verify_started: None,
             migration_task: None,
             migration_started: None,
+            model_probe_task: None,
+            model_models_task: None,
             restart_requested: false,
         };
         let outcome = runtime.run();
@@ -300,6 +323,21 @@ pub(crate) fn run_home(
             .map_err(|_| anyhow::anyhow!("case verification worker failed"))??;
         outcome
     })
+}
+
+pub(super) fn apply_case_exit(state: &mut HomeState, exit: &case::CaseExit) {
+    state.mode = match exit {
+        case::CaseExit::Home | case::CaseExit::Open(_) | case::CaseExit::Quit => Mode::List,
+        case::CaseExit::New => Mode::New,
+        case::CaseExit::Model => Mode::Model,
+        case::CaseExit::Modules => Mode::Modules,
+        case::CaseExit::Keystore => Mode::Keystore,
+    };
+    if let case::CaseExit::Open(name) = exit {
+        state.input = format!("/open {name}");
+    } else if matches!(exit, case::CaseExit::Quit) {
+        state.confirm_exit = crate::ExitConfirmation::Pending;
+    }
 }
 
 pub(crate) fn show_startup_error(
@@ -312,13 +350,22 @@ pub(crate) fn show_startup_error(
         .collect::<String>();
     loop {
         terminal.draw(|frame| {
-            let block = Block::default().title(" IRMind startup blocked ").borders(Borders::ALL);
-            frame.render_widget(Paragraph::new(format!("Startup needs attention.\n\n{visible}\n\nPress r to retry, or q/Esc to exit safely.")).block(block).wrap(Wrap { trim: false }), frame.area());
+            let block = Block::default()
+                .title(" IRMind startup blocked ")
+                .borders(Borders::ALL);
+            frame.render_widget(
+                Paragraph::new(format!(
+                    "Startup needs attention.\n\n{visible}\n\nEnter retries; Esc exits safely."
+                ))
+                .block(block)
+                .wrap(Wrap { trim: false }),
+                frame.area(),
+            );
         })?;
         if let Event::Key(key) = event::read()? {
             match key.code {
-                KeyCode::Char('r') => return Ok(true),
-                KeyCode::Esc | KeyCode::Char('q') => return Ok(false),
+                KeyCode::Enter => return Ok(true),
+                KeyCode::Esc => return Ok(false),
                 _ => {}
             }
         }

@@ -97,7 +97,7 @@ impl CaseRuntime<'_, '_, '_> {
         if !matches!(self.state.confirmed_action.as_ref(), Some(Confirmation::ObjectRead(approved, _)) if approved == &command)
         {
             let summary = format!(
-                "Read cloud object?\n{}\nEstimated transfer: {} bytes\nVersion: {}\n{}\nPress y to confirm or Esc to cancel",
+                "Read cloud object?\n{}\nEstimated transfer: {} bytes\nVersion: {}\n{}\n1. Cancel  2. Confirm (↑/↓, Enter, or number then Enter)",
                 item.uri,
                 item.size,
                 item.version.as_deref().unwrap_or("ETag-bound"),
@@ -107,6 +107,7 @@ impl CaseRuntime<'_, '_, '_> {
                     "The source and hash will be signed; the original remains in cloud storage."
                 }
             );
+            self.state.confirmation_option = 0;
             self.state.confirmation = Some(Confirmation::ObjectRead(command, summary));
             return true;
         }

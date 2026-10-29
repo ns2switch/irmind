@@ -4,13 +4,12 @@ use irmind_app::{CaseId, Engine, SealPreview};
 pub(super) enum Confirmation {
     Seal(Box<SealPreview>, String),
     Export(String, String),
-    Finding(String, String),
     ObjectRead(String, String),
 }
 
 pub(super) fn seal_confirmation(preview: &SealPreview) -> String {
     format!(
-        "Seal case {}\nAudit entries after seal: {}\nFinal hash: {}\nAnalyst key fingerprint: {}\nPress y to confirm or Esc to cancel",
+        "Seal case {}\nAudit entries after seal: {}\nFinal hash: {}\nAnalyst key fingerprint: {}\n1. Cancel  2. Confirm (↑/↓, Enter, or number then Enter)",
         preview.case_id(),
         preview.entry_count(),
         irmind_app::hex(&preview.final_hash()),
@@ -46,7 +45,7 @@ pub(super) fn confirmation_summary(
     let entries = engine.audit_log.entries(id)?;
     let last = entries.last().map_or([0u8; 32], |entry| entry.hash);
     Ok(format!(
-        "{operation} case {}\nAudit entries: {}\nFinal hash: {}\nAnalyst key fingerprint: {}\nPress y to confirm or Esc to cancel",
+        "{operation} case {}\nAudit entries: {}\nFinal hash: {}\nAnalyst key fingerprint: {}\n1. Cancel  2. Confirm (↑/↓, Enter, or number then Enter)",
         id.as_str(),
         entries.len(),
         irmind_app::hex(&last),

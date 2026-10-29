@@ -1,0 +1,8 @@
+---
+source: crates/tui/src/home/model.rs
+expression: screen(&state)
+---
+Enable Anthropic? Case data may be sent to https://api.anthropic.com/.
+The model remains disabled until you confirm this change.
+> 1. Cancel
+  2. Enable and sign configuration

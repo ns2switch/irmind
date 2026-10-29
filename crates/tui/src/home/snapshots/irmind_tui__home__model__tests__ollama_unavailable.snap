@@ -1,0 +1,7 @@
+---
+source: crates/tui/src/home/model.rs
+expression: screen(&state)
+---
+Installed Ollama models (Tab edits HTTP/HTTPS loopback URL):
+Ollama is unavailable. Start it with `ollama serve`, then press Enter to retry.
+Status: Ollama is not responding; start it with `ollama serve`
