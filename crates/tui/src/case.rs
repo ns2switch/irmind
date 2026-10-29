@@ -149,7 +149,7 @@ pub(crate) fn run_case(
     verify_case_before_open(terminal, engine, id, shutdown)?;
     let state = initial_state(engine, id, model, io_ops)?;
     let (progress_tx, progress_rx) = mpsc::channel::<String>();
-    let (model_tx, model_rx) = mpsc::channel::<String>();
+    let (model_tx, model_rx) = mpsc::channel::<irmind_app::ModelProgress>();
     let (seal_tx, seal_rx) = mpsc::channel::<irmind_app::SealPreview>();
     std::thread::scope(|scope| {
         let mut runtime = CaseRuntime {

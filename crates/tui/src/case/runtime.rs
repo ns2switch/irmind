@@ -19,8 +19,8 @@ pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub active: Option<ActiveTask<'scope>>,
     pub progress_tx: mpsc::Sender<String>,
     pub progress_rx: mpsc::Receiver<String>,
-    pub model_tx: mpsc::Sender<String>,
-    pub model_rx: mpsc::Receiver<String>,
+    pub model_tx: mpsc::Sender<irmind_app::ModelProgress>,
+    pub model_rx: mpsc::Receiver<irmind_app::ModelProgress>,
     pub seal_tx: mpsc::Sender<irmind_app::SealPreview>,
     pub seal_rx: mpsc::Receiver<irmind_app::SealPreview>,
     pub overrides_active: bool,
@@ -41,11 +41,26 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             }
             let mut preview_dirty = false;
             for _ in 0..256 {
-                let Ok(delta) = self.model_rx.try_recv() else {
+                let Ok(progress) = self.model_rx.try_recv() else {
                     break;
                 };
-                update(&mut self.state, CaseMessage::ModelDelta(delta));
-                preview_dirty = true;
+                match progress {
+                    irmind_app::ModelProgress::RoundStarted => {
+                        if self.state.model_preview.is_empty() {
+                            self.state.conversation.discard_preview();
+                        } else {
+                            let safe = self.engine.guard.screen(&self.state.model_preview)?.text;
+                            self.state.conversation.set_preview(safe);
+                            self.state.conversation.finish_preview();
+                        }
+                        update(&mut self.state, CaseMessage::ModelRoundStarted);
+                        preview_dirty = false;
+                    }
+                    irmind_app::ModelProgress::TextDelta(delta) => {
+                        update(&mut self.state, CaseMessage::ModelDelta(delta));
+                        preview_dirty = true;
+                    }
+                }
             }
             if preview_dirty {
                 let safe = self.engine.guard.screen(&self.state.model_preview)?.text;

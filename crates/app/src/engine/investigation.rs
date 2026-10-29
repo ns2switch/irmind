@@ -32,7 +32,7 @@ impl Engine<'_> {
         alert: &str,
         model: &dyn LlmPort,
         cancel: &CancellationToken,
-        on_text: &(dyn Fn(&str) + Send + Sync),
+        on_text: &(dyn Fn(ModelProgress) + Send + Sync),
     ) -> Result<String, AppError> {
         run_async(self.investigate_cancelable_with_progress(id, alert, model, cancel, on_text))
     }
@@ -54,7 +54,7 @@ impl Engine<'_> {
         alert: &str,
         model: &dyn LlmPort,
         cancel: &CancellationToken,
-        on_text: &(dyn Fn(&str) + Send + Sync),
+        on_text: &(dyn Fn(ModelProgress) + Send + Sync),
     ) -> Result<String, AppError> {
         let _tainted_alert = Tainted::from_external(
             alert,
@@ -124,33 +124,10 @@ impl Engine<'_> {
         model: &dyn LlmPort,
         round: RoundContext<'_>,
         cancel: &CancellationToken,
-        on_text: &(dyn Fn(&str) + Send + Sync),
+        on_text: &(dyn Fn(ModelProgress) + Send + Sync),
     ) -> Result<Option<String>, AppError> {
         let id = &case.id;
-        let id_owned = id.clone();
-        let spent = self
-            .blocking_local(move |local| summarize_usage(&local.audit_log.entries(&id_owned)?))
-            .await?;
-        let used_tokens =
-            spent
-                .input_tokens
-                .checked_add(spent.output_tokens)
-                .ok_or(AppError::Fixed(
-                    crate::FixedAppError::PolicyModelTokenCountOverflow,
-                ))?;
-        if used_tokens >= self.policy.max_model_tokens_per_case {
-            self.audit_local(
-                id,
-                crate::AuditOrigin::Policy,
-                irmind_domain::AuditEventKind::BudgetExceeded,
-                "model token quota",
-                None,
-            )
-            .await?;
-            return Err(AppError::Fixed(
-                crate::FixedAppError::PolicyCaseModelTokenQuotaReached,
-            ));
-        }
+        let used_tokens = self.used_model_tokens(id).await?;
         self.audit_local(
             id,
             crate::AuditOrigin::System,
@@ -171,8 +148,11 @@ impl Engine<'_> {
                 max_output_tokens: 2048,
                 remaining_case_tokens: self.policy.max_model_tokens_per_case - used_tokens,
             };
+        on_text(ModelProgress::RoundStarted);
         let (answer, usage) = self
-            .complete_model_request(id, model, request, cancel, on_text)
+            .complete_model_request(id, model, request, cancel, &|text| {
+                on_text(ModelProgress::TextDelta(text.to_owned()));
+            })
             .await?;
         self.audit_local(
             id,
@@ -204,6 +184,34 @@ impl Engine<'_> {
             let _ = write!(round.text, "\n</UNTRUSTED_{}>", round.nonce);
         }
         Ok(None)
+    }
+
+    async fn used_model_tokens(&self, id: &CaseId) -> Result<u64, AppError> {
+        let id_owned = id.clone();
+        let spent = self
+            .blocking_local(move |local| summarize_usage(&local.audit_log.entries(&id_owned)?))
+            .await?;
+        let used_tokens =
+            spent
+                .input_tokens
+                .checked_add(spent.output_tokens)
+                .ok_or(AppError::Fixed(
+                    crate::FixedAppError::PolicyModelTokenCountOverflow,
+                ))?;
+        if used_tokens >= self.policy.max_model_tokens_per_case {
+            self.audit_local(
+                id,
+                crate::AuditOrigin::Policy,
+                irmind_domain::AuditEventKind::BudgetExceeded,
+                "model token quota",
+                None,
+            )
+            .await?;
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyCaseModelTokenQuotaReached,
+            ));
+        }
+        Ok(used_tokens)
     }
 
     async fn record_model_usage(

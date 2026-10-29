@@ -329,6 +329,10 @@ impl Conversation {
         self.content_changed();
     }
 
+    pub(super) fn finish_preview(&mut self) {
+        self.preview = None;
+    }
+
     fn content_changed(&mut self) {
         if self.follow_tail {
             self.scroll = self.max_scroll();

@@ -61,6 +61,7 @@ pub(super) enum CaseMessage {
     Key(KeyCode, KeyModifiers, bool),
     Progress(String),
     ModelDelta(String),
+    ModelRoundStarted,
     TaskFinished(String),
 }
 
@@ -94,6 +95,11 @@ pub(crate) fn panel_findings_for(findings: &[Finding], tab: usize) -> Vec<&Findi
 /// Only updates screen state. I/O and tool execution follow the returned action.
 pub(super) fn update(state: &mut CaseState, message: CaseMessage) -> CaseAction {
     match message {
+        CaseMessage::ModelRoundStarted => {
+            state.model_preview.clear();
+            state.conversation.begin_preview();
+            CaseAction::None
+        }
         CaseMessage::ModelDelta(text) => {
             if state.model_preview.len().saturating_add(text.len()) <= 16_384 {
                 state.model_preview.push_str(&text);
@@ -341,9 +347,11 @@ mod tests {
             ),
             CaseAction::None
         ));
+        update(&mut state, CaseMessage::ModelRoundStarted);
         update(&mut state, CaseMessage::ModelDelta("partial answer".into()));
         assert_eq!(state.model_preview, "partial answer");
-        state.model_preview.clear();
+        update(&mut state, CaseMessage::ModelRoundStarted);
+        assert!(state.model_preview.is_empty());
         update(&mut state, CaseMessage::ModelDelta("enrichment.".into()));
         update(&mut state, CaseMessage::ModelDelta(" The".into()));
         assert_eq!(state.model_preview, "enrichment. The");

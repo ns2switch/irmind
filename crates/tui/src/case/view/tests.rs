@@ -192,3 +192,53 @@ fn visual_states_have_versioned_terminal_snapshots() {
     draw_case(&mut terminal, &view).unwrap();
     assert!(screen(&terminal).contains("2 approvals pending"));
 }
+
+#[test]
+fn consecutive_model_rounds_have_separate_messages() {
+    use crate::case::conversation::{Card, CardKind, Conversation};
+    let mut chat = Conversation::new(false);
+    chat.set_viewport(80, 18);
+    chat.push(Card::new(
+        CardKind::Analyst,
+        "Analyst",
+        "Investigate example.com",
+        false,
+    ));
+    chat.begin_preview();
+    chat.set_preview("Review the evidence before enrichment.".into());
+    chat.finish_preview();
+    chat.begin_preview();
+    chat.set_preview("The external lookup needs approval.".into());
+    let lines = chat.visible_lines();
+    let mut terminal = Terminal::new(TestBackend::new(80, 16)).unwrap();
+    draw_case(
+        &mut terminal,
+        &CaseFrame {
+            title: "Synthetic case",
+            messages: "",
+            visible_lines: Some(&lines),
+            input: "",
+            input_focused: true,
+            panel: "",
+            overlay: None,
+            menu: None,
+            tab: 0,
+            sidebar_visible: false,
+            sidebar_scroll: 0,
+            overlay_scroll: 0,
+            new_content: false,
+            model: "synthetic-model",
+            tokens: 42,
+            cost: "",
+            pending: 0,
+            detections: 0,
+            status: "Thinking…",
+        },
+    )
+    .unwrap();
+    let shown = screen(&terminal);
+    assert!(shown.contains("⏺ Review the evidence before enrichment."));
+    assert!(shown.contains("⏺ The external lookup needs approval."));
+    assert!(!shown.contains("enrichment.The"));
+    insta::assert_snapshot!("two_model_rounds", shown);
+}

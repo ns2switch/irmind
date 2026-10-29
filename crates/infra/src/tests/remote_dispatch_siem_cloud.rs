@@ -231,9 +231,21 @@ fn scoped_siem_read_uses_authorized_port_and_keeps_raw_evidence_local() {
     .unwrap();
     let scope = "v1;sources=splunk-prod;accounts=123;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z";
     let case = engine.create_case("SIEM", scope).unwrap();
+    let rounds = Mutex::new(0usize);
     engine
-        .investigate(&case.id, "Find AssumeRole", &Propose(Mutex::new(0)))
+        .investigate_with_progress(
+            &case.id,
+            "Find AssumeRole",
+            &Propose(Mutex::new(0)),
+            &CancellationToken::new(),
+            &|event| {
+                if matches!(event, irmind_app::ModelProgress::RoundStarted) {
+                    *rounds.lock().unwrap() += 1;
+                }
+            },
+        )
         .unwrap();
+    assert_eq!(*rounds.lock().unwrap(), 2);
     assert_eq!(*siem.calls.lock().unwrap(), 1);
     assert!(engine.pending_approvals(&case.id).unwrap().is_empty());
     let result = store
