@@ -1,11 +1,34 @@
 #![cfg(unix)]
 #![allow(clippy::unwrap_used)]
 
-use expectrl::{Expect as _, Session};
-use std::{path::Path, process::Command, thread, time::Duration};
+use expectrl::{Expect as _, Session, session::OsSession};
+use std::{io::ErrorKind, path::Path, process::Command, thread, time::Duration};
 
-fn wait_for_file(path: &Path) -> bool {
+fn drain_output(session: &mut OsSession) {
+    let mut output = [0_u8; 8192];
+    loop {
+        match session.try_read(&mut output) {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(error) => {
+                assert_eq!(error.kind(), ErrorKind::WouldBlock, "PTY read: {error}");
+                break;
+            }
+        }
+    }
+}
+
+fn send_and_drain(session: &mut OsSession, input: &str) {
+    session.send(input).unwrap();
+    for _ in 0..10 {
+        drain_output(session);
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+fn wait_for_file(session: &mut OsSession, path: &Path) -> bool {
     for _ in 0..900 {
+        drain_output(session);
         if path.is_file() {
             return true;
         }
@@ -33,20 +56,17 @@ fn first_run_creates_file_keystore_without_leaving_the_tui() {
     let mut session = Session::spawn(terminal_command(binary, home.path())).unwrap();
     session.set_expect_timeout(Some(Duration::from_secs(45)));
     session.expect("Welcome").unwrap();
-    session.send("\r").unwrap();
-    thread::sleep(Duration::from_millis(300));
-    session.send("\x1b[B").unwrap();
-    thread::sleep(Duration::from_millis(300));
-    session.send("\r").unwrap();
-    thread::sleep(Duration::from_millis(300));
-    session.send("\x1b[B").unwrap();
-    thread::sleep(Duration::from_millis(300));
-    session.send("\r").unwrap();
-    thread::sleep(Duration::from_millis(300));
-    session.send("synthetic passphrase for PTY test\r").unwrap();
-    thread::sleep(Duration::from_millis(500));
-    session.send("synthetic passphrase for PTY test\r").unwrap();
-    assert!(wait_for_file(&home.path().join("keystore.toml")));
+    send_and_drain(&mut session, "\r");
+    send_and_drain(&mut session, "\x1b[B");
+    send_and_drain(&mut session, "\r");
+    send_and_drain(&mut session, "\x1b[B");
+    send_and_drain(&mut session, "\r");
+    send_and_drain(&mut session, "synthetic passphrase for PTY test\r");
+    send_and_drain(&mut session, "synthetic passphrase for PTY test\r");
+    assert!(wait_for_file(
+        &mut session,
+        &home.path().join("keystore.toml")
+    ));
     session.send("\r").unwrap();
     session.expect("First-run").unwrap();
     assert!(home.path().join("keystore.enc").exists());
