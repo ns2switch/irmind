@@ -1,0 +1,10 @@
+---
+source: crates/tui/src/home/model.rs
+expression: remote
+---
+Provider: Anthropic · Model: synthetic-model
+Endpoint: https://api.anthropic.com/
+A remote provider may receive case data after you enable it.
+> 1. Test connection with synthetic text
+  2. Save and enable model
+  3. Back

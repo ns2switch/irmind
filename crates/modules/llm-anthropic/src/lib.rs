@@ -11,7 +11,6 @@ use serde_json::json;
 mod stream;
 
 pub const MODULE_ID: &str = "llm-anthropic";
-const ENDPOINT: &str = "https://api.anthropic.com/v1/messages";
 const API_VERSION: &str = "2026-10-21";
 
 pub static MANIFEST: ModuleManifest = ModuleManifest {
@@ -20,6 +19,11 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
     ports: &[ModulePort::Llm],
     tools: &[],
     config: &[
+        ConfigField {
+            name: "IRMIND_ANTHROPIC_BASE_URL",
+            required: false,
+            secret: false,
+        },
         ConfigField {
             name: "IRMIND_ANTHROPIC_MODEL",
             required: true,
@@ -35,6 +39,7 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
 
 pub struct Anthropic {
     async_client: reqwest::Client,
+    endpoint: reqwest::Url,
     key: SecretString,
     model: String,
 }
@@ -46,10 +51,35 @@ impl Anthropic {
             .required_secret("ANTHROPIC_API_KEY")?
             .expose_secret()
             .to_owned();
-        Self::new(model, key)
+        Self::new_with_base(
+            config
+                .value("IRMIND_ANTHROPIC_BASE_URL")
+                .unwrap_or("https://api.anthropic.com/"),
+            model,
+            key,
+        )
     }
 
     pub fn new(model: &str, key: String) -> Result<Self, AppError> {
+        Self::new_with_base("https://api.anthropic.com/", model, key)
+    }
+
+    fn new_with_base(base_url: &str, model: &str, key: String) -> Result<Self, AppError> {
+        let mut endpoint = reqwest::Url::parse(base_url)
+            .map_err(|_| AppError::Model("invalid Anthropic API URL".into()))?;
+        if endpoint.username() != ""
+            || endpoint.password().is_some()
+            || endpoint.query().is_some()
+            || endpoint.fragment().is_some()
+            || (endpoint.scheme() != "https"
+                && !(endpoint.scheme() == "http"
+                    && matches!(endpoint.host_str(), Some("127.0.0.1" | "::1" | "localhost"))))
+        {
+            return Err(AppError::Model(
+                "Anthropic API URL requires HTTPS or loopback HTTP".into(),
+            ));
+        }
+        endpoint.set_path("/v1/messages");
         if model.trim().is_empty()
             || model.len() > 200
             || !model
@@ -74,6 +104,7 @@ impl Anthropic {
             })?;
         Ok(Self {
             async_client,
+            endpoint,
             key: SecretString::from(key),
             model: model.to_owned(),
         })
@@ -144,7 +175,7 @@ impl LlmPort for Anthropic {
         format!(
             "module={MODULE_ID};model={};endpoint_sha256={}",
             self.model,
-            irmind_app::hex(&irmind_app::sha256(ENDPOINT.as_bytes()))
+            irmind_app::hex(&irmind_app::sha256(self.endpoint.as_str().as_bytes()))
         )
     }
 
@@ -157,7 +188,7 @@ impl LlmPort for Anthropic {
         let response = tokio::select! {
             biased;
             () = cancel.cancelled() => return Err(AppError::Cancelled),
-            result = self.async_client.post(ENDPOINT)
+            result = self.async_client.post(self.endpoint.clone())
                 .bearer_auth(self.key.expose_secret())
                 .header("anthropic-version", API_VERSION)
                 .json(&body)

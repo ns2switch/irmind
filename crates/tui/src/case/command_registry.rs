@@ -1,14 +1,14 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 use std::fmt::Write as _;
-pub(super) struct Command {
-    pub name: &'static str,
-    pub description: &'static str,
-    pub shortcut: &'static str,
-    pub slash: bool,
+pub(crate) struct Command {
+    pub(crate) name: &'static str,
+    pub(crate) description: &'static str,
+    pub(crate) shortcut: &'static str,
+    pub(crate) slash: bool,
 }
 
 impl Command {
-    pub(super) fn category(&self) -> &'static str {
+    pub(crate) fn category(&self) -> &'static str {
         match self.name {
             "ingest" | "verify" | "seal" | "export" | "report" | "scope" | "home" | "rebuild" => {
                 "Case"
@@ -24,9 +24,10 @@ impl Command {
         }
     }
 
-    pub(super) fn syntax(&self) -> &'static str {
+    pub(crate) fn syntax(&self) -> &'static str {
         match self.name {
             "approve" | "deny" | "edit" | "module" => " <id>",
+            "open" => " <case title or ID>",
             "evidence" | "raw" => " <hash>",
             "ingest" => " <path>",
             "objects" => " <source> <scheme> <container> <prefix> <from> <to>",
@@ -51,7 +52,7 @@ pub(super) fn category_rank(category: &str) -> usize {
 mod specs;
 use specs::COMMANDS;
 
-pub(super) fn matches(query: &str) -> Vec<&'static Command> {
+pub(crate) fn matches(query: &str) -> Vec<&'static Command> {
     let needle = query.trim_start_matches('/').to_ascii_lowercase();
     let mut found = COMMANDS
         .iter()
@@ -71,9 +72,10 @@ pub(super) fn matches(query: &str) -> Vec<&'static Command> {
     found
 }
 
-pub(super) fn help() -> String {
-    let mut output =
-        String::from("Enter send · Alt/Shift+Enter newline\nCommands and shortcuts:\n");
+pub(crate) fn help() -> String {
+    let mut output = String::from(
+        "Enter confirm/send · Esc cancel/back · arrows select · Tab complete · PgUp/PgDn scroll · Ctrl+C confirm exit · Ctrl+K commands · Ctrl+O detail\nCommands:\n",
+    );
     for command in COMMANDS {
         let suffix = if command.slash && !command.shortcut.is_empty() {
             format!(" ({})", command.shortcut)
@@ -101,30 +103,16 @@ pub(super) fn shortcut_name(code: KeyCode, modifiers: KeyModifiers) -> Option<&'
     }
     let label = if modifiers.contains(KeyModifiers::CONTROL) {
         match code {
-            KeyCode::Char('b') => "Ctrl+B",
             KeyCode::Char('k') => "Ctrl+K",
-            KeyCode::Char('l') => "Ctrl+L",
-            KeyCode::Char('i') => "Ctrl+I",
             KeyCode::Char('o') => "Ctrl+O",
             KeyCode::Char('c') => "Ctrl+C",
-            KeyCode::Char('u') => "Ctrl+U",
-            KeyCode::Char('d') => "Ctrl+D",
             _ => return None,
         }
     } else {
         match code {
             KeyCode::Esc => "Esc",
-            KeyCode::Char('?') => "?",
-            KeyCode::Char('a') => "a",
-            KeyCode::Char('c') => "c",
-            KeyCode::Char('d') => "d",
-            KeyCode::Char('e') => "e",
             KeyCode::PageUp => "PgUp",
             KeyCode::PageDown => "PgDn",
-            KeyCode::Home => "Home",
-            KeyCode::End => "End",
-            KeyCode::Char('g') => "g",
-            KeyCode::Char('G') => "G",
             _ => return None,
         }
     };
@@ -165,7 +153,7 @@ pub(super) fn argument_candidates(
         .collect()
 }
 
-pub(super) fn cycle(len: usize, selected: usize, started: bool, forward: bool) -> usize {
+pub(crate) fn cycle(len: usize, selected: usize, started: bool, forward: bool) -> usize {
     if len == 0 {
         return 0;
     }
@@ -200,17 +188,14 @@ mod tests {
         assert_eq!(cycle(3, 0, false, true), 0);
         assert_eq!(cycle(3, 0, true, true), 1);
         assert_eq!(cycle(3, 0, true, false), 2);
-        assert_eq!(
-            shortcut_name(KeyCode::Char('a'), KeyModifiers::NONE),
-            Some("approve")
-        );
+        assert_eq!(shortcut_name(KeyCode::Char('a'), KeyModifiers::NONE), None);
         assert_eq!(shortcut_name(KeyCode::Char('a'), KeyModifiers::ALT), None);
         assert_eq!(
             shortcut_name(KeyCode::Char('b'), KeyModifiers::CONTROL),
-            Some("sidebar")
+            None
         );
-        assert!(matches("/side").is_empty());
-        assert!(help().contains("Ctrl+B"));
+        assert_eq!(matches("/side")[0].name, "sidebar");
+        assert!(help().contains("Ctrl+K"));
         let all = matches("/");
         assert!(all.windows(2).all(|pair| {
             (category_rank(pair[0].category()), pair[0].name)

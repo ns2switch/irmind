@@ -6,7 +6,12 @@ rust-version.workspace = true
 license.workspace = true
 
 [features]
-default = ["keystore-os", "keystore-file"]
+default = [
+    "keystore-os", "keystore-file",
+    "llm-anthropic", "llm-deepseek", "llm-openrouter",
+    "siem-splunk", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
+    "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
+]
 keystore-os = ["dep:irmind-mod-keystore-os"]
 keystore-file = ["dep:irmind-mod-keystore-file"]
 persistent-keyring = ["irmind-infra/persistent-keyring"]

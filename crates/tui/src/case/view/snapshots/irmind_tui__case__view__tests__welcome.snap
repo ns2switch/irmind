@@ -5,7 +5,7 @@ expression: screen(&terminal)
 ╭─ IRMind v0.1.0 ──────────────────────────────────────────────────────────────╮
 │ Synthetic case · high                                                        │
 │ Model: no model · Keystore: file                                             │
-│ /ingest adds evidence · ? opens help                                         │
+│ /ingest adds evidence · /help opens help                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
 
@@ -23,6 +23,6 @@ expression: screen(&terminal)
 
 
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│Ask about the case… · / for commands · ? help                                 │
+│Ask about the case… · / for commands · /help for help                         │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Synthetic case · no model · 0 tok · $0

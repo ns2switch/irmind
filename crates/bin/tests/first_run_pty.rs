@@ -71,7 +71,8 @@ fn first_run_creates_file_keystore_without_leaving_the_tui() {
     session.expect("First-run").unwrap();
     assert!(home.path().join("keystore.enc").exists());
     assert!(home.path().join("keystore.toml").exists());
-    session.send("q").unwrap();
+    session.send("\x1b").unwrap();
+    session.send("/quit\r\r").unwrap();
     drop(session);
 
     let mut unlock = Session::spawn(terminal_command(binary, home.path())).unwrap();

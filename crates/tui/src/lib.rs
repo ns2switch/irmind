@@ -22,6 +22,12 @@ use std::{
 };
 
 #[derive(Clone, Copy, Eq, PartialEq)]
+enum ExitConfirmation {
+    Inactive,
+    Pending,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ModuleKind {
     Llm,
     Connector,
@@ -127,6 +133,18 @@ pub trait WorkspaceIo: Send + Sync {
         change: irmind_app::ConfigChange,
         confirmed: bool,
     ) -> Result<bool>;
+    fn list_ollama_models(&self, _base_url: &str) -> Result<Vec<String>> {
+        anyhow::bail!("Ollama discovery is unavailable in this workspace")
+    }
+    fn test_model_connection(
+        &self,
+        _provider: &str,
+        _base_url: &str,
+        _model: &str,
+        _key: Option<&SecretString>,
+    ) -> Result<String> {
+        anyhow::bail!("Model connection testing is unavailable in this workspace")
+    }
 }
 
 struct TerminalSession;

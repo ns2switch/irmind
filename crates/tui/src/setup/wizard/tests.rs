@@ -128,7 +128,7 @@ fn control_c_requires_confirmation_and_escape_goes_back() {
     assert_eq!(wizard.key(ctrl_c), WizardAction::None);
     assert_eq!(wizard.key(key(KeyCode::Char('n'))), WizardAction::None);
     assert_eq!(wizard.key(ctrl_c), WizardAction::None);
-    assert_eq!(wizard.key(key(KeyCode::Char('y'))), WizardAction::Exit);
+    assert_eq!(wizard.key(key(KeyCode::Enter)), WizardAction::Exit);
 }
 
 #[test]

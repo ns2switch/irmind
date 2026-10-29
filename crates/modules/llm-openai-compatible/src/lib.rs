@@ -54,6 +54,61 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
 pub struct OpenAiCompatible(ChatCompletionsClient);
 
 impl OpenAiCompatible {
+    pub async fn list_ollama_models(base_url: &str) -> Result<Vec<String>, AppError> {
+        let mut url = reqwest::Url::parse(base_url)
+            .map_err(|_| AppError::Model("invalid Ollama URL".into()))?;
+        if !url.host_str().is_some_and(|host| {
+            matches!(
+                host.trim_start_matches('[').trim_end_matches(']'),
+                "127.0.0.1" | "::1" | "localhost"
+            )
+        }) || !matches!(url.scheme(), "http" | "https")
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.query().is_some()
+            || url.fragment().is_some()
+        {
+            return Err(AppError::Model(
+                "Ollama discovery requires a loopback HTTP or HTTPS URL".into(),
+            ));
+        }
+        url.set_path("/api/tags");
+        url.set_query(None);
+        let client = irmind_http::client_builder(std::time::Duration::from_secs(5), true)
+            .build()
+            .map_err(|_| AppError::Model("cannot create Ollama client".into()))?;
+        let response = client.get(url).send().await.map_err(|_| {
+            AppError::Model("Ollama is not responding; start it with `ollama serve`".into())
+        })?;
+        if !response.status().is_success() {
+            return Err(AppError::Model(format!(
+                "Ollama model list returned HTTP {}",
+                response.status()
+            )));
+        }
+        let bytes =
+            irmind_http::read_limited(response, 1_048_576, &irmind_app::CancellationToken::new())
+                .await
+                .map_err(|_| {
+                    AppError::Model("Ollama model list is unavailable or too large".into())
+                })?;
+        let value: serde_json::Value = serde_json::from_slice(&bytes)
+            .map_err(|_| AppError::Model("Ollama returned an invalid model list".into()))?;
+        let models = value
+            .get("models")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| AppError::Model("Ollama returned no model list".into()))?;
+        Ok(models
+            .iter()
+            .filter_map(|item| item.get("name").and_then(serde_json::Value::as_str))
+            .filter(|name| {
+                !name.is_empty() && name.len() <= 200 && name.chars().all(|ch| !ch.is_control())
+            })
+            .take(100)
+            .map(str::to_owned)
+            .collect())
+    }
+
     pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
         let base_url = config
             .value("IRMIND_LLM_BASE_URL")
@@ -112,6 +167,34 @@ impl LlmPort for OpenAiCompatible {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ollama_model_list_uses_bounded_loopback_request() {
+        let server = irmind_testkit::MockServer::start(vec![irmind_testkit::MockResponse::json(
+            r#"{"models":[{"name":"synthetic:latest"},{"name":"local:test"}]}"#,
+        )])
+        .unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let models = runtime
+            .block_on(OpenAiCompatible::list_ollama_models(&format!(
+                "{}v1/",
+                server.origin()
+            )))
+            .unwrap();
+        assert_eq!(models, ["synthetic:latest", "local:test"]);
+        let requests = server.finish().unwrap();
+        assert_eq!(requests[0].target, "/api/tags");
+        assert!(
+            runtime
+                .block_on(OpenAiCompatible::list_ollama_models(
+                    "http://example.com/v1/"
+                ))
+                .is_err()
+        );
+    }
 
     #[test]
     fn openai_key_is_never_reused_for_custom_endpoint() {

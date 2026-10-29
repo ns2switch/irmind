@@ -1,6 +1,6 @@
 use crate::TerminalSession;
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use irmind_app::{ConfigurationReview, ContentGuard};
 use ratatui::{
     Terminal,
@@ -26,24 +26,49 @@ pub struct OverrideReviewEntry {
 #[derive(Default)]
 struct OverrideScreen {
     offset: usize,
+    selected: usize,
+    typed: Option<usize>,
+    confirm_exit: bool,
 }
 
 impl OverrideScreen {
     fn update(&mut self, key: KeyCode, count: usize) -> Option<bool> {
+        if self.confirm_exit {
+            return match key {
+                KeyCode::Enter => Some(false),
+                KeyCode::Esc => {
+                    self.confirm_exit = false;
+                    None
+                }
+                _ => None,
+            };
+        }
         match key {
-            KeyCode::Char('y') => Some(true),
-            KeyCode::Char('n' | 'q') | KeyCode::Esc => Some(false),
+            KeyCode::Esc => Some(false),
             KeyCode::Down => {
-                self.offset = self
-                    .offset
-                    .saturating_add(1)
-                    .min(count.saturating_mul(1024));
+                self.selected = 1;
                 None
             }
             KeyCode::Up => {
-                self.offset = self.offset.saturating_sub(1);
+                self.selected = 0;
                 None
             }
+            KeyCode::PageDown => {
+                self.offset = self
+                    .offset
+                    .saturating_add(10)
+                    .min(count.saturating_mul(1024));
+                None
+            }
+            KeyCode::PageUp => {
+                self.offset = self.offset.saturating_sub(10);
+                None
+            }
+            KeyCode::Char('1' | '2') => {
+                self.typed = Some(usize::from(key == KeyCode::Char('2')));
+                None
+            }
+            KeyCode::Enter => Some(self.typed.take().unwrap_or(self.selected) == 1),
             _ => None,
         }
     }
@@ -85,7 +110,9 @@ impl OverrideScreen {
                 areas[1],
             );
             frame.render_widget(
-                Paragraph::new("Up/Down inspect every field · y accept and sign for this session · n use saved configuration")
+                Paragraph::new(if self.confirm_exit { "Exit IRMind? Enter confirms · Esc returns".into() } else { format!("{} 1. Use saved configuration   {} 2. Accept overrides and sign\n↑/↓ choose · Enter confirm · PgUp/PgDn inspect fields · typed: {}",
+                    if self.selected == 0 { ">" } else { " " },
+                    if self.selected == 1 { ">" } else { " " }, self.typed.map_or(String::new(), |value| (value + 1).to_string())) })
                     .block(Block::default().borders(Borders::ALL)),
                 areas[2],
             );
@@ -106,10 +133,14 @@ pub fn resolve_override_review(
         if !event::poll(Duration::from_millis(100))? {
             continue;
         }
-        if let Event::Key(key) = event::read()?
-            && let Some(accepted) = screen.update(key.code, entries.len())
-        {
-            return Ok(accepted);
+        if let Event::Key(key) = event::read()? {
+            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                screen.confirm_exit = true;
+                continue;
+            }
+            if let Some(accepted) = screen.update(key.code, entries.len()) {
+                return Ok(accepted);
+            }
         }
     }
 }
@@ -118,6 +149,9 @@ pub fn resolve_override_review(
 struct RecoveryScreen {
     offset: usize,
     confirming_acceptance: bool,
+    selected: usize,
+    typed: Option<usize>,
+    confirm_exit: bool,
 }
 
 impl RecoveryScreen {
@@ -126,12 +160,22 @@ impl RecoveryScreen {
         key: KeyCode,
         review: &ConfigurationReview,
     ) -> Option<ConfigurationRecoveryChoice> {
+        if self.confirm_exit {
+            return match key {
+                KeyCode::Enter => Some(ConfigurationRecoveryChoice::Quit),
+                KeyCode::Esc => {
+                    self.confirm_exit = false;
+                    None
+                }
+                _ => None,
+            };
+        }
         if self.confirming_acceptance {
             return match key {
-                KeyCode::Char('y') if review.current.is_some() => {
+                KeyCode::Enter if review.current.is_some() => {
                     Some(ConfigurationRecoveryChoice::Accept)
                 }
-                KeyCode::Esc | KeyCode::Char('n') => {
+                KeyCode::Esc => {
                     self.confirming_acceptance = false;
                     None
                 }
@@ -139,25 +183,42 @@ impl RecoveryScreen {
             };
         }
         match key {
-            KeyCode::Char('r') if review.approved.is_some() => {
-                Some(ConfigurationRecoveryChoice::Restore)
-            }
-            KeyCode::Char('a') if review.current.is_some() => {
-                self.confirming_acceptance = true;
+            KeyCode::Esc => Some(ConfigurationRecoveryChoice::Quit),
+            KeyCode::Char('1' | '2' | '3') => {
+                self.typed = match key {
+                    KeyCode::Char(ch) => ch.to_digit(10).map(|value| value as usize - 1),
+                    _ => None,
+                };
                 None
             }
-            KeyCode::Char('q') | KeyCode::Esc => Some(ConfigurationRecoveryChoice::Quit),
             KeyCode::Down => {
-                self.offset = self
-                    .offset
-                    .saturating_add(1)
-                    .min(review.differences.len().saturating_mul(1024));
+                self.selected = (self.selected + 1).min(2);
                 None
             }
             KeyCode::Up => {
-                self.offset = self.offset.saturating_sub(1);
+                self.selected = self.selected.saturating_sub(1);
                 None
             }
+            KeyCode::PageDown => {
+                self.offset = self
+                    .offset
+                    .saturating_add(10)
+                    .min(review.differences.len().saturating_mul(1024));
+                None
+            }
+            KeyCode::PageUp => {
+                self.offset = self.offset.saturating_sub(10);
+                None
+            }
+            KeyCode::Enter => match self.typed.take().unwrap_or(self.selected) {
+                0 if review.approved.is_some() => Some(ConfigurationRecoveryChoice::Restore),
+                1 if review.current.is_some() => {
+                    self.confirming_acceptance = true;
+                    None
+                }
+                2 => Some(ConfigurationRecoveryChoice::Quit),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -192,12 +253,14 @@ impl RecoveryScreen {
             })
             .collect::<Result<Vec<_>, _>>()?
             .join("\n\n");
-        let help = if self.confirming_acceptance {
-            "Accept the current file and sign it? It may change where case data is sent. y confirm · Esc cancel"
+        let help = if self.confirm_exit {
+            "Exit IRMind? Enter confirms · Esc returns"
+        } else if self.confirming_acceptance {
+            "Accept current config.toml and sign it? Enter confirms · Esc cancels"
         } else if review.approved.is_none() {
-            "Older signed event has no recoverable copy · a review and accept a valid file · q quit"
+            "1. Restore unavailable · 2. Review and accept current file · 3. Quit · ↑/↓ choose, Enter confirm"
         } else {
-            "Up/Down review fields · r restore approved file · a review and accept current file · q quit"
+            "1. Restore approved file · 2. Review and accept current file · 3. Quit · ↑/↓ choose, Enter confirm"
         };
         terminal.draw(|frame| {
             let areas = Layout::vertical([
@@ -226,7 +289,12 @@ impl RecoveryScreen {
                 areas[1],
             );
             frame.render_widget(
-                Paragraph::new(help).block(Block::default().borders(Borders::ALL)),
+                Paragraph::new(format!(
+                    "{help} · typed: {}",
+                    self.typed
+                        .map_or(String::new(), |value| (value + 1).to_string())
+                ))
+                .block(Block::default().borders(Borders::ALL)),
                 areas[2],
             );
         })?;
@@ -246,10 +314,14 @@ pub fn resolve_configuration_review(
         if !event::poll(Duration::from_millis(100))? {
             continue;
         }
-        if let Event::Key(key) = event::read()?
-            && let Some(choice) = screen.update(key.code, review)
-        {
-            return Ok(choice);
+        if let Event::Key(key) = event::read()? {
+            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                screen.confirm_exit = true;
+                continue;
+            }
+            if let Some(choice) = screen.update(key.code, review) {
+                return Ok(choice);
+            }
         }
     }
 }
@@ -301,7 +373,9 @@ mod tests {
         let shown = screen_text(&terminal);
         assert!(shown.contains("https://saved.example"));
         assert!(shown.contains("https://session.example"));
-        assert_eq!(screen.update(KeyCode::Char('y'), rows.len()), Some(true));
+        assert_eq!(screen.update(KeyCode::Char('y'), rows.len()), None);
+        assert_eq!(screen.update(KeyCode::Down, rows.len()), None);
+        assert_eq!(screen.update(KeyCode::Enter, rows.len()), Some(true));
     }
 
     #[test]
@@ -315,7 +389,8 @@ mod tests {
         let mut screen = OverrideScreen::default();
         screen.render(&mut terminal, &rows, &TestGuard).unwrap();
         assert!(screen_text(&terminal).contains("llm-openai-compatible"));
-        assert_eq!(screen.update(KeyCode::Char('n'), rows.len()), Some(false));
+        assert_eq!(screen.update(KeyCode::Char('n'), rows.len()), None);
+        assert_eq!(screen.update(KeyCode::Enter, rows.len()), Some(false));
         let review = ConfigurationReview {
             approved: Some(PersistentConfig::default()),
             current: Some(PersistentConfig::default()),
@@ -327,7 +402,7 @@ mod tests {
         assert_eq!(recovery.update(KeyCode::Char('a'), &review), None);
         assert_eq!(recovery.update(KeyCode::Char('n'), &review), None);
         assert_eq!(
-            recovery.update(KeyCode::Char('r'), &review),
+            recovery.update(KeyCode::Enter, &review),
             Some(ConfigurationRecoveryChoice::Restore)
         );
     }

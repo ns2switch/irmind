@@ -27,7 +27,19 @@ Sleep 2 s
 Show
 
 Sleep 1 s
-Type "n"
+Escape
+Sleep 800 ms
+Type "/model"
+Enter
+Sleep 2 s
+Screenshot docs/assets/model.png
+Sleep 1 s
+Escape
+Sleep 2 s
+Screenshot docs/assets/home.png
+Sleep 1 s
+Type "/new"
+Enter
 Sleep 400 ms
 Type "Demo CloudTrail alert"
 Enter
@@ -59,4 +71,3 @@ Type "/ver"
 Tab
 Enter
 Sleep 3 s
-Sleep 5 s

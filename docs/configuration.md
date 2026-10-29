@@ -34,7 +34,7 @@ The optional `[scope]` table is a hard ceiling for remote reads across cases. It
 
 ## Non-secret settings
 
-The TUI stores non-secret settings in `config.toml` in the [standard data directory](platforms.md#data-and-terminal-behavior). Press `m` to select the LLM and model, enable compiled connectors, and edit their public fields. Tab selects a field and `e` edits it. `k` opens its credentials in the keystore. The session reloads inside the TUI after a change. Activation or endpoint changes that may send data off this computer require explicit signed confirmation.
+The TUI stores non-secret settings in `config.toml` in the [standard data directory](platforms.md#data-and-terminal-behavior). The normal build compiles all current product modules and both keystores but enables none. Type `/model` to choose a provider and model; type `/modules` to enable connectors and inspect their public fields. Tab selects a field, `/edit-param` edits it, and `/keystore` opens credentials. The session reloads inside the TUI after a change. Activation or endpoint changes that may send data off this computer require explicit signed confirmation. A minimal build uses `--no-default-features --features keystore-file` because a signer and secrets backend must remain available.
 
 For automation, resolution order is **CLI flag > environment variable > config.toml > default**. An override lasts only for that run; the TUI does not silently replace it. The file contains module IDs, models, URLs, source IDs, indexes, regions, and optional pricing, but never credentials or passphrases. Unknown or secret manifest fields fail validation. Example:
 
@@ -97,7 +97,7 @@ analyst_key_fingerprint = "<fingerprint shown by IRMind>"
 
 Choose `os` or `file` independently for each capability. The OS backend uses Keychain, Credential Manager, or Secret Service. The encrypted-file backend keeps both capabilities in `keystore.enc`, prompts once per session without echo, and works over SSH. It uses Argon2id and XChaCha20-Poly1305; a strong passphrase and a protected host still matter. If a selected backend cannot be opened, IRMind fails closed and offers an explicit change in the TUI. It never falls back silently.
 
-Press `k` on the home screen to view the active backends, check credential presence, add or replace a credential (`a`), delete one (`d`), change the file passphrase (`p`), or migrate a capability (`s` or `x`). Migration preserves the analyst public-key fingerprint and writes a signed global operational event even before the first case exists. After a credential change, active connectors may retain the previous value: press `r` to restart the session. Never type secrets into case text.
+Type `/keystore` to view active backends and credential presence. Use `/cred-add`, `/cred-delete`, `/passphrase`, `/migrate-signer`, or `/migrate-secrets` to change them. Migration preserves the analyst public-key fingerprint and writes a signed global operational event even before the first case exists. After a credential change, active connectors may retain the previous value: type `/restart` to restart the session. Never type secrets into case text.
 
 The CLI reads a file-backend passphrase from the terminal without echo or from an explicitly opened descriptor with `--passphrase-fd <FD>`; Windows currently accepts descriptor `0` only. IRMind does not accept passphrases or module secrets through arguments or environment variables. `verify-export` needs no keystore.
 

@@ -152,10 +152,22 @@ pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Opt
         let detail = match confirm {
             Confirmation::Seal(_, info)
             | Confirmation::Export(_, info)
-            | Confirmation::Finding(_, info)
             | Confirmation::ObjectRead(_, info) => info,
         };
-        return Ok(Some(escape_display(detail)));
+        return Ok(Some(format!(
+            "{}\n\n{} 1. Cancel   {} 2. Confirm\n↑/↓ choose · Enter select · Esc cancel",
+            escape_display(detail),
+            if state.confirmation_option == 0 {
+                ">"
+            } else {
+                " "
+            },
+            if state.confirmation_option == 1 {
+                ">"
+            } else {
+                " "
+            },
+        )));
     }
     if let Some(search) = &state.palette {
         let listed = command_registry::matches(search)

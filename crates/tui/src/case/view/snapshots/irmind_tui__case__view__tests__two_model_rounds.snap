@@ -15,6 +15,6 @@ expression: shown
 
 
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│Ask about the case… · / for commands · ? help                                 │
+│Ask about the case… · / for commands · /help for help                         │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Synthetic case · synthetic-model · 42 tok · Thinking…

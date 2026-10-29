@@ -33,31 +33,23 @@ impl CaseRuntime<'_, '_, '_> {
             }
             return true;
         }
-        if shortcut == Some("end")
-            && (code == KeyCode::End || self.state.focus == Focus::Conversation)
-        {
-            self.state.conversation.jump_end();
-            return true;
-        }
-        if shortcut == Some("start") && self.state.focus == Focus::Conversation {
-            self.state.conversation.jump_start();
-            return true;
-        }
         if self.state.focus == Focus::Conversation
             && self.state.palette.is_none()
             && self.state.confirmation.is_none()
         {
-            return self.navigate_focused_card(code, shortcut);
+            return self.navigate_focused_card(code);
         }
         false
     }
 
-    fn navigate_focused_card(&mut self, code: KeyCode, shortcut: Option<&str>) -> bool {
-        if let Some(id) = self
-            .state
-            .conversation
-            .selected_approval()
-            .map(str::to_owned)
+    fn navigate_focused_card(&mut self, code: KeyCode) -> bool {
+        if (self.state.input.is_empty()
+            || self.state.input.bytes().all(|byte| byte.is_ascii_digit()))
+            && let Some(id) = self
+                .state
+                .conversation
+                .selected_approval()
+                .map(str::to_owned)
             && self.approval_card_key(&id, code)
         {
             return true;
@@ -65,31 +57,8 @@ impl CaseRuntime<'_, '_, '_> {
         match code {
             KeyCode::Up => self.state.conversation.select_by(-1),
             KeyCode::Down => self.state.conversation.select_by(1),
-            KeyCode::Enter | KeyCode::Char(' ') => self.state.conversation.toggle_selected(),
-            KeyCode::Char(_) if shortcut == Some("approve") && self.active.is_none() => {
-                if let Some(id) = self
-                    .state
-                    .conversation
-                    .selected_approval()
-                    .map(str::to_owned)
-                {
-                    self.start_approval(id);
-                }
-            }
-            KeyCode::Char(_)
-                if matches!(shortcut, Some("deny" | "edit")) && self.active.is_none() =>
-            {
-                if let Some(id) = self.state.conversation.selected_approval() {
-                    self.state.input = format!(
-                        "/{} {id} ",
-                        if shortcut == Some("deny") {
-                            "deny"
-                        } else {
-                            "edit"
-                        }
-                    );
-                    self.state.focus = Focus::Composer;
-                }
+            KeyCode::Enter if self.state.input.is_empty() => {
+                self.state.conversation.toggle_selected();
             }
             _ => return false,
         }
@@ -102,10 +71,12 @@ impl CaseRuntime<'_, '_, '_> {
                 self.state.approval_option = self.state.approval_option.saturating_sub(1);
             }
             KeyCode::Down => self.state.approval_option = (self.state.approval_option + 1).min(2),
-            KeyCode::Char('1' | 'a') => self.state.approval_option = 0,
-            KeyCode::Char('2' | 'd') | KeyCode::Esc => self.state.approval_option = 1,
-            KeyCode::Char('3' | 'e') => self.state.approval_option = 2,
-            KeyCode::Enter => {}
+            KeyCode::Enter => {
+                if let Ok(choice) = self.state.input.parse::<usize>() {
+                    self.state.approval_option = choice.saturating_sub(1).min(2);
+                    self.state.input.clear();
+                }
+            }
             _ => return false,
         }
         if matches!(code, KeyCode::Up | KeyCode::Down) {
@@ -255,47 +226,34 @@ impl CaseRuntime<'_, '_, '_> {
     }
 
     pub(super) fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<bool> {
-        if code == KeyCode::Esc
-            && self.state.focus == Focus::Conversation
-            && let Some(id) = self
-                .state
-                .conversation
-                .selected_approval()
-                .map(str::to_owned)
-        {
-            self.approval_card_key(&id, code);
-            return Ok(false);
+        if self.state.confirm_exit == crate::ExitConfirmation::Pending {
+            return match code {
+                KeyCode::Enter => {
+                    if let Some((cancel, _, _)) = &self.active {
+                        cancel.cancel();
+                    }
+                    Ok(true)
+                }
+                KeyCode::Esc => {
+                    self.state.confirm_exit = crate::ExitConfirmation::Inactive;
+                    Ok(false)
+                }
+                _ => Ok(false),
+            };
         }
         let shortcut = command_registry::shortcut_name(code, modifiers);
         if shortcut == Some("exit") {
-            return Ok(true);
+            self.state.confirm_exit = crate::ExitConfirmation::Pending;
+            self.state
+                .messages
+                .push("Exit IRMind? Enter confirms; Esc cancels.".into());
+            return Ok(false);
         }
         if shortcut == Some("pause")
             && let Some((cancel, _, _)) = &self.active
         {
             cancel.cancel();
             self.state.menu_open = false;
-            return Ok(false);
-        }
-        if shortcut == Some("help") && self.state.input.is_empty() && self.state.palette.is_none() {
-            self.state.messages.push(command_registry::help());
-            return Ok(false);
-        }
-        if shortcut == Some("sidebar") {
-            self.state.sidebar_visible = !self.state.sidebar_visible;
-            self.state.focus = if self.state.sidebar_visible {
-                Focus::Sidebar
-            } else {
-                Focus::Composer
-            };
-            return Ok(false);
-        }
-        if shortcut == Some("focus-conversation") {
-            self.state.focus = Focus::Conversation;
-            return Ok(false);
-        }
-        if shortcut == Some("focus-prompt") {
-            self.state.focus = Focus::Composer;
             return Ok(false);
         }
         if shortcut == Some("palette") {
@@ -339,27 +297,6 @@ impl CaseRuntime<'_, '_, '_> {
                 Ok(false)
             }
             CaseAction::Exit => Ok(true),
-            CaseAction::Approve(request_id) => {
-                self.start_approval(request_id);
-                Ok(false)
-            }
-            CaseAction::ConfirmFinding(finding_id) => {
-                if let Some(finding) = self
-                    .state
-                    .findings
-                    .iter()
-                    .find(|item| item.id == finding_id)
-                {
-                    self.state.confirmation = Some(Confirmation::Finding(
-                        finding_id,
-                        format!(
-                            "Confirm {:?}: {}\nEvidence: {}\nPress y to sign confirmation or Esc to cancel",
-                            finding.kind, finding.value, finding.evidence_hash
-                        ),
-                    ));
-                }
-                Ok(false)
-            }
             CaseAction::Submit(prompt) => {
                 self.state.menu_open = false;
                 self.submit(prompt)
@@ -397,17 +334,40 @@ impl CaseRuntime<'_, '_, '_> {
             return self.handle_picker_key(code);
         }
         if let Some(pending) = self.state.confirmation.take() {
-            if code == KeyCode::Char('y') {
+            match code {
+                KeyCode::Esc => return Ok(None),
+                KeyCode::Up | KeyCode::Down => {
+                    self.state.confirmation_option = 1 - self.state.confirmation_option;
+                    self.state.confirmation = Some(pending);
+                    return Ok(None);
+                }
+                KeyCode::Char(ch) if !ch.is_control() => {
+                    if self.state.input.len() < 4 {
+                        self.state.input.push(ch);
+                    }
+                    self.state.confirmation = Some(pending);
+                    return Ok(None);
+                }
+                KeyCode::Enter => {}
+                _ => {
+                    self.state.confirmation = Some(pending);
+                    return Ok(None);
+                }
+            }
+            if let Ok(choice) = self.state.input.parse::<usize>()
+                && (1..=2).contains(&choice)
+            {
+                self.state.confirmation_option = choice - 1;
+            }
+            self.state.input.clear();
+            if self.state.confirmation_option == 1 {
                 self.state.input = match &pending {
                     Confirmation::Seal(_, _) => "/seal".into(),
                     Confirmation::Export(command, _) | Confirmation::ObjectRead(command, _) => {
                         command.clone()
                     }
-                    Confirmation::Finding(id, _) => format!("/confirm {id}"),
                 };
-                if !matches!(pending, Confirmation::Finding(_, _)) {
-                    self.state.confirmed_action = Some(pending);
-                }
+                self.state.confirmed_action = Some(pending);
                 return Ok(Some(KeyCode::Enter));
             }
             return Ok(None);
@@ -446,10 +406,6 @@ impl CaseRuntime<'_, '_, '_> {
                     self.state.input = format!("/ingest {}", selected.to_string_lossy());
                     return Ok(Some(KeyCode::Enter));
                 }
-            }
-            KeyCode::Char('s') => {
-                self.state.input = format!("/ingest {}", browser.selected_path().to_string_lossy());
-                return Ok(Some(KeyCode::Enter));
             }
             _ => {}
         }

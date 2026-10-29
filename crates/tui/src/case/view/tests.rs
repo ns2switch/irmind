@@ -126,7 +126,7 @@ fn cloud_listing_and_transfer_confirmation_fit_in_a_narrow_terminal() {
         input_focused: false,
         panel: "",
         overlay: Some(
-            "Read cloud object?\ns3://synthetic-audit/AWSLogs/123/a.json\nEstimated transfer: 512 bytes\nVersion: v1\nPress y to confirm or Esc to cancel",
+            "Read cloud object?\ns3://synthetic-audit/AWSLogs/123/a.json\nEstimated transfer: 512 bytes\nVersion: v1\n1. Cancel  2. Confirm (↑/↓, Enter, or number then Enter)",
         ),
         menu: None,
         tab: 0,
@@ -153,7 +153,7 @@ fn visual_states_have_versioned_terminal_snapshots() {
     use crate::case::conversation::{Card, CardKind, Conversation};
     let mut chat = Conversation::new(false);
     chat.set_viewport(80, 18);
-    chat.push(Card::new(CardKind::Welcome, "IRMind v0.1.0", "Synthetic case · high\nModel: no model · Keystore: file\n/ingest adds evidence · ? opens help", false));
+    chat.push(Card::new(CardKind::Welcome, "IRMind v0.1.0", "Synthetic case · high\nModel: no model · Keystore: file\n/ingest adds evidence · /help opens help", false));
     let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
     let lines0 = chat.visible_lines();
     let mut view = CaseFrame {

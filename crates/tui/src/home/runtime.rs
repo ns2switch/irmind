@@ -25,6 +25,9 @@ pub(super) struct HomeRuntime<'scope, 'env, 'ports> {
     pub(super) verify_started: Option<Instant>,
     pub(super) migration_task: Option<Worker<'scope>>,
     pub(super) migration_started: Option<Instant>,
+    pub(super) model_probe_task: Option<Worker<'scope>>,
+    pub(super) model_models_task:
+        Option<std::thread::ScopedJoinHandle<'scope, Result<Vec<String>>>>,
     pub(super) restart_requested: bool,
 }
 
@@ -54,13 +57,30 @@ impl HomeRuntime<'_, '_, '_> {
             let Event::Key(key) = event::read()? else {
                 continue;
             };
+            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                self.state.confirm_exit = crate::ExitConfirmation::Pending;
+                self.state.notice = "Exit IRMind? Enter confirms; Esc cancels.".into();
+                continue;
+            }
+            if self.state.confirm_exit == crate::ExitConfirmation::Pending {
+                let action = update(&mut self.state, key.code);
+                if self.apply_action(action)? {
+                    break;
+                }
+                continue;
+            }
             if self.migration_task.is_some()
                 || (self.verify_task.is_some() && self.state.mode == Mode::VerifyExport)
             {
                 continue;
             }
-            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-                break;
+            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('k') {
+                if self.state.mode != Mode::List {
+                    self.state.palette_return = Some(self.state.mode);
+                    self.state.mode = Mode::List;
+                }
+                self.state.input = "/".into();
+                continue;
             }
             let action = update(&mut self.state, key.code);
             if self.apply_action(action)? {
@@ -71,6 +91,59 @@ impl HomeRuntime<'_, '_, '_> {
     }
 
     fn poll_tasks(&mut self) -> Result<()> {
+        self.poll_ollama_models();
+        self.poll_model_probe();
+        self.poll_verify_export();
+        self.poll_migration()?;
+        Ok(())
+    }
+
+    fn poll_ollama_models(&mut self) {
+        if self
+            .model_models_task
+            .as_ref()
+            .is_some_and(std::thread::ScopedJoinHandle::is_finished)
+            && let Some(task) = self.model_models_task.take()
+        {
+            match task.join() {
+                Ok(Ok(models)) => {
+                    self.state.model_setup.models = models;
+                    self.state.model_setup.selected_model = 0;
+                    self.state.model_setup.step = super::model::ModelStep::OllamaModels;
+                    self.state.model_setup.notice = if self.state.model_setup.models.is_empty() {
+                        "Ollama has no installed models; run `ollama pull <model>`".into()
+                    } else {
+                        "Choose an installed model".into()
+                    };
+                }
+                Ok(Err(error)) => {
+                    self.state.model_setup.step = super::model::ModelStep::OllamaModels;
+                    self.state.model_setup.notice = format!("Ollama: {error}");
+                }
+                Err(_) => {
+                    self.state.model_setup.step = super::model::ModelStep::OllamaModels;
+                    self.state.model_setup.notice = "Ollama discovery failed".into();
+                }
+            }
+        }
+    }
+
+    fn poll_model_probe(&mut self) {
+        if self
+            .model_probe_task
+            .as_ref()
+            .is_some_and(std::thread::ScopedJoinHandle::is_finished)
+            && let Some(task) = self.model_probe_task.take()
+        {
+            self.state.model_setup.notice = match task.join() {
+                Ok(Ok(message)) => message,
+                Ok(Err(error)) => format!("Connection failed: {error}"),
+                Err(_) => "Connection test failed".into(),
+            };
+        }
+    }
+
+    fn poll_verify_export(&mut self) {
         if self
             .verify_task
             .as_ref()
@@ -93,6 +166,9 @@ impl HomeRuntime<'_, '_, '_> {
                 started.elapsed().as_secs()
             );
         }
+    }
+
+    fn poll_migration(&mut self) -> Result<()> {
         if self
             .migration_task
             .as_ref()
@@ -158,8 +234,102 @@ impl HomeRuntime<'_, '_, '_> {
             HomeAction::ChangeModule(change, confirmed) => {
                 return Ok(self.change_module(change, confirmed));
             }
+            HomeAction::DiscoverOllama => {
+                if self.model_models_task.is_none() {
+                    let io_ops = self.io_ops;
+                    let url = self.state.model_setup.url.clone();
+                    self.state.model_setup.notice = "Checking Ollama…".into();
+                    self.model_models_task =
+                        Some(self.scope.spawn(move || io_ops.list_ollama_models(&url)));
+                }
+            }
+            HomeAction::ProbeModel(draft) => {
+                if self.model_probe_task.is_none() {
+                    let io_ops = self.io_ops;
+                    self.state.model_setup.notice = "Testing with synthetic text…".into();
+                    self.model_probe_task = Some(self.scope.spawn(move || {
+                        io_ops.test_model_connection(
+                            draft.provider,
+                            &draft.url,
+                            &draft.name,
+                            draft.key.as_ref(),
+                        )
+                    }));
+                }
+            }
+            HomeAction::SaveModel(draft) => return Ok(self.save_model(&draft)),
         }
         Ok(false)
+    }
+
+    fn save_model(&mut self, draft: &super::model::ModelDraft) -> bool {
+        let result = self.apply_model_configuration(draft);
+        match result {
+            Ok(()) => {
+                self.restart_requested = true;
+                true
+            }
+            Err(error) => {
+                self.state.model_setup.notice = format!("Cannot save model: {error}");
+                false
+            }
+        }
+    }
+
+    fn apply_model_configuration(&self, draft: &super::model::ModelDraft) -> Result<()> {
+        if !self
+            .modules
+            .iter()
+            .any(|item| item.id == draft.provider && item.compiled)
+        {
+            anyhow::bail!("provider is not compiled into this binary");
+        }
+        let model_field = match draft.provider {
+            "llm-openai-compatible" => "IRMIND_MODEL",
+            "llm-anthropic" => "IRMIND_ANTHROPIC_MODEL",
+            "llm-deepseek" => "IRMIND_DEEPSEEK_MODEL",
+            "llm-openrouter" => "IRMIND_OPENROUTER_MODEL",
+            _ => anyhow::bail!("unknown model provider"),
+        };
+        let key_field = match draft.provider {
+            "llm-openai-compatible" => "IRMIND_LLM_API_KEY",
+            "llm-anthropic" => "ANTHROPIC_API_KEY",
+            "llm-deepseek" => "DEEPSEEK_API_KEY",
+            _ => "OPENROUTER_API_KEY",
+        };
+        if let Some(key) = &draft.key {
+            self.io_ops.put_credential(key_field, key)?;
+        }
+        let base_field = match draft.provider {
+            "llm-openai-compatible" => "IRMIND_LLM_BASE_URL",
+            "llm-anthropic" => "IRMIND_ANTHROPIC_BASE_URL",
+            "llm-deepseek" => "IRMIND_DEEPSEEK_BASE_URL",
+            _ => "IRMIND_OPENROUTER_BASE_URL",
+        };
+        self.io_ops.change_module_configuration(
+            self.engine,
+            ConfigChange::SetValue {
+                module: draft.provider.into(),
+                field: base_field.into(),
+                value: draft.url.clone(),
+            },
+            true,
+        )?;
+        self.io_ops.change_module_configuration(
+            self.engine,
+            ConfigChange::SetValue {
+                module: draft.provider.into(),
+                field: model_field.into(),
+                value: draft.name.clone(),
+            },
+            true,
+        )?;
+        self.io_ops.change_module_configuration(
+            self.engine,
+            ConfigChange::SelectLlm(Some(draft.provider.into())),
+            true,
+        )?;
+        Ok(())
     }
 
     fn change_module(&mut self, change: ConfigChange, confirmed: bool) -> bool {
@@ -215,7 +385,13 @@ impl HomeRuntime<'_, '_, '_> {
         );
         self.state.rows = load_rows(self.engine)?;
         match result {
-            Ok(()) => self.state.notice = "Returned to case list".into(),
+            Ok(exit) => {
+                super::apply_case_exit(&mut self.state, &exit);
+                if self.state.mode == Mode::Keystore {
+                    self.state.keystore = Some(self.io_ops.keystore_status()?);
+                }
+                self.state.notice = "Returned to case list".into();
+            }
             Err(error) => {
                 let Some(case_error) = error.downcast_ref::<irmind_app::AppError>() else {
                     return Err(error);
@@ -254,7 +430,7 @@ impl HomeRuntime<'_, '_, '_> {
                 self.state.rows = load_rows(self.engine)?;
                 self.state.mode = Mode::List;
                 self.state.notice = format!("Created signed case {}", case_id.as_str());
-                case::run_case(
+                let exit = case::run_case(
                     self.terminal,
                     self.engine,
                     self.model,
@@ -267,6 +443,7 @@ impl HomeRuntime<'_, '_, '_> {
                         mouse_capture: self.mouse_capture,
                     },
                 )?;
+                super::apply_case_exit(&mut self.state, &exit);
                 self.state.rows = load_rows(self.engine)?;
             }
             Err(error) => self.state.notice = format!("Case creation failed: {error}"),
@@ -320,7 +497,7 @@ impl HomeRuntime<'_, '_, '_> {
             self.state.restart_required = true;
             self.state.notice = match self.io_ops.delete_credential(&name) {
                 Ok(()) => format!(
-                    "Deleted {name}. Active connectors may still use it; press r to restart this session"
+                    "Deleted {name}. Active connectors may still use it; use /restart for a new session"
                 ),
                 Err(error) => format!("Credential deletion failed: {error}"),
             };
@@ -347,7 +524,7 @@ impl HomeRuntime<'_, '_, '_> {
             self.state.restart_required = true;
             self.state.notice = match self.io_ops.put_credential(&name, &value) {
                 Ok(()) if replacing => format!(
-                    "Replaced {name}. Active connectors still use the previous credential; press r to restart this session"
+                    "Replaced {name}. Active connectors still use the previous credential; use /restart for a new session"
                 ),
                 Ok(()) => {
                     format!("Saved {name}. Restart the session with r to activate the credential")

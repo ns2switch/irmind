@@ -1,4 +1,4 @@
-use super::{CaseId, ConfigChange, HomeState, KeyCode, Mode, modules};
+use super::{CaseId, ConfigChange, HomeState, KeyCode, Mode, case, model, modules};
 
 pub(crate) enum HomeAction {
     None,
@@ -13,98 +13,269 @@ pub(crate) enum HomeAction {
     Migrate(&'static str),
     ChangePassphrase,
     ChangeModule(ConfigChange, bool),
+    DiscoverOllama,
+    ProbeModel(model::ModelDraft),
+    SaveModel(model::ModelDraft),
 }
 
 /// A screen transition does not perform I/O. The event loop applies the returned action.
 pub(crate) fn update(state: &mut HomeState, key: KeyCode) -> HomeAction {
+    if state.confirm_exit == crate::ExitConfirmation::Pending {
+        return match key {
+            KeyCode::Enter => HomeAction::Quit,
+            KeyCode::Esc => {
+                state.confirm_exit = crate::ExitConfirmation::Inactive;
+                HomeAction::None
+            }
+            _ => HomeAction::None,
+        };
+    }
     if state.restart_required
         && matches!(state.mode, Mode::List | Mode::Setup | Mode::Modules)
-        && matches!(key, KeyCode::Enter | KeyCode::Char('n'))
+        && key == KeyCode::Enter
+        && state.input.is_empty()
     {
         state.notice =
             "Restart IRMind before opening a case so changed credentials take effect".into();
         return HomeAction::None;
     }
+    if state.input.starts_with('/') && !matches!(state.mode, Mode::New | Mode::VerifyExport) {
+        match key {
+            KeyCode::Tab | KeyCode::BackTab => {
+                complete_command(state, key == KeyCode::Tab);
+                return HomeAction::None;
+            }
+            KeyCode::Up => {
+                state.menu_selected = state.menu_selected.saturating_sub(1);
+                return HomeAction::None;
+            }
+            KeyCode::Down => {
+                state.menu_selected =
+                    (state.menu_selected + 1).min(command_options(state).len().saturating_sub(1));
+                return HomeAction::None;
+            }
+            KeyCode::Enter => {
+                let source = state.menu_query.as_deref().unwrap_or(&state.input);
+                if let Some(value) = command_options_for(state, source).get(state.menu_selected) {
+                    state.input.clone_from(value);
+                }
+                state.menu_query = None;
+                return execute_command(state);
+            }
+            KeyCode::Esc => {
+                state.input.clear();
+                if let Some(previous) = state.palette_return.take() {
+                    state.mode = previous;
+                }
+                return HomeAction::None;
+            }
+            _ => {}
+        }
+    }
     match state.mode {
         Mode::List => update_list(state, key),
-        Mode::Search => update_search(state, key),
         Mode::New => update_new_case(state, key),
+        Mode::Model => update_model(state, key),
         Mode::VerifyExport => update_verify_export(state, key),
         Mode::Modules => modules::update_module_screen(state, key),
         Mode::Setup => update_setup(state, key),
+        Mode::Help => update_help(state, key),
         Mode::Keystore => update_keystore(state, key),
     }
 }
 
 fn update_list(state: &mut HomeState, key: KeyCode) -> HomeAction {
     match key {
-        KeyCode::Char('q') => HomeAction::Quit,
-        KeyCode::Char('n') => {
-            state.form = HomeState::new(Vec::new(), false).form;
-            state.form_field = 0;
-            state.mode = Mode::New;
-            HomeAction::None
-        }
-        KeyCode::Char('/') => {
-            state.mode = Mode::Search;
-            HomeAction::None
-        }
-        KeyCode::Char('f') => {
-            state.cycle_filter();
-            HomeAction::None
-        }
-        KeyCode::Char('m') => {
-            state.mode = Mode::Modules;
-            HomeAction::None
-        }
-        KeyCode::Char('k') => {
-            state.keystore_selected = 0;
-            state.mode = Mode::Keystore;
-            HomeAction::LoadKeystore
-        }
-        KeyCode::Char('v') => {
-            state.verify_form = Default::default();
-            state.verify_field = 0;
-            state.mode = Mode::VerifyExport;
-            HomeAction::None
-        }
-        KeyCode::Char('?') => {
-            state.mode = Mode::Setup;
-            HomeAction::None
-        }
-        KeyCode::Up => {
-            state.selected = state.selected.saturating_sub(1);
-            HomeAction::None
-        }
-        KeyCode::Down => {
-            state.selected = (state.selected + 1).min(state.visible().len().saturating_sub(1));
-            HomeAction::None
-        }
-        KeyCode::Enter => state
-            .visible()
-            .get(state.selected)
-            .map_or(HomeAction::None, |row| HomeAction::OpenCase(row.id.clone())),
-        _ => HomeAction::None,
-    }
-}
-
-fn update_search(state: &mut HomeState, key: KeyCode) -> HomeAction {
-    match key {
-        KeyCode::Esc | KeyCode::Enter => {
-            state.mode = Mode::List;
-            state.selected = 0;
+        KeyCode::Esc => {
+            state.input.clear();
+            if let Some(previous) = state.palette_return.take() {
+                state.mode = previous;
+            }
         }
         KeyCode::Backspace => {
-            state.search.pop();
-            state.selected = 0;
+            state.input.pop();
+            state.menu_query = None;
         }
-        KeyCode::Char(ch) if state.search.len() < 200 => {
-            state.search.push(ch);
-            state.selected = 0;
+        KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4096 => {
+            state.input.push(ch);
+            state.menu_query = None;
+            state.menu_selected = 0;
+        }
+        KeyCode::Tab | KeyCode::BackTab if state.input.starts_with('/') => {
+            complete_command(state, key == KeyCode::Tab);
+        }
+        KeyCode::Up => {
+            if state.input.starts_with('/') {
+                state.menu_selected = state.menu_selected.saturating_sub(1);
+            } else {
+                state.selected = state.selected.saturating_sub(1);
+            }
+        }
+        KeyCode::Down => {
+            if state.input.starts_with('/') {
+                state.menu_selected =
+                    (state.menu_selected + 1).min(command_options(state).len().saturating_sub(1));
+            } else {
+                state.selected = (state.selected + 1).min(state.visible().len().saturating_sub(1));
+            }
+        }
+        KeyCode::Enter if !state.input.is_empty() => {
+            if state.input.starts_with('/') {
+                let source = state.menu_query.as_deref().unwrap_or(&state.input);
+                let options = command_options_for(state, source);
+                if let Some(value) = options.get(state.menu_selected) {
+                    state.input.clone_from(value);
+                }
+            }
+            state.menu_query = None;
+            return execute_command(state);
+        }
+        KeyCode::Enter => {
+            return state
+                .visible()
+                .get(state.selected)
+                .map_or(HomeAction::None, |row| HomeAction::OpenCase(row.id.clone()));
         }
         _ => {}
     }
     HomeAction::None
+}
+
+pub(super) fn command_options(state: &HomeState) -> Vec<String> {
+    command_options_for(state, state.menu_query.as_deref().unwrap_or(&state.input))
+}
+
+fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
+    if let Some(query) = source.strip_prefix("/open ") {
+        return state
+            .rows
+            .iter()
+            .filter(|row| {
+                row.title.to_lowercase().contains(&query.to_lowercase())
+                    || row.id.as_str().starts_with(query)
+            })
+            .take(20)
+            .map(|row| format!("/open {}", row.title))
+            .collect();
+    }
+    if source.contains(' ') {
+        return Vec::new();
+    }
+    case::command_registry::matches(source)
+        .into_iter()
+        .filter(|command| {
+            matches!(
+                command.name,
+                "new"
+                    | "open"
+                    | "cases"
+                    | "home"
+                    | "model"
+                    | "modules"
+                    | "config"
+                    | "keystore"
+                    | "help"
+                    | "quit"
+                    | "filter"
+                    | "verify-export"
+                    | "restart"
+                    | "cred-add"
+                    | "cred-delete"
+                    | "passphrase"
+                    | "migrate-signer"
+                    | "migrate-secrets"
+                    | "edit-param"
+            )
+        })
+        .map(|command| format!("/{}", command.name))
+        .collect()
+}
+
+fn complete_command(state: &mut HomeState, forward: bool) {
+    let started = state.menu_query.is_some();
+    if !started {
+        state.menu_query = Some(state.input.clone());
+    }
+    let options = command_options(state);
+    if options.is_empty() {
+        return;
+    }
+    state.menu_selected =
+        case::command_registry::cycle(options.len(), state.menu_selected, started, forward);
+    state.input.clone_from(&options[state.menu_selected]);
+}
+
+pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
+    let input = std::mem::take(&mut state.input);
+    state.palette_return = None;
+    match input.trim() {
+        "/new" => {
+            state.form = HomeState::new(Vec::new(), false).form;
+            state.form_field = 0;
+            state.mode = Mode::New;
+        }
+        "/cases" | "/home" => state.mode = Mode::List,
+        "/modules" | "/config" => state.mode = Mode::Modules,
+        "/model" => {
+            state.model_setup = model::ModelSetup::new();
+            state.mode = Mode::Model;
+        }
+        "/keystore" => {
+            state.mode = Mode::Keystore;
+            return HomeAction::LoadKeystore;
+        }
+        "/help" => {
+            state.help_return = state.mode;
+            state.help_selected = 0;
+            state.mode = Mode::Help;
+        }
+        "/quit" => state.confirm_exit = crate::ExitConfirmation::Pending,
+        "/filter" => state.cycle_filter(),
+        "/verify-export" => state.mode = Mode::VerifyExport,
+        "/restart" if state.restart_required => return HomeAction::Restart,
+        "/cred-add" if state.mode == Mode::Keystore => return HomeAction::AddCredential,
+        "/cred-delete" if state.mode == Mode::Keystore => {
+            state.confirm_credential_delete = true;
+            state.selected_option = 0;
+        }
+        "/passphrase" if state.mode == Mode::Keystore => return HomeAction::ChangePassphrase,
+        "/migrate-signer" if state.mode == Mode::Keystore => {
+            state.pending_migration = Some("signer");
+            state.selected_option = 0;
+        }
+        "/migrate-secrets" if state.mode == Mode::Keystore => {
+            state.pending_migration = Some("secrets");
+            state.selected_option = 0;
+        }
+        "/edit-param" if state.mode == Mode::Modules => modules::begin_edit(state),
+        value if value.starts_with("/open ") => return open_named_case(state, &value[6..]),
+        value if value.starts_with("/cases ") => {
+            value[7..].trim().clone_into(&mut state.search);
+            state.mode = Mode::List;
+            state.selected = 0;
+        }
+        _ => state.notice = "Unknown command; use /help".into(),
+    }
+    HomeAction::None
+}
+
+fn open_named_case(state: &mut HomeState, query: &str) -> HomeAction {
+    let query = query.trim();
+    let matches = state
+        .rows
+        .iter()
+        .filter(|row| row.id.as_str() == query || row.title.eq_ignore_ascii_case(query))
+        .collect::<Vec<_>>();
+    if matches.len() == 1 {
+        HomeAction::OpenCase(matches[0].id.clone())
+    } else {
+        state.notice = if matches.is_empty() {
+            "No matching case; use /cases to list cases".into()
+        } else {
+            "Several cases have that title; use the case ID".into()
+        };
+        HomeAction::None
+    }
 }
 
 fn update_new_case(state: &mut HomeState, key: KeyCode) -> HomeAction {
@@ -156,49 +327,46 @@ fn update_verify_export(state: &mut HomeState, key: KeyCode) -> HomeAction {
 fn update_setup(state: &mut HomeState, key: KeyCode) -> HomeAction {
     match key {
         KeyCode::Esc => state.mode = Mode::List,
-        KeyCode::Char('m') => state.mode = Mode::Modules,
-        KeyCode::Char('k') => {
-            state.mode = Mode::Keystore;
-            return HomeAction::LoadKeystore;
-        }
-        KeyCode::Char('n') => {
-            state.form = HomeState::new(Vec::new(), false).form;
-            state.mode = Mode::New;
-        }
-        KeyCode::Char('q') => return HomeAction::Quit,
+        KeyCode::Enter if !state.input.is_empty() => return execute_command(state),
+        KeyCode::Enter => state.mode = Mode::Model,
+        KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4096 => state.input.push(ch),
         _ => {}
     }
     HomeAction::None
 }
 
+fn update_help(state: &mut HomeState, key: KeyCode) -> HomeAction {
+    match key {
+        KeyCode::Esc => state.mode = state.help_return,
+        KeyCode::PageUp | KeyCode::Up => {
+            state.help_selected = state.help_selected.saturating_sub(10);
+        }
+        KeyCode::PageDown | KeyCode::Down => {
+            state.help_selected = (state.help_selected + 10).min(80);
+        }
+        KeyCode::Backspace => {
+            state.input.pop();
+        }
+        KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4096 => state.input.push(ch),
+        KeyCode::Enter if !state.input.is_empty() => return execute_command(state),
+        _ => {}
+    }
+    HomeAction::None
+}
+
+fn update_model(state: &mut HomeState, key: KeyCode) -> HomeAction {
+    model::update_model(state, key)
+}
+
 fn update_keystore(state: &mut HomeState, key: KeyCode) -> HomeAction {
-    if key == KeyCode::Char('r') && state.restart_required {
-        return HomeAction::Restart;
-    }
-    if let Some(capability) = state.pending_migration {
-        match key {
-            KeyCode::Esc => state.pending_migration = None,
-            KeyCode::Char('y') => {
-                state.pending_migration = None;
-                return HomeAction::Migrate(capability);
-            }
-            _ => {}
-        }
-        return HomeAction::None;
-    }
-    if state.confirm_credential_delete {
-        match key {
-            KeyCode::Esc => state.confirm_credential_delete = false,
-            KeyCode::Char('y') => {
-                state.confirm_credential_delete = false;
-                return HomeAction::DeleteCredential;
-            }
-            _ => {}
-        }
-        return HomeAction::None;
+    if let Some(action) = update_keystore_confirmation(state, key) {
+        return action;
     }
     match key {
-        KeyCode::Esc => state.mode = Mode::List,
+        KeyCode::Esc => {
+            state.mode = Mode::List;
+            state.input.clear();
+        }
         KeyCode::Up => state.keystore_selected = state.keystore_selected.saturating_sub(1),
         KeyCode::Down => {
             let count = state
@@ -207,30 +375,48 @@ fn update_keystore(state: &mut HomeState, key: KeyCode) -> HomeAction {
                 .map_or(0, |item| item.credentials.len());
             state.keystore_selected = (state.keystore_selected + 1).min(count.saturating_sub(1));
         }
-        KeyCode::Char('a') => return HomeAction::AddCredential,
-        KeyCode::Char('d') => state.confirm_credential_delete = true,
-        KeyCode::Char('s') => {
-            state.pending_migration = Some("signer");
-            state.notice =
-                "Copy the analyst key to the other backend; its fingerprint must remain unchanged"
-                    .into();
+        KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4096 => state.input.push(ch),
+        KeyCode::Backspace => {
+            state.input.pop();
         }
-        KeyCode::Char('x') => {
-            state.pending_migration = Some("secrets");
-            state.notice =
-                "Copy module credentials to the other backend; source credentials remain".into();
-        }
-        KeyCode::Char('p')
-            if state
-                .keystore
-                .as_ref()
-                .is_some_and(|item| item.file_backend_active) =>
-        {
-            return HomeAction::ChangePassphrase;
-        }
+        KeyCode::Enter if !state.input.is_empty() => return execute_command(state),
         _ => {}
     }
     HomeAction::None
+}
+
+fn update_keystore_confirmation(state: &mut HomeState, key: KeyCode) -> Option<HomeAction> {
+    let migration = state.pending_migration;
+    if migration.is_none() && !state.confirm_credential_delete {
+        return None;
+    }
+    match key {
+        KeyCode::Up | KeyCode::Down => state.selected_option = 1 - state.selected_option,
+        KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4 => state.input.push(ch),
+        KeyCode::Backspace => {
+            state.input.pop();
+        }
+        KeyCode::Esc | KeyCode::Enter => {
+            let confirm = if key == KeyCode::Esc {
+                false
+            } else {
+                match state.input.as_str() {
+                    "2" => true,
+                    "1" => false,
+                    "" => state.selected_option == 1,
+                    _ => return Some(HomeAction::None),
+                }
+            };
+            state.input.clear();
+            state.pending_migration = None;
+            state.confirm_credential_delete = false;
+            if confirm {
+                return Some(migration.map_or(HomeAction::DeleteCredential, HomeAction::Migrate));
+            }
+        }
+        _ => {}
+    }
+    Some(HomeAction::None)
 }
 
 #[cfg(test)]
@@ -238,26 +424,67 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::unwrap_used)]
+    fn slash_open_completes_case_title_and_help_lists_reserved_keys() {
+        let mut state = HomeState::new(
+            vec![super::super::CaseRow {
+                id: CaseId::parse("00000000-0000-0000-0000-000000000001").unwrap(),
+                title: "Synthetic CloudTrail".into(),
+                severity: "high".into(),
+                status: super::super::CaseStatus::Open,
+                last_activity: 0,
+            }],
+            false,
+        );
+        for ch in "/open Synth".chars() {
+            update(&mut state, KeyCode::Char(ch));
+        }
+        update(&mut state, KeyCode::Tab);
+        assert_eq!(state.input, "/open Synthetic CloudTrail");
+        assert!(matches!(
+            update(&mut state, KeyCode::Enter),
+            HomeAction::OpenCase(_)
+        ));
+        for ch in "/help".chars() {
+            update(&mut state, KeyCode::Char(ch));
+        }
+        update(&mut state, KeyCode::Enter);
+        assert_eq!(state.mode, Mode::Help);
+        assert!(case::command_registry::help().contains("Ctrl+K commands"));
+        update(&mut state, KeyCode::Esc);
+        assert_eq!(state.mode, Mode::List);
+    }
+
+    #[test]
     fn new_case_form_starts_with_a_valid_severity_and_local_scope() {
         let mut state = HomeState::new(Vec::new(), false);
-        update(&mut state, KeyCode::Char('n'));
+        for ch in "/new".chars() {
+            update(&mut state, KeyCode::Char(ch));
+        }
+        update(&mut state, KeyCode::Enter);
         assert!(irmind_app::Severity::parse(&state.form[1]).is_ok());
         assert!(state.form[2].is_empty());
         assert_eq!(state.scope(), "local evidence only");
     }
 
     #[test]
-    fn update_moves_between_list_search_and_new_case_without_io() {
+    fn printable_keys_only_edit_the_home_command_field() {
         let mut state = HomeState::new(Vec::new(), false);
         assert!(matches!(
             update(&mut state, KeyCode::Char('/')),
             HomeAction::None
         ));
-        assert_eq!(state.mode, Mode::Search);
-        update(&mut state, KeyCode::Char('x'));
-        assert_eq!(state.search, "x");
+        assert_eq!(state.mode, Mode::List);
+        for ch in "zzzz".chars() {
+            update(&mut state, KeyCode::Char(ch));
+        }
+        assert_eq!(state.input, "/zzzz");
         update(&mut state, KeyCode::Enter);
-        update(&mut state, KeyCode::Char('n'));
+        assert_eq!(state.mode, Mode::List);
+        for ch in "/new".chars() {
+            update(&mut state, KeyCode::Char(ch));
+        }
+        update(&mut state, KeyCode::Enter);
         assert_eq!(state.mode, Mode::New);
         assert!(matches!(
             update(&mut state, KeyCode::Enter),

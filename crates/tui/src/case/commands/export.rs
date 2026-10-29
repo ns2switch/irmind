@@ -100,6 +100,7 @@ impl CaseRuntime<'_, '_, '_> {
                     || "Originals: omitted; signed manifest only".into(),
                     |root| format!("Originals: include from {}", root.display()),
                 );
+                self.state.confirmation_option = 0;
                 self.state.confirmation = Some(Confirmation::Export(
                     prompt.to_owned(),
                     format!(
