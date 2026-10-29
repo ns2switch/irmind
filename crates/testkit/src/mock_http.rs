@@ -1,11 +1,13 @@
 use crate::contract_support::contract_runtime;
 use crate::*;
+use std::fmt::Write as _;
 
 pub struct MockResponse {
     pub status: u16,
     pub body: Vec<u8>,
     pub location: Option<&'static str>,
     pub delay: Duration,
+    pub headers: Vec<(&'static str, &'static str)>,
 }
 
 impl MockResponse {
@@ -16,6 +18,7 @@ impl MockResponse {
             body: body.as_bytes().to_vec(),
             location: None,
             delay: Duration::ZERO,
+            headers: Vec::new(),
         }
     }
     #[must_use]
@@ -25,6 +28,7 @@ impl MockResponse {
             body: b"{}".to_vec(),
             location: None,
             delay: Duration::ZERO,
+            headers: Vec::new(),
         }
     }
     #[must_use]
@@ -34,6 +38,7 @@ impl MockResponse {
             body: Vec::new(),
             location: Some("/unexpected-redirect"),
             delay: Duration::ZERO,
+            headers: Vec::new(),
         }
     }
 
@@ -43,6 +48,12 @@ impl MockResponse {
             delay,
             ..Self::json(body)
         }
+    }
+
+    #[must_use]
+    pub fn with_header(mut self, name: &'static str, value: &'static str) -> Self {
+        self.headers.push((name, value));
+        self
     }
 }
 
@@ -230,8 +241,12 @@ fn write_response(stream: &mut TcpStream, response: &MockResponse) -> Result<(),
     let location = response
         .location
         .map_or(String::new(), |url| format!("Location: {url}\r\n"));
+    let mut extra = String::new();
+    for (name, value) in &response.headers {
+        write!(&mut extra, "{name}: {value}\r\n").map_err(|error| error.to_string())?;
+    }
     let head = format!(
-        "HTTP/1.1 {} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n{location}Connection: close\r\n\r\n",
+        "HTTP/1.1 {} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n{location}{extra}Connection: close\r\n\r\n",
         response.status,
         response.body.len()
     );
