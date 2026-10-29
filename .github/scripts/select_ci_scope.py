@@ -12,6 +12,7 @@ def platform_path(path: str) -> bool:
     parts = path.split("/")
     return (
         path.startswith("crates/fs/")
+        or path.startswith("crates/modules/storage-object/")
         or (len(parts) >= 4 and parts[:2] == ["crates", "modules"]
             and parts[2].startswith("keystore-"))
         or (path.startswith("crates/infra/")

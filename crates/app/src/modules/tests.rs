@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     AppError, CancellationToken, CompletionRequest, EdrPort, LlmPort, ModelEvent, ModelResponse,
-    ModelStream, async_trait,
+    ModelStream, ObjectSource, ObjectSourceOutput, async_trait,
 };
 use irmind_domain::{AuthorizedCall, Tool};
 
@@ -28,6 +28,13 @@ static MISDECLARED: ModuleManifest = ModuleManifest {
     version: "0.1.0",
     ports: &[ModulePort::Llm],
     tools: &[],
+    config: &[],
+};
+static OBJECT: ModuleManifest = ModuleManifest {
+    id: "storage-test",
+    version: "0.1.0",
+    ports: &[ModulePort::ObjectSource],
+    tools: &[Tool::ObjectList, Tool::ObjectRead],
     config: &[],
 };
 
@@ -128,6 +135,55 @@ impl Module for Misdeclared {
     ) -> Result<(), AppError> {
         registry.add_edr(Box::new(TestEdr))
     }
+}
+
+struct TestObject;
+#[crate::async_trait]
+impl ObjectSource for TestObject {
+    fn source_id(&self) -> &'static str {
+        "storage-test-source"
+    }
+
+    async fn execute(
+        &self,
+        _call: &AuthorizedCall,
+        _cancel: &CancellationToken,
+    ) -> Result<ObjectSourceOutput, AppError> {
+        Ok(ObjectSourceOutput::Listing {
+            objects: Vec::new(),
+            total_bytes: 0,
+            truncated: false,
+        })
+    }
+}
+impl Module for TestObject {
+    fn manifest(&self) -> &'static ModuleManifest {
+        &OBJECT
+    }
+
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        _config: &ModuleConfig,
+    ) -> Result<(), AppError> {
+        registry.add_object_source(self)
+    }
+}
+
+#[test]
+fn object_source_registration_is_unique_and_explicit() {
+    let mut registry = ModuleRegistry::new();
+    registry
+        .register(Box::new(TestObject), &ModuleConfig::new())
+        .unwrap();
+    assert_eq!(registry.counts()[&ModulePort::ObjectSource], 1);
+    assert!(registry.object_source("storage-test-source").is_ok());
+    assert!(registry.object_source("another-source").is_err());
+    assert!(
+        registry
+            .register(Box::new(TestObject), &ModuleConfig::new())
+            .is_err()
+    );
 }
 
 #[tokio::test]

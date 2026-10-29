@@ -67,11 +67,15 @@ Estas variables de entorno prevalecen sobre los campos públicos correspondiente
 | `IRMIND_POLICY` | Ruta del archivo TOML de política. |
 | `IRMIND_LLM_MODULE` | Selección explícita del módulo de modelo; alternativa a `--llm-module`. |
 | `IRMIND_ENABLE_SPLUNK`, `IRMIND_ENABLE_AWS`, `IRMIND_ENABLE_CROWDSTRIKE`, `IRMIND_ENABLE_SENTINELONE`, `IRMIND_ENABLE_MISP`, `IRMIND_ENABLE_VIRUSTOTAL` | Overrides temporales para activar conectores (`true` o `false`). |
+| `IRMIND_ENABLE_STORAGE_S3`, `IRMIND_ENABLE_STORAGE_GCS`, `IRMIND_ENABLE_STORAGE_AZURE` | Overrides temporales para activar lectores de objetos (`true` o `false`). |
 | `IRMIND_MODEL`, `IRMIND_LLM_BASE_URL` | Modelo compatible con OpenAI y URL base opcional. |
 | `IRMIND_ANTHROPIC_MODEL`, `IRMIND_DEEPSEEK_MODEL`, `IRMIND_OPENROUTER_MODEL` | IDs de modelos de esos proveedores. |
 | `IRMIND_SPLUNK_URL`, `IRMIND_SPLUNK_SOURCE_ID`, `IRMIND_SPLUNK_INDEX`, `IRMIND_SPLUNK_ACCOUNT_FIELD`, `IRMIND_SPLUNK_ALERT_ID_FIELD` | Servicio Splunk, índice acotado y campo opcional del ID de alerta (por defecto `alert_id`). |
 | `IRMIND_SPLUNK_EVENT_NAME_FIELD`, `IRMIND_SPLUNK_USER_FIELD`, `IRMIND_SPLUNK_SOURCE_IP_FIELD`, `IRMIND_SPLUNK_HOST_FIELD` | Nombres opcionales de los cuatro campos de búsqueda estructurada; por defecto `eventName`, `user`, `sourceIPAddress` y `host`. |
 | `IRMIND_AWS_SOURCE_ID`, `IRMIND_AWS_REGION`, `IRMIND_AWS_ROLE_NAME` | Fuente, región y rol de solo lectura de AWS. |
+| `IRMIND_STORAGE_S3_SOURCE_ID`, `IRMIND_STORAGE_S3_BUCKET`, `IRMIND_STORAGE_S3_REGION`, `IRMIND_STORAGE_S3_ENDPOINT` | Fuente, bucket, región y URL HTTPS opcional de S3. |
+| `IRMIND_STORAGE_GCS_SOURCE_ID`, `IRMIND_STORAGE_GCS_BUCKET`, `IRMIND_STORAGE_GCS_ENDPOINT` | Fuente, bucket y URL HTTPS opcional de GCS. |
+| `IRMIND_STORAGE_AZURE_SOURCE_ID`, `IRMIND_STORAGE_AZURE_ACCOUNT`, `IRMIND_STORAGE_AZURE_CONTAINER`, `IRMIND_STORAGE_AZURE_CLIENT_ID`, `IRMIND_STORAGE_AZURE_TENANT_ID`, `IRMIND_STORAGE_AZURE_ENDPOINT` | Fuente, cuenta, contenedor, identidad del principal de servicio y URL HTTPS opcional de Azure Blob. |
 | `IRMIND_CROWDSTRIKE_URL`, `IRMIND_CROWDSTRIKE_SOURCE_ID` | Servicio y fuente de CrowdStrike. |
 | `IRMIND_SENTINELONE_URL`, `IRMIND_SENTINELONE_SOURCE_ID`, `IRMIND_SENTINELONE_SITE_ID` | Servicio, fuente y sitio de SentinelOne. |
 | `IRMIND_MISP_URL`, `IRMIND_MISP_SOURCE_ID` | Servicio y fuente interna de MISP. |
@@ -107,6 +111,8 @@ No pongas credenciales en variables de entorno. Introdúcelas en la vista de lla
 | `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY` | Proveedores LLM correspondientes. |
 | `IRMIND_SPLUNK_TOKEN` | Token de Splunk de solo lectura. |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | Credenciales de un rol AWS dedicado; token de sesión cuando corresponda. |
+| `GCP_SERVICE_ACCOUNT_JSON` | Clave de la cuenta de servicio GCS del bucket autorizado. |
+| `AZURE_CLIENT_SECRET` | Secreto del principal de servicio de Azure Blob para el contenedor autorizado. |
 | `IRMIND_CROWDSTRIKE_CLIENT_ID`, `IRMIND_CROWDSTRIKE_CLIENT_SECRET` | Cliente API de CrowdStrike. |
 | `IRMIND_SENTINELONE_API_TOKEN` | Token limitado al sitio de SentinelOne. |
 | `IRMIND_MISP_API_KEY` | Clave MISP de solo lectura. |

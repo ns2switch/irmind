@@ -97,6 +97,7 @@ pub struct Engine<'a> {
     pub(crate) cloud_audits: Vec<&'a dyn CloudAuditPort>,
     pub(crate) edrs: Vec<&'a dyn EdrPort>,
     pub(crate) internal_intel: Vec<&'a dyn InternalIntelPort>,
+    pub(crate) object_sources: Vec<&'a dyn ObjectSource>,
     pub(crate) pricing: Option<ModelPricing>,
     pub(crate) verified_cases: Arc<
         std::sync::Mutex<
@@ -171,6 +172,7 @@ impl<'a> Engine<'a> {
             cloud_audits: Vec::new(),
             edrs: Vec::new(),
             internal_intel: Vec::new(),
+            object_sources: Vec::new(),
             pricing: self.pricing,
             verified_cases: Arc::clone(&self.verified_cases),
         }
@@ -283,6 +285,18 @@ impl<'a> Engine<'a> {
             ));
         }
         self.internal_intel.push(port);
+        Ok(self)
+    }
+
+    pub fn with_object_source(mut self, port: &'a dyn ObjectSource) -> Result<Self, AppError> {
+        if self
+            .object_sources
+            .iter()
+            .any(|existing| existing.source_id() == port.source_id())
+        {
+            return Err(AppError::Policy("duplicate object source".into()));
+        }
+        self.object_sources.push(port);
         Ok(self)
     }
 }

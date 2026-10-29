@@ -98,6 +98,8 @@ pub enum Tool {
     EdrDetections,
     ThreatIntelInternal,
     ThreatIntelExternal,
+    ObjectList,
+    ObjectRead,
 }
 
 mod scope;
@@ -130,6 +132,8 @@ impl Tool {
             "edr_detections" => Ok(Self::EdrDetections),
             "ti_lookup_internal" => Ok(Self::ThreatIntelInternal),
             "ti_lookup_external" => Ok(Self::ThreatIntelExternal),
+            "object_list" => Ok(Self::ObjectList),
+            "object_read" => Ok(Self::ObjectRead),
             _ => Err(DomainError::UnknownTool),
         }
     }
@@ -155,6 +159,8 @@ impl Tool {
             Self::EdrDetections => "edr_detections",
             Self::ThreatIntelInternal => "ti_lookup_internal",
             Self::ThreatIntelExternal => "ti_lookup_external",
+            Self::ObjectList => "object_list",
+            Self::ObjectRead => "object_read",
         }
     }
 

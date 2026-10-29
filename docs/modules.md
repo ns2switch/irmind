@@ -66,6 +66,18 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 **Limits:** One configured region and bounded queries. The module does not assume ambient AWS profiles and cannot change cloud resources.
 
+## Cloud object storage (S3, GCS, Azure Blob)
+
+**Does:** Lists versioned objects under a case-scoped prefix and reads selected exported logs in bounded streams. IRMind hashes the downloaded bytes and converts accepted records to local Parquet. It never writes to the bucket or container.
+
+**Permission:** S3 needs `s3:ListBucket` limited to the prefix and `s3:GetObject`; GCS needs `roles/storage.objectViewer` on the selected bucket; Azure needs `Storage Blob Data Reader` on the selected container. Use dedicated identities and deny writes in the cloud policy as well as IRMind. Provider ETags are version guards, not evidence hashes.
+
+**Configure:** Build with `--features storage-s3`, `storage-gcs`, or `storage-azure`. In the TUI's module view, enable each compiled connector explicitly and set its source ID and bucket or container. S3 also needs a region; Azure needs account, client ID, and tenant ID. Optional endpoint overrides must use HTTPS. Add the matching object prefix and UTC window to the case and organization policy scope.
+
+**Credentials:** S3 reuses the dedicated `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` from the selected secret backend. GCS uses `GCP_SERVICE_ACCOUNT_JSON` with the service account private key. Azure uses `AZURE_CLIENT_SECRET` for the configured service principal. These values never belong in `config.toml` or environment variables.
+
+**Limits:** Reads require an object version or ETag observed during listing, a per-read byte ceiling, and the case transfer budget. A listing truncated at its bound must be narrowed before ingest. Rechecking an uncopied cloud original downloads it again and may incur provider charges. No ambient cloud profiles, CLI sessions, or instance credentials are used.
+
 ## CrowdStrike
 
 **Does:** Reads host inventory and host-linked alerts.

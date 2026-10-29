@@ -68,6 +68,9 @@ Una feature de Cargo incluye el módulo en el binario; activarlo es un paso dist
 | OpenRouter | LLM | `llm-openrouter` | experimental | [Módulos](docs/es/modules.md) |
 | Splunk | SIEM | `siem-splunk` | experimental | [Módulos](docs/es/modules.md) |
 | AWS CloudTrail e IAM | nube | `cloud-aws` | experimental | [Módulos](docs/es/modules.md) |
+| Objetos S3 | almacenamiento en la nube | `storage-s3` | experimental | [Módulos](docs/es/modules.md) |
+| Objetos GCS | almacenamiento en la nube | `storage-gcs` | experimental | [Módulos](docs/es/modules.md) |
+| Azure Blob | almacenamiento en la nube | `storage-azure` | experimental | [Módulos](docs/es/modules.md) |
 | CrowdStrike | EDR | `edr-crowdstrike` | experimental | [Módulos](docs/es/modules.md) |
 | SentinelOne | EDR | `edr-sentinelone` | experimental | [Módulos](docs/es/modules.md) |
 | MISP | TI interna | `ti-misp` | experimental | [Módulos](docs/es/modules.md) |

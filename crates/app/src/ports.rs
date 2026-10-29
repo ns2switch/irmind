@@ -1,6 +1,7 @@
 mod audit;
 mod local;
 mod model;
+mod object_source;
 mod remote;
 
 pub use audit::{
@@ -19,4 +20,5 @@ pub use model::{
     ModelProgress, ModelResponse, ModelStream, ModelUsage, UsageEvent, collect_model_stream,
     collect_model_stream_with_progress, single_completion_stream, summarize_usage,
 };
+pub use object_source::{ObjectEntry, ObjectSource, ObjectSourceOutput, ObjectStream};
 pub use remote::{CloudAuditPort, EdrPort, InternalIntelPort, SiemPort, ThreatIntelPort};

@@ -68,6 +68,9 @@ A Cargo feature includes a module in the binary; enabling a connector or selecti
 | OpenRouter | LLM | `llm-openrouter` | experimental | [LLM setup](docs/modules.md#openrouter) |
 | Splunk | SIEM | `siem-splunk` | experimental | [Splunk](docs/modules.md#splunk) |
 | AWS CloudTrail and IAM | cloud | `cloud-aws` | experimental | [AWS](docs/modules.md#aws-cloudtrail-and-iam) |
+| S3 object storage | cloud storage | `storage-s3` | experimental | [Object storage](docs/modules.md#cloud-object-storage-s3-gcs-azure-blob) |
+| GCS object storage | cloud storage | `storage-gcs` | experimental | [Object storage](docs/modules.md#cloud-object-storage-s3-gcs-azure-blob) |
+| Azure Blob object storage | cloud storage | `storage-azure` | experimental | [Object storage](docs/modules.md#cloud-object-storage-s3-gcs-azure-blob) |
 | CrowdStrike | EDR | `edr-crowdstrike` | experimental | [CrowdStrike](docs/modules.md#crowdstrike) |
 | SentinelOne | EDR | `edr-sentinelone` | experimental | [SentinelOne](docs/modules.md#sentinelone) |
 | MISP | internal threat intel | `ti-misp` | experimental | [MISP](docs/modules.md#misp) |

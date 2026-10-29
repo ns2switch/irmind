@@ -30,6 +30,12 @@ pub(super) struct Cli {
     pub(super) enable_crowdstrike: bool,
     #[arg(long)]
     pub(super) enable_sentinelone: bool,
+    #[arg(long)]
+    pub(super) enable_storage_s3: bool,
+    #[arg(long)]
+    pub(super) enable_storage_gcs: bool,
+    #[arg(long)]
+    pub(super) enable_storage_azure: bool,
     #[command(subcommand)]
     pub(super) command: Option<Command>,
 }

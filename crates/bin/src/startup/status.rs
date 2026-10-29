@@ -68,6 +68,21 @@ fn append_product_statuses(cli: &Cli, builder: &mut StatusBuilder<'_>) {
     );
     builder.push("cloud-aws", cfg!(feature = "cloud-aws"), cli.enable_aws);
     builder.push(
+        "storage-s3",
+        cfg!(feature = "storage-s3"),
+        cli.enable_storage_s3,
+    );
+    builder.push(
+        "storage-gcs",
+        cfg!(feature = "storage-gcs"),
+        cli.enable_storage_gcs,
+    );
+    builder.push(
+        "storage-azure",
+        cfg!(feature = "storage-azure"),
+        cli.enable_storage_azure,
+    );
+    builder.push(
         "edr-crowdstrike",
         cfg!(feature = "edr-crowdstrike"),
         cli.enable_crowdstrike,

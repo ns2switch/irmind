@@ -20,6 +20,12 @@ use super::{
     BTreeMap, Cli, DEFAULT_LLM_MODULE, JsonParser, ModuleConfig, ModuleRegistry, OpenAiCompatible,
     PersistentConfig, Result, SecretBackend, anyhow, configuration_issue, load_module_config,
 };
+#[cfg(any(
+    feature = "storage-s3",
+    feature = "storage-gcs",
+    feature = "storage-azure"
+))]
+use irmind_mod_storage_object::StorageObject;
 
 pub(super) fn configured_registry(
     cli: &Cli,
@@ -49,6 +55,15 @@ pub(super) fn configured_registry(
         &mut registry,
         &mut config_issues,
     )?;
+    register_object_storage(
+        cli,
+        saved,
+        secrets,
+        allow_environment,
+        interactive,
+        &mut registry,
+        &mut config_issues,
+    )?;
     register_edr_and_intel(
         cli,
         saved,
@@ -59,6 +74,89 @@ pub(super) fn configured_registry(
         &mut config_issues,
     )?;
     Ok((registry, config_issues))
+}
+
+fn register_object_storage(
+    cli: &Cli,
+    saved: &PersistentConfig,
+    secrets: &dyn SecretBackend,
+    allow_environment: bool,
+    interactive: bool,
+    registry: &mut ModuleRegistry,
+    config_issues: &mut BTreeMap<&'static str, String>,
+) -> Result<()> {
+    let _ = (
+        secrets,
+        saved,
+        allow_environment,
+        interactive,
+        &registry,
+        &config_issues,
+    );
+    #[cfg(any(
+        feature = "storage-s3",
+        feature = "storage-gcs",
+        feature = "storage-azure"
+    ))]
+    macro_rules! register_storage {
+        ($constructor:expr, $manifest:expr) => {{
+            let outcome = (|| -> Result<()> {
+                let config = load_module_config(&$manifest, secrets, saved, allow_environment)?;
+                registry.register(Box::new($constructor(&config)?), &config)?;
+                Ok(())
+            })();
+            if let Err(error) = outcome {
+                if interactive {
+                    config_issues.insert(
+                        $manifest.id,
+                        configuration_issue(&$manifest, secrets, saved, allow_environment),
+                    );
+                } else {
+                    return Err(error);
+                }
+            }
+        }};
+    }
+    #[cfg(feature = "storage-s3")]
+    if cli.enable_storage_s3 {
+        register_storage!(
+            StorageObject::from_s3_config,
+            irmind_mod_storage_object::S3_MANIFEST
+        );
+    }
+    #[cfg(not(feature = "storage-s3"))]
+    if cli.enable_storage_s3 && !interactive {
+        return Err(anyhow!(
+            "this binary was built without the storage-s3 feature"
+        ));
+    }
+    #[cfg(feature = "storage-gcs")]
+    if cli.enable_storage_gcs {
+        register_storage!(
+            StorageObject::from_gcs_config,
+            irmind_mod_storage_object::GCS_MANIFEST
+        );
+    }
+    #[cfg(not(feature = "storage-gcs"))]
+    if cli.enable_storage_gcs && !interactive {
+        return Err(anyhow!(
+            "this binary was built without the storage-gcs feature"
+        ));
+    }
+    #[cfg(feature = "storage-azure")]
+    if cli.enable_storage_azure {
+        register_storage!(
+            StorageObject::from_azure_config,
+            irmind_mod_storage_object::AZURE_MANIFEST
+        );
+    }
+    #[cfg(not(feature = "storage-azure"))]
+    if cli.enable_storage_azure && !interactive {
+        return Err(anyhow!(
+            "this binary was built without the storage-azure feature"
+        ));
+    }
+    Ok(())
 }
 
 fn register_llm(
