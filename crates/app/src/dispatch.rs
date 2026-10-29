@@ -209,6 +209,9 @@ impl Engine<'_> {
             Tool::ThreatIntelInternal if !self.internal_intel_available(source) => {
                 Some("internal intelligence source unavailable")
             }
+            Tool::ObjectList | Tool::ObjectRead if !self.object_source_available(source) => {
+                Some("object source unavailable")
+            }
             _ => None,
         }
     }

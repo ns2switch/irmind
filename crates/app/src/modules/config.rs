@@ -13,6 +13,7 @@ pub enum ModulePort {
     InternalIntel,
     ThreatIntel,
     EventParser,
+    ObjectSource,
 }
 
 #[derive(Clone, Copy, Debug)]

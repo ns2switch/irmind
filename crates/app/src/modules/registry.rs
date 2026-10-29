@@ -1,7 +1,7 @@
 use super::config::{Module, ModuleConfig, ModuleManifest, ModulePort};
 use crate::{
-    AppError, CloudAuditPort, EdrPort, Engine, EventParser, InternalIntelPort, LlmPort, SiemPort,
-    ThreatIntelPort, hex, sha256,
+    AppError, CloudAuditPort, EdrPort, Engine, EventParser, InternalIntelPort, LlmPort,
+    ObjectSource, SiemPort, ThreatIntelPort, hex, sha256,
 };
 use irmind_domain::Tool;
 use std::collections::{BTreeMap, BTreeSet};
@@ -17,6 +17,7 @@ pub struct ModuleRegistry {
     cloud_audits: Vec<Box<dyn CloudAuditPort>>,
     internal_intel: Vec<Box<dyn InternalIntelPort>>,
     threat_intel: Option<Box<dyn ThreatIntelPort>>,
+    object_sources: Vec<Box<dyn ObjectSource>>,
 }
 
 impl ModuleRegistry {
@@ -46,6 +47,7 @@ impl ModuleRegistry {
         self.edrs.extend(staged.edrs);
         self.cloud_audits.extend(staged.cloud_audits);
         self.internal_intel.extend(staged.internal_intel);
+        self.object_sources.extend(staged.object_sources);
         if let Some(port) = staged.threat_intel {
             self.threat_intel = Some(port);
         }
@@ -66,6 +68,7 @@ impl ModuleRegistry {
             ModulePort::InternalIntel,
             ModulePort::ThreatIntel,
             ModulePort::EventParser,
+            ModulePort::ObjectSource,
         ] {
             let expected = usize::from(manifest.ports.contains(&port));
             if actual[&port] != expected {
@@ -105,6 +108,11 @@ impl ModuleRegistry {
                 .iter()
                 .any(|prior| prior.source_id() == port.source_id())
         }) || (staged.threat_intel.is_some() && self.threat_intel.is_some())
+            || staged.object_sources.iter().any(|port| {
+                self.object_sources
+                    .iter()
+                    .any(|prior| prior.source_id() == port.source_id())
+            })
             || (staged.parser.is_some() && self.parser.is_some())
         {
             return Err(AppError::Fixed(
@@ -211,6 +219,26 @@ impl ModuleRegistry {
         Ok(())
     }
 
+    pub fn add_object_source(&mut self, port: Box<dyn ObjectSource>) -> Result<(), AppError> {
+        if self
+            .object_sources
+            .iter()
+            .any(|prior| prior.source_id() == port.source_id())
+        {
+            return Err(AppError::Policy("duplicate object source".into()));
+        }
+        self.object_sources.push(port);
+        Ok(())
+    }
+
+    pub fn object_source(&self, source_id: &str) -> Result<&dyn ObjectSource, AppError> {
+        self.object_sources
+            .iter()
+            .find(|port| port.source_id() == source_id)
+            .map(Box::as_ref)
+            .ok_or_else(|| AppError::Policy("object source unavailable".into()))
+    }
+
     pub fn llm(&self, id: &str) -> Result<&dyn LlmPort, AppError> {
         self.llms.get(id).map(Box::as_ref).ok_or(AppError::Fixed(
             crate::FixedAppError::ModelLLMModuleIsNotRegistered,
@@ -232,6 +260,9 @@ impl ModuleRegistry {
         }
         if let Some(port) = &self.threat_intel {
             engine = engine.with_threat_intel(port.as_ref());
+        }
+        for port in &self.object_sources {
+            engine = engine.with_object_source(port.as_ref())?;
         }
         engine.with_module_fingerprint(self.fingerprint())
     }
@@ -272,6 +303,7 @@ impl ModuleRegistry {
                 usize::from(self.threat_intel.is_some()),
             ),
             (ModulePort::EventParser, usize::from(self.parser.is_some())),
+            (ModulePort::ObjectSource, self.object_sources.len()),
         ])
     }
 }

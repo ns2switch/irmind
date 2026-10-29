@@ -45,6 +45,7 @@ impl<'a> Engine<'a> {
             cloud_audits: Vec::new(),
             edrs: Vec::new(),
             internal_intel: Vec::new(),
+            object_sources: Vec::new(),
             pricing: None,
             verified_cases: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         };

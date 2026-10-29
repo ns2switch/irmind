@@ -19,6 +19,9 @@ ti-misp = ["dep:irmind-mod-ti-misp"]
 cloud-aws = ["dep:irmind-mod-cloud-aws"]
 edr-crowdstrike = ["dep:irmind-mod-edr-crowdstrike"]
 edr-sentinelone = ["dep:irmind-mod-edr-sentinelone"]
+storage-s3 = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/s3"]
+storage-gcs = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/gcs"]
+storage-azure = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/azure"]
 
 [dependencies]
 irmind-app = { path = "../app", version = "0.1.0" }
@@ -40,6 +43,7 @@ irmind-mod-ti-misp = { path = "../modules/ti-misp", version = "0.1.0", optional 
 irmind-mod-cloud-aws = { path = "../modules/cloud-aws", version = "0.1.0", optional = true }
 irmind-mod-edr-crowdstrike = { path = "../modules/edr-crowdstrike", version = "0.1.0", optional = true }
 irmind-mod-edr-sentinelone = { path = "../modules/edr-sentinelone", version = "0.1.0", optional = true }
+irmind-mod-storage-object = { path = "../modules/storage-object", version = "0.1.0", optional = true }
 anyhow = "1"
 clap = { version = "4", default-features = false, features = ["std", "color", "help", "usage", "error-context", "suggestions", "derive", "env"] }
 serde_json = "1"

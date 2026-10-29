@@ -1,6 +1,14 @@
 use crate::{AppError, AuthorizedCall, CancellationToken, Engine, Tool};
 
 impl Engine<'_> {
+    pub(crate) fn object_source_available(&self, source: Option<&str>) -> bool {
+        source.is_some_and(|source| {
+            self.object_sources
+                .iter()
+                .any(|port| port.source_id() == source)
+        })
+    }
+
     pub(crate) fn siem_available(&self, source: Option<&str>) -> bool {
         source.is_some_and(|source| self.siems.iter().any(|port| port.source_id() == source))
     }

@@ -21,6 +21,7 @@ pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
         | Tool::EdrProcessTree
         | Tool::EdrDetections
         | Tool::ThreatIntelExternal => valid_edr_and_external_intel(proposal),
+        Tool::ObjectList | Tool::ObjectRead => false,
     }
 }
 

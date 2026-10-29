@@ -9,6 +9,7 @@ class ScopeTests(unittest.TestCase):
         for path in (
             "crates/fs/src/lib.rs", "crates/modules/keystore-file/src/lib.rs",
             "crates/infra/src/windows_security.rs", "crates/tui/src/case.rs",
+            "crates/modules/storage-object/src/lib.rs",
             ".github/workflows/ci.yml",
         ):
             self.assertTrue(platform_path(path), path)

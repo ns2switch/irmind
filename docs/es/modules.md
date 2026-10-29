@@ -68,6 +68,18 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Límites:** Una región configurada y consultas acotadas. El módulo no utiliza perfiles AWS del entorno ni puede cambiar recursos en la nube.
 
+## Almacenamiento de objetos en la nube (S3, GCS y Azure Blob)
+
+**Función:** Enumera objetos versionados bajo un prefijo autorizado por el caso y lee los logs exportados en un flujo acotado. IRMind calcula el hash de los bytes descargados y convierte los registros válidos a Parquet local. No escribe en el bucket ni en el contenedor.
+
+**Permiso:** S3 requiere `s3:ListBucket` limitado al prefijo y `s3:GetObject`; GCS requiere `roles/storage.objectViewer` en el bucket; Azure requiere `Storage Blob Data Reader` en el contenedor. Usa identidades dedicadas y deniega escrituras también en la política de la nube. Los ETag del proveedor sirven para controlar la versión, no son hashes de evidencia.
+
+**Configuración:** Compila con `--features storage-s3`, `storage-gcs` o `storage-azure`. En la vista de módulos de la TUI, activa cada conector y define su ID de fuente y bucket o contenedor. S3 necesita una región; Azure necesita cuenta, ID de cliente y tenant. Las URL opcionales requieren HTTPS. Incluye el prefijo y la ventana UTC en los alcances del caso y de la organización.
+
+**Credenciales:** S3 reutiliza `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y, si procede, `AWS_SESSION_TOKEN`. GCS usa `GCP_SERVICE_ACCOUNT_JSON`; Azure usa `AZURE_CLIENT_SECRET`. Se guardan en el backend de secretos seleccionado, nunca en `config.toml` ni en variables de entorno.
+
+**Límites:** La lectura requiere la versión o ETag observado al enumerar, un límite de bytes por objeto y el presupuesto de transferencia del caso. Hay que acotar una enumeración truncada antes de ingerir. Verificar de nuevo un original remoto no copiado vuelve a descargarlo y puede generar costes. No se usan perfiles, sesiones de CLI ni credenciales de instancia ambientales.
+
 ## CrowdStrike
 
 **Función:** Lee el inventario de hosts y las alertas vinculadas a ellos.

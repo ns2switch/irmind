@@ -120,6 +120,12 @@ fn compiled_credential_fields() -> Vec<&'static str> {
     collect!(irmind_mod_siem_splunk::MANIFEST);
     #[cfg(feature = "cloud-aws")]
     collect!(irmind_mod_cloud_aws::MANIFEST);
+    #[cfg(feature = "storage-s3")]
+    collect!(irmind_mod_storage_object::S3_MANIFEST);
+    #[cfg(feature = "storage-gcs")]
+    collect!(irmind_mod_storage_object::GCS_MANIFEST);
+    #[cfg(feature = "storage-azure")]
+    collect!(irmind_mod_storage_object::AZURE_MANIFEST);
     #[cfg(feature = "edr-crowdstrike")]
     collect!(irmind_mod_edr_crowdstrike::MANIFEST);
     #[cfg(feature = "edr-sentinelone")]
