@@ -56,7 +56,10 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
 
     fn investigate_prompt(&mut self, prompt: String) {
         if self.model.is_none() {
-            self.state.messages.push("No LLM selected. Launch with --llm-module after approval, or use case commands without a model.".into());
+            self.state.messages.push(
+                "No LLM selected. Open the Modules view (m), choose a model, then try again."
+                    .into(),
+            );
             return;
         }
         match self.engine.guard.screen(&prompt) {

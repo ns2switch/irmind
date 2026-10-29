@@ -142,6 +142,18 @@ fn wizard_error_snapshot_shows_recovery_choices() {
 }
 
 #[test]
+fn startup_error_escapes_terminal_and_bidi_controls() {
+    let mut wizard = KeystoreWizard::new(None, false, true, false);
+    wizard.error = Some("unwritable \u{1b}[31m/path\u{202e}".into());
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    render(&mut terminal, &wizard).unwrap();
+    let visible = screen(&terminal);
+    assert!(!visible.contains('\u{1b}'));
+    assert!(!visible.contains('\u{202e}'));
+    assert!(visible.contains("/path"));
+}
+
+#[test]
 fn unwritable_directory_error_stays_in_wizard_with_retry() {
     let mut wizard = KeystoreWizard::new(None, false, true, false);
     enter(&mut wizard);

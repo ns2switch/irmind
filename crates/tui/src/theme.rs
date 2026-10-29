@@ -17,15 +17,24 @@ impl Theme {
         if std::env::var_os("NO_COLOR").is_some() {
             return Self::plain();
         }
-        let light = std::env::var("IRMIND_THEME").is_ok_and(|value| value == "light")
-            || std::env::var("COLORFGBG").is_ok_and(|value| {
+        let configured = std::env::var("IRMIND_THEME").ok();
+        let terminal = std::env::var("COLORFGBG").ok();
+        let light = Self::is_light(configured.as_deref(), terminal.as_deref());
+        if light { Self::light() } else { Self::dark() }
+    }
+
+    fn is_light(configured: Option<&str>, terminal: Option<&str>) -> bool {
+        match configured {
+            Some("light") => true,
+            Some("dark") => false,
+            _ => terminal.is_some_and(|value| {
                 value
                     .rsplit(';')
                     .next()
                     .and_then(|number| number.parse::<u8>().ok())
                     .is_some_and(|background| background >= 7 && background != 8)
-            });
-        if light { Self::light() } else { Self::dark() }
+            }),
+        }
     }
 
     pub(crate) const fn plain() -> Self {
@@ -87,5 +96,12 @@ mod tests {
         let theme = Theme::plain();
         assert_eq!(theme.warning, Color::Reset);
         assert_eq!(theme.user_background, Color::Reset);
+    }
+
+    #[test]
+    fn configured_theme_overrides_terminal_background() {
+        assert!(!Theme::is_light(Some("dark"), Some("0;15")));
+        assert!(Theme::is_light(Some("light"), Some("0;0")));
+        assert!(Theme::is_light(None, Some("0;15")));
     }
 }

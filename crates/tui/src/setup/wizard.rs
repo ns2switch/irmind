@@ -1,4 +1,5 @@
 use super::{KeystoreChoice, TerminalSession};
+use crate::case::escape_display;
 use crate::theme::Theme;
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -304,7 +305,7 @@ where
             text.push_str("\n\nExit setup? Enter/y confirms; any other key stays.");
         }
         frame.render_widget(
-            Paragraph::new(text).block(
+            Paragraph::new(escape_display(&text)).block(
                 Block::default()
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
@@ -375,13 +376,17 @@ pub(crate) fn prompt_secret(
     prompt: &str,
 ) -> Result<SecretString> {
     let mut secret = SecretString::from(String::new());
+    let safe_prompt = escape_display(prompt);
     loop {
         terminal.draw(|frame| {
             let rows =
                 Layout::vertical([Constraint::Min(4), Constraint::Length(3)]).split(frame.area());
             frame.render_widget(
-                Paragraph::new(format!("{prompt}\n{}", KeystoreWizard::masked(&secret)))
-                    .block(Block::default().borders(Borders::ALL)),
+                Paragraph::new(format!(
+                    "{safe_prompt}\n{}",
+                    KeystoreWizard::masked(&secret)
+                ))
+                .block(Block::default().borders(Borders::ALL)),
                 rows[0],
             );
             frame.render_widget(Paragraph::new("Enter confirm · Esc cancel"), rows[1]);
