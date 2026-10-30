@@ -40,11 +40,14 @@ La tabla opcional `[scope]` fija un techo estricto para las lecturas remotas de 
 
 La TUI guarda los ajustes no secretos en `config.toml` dentro del [directorio de datos estándar](platforms.md#datos-y-terminal). La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no activa ninguno. Escribe `/model` para elegir un proveedor y modelo; usa `/modules` para activar conectores y consultar sus campos públicos. Tab elige un campo, `/edit-param` lo edita y `/keystore` abre sus credenciales. La sesión se recarga tras un cambio. La salida de datos del equipo requiere confirmación explícita y firmada. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre debe existir un backend de firma y secretos.
 
+`resume_last_case` vale `true` por defecto. Tras arrancar, la TUI reabre el último caso abierto que se usó solo si verifica su cadena de custodia. Un caso sellado o eliminado deja la pantalla de inicio; un fallo de verificación aparece allí como aviso. Usa `/config` para cambiar la opción. La referencia privada `last-case` se guarda junto a `config.toml` y no forma parte de la custodia. La automatización CLI no reanuda casos.
+
 Para automatización, el orden es **flag de CLI > variable de entorno > config.toml > valor por defecto**. Un override solo dura esa ejecución; la TUI no lo sustituye en silencio. El archivo contiene IDs de módulos, modelos, URLs, fuentes, índices, regiones y precios opcionales, pero nunca credenciales ni passphrases. Se rechazan los campos desconocidos o secretos. Ejemplo:
 
 ```toml
 version = 1
 llm_module = "llm-openai-compatible"
+resume_last_case = true
 
 [modules.llm-openai-compatible.values]
 IRMIND_MODEL = "modelo-local"

@@ -381,6 +381,7 @@ impl HomeRuntime<'_, '_, '_> {
                 overrides_active: self.state.overrides_active,
                 modules: self.modules,
                 mouse_capture: self.mouse_capture,
+                resumed: false,
             },
         );
         self.state.rows = load_rows(self.engine)?;
@@ -411,6 +412,16 @@ impl HomeRuntime<'_, '_, '_> {
     }
 
     fn create_case(&mut self) -> Result<()> {
+        if let Some((field, message)) =
+            super::new_case::check(&self.state, self.engine).first_issue()
+        {
+            self.state.notice = message.into();
+            if field >= 2 {
+                self.state.remote_scope_step = super::RemoteScopeStep::Remote;
+            }
+            self.state.form_field = field;
+            return Ok(());
+        }
         let scope_text = self.state.scope();
         let severity = irmind_app::Severity::parse(&self.state.form[1]);
         let workflow = CaseWorkflow {
@@ -441,6 +452,7 @@ impl HomeRuntime<'_, '_, '_> {
                         overrides_active: self.state.overrides_active,
                         modules: self.modules,
                         mouse_capture: self.mouse_capture,
+                        resumed: false,
                     },
                 )?;
                 super::apply_case_exit(&mut self.state, &exit);

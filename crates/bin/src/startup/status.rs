@@ -34,6 +34,7 @@ pub(super) fn module_statuses(
             selection_source: ModuleSelectionSource::Persistent,
             parameters: Vec::new(),
             credentials: Vec::new(),
+            missing: Vec::new(),
         }],
     };
     for (id, compiled) in [
@@ -53,6 +54,7 @@ pub(super) fn module_statuses(
             selection_source: ModuleSelectionSource::Persistent,
             parameters: Vec::new(),
             credentials: Vec::new(),
+            missing: Vec::new(),
         });
     }
     append_product_statuses(cli, &mut builder);
@@ -184,6 +186,14 @@ impl StatusBuilder<'_> {
             },
             parameters,
             credentials,
+            missing: manifest.map_or_else(Vec::new, |manifest| {
+                configuration::missing_required_settings(
+                    manifest,
+                    self.keystore.secret_backend.as_ref(),
+                    self.saved,
+                    self.keystore.allow_environment,
+                )
+            }),
         });
     }
 }

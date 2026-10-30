@@ -118,6 +118,9 @@ fn fields(config: &PersistentConfig) -> BTreeMap<String, String> {
     if let Some(value) = config.output_microusd_per_million {
         out.insert("output_microusd_per_million".into(), value.to_string());
     }
+    if let Some(value) = config.resume_last_case {
+        out.insert("resume_last_case".into(), value.to_string());
+    }
     for (id, settings) in &config.modules {
         out.insert(
             format!("modules.{id}.enabled"),

@@ -343,6 +343,13 @@ fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) ->
             context.cancel,
             irmind_tui::WorkspaceLaunch {
                 initial_case: None,
+                resume_last_case: context
+                    .workspace_io
+                    .config_store
+                    .load()?
+                    .resume_last_case
+                    .unwrap_or(true)
+                    .into(),
                 new_analyst_key: context.new_analyst_key,
                 overrides_active: context.overrides_active,
                 mouse_capture: context.mouse_capture,

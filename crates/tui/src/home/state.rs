@@ -1,4 +1,4 @@
-use super::{CaseId, ConfigChange, HomeState, KeyCode, Mode, case, model, modules};
+use super::{CaseId, ConfigChange, HomeState, KeyCode, Mode, case, model, modules, new_case};
 
 pub(crate) enum HomeAction {
     None,
@@ -78,6 +78,7 @@ pub(crate) fn update(state: &mut HomeState, key: KeyCode) -> HomeAction {
         Mode::Model => update_model(state, key),
         Mode::VerifyExport => update_verify_export(state, key),
         Mode::Modules => modules::update_module_screen(state, key),
+        Mode::Config => update_config(state, key),
         Mode::Setup => update_setup(state, key),
         Mode::Help => update_help(state, key),
         Mode::Keystore => update_keystore(state, key),
@@ -220,6 +221,7 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
         "/new" => {
             state.form = HomeState::new(Vec::new(), false).form;
             state.form_field = 0;
+            state.remote_scope_step = super::RemoteScopeStep::Local;
             state.mode = Mode::New;
         }
         "/cases" | "/home" => {
@@ -227,7 +229,8 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
             state.status_filter = None;
             state.selected = 0;
         }
-        "/modules" | "/config" => state.mode = Mode::Modules,
+        "/modules" => state.mode = Mode::Modules,
+        "/config" => state.mode = Mode::Config,
         "/model" => {
             state.model_setup = model::ModelSetup::new();
             state.mode = Mode::Model;
@@ -299,22 +302,21 @@ fn open_named_case(state: &mut HomeState, query: &str) -> HomeAction {
 }
 
 fn update_new_case(state: &mut HomeState, key: KeyCode) -> HomeAction {
+    new_case::update(state, key)
+}
+
+fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
     match key {
-        KeyCode::Esc => state.mode = Mode::List,
-        KeyCode::Tab => state.form_field = (state.form_field + 1) % state.form.len(),
-        KeyCode::BackTab => {
-            state.form_field = (state.form_field + state.form.len() - 1) % state.form.len();
+        KeyCode::Esc => {
+            state.mode = Mode::List;
+            HomeAction::None
         }
-        KeyCode::Backspace => {
-            state.form[state.form_field].pop();
-        }
-        KeyCode::Char(ch) if state.form[state.form_field].len() < 200 => {
-            state.form[state.form_field].push(ch);
-        }
-        KeyCode::Enter => return HomeAction::CreateCase,
-        _ => {}
+        KeyCode::Enter => HomeAction::ChangeModule(
+            ConfigChange::SetResumeLastCase(!state.resume_last_case.enabled()),
+            true,
+        ),
+        _ => HomeAction::None,
     }
-    HomeAction::None
 }
 
 fn update_verify_export(state: &mut HomeState, key: KeyCode) -> HomeAction {

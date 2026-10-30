@@ -237,7 +237,21 @@ pub(super) fn configuration_issue(
     saved: &PersistentConfig,
     allow_environment: bool,
 ) -> String {
-    let missing = manifest
+    let missing = missing_required_settings(manifest, secrets, saved, allow_environment);
+    if missing.is_empty() {
+        "invalid values in module configuration".into()
+    } else {
+        format!("missing required settings: {}", missing.join(", "))
+    }
+}
+
+pub(super) fn missing_required_settings(
+    manifest: &ModuleManifest,
+    secrets: &dyn SecretBackend,
+    saved: &PersistentConfig,
+    allow_environment: bool,
+) -> Vec<String> {
+    manifest
         .config
         .iter()
         .filter(|field| field.required)
@@ -251,13 +265,8 @@ pub(super) fn configuration_issue(
                     .is_none()
             }
         })
-        .map(|field| field.name)
-        .collect::<Vec<_>>();
-    if missing.is_empty() {
-        "invalid values in module configuration".into()
-    } else {
-        format!("missing required settings: {}", missing.join(", "))
-    }
+        .map(|field| field.name.to_owned())
+        .collect()
 }
 
 pub(super) fn load_pricing(saved: &PersistentConfig) -> Result<Option<ModelPricing>> {

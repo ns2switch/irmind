@@ -3,7 +3,11 @@ use super::{HomeState, Mode};
 pub(super) fn help_line(state: &HomeState) -> &'static str {
     match state.mode {
         Mode::List => "↑/↓ choose · Enter open · /new create · /model AI · Ctrl+K commands",
-        Mode::New => "Tab next field · Enter create · Esc back",
+        Mode::New if state.remote_scope_step.is_remote() => {
+            "Tab/Shift+Tab field · Enter create · Esc local step"
+        }
+        Mode::New => "Tab/Shift+Tab field · ↑/↓ severity · Enter create or expand · Esc back",
+        Mode::Config => "Enter toggle resume · Esc back",
         Mode::Modules => {
             if state.pending_module_change.is_some() {
                 "↑/↓ choose · Enter confirm · Esc back"

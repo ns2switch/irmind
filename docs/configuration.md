@@ -36,12 +36,15 @@ The optional `[scope]` table is a hard ceiling for remote reads across cases. It
 
 The TUI stores non-secret settings in `config.toml` in the [standard data directory](platforms.md#data-and-terminal-behavior). The normal build compiles all current product modules and both keystores but enables none. Type `/model` to choose a provider and model; type `/modules` to enable connectors and inspect their public fields. Tab selects a field, `/edit-param` edits it, and `/keystore` opens credentials. The session reloads inside the TUI after a change. Activation or endpoint changes that may send data off this computer require explicit signed confirmation. A minimal build uses `--no-default-features --features keystore-file` because a signer and secrets backend must remain available.
 
+`resume_last_case` defaults to `true`. After startup, the TUI reopens the most recently used open case only if its custody chain verifies. Sealed or deleted cases stay on the home screen; a verification failure appears there as a warning. Use `/config` to turn resumption off or on. The private `last-case` reference is stored beside `config.toml` and is not part of custody. CLI automation does not resume a case.
+
 For automation, resolution order is **CLI flag > environment variable > config.toml > default**. An override lasts only for that run; the TUI does not silently replace it. The file contains module IDs, models, URLs, source IDs, indexes, regions, and optional pricing, but never credentials or passphrases. Unknown or secret manifest fields fail validation. Example:
 
 ```toml
 version = 1
 llm_module = "llm-openai-compatible"
 mouse_capture = false # optional: leave terminal text selection available
+resume_last_case = true # optional: reopen the last verified open case
 
 [modules.llm-openai-compatible.values]
 IRMIND_MODEL = "your-local-model"

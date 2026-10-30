@@ -16,6 +16,9 @@ struct HomeVisual<'a> {
     notice: &'a str,
     input: &'a str,
     has_model: bool,
+    form: &'a [String],
+    form_check: &'a super::new_case::FormCheck,
+    module_detail: &'a [String],
 }
 
 pub(crate) fn render_home<B: Backend>(
@@ -49,6 +52,17 @@ where
         state.notice.clone()
     })?;
     let input = safe(&state.input)?;
+    let safe_form = state
+        .form
+        .iter()
+        .map(|value| safe(value))
+        .collect::<Result<Vec<_>>>()?;
+    let form_check = super::new_case::check(state, engine);
+    let module_detail = if state.mode == Mode::Modules {
+        items::module_detail(state, modules, &safe)?
+    } else {
+        Vec::new()
+    };
     let menu = home_menu_rows(state, &safe)?;
     let visual = HomeVisual {
         title: &title,
@@ -56,6 +70,9 @@ where
         notice: &notice,
         input: &input,
         has_model: model.is_some(),
+        form: &safe_form,
+        form_check: &form_check,
+        module_detail: &module_detail,
     };
     let mut list_state = home_list_state(state);
     terminal.draw(|frame| {
@@ -297,6 +314,14 @@ fn draw_dialog_screen(
         .border_style(Style::default().fg(theme.border));
     let inner = block.inner(modal);
     frame.render_widget(block, modal);
+    if state.mode == Mode::New {
+        new_case::draw(frame, inner, state, visual, theme);
+        return;
+    }
+    if state.mode == Mode::Modules {
+        draw_modules(frame, inner, state, content, selected, visual, theme);
+        return;
+    }
     let content_area = Rect {
         height: inner.height.saturating_sub(2),
         ..inner
@@ -320,12 +345,64 @@ fn draw_dialog_screen(
     }
 }
 
+fn draw_modules(
+    frame: &mut ratatui::Frame<'_>,
+    area: Rect,
+    state: &HomeState,
+    content: Vec<ListItem<'static>>,
+    selected: &mut ListState,
+    visual: &HomeVisual<'_>,
+    theme: Theme,
+) {
+    let split =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).split(area);
+    frame.render_stateful_widget(
+        List::new(content).highlight_style(theme.accent()),
+        split[0],
+        selected,
+    );
+    let status = state
+        .modules
+        .get(state.module_selected)
+        .map(super::module_catalog::status);
+    let lines = visual
+        .module_detail
+        .iter()
+        .enumerate()
+        .map(|(index, row)| {
+            let style = if index == 1 {
+                match status {
+                    Some(super::module_catalog::DisplayStatus::Active) => {
+                        Style::default().fg(theme.success)
+                    }
+                    Some(super::module_catalog::DisplayStatus::Missing) => theme.warning(),
+                    _ => theme.muted(),
+                }
+            } else {
+                Style::default().fg(theme.text)
+            };
+            Line::styled(row.clone(), style)
+        })
+        .collect::<Vec<_>>();
+    frame.render_widget(
+        Paragraph::new(lines)
+            .wrap(ratatui::widgets::Wrap { trim: false })
+            .block(
+                Block::default()
+                    .borders(Borders::LEFT)
+                    .border_style(theme.muted()),
+            ),
+        split[1],
+    );
+}
+
 fn home_header(mode: Mode) -> &'static str {
     match mode {
         Mode::List => " Cases ",
         Mode::New => " New case ",
         Mode::Model => " Model setup ",
         Mode::Modules => " Modules ",
+        Mode::Config => " Configuration ",
         Mode::Keystore => " Keystore ",
         Mode::Setup => " First-run guide ",
         Mode::Help => " Commands and keys ",
@@ -337,15 +414,10 @@ fn home_list_state(state: &HomeState) -> ListState {
     let mut selected = ListState::default();
     match state.mode {
         Mode::Modules => {
-            let prefix = usize::from(state.pending_module_change.is_some())
-                + usize::from(state.module_edit.is_some());
-            let field_offset = state
-                .modules
-                .get(state.module_selected)
-                .map_or(0, |module| {
-                    usize::from(!module.parameters.is_empty()) * (state.parameter_selected + 1)
-                });
-            selected.select(Some(prefix + state.module_selected + field_offset));
+            selected.select(Some(super::module_catalog::selected_row(
+                &state.modules,
+                state.module_selected,
+            )));
         }
         Mode::Help => selected.select(Some(state.help_selected)),
         _ => {}
@@ -360,6 +432,8 @@ pub(super) use items::model_items;
 
 mod help;
 use help::help_line;
+
+mod new_case;
 
 #[cfg(test)]
 #[allow(clippy::expect_used)]

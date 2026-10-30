@@ -348,6 +348,7 @@ impl AutomationContext<'_, '_> {
                     cancel,
                     irmind_tui::WorkspaceLaunch {
                         initial_case: Some(&parse_id(&case_id)?),
+                        resume_last_case: irmind_tui::ResumeMode::Disabled,
                         new_analyst_key,
                         overrides_active,
                         mouse_capture,

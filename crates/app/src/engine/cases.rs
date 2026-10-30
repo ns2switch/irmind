@@ -191,6 +191,13 @@ impl<'a> Engine<'a> {
         Ok(!scope.is_within(ceiling))
     }
 
+    /// Validates a proposed scope before the analyst submits the new-case form.
+    pub fn validate_case_scope(&self, scope: &str) -> Result<(), AppError> {
+        let parsed = CaseScope::parse(scope)
+            .map_err(|_| AppError::Fixed(crate::FixedAppError::PolicyInvalidStructuredScope))?;
+        self.validate_policy_ceiling(&parsed)
+    }
+
     fn validate_policy_ceiling(&self, scope: &CaseScope) -> Result<(), AppError> {
         if self
             .policy

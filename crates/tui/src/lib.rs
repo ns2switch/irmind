@@ -61,6 +61,7 @@ pub struct ModuleStatus {
     pub selection_source: ModuleSelectionSource,
     pub parameters: Vec<ModuleParameter>,
     pub credentials: Vec<String>,
+    pub missing: Vec<String>,
 }
 
 impl ModuleStatus {
@@ -94,14 +95,40 @@ pub use startup_review::{
 #[derive(Clone, Copy)]
 pub struct WorkspaceLaunch<'a> {
     pub initial_case: Option<&'a irmind_app::CaseId>,
+    pub resume_last_case: ResumeMode,
     pub new_analyst_key: bool,
     pub overrides_active: bool,
     pub mouse_capture: bool,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum ResumeMode {
+    Enabled,
+    Disabled,
+}
+
+impl ResumeMode {
+    #[must_use]
+    pub fn enabled(self) -> bool {
+        self == Self::Enabled
+    }
+}
+
+impl From<bool> for ResumeMode {
+    fn from(value: bool) -> Self {
+        if value { Self::Enabled } else { Self::Disabled }
+    }
+}
+
 /// Filesystem selection is presentation I/O. The composition root supplies the
 /// same bounded, no-follow reader used by the noninteractive ingest command.
 pub trait WorkspaceIo: Send + Sync {
+    fn load_last_case(&self) -> Result<Option<irmind_app::CaseId>> {
+        Ok(None)
+    }
+    fn remember_last_case(&self, _id: &irmind_app::CaseId) -> Result<()> {
+        Ok(())
+    }
     fn input_files(&self, root: &Path) -> Result<Vec<PathBuf>>;
     fn read_evidence(&self, path: &Path) -> Result<Vec<u8>>;
     fn audit_source_name(&self, root: &Path, file: &Path) -> Result<String>;
