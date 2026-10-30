@@ -1,4 +1,5 @@
 use crate::TerminalSession;
+use crate::theme::Theme;
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use irmind_app::{ConfigurationReview, ContentGuard};
@@ -113,6 +114,7 @@ impl OverrideScreen {
                 Paragraph::new(if self.confirm_exit { "Exit IRMind? Enter confirms · Esc returns".into() } else { format!("{} 1. Use saved configuration   {} 2. Accept overrides and sign\n↑/↓ choose · Enter confirm · PgUp/PgDn inspect fields · typed: {}",
                     if self.selected == 0 { ">" } else { " " },
                     if self.selected == 1 { ">" } else { " " }, self.typed.map_or(String::new(), |value| (value + 1).to_string())) })
+                    .style(Theme::detect().muted())
                     .block(Block::default().borders(Borders::ALL)),
                 areas[2],
             );
@@ -294,6 +296,7 @@ impl RecoveryScreen {
                     self.typed
                         .map_or(String::new(), |value| (value + 1).to_string())
                 ))
+                .style(Theme::detect().muted())
                 .block(Block::default().borders(Borders::ALL)),
                 areas[2],
             );

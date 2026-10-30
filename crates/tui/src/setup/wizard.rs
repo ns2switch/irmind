@@ -634,7 +634,10 @@ pub(crate) fn prompt_secret(
                 .block(Block::default().borders(Borders::ALL)),
                 rows[0],
             );
-            frame.render_widget(Paragraph::new("Enter confirm · Esc cancel"), rows[1]);
+            frame.render_widget(
+                Paragraph::new("Enter confirm · Esc cancel").style(Theme::detect().muted()),
+                rows[1],
+            );
         })?;
         let Event::Key(key) = event::read()? else {
             continue;

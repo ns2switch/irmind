@@ -48,7 +48,7 @@ No released binaries are available yet. CI produces unsigned artifacts only on r
 ## First case in the TUI
 
 1. Run `irmind` without a subcommand. Choose signing and secrets backends with the arrow keys and Enter, then enter and confirm the masked passphrase if using a file keystore. It works over SSH. Save the analyst key fingerprint outside this computer. The optional “AI model” step can be skipped.
-2. Type `/new` to create a case. Give it a title, severity, and a time window. Leave remote sources empty for a local-only case.
+2. On the home screen, type to filter case titles or use `/cases open|sealed|inconsistent` for status. Type `/new` to create a case. Give it a title, severity, and a time window. Leave remote sources empty for a local-only case.
 3. Open the case and enter `/ingest`. Select [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), which contains only synthetic data. IRMind hashes the file in place; copying the original is an explicit option.
 4. Type `/model` to choose Ollama, an OpenAI-compatible endpoint, Anthropic, DeepSeek, or OpenRouter. Ollama lists installed models from `http://127.0.0.1:11434`; remote keys go into the selected secrets backend. Use “Test connection” with synthetic text and explicitly confirm remote data transfer. The session reloads inside the TUI.
 5. Open the case again and describe the synthetic alert. Enter sends. Type `/` for commands, `Ctrl+K` for the palette, `/sidebar` for case panels, and `Ctrl+O` to expand a selected card. PgUp/PgDn scroll. On an approval, select an option with the arrows and Enter, or type its number followed by Enter. `/pause` or Esc cancels a running task.

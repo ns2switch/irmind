@@ -16,12 +16,20 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "docs" / "assets"
 UX_AFTER = ROOT / "docs" / "ux" / "after"
+HOME_REFRESH_AFTER = ROOT / "docs" / "ux" / "home-refresh" / "after"
 IMAGE = (
     "ghcr.io/charmbracelet/vhs@"
     "sha256:9d5fc3dc0c160b0fb1d2212baff07e6bdf3fa9438c504a3237484567302fcf93"
 )
 EXAMPLE_SHA256 = "0b7f3a97647d64d5d917b09002f069f2cf15a058ea2406bceaf2d5fe5f02d055"
-FILES = ("demo.gif", "conversation.png", "command-menu.png", "approval-card.png")
+FILES = (
+    "demo.gif", "home.png", "model.png", "conversation.png",
+    "command-menu.png", "approval-card.png",
+)
+HOME_REFRESH_FILES = (
+    "home.png", "command-menu.png", "new.png",
+    "modules.png", "keystore.png", "model.png",
+)
 UX_FILES = (
     "home.png",
     "model.png",
@@ -125,6 +133,20 @@ def validate_ux_images(directory: Path) -> None:
         raise ValueError("first-run screenshots do not show backend and passphrase steps")
 
 
+def validate_home_refresh(directory: Path) -> None:
+    for name in HOME_REFRESH_FILES:
+        raw = (directory / name).read_bytes()[:24]
+        if raw[:8] != b"\x89PNG\r\n\x1a\n" or struct.unpack(">II", raw[16:24]) != (1230, 660):
+            raise ValueError(f"wrong home refresh screenshot dimensions: {name}")
+    transcript = (directory / "preview.ascii").read_text(
+        encoding="utf-8", errors="replace"
+    )
+    validate_privacy(transcript.replace("Analyst key: ephemeral demo key", "Demo key: synthetic"))
+    for label in ("Recent cases", "New case", "Modules", "Keystore", "Model setup"):
+        if label not in transcript:
+            raise ValueError(f"home refresh capture is missing {label}")
+
+
 def install_images(directory: Path, names: tuple[str, ...], destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     for name in names:
@@ -175,11 +197,22 @@ def main() -> None:
         validate_ux_images(output)
         install_images(output, FILES, ASSETS)
         install_images(output, UX_FILES, UX_AFTER)
+        refreshed = docker(
+            "--init", "--user", f"{os.getuid()}:{os.getgid()}",
+            "--env", "HOME=/tmp/irmind-home-refresh",
+            "--mount", f"type=bind,src={ROOT},dst=/vhs,readonly",
+            "--mount", f"type=bind,src={output},dst=/vhs/docs/ux/home-refresh/after",
+            "--workdir", "/vhs", IMAGE, "docs/ux/home-refresh/capture.tape",
+        )
+        validate_home_refresh(output)
+        install_images(output, HOME_REFRESH_FILES, HOME_REFRESH_AFTER)
         print("Generated synthetic demo and UX captures; privacy scan passed.")
         if result.stderr.strip():
             print(result.stderr.strip())
         if wizard.stderr.strip():
             print(wizard.stderr.strip())
+        if refreshed.stderr.strip():
+            print(refreshed.stderr.strip())
 
 
 if __name__ == "__main__":

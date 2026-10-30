@@ -95,11 +95,13 @@ fn update_list(state: &mut HomeState, key: KeyCode) -> HomeAction {
         KeyCode::Backspace => {
             state.input.pop();
             state.menu_query = None;
+            state.selected = 0;
         }
         KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4096 => {
             state.input.push(ch);
             state.menu_query = None;
             state.menu_selected = 0;
+            state.selected = 0;
         }
         KeyCode::Tab | KeyCode::BackTab if state.input.starts_with('/') => {
             complete_command(state, key == KeyCode::Tab);
@@ -119,7 +121,7 @@ fn update_list(state: &mut HomeState, key: KeyCode) -> HomeAction {
                 state.selected = (state.selected + 1).min(state.visible().len().saturating_sub(1));
             }
         }
-        KeyCode::Enter if !state.input.is_empty() => {
+        KeyCode::Enter if state.input.starts_with('/') => {
             if state.input.starts_with('/') {
                 let source = state.menu_query.as_deref().unwrap_or(&state.input);
                 let options = command_options_for(state, source);
@@ -158,6 +160,13 @@ fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
             .map(|row| format!("/open {}", row.title))
             .collect();
     }
+    if let Some(query) = source.strip_prefix("/cases ") {
+        return ["all", "open", "sealed", "inconsistent"]
+            .into_iter()
+            .filter(|value| value.starts_with(&query.to_lowercase()))
+            .map(|value| format!("/cases {value}"))
+            .collect();
+    }
     if source.contains(' ') {
         return Vec::new();
     }
@@ -176,7 +185,6 @@ fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
                     | "keystore"
                     | "help"
                     | "quit"
-                    | "filter"
                     | "verify-export"
                     | "restart"
                     | "cred-add"
@@ -214,7 +222,11 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
             state.form_field = 0;
             state.mode = Mode::New;
         }
-        "/cases" | "/home" => state.mode = Mode::List,
+        "/cases" | "/home" => {
+            state.mode = Mode::List;
+            state.status_filter = None;
+            state.selected = 0;
+        }
         "/modules" | "/config" => state.mode = Mode::Modules,
         "/model" => {
             state.model_setup = model::ModelSetup::new();
@@ -230,7 +242,6 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
             state.mode = Mode::Help;
         }
         "/quit" => state.confirm_exit = crate::ExitConfirmation::Pending,
-        "/filter" => state.cycle_filter(),
         "/verify-export" => state.mode = Mode::VerifyExport,
         "/restart" if state.restart_required => return HomeAction::Restart,
         "/cred-add" if state.mode == Mode::Keystore => return HomeAction::AddCredential,
@@ -250,7 +261,16 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
         "/edit-param" if state.mode == Mode::Modules => modules::begin_edit(state),
         value if value.starts_with("/open ") => return open_named_case(state, &value[6..]),
         value if value.starts_with("/cases ") => {
-            value[7..].trim().clone_into(&mut state.search);
+            match value[7..].trim().to_ascii_lowercase().as_str() {
+                "all" => state.status_filter = None,
+                "open" => state.status_filter = Some(super::CaseStatus::Open),
+                "sealed" => state.status_filter = Some(super::CaseStatus::Sealed),
+                "inconsistent" => state.status_filter = Some(super::CaseStatus::Inconsistent),
+                _ => {
+                    state.notice = "Use /cases all|open|sealed|inconsistent".into();
+                    return HomeAction::None;
+                }
+            }
             state.mode = Mode::List;
             state.selected = 0;
         }
@@ -490,5 +510,45 @@ mod tests {
             update(&mut state, KeyCode::Enter),
             HomeAction::CreateCase
         ));
+    }
+
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    fn plain_text_filters_cases_live_and_cases_command_filters_status() {
+        let mut state = HomeState::new(
+            vec![
+                super::super::CaseRow {
+                    id: CaseId::parse("00000000-0000-0000-0000-000000000001").unwrap(),
+                    title: "CloudTrail alert".into(),
+                    severity: "high".into(),
+                    status: super::super::CaseStatus::Open,
+                    last_activity: 0,
+                },
+                super::super::CaseRow {
+                    id: CaseId::parse("00000000-0000-0000-0000-000000000002").unwrap(),
+                    title: "Sealed export".into(),
+                    severity: "low".into(),
+                    status: super::super::CaseStatus::Sealed,
+                    last_activity: 0,
+                },
+            ],
+            false,
+        );
+        for ch in "Cloud".chars() {
+            update(&mut state, KeyCode::Char(ch));
+        }
+        assert_eq!(state.visible().len(), 1);
+        assert_eq!(state.visible()[0].title, "CloudTrail alert");
+        assert!(matches!(
+            update(&mut state, KeyCode::Enter),
+            HomeAction::OpenCase(_)
+        ));
+        state.input.clear();
+        for ch in "/cases sealed".chars() {
+            update(&mut state, KeyCode::Char(ch));
+        }
+        update(&mut state, KeyCode::Enter);
+        assert_eq!(state.visible().len(), 1);
+        assert_eq!(state.visible()[0].title, "Sealed export");
     }
 }

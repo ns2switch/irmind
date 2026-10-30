@@ -2,6 +2,7 @@
 
 mod case;
 mod home;
+mod menu_layout;
 pub mod scripted;
 mod setup;
 mod startup_review;

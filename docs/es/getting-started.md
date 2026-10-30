@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 1062ed9ecebb5f0c6cbe3fbccb335de723e20dbe; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 50567b12a2211a023ecb03b8ef0a5ef382aa22b0; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -25,6 +25,10 @@ Al ejecutar `irmind` sin subcomando se abre la TUI. El asistente explica por qu�
 Si falla el desbloqueo, el asistente muestra el motivo y permite reintentar o elegir otro backend. Una passphrase errónea no cierra la TUI. Los errores inesperados apuntan a `diagnostics.log` en el directorio de datos. La selección queda en `keystore.toml`. Escribe `/keystore` para ver los backends y la huella, gestionar credenciales, cambiar la passphrase o migrar. La entrada de secretos permanece enmascarada dentro de la TUI. Tras sustituir una credencial, los conectores activos conservan el valor anterior; escribe `/restart` para reiniciar la sesión.
 
 La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no habilita ningún LLM ni conector. El paso opcional «Modelo de IA» del primer arranque, o `/model` después, ofrece Ollama local, compatible con OpenAI, Anthropic, DeepSeek y OpenRouter. Ollama comprueba `http://127.0.0.1:11434` y muestra los modelos instalados; si no responde, arráncalo con `ollama serve` y reintenta. Para un proveedor remoto, indica la URL, el modelo y la clave enmascarada. «Probar conexión» envía solo texto sintético. La salida remota de datos requiere confirmación firmada. Escribe `/modules` para ver los módulos, usa las flechas para seleccionarlos, Tab para elegir campos, `/edit-param` para editarlos y `/keystore` para gestionar credenciales. La sesión se recarga tras aprobar un cambio.
+
+La pantalla de inicio muestra los casos recientes sin un campo de búsqueda aparte. Escribe texto normal en la entrada inferior para filtrar títulos mientras escribes, o usa `/cases all|open|sealed|inconsistent` para filtrar por estado. ↑/↓ selecciona un caso y Enter lo abre. `/new`, `/model`, `/modules` y `/keystore` abren diálogos centrados; Esc vuelve al inicio.
+
+![Pantalla de inicio con casos recientes y una sola entrada inferior para buscar y escribir comandos](../assets/home.png)
 
 Si `config.toml` requiere recuperación, la TUI ofrece restaurarlo o revisar los cambios campo a campo antes de abrir casos. Los flags y variables de entorno que cambian los destinos se muestran y requieren confirmación; rechazarlos mantiene los ajustes guardados.
 

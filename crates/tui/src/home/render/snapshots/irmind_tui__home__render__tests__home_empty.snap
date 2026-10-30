@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: screen
+---
+IRMind v0.1.0
+Assisted Incident Response
+Keystore: file / file · Model: No model · /model to configure
+
+
+Recent cases · all
+No cases yet · /new to create one
+No model? Use /model when you are ready to investigate.
+
+
+
+
+
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│Find cases or type / for commands · /help for help                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+↑/↓ choose · Enter open · /new create · /model AI · Ctrl+K commands
