@@ -15,6 +15,7 @@ irmind-domain = { path = "../domain", version = "0.1.0" }
 irmind-fs = { path = "../fs", version = "0.1.0" }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 hex = "0.4"
+memchr = "2"
 keyring = { version = "3", features = ["linux-native", "apple-native", "windows-native"] }
 rand = "0.8"
 rusqlite = { version = "0.32", features = ["bundled"] }

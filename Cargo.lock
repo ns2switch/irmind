@@ -2536,6 +2536,7 @@ dependencies = [
  "irmind-security",
  "irmind-testkit",
  "keyring",
+ "memchr",
  "parquet",
  "rand 0.8.8",
  "rusqlite",
