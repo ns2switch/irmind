@@ -106,7 +106,11 @@ fn synthetic_module(id: &str, compiled: bool, selected: bool) -> ModuleStatus {
             "disabled"
         }
         .into(),
-        kind: ModuleKind::Connector,
+        kind: if id.starts_with("llm-") {
+            ModuleKind::Llm
+        } else {
+            ModuleKind::Connector
+        },
         selected,
         selection_source: ModuleSelectionSource::Persistent,
         parameters: vec![ModuleParameter {
@@ -187,25 +191,70 @@ fn selected_case_uses_accent_color() {
     assert_eq!(terminal.backend().buffer()[(0, 1)].fg, Color::Blue);
 }
 
+fn settings_fixture_state() -> HomeState {
+    let mut state = HomeState::new(Vec::new(), false);
+    let mut connectors = [
+        "siem-splunk",
+        "edr-crowdstrike",
+        "edr-sentinelone",
+        "cloud-aws",
+        "ti-misp",
+        "ti-virustotal",
+        "storage-s3",
+        "storage-gcs",
+        "storage-azure",
+    ]
+    .map(|id| synthetic_module(id, true, false));
+    for module in &mut connectors[..2] {
+        module.selected = true;
+        module.enabled = true;
+        module.missing.clear();
+        module.configuration = "valid".into();
+    }
+    connectors[2].selected = true;
+    connectors[2].missing = vec!["API_KEY".into()];
+    let mut modules = connectors.to_vec();
+    modules.push(ModuleStatus {
+        id: "llm-deepseek".into(),
+        compiled: true,
+        enabled: true,
+        configuration: "valid".into(),
+        kind: ModuleKind::Llm,
+        selected: true,
+        selection_source: ModuleSelectionSource::Persistent,
+        parameters: vec![ModuleParameter {
+            name: "IRMIND_DEEPSEEK_MODEL".into(),
+            value: "deepseek-chat".into(),
+            defaulted: false,
+            required: true,
+            overridden: false,
+        }],
+        credentials: Vec::new(),
+        missing: Vec::new(),
+    });
+    state.set_modules(&modules);
+    state.keystore = Some(KeystoreStatus {
+        signer_backend: "file".into(),
+        secrets_backend: "os".into(),
+        analyst_fingerprint: "ab".repeat(32),
+        credentials: Vec::new(),
+        file_backend_active: true,
+    });
+    state
+}
+
 #[test]
 fn settings_sections_have_versioned_snapshots() {
-    let mut state = HomeState::new(Vec::new(), false);
+    let mut state = settings_fixture_state();
     state.mode = Mode::Settings;
-    insta::assert_snapshot!(
-        "settings_sections",
-        snapshot_screen(
-            &state,
-            super::super::SettingsSection::ALL
-                .iter()
-                .enumerate()
-                .map(|(index, section)| ListItem::new(format!(
-                    "{} {}",
-                    if index == 0 { ">" } else { " " },
-                    section.label()
-                )))
-                .collect()
-        )
-    );
+    let settings = items::settings_items(
+        &state,
+        &state.modules,
+        Some("module=llm-deepseek;model=deepseek-chat"),
+        &|value| Ok(value.to_owned()),
+    )
+    .expect("settings rows");
+    insta::assert_snapshot!("settings_sections", snapshot_screen(&state, settings));
 
     state.mode = Mode::Config;
     insta::assert_snapshot!(
@@ -221,23 +270,18 @@ fn settings_sections_have_versioned_snapshots() {
     );
 
     state.mode = Mode::Modules;
-    state.set_modules(&[synthetic_module("siem-splunk", true, true)]);
-    state.module_selected = 0;
     let modules = items::module_items(&state, &state.modules, &|value| Ok(value.to_owned()))
         .expect("module rows");
+    assert_eq!(modules.len(), 14); // Five group labels plus nine connectors.
     insta::assert_snapshot!("settings_connectors", snapshot_screen(&state, modules));
 
     state.mode = Mode::Keystore;
-    state.keystore = Some(KeystoreStatus {
-        signer_backend: "file".into(),
-        secrets_backend: "file".into(),
-        analyst_fingerprint: "ab".repeat(32),
-        credentials: vec![CredentialStatus {
+    if let Some(status) = &mut state.keystore {
+        status.credentials = vec![CredentialStatus {
             name: "DEEPSEEK_API_KEY".into(),
             present: true,
-        }],
-        file_backend_active: true,
-    });
+        }];
+    }
     insta::assert_snapshot!(
         "settings_keystore",
         snapshot_screen(&state, items::keystore_items(&state))
@@ -249,7 +293,7 @@ fn settings_sections_have_versioned_snapshots() {
 }
 
 #[test]
-fn deepseek_default_is_visible_in_escaped_connector_detail() {
+fn model_parameters_do_not_appear_in_connectors() {
     let mut state = HomeState::new(Vec::new(), false);
     state.mode = Mode::Modules;
     state.set_modules(&[ModuleStatus {
@@ -270,15 +314,12 @@ fn deepseek_default_is_visible_in_escaped_connector_detail() {
         credentials: Vec::new(),
         missing: Vec::new(),
     }]);
-    let detail = items::module_detail(&state, &state.modules, &|value| {
-        Ok(crate::case::escape_display(value))
-    })
-    .expect("safe detail");
-    assert!(
-        detail
-            .iter()
-            .any(|line| line.contains("https://api.deepseek.com/ (default)"))
-    );
+    let rows = items::module_items(&state, &state.modules, &|value| Ok(value.to_owned()))
+        .expect("connector rows");
+    assert!(rows.is_empty());
+    let detail = items::module_detail(&state, &state.modules, &|value| Ok(value.to_owned()))
+        .expect("connector detail");
+    assert_eq!(detail, ["Select a connector"]);
 }
 
 #[test]
@@ -317,7 +358,7 @@ fn assistants_hide_the_background_composer() {
         let screen = snapshot_screen(&state, content);
         assert!(!screen.contains("Find cases or type /"));
         if mode == Mode::Modules {
-            assert!(screen.contains("AI model"));
+            assert!(!screen.contains("AI model"), "{screen}");
             assert!(screen.contains("SIEM"));
             assert!(screen.contains("Storage"));
             assert!(screen.contains("Missing: API_KEY"));

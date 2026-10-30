@@ -1,4 +1,6 @@
-use super::{HomeState, KeyCode, state::HomeAction};
+use super::{
+    ConfigChange, Engine, HomeState, KeyCode, ModuleStatus, WorkspaceIo, state::HomeAction,
+};
 use secrecy::{ExposeSecret as _, SecretString};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -19,6 +21,59 @@ pub(crate) struct ModelDraft {
     pub url: String,
     pub name: String,
     pub key: Option<SecretString>,
+}
+
+pub(crate) fn save_configuration(
+    io_ops: &dyn WorkspaceIo,
+    engine: &Engine<'_>,
+    modules: &[ModuleStatus],
+    draft: &ModelDraft,
+) -> anyhow::Result<()> {
+    if !modules
+        .iter()
+        .any(|item| item.id == draft.provider && item.compiled)
+    {
+        anyhow::bail!("provider is not compiled into this binary");
+    }
+    let (model_field, key_field, base_field) = match draft.provider {
+        "llm-openai-compatible" => ("IRMIND_MODEL", "IRMIND_LLM_API_KEY", "IRMIND_LLM_BASE_URL"),
+        "llm-anthropic" => (
+            "IRMIND_ANTHROPIC_MODEL",
+            "ANTHROPIC_API_KEY",
+            "IRMIND_ANTHROPIC_BASE_URL",
+        ),
+        "llm-deepseek" => (
+            "IRMIND_DEEPSEEK_MODEL",
+            "DEEPSEEK_API_KEY",
+            "IRMIND_DEEPSEEK_BASE_URL",
+        ),
+        "llm-openrouter" => (
+            "IRMIND_OPENROUTER_MODEL",
+            "OPENROUTER_API_KEY",
+            "IRMIND_OPENROUTER_BASE_URL",
+        ),
+        _ => anyhow::bail!("unknown model provider"),
+    };
+    if let Some(key) = &draft.key {
+        io_ops.put_credential(key_field, key)?;
+    }
+    for (field, value) in [(base_field, &draft.url), (model_field, &draft.name)] {
+        io_ops.change_module_configuration(
+            engine,
+            ConfigChange::SetValue {
+                module: draft.provider.into(),
+                field: field.into(),
+                value: value.clone(),
+            },
+            true,
+        )?;
+    }
+    io_ops.change_module_configuration(
+        engine,
+        ConfigChange::SelectLlm(Some(draft.provider.into())),
+        true,
+    )?;
+    Ok(())
 }
 
 pub(super) struct ModelSetup {

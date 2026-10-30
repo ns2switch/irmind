@@ -273,7 +273,8 @@ impl HomeRuntime<'_, '_, '_> {
     }
 
     fn save_model(&mut self, draft: &super::model::ModelDraft) -> bool {
-        let result = self.apply_model_configuration(draft);
+        let result =
+            super::model::save_configuration(self.io_ops, self.engine, self.modules, draft);
         match result {
             Ok(()) => {
                 self.restart_requested = true;
@@ -284,62 +285,6 @@ impl HomeRuntime<'_, '_, '_> {
                 false
             }
         }
-    }
-
-    fn apply_model_configuration(&self, draft: &super::model::ModelDraft) -> Result<()> {
-        if !self
-            .modules
-            .iter()
-            .any(|item| item.id == draft.provider && item.compiled)
-        {
-            anyhow::bail!("provider is not compiled into this binary");
-        }
-        let model_field = match draft.provider {
-            "llm-openai-compatible" => "IRMIND_MODEL",
-            "llm-anthropic" => "IRMIND_ANTHROPIC_MODEL",
-            "llm-deepseek" => "IRMIND_DEEPSEEK_MODEL",
-            "llm-openrouter" => "IRMIND_OPENROUTER_MODEL",
-            _ => anyhow::bail!("unknown model provider"),
-        };
-        let key_field = match draft.provider {
-            "llm-openai-compatible" => "IRMIND_LLM_API_KEY",
-            "llm-anthropic" => "ANTHROPIC_API_KEY",
-            "llm-deepseek" => "DEEPSEEK_API_KEY",
-            _ => "OPENROUTER_API_KEY",
-        };
-        if let Some(key) = &draft.key {
-            self.io_ops.put_credential(key_field, key)?;
-        }
-        let base_field = match draft.provider {
-            "llm-openai-compatible" => "IRMIND_LLM_BASE_URL",
-            "llm-anthropic" => "IRMIND_ANTHROPIC_BASE_URL",
-            "llm-deepseek" => "IRMIND_DEEPSEEK_BASE_URL",
-            _ => "IRMIND_OPENROUTER_BASE_URL",
-        };
-        self.io_ops.change_module_configuration(
-            self.engine,
-            ConfigChange::SetValue {
-                module: draft.provider.into(),
-                field: base_field.into(),
-                value: draft.url.clone(),
-            },
-            true,
-        )?;
-        self.io_ops.change_module_configuration(
-            self.engine,
-            ConfigChange::SetValue {
-                module: draft.provider.into(),
-                field: model_field.into(),
-                value: draft.name.clone(),
-            },
-            true,
-        )?;
-        self.io_ops.change_module_configuration(
-            self.engine,
-            ConfigChange::SelectLlm(Some(draft.provider.into())),
-            true,
-        )?;
-        Ok(())
     }
 
     fn change_module(&mut self, change: ConfigChange, confirmed: bool) -> bool {

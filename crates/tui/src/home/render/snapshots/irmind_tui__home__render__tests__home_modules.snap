@@ -4,16 +4,16 @@ expression: screen
 ---
 IRMind v0.1.0
 
-  ╭ Modules ─────────────────────────────────────────────────────────────────╮
-  │AI model                             │Splunk                              │
-  │  Anthropic                          │Status: missing configuration       │
-  │    disabled                         │Technical ID: siem-splunk           │
-  │SIEM                                 │Configuration: missing API key      │
-  │  Splunk                             │Missing: API_KEY                    │
-  │    missing configuration · API_KEY  │Parameters · Tab selects, Enter     │
-  │Storage                              │edits                               │
-  │  Google Cloud Storage               │  base_url = https://example.invalid│
-  │    not compiled                     │(required)                          │
+  ╭ Connectors ──────────────────────────────────────────────────────────────╮
+  │SIEM                                 │Splunk                              │
+  │  Splunk                             │Status: missing configuration       │
+  │    missing configuration · API_KEY  │Technical ID: siem-splunk           │
+  │Storage                              │Configuration: missing API key      │
+  │  Google Cloud Storage               │Missing: API_KEY                    │
+  │    not compiled                     │Parameters · Tab selects, Enter     │
+  │                                     │edits                               │
+  │                                     │  base_url = https://example.invalid│
+  │                                     │(required)                          │
   │                                     │Credentials · /settings keystore to │
   │                                     │manage                              │
   │                                     │  API_KEY: missing                  │

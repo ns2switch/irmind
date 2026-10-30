@@ -61,7 +61,7 @@ pub(super) fn update_module_screen(state: &mut HomeState, key: KeyCode) -> HomeA
 }
 
 fn move_module(state: &mut HomeState, forward: bool) {
-    let order = module_catalog::ordered(&state.modules)
+    let order = module_catalog::connectors(&state.modules)
         .into_iter()
         .map(|(index, _)| index)
         .collect::<Vec<_>>();
@@ -77,6 +77,8 @@ fn move_module(state: &mut HomeState, forward: bool) {
         state.module_selected = order[next];
         state.parameter_selected = 0;
         state.ui_selection.parameter_focused = false;
+    } else if let Some(first) = order.first() {
+        state.module_selected = *first;
     }
 }
 
@@ -99,7 +101,7 @@ pub(super) fn begin_edit(state: &mut HomeState) {
     let Some(module) = state.modules.get(state.module_selected) else {
         return;
     };
-    if !module.compiled {
+    if module.kind != ModuleKind::Connector || !module.compiled {
         state.notice = "Module is not compiled into this binary".into();
         return;
     }
@@ -173,7 +175,7 @@ fn toggle_selected(state: &mut HomeState) -> HomeAction {
     let Some(module) = state.modules.get(state.module_selected) else {
         return HomeAction::None;
     };
-    if !module.compiled {
+    if module.kind != ModuleKind::Connector || !module.compiled {
         state.notice = "Module is not compiled into this binary".into();
         return HomeAction::None;
     }

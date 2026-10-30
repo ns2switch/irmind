@@ -221,7 +221,7 @@ impl HomeState {
 
     pub(crate) fn set_modules(&mut self, modules: &[ModuleStatus]) {
         self.modules = modules.to_vec();
-        self.module_selected = module_catalog::ordered(&self.modules)
+        self.module_selected = module_catalog::connectors(&self.modules)
             .first()
             .map_or(0, |(index, _)| *index);
     }
@@ -317,6 +317,7 @@ where
 mod render;
 pub(crate) use render::render_home;
 mod model;
+pub(crate) use model::save_configuration as save_model_configuration;
 mod module_catalog;
 mod modules;
 mod new_case;

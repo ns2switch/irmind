@@ -4,7 +4,7 @@ expression: "snapshot_screen(&state,\nvec![ListItem::new(\"Resume last case: on\
 ---
 IRMind v0.1.0
 
-  ╭ Configuration ───────────────────────────────────────────────────────────╮
+  ╭ Preferences ─────────────────────────────────────────────────────────────╮
   │Resume last case: on                                                      │
   │Mouse capture: on                                                         │
   │Theme: auto                                                               │

@@ -113,6 +113,44 @@ where
         Ok(false)
     }
 
+    pub fn drive_model_screen(
+        &mut self,
+        modules: &[ModuleStatus],
+        keys: &[KeyCode],
+    ) -> Result<bool> {
+        let mut state = home::HomeState::new(home::load_rows(self.workflow.engine)?, false);
+        state.set_modules(modules);
+        state.mode = home::Mode::Model;
+        for key in keys {
+            home::render_home(
+                &mut self.terminal,
+                &state,
+                self.workflow.engine,
+                modules,
+                self.workflow.model,
+                false,
+            )?;
+            if let home::HomeAction::SaveModel(draft) = home::update(&mut state, *key) {
+                home::save_model_configuration(
+                    self.workflow.io_ops,
+                    self.workflow.engine,
+                    modules,
+                    &draft,
+                )?;
+                return Ok(true);
+            }
+        }
+        home::render_home(
+            &mut self.terminal,
+            &state,
+            self.workflow.engine,
+            modules,
+            self.workflow.model,
+            false,
+        )?;
+        Ok(false)
+    }
+
     pub fn render_home(&mut self) -> Result<()> {
         let state = home::HomeState::new(home::load_rows(self.workflow.engine)?, false);
         home::render_home(
