@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: screen
+---
+IRMind v0.1.0
+
+  ╭ New case ────────────────────────────────────────────────────────────────╮
+  │Title: Synthetic alert                                                    │
+  │Severity: high                                                            │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+
+Tab next field · Enter create · Esc back

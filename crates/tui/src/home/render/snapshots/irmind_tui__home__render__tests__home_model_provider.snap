@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: screen
+---
+IRMind v0.1.0
+
+  ╭ Model setup ─────────────────────────────────────────────────────────────╮
+  │Choose an AI model now, or continue without one.                          │
+  │> 1. Ollama local — Runs on this device; HTTP or HTTPS loopback           │
+  │  2. OpenAI compatible — Custom API endpoint                              │
+  │  3. Anthropic — Remote API; case data may leave this device              │
+  │  4. DeepSeek — Remote API; case data may leave this device               │
+  │  5. OpenRouter — Remote API; case data may leave this device             │
+  │  6. Later — No model is enabled                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+
+↑/↓ choose · Enter continue · Esc back

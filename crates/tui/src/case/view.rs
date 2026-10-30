@@ -1,4 +1,5 @@
 use super::markdown;
+use crate::menu_layout;
 use crate::theme::Theme;
 use anyhow::Result;
 use ratatui::{
@@ -254,18 +255,19 @@ fn draw_menu(
     theme: Theme,
 ) {
     if let Some(menu) = view.menu {
-        let width = area.width.clamp(1, 72);
+        let rows = menu.lines().map(str::to_owned).collect::<Vec<_>>();
+        let width = menu_layout::width(&rows, area.width);
         let height = u16::try_from(menu.lines().count().saturating_add(2))
             .unwrap_or(16)
             .min(16)
             .min(area.height.saturating_sub(3));
         let menu_area = Rect::new(area.x, prompt_area.y.saturating_sub(height), width, height);
         frame.render_widget(Clear, menu_area);
-        let lines = menu
-            .lines()
+        let lines = rows
+            .iter()
             .map(|line| {
                 Line::styled(
-                    line.to_owned(),
+                    menu_layout::clip(line, usize::from(width.saturating_sub(2))),
                     if line.starts_with('>') {
                         theme.accent()
                     } else if line.starts_with("· ") {

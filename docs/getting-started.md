@@ -24,6 +24,10 @@ If unlocking fails, the wizard shows an actionable reason and lets you retry or 
 
 The normal build compiles all current product modules and both keystores, but enables no LLM or connector. The optional first-run “AI model” step, or `/model` later, offers Ollama local, OpenAI-compatible, Anthropic, DeepSeek, and OpenRouter. Ollama checks `http://127.0.0.1:11434` and lists installed models; if unavailable, start it with `ollama serve` and retry. For a remote provider, enter its URL, model, and masked API key. “Test connection” sends synthetic text only. Enabling remote data transfer requires explicit signed confirmation. Type `/modules` to see compiled and enabled modules. Select with arrows, use Tab for public fields, `/edit-param` to edit, and `/keystore` for credentials. The session reloads after an approved change.
 
+The home screen shows recent cases without a separate search field. Type plain text in its bottom input to filter titles as you type, or use `/cases all|open|sealed|inconsistent` to filter by status. Up/Down selects a case and Enter opens it. `/new`, `/model`, `/modules`, and `/keystore` open centered dialogs; Esc returns home.
+
+![Home screen with recent cases and one bottom input for search and commands](assets/home.png)
+
 If `config.toml` needs recovery, the TUI offers restoration or a field-by-field review before any case opens. Session flags and environment overrides that change destinations are shown and require confirmation; rejecting them uses the saved settings.
 
 ## A synthetic first case

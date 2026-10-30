@@ -261,7 +261,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "cases",
-        description: "List or search cases",
+        description: "List cases; optional all|open|sealed|inconsistent",
         shortcut: "",
         slash: true,
     },
@@ -280,12 +280,6 @@ pub(super) const COMMANDS: &[Command] = &[
     Command {
         name: "config",
         description: "Configure compiled modules",
-        shortcut: "",
-        slash: true,
-    },
-    Command {
-        name: "filter",
-        description: "Filter cases by status",
         shortcut: "",
         slash: true,
     },

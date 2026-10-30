@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: screen
+---
+IRMind v0.1.0
+
+  ╭ Modules ─────────────────────────────────────────────────────────────────╮
+  │llm-openai-compatible · compiled · disabled                               │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+
+↑/↓ choose · Tab field · Enter select · Esc back

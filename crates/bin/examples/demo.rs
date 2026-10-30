@@ -13,7 +13,10 @@ use irmind_infra::{LocalExportVerifier, LocalStore, LocalVerifier, SystemClock};
 use irmind_mod_keystore_file::FileKeystore;
 use irmind_mod_parser_json::JsonParser;
 use irmind_security::MandatoryGuard;
-use irmind_tui::{KeystoreStatus, WorkspaceIo, WorkspaceLaunch};
+use irmind_tui::{
+    KeystoreStatus, ModuleKind, ModuleParameter, ModuleSelectionSource, ModuleStatus, WorkspaceIo,
+    WorkspaceLaunch,
+};
 use secrecy::SecretString;
 use std::{
     collections::BTreeMap,
@@ -207,11 +210,40 @@ fn main() -> Result<()> {
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
         .with_threat_intel(&intel);
     let io = DemoIo { store };
+    let modules = [
+        ModuleStatus {
+            id: "llm-openai-compatible".into(),
+            compiled: true,
+            enabled: false,
+            configuration: "demo: not configured".into(),
+            kind: ModuleKind::Llm,
+            selected: false,
+            selection_source: ModuleSelectionSource::Persistent,
+            parameters: vec![ModuleParameter {
+                name: "model".into(),
+                value: String::new(),
+                required: true,
+                overridden: false,
+            }],
+            credentials: vec!["OPENAI_API_KEY".into()],
+        },
+        ModuleStatus {
+            id: "siem-splunk".into(),
+            compiled: true,
+            enabled: false,
+            configuration: "demo: not configured".into(),
+            kind: ModuleKind::Connector,
+            selected: false,
+            selection_source: ModuleSelectionSource::Persistent,
+            parameters: Vec::new(),
+            credentials: vec!["SPLUNK_TOKEN".into()],
+        },
+    ];
     irmind_tui::run_workspace(
         &engine,
         Some(&model),
         &io,
-        &[],
+        &modules,
         &CancellationToken::new(),
         WorkspaceLaunch {
             initial_case: None,

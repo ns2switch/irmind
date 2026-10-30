@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: menu
+---
+IRMind v0.1.0
+Assisted Incident Response
+Keystore: file / file · Model: No model · /model to configure
+
+
+Recent cases · all
+> Synthetic alert  ·  high  ·  open  ·  2026-10-29 12:00 UTC
+
+
+╭ Commands ───────────────────────────────────────────────────╮
+│> /home — Return to case list                                │
+│  /cases — List cases; optional all|open|sealed|inconsistent │
+│  /config — Configure compiled modules                       │
+│  /cred-add — Add or replace a credential                    │
+│  /cred-delete — Delete a credential                         │
+│  /edit-param — Edit selected module setting                 │
+│  /help — help                                               │
+│  /keystore — View keys and credentials                      │
+│  /migrate-secrets — Migrate module credentials              │
+╰─────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│/                                                                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+↑/↓ choose · Enter open · /new create · /model AI · Ctrl+K commands

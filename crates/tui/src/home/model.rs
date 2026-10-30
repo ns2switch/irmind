@@ -34,7 +34,6 @@ pub(super) struct ModelSetup {
 }
 
 pub(super) const PROVIDERS: &[(&str, &str)] = &[
-    ("Later", "No model is enabled"),
     (
         "Ollama local",
         "Runs on this device; HTTP or HTTPS loopback",
@@ -43,6 +42,7 @@ pub(super) const PROVIDERS: &[(&str, &str)] = &[
     ("Anthropic", "Remote API; case data may leave this device"),
     ("DeepSeek", "Remote API; case data may leave this device"),
     ("OpenRouter", "Remote API; case data may leave this device"),
+    ("Later", "No model is enabled"),
 ];
 
 impl ModelSetup {
@@ -63,10 +63,10 @@ impl ModelSetup {
 
     fn provider_id(&self) -> &'static str {
         match self.provider {
-            1 | 2 => "llm-openai-compatible",
-            3 => "llm-anthropic",
-            4 => "llm-deepseek",
-            5 => "llm-openrouter",
+            0 | 1 => "llm-openai-compatible",
+            2 => "llm-anthropic",
+            3 => "llm-deepseek",
+            4 => "llm-openrouter",
             _ => "",
         }
     }
@@ -88,31 +88,31 @@ impl ModelSetup {
         self.models.clear();
         self.key = SecretString::from(String::new());
         match self.provider {
-            0 => HomeAction::None,
-            1 => {
+            0 => {
                 self.url = "http://127.0.0.1:11434/v1/".into();
                 HomeAction::DiscoverOllama
             }
-            2 => {
+            1 => {
                 self.url = "https://api.openai.com/v1/".into();
                 self.step = ModelStep::Url;
                 HomeAction::None
             }
-            3 => {
+            2 => {
                 self.url = "https://api.anthropic.com/".into();
                 self.step = ModelStep::Url;
                 HomeAction::None
             }
-            4 => {
+            3 => {
                 self.url = "https://api.deepseek.com/".into();
                 self.step = ModelStep::Url;
                 HomeAction::None
             }
-            _ => {
+            4 => {
                 self.url = "https://openrouter.ai/api/v1/".into();
                 self.step = ModelStep::Url;
                 HomeAction::None
             }
+            _ => HomeAction::None,
         }
     }
 }
@@ -130,7 +130,7 @@ pub(super) fn update_model(state: &mut HomeState, key: KeyCode) -> HomeAction {
                 ModelStep::Name => ModelStep::Url,
                 ModelStep::Key => ModelStep::Name,
                 ModelStep::ConfirmEgress => ModelStep::Review,
-                ModelStep::Review if setup.provider == 1 => ModelStep::OllamaModels,
+                ModelStep::Review if setup.provider == 0 => ModelStep::OllamaModels,
                 ModelStep::Review => ModelStep::Key,
             };
         }
@@ -214,7 +214,7 @@ fn advance(state: &mut HomeState) -> HomeAction {
     apply_numeric_choice(setup, &state.input);
     state.input.clear();
     match setup.step {
-        ModelStep::Provider if setup.provider == 0 => {
+        ModelStep::Provider if setup.provider == PROVIDERS.len() - 1 => {
             state.mode = Mode::List;
             HomeAction::None
         }
@@ -240,7 +240,7 @@ fn advance(state: &mut HomeState) -> HomeAction {
         ModelStep::Url
             if setup.url.starts_with("https://") || setup.url.starts_with("http://127.0.0.1:") =>
         {
-            if setup.provider == 1 {
+            if setup.provider == 0 {
                 setup.step = ModelStep::OllamaModels;
                 HomeAction::DiscoverOllama
             } else {
@@ -279,7 +279,9 @@ fn advance(state: &mut HomeState) -> HomeAction {
 fn apply_numeric_choice(setup: &mut ModelSetup, input: &str) {
     if let Ok(choice) = input.parse::<usize>() {
         match setup.step {
-            ModelStep::Provider if choice < PROVIDERS.len() => setup.provider = choice,
+            ModelStep::Provider if (1..=PROVIDERS.len()).contains(&choice) => {
+                setup.provider = choice - 1;
+            }
             ModelStep::OllamaModels if choice > 0 && choice <= setup.models.len() => {
                 setup.selected_model = choice - 1;
             }
@@ -295,7 +297,7 @@ fn apply_numeric_choice(setup: &mut ModelSetup, input: &str) {
 fn review_action(setup: &mut ModelSetup) -> HomeAction {
     match setup.selected_action {
         0 => HomeAction::ProbeModel(setup.draft()),
-        1 if setup.provider == 1 => HomeAction::SaveModel(setup.draft()),
+        1 if setup.provider == 0 => HomeAction::SaveModel(setup.draft()),
         1 => {
             setup.selected_action = 0;
             setup.step = ModelStep::ConfirmEgress;
@@ -345,28 +347,34 @@ mod tests {
             HomeAction::None
         ));
         assert!(state.model_setup.notice.contains("not compiled"));
+        state.model_setup.provider = 0;
         assert!(matches!(
             state.model_setup.choose_provider(),
             HomeAction::DiscoverOllama
         ));
         state.model_setup.key = SecretString::from("previous-provider-key");
-        state.model_setup.provider = 3;
+        state.model_setup.provider = 2;
         state.model_setup.choose_provider();
         assert!(state.model_setup.draft().key.is_none());
+        assert_eq!(PROVIDERS[0].0, "Ollama local");
+        assert_eq!(PROVIDERS[PROVIDERS.len() - 1].0, "Later");
+        state.model_setup.step = ModelStep::Provider;
+        apply_numeric_choice(&mut state.model_setup, "6");
+        assert_eq!(state.model_setup.provider, PROVIDERS.len() - 1);
     }
 
     #[test]
     fn model_setup_has_versioned_terminal_snapshots() {
         let mut state = HomeState::new(Vec::new(), false);
         state.mode = Mode::Model;
-        state.model_setup.provider = 1;
+        state.model_setup.provider = 0;
         state.model_setup.step = ModelStep::OllamaModels;
         state.model_setup.models = vec!["synthetic:latest".into()];
         insta::assert_snapshot!("ollama_available", screen(&state));
         state.model_setup.models.clear();
         state.model_setup.notice = "Ollama is not responding; start it with `ollama serve`".into();
         insta::assert_snapshot!("ollama_unavailable", screen(&state));
-        state.model_setup.provider = 3;
+        state.model_setup.provider = 2;
         state.model_setup.step = ModelStep::Review;
         state.model_setup.url = "https://api.anthropic.com/".into();
         state.model_setup.name = "synthetic-model".into();

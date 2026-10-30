@@ -7,7 +7,7 @@ use ratatui::{
     backend::Backend,
     backend::CrosstermBackend,
     layout::{Constraint, Layout},
-    style::{Modifier, Style},
+    style::Style,
     text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
 };
@@ -53,7 +53,6 @@ pub(crate) enum Mode {
 pub(crate) struct HomeState {
     rows: Vec<CaseRow>,
     pub(crate) mode: Mode,
-    search: String,
     status_filter: Option<CaseStatus>,
     selected: usize,
     form: [String; 9],
@@ -94,7 +93,6 @@ impl HomeState {
         Self {
             rows,
             mode: if show_setup { Mode::Setup } else { Mode::List },
-            search: String::new(),
             status_filter: None,
             selected: 0,
             form: [
@@ -142,8 +140,19 @@ impl HomeState {
             .min(self.modules.len().saturating_sub(1));
     }
 
+    fn refresh_keystore(&mut self, io_ops: &dyn WorkspaceIo) {
+        match io_ops.keystore_status() {
+            Ok(status) => self.keystore = Some(status),
+            Err(_) => self.notice = "Keystore status unavailable; use /keystore to retry".into(),
+        }
+    }
+
     fn visible(&self) -> Vec<&CaseRow> {
-        let needle = self.search.to_lowercase();
+        let needle = if self.input.starts_with('/') {
+            String::new()
+        } else {
+            self.input.to_lowercase()
+        };
         self.rows
             .iter()
             .filter(|row| {
@@ -153,16 +162,6 @@ impl HomeState {
                         || row.id.as_str().contains(&needle))
             })
             .collect()
-    }
-
-    fn cycle_filter(&mut self) {
-        self.status_filter = match self.status_filter {
-            None => Some(CaseStatus::Open),
-            Some(CaseStatus::Open) => Some(CaseStatus::Sealed),
-            Some(CaseStatus::Sealed) => Some(CaseStatus::Inconsistent),
-            Some(CaseStatus::Inconsistent) => None,
-        };
-        self.selected = 0;
     }
 
     fn scope(&self) -> String {
@@ -251,6 +250,7 @@ pub(crate) fn run_home(
     );
     state.set_modules(modules);
     state.overrides_active = launch.overrides_active;
+    state.refresh_keystore(io_ops);
     if let Some(id) = launch.initial_case {
         let exit = case::run_case(
             terminal,

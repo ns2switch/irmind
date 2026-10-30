@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: "snapshot_screen(&state, cases.clone())"
+---
+IRMind v0.1.0
+Assisted Incident Response
+Keystore: file / file · Model: No model · /model to configure
+
+
+Recent cases · all
+> Synthetic alert  ·  high  ·  open  ·  2026-10-29 12:00 UTC
+
+
+
+
+
+
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│Find cases or type / for commands · /help for help                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+↑/↓ choose · Enter open · /new create · /model AI · Ctrl+K commands
