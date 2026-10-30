@@ -7,6 +7,7 @@ use arrow::datatypes::DataType;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use irmind_domain::GraphQueryFilter;
+use memchr::{memchr, memchr2};
 use parquet::arrow::ProjectionMask;
 use parquet::arrow::arrow_reader::{ArrowPredicateFn, ParquetRecordBatchReaderBuilder, RowFilter};
 use sha2::{Digest, Sha256};
@@ -79,12 +80,36 @@ impl Predicate {
 }
 
 pub(super) fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
-    if haystack.is_ascii() && needle.is_ascii() {
+    if needle.is_ascii() {
         let bytes = haystack.as_bytes();
         let target = needle.as_bytes();
-        return bytes
-            .windows(target.len())
-            .any(|window| window.eq_ignore_ascii_case(target));
+        if target.is_empty() {
+            return true;
+        }
+        if target.len() > bytes.len() {
+            return false;
+        }
+        let last = target[target.len() - 1];
+        let mut offset = target.len() - 1;
+        while offset < bytes.len() {
+            let remaining = &bytes[offset..];
+            let found = if last.is_ascii_alphabetic() {
+                memchr2(
+                    last.to_ascii_lowercase(),
+                    last.to_ascii_uppercase(),
+                    remaining,
+                )
+            } else {
+                memchr(last, remaining)
+            };
+            let Some(found) = found else { break };
+            let end = offset + found + 1;
+            if bytes[end - target.len()..end].eq_ignore_ascii_case(target) {
+                return true;
+            }
+            offset = end;
+        }
+        return false;
     }
     haystack.to_lowercase().contains(&needle.to_lowercase())
 }
@@ -346,4 +371,41 @@ pub(super) fn partition_matches(artifact: &ParquetArtifactV1, filter: &GraphQuer
         && filter
             .region()
             .is_none_or(|value| artifact.partition_region == super::writer::safe_partition(value))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::contains_ignore_case;
+
+    #[test]
+    fn case_insensitive_search_matches_previous_semantics() {
+        for text in [
+            "",
+            "a",
+            "Synthetic-000001",
+            "sYntHetic-000001",
+            "12345",
+            "abcABC",
+            "Étage",
+        ] {
+            for needle in [
+                "",
+                "a",
+                "A",
+                "1",
+                "SYNTHETIC-000001",
+                "ABC",
+                "bcA",
+                "ÉTAGE",
+                "absent",
+            ] {
+                let expected = text.to_lowercase().contains(&needle.to_lowercase());
+                assert_eq!(
+                    contains_ignore_case(text, needle),
+                    expected,
+                    "text={text}, needle={needle}"
+                );
+            }
+        }
+    }
 }
