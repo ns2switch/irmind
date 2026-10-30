@@ -574,10 +574,18 @@ mod tests {
         }
     }
 
+    fn connector() -> ModuleStatus {
+        let mut module = deepseek();
+        module.id = "siem-splunk".into();
+        module.kind = ModuleKind::Connector;
+        module.parameters[0].name = "SPLUNK_BASE_URL".into();
+        module
+    }
+
     #[test]
-    fn deepseek_url_uses_form_for_typed_and_pasted_slashes() {
+    fn connector_url_uses_form_for_typed_and_pasted_slashes() {
         let mut state = HomeState::new(Vec::new(), false);
-        state.set_modules(&[deepseek()]);
+        state.set_modules(&[connector()]);
         state.mode = Mode::Modules;
         update(&mut state, KeyCode::Tab);
         for ch in "https://api.deepseek.com//v1".chars() {
@@ -601,9 +609,9 @@ mod tests {
     }
 
     #[test]
-    fn deepseek_default_can_be_accepted_and_legacy_commands_redirect() {
+    fn connector_default_can_be_accepted_and_legacy_commands_redirect() {
         let mut state = HomeState::new(Vec::new(), false);
-        state.set_modules(&[deepseek()]);
+        state.set_modules(&[connector()]);
         state.mode = Mode::Modules;
         update(&mut state, KeyCode::Tab);
         update(&mut state, KeyCode::Enter);

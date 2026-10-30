@@ -119,7 +119,7 @@ fn draw_settings_screen(
         Rect::new(area.x, area.y.saturating_add(2), area.width, 1),
     );
     frame.render_stateful_widget(
-        List::new(content).highlight_style(theme.accent()),
+        List::new(content),
         Rect::new(
             area.x.saturating_add(2),
             area.y.saturating_add(4),
@@ -457,8 +457,8 @@ fn home_header(mode: Mode) -> &'static str {
         Mode::Settings => " Settings ",
         Mode::New => " New case ",
         Mode::Model => " Model setup ",
-        Mode::Modules => " Modules ",
-        Mode::Config => " Configuration ",
+        Mode::Modules => " Connectors ",
+        Mode::Config => " Preferences ",
         Mode::Keystore => " Keystore ",
         Mode::Setup => " First-run guide ",
         Mode::Help => " Commands and keys ",

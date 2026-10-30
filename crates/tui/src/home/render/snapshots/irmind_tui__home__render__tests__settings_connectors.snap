@@ -4,24 +4,24 @@ expression: "snapshot_screen(&state, modules)"
 ---
 IRMind v0.1.0
 
-  ╭ Modules ─────────────────────────────────────────────────────────────────╮
+  ╭ Connectors ──────────────────────────────────────────────────────────────╮
   │SIEM                                 │Splunk                              │
-  │  Splunk                             │Status: missing configuration       │
-  │    missing configuration · API_KEY  │Technical ID: siem-splunk           │
-  │                                     │Configuration: missing API key      │
-  │                                     │Missing: API_KEY                    │
-  │                                     │Parameters · Tab selects, Enter     │
-  │                                     │edits                               │
-  │                                     │  base_url = https://example.invalid│
-  │                                     │(required)                          │
-  │                                     │Credentials · /settings keystore to │
-  │                                     │manage                              │
-  │                                     │  API_KEY: missing                  │
-  │                                     │                                    │
-  │                                     │                                    │
-  │                                     │                                    │
-  │                                     │                                    │
-  │                                     │                                    │
+  │  Splunk                             │Status: active                      │
+  │    active                           │Technical ID: siem-splunk           │
+  │EDR                                  │Configuration: valid                │
+  │  CrowdStrike                        │Parameters · Tab selects, Enter     │
+  │    active                           │edits                               │
+  │  SentinelOne                        │  base_url = https://example.invalid│
+  │    missing configuration · API_KEY  │(required)                          │
+  │Cloud                                │Credentials · /settings keystore to │
+  │  AWS CloudTrail                     │manage                              │
+  │    disabled                         │  API_KEY: missing                  │
+  │Threat intel                         │                                    │
+  │  MISP                               │                                    │
+  │    disabled                         │                                    │
+  │  VirusTotal                         │                                    │
+  │    disabled                         │                                    │
+  │Storage                              │                                    │
   │                                     │                                    │
   ╰──────────────────────────────────────────────────────────────────────────╯
 

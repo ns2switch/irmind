@@ -95,10 +95,23 @@ pub(super) fn ordered(modules: &[ModuleStatus]) -> Vec<(usize, &ModuleStatus)> {
     rows
 }
 
+pub(super) fn connectors(modules: &[ModuleStatus]) -> Vec<(usize, &ModuleStatus)> {
+    ordered(modules)
+        .into_iter()
+        .filter(|(_, module)| {
+            module.kind == ModuleKind::Connector
+                && matches!(
+                    group(&module.id),
+                    "SIEM" | "EDR" | "Cloud" | "Threat intel" | "Storage"
+                )
+        })
+        .collect()
+}
+
 pub(super) fn selected_row(modules: &[ModuleStatus], selected: usize) -> usize {
     let mut position = 0;
     let mut last_group = "";
-    for (index, module) in ordered(modules) {
+    for (index, module) in connectors(modules) {
         let current_group = group(&module.id);
         if current_group != last_group {
             position += 1;

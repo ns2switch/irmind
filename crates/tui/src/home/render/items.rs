@@ -5,7 +5,7 @@ use crate::home::SettingsSection;
 use crate::home::module_catalog::{self, DisplayStatus};
 use crate::theme::Theme;
 use ratatui::style::Style;
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use secrecy::ExposeSecret as _;
 
 pub(super) fn home_items(
@@ -18,23 +18,10 @@ pub(super) fn home_items(
     let fingerprint = hex(&sha256(&engine.signer.public_key()));
     let safe = |value: &str| -> Result<String> { Ok(engine.guard.screen(value)?.text) };
     let escaped = |value: &str| -> Result<String> { Ok(case::escape_display(value)) };
+    let model_descriptor = model.map(LlmPort::descriptor);
     let content = match state.mode {
         Mode::List => case_items(state, engine)?,
-        Mode::Settings => SettingsSection::ALL
-            .iter()
-            .enumerate()
-            .map(|(index, section)| {
-                ListItem::new(format!(
-                    "{} {}",
-                    if index == state.settings_selected {
-                        ">"
-                    } else {
-                        " "
-                    },
-                    section.label()
-                ))
-            })
-            .collect(),
+        Mode::Settings => settings_items(state, modules, model_descriptor.as_deref(), &safe)?,
         Mode::New => Vec::new(),
         Mode::Model => model_items(state, &escaped)?,
         Mode::Modules => module_items(state, modules, &escaped)?,
@@ -82,6 +69,130 @@ pub(super) fn home_items(
     Ok(content)
 }
 
+pub(super) fn settings_items(
+    state: &HomeState,
+    modules: &[ModuleStatus],
+    model: Option<&str>,
+    safe: &impl Fn(&str) -> Result<String>,
+) -> Result<Vec<ListItem<'static>>> {
+    let theme = Theme::detect();
+    SettingsSection::ALL
+        .iter()
+        .enumerate()
+        .map(|(index, section)| {
+            let (summary, warning) = section_status(*section, state, modules, model);
+            let label = format!(
+                "{} {}",
+                if index == state.settings_selected {
+                    ">"
+                } else {
+                    " "
+                },
+                section.label()
+            );
+            let status_style = if warning {
+                theme.warning()
+            } else {
+                theme.muted()
+            };
+            let suffix = if summary.is_empty() {
+                String::new()
+            } else {
+                format!("  ·  {summary}")
+            };
+            Ok(ListItem::new(Line::from(vec![
+                Span::styled(
+                    safe(&label)?,
+                    if index == state.settings_selected {
+                        theme.accent()
+                    } else {
+                        Style::default().fg(theme.text)
+                    },
+                ),
+                Span::styled(safe(&suffix)?, status_style),
+            ])))
+        })
+        .collect()
+}
+
+fn section_status(
+    section: SettingsSection,
+    state: &HomeState,
+    modules: &[ModuleStatus],
+    model: Option<&str>,
+) -> (String, bool) {
+    match section {
+        SettingsSection::Model => (model_status(modules, model), false),
+        SettingsSection::Connectors => connector_status(modules),
+        SettingsSection::Keystore => (
+            state.keystore.as_ref().map_or_else(
+                || "unavailable".into(),
+                |status| {
+                    format!(
+                        "signing: {} · secrets: {}",
+                        status.signer_backend, status.secrets_backend
+                    )
+                },
+            ),
+            state.keystore.is_none(),
+        ),
+        SettingsSection::Preferences => (String::new(), false),
+    }
+}
+
+fn model_status(modules: &[ModuleStatus], model: Option<&str>) -> String {
+    let Some(model) = model else {
+        return "No model".into();
+    };
+    let Some(module) = modules
+        .iter()
+        .find(|module| module.kind == crate::ModuleKind::Llm && module.selected && module.enabled)
+    else {
+        return model.into();
+    };
+    let provider = module
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name.ends_with("BASE_URL"))
+        .and_then(|parameter| {
+            model::PROVIDERS
+                .iter()
+                .find(|preset| preset.module == module.id && preset.url == parameter.value)
+        })
+        .map_or_else(|| module_catalog::label(&module.id), |preset| preset.name);
+    let name = module
+        .parameters
+        .iter()
+        .find(|parameter| parameter.name.ends_with("MODEL"))
+        .map_or("", |parameter| parameter.value.as_str());
+    if name.is_empty() {
+        provider.into()
+    } else {
+        format!("{provider} · {name}")
+    }
+}
+
+fn connector_status(modules: &[ModuleStatus]) -> (String, bool) {
+    let connectors = module_catalog::connectors(modules);
+    let active = connectors
+        .iter()
+        .filter(|(_, module)| module.selected && module.enabled)
+        .count();
+    let incomplete = connectors
+        .iter()
+        .filter(|(_, module)| module.selected && !module.enabled)
+        .count();
+    let summary = if incomplete > 0 {
+        format!(
+            "{active} of {} active · {incomplete} needs configuration",
+            connectors.len()
+        )
+    } else {
+        format!("{active} of {} active", connectors.len())
+    };
+    (summary, incomplete > 0)
+}
+
 pub(super) fn module_items(
     _state: &HomeState,
     modules: &[ModuleStatus],
@@ -90,7 +201,7 @@ pub(super) fn module_items(
     let mut items = Vec::new();
     let theme = Theme::detect();
     let mut last_group = "";
-    for (_, module) in module_catalog::ordered(modules) {
+    for (_, module) in module_catalog::connectors(modules) {
         let group = module_catalog::group(&module.id);
         if group != last_group {
             items.push(ListItem::new(safe(group)?).style(theme.muted()));
@@ -121,8 +232,11 @@ pub(super) fn module_detail(
     modules: &[ModuleStatus],
     safe: &impl Fn(&str) -> Result<String>,
 ) -> Result<Vec<String>> {
-    let Some(module) = modules.get(state.module_selected) else {
-        return Ok(vec!["Select a module".into()]);
+    let Some(module) = modules
+        .get(state.module_selected)
+        .filter(|module| module.kind == crate::ModuleKind::Connector)
+    else {
+        return Ok(vec!["Select a connector".into()]);
     };
     let mut rows = vec![
         module_catalog::label(&module.id).to_owned(),

@@ -31,7 +31,7 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
     );
     let terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     let mut tui = ScriptedWorkspace::new(terminal, &engine, None, &io_ops);
-    let mut module = ModuleStatus {
+    let module = ModuleStatus {
         id: "llm-openai-compatible".into(),
         compiled: true,
         enabled: false,
@@ -49,21 +49,24 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
         credentials: Vec::new(),
         missing: Vec::new(),
     };
-    let mut edit = vec![KeyCode::Tab, KeyCode::Enter];
-    edit.extend("synthetic-model".chars().map(KeyCode::Char));
-    edit.push(KeyCode::Enter);
-    assert!(tui.drive_module_screen(&[module.clone()], &edit).unwrap());
-    module.parameters[0].value = "synthetic-model".into();
-    assert!(
-        !tui.drive_module_screen(&[module.clone()], &[KeyCode::Enter])
-            .unwrap()
-    );
-    assert!(screen(tui.terminal()).contains("Confirm egress change"));
-    assert!(io_ops.1.load().unwrap().llm_module.is_none());
-    assert!(
-        tui.drive_module_screen(&[module], &[KeyCode::Enter, KeyCode::Down, KeyCode::Enter])
-            .unwrap()
-    );
+    let mut keys = vec![
+        KeyCode::Down,
+        KeyCode::Down,
+        KeyCode::Down,
+        KeyCode::Enter, // OpenAI preset
+        KeyCode::Enter, // Accept the default URL
+    ];
+    keys.extend("synthetic-key".chars().map(KeyCode::Char));
+    keys.extend([KeyCode::Enter, KeyCode::Enter]); // Skip model listing after confirmation
+    keys.extend("synthetic-model".chars().map(KeyCode::Char));
+    keys.extend([
+        KeyCode::Enter,
+        KeyCode::Down,
+        KeyCode::Enter, // Save from review
+        KeyCode::Down,
+        KeyCode::Enter, // Explicitly approve remote egress
+    ]);
+    assert!(tui.drive_model_screen(&[module], &keys).unwrap());
     let saved = io_ops.1.load().unwrap();
     assert_eq!(saved.llm_module.as_deref(), Some("llm-openai-compatible"));
     engine
@@ -76,7 +79,7 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
             .iter()
             .any(|entry| entry.operation.starts_with("configuration-approved-v2:"))
     );
-    assert!(screen(tui.terminal()).contains("Modules"));
+    assert!(screen(tui.terminal()).contains("Model setup"));
 
     tui.select_model(&model);
     let id = tui
