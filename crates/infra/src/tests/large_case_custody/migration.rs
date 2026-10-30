@@ -1,6 +1,55 @@
 use super::*;
 
 #[test]
+fn missing_legacy_original_keeps_a_verified_read_only_chain() {
+    let root = tempfile::tempdir().unwrap();
+    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let signer = Arc::new(LocalSigner {
+        key: SigningKey::from_bytes(&[79u8; 32]),
+        actor: Actor::Analyst,
+    });
+    let parser = Arc::new(JsonParser);
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(
+                signer.clone(),
+                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            ),
+            Arc::new(MandatoryGuard::new().unwrap()),
+            parser.clone(),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )
+    .unwrap();
+    let id = engine.create_case("Old case", "local").unwrap().id;
+    let bytes = br#"{"eventName":"AssumeRole"}"#;
+    let hash = ingest_historical_fixture(store.as_ref(), signer.as_ref(), &id, bytes, "old.json");
+    fs::remove_file(root.path().join("evidence").join(hash)).unwrap();
+    assert!(engine.verify(&id).is_err());
+    assert_eq!(
+        engine
+            .inspect_signed_chain_only(&id, &CancellationToken::new())
+            .unwrap(),
+        3
+    );
+    assert!(store.graph_summary(&id).is_err());
+    assert!(
+        LargeCaseUseCases {
+            engine: &engine,
+            store: store.as_ref(),
+            parser: parser.as_ref()
+        }
+        .migrate_legacy(&id, &CancellationToken::new())
+        .is_err()
+    );
+}
+
+#[test]
 fn open_legacy_case_migrates_with_verified_chain_and_v4_export() {
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(LocalStore::open(root.path()).unwrap());
@@ -30,7 +79,13 @@ fn open_legacy_case_migrates_with_verified_chain_and_v4_export() {
         .create_case("legacy", "account 123456789012")
         .unwrap();
     let bytes = br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin","sourceIPAddress":"203.0.113.9"}"#;
-    engine.ingest(&case.id, bytes, "legacy.json").unwrap();
+    ingest_historical_fixture(
+        store.as_ref(),
+        signer.as_ref(),
+        &case.id,
+        bytes,
+        "legacy.json",
+    );
     assert_eq!(engine.verify(&case.id).unwrap(), 3);
     let use_cases = LargeCaseUseCases {
         engine: &engine,
@@ -108,15 +163,15 @@ fn sealed_legacy_migration_keeps_the_seal_and_exports_signed_operations() {
     let case = engine
         .create_case("sealed legacy", "account 123456789012")
         .unwrap();
-    engine.ingest(
+    ingest_historical_fixture(store.as_ref(), signer.as_ref(),
         &case.id,
         br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin","sourceIPAddress":"203.0.113.9"}"#,
         "legacy.json",
-    ).unwrap();
+    );
     engine.seal(&case.id).unwrap();
     let original_seal = store.case_seal(&case.id).unwrap().unwrap();
     let original_entries = engine.verify(&case.id).unwrap();
-    store.graph_summary(&case.id).unwrap();
+    assert!(store.graph_summary(&case.id).is_err());
     let use_cases = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),

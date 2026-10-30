@@ -29,7 +29,7 @@ impl LocalStore {
             .map(|catalog| catalog.has_legacy)
             .ok_or(AppError::InvalidChain(0))
     }
-    pub(super) fn signed_parquet_artifacts(
+    pub(crate) fn signed_parquet_artifacts(
         &self,
         id: &CaseId,
     ) -> Result<Option<Vec<ParquetArtifactV1>>, AppError> {

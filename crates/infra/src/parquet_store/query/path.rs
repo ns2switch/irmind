@@ -1,10 +1,9 @@
 use super::{
-    AppError, CancellationToken, CaseId, MAX_NEIGHBOR_RECORDS, ParquetArtifactV1, ParquetStore,
-    QUERY_DEADLINE,
+    AppError, CancellationToken, CaseId, GraphQueryFilter, Instant, ParquetArtifactV1,
+    ParquetStore, QUERY_DEADLINE, ScanFlow, ScanSpec, ScanStatus, TargetScan, number, text,
+    time_rules,
 };
-use irmind_domain::GraphQueryFilter;
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::time::{Duration, Instant};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 const MAX_PATH_EXPANSIONS: usize = 200;
 const MAX_PATH_NEIGHBORS: usize = 50;
@@ -12,15 +11,14 @@ const MAX_PATH_HOPS: usize = 3;
 
 type Entity = (String, String);
 type Breadcrumbs = HashMap<Entity, (Entity, String)>;
-type PathCandidate = (String, String, String);
 
-struct CandidateBatch {
-    entries: Vec<PathCandidate>,
+pub(super) struct CandidateBatch {
+    entries: Vec<(String, String, String)>,
     partial: bool,
 }
 
 impl ParquetStore {
-    pub(crate) fn path_artifacts(
+    pub(crate) fn path_native(
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifactV1],
@@ -34,7 +32,7 @@ impl ParquetStore {
         if start == goal {
             return Ok(format!("{} {} is the same entity", from.0, from.1));
         }
-        let begun = Instant::now();
+        let deadline = Instant::now() + QUERY_DEADLINE;
         let mut queue = VecDeque::from([(start.clone(), 0usize)]);
         let mut visited = HashSet::from([start.clone()]);
         let mut previous = Breadcrumbs::new();
@@ -44,13 +42,17 @@ impl ParquetStore {
             if depth >= MAX_PATH_HOPS {
                 continue;
             }
-            if expanded >= MAX_PATH_EXPANSIONS || begun.elapsed() >= QUERY_DEADLINE {
+            if expanded >= MAX_PATH_EXPANSIONS || Instant::now() >= deadline {
                 truncated = true;
                 break;
             }
             expanded += 1;
-            let remaining = QUERY_DEADLINE.saturating_sub(begun.elapsed());
-            let batch = self.path_candidates(id, artifacts, filter, &current, remaining, cancel)?;
+            let Some(batch) =
+                self.path_candidates_native(id, artifacts, filter, &current, deadline, cancel)?
+            else {
+                truncated = true;
+                break;
+            };
             truncated |= batch.partial;
             for (kind, value, source) in batch.entries {
                 let next = (kind, value);
@@ -71,31 +73,77 @@ impl ParquetStore {
         }
     }
 
-    fn path_candidates(
+    fn path_candidates_native(
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifactV1],
         filter: &GraphQueryFilter,
         entity: &Entity,
-        remaining: Duration,
+        deadline: Instant,
         cancel: &CancellationToken,
-    ) -> Result<CandidateBatch, AppError> {
-        let target_limit = (MAX_NEIGHBOR_RECORDS + 1).to_string();
-        let sample_limit = MAX_NEIGHBOR_RECORDS.to_string();
-        let candidate_limit = (MAX_PATH_NEIGHBORS + 1).to_string();
-        let rows = self.query_rows_limited(id, artifacts, filter,
-            ("WITH records AS NOT MATERIALIZED (SELECT * FROM {entities}), targets AS MATERIALIZED (SELECT source_hash,record_index FROM records WHERE entity_kind=? AND entity_value=? LIMIT CAST(? AS BIGINT)), bounded AS (SELECT source_hash,record_index FROM targets LIMIT CAST(? AS BIGINT)) SELECT n.entity_kind,n.entity_value,MIN(n.source_hash || '#' || CAST(n.record_index AS VARCHAR)),(SELECT COUNT(*) FROM targets)>CAST(? AS BIGINT) FROM records n JOIN bounded USING (source_hash,record_index) WHERE (n.entity_kind<>? OR n.entity_value<>?) GROUP BY 1,2 ORDER BY 1,2 LIMIT CAST(? AS BIGINT)", &[&entity.0,&entity.1,&target_limit,&sample_limit,&sample_limit,&entity.0,&entity.1,&candidate_limit], remaining), cancel,
-            |row| Ok((row.get::<_, String>(0)?,row.get::<_, String>(1)?,row.get::<_, String>(2)?,row.get::<_, bool>(3)?)),
+    ) -> Result<Option<CandidateBatch>, AppError> {
+        let TargetScan {
+            records: targets,
+            sampled,
+            status,
+        } = self.native_targets(
+            id,
+            artifacts,
+            filter,
+            (&entity.0, &entity.1),
+            deadline,
+            cancel,
         )?;
-        let partial = rows.len() > MAX_PATH_NEIGHBORS || rows.first().is_some_and(|row| row.3);
-        Ok(CandidateBatch {
-            entries: rows
+        if status == ScanStatus::Deadline {
+            return Ok(None);
+        }
+        let mut neighbors = BTreeMap::<Entity, String>::new();
+        let status = self.scan_artifacts(
+            ScanSpec {
+                id,
+                artifacts,
+                filter,
+                schema: "irmind-entities-v1",
+                columns: &["source_hash", "record_index", "entity_kind", "entity_value"],
+                predicates: &time_rules(filter),
+                deadline,
+                cancel,
+            },
+            |batch| {
+                for row in 0..batch.num_rows() {
+                    let hash = text(batch, "source_hash", row)?;
+                    let index = number(batch, "record_index", row)?;
+                    if !targets.contains(&(hash.to_owned(), index)) {
+                        continue;
+                    }
+                    let kind = text(batch, "entity_kind", row)?;
+                    let value = text(batch, "entity_value", row)?;
+                    if (kind, value) == (&entity.0[..], &entity.1[..]) {
+                        continue;
+                    }
+                    let source = format!("{hash}#{index}");
+                    let current = neighbors
+                        .entry((kind.into(), value.into()))
+                        .or_insert_with(|| source.clone());
+                    if source < *current {
+                        *current = source;
+                    }
+                }
+                Ok(ScanFlow::Continue)
+            },
+        )?;
+        if status == ScanStatus::Deadline {
+            return Ok(None);
+        }
+        let partial = sampled || neighbors.len() > MAX_PATH_NEIGHBORS;
+        Ok(Some(CandidateBatch {
+            entries: neighbors
                 .into_iter()
                 .take(MAX_PATH_NEIGHBORS)
-                .map(|(kind, value, source, _)| (kind, value, source))
+                .map(|((kind, value), source)| (kind, value, source))
                 .collect(),
             partial,
-        })
+        }))
     }
 }
 

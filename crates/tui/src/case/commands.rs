@@ -157,10 +157,10 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if prompt == "/rebuild" {
             let workflow = self.workflow();
             let id = self.id;
-            self.start_task("Rebuild graph", move |cancel| {
+            self.start_task("Migrate copied evidence", move |cancel| {
                 workflow
                     .rebuild_graph(id, &cancel)
-                    .map(|count| format!("Rebuilt {count} records"))
+                    .map(|count| format!("Converted {count} copied sources to Parquet"))
             });
             return Ok(true);
         }

@@ -60,13 +60,14 @@ fn agent_can_propose_but_only_analyst_can_confirm_evidence_finding() {
     )
     .unwrap();
     let case = attended.create_case("IOC", "local only").unwrap();
-    let hash = attended
-        .ingest(
-            &case.id,
-            br#"{"eventName":"Alert","sourceIPAddress":"198.51.100.9"}"#,
-            "alert.json",
-        )
-        .unwrap();
+    let hash = ingest_synthetic(
+        &attended,
+        store.as_ref(),
+        parser.as_ref(),
+        &case.id,
+        br#"{"eventName":"Alert","sourceIPAddress":"198.51.100.9"}"#,
+        "alert.json",
+    );
     let model = FindingModel {
         hash: hash.clone(),
         turns: Mutex::new(0),
@@ -140,13 +141,18 @@ fn raw_record_pointer_selects_one_event_from_cloud_response() {
     .unwrap();
     let case = engine.create_case("Cloud response", "local only").unwrap();
     let bytes = br#"{"events":[{"eventName":"First"},{"eventName":"Second"}]}"#;
-    let hash = engine
-        .ingest(&case.id, bytes, "cloud-response.json")
-        .unwrap();
+    let hash = ingest_synthetic(
+        &engine,
+        store.as_ref(),
+        parser.as_ref(),
+        &case.id,
+        bytes,
+        "cloud-response.json",
+    );
     let raw = store.raw_record(&case.id, &hash, 1).unwrap();
     assert!(raw.contains("Second"));
     assert!(!raw.contains("First"));
-    engine.verify_graph(&case.id).unwrap();
+    engine.verify(&case.id).unwrap();
 }
 
 #[test]

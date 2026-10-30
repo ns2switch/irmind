@@ -65,7 +65,7 @@ fn benchmark(files: usize, multiplier: usize) {
     for start in (0..files).step_by(4) {
         let names = (start..(start + 4).min(files))
             .map(|index| {
-                let records = super::graph_benchmark::representative_records(index);
+                let records = representative_records(index);
                 let body = std::iter::repeat_n(records.as_str(), multiplier)
                     .collect::<Vec<_>>()
                     .join(",");
@@ -161,11 +161,11 @@ fn benchmark(files: usize, multiplier: usize) {
             "{label} query exceeded the 10-second benchmark target"
         );
     }
-    let [_, _, _, _, verify_time, sql_time] = profile.snapshot();
+    let [_, _, _, _, verify_time, scan_time] = profile.snapshot();
     println!(
-        "PARQUET_QUERY_PHASE verify_seconds={:.3} sql_seconds={:.3}",
+        "PARQUET_QUERY_PHASE verify_seconds={:.3} scan_seconds={:.3}",
         verify_time.as_secs_f64(),
-        sql_time.as_secs_f64()
+        scan_time.as_secs_f64()
     );
 }
 
@@ -184,4 +184,74 @@ fn directory_bytes(root: &Path) -> u64 {
         }
     }
     total
+}
+fn representative_records(file_index: usize) -> String {
+    let mut records = String::new();
+    let mut index = 0usize;
+    while records.len() < 1_045_000 {
+        if !records.is_empty() {
+            records.push(',');
+        }
+        let sequence = file_index * 1_000 + index;
+        let session = format!("synthetic-{sequence:06}");
+        let record = serde_json::json!({
+            "eventVersion": "1.08",
+            "userIdentity": {
+                "type": "AssumedRole",
+                "principalId": format!("AROASYNTHETIC:{session}"),
+                "arn": format!("arn:aws:sts::111122223333:assumed-role/SyntheticAnalyst/{session}"),
+                "accountId": "111122223333",
+                "accessKeyId": "SYNTHETIC-DO-NOT-USE",
+                "sessionContext": {
+                    "sessionIssuer": {
+                        "type": "Role",
+                        "principalId": "AROASYNTHETIC",
+                        "arn": "arn:aws:iam::111122223333:role/SyntheticAnalyst",
+                        "accountId": "111122223333",
+                        "userName": "SyntheticAnalyst"
+                    },
+                    "attributes": {
+                        "creationDate": "2026-10-27T11:59:00Z",
+                        "mfaAuthenticated": "true"
+                    }
+                }
+            },
+            "eventTime": "2026-10-27T12:00:00Z",
+            "eventSource": "sts.amazonaws.com",
+            "eventName": "SyntheticBenchmark",
+            "awsRegion": "eu-west-1",
+            "sourceIPAddress": "198.51.100.42",
+            "userAgent": "aws-cli/2.15.22 Python/3.11.7 Linux/6.8.0 botocore/2.4.5",
+            "requestParameters": {
+                "roleArn": "arn:aws:iam::111122223333:role/SyntheticTarget",
+                "roleSessionName": session,
+                "durationSeconds": 3600,
+                "tags": [
+                    {"key": "incident", "value": "synthetic-benchmark"},
+                    {"key": "team", "value": "security-lab"}
+                ]
+            },
+            "responseElements": {
+                "assumedRoleUser": {
+                    "arn": format!("arn:aws:sts::111122223333:assumed-role/SyntheticTarget/{session}"),
+                    "assumedRoleId": format!("AROATARGET:{session}")
+                }
+            },
+            "requestID": session,
+            "eventID": format!("00000000-0000-0000-0000-{sequence:012}"),
+            "readOnly": false,
+            "eventType": "AwsApiCall",
+            "managementEvent": true,
+            "recipientAccountId": "111122223333",
+            "eventCategory": "Management",
+            "tlsDetails": {
+                "tlsVersion": "TLSv1.3",
+                "cipherSuite": "TLS_AES_128_GCM_SHA256",
+                "clientProvidedHostHeader": "sts.amazonaws.com"
+            }
+        });
+        records.push_str(&record.to_string());
+        index += 1;
+    }
+    records
 }

@@ -1,5 +1,79 @@
 use super::*;
 
+pub(super) fn ingest_synthetic(
+    engine: &Engine<'_>,
+    store: &LocalStore,
+    parser: &JsonParser,
+    id: &CaseId,
+    bytes: &[u8],
+    source: &str,
+) -> String {
+    ingest_synthetic_result(engine, store, parser, id, bytes, source).unwrap()
+}
+
+pub(super) fn ingest_synthetic_result(
+    engine: &Engine<'_>,
+    store: &LocalStore,
+    parser: &JsonParser,
+    id: &CaseId,
+    bytes: &[u8],
+    source: &str,
+) -> Result<String, AppError> {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join(source);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, bytes).unwrap();
+    irmind_app::LargeCaseUseCases {
+        engine,
+        store,
+        parser,
+    }
+    .ingest_local(id, root.path(), source, true, &CancellationToken::new())
+    .map(|hash| hash.as_str().to_owned())
+}
+
+pub(super) fn ingest_historical_fixture(
+    store: &LocalStore,
+    signer: &LocalSigner,
+    id: &CaseId,
+    bytes: &[u8],
+    source: &str,
+) -> String {
+    let hash = hex(&sha256(bytes));
+    store.put_evidence(id, &hash, bytes).unwrap();
+    let count = JsonParser.parse(source, bytes).unwrap().len();
+    for (kind, payload) in [
+        (
+            irmind_domain::AuditEventKind::EvidenceIngested,
+            source.to_owned(),
+        ),
+        (
+            irmind_domain::AuditEventKind::GraphIndexed,
+            format!("parser=json-cloudtrail-v5;graph=duckdb-graph-v4;records={count}"),
+        ),
+    ] {
+        let last = store.last_entry(id).unwrap().unwrap();
+        let mut entry = SignedEntry {
+            seq: last.seq + 1,
+            case_id: id.as_str().to_owned(),
+            at: last.at + 1,
+            actor: Actor::Analyst,
+            origin: "system".into(),
+            kind,
+            payload,
+            evidence: Some(hash.clone()),
+            prev: last.hash,
+            hash: [0; 32],
+            sig: Vec::new(),
+            public_key: signer.public_key(),
+        };
+        entry.hash = sha256(&entry.canonical());
+        entry.sig = signer.sign(&entry.hash).unwrap();
+        store.append(&entry).unwrap();
+    }
+    hash
+}
+
 pub(super) struct FakeSiem {
     pub(super) calls: Mutex<usize>,
     pub(super) source_id: String,

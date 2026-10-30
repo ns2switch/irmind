@@ -73,12 +73,14 @@ fn scoped_edr_read_is_audited_indexed_and_redacted() {
     assert!(entries.iter().any(
         |entry| entry.kind == irmind_domain::AuditEventKind::ModelReply && entry.seq > result.seq
     ));
-    assert!(store.timeline(&case.id, 20).unwrap().iter().any(|event| {
-        event.event == "MalwareDetected" && event.evidence_hash == result.evidence.clone().unwrap()
-    }));
+    assert!(store.timeline(&case.id, 20).unwrap().is_empty());
     assert!(!model.seen.lock().unwrap()[1].contains("alice@example.com"));
     engine.verify(&case.id).unwrap();
-    engine.verify_graph(&case.id).unwrap();
+    assert!(
+        store
+            .get_evidence(&case.id, result.evidence.as_deref().unwrap())
+            .is_ok()
+    );
 }
 
 #[test]

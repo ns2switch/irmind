@@ -1,7 +1,7 @@
 use super::SealPreview;
 use crate::{
-    Actor, AppError, CancellationToken, CaseId, CaseMutation, CaseSeal, Engine, hex,
-    seal_challenge, sha256, summarize_usage, verify_case_metadata,
+    Actor, AppError, CancellationToken, Case, CaseId, CaseMutation, CaseSeal, Engine, SignedEntry,
+    hex, seal_challenge, sha256, summarize_usage, verify_case_metadata,
 };
 
 impl Engine<'_> {
@@ -114,6 +114,72 @@ impl Engine<'_> {
         self.verify_unlocked_cancelable(id, cancel)
     }
 
+    /// Inspect signed history when an original is missing. This does not mark
+    /// evidence or the case as verified and must only back a read-only view.
+    pub fn inspect_signed_chain_only(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<usize, AppError> {
+        let _case_lock = self.repo.lock_case(id)?;
+        let case = self.repo.get_case(id)?;
+        let entries = self.audit_log.entries(id)?;
+        verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
+        let mut previous = [0; 32];
+        for (index, entry) in entries.iter().enumerate() {
+            if index.is_multiple_of(256) && cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            previous = self.verify_chain_entry(id, index, previous, entry)?;
+        }
+        crate::large_case::read_manifest_index(&entries)?;
+        self.verify_seal_metadata(id, &case, &entries)?;
+        self.pending_requests_unlocked(&case, &entries)?;
+        self.findings_unlocked(id, &entries)?;
+        summarize_usage(&entries)?;
+        self.verify_operations_unlocked(id, cancel)?;
+        if case.sealed {
+            let seal = self.repo.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
+            crate::large_case::read_sealed_artifacts(
+                &entries,
+                &self.audit_log.operations(id)?,
+                seal.hash,
+            )?;
+        }
+        Ok(entries.len())
+    }
+
+    fn verify_seal_metadata(
+        &self,
+        id: &CaseId,
+        case: &Case,
+        entries: &[SignedEntry],
+    ) -> Result<(), AppError> {
+        if !case.sealed {
+            return Ok(());
+        }
+        let seal = self.repo.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
+        let last = entries.last().ok_or(AppError::InvalidChain(0))?;
+        if seal.seq != last.seq
+            || seal.hash != last.hash
+            || seal.public_key != last.public_key
+            || (!seal.analyst_key_fingerprint.is_empty()
+                && seal.analyst_key_fingerprint != hex(&sha256(&last.public_key)))
+            || last.kind != irmind_domain::AuditEventKind::CaseSealed
+            || last.actor != Actor::Analyst
+            || last.payload != self.evidence_store.evidence_hashes(id)?.join(",")
+        {
+            return Err(AppError::InvalidChain(last.seq));
+        }
+        self.verifier
+            .verify(
+                &seal.public_key,
+                &seal_challenge(id, seal.seq, &seal.hash, &last.payload),
+                &seal.sig,
+            )
+            .map_err(|_| AppError::InvalidChain(last.seq))
+    }
+
     pub(crate) fn verify_unlocked(&self, id: &CaseId) -> Result<usize, AppError> {
         self.verify_unlocked_cancelable(id, &CancellationToken::new())
     }
@@ -134,7 +200,12 @@ impl Engine<'_> {
             }
             prev = self.verify_chain_entry(id, index, prev, entry)?;
         }
-        crate::large_case::read_manifest_index(&entries)?;
+        let manifest = crate::large_case::read_manifest_index(&entries)?;
+        let source_hashes = manifest
+            .sources
+            .iter()
+            .map(|source| source.sha256.as_str())
+            .collect::<std::collections::HashSet<_>>();
         let evidence_hashes = self.evidence_store.evidence_hashes(id)?;
         for entry in &entries {
             if cancel.is_cancelled() {
@@ -142,6 +213,7 @@ impl Engine<'_> {
             }
             if let Some(hash) = &entry.evidence
                 && !evidence_hashes.contains(hash)
+                && !source_hashes.contains(hash.as_str())
             {
                 return Err(AppError::EvidenceMismatch(hash.clone()));
             }
@@ -155,28 +227,7 @@ impl Engine<'_> {
                 return Err(AppError::EvidenceMismatch(hash));
             }
         }
-        if case.sealed {
-            let seal = self.repo.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
-            let last = entries.last().ok_or(AppError::InvalidChain(0))?;
-            if seal.seq != last.seq
-                || seal.hash != last.hash
-                || seal.public_key != last.public_key
-                || (!seal.analyst_key_fingerprint.is_empty()
-                    && seal.analyst_key_fingerprint != hex(&sha256(&last.public_key)))
-                || last.kind != irmind_domain::AuditEventKind::CaseSealed
-                || last.actor != Actor::Analyst
-                || last.payload != self.evidence_store.evidence_hashes(id)?.join(",")
-            {
-                return Err(AppError::InvalidChain(last.seq));
-            }
-            self.verifier
-                .verify(
-                    &seal.public_key,
-                    &seal_challenge(id, seal.seq, &seal.hash, &last.payload),
-                    &seal.sig,
-                )
-                .map_err(|_| AppError::InvalidChain(last.seq))?;
-        }
+        self.verify_seal_metadata(id, &case, &entries)?;
         self.pending_requests_unlocked(&case, &entries)?;
         self.findings_unlocked(id, &entries)?;
         summarize_usage(&entries)?;

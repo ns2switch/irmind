@@ -1,7 +1,8 @@
 use crate::{
-    AppError, CaseId, EvidenceStore, LocalStore, OpenOptions, Path, PathBuf, Read, Repository,
-    Write, fs, hex, params, private_file, sha256, storage, storage_reason,
+    AppError, AuditLog, CaseId, EvidenceStore, LocalStore, OpenOptions, Path, PathBuf, Read,
+    Repository, Write, fs, hex, params, private_file, sha256, storage, storage_reason,
 };
+use irmind_domain::{AuditEventKind, SourceManifestV1};
 
 pub(crate) fn read_evidence_file(path: &Path) -> Result<Vec<u8>, AppError> {
     let file = fs::File::open(path).map_err(storage)?;
@@ -24,6 +25,48 @@ impl LocalStore {
             return Err(storage_reason("invalid evidence hash"));
         }
         Ok(self.evidence_dir.join(hash.to_ascii_lowercase()))
+    }
+
+    fn signed_source(&self, id: &CaseId, hash: &str) -> Result<Option<SourceManifestV1>, AppError> {
+        self.signed_parquet_artifacts(id)?;
+        for entry in self.entries(id)? {
+            if entry.kind == AuditEventKind::SourceManifestV1 {
+                let source = SourceManifestV1::decode(&entry.payload)
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                if source.sha256.as_str() == hash {
+                    return Ok(Some(source));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    fn read_copied_source(
+        &self,
+        id: &CaseId,
+        source: &SourceManifestV1,
+    ) -> Result<Vec<u8>, AppError> {
+        if !source.copied {
+            return Err(storage_reason(
+                "original source was not copied; open it from its recorded location",
+            ));
+        }
+        let case_dir = self.parquet.case_dir(id)?;
+        let relative = PathBuf::from(format!("originals/{}", source.sha256.as_str()));
+        let file = irmind_fs::open_regular_no_follow(&case_dir, &relative).map_err(storage)?;
+        if file.metadata().map_err(storage)?.len() > 50_000_000 {
+            return Err(storage_reason(
+                "copied source exceeds the 50 MB evidence-view limit",
+            ));
+        }
+        let mut bytes = Vec::new();
+        file.take(50_000_001)
+            .read_to_end(&mut bytes)
+            .map_err(storage)?;
+        if bytes.len() as u64 != source.size || hex(&sha256(&bytes)) != source.sha256.as_str() {
+            return Err(AppError::EvidenceMismatch(source.sha256.as_str().into()));
+        }
+        Ok(bytes)
     }
 }
 impl EvidenceStore for LocalStore {
@@ -76,7 +119,10 @@ impl EvidenceStore for LocalStore {
             )
             .map_err(storage)?;
         if exists == 0 {
-            return Err(storage_reason("evidence not in case"));
+            let source = self
+                .signed_source(id, &hash.to_ascii_lowercase())?
+                .ok_or_else(|| storage_reason("evidence not in case"))?;
+            return self.read_copied_source(id, &source);
         }
         let bytes = read_evidence_file(&path)?;
         if hex(&sha256(&bytes)) != hash.to_ascii_lowercase() {

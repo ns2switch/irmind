@@ -34,7 +34,6 @@ jobs:
       platforms: ${{ steps.scope.outputs.platforms }}
       cross_verify: ${{ steps.scope.outputs.cross_verify }}
       release_build: ${{ steps.scope.outputs.release_build }}
-      duckdb_version: ${{ steps.scope.outputs.duckdb_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false, fetch-depth: 0}
@@ -67,7 +66,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         id: rust_cache
         with:
-          key: linux-mold-duckdb-${{ needs.dco.outputs.duckdb_version }}-${{ hashFiles('Cargo.lock') }}
+          key: linux-mold-${{ hashFiles('Cargo.lock') }}
           add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -151,7 +150,7 @@ jobs:
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: windows-msvc-duckdb-${{ needs.dco.outputs.duckdb_version }}-${{ hashFiles('Cargo.lock') }}
+          key: windows-msvc-${{ hashFiles('Cargo.lock') }}
           add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -230,7 +229,7 @@ jobs:
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: macos-arm64-duckdb-${{ needs.dco.outputs.duckdb_version }}-${{ hashFiles('Cargo.lock') }}
+          key: macos-arm64-${{ hashFiles('Cargo.lock') }}
           add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}

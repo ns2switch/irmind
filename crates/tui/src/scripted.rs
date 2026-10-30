@@ -353,6 +353,15 @@ where
         Ok(self.workflow.verify(id, &CancellationToken::new())?)
     }
 
+    pub fn verify_with_source_root(&self, id: &CaseId, root: &Path) -> Result<String> {
+        Ok(self.workflow.verify_with_source_root(
+            id,
+            root,
+            irmind_app::SourceCheckMode::Full,
+            &CancellationToken::new(),
+        )?)
+    }
+
     pub fn seal(&self, id: &CaseId) -> Result<()> {
         Ok(self.workflow.seal(id)?)
     }

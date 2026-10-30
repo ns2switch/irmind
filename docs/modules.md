@@ -138,13 +138,13 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 ## Streaming JSON and exported cloud log parser
 
-**Does:** Parses generic JSON, AWS CloudTrail, GCP Cloud Audit Logs, Azure Activity, and Entra ID sign-in exports in bounded streams. Large cases become partitioned Parquet; DuckDB reads only IRMind-produced Parquet. The parser does not send records to a model.
+**Does:** Parses generic JSON, AWS CloudTrail, GCP Cloud Audit Logs, Azure Activity, and Entra ID sign-in exports in bounded streams. Large cases become partitioned Parquet. Bounded Arrow scans read only signed, hash-checked IRMind artifacts. The parser does not send records to a model.
 
 **Permission:** Read access to the selected local file only.
 
 **Configure:** Included and active in every binary. Use the TUI's `/ingest` picker or the [CLI ingest command](development/cli.md).
 
-**Limits:** Deeply nested JSON and oversized individual records are rejected. Originals are hashed in place; copying one requires an explicit choice. Parquet searches use bounded substring matching and optional date, account or project, and region filters. Legacy small-case DuckDB indexing retains its 50 MB input limit and word-based search. Other log formats need future parsers.
+**Limits:** Deeply nested JSON and oversized individual records are rejected. Originals are hashed in place; copying one requires an explicit choice. Parquet searches use bounded substring matching and optional date, account or project, and region filters. Older derived indexes must be migrated from copied originals before graph queries are available. Other log formats need future parsers.
 
 ## OS keystore
 

@@ -1,11 +1,6 @@
 name: Synthetic graph benchmark
 on:
   workflow_dispatch:
-    inputs:
-      include_legacy:
-        description: Include the slow legacy DuckDB graph baseline
-        type: boolean
-        default: false
   schedule:
     - cron: '31 4 * * 1'
 permissions:
@@ -28,17 +23,22 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with: {key: graph-benchmark-linux}
       - run: sudo apt-get update && sudo apt-get install -y mold
-      - name: Profile representative and large-record 1 GB corpora
-        if: github.event_name == 'schedule' || inputs.include_legacy == true
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo test -p irmind-infra graph_benchmark_ --profile ci --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee benchmark-results.txt
       - name: Profile Parquet conversion with 1 GB and 15 GB synthetic corpora
         shell: bash
         run: |
           set -o pipefail
-          cargo test -p irmind-infra parquet_benchmark_ --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee -a benchmark-results.txt
+          cargo test -p irmind-infra parquet_benchmark_ --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee benchmark-results.txt
+      - name: Measure warm build and binary size
+        shell: bash
+        run: |
+          set -o pipefail
+          started=$(date +%s)
+          cargo test -p irmind-infra --release --locked --no-run 2>&1 | tee -a benchmark-results.txt
+          echo "BUILD_HOT_SECONDS=$(($(date +%s) - started))" | tee -a benchmark-results.txt
+          started=$(date +%s)
+          cargo build -p irmind --release --locked 2>&1 | tee -a benchmark-results.txt
+          echo "BINARY_BUILD_SECONDS=$(($(date +%s) - started))" | tee -a benchmark-results.txt
+          stat -c 'BINARY_BYTES=%s' target/release/irmind | tee -a benchmark-results.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

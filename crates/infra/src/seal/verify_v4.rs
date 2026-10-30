@@ -144,7 +144,10 @@ fn verify_legacy_blobs(input: &mut File, chain: &ChainState) -> Result<(), AppEr
         .collect::<Vec<_>>()
         .join(",")
         != last.payload
-        || !chain.referenced_evidence.is_subset(&evidence_hashes)
+        || chain.referenced_evidence.iter().any(|hash| {
+            !evidence_hashes.contains(hash)
+                && !chain.sources.keys().any(|(source, _)| source == hash)
+        })
     {
         return Err(AppError::InvalidChain(last.seq));
     }

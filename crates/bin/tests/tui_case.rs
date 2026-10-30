@@ -5,8 +5,8 @@ use crossterm::event::KeyCode;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CaseLock, CaseSeal, CompletionRequest,
-    ConfigurationStore, CryptoPorts, Engine, EnginePorts, EvidenceStore, LlmPort, ModelEvent,
-    ModelResponse, ModelStream, Repository, Signer, ThreatIntelPort,
+    ConfigurationStore, CryptoPorts, Engine, EnginePorts, LlmPort, ModelEvent, ModelResponse,
+    ModelStream, Repository, Signer, ThreatIntelPort,
 };
 #[cfg(feature = "keystore-file")]
 use irmind_app::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
