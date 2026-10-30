@@ -18,6 +18,8 @@ This internal plan is for maintainers tracking acceptance criteria. Public reade
 
 ## Milestones and acceptance criteria
 
+The agent loop keeps case context separate from the analyst's message. Provider-native tool-call IDs and guarded tool results stay linked across rounds. The signed case log supplies prior analyst prompts and screened final replies. The policy sets a default of 25 model rounds per turn (maximum 100); a limit produces a final no-tool summary and `/continue` rather than discarding prior work. Older conversation may be compacted into a guarded, signed summary while recent turns and confirmed findings remain available.
+
 | Milestone | Scope | Done when |
 | --- | --- | --- |
 | H0 Skeleton | Workspace, lints, CI, cargo-deny, dependency-direction test. | The test rejects an intentionally introduced reverse dependency. |

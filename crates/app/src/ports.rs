@@ -17,8 +17,9 @@ pub use local::{
 };
 pub use model::{
     CompletionMessage, CompletionRequest, LlmPort, MessageRole, ModelEvent, ModelPricing,
-    ModelProgress, ModelResponse, ModelStream, ModelUsage, UsageEvent, collect_model_stream,
-    collect_model_stream_with_progress, single_completion_stream, summarize_usage,
+    ModelProgress, ModelResponse, ModelStream, ModelToolCall, ModelUsage, UsageEvent,
+    collect_model_stream, collect_model_stream_with_progress, single_completion_stream,
+    summarize_usage,
 };
 pub use object_source::{ObjectEntry, ObjectSource, ObjectSourceOutput, ObjectStream};
 pub use remote::{CloudAuditPort, EdrPort, InternalIntelPort, SiemPort, ThreatIntelPort};

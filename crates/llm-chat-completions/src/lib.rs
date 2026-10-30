@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
 use irmind_app::{
-    AppError, CancellationToken, CompletionRequest, LlmPort, MessageRole, ModelEvent, ModelStream,
-    async_trait,
+    AppError, CancellationToken, CompletionMessage, CompletionRequest, LlmPort, MessageRole,
+    ModelEvent, ModelStream, async_trait,
 };
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::json;
@@ -126,33 +126,65 @@ impl ChatCompletionsClient {
         let messages = request
             .messages
             .iter()
-            .map(|message| {
-                let role = match message.role {
-                    MessageRole::System => "system",
-                    MessageRole::User => "user",
-                    MessageRole::Assistant => "assistant",
-                    MessageRole::Tool => "tool",
-                };
-                json!({"role":role,"content":message.content})
-            })
+            .map(encode_message)
             .collect::<Vec<_>>();
         let limit = u64::from(request.max_output_tokens).min(request.remaining_case_tokens);
-        let mut body = json!({"model":self.model,"messages":messages,
-            "tools":tools,"tool_choice":"auto","stream":true,
+        let mut body = json!({"model":self.model,"messages":messages,"stream":true,
             "stream_options":{"include_usage":true}});
+        if !tools.is_empty() {
+            body["tools"] = json!(tools);
+            body["tool_choice"] = json!("auto");
+        }
         match self.profile {
             ChatProfile::OpenAi => {
                 body["max_completion_tokens"] = json!(limit);
                 body["parallel_tool_calls"] = json!(false);
                 body["store"] = json!(false);
             }
-            ChatProfile::DeepSeek => body["max_tokens"] = json!(limit),
+            ChatProfile::DeepSeek => {
+                body["max_tokens"] = json!(limit);
+                if !request.tools.is_empty() {
+                    body["thinking"] = json!({"type":"disabled"});
+                }
+            }
             ChatProfile::OpenRouter => {
                 body["max_completion_tokens"] = json!(limit);
                 body["parallel_tool_calls"] = json!(false);
             }
         }
         body
+    }
+}
+
+fn encode_message(message: &CompletionMessage) -> serde_json::Value {
+    match message.role {
+        MessageRole::Tool => json!({
+            "role":"tool", "tool_call_id":message.tool_call_id, "content":message.content
+        }),
+        MessageRole::Assistant if !message.tool_calls.is_empty() => {
+            let calls = message
+                .tool_calls
+                .iter()
+                .map(|call| {
+                    json!({
+                        "id":call.id(),"type":"function","function":{
+                            "name":call.proposal().tool.as_str(),
+                            "arguments":call.arguments_json()
+                        }
+                    })
+                })
+                .collect::<Vec<_>>();
+            json!({"role":"assistant","content":message.content,"tool_calls":calls})
+        }
+        role => {
+            let role = match role {
+                MessageRole::System => "system",
+                MessageRole::User => "user",
+                MessageRole::Assistant => "assistant",
+                MessageRole::Tool => "tool",
+            };
+            json!({"role":role,"content":message.content})
+        }
     }
 }
 
@@ -172,6 +204,7 @@ impl LlmPort for ChatCompletionsClient {
                 irmind_app::AdapterModelError::ModelTokenBudgetIsEmpty,
             )));
         }
+        request.validate()?;
         let body = self.request_body(&request);
         let mut http_request = self.async_client.post(self.endpoint.clone());
         if let Some(key) = &self.key {
@@ -318,6 +351,8 @@ mod tests {
                         messages: vec![irmind_app::CompletionMessage {
                             role: MessageRole::User,
                             content: "case".into(),
+                            tool_calls: Vec::new(),
+                            tool_call_id: None,
                         }],
                         tools: catalog[..1].to_vec(),
                         max_output_tokens: 2048,
@@ -351,6 +386,108 @@ mod tests {
                     assert!(body.get("store").is_none());
                 }
             }
+        }
+    }
+
+    #[test]
+    fn chat_profiles_preserve_tool_call_ids_and_disable_tools_for_final_summary() {
+        let proposal = irmind_app::ProposedCall {
+            tool: irmind_app::Tool::EvidenceSearch,
+            args: std::collections::BTreeMap::from([("query".into(), "AssumeRole".into())]),
+        };
+        let call = irmind_app::ModelToolCall::from_proposal("call_synthetic", proposal).unwrap();
+        for profile in [
+            ChatProfile::OpenAi,
+            ChatProfile::DeepSeek,
+            ChatProfile::OpenRouter,
+        ] {
+            let adapter = ChatCompletionsClient::new_with_profile(
+                "http://127.0.0.1:11434/v1/",
+                "synthetic",
+                None,
+                profile,
+            )
+            .unwrap();
+            let messages = vec![
+                CompletionMessage::text(MessageRole::User, "Find the event".into()),
+                CompletionMessage::assistant_tools("Searching".into(), vec![call.clone()]),
+                CompletionMessage::tool_result(
+                    "call_synthetic".into(),
+                    "<UNTRUSTED_test>event</UNTRUSTED_test>".into(),
+                ),
+            ];
+            let request = CompletionRequest {
+                messages,
+                tools: irmind_app::tool_catalog::catalog()[..1].to_vec(),
+                max_output_tokens: 128,
+                remaining_case_tokens: 1_000,
+            };
+            request.validate().unwrap();
+            let body = adapter.request_body(&request);
+            assert_eq!(body["messages"][1]["tool_calls"][0]["id"], "call_synthetic");
+            assert_eq!(
+                body["messages"][1]["tool_calls"][0]["function"]["arguments"],
+                call.arguments_json()
+            );
+            assert_eq!(body["messages"][2]["role"], "tool");
+            assert_eq!(body["messages"][2]["tool_call_id"], "call_synthetic");
+            if matches!(profile, ChatProfile::DeepSeek) {
+                assert_eq!(body["thinking"]["type"], "disabled");
+            }
+            let mut final_request = request.clone();
+            final_request.tools.clear();
+            let final_body = adapter.request_body(&final_request);
+            assert!(final_body.get("tools").is_none());
+            assert!(final_body.get("tool_choice").is_none());
+        }
+    }
+
+    #[test]
+    fn recorded_two_round_tool_exchange_works_for_every_chat_profile() {
+        let tool_wire = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_recorded\",\"type\":\"function\",\"function\":{\"name\":\"evidence_search\",\"arguments\":\"{\\\"query\\\":\\\"AssumeRole\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}\n\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":4}}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let final_wire = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Found one event.\"},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":20,\"completion_tokens\":5}}\n\n",
+            "data: [DONE]\n\n"
+        );
+        for profile in [
+            ChatProfile::OpenAi,
+            ChatProfile::DeepSeek,
+            ChatProfile::OpenRouter,
+        ] {
+            let adapter = ChatCompletionsClient::new_with_profile(
+                "http://127.0.0.1:11434/v1/",
+                "synthetic",
+                None,
+                profile,
+            )
+            .unwrap();
+            let (first, _) = stream::parse(tool_wire.as_bytes()).unwrap();
+            let call = first.calls[0].clone();
+            let request = CompletionRequest {
+                messages: vec![
+                    CompletionMessage::text(MessageRole::User, "Find the event".into()),
+                    CompletionMessage::assistant_tools(first.text, first.calls),
+                    CompletionMessage::tool_result(
+                        call.id().into(),
+                        "<UNTRUSTED_test>one event</UNTRUSTED_test>".into(),
+                    ),
+                ],
+                tools: irmind_app::tool_catalog::catalog()[..1].to_vec(),
+                max_output_tokens: 128,
+                remaining_case_tokens: 1_000,
+            };
+            request.validate().unwrap();
+            let body = adapter.request_body(&request);
+            assert_eq!(body["messages"][1]["tool_calls"][0]["id"], call.id());
+            assert_eq!(body["messages"][2]["tool_call_id"], call.id());
+            let (final_answer, _) = stream::parse(final_wire.as_bytes()).unwrap();
+            assert_eq!(final_answer.text, "Found one event.");
+            assert!(final_answer.calls.is_empty());
         }
     }
 }

@@ -109,12 +109,13 @@ streaming_test_model!(MissingReadModel);
 impl LegacyModel for MissingReadModel {
     fn complete(&self, _context: &str) -> Result<ModelResponse, AppError> {
         Ok(ModelResponse {
+            truncated: false,
             text: String::new(),
             raw: "missing evidence read".into(),
-            calls: vec![ProposedCall {
+            calls: model_calls(vec![ProposedCall {
                 tool: Tool::EvidenceRead,
                 args: BTreeMap::from([("hash".into(), "a".repeat(64))]),
-            }],
+            }]),
         })
     }
 }
@@ -136,9 +137,10 @@ impl LegacyModel for FindingModel {
         *turns += 1;
         Ok(if *turns == 1 {
             ModelResponse {
+                truncated: false,
                 text: String::new(),
                 raw: "proposed finding".into(),
-                calls: vec![ProposedCall {
+                calls: model_calls(vec![ProposedCall {
                     tool: Tool::CaseAddFinding,
                     args: BTreeMap::from([
                         ("kind".into(), "ioc".into()),
@@ -149,10 +151,11 @@ impl LegacyModel for FindingModel {
                         ("last_seen".into(), "2026-10-23T12:00:00Z".into()),
                         ("verdict".into(), "unknown".into()),
                     ]),
-                }],
+                }]),
             }
         } else {
             ModelResponse {
+                truncated: false,
                 text: "done".into(),
                 raw: "done".into(),
                 calls: Vec::new(),

@@ -1,4 +1,4 @@
-use irmind_app::{AppError, ModelResponse, ModelUsage};
+use irmind_app::{AppError, ModelResponse, ModelToolCall, ModelUsage};
 use irmind_domain::{ProposedCall, Tool};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -63,6 +63,7 @@ struct StreamState {
     tools: BTreeMap<usize, ToolDelta>,
     usage: Option<ModelUsage>,
     finished: bool,
+    truncated: bool,
     done: bool,
     bytes_read: usize,
 }
@@ -175,12 +176,13 @@ impl StreamState {
             }
         }
         if let Some(reason) = choice.get("finish_reason").and_then(Value::as_str) {
-            if !matches!(reason, "stop" | "tool_calls") {
+            if !matches!(reason, "stop" | "tool_calls" | "length") {
                 return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                     irmind_app::AdapterModelError::ProviderStoppedUnexpectedly,
                 )));
             }
             self.finished = true;
+            self.truncated = reason == "length";
         }
         Ok(())
     }
@@ -238,18 +240,28 @@ impl StreamState {
         })?;
         let mut calls = Vec::with_capacity(self.tools.len());
         for (expected, (index, tool)) in self.tools.into_iter().enumerate() {
-            if index != expected || tool.id.is_none() {
+            if self.truncated {
+                break;
+            }
+            if index != expected {
                 return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                     irmind_app::AdapterModelError::IncompleteProviderToolCall,
                 )));
             }
-            calls.push(parse_tool(&tool.name, &tool.arguments)?);
+            let id = tool
+                .id
+                .ok_or(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                    irmind_app::AdapterModelError::IncompleteProviderToolCall,
+                )))?;
+            let proposal = parse_tool(&tool.name, &tool.arguments)?;
+            calls.push(ModelToolCall::new(id, proposal, tool.arguments)?);
         }
         Ok((
             ModelResponse {
                 text: self.text,
                 calls,
                 raw: self.raw,
+                truncated: self.truncated,
             },
             usage,
         ))
@@ -308,9 +320,14 @@ mod tests {
         );
         let (answer, usage) = parse(wire.as_bytes()).unwrap();
         assert_eq!(answer.calls.len(), 1);
-        assert_eq!(answer.calls[0].tool, Tool::EvidenceSearch);
+        assert_eq!(answer.calls[0].id(), "call_1");
+        assert_eq!(answer.calls[0].proposal().tool, Tool::EvidenceSearch);
         assert_eq!(
-            answer.calls[0].args.get("query").map(String::as_str),
+            answer.calls[0]
+                .proposal()
+                .args
+                .get("query")
+                .map(String::as_str),
             Some("AssumeRole")
         );
         assert_eq!(usage.input_tokens, 14);
@@ -323,5 +340,19 @@ mod tests {
         assert!(parse(prefix.as_bytes()).is_err());
         let without_usage = format!("{prefix}data: [DONE]\n\n");
         assert!(parse(without_usage.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn length_is_a_truncated_answer_and_reasoning_is_not_answer_text() {
+        let wire = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"private reasoning\",\"content\":\"partial\"},\"finish_reason\":\"length\"}]}\n\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":10}}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let (answer, usage) = parse(wire.as_bytes()).unwrap();
+        assert!(answer.truncated);
+        assert_eq!(answer.text, "partial");
+        assert!(!answer.text.contains("reasoning"));
+        assert_eq!(usage.output_tokens, 10);
     }
 }

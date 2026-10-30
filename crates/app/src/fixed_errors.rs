@@ -21,10 +21,8 @@ pub enum FixedAppError {
     PolicySIEMSourceUnavailable,
     #[error("policy denied: agent cannot run in attended mode")]
     PolicyAgentCannotRunInAttendedMode,
-    #[error("policy denied: alert exceeds 20 KB")]
-    PolicyAlertExceeds20KB,
-    #[error("policy denied: case model token quota reached")]
-    PolicyCaseModelTokenQuotaReached,
+    #[error("policy denied: analyst message exceeds 20 KB")]
+    PolicyAnalystMessageExceeds20KB,
     #[error("policy denied: cloud audit source unavailable")]
     PolicyCloudAuditSourceUnavailable,
     #[error("policy denied: duplicate EDR source")]
@@ -123,8 +121,6 @@ pub enum FixedAppError {
     PolicyMissingValue,
     #[error("policy denied: model cost overflow")]
     PolicyModelCostOverflow,
-    #[error("policy denied: model exceeded tool round limit")]
-    PolicyModelExceededToolRoundLimit,
     #[error("policy denied: model token count overflow")]
     PolicyModelTokenCountOverflow,
     #[error("policy denied: open finding not found")]

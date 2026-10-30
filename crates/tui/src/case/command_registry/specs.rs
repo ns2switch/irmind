@@ -98,6 +98,12 @@ pub(super) const COMMANDS: &[Command] = &[
         slash: true,
     },
     Command {
+        name: "continue",
+        description: "Continue an investigation after a model limit",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
         name: "home",
         description: "Return to case list",
         shortcut: "",

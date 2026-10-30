@@ -1,6 +1,7 @@
 use super::*;
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn detected_injection_cannot_expand_next_read_scope() {
     struct FollowLog(Mutex<usize>);
     streaming_test_model!(FollowLog);
@@ -10,9 +11,10 @@ fn detected_injection_cannot_expand_next_read_scope() {
             *turns += 1;
             let account = if *turns == 1 { "123" } else { "999" };
             Ok(ModelResponse {
+                truncated: false,
                 text: "done".into(),
                 raw: format!("turn {}", *turns),
-                calls: if *turns <= 2 {
+                calls: model_calls(if *turns <= 2 {
                     vec![ProposedCall {
                         tool: Tool::SiemSearch,
                         args: BTreeMap::from([
@@ -27,7 +29,7 @@ fn detected_injection_cannot_expand_next_read_scope() {
                     }]
                 } else {
                     Vec::new()
-                },
+                }),
             })
         }
     }
@@ -93,9 +95,10 @@ fn scoped_internal_intel_uses_its_own_read_port() {
             let mut turns = self.0.lock().map_err(storage)?;
             *turns += 1;
             Ok(ModelResponse {
+                truncated: false,
                 text: "done".into(),
                 raw: "internal lookup".into(),
-                calls: if *turns == 1 {
+                calls: model_calls(if *turns == 1 {
                     vec![ProposedCall {
                         tool: Tool::ThreatIntelInternal,
                         args: BTreeMap::from([
@@ -105,7 +108,7 @@ fn scoped_internal_intel_uses_its_own_read_port() {
                     }]
                 } else {
                     Vec::new()
-                },
+                }),
             })
         }
     }
@@ -183,21 +186,23 @@ fn result_is_redacted_before_model_byte_limit() {
                     return Err(AppError::Guard("secret crossed result limit".into()));
                 }
                 return Ok(ModelResponse {
+                    truncated: false,
                     text: "safe".into(),
                     calls: Vec::new(),
                     raw: "safe".into(),
                 });
             }
             Ok(ModelResponse {
+                truncated: false,
                 text: String::new(),
                 raw: "lookup".into(),
-                calls: vec![ProposedCall {
+                calls: model_calls(vec![ProposedCall {
                     tool: Tool::ThreatIntelInternal,
                     args: BTreeMap::from([
                         ("source".into(), "misp-internal".into()),
                         ("ioc".into(), "example.com".into()),
                     ]),
-                }],
+                }]),
             })
         }
     }

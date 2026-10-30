@@ -126,6 +126,7 @@ fn initial_state(
         menu_selected: 0,
         menu_query: None,
         model_preview: String::new(),
+        model_round: None,
         approvals,
         approval_sources,
         findings,

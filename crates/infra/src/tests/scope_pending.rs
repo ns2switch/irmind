@@ -7,9 +7,10 @@ fn narrowed_policy_keeps_old_pending_auditable_but_blocks_its_approval() {
     impl LegacyModel for OneCall {
         fn complete(&self, _context: &str) -> Result<ModelResponse, AppError> {
             Ok(ModelResponse {
+                truncated: false,
                 text: "synthetic".into(),
                 raw: "one proposal".into(),
-                calls: self.0.lock().map_err(storage)?.take().into_iter().collect(),
+                calls: model_calls(self.0.lock().map_err(storage)?.take().into_iter().collect()),
             })
         }
     }

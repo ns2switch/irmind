@@ -17,6 +17,7 @@ Pasa `--policy policy.toml` o define `IRMIND_POLICY`. El archivo [policy.toml](.
 ```toml
 version = 1
 max_tool_calls_per_case = 100
+max_model_rounds_per_turn = 25
 max_model_result_bytes = 10000
 max_model_tokens_per_case = 200000
 max_object_read_bytes = 1073741824
@@ -35,6 +36,8 @@ to = "2026-10-23T23:59:59Z"
 ```
 
 La tabla opcional `[scope]` fija un techo estricto para las lecturas remotas de todos los casos. Puede contener cuentas, proyectos, hosts y prefijos de objetos, además de fuentes y una ventana UTC. Una lectura de objetos fuera del prefijo del caso o del techo de la política se deniega, incluso con aprobación. Otras lecturas fuera del caso pueden requerir aprobación; fuera del techo se deniegan. Los casos nuevos y los cambios de alcance no pueden superar el techo. Si una política nueva reduce el alcance de un caso existente, sus lecturas usan la intersección y la TUI muestra un aviso. El conector AWS actual exige una cuenta; las consultas por proyecto estarán disponibles cuando exista un conector que las admita. La política puede restringir las reglas fijas de las herramientas, pero no habilitar acciones denegadas. El enriquecimiento externo requiere aprobación firmada del analista; la contención está deshabilitada. Los campos desconocidos causan un error.
+
+`max_model_rounds_per_turn` vale 25 por defecto si se omite y no puede superar 100. Al alcanzar el límite, IRMind pide un resumen final sin herramientas y ofrece `/continue`. Los límites de llamadas y tokens siguen aplicándose a todo el caso.
 
 ## Ajustes no secretos
 

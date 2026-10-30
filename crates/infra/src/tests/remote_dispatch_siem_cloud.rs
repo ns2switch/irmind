@@ -8,9 +8,10 @@ fn every_port_family_dispatches_signed_approval_through_registry() {
     impl LegacyModel for OneCall {
         fn complete(&self, _context: &str) -> Result<ModelResponse, AppError> {
             Ok(ModelResponse {
+                truncated: false,
                 text: "done".into(),
                 raw: "propose once".into(),
-                calls: self.0.lock().map_err(storage)?.take().into_iter().collect(),
+                calls: model_calls(self.0.lock().map_err(storage)?.take().into_iter().collect()),
             })
         }
     }
@@ -177,9 +178,10 @@ fn scoped_siem_read_uses_authorized_port_and_keeps_raw_evidence_local() {
             let mut turns = self.0.lock().map_err(storage)?;
             *turns += 1;
             Ok(ModelResponse {
+                truncated: false,
                 text: "done".into(),
                 raw: "siem proposal".into(),
-                calls: if *turns == 1 {
+                calls: model_calls(if *turns == 1 {
                     vec![ProposedCall {
                         tool: Tool::SiemSearch,
                         args: BTreeMap::from([
@@ -194,7 +196,7 @@ fn scoped_siem_read_uses_authorized_port_and_keeps_raw_evidence_local() {
                     }]
                 } else {
                     Vec::new()
-                },
+                }),
             })
         }
     }
@@ -239,7 +241,7 @@ fn scoped_siem_read_uses_authorized_port_and_keeps_raw_evidence_local() {
             &Propose(Mutex::new(0)),
             &CancellationToken::new(),
             &|event| {
-                if matches!(event, irmind_app::ModelProgress::RoundStarted) {
+                if matches!(event, irmind_app::ModelProgress::RoundStarted { .. }) {
                     *rounds.lock().unwrap() += 1;
                 }
             },
@@ -276,9 +278,10 @@ fn scoped_cloud_read_is_audited_and_redacted() {
             let mut turns = self.0.lock().map_err(storage)?;
             *turns += 1;
             Ok(ModelResponse {
+                truncated: false,
                 text: "done".into(),
                 raw: "cloud proposal".into(),
-                calls: if *turns == 1 {
+                calls: model_calls(if *turns == 1 {
                     vec![ProposedCall {
                         tool: Tool::CloudAuditEvents,
                         args: BTreeMap::from([
@@ -291,7 +294,7 @@ fn scoped_cloud_read_is_audited_and_redacted() {
                     }]
                 } else {
                     Vec::new()
-                },
+                }),
             })
         }
     }

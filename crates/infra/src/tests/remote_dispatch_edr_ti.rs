@@ -92,9 +92,10 @@ fn cloud_identity_uses_scoped_read_port() {
             let mut turns = self.0.lock().map_err(storage)?;
             *turns += 1;
             Ok(ModelResponse {
+                truncated: false,
                 text: "done".into(),
                 raw: "cloud identity proposal".into(),
-                calls: if *turns == 1 {
+                calls: model_calls(if *turns == 1 {
                     vec![ProposedCall {
                         tool: Tool::CloudIdentity,
                         args: BTreeMap::from([
@@ -106,7 +107,7 @@ fn cloud_identity_uses_scoped_read_port() {
                     }]
                 } else {
                     Vec::new()
-                },
+                }),
             })
         }
     }
@@ -194,9 +195,10 @@ fn malicious_siem_record_cannot_dispatch_external_intel() {
                 _ => Vec::new(),
             };
             Ok(ModelResponse {
+                truncated: false,
                 text: "investigation paused".into(),
                 raw: format!("turn {}", *turns),
-                calls,
+                calls: model_calls(calls),
             })
         }
     }

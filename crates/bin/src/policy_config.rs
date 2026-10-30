@@ -9,6 +9,8 @@ use std::path::Path;
 struct PolicyFile {
     version: u8,
     max_tool_calls_per_case: usize,
+    #[serde(default = "default_model_rounds_per_turn")]
+    max_model_rounds_per_turn: usize,
     max_model_result_bytes: usize,
     max_model_tokens_per_case: u64,
     #[serde(default = "default_object_read_bytes")]
@@ -24,6 +26,9 @@ struct PolicyFile {
 
 fn default_object_read_bytes() -> u64 {
     PolicyRules::default().max_object_read_bytes
+}
+fn default_model_rounds_per_turn() -> usize {
+    PolicyRules::default().max_model_rounds_per_turn
 }
 fn default_object_case_bytes() -> u64 {
     PolicyRules::default().max_object_bytes_per_case
@@ -89,6 +94,7 @@ pub(crate) fn load_policy(path: &Path) -> Result<(PolicyRules, String)> {
         denied_tools,
         scope: file.scope.map(ScopePolicyFile::parse).transpose()?,
         max_tool_calls_per_case: file.max_tool_calls_per_case,
+        max_model_rounds_per_turn: file.max_model_rounds_per_turn,
         max_model_result_bytes: file.max_model_result_bytes,
         max_model_tokens_per_case: file.max_model_tokens_per_case,
         max_object_read_bytes: file.max_object_read_bytes,
@@ -105,6 +111,18 @@ pub(crate) fn load_policy(path: &Path) -> Result<(PolicyRules, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn model_round_limit_defaults_to_25_and_rejects_values_above_100() {
+        assert_eq!(default_model_rounds_per_turn(), 25);
+        let mut rules = PolicyRules {
+            max_model_rounds_per_turn: 100,
+            ..PolicyRules::default()
+        };
+        assert!(rules.validate().is_ok());
+        rules.max_model_rounds_per_turn = 101;
+        assert!(rules.validate().is_err());
+    }
 
     #[test]
     fn toml_scope_covers_accounts_projects_hosts_and_window() -> Result<()> {

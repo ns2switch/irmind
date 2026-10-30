@@ -305,6 +305,8 @@ pub fn run_llm_contract(port: &dyn LlmPort) -> Result<(), String> {
         messages: vec![CompletionMessage {
             role: MessageRole::User,
             content: "synthetic incident".into(),
+            tool_calls: Vec::new(),
+            tool_call_id: None,
         }],
         tools: Vec::new(),
         max_output_tokens: limit,

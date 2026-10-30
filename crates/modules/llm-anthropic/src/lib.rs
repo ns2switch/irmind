@@ -111,6 +111,7 @@ impl Anthropic {
     }
 
     fn body(&self, request: &CompletionRequest) -> Result<serde_json::Value, AppError> {
+        request.validate()?;
         if request.max_output_tokens == 0 || request.remaining_case_tokens == 0 {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                 irmind_app::AdapterModelError::ModelTokenBudgetIsEmpty,
@@ -134,25 +135,59 @@ impl Anthropic {
             .map(|message| message.content.as_str())
             .collect::<Vec<_>>()
             .join("\n");
-        let messages = request
+        let mut messages = Vec::<serde_json::Value>::new();
+        for message in request
             .messages
             .iter()
-            .filter(|message| message.role != MessageRole::System)
-            .map(|message| {
-                json!({"role":match message.role {
-                MessageRole::Assistant => "assistant", _ => "user"
-            }, "content":message.content})
-            })
-            .collect::<Vec<_>>();
-        Ok(json!({
+            .filter(|m| m.role != MessageRole::System)
+        {
+            match message.role {
+                MessageRole::Assistant if !message.tool_calls.is_empty() => {
+                    let mut blocks = Vec::new();
+                    if !message.content.is_empty() {
+                        blocks.push(json!({"type":"text","text":message.content}));
+                    }
+                    for call in &message.tool_calls {
+                        let input: serde_json::Value = serde_json::from_str(call.arguments_json())
+                            .map_err(|_| AppError::Model("invalid tool arguments".into()))?;
+                        blocks.push(json!({"type":"tool_use","id":call.id(),
+                            "name":call.proposal().tool.as_str(),"input":input}));
+                    }
+                    messages.push(json!({"role":"assistant","content":blocks}));
+                }
+                MessageRole::Tool => {
+                    let block = json!({"type":"tool_result",
+                        "tool_use_id":message.tool_call_id,"content":message.content});
+                    if let Some(last) = messages.last_mut()
+                        && last["role"] == "user"
+                        && last["content"].is_array()
+                    {
+                        if let Some(blocks) = last["content"].as_array_mut() {
+                            blocks.push(block);
+                        }
+                    } else {
+                        messages.push(json!({"role":"user","content":[block]}));
+                    }
+                }
+                MessageRole::User | MessageRole::Assistant => messages.push(json!({
+                    "role":if message.role == MessageRole::User {"user"} else {"assistant"},
+                    "content":message.content
+                })),
+                MessageRole::System => {}
+            }
+        }
+        let mut body = json!({
             "model": self.model,
             "max_tokens": u64::from(request.max_output_tokens).min(request.remaining_case_tokens),
             "system": system,
             "messages": messages,
-            "tools": tools,
-            "tool_choice": {"type":"auto","disable_parallel_tool_use":true},
             "stream": true,
-        }))
+        });
+        if !tools.is_empty() {
+            body["tools"] = json!(tools);
+            body["tool_choice"] = json!({"type":"auto","disable_parallel_tool_use":true});
+        }
+        Ok(body)
     }
 }
 
@@ -241,6 +276,8 @@ mod tests {
                 messages: vec![irmind_app::CompletionMessage {
                     role: MessageRole::User,
                     content: "investigate".into(),
+                    tool_calls: Vec::new(),
+                    tool_call_id: None,
                 }],
                 tools: catalog[..1].to_vec(),
                 max_output_tokens: 2048,
@@ -253,6 +290,82 @@ mod tests {
         assert!(!adapter.descriptor().contains("test-secret"));
         assert!(Anthropic::new("", "key".into()).is_err());
         assert!(Anthropic::new("claude-sonnet-4-6", String::new()).is_err());
+    }
+
+    #[test]
+    fn native_request_uses_tool_use_and_tool_result_blocks_with_matching_ids() {
+        let adapter = Anthropic::new("synthetic", "test-secret".into()).unwrap();
+        let proposal = irmind_app::ProposedCall {
+            tool: irmind_app::Tool::EvidenceSearch,
+            args: std::collections::BTreeMap::from([("query".into(), "AssumeRole".into())]),
+        };
+        let call = irmind_app::ModelToolCall::from_proposal("toolu_synthetic", proposal).unwrap();
+        let request = CompletionRequest {
+            messages: vec![
+                irmind_app::CompletionMessage::text(MessageRole::User, "Find the event".into()),
+                irmind_app::CompletionMessage::assistant_tools("Searching".into(), vec![call]),
+                irmind_app::CompletionMessage::tool_result(
+                    "toolu_synthetic".into(),
+                    "<UNTRUSTED_test>event</UNTRUSTED_test>".into(),
+                ),
+            ],
+            tools: irmind_app::tool_catalog::catalog()[..1].to_vec(),
+            max_output_tokens: 128,
+            remaining_case_tokens: 1_000,
+        };
+        let body = adapter.body(&request).unwrap();
+        assert_eq!(body["messages"][1]["content"][1]["type"], "tool_use");
+        assert_eq!(body["messages"][1]["content"][1]["id"], "toolu_synthetic");
+        assert_eq!(body["messages"][2]["content"][0]["type"], "tool_result");
+        assert_eq!(
+            body["messages"][2]["content"][0]["tool_use_id"],
+            "toolu_synthetic"
+        );
+        let mut final_request = request;
+        final_request.tools.clear();
+        let final_body = adapter.body(&final_request).unwrap();
+        assert!(final_body.get("tools").is_none());
+    }
+
+    #[test]
+    fn recorded_two_round_native_tool_exchange_preserves_tool_use_id() {
+        let adapter = Anthropic::new("synthetic", "test-secret".into()).unwrap();
+        let tool_wire = concat!(
+            "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":8}}}\n\n",
+            "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_recorded\",\"name\":\"evidence_search\",\"input\":{}}}\n\n",
+            "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"query\\\":\\\"AssumeRole\\\"}\"}}\n\n",
+            "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+            "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"output_tokens\":4}}\n\n",
+            "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+        );
+        let final_wire = concat!(
+            "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":20}}}\n\n",
+            "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"Found one event.\"}}\n\n",
+            "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+            "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":5}}\n\n",
+            "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+        );
+        let (first, _) = stream::parse(tool_wire.as_bytes()).unwrap();
+        let call = first.calls[0].clone();
+        let request = CompletionRequest {
+            messages: vec![
+                irmind_app::CompletionMessage::text(MessageRole::User, "Find the event".into()),
+                irmind_app::CompletionMessage::assistant_tools(first.text, first.calls),
+                irmind_app::CompletionMessage::tool_result(
+                    call.id().into(),
+                    "<UNTRUSTED_test>one event</UNTRUSTED_test>".into(),
+                ),
+            ],
+            tools: irmind_app::tool_catalog::catalog()[..1].to_vec(),
+            max_output_tokens: 128,
+            remaining_case_tokens: 1_000,
+        };
+        let body = adapter.body(&request).unwrap();
+        assert_eq!(body["messages"][1]["content"][0]["id"], call.id());
+        assert_eq!(body["messages"][2]["content"][0]["tool_use_id"], call.id());
+        let (final_answer, _) = stream::parse(final_wire.as_bytes()).unwrap();
+        assert_eq!(final_answer.text, "Found one event.");
+        assert!(final_answer.calls.is_empty());
     }
 
     #[test]

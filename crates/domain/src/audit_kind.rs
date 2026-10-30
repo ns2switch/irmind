@@ -22,6 +22,8 @@ pub enum AuditEventKind {
     InjectionDetected,
     ModelError,
     ModelReply,
+    FinalAnswer,
+    ConversationSummary,
     ModelRequest,
     ModelSelected,
     ModelUsage,
@@ -39,7 +41,7 @@ pub enum AuditEventKind {
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 33] = [
+    pub const ALL: [Self; 35] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -59,6 +61,8 @@ impl AuditEventKind {
         Self::InjectionDetected,
         Self::ModelError,
         Self::ModelReply,
+        Self::FinalAnswer,
+        Self::ConversationSummary,
         Self::ModelRequest,
         Self::ModelSelected,
         Self::ModelUsage,
@@ -96,6 +100,8 @@ impl AuditEventKind {
             Self::InjectionDetected => "InjectionDetected",
             Self::ModelError => "ModelError",
             Self::ModelReply => "ModelReply",
+            Self::FinalAnswer => "FinalAnswer",
+            Self::ConversationSummary => "ConversationSummary",
             Self::ModelRequest => "ModelRequest",
             Self::ModelSelected => "ModelSelected",
             Self::ModelUsage => "ModelUsage",
@@ -134,7 +140,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 33] = [
+        const EXPECTED: [&str; 35] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -154,6 +160,8 @@ mod tests {
             "InjectionDetected",
             "ModelError",
             "ModelReply",
+            "FinalAnswer",
+            "ConversationSummary",
             "ModelRequest",
             "ModelSelected",
             "ModelUsage",

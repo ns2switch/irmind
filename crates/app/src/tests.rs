@@ -87,6 +87,8 @@ fn model_and_approval_debug_omit_sensitive_content() {
     let message = super::CompletionMessage {
         role: super::MessageRole::User,
         content: "SECRET alert".into(),
+        tool_calls: Vec::new(),
+        tool_call_id: None,
     };
     let request = super::CompletionRequest {
         messages: vec![message],
@@ -95,6 +97,7 @@ fn model_and_approval_debug_omit_sensitive_content() {
         remaining_case_tokens: 20,
     };
     let response = super::ModelResponse {
+        truncated: false,
         text: "SECRET answer".into(),
         calls: Vec::new(),
         raw: "SECRET provider frame".into(),
@@ -130,6 +133,7 @@ async fn incomplete_or_repeated_model_completion_fails_closed() {
         ))
     ));
     let response = || ModelResponse {
+        truncated: false,
         text: "ok".into(),
         calls: Vec::new(),
         raw: "ok".into(),
@@ -165,6 +169,7 @@ async fn streamed_text_is_incremental_and_must_match_the_final_reply() -> Result
             Ok(ModelEvent::TextDelta("world".into())),
             Ok(ModelEvent::Completed {
                 response: ModelResponse {
+                    truncated: false,
                     text: final_text.into(),
                     calls: Vec::new(),
                     raw: "synthetic".into(),

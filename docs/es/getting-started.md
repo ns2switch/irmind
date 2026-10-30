@@ -56,7 +56,7 @@ Si `config.toml` requiere recuperación, la TUI ofrece restaurarlo o revisar los
 2. Escribe `/new`, introduce un título como «Alerta de CloudTrail de prueba» y elige una severidad. Enter crea un caso local firmado; el alcance remoto es opcional.
 3. Escribe `/ingest` y selecciona [el archivo sintético de CloudTrail](../../examples/cloudtrail-alert.json). IRMind calcula su hash en la ubicación original y crea un índice Parquet. Solo copia el original si usas expresamente `/ingest --copy-original <ruta>`.
 4. Pregunta «¿Qué sugiere el evento AssumeRole sintético?» y pulsa Enter. La respuesta aparece de forma incremental. Usa `/timeline` o `/graph` para examinar los eventos y `/search <palabras>` para buscar registros.
-5. Revisa las llamadas propuestas en la conversación. Una consulta externa exige una aprobación firmada con opciones numeradas; usa las flechas y Enter. Escribe `/` para ver sugerencias o pulsa Ctrl+K para abrir la paleta.
+5. Revisa las llamadas propuestas en la conversación. Una consulta externa exige una aprobación firmada con opciones numeradas; usa las flechas y Enter. Escribe `/` para ver sugerencias o pulsa Ctrl+K para abrir la paleta. Si se alcanza un límite, revisa el resumen y usa `/continue`.
 6. Ejecuta `/verify <directorio-origen>` para comprobar los bytes originales, revisa `/report` y usa `/seal` y `/export` después de comprobar el hash del caso y la huella de la clave de firma que se muestran.
 
 Puedes verificar el paquete en otro equipo con `irmind verify-export <PACKAGE> --expected-key <FINGERPRINT>`. Consulta la [referencia de la CLI](../development/cli.md) para automatización.

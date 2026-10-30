@@ -66,6 +66,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             }
             return Ok(false);
         }
+        if self.continue_command(&prompt) {
+            return Ok(false);
+        }
         if self.active.is_some() {
             self.state
                 .messages
@@ -84,6 +87,20 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             self.investigate_prompt(prompt);
         }
         Ok(false)
+    }
+
+    fn continue_command(&mut self, prompt: &str) -> bool {
+        if prompt != "/continue" {
+            return false;
+        }
+        if self.active.is_some() {
+            self.state
+                .messages
+                .push("Investigation is still running.".into());
+        } else {
+            self.investigate_prompt("Continue the previous investigation from the signed case history. Focus on pending questions and cite evidence.".into());
+        }
+        true
     }
 
     fn workflow(&self) -> CaseWorkflow<'env, 'ports> {
