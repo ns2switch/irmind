@@ -29,7 +29,9 @@ def release_source(path: str) -> bool:
 
 
 def select_scope(event: str, ref: str, changed: list[str], labels: set[str],
-                 recent_commit: bool) -> dict[str, bool]:
+                 recent_commit: bool, release_dry_run: bool = False) -> dict[str, bool]:
+    if release_dry_run and (event != "workflow_dispatch" or not ref.startswith("refs/heads/")):
+        raise ValueError("release dry run requires a manual workflow on a branch")
     tag = event == "push" and ref.startswith("refs/tags/v")
     nightly = event == "schedule" and recent_commit
     return {
@@ -39,8 +41,10 @@ def select_scope(event: str, ref: str, changed: list[str], labels: set[str],
                 "full-ci" in labels or any(map(platform_path, changed))
             )
         ),
-        "cross_verify": tag or nightly,
-        "release_build": tag or (nightly and any(map(release_source, changed))),
+        "cross_verify": tag or nightly or release_dry_run,
+        "release_build": tag or release_dry_run or (
+            nightly and any(map(release_source, changed))
+        ),
     }
 
 
@@ -71,8 +75,12 @@ def main() -> None:
     }
     last_main_commit = int(command("git", "log", "-1", "--format=%ct"))
     recent_commit = 0 <= time.time() - last_main_commit < 86_400
+    inputs = payload.get("inputs") or {}
+    release_dry_run = inputs.get("release_dry_run", "false") in (True, "true")
+    if release_dry_run and inputs.get("profile_linux", "false") in (True, "true"):
+        raise ValueError("release dry run and Linux-only profiling cannot run together")
     scope = select_scope(event, os.environ["GITHUB_REF"], changed, labels,
-                         recent_commit)
+                         recent_commit, release_dry_run)
     lock = tomllib.loads(Path("Cargo.lock").read_text())
     version = next(
         package["version"] for package in lock["package"]

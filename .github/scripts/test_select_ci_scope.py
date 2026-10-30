@@ -54,6 +54,21 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(scope, dict(run_ci=True, platforms=True,
                                      cross_verify=True, release_build=True))
 
+    def test_manual_release_dry_run_builds_and_verifies_without_a_tag(self):
+        scope = select_scope("workflow_dispatch", "refs/heads/release-test", [],
+                             set(), False, release_dry_run=True)
+        self.assertEqual(scope, dict(run_ci=True, platforms=True,
+                                     cross_verify=True, release_build=True))
+        self.assertFalse(select_scope("workflow_dispatch", "refs/heads/release-test",
+                                      [], set(), False)["release_build"])
+
+    def test_dry_run_rejects_non_branch_and_non_manual_events(self):
+        for event, ref in (("push", "refs/heads/main"),
+                           ("workflow_dispatch", "refs/tags/v0.1.0")):
+            with self.assertRaises(ValueError):
+                select_scope(event, ref, [], set(), False,
+                             release_dry_run=True)
+
 
 if __name__ == "__main__":
     unittest.main()

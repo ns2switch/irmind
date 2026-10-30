@@ -40,7 +40,22 @@ GCP and Azure enter the MVP only as object-storage read sources and exported-log
 
 For uncopied originals, the signed manifest proves what IRMind observed when it hashed each source, while later full verification requires access to that same source. Sampling verifies only selected originals. Neither mode claims that an unavailable source remains intact. Export without originals is verifiable as a signed manifest and case chain, not as a complete portable evidence package.
 
-Exit only when H0–H8 meet their stated acceptance criteria, the H5 manual test is documented, at least one connector has been tested against a real test environment, and a `v0.1.0` tag has a changelog and downloadable binaries. Synthetic recordings alone do not satisfy the connector test.
+Exit only when H0–H8 meet their stated acceptance criteria, the H5 manual test is documented, at least one connector has been tested against a real test environment, and a `v0.1.0` tag has a changelog and downloadable binaries. Synthetic recordings alone do not satisfy the connector test. Record the two manual results in [manual validation](manual-validation.md).
+
+| MVP exit criterion | Status | Evidence or next action |
+| --- | --- | --- |
+| H0–H4 and H6 automated acceptance | Done | Workspace gates, signed custody, policy and TUI tests run in CI. |
+| H7 local Parquet and benchmark acceptance | Done | [15 GB runner benchmark](https://github.com/ns2switch/irmind/actions/runs/40776509647) and migration tests. |
+| H8 existing connector and object-source contracts | Done | Recorded synthetic contract suites and setup guides. |
+| H5 recorded-response tests | Done | CI contract and application tests. |
+| H5 manual test with real DeepSeek | Pending analyst | Run the first procedure in [manual validation](manual-validation.md) and record the result. Until then, H5 as a whole remains open. |
+| One connector against a real test environment | Pending analyst | Run the Splunk lab procedure in [manual validation](manual-validation.md) and record the result. |
+| Release dry run without a tag | Pending agent | Manually dispatch CI with `release_dry_run` on the release-preparation branch and check all artifacts and cross-platform verification. |
+| `v0.1.0` tag, changelog and downloadable binaries | Pending agent | Tag only after manual results, approved work and green `main`; publish the reviewed changelog and CI artifacts. |
+
+## Release process
+
+The workspace version is `0.1.0`. Keep [CHANGELOG.md](../../CHANGELOG.md) as a draft until the MVP exit criteria above are met. Before the first tag, run the CI `release_dry_run` manual dispatch on a branch: it must build unsigned binaries and checksums for Linux, macOS and Windows and verify portable exports across platforms, without creating a tag or GitHub Release. Review the resulting artifacts and the green `main` checks. Only then create `v0.1.0` and publish its changelog and binaries. Do not treat a synthetic connector recording as the analyst's live test.
 
 ## Later unattended gateway
 
