@@ -10,8 +10,17 @@ The representative CloudTrail-shaped corpus has about 1,000 files of approximate
 | --- | ---: | ---: | ---: | ---: |
 | Previous SQL reader, [same-workflow baseline](https://github.com/ns2switch/irmind/actions/runs/41128581228) | 1,045,717,000 B | 28.145 s | 301,108,413 B | 0.297 s |
 | Previous SQL reader, [same-workflow baseline](https://github.com/ns2switch/irmind/actions/runs/41128581228) | 15,685,573,000 B | 264.693 s | 1,803,559,114 B | 0.947 s |
+| Direct reader, [measured run](https://github.com/ns2switch/irmind/actions/runs/41138351183) | 1,045,717,000 B | 29.104 s | 301,108,413 B | 0.220 s |
+| Direct reader, [measured run](https://github.com/ns2switch/irmind/actions/runs/41138351183) | 15,685,573,000 B | 266.277 s | 1,803,559,114 B | 0.665 s |
 
-The previous reader's 15 GB ingestion met the 15-minute target. The corpus repeats synthetic records, so its compression ratio is not a forecast for real evidence. The CPU phase sums overlap across four source workers.
+Both readers met the 15-minute ingestion target. The direct reader took 0.6% longer at 15 GB. The corpus repeats synthetic records, so its compression ratio is not a forecast for real evidence. The phase sums overlap across four source workers and must not be added to estimate wall time.
+
+| Reader and input | Hash | Conversion | Row preparation | Parquet write | Wall |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Previous, 1 GB | 0.958 s | 56.474 s | 9.817 s | 8.477 s | 28.145 s |
+| Direct, 1 GB | 1.462 s | 55.270 s | 9.386 s | 11.372 s | 29.104 s |
+| Previous, 15 GB | 11.697 s | 800.591 s | 148.470 s | 84.359 s | 264.693 s |
+| Direct, 15 GB | 18.959 s | 753.325 s | 139.122 s | 93.463 s | 266.277 s |
 
 | Previous SQL reader, warm query | 1 GB p50 | 1 GB p95 | 15 GB p50 | 15 GB p95 |
 | --- | ---: | ---: | ---: | ---: |
@@ -27,4 +36,24 @@ The direct path sample connects entities in one record. The path implementation 
 
 The new reader prunes signed partitions, projects required columns, uses row-group statistics and row filters where possible, and streams batches with bounded channels. It hashes each selected artifact on the same file handle before parsing it. Four standard-library workers read independent files while the caller receives batches in deterministic manifest order. The 10-second query budget includes hash verification. No SQL engine or text-term index is loaded.
 
-The before/after runner measurements for the direct reader are being generated in the [same benchmark workflow](../../.github/workflows/graph-benchmark.yml). The PR must report ingestion, p50/p95 for every query, cold and warm compile time, binary size, and any query regression above 25% before it is ready for review.
+The direct-reader results below come from the [same standard-runner workflow](https://github.com/ns2switch/irmind/actions/runs/41138351183). All measured 15 GB p95 values stayed below 10 seconds. A first direct-reader run used a byte-by-byte case-insensitive substring scan; it exceeded the deadline at 12.346 seconds. Searching candidate final bytes with `memchr` reduced term-search p95 to 3.813 seconds without changing matching semantics.
+
+| Direct reader, warm query | 1 GB p50 | 1 GB p95 | 15 GB p50 | 15 GB p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Term search | 0.343 s | 0.352 s | 3.779 s | 3.813 s |
+| Entity lookup | 0.180 s | 0.190 s | 2.570 s | 2.632 s |
+| Neighbors | 0.590 s | 0.594 s | 8.213 s | 8.550 s |
+| Timeline | 0.221 s | 0.223 s | 2.882 s | 2.886 s |
+| Direct path | 0.580 s | 0.615 s | 8.269 s | 8.554 s |
+
+At 15 GB, entity lookup is 64% slower, timeline 173% slower, neighbors 1,692% slower, and path 1,720% slower than the previous SQL reader. These operations scan entity Parquet row groups; neighbors and path also scan co-observed records a second time. The direct reader trades a material graph-query slowdown for a smaller, faster build. A follow-up should add entity-value Bloom filters to row groups and a bounded, partitioned co-observation artifact; it should also use borrowed record keys to avoid allocating a string for each scanned entity. Those optimizations must retain signed artifact hashes, bounded memory, and the current partial-result labels. Until then, analysts should narrow large cases by date, account or project, and region. The 10-second target is measured for this synthetic 15 GB workload, not promised for an unfiltered 500 GB query.
+
+| Build or package measurement | Previous reader | Direct reader |
+| --- | ---: | ---: |
+| Cold release test build, same workflow | 42m 11s | 8m 06s |
+| Warm release test build | Not measured | 21 s |
+| Additional full release binary build after test build | Not measured | 15m 36s |
+| Release binary size | 104,377,128 B | 44,074,000 B |
+| Packages in Cargo.lock | 576 | 536 |
+
+The previous binary size is from the [last main build with the former reader](https://github.com/ns2switch/irmind/actions/runs/41038459252). Release test builds are directly comparable; the binary build is a separate measurement and must not be added to the test-build row as if it were a warm rebuild. The new binary is 57.8% smaller. The previous Linux `main` job took 3m 58s with a warm cache; this PR's Linux job took 13m 02s after the lockfile changed. A matched warm Linux run on `main` cannot be measured before this PR merges. The cold release build is the reliable same-workflow compilation comparison. No extra CI run was started just to fill that gap.
