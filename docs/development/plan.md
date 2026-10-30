@@ -48,9 +48,10 @@ Exit only when H0–H8 meet their stated acceptance criteria, the H5 manual test
 | H7 local Parquet and benchmark acceptance | Done | [15 GB runner benchmark](https://github.com/ns2switch/irmind/actions/runs/40776509647) and migration tests. |
 | H8 existing connector and object-source contracts | Done | Recorded synthetic contract suites and setup guides. |
 | H5 recorded-response tests | Done | CI contract and application tests. |
-| H5 manual test with real DeepSeek | Pending analyst | Run the first procedure in [manual validation](manual-validation.md) and record the result. Until then, H5 as a whole remains open. |
+| H5 conversation-loop correction | Pending agent | Integrate the reviewed Phase L work from PR #31 after the analyst's requested manual test. H5 as a whole remains open. |
+| H5 manual test with real DeepSeek | Pending analyst | After Phase L is integrated, run the first procedure in [manual validation](manual-validation.md) and record the result. |
 | One connector against a real test environment | Pending analyst | Run the Splunk lab procedure in [manual validation](manual-validation.md) and record the result. |
-| Release dry run without a tag | Pending agent | Manually dispatch CI with `release_dry_run` on the release-preparation branch and check all artifacts and cross-platform verification. |
+| Release dry run without a tag | Done | [Manual CI run 41117075395](https://github.com/ns2switch/irmind/actions/runs/41117075395) passed on Linux, macOS and Windows, including checksums and both Windows export cross-checks. No tag or GitHub Release was created. |
 | `v0.1.0` tag, changelog and downloadable binaries | Pending agent | Tag only after manual results, approved work and green `main`; publish the reviewed changelog and CI artifacts. |
 
 ## Release process
