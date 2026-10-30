@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 08172a83df22ec719c7f9a7fbe83c064fc5e9229; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit ae1b62bf3ba41673881a7076562ca5c2aa8e3ae9; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -26,22 +26,32 @@ Si falla el desbloqueo, el asistente muestra el motivo y permite reintentar o el
 
 La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no habilita ningún LLM ni conector. El paso opcional «Modelo de IA» del primer arranque, o `/model` después, ofrece Ollama local, compatible con OpenAI, Anthropic, DeepSeek y OpenRouter. Ollama comprueba `http://127.0.0.1:11434` y muestra los modelos instalados; si no responde, arráncalo con `ollama serve` y reintenta. Para un proveedor remoto, indica la URL, el modelo y la clave enmascarada. «Probar conexión» envía solo texto sintético. La salida remota de datos requiere confirmación firmada. Escribe `/modules` para ver los módulos, usa las flechas para seleccionarlos, Tab para elegir campos, `/edit-param` para editarlos y `/keystore` para gestionar credenciales. La sesión se recarga tras aprobar un cambio.
 
+![Diálogo de modelo con proveedores seleccionables y la opción de configurarlo más tarde](../assets/model.png)
+
 Después del primer uso, IRMind suele reabrir el último caso abierto tras verificar su cadena de custodia. Si está sellado, se ha eliminado o no supera la verificación, aparece el inicio; un fallo de verificación muestra además un aviso. Usa `/home` para ver todos los casos o `/config` para desactivar la reanudación. En el inicio, escribe texto normal en la entrada inferior para filtrar títulos, o usa `/cases all|open|sealed|inconsistent` para filtrar por estado. ↑/↓ selecciona un caso y Enter lo abre.
+
+![Último caso reabierto tras verificar su cadena, con aviso de reanudación y campo de conversación](../assets/resumed.png)
 
 `/new` empieza con título obligatorio y una lista de severidades (media preseleccionada). Enter crea un caso local. Tab lleva al paso opcional de alcance remoto: fuentes, cuentas, proyectos, hosts, prefijos de objetos y límites UTC tienen campos visibles y validación en línea. No se puede crear un alcance por encima del techo de la política. `/modules` agrupa los nombres legibles por tipo; el detalle muestra el ID técnico, los parámetros públicos editables, las credenciales que faltan y la feature de un módulo no compilado. `/model`, `/modules` y `/keystore` abren diálogos centrados; Esc vuelve al inicio.
 
-![Pantalla de inicio con casos recientes y una sola entrada inferior para buscar y escribir comandos](../assets/home.png)
+![Formulario de caso nuevo con título, severidad y alcance remoto opcional](../assets/new.png)
+
+![Vista de módulos agrupados con nombres legibles, estado, parámetros y credenciales](../assets/modules.png)
+
+La demo sin conexión muestra dos módulos ilustrativos; la compilación normal incluye todos los módulos de producto actuales.
+
+![Pantalla de inicio con casos recientes y un único campo para filtrar títulos o escribir comandos](../assets/home.png)
 
 Si `config.toml` requiere recuperación, la TUI ofrece restaurarlo o revisar los cambios campo a campo antes de abrir casos. Los flags y variables de entorno que cambian los destinos se muestran y requieren confirmación; rechazarlos mantiene los ajustes guardados.
 
 ## Primer caso sintético
 
-1. Escribe `/new`, introduce un título como «Alerta de CloudTrail de prueba», elige una severidad y deja vacíos los campos de fuentes remotas. Se creará un caso local con un evento firmado.
-2. En el caso, escribe `/ingest` y selecciona [el archivo sintético de CloudTrail](../../examples/cloudtrail-alert.json). IRMind lo identifica por su hash en su ubicación y crea un índice Parquet. Solo copia el original si usas expresamente `/ingest --copy-original <ruta>`.
-3. Usa `/timeline` o `/graph` para examinar los eventos indexados. `/search <palabras>` busca registros JSON coincidentes. Usa `/raw <hash> <índice>` para consultar un registro indexado.
-4. Escribe `/model` para elegir y probar un modelo como explica [configuración](configuration.md). La sesión se recarga sin salir de IRMind. Abre el caso y pregunta: «¿Qué sugiere el evento AssumeRole sintético?».
-5. Revisa las llamadas propuestas en la conversación. Enter envía. Escribe `/` para ver sugerencias o pulsa `Ctrl+K` para abrir la paleta. `/pause` o Esc cancela una tarea activa.
-6. Ejecuta `/verify <directorio-origen>` para comprobar los bytes originales, revisa `/report` y usa `/seal` y `/export` solo después de comprobar el hash del caso y la huella de la clave de firma que se muestran.
+1. Escribe `/model` para elegir y probar un proveedor en la TUI, o posponlo para trabajar solo con evidencia local. Consulta [configuración](configuration.md) para conocer los proveedores.
+2. Escribe `/new`, introduce un título como «Alerta de CloudTrail de prueba» y elige una severidad. Enter crea un caso local firmado; el alcance remoto es opcional.
+3. Escribe `/ingest` y selecciona [el archivo sintético de CloudTrail](../../examples/cloudtrail-alert.json). IRMind calcula su hash en la ubicación original y crea un índice Parquet. Solo copia el original si usas expresamente `/ingest --copy-original <ruta>`.
+4. Pregunta «¿Qué sugiere el evento AssumeRole sintético?» y pulsa Enter. La respuesta aparece de forma incremental. Usa `/timeline` o `/graph` para examinar los eventos y `/search <palabras>` para buscar registros.
+5. Revisa las llamadas propuestas en la conversación. Una consulta externa exige una aprobación firmada con opciones numeradas; usa las flechas y Enter. Escribe `/` para ver sugerencias o pulsa Ctrl+K para abrir la paleta.
+6. Ejecuta `/verify <directorio-origen>` para comprobar los bytes originales, revisa `/report` y usa `/seal` y `/export` después de comprobar el hash del caso y la huella de la clave de firma que se muestran.
 
 Puedes verificar el paquete en otro equipo con `irmind verify-export <PACKAGE> --expected-key <FINGERPRINT>`. Consulta la [referencia de la CLI](../development/cli.md) para automatización.
 
@@ -55,15 +65,15 @@ En casos Parquet grandes, añade `--from=<UTC> --to=<UTC>`, `--account=<ID>` o `
 
 Con un SIEM configurado, `/siem-alert` obtiene una alerta dentro del alcance por su ID. El resultado aparece como una tarjeta protegida y plegable en la conversación. `/help` muestra el orden de los argumentos.
 
-![Conversación de un caso sintético de CloudTrail con una respuesta del modelo que aparece de forma incremental](../assets/conversation.png)
+![Conversación de un caso sintético de CloudTrail con la pregunta y una respuesta incremental del modelo](../assets/conversation.png)
 
 PgUp/PgDn desplazan la vista enfocada. El texto nuevo del modelo sigue el final solo si ya estás allí. ↑/↓ recuperan entradas anteriores cuando el campo está vacío. `/help` lista todos los comandos y las teclas reservadas. Los caracteres imprimibles siempre se escriben en el campo; ninguna letra ejecuta un atajo. La rueda del ratón funciona por defecto. Para seleccionar texto con el terminal, pon `mouse_capture = false` en la [configuración](configuration.md) y acepta el cambio desde la TUI.
 
-![Menú de comandos con sus descripciones sobre el campo de entrada](../assets/command-menu.png)
+![Menú de comandos con nombres y descripciones sobre la entrada del caso](../assets/command-menu.png)
 
 Una consulta externa espera la aprobación firmada del analista. La tarjeta muestra los argumentos exactos y el fragmento de evidencia sintética del que procede el valor no confiable.
 
-![Tarjeta de aprobación con la consulta externa, sus argumentos y el fragmento de origen no confiable](../assets/approval-card.png)
+![Tarjeta de aprobación numerada para VirusTotal con argumentos exactos y el fragmento de evidencia no confiable](../assets/approval-card.png)
 
 ## Siguientes pasos
 
