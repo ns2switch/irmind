@@ -3,6 +3,9 @@
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
+mod trust;
+pub use trust::{CaBundle, CaError, load_ca_file, load_optional_ca};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BodyError {
     Cancelled,
@@ -21,6 +24,22 @@ pub fn client_builder(timeout: Duration, no_proxy: bool) -> reqwest::ClientBuild
     } else {
         builder
     }
+}
+
+pub fn client_builder_with_ca(
+    timeout: Duration,
+    no_proxy: bool,
+    ca: Option<&CaBundle>,
+) -> reqwest::ClientBuilder {
+    ca.map_or_else(
+        || client_builder(timeout, no_proxy),
+        |bundle| {
+            bundle.certificates().iter().cloned().fold(
+                client_builder(timeout, no_proxy),
+                reqwest::ClientBuilder::add_root_certificate,
+            )
+        },
+    )
 }
 
 pub async fn read_limited(

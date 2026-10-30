@@ -76,13 +76,22 @@ impl SentinelOne {
                 irmind_app::AdapterPolicyError::EmptySentinelOneAPIToken,
             )));
         }
-        let async_client = irmind_http::client_builder(Duration::from_secs(30), false)
-            .build()
-            .map_err(|_| {
-                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
-                    irmind_app::AdapterStorageError::CannotCreateSentinelOneHTTPClient,
-                ))
-            })?;
+        let async_client = irmind_http::client_builder_with_ca(
+            Duration::from_secs(30),
+            false,
+            irmind_http::load_optional_ca(
+                config.value("IRMIND_SENTINELONE_CA_PEM"),
+                config.value("IRMIND_SENTINELONE_CA_SHA256"),
+            )
+            .map_err(|error| AppError::Policy(error.to_string()))?
+            .as_ref(),
+        )
+        .build()
+        .map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                irmind_app::AdapterStorageError::CannotCreateSentinelOneHTTPClient,
+            ))
+        })?;
         Ok(Self {
             async_client,
             base,

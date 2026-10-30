@@ -2440,6 +2440,7 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "irmind-fs",
+ "irmind-http",
  "irmind-infra",
  "irmind-mod-cloud-aws",
  "irmind-mod-edr-crowdstrike",
@@ -2513,7 +2514,10 @@ name = "irmind-http"
 version = "0.1.0"
 dependencies = [
  "reqwest",
+ "sha2 0.10.9",
+ "tempfile",
  "tokio",
+ "tokio-rustls",
  "tokio-util",
 ]
 
@@ -3969,6 +3973,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
  "aws-lc-rs",
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",

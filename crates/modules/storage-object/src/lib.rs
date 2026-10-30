@@ -55,6 +55,16 @@ pub static S3_MANIFEST: ModuleManifest = ModuleManifest {
             secret: false,
         },
         ConfigField {
+            name: "IRMIND_STORAGE_S3_CA_PEM",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_STORAGE_S3_CA_SHA256",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "AWS_ACCESS_KEY_ID",
             required: true,
             secret: true,

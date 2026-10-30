@@ -173,3 +173,28 @@ fn configured_search_fields_cannot_contain_spl_commands() {
     );
     assert!(Splunk::from_config(&config).is_err());
 }
+
+#[test]
+fn connector_rejects_unapproved_ca_file() {
+    let mut config = ModuleConfig::new();
+    config.insert_value("IRMIND_SPLUNK_URL", "https://splunk.invalid/".into());
+    config.insert_value("IRMIND_SPLUNK_SOURCE_ID", "splunk-prod".into());
+    config.insert_value("IRMIND_SPLUNK_INDEX", "cloudtrail".into());
+    config.insert_value("IRMIND_SPLUNK_ACCOUNT_FIELD", "recipientAccountId".into());
+    config.insert_value(
+        "IRMIND_SPLUNK_CA_PEM",
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../http/tests/fixtures/ca.pem"
+        )
+        .into(),
+    );
+    config.insert_value("IRMIND_SPLUNK_CA_SHA256", "0".repeat(64));
+    config.insert_secret(
+        "IRMIND_SPLUNK_TOKEN",
+        SecretString::from("synthetic-token".to_owned()),
+    );
+    let error = Splunk::from_config(&config).err().unwrap();
+    assert!(error.to_string().contains("fingerprint"));
+    assert!(!error.to_string().contains("synthetic-token"));
+}

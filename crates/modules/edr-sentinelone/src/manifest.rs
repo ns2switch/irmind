@@ -12,6 +12,16 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
             secret: false,
         },
         ConfigField {
+            name: "IRMIND_SENTINELONE_CA_PEM",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_SENTINELONE_CA_SHA256",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "IRMIND_SENTINELONE_SOURCE_ID",
             required: true,
             secret: false,

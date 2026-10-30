@@ -31,12 +31,104 @@ static SIEM: ModuleManifest = ModuleManifest {
     version: "test",
     ports: &[ModulePort::Siem],
     tools: &[],
-    config: &[ConfigField {
-        name: "IRMIND_SPLUNK_URL",
-        required: true,
-        secret: false,
-    }],
+    config: &[
+        ConfigField {
+            name: "IRMIND_SPLUNK_URL",
+            required: true,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_SPLUNK_CA_PEM",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_SPLUNK_CA_SHA256",
+            required: false,
+            secret: false,
+        },
+    ],
 };
+
+#[test]
+fn connector_ca_path_and_fingerprint_change_atomically() {
+    let base = PersistentConfig::default();
+    let path = "test-ca.pem";
+    let digest = "a".repeat(64);
+    let change = ConfigChange::SetCertificateAuthority {
+        module: SIEM.id.into(),
+        path_field: "IRMIND_SPLUNK_CA_PEM".into(),
+        path: path.into(),
+        sha256: digest.clone(),
+    };
+    let configured = base.changed(change, &[&SIEM]).unwrap();
+    let values = &configured.modules.get(SIEM.id).unwrap().values;
+    assert_eq!(values.get("IRMIND_SPLUNK_CA_PEM"), Some(&path.into()));
+    assert_eq!(values.get("IRMIND_SPLUNK_CA_SHA256"), Some(&digest));
+    let enabled = configured
+        .changed(
+            ConfigChange::SetEnabled {
+                module: SIEM.id.into(),
+                enabled: true,
+            },
+            &[&SIEM],
+        )
+        .unwrap();
+    let changed_ca = enabled
+        .changed(
+            ConfigChange::SetCertificateAuthority {
+                module: SIEM.id.into(),
+                path_field: "IRMIND_SPLUNK_CA_PEM".into(),
+                path: "replacement-ca.pem".into(),
+                sha256: "b".repeat(64),
+            },
+            &[&SIEM],
+        )
+        .unwrap();
+    assert!(enabled.active_egress_changed(&changed_ca));
+    assert!(
+        base.changed(
+            ConfigChange::SetValue {
+                module: SIEM.id.into(),
+                field: "IRMIND_SPLUNK_CA_PEM".into(),
+                value: path.into(),
+            },
+            &[&SIEM]
+        )
+        .is_err()
+    );
+    assert!(
+        base.changed(
+            ConfigChange::SetValue {
+                module: SIEM.id.into(),
+                field: "IRMIND_SPLUNK_CA_SHA256".into(),
+                value: digest,
+            },
+            &[&SIEM]
+        )
+        .is_err()
+    );
+    let mut incomplete = configured.clone();
+    incomplete
+        .modules
+        .get_mut(SIEM.id)
+        .unwrap()
+        .values
+        .remove("IRMIND_SPLUNK_CA_SHA256");
+    assert!(incomplete.validate(&[&SIEM]).is_err());
+    let cleared = configured
+        .changed(
+            ConfigChange::SetCertificateAuthority {
+                module: SIEM.id.into(),
+                path_field: "IRMIND_SPLUNK_CA_PEM".into(),
+                path: String::new(),
+                sha256: String::new(),
+            },
+            &[&SIEM],
+        )
+        .unwrap();
+    assert!(cleared.modules.get(SIEM.id).unwrap().values.is_empty());
+}
 
 #[test]
 fn unset_mouse_capture_preserves_signed_v1_configuration_bytes() {

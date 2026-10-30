@@ -288,6 +288,39 @@ impl HomeRuntime<'_, '_, '_> {
     }
 
     fn change_module(&mut self, change: ConfigChange, confirmed: bool) -> bool {
+        let change = if let ConfigChange::SetValue {
+            module,
+            field,
+            value,
+        } = &change
+            && field.ends_with("_CA_PEM")
+        {
+            let sha256 = if value.is_empty() {
+                String::new()
+            } else {
+                match self.io_ops.ca_fingerprint(std::path::Path::new(value)) {
+                    Ok(fingerprint) => fingerprint,
+                    Err(error) => {
+                        self.state.notice = format!("Cannot approve CA file: {error}");
+                        self.state.module_edit = Some(super::ModuleEdit {
+                            module: module.clone(),
+                            field: field.clone(),
+                            value: value.clone(),
+                            replace_on_type: false,
+                        });
+                        return false;
+                    }
+                }
+            };
+            ConfigChange::SetCertificateAuthority {
+                module: module.clone(),
+                path_field: field.clone(),
+                path: value.clone(),
+                sha256,
+            }
+        } else {
+            change
+        };
         match self
             .io_ops
             .change_module_configuration(self.engine, change.clone(), confirmed)

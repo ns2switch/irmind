@@ -31,6 +31,16 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
             secret: false,
         },
         ConfigField {
+            name: "IRMIND_CROWDSTRIKE_CA_PEM",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_CROWDSTRIKE_CA_SHA256",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "IRMIND_CROWDSTRIKE_SOURCE_ID",
             required: true,
             secret: false,
@@ -100,13 +110,22 @@ impl CrowdStrike {
                 irmind_app::AdapterPolicyError::EmptyCrowdStrikeCredential,
             )));
         }
-        let async_client = irmind_http::client_builder(Duration::from_secs(30), false)
-            .build()
-            .map_err(|_| {
-                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
-                    irmind_app::AdapterStorageError::CannotCreateCrowdStrikeHTTPClient,
-                ))
-            })?;
+        let async_client = irmind_http::client_builder_with_ca(
+            Duration::from_secs(30),
+            false,
+            irmind_http::load_optional_ca(
+                config.value("IRMIND_CROWDSTRIKE_CA_PEM"),
+                config.value("IRMIND_CROWDSTRIKE_CA_SHA256"),
+            )
+            .map_err(|error| AppError::Policy(error.to_string()))?
+            .as_ref(),
+        )
+        .build()
+        .map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                irmind_app::AdapterStorageError::CannotCreateCrowdStrikeHTTPClient,
+            ))
+        })?;
         Ok(Self {
             async_client,
             base,

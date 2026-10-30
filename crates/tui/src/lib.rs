@@ -164,6 +164,9 @@ pub trait WorkspaceIo: Send + Sync {
         change: irmind_app::ConfigChange,
         confirmed: bool,
     ) -> Result<bool>;
+    fn ca_fingerprint(&self, _path: &Path) -> Result<String> {
+        anyhow::bail!("CA inspection is unavailable in this workspace")
+    }
     fn list_ollama_models(&self, _base_url: &str) -> Result<Vec<String>> {
         anyhow::bail!("Ollama discovery is unavailable in this workspace")
     }
