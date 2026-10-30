@@ -1,4 +1,5 @@
-# IRMind synthetic, offline walkthrough. Run from the repository root.
+# Offline synthetic walkthrough. The demo process creates an ephemeral signed
+# case, file keystore and fake model. No provider or network is used.
 Output docs/assets/demo.gif
 Output docs/assets/demo.ascii
 
@@ -21,53 +22,65 @@ Env PS1 "demo$ "
 Env TERM "xterm-256color"
 
 Hide
-Type "mkdir -p /tmp/irmind-demo-home && clear && env -i HOME=/tmp/irmind-demo-home USER=demo LOGNAME=demo HOSTNAME=demo PATH=/usr/local/bin:/usr/bin:/bin TERM=xterm-256color /vhs/target/debug/examples/demo"
+Type "mkdir -p /tmp/irmind-demo-home && clear && env -i HOME=/tmp/irmind-demo-home USER=demo LOGNAME=demo HOSTNAME=demo PATH=/usr/local/bin:/usr/bin:/bin TERM=xterm-256color /vhs/target/debug/examples/demo --resume"
 Enter
-Sleep 2 s
+Sleep 6 s
 Show
+Screenshot docs/assets/resumed.png
+Sleep 700 ms
 
-Sleep 1 s
-Escape
-Sleep 800 ms
+Type "/home"
+Enter
+Sleep 500 ms
+Screenshot docs/assets/home.png
+Sleep 700 ms
 Type "/model"
 Enter
-Sleep 2 s
+Sleep 500 ms
 Screenshot docs/assets/model.png
-Sleep 1 s
+Sleep 700 ms
 Escape
-Sleep 2 s
-Screenshot docs/assets/home.png
-Sleep 1 s
+Sleep 300 ms
+Type "/modules"
+Enter
+Sleep 500 ms
+Screenshot docs/assets/modules.png
+Sleep 700 ms
+Escape
+Sleep 300 ms
 Type "/new"
 Enter
-Sleep 400 ms
+Sleep 500 ms
+Screenshot docs/assets/new.png
+Sleep 700 ms
 Type "Demo CloudTrail alert"
 Enter
-Sleep 1 s
+Sleep 1200 ms
 
 Type "/"
-Sleep 500 ms
+Sleep 350 ms
 Screenshot docs/assets/command-menu.png
-Sleep 300 ms
+Sleep 700 ms
 Type "ing"
 Tab
 Type " examples/cloudtrail-alert.json"
 Enter
-Sleep 2 s
+Sleep 1400 ms
 
 Type "What does this synthetic role assumption show?"
 Enter
-Sleep 1500 ms
+Sleep 1 s
 Screenshot docs/assets/conversation.png
-Sleep 4 s
+Sleep 1 s
+Sleep 1700 ms
 Screenshot docs/assets/approval-card.png
-Sleep 300 ms
+Sleep 700 ms
 
 Type "/approve "
 Tab
 Enter
-Sleep 3 s
+Sleep 2 s
 Type "/ver"
 Tab
 Enter
-Sleep 3 s
+Sleep 2200 ms

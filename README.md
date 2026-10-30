@@ -4,7 +4,7 @@
 
 A terminal AI client for security investigations with policy-enforced tool calls and a signed chain of custody.
 
-![IRMind synthetic walkthrough: a case, evidence, a model proposal, signed approval, and verification](docs/assets/demo.gif)
+![Synthetic IRMind TUI walkthrough showing a resumed case, slash commands, local evidence ingestion, streaming model text, and a numbered approval](docs/assets/demo.gif)
 
 *This offline demo uses synthetic evidence, an ephemeral file keystore, and a fake model.*
 
@@ -47,15 +47,14 @@ No released binaries are available yet. CI produces unsigned artifacts only on r
 
 ## First case in the TUI
 
-1. Run `irmind` without a subcommand. Choose signing and secrets backends with the arrow keys and Enter, then enter and confirm the masked passphrase if using a file keystore. It works over SSH. Save the analyst key fingerprint outside this computer. The optional “AI model” step can be skipped.
-2. On the home screen, type to filter case titles or use `/cases open|sealed|inconsistent` for status. Type `/new`, enter a title, and choose a severity; Enter creates a local case. The second step adds optional remote scope and a UTC window.
-3. Open the case and enter `/ingest`. Select [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), which contains only synthetic data. IRMind hashes the file in place; copying the original is an explicit option.
-4. Type `/model` to choose Ollama, an OpenAI-compatible endpoint, Anthropic, DeepSeek, or OpenRouter. Ollama lists installed models from `http://127.0.0.1:11434`; remote keys go into the selected secrets backend. Use “Test connection” with synthetic text and explicitly confirm remote data transfer. The session reloads inside the TUI.
-5. Open the case again and describe the synthetic alert. Enter sends. Type `/` for commands, `Ctrl+K` for the palette, `/sidebar` for case panels, and `Ctrl+O` to expand a selected card. PgUp/PgDn scroll. On an approval, select an option with the arrows and Enter, or type its number followed by Enter. `/pause` or Esc cancels a running task.
-6. Review the timeline and indexed records, then use `/verify <source-root>`, `/report`, `/seal`, and `/export`. Sealing and export show the case hash and signing-key fingerprint before confirmation.
+1. Run `irmind`. The first-run guide sets up signing and secrets backends; enter and confirm a masked passphrase if you choose the file backend. Save the analyst key fingerprint outside this computer. Choose a model in the guide or type `/model` afterward. No model is selected by default.
+2. Type `/new`, enter a title, and choose a severity with the arrow keys. Enter creates a local case; the second form step adds optional remote scope.
+3. In the case, type `/ingest` and select the synthetic [CloudTrail example](examples/cloudtrail-alert.json). IRMind hashes the file in place; copying the original is an explicit option.
+4. Ask what the synthetic role assumption suggests, then press Enter. The response streams into the conversation.
+5. Review the proposed tool call. An external lookup waits for a signed approval; choose a numbered option with the arrows and Enter. Type `/` for commands, `Ctrl+K` for the palette, and `/pause` to cancel active work.
+6. Use `/verify <source-root>` to check the original, then review `/report` before `/seal` and `/export`. The latter two show the case hash and signing-key fingerprint before confirmation.
 
-No LLM is enabled by default. You can ingest, inspect, and verify local evidence without one.
-On later starts, IRMind verifies and reopens your most recently used open case. Use `/home` for the case list or `/config` to disable this behavior.
+You can ingest, inspect, and verify local evidence without a model. On later starts, IRMind verifies and reopens your most recently used open case. Use `/home` for the case list or `/config` to disable this behavior. `/help` lists the slash commands and reserved keys: Enter, Esc, arrows, Tab/Shift+Tab, PgUp/PgDn, Ctrl+C, Ctrl+K, and Ctrl+O. Printable characters go into the active field.
 
 ## Modules
 

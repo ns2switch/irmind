@@ -4,7 +4,7 @@ Traducción de README.md en el commit 08172a83df22ec719c7f9a7fbe83c064fc5e9229; 
 
 Cliente de IA en terminal para investigaciones de seguridad, con llamadas a herramientas sujetas a política y cadena de custodia firmada.
 
-![Demostración sintética de IRMind: caso, evidencia, propuesta del modelo, aprobación firmada y verificación](docs/assets/demo.gif)
+![Demostración sintética de IRMind: caso reanudado, comandos, ingesta, respuesta en streaming y aprobación numerada](docs/assets/demo.gif)
 
 *Esta demostración sin conexión usa evidencia sintética, un llavero de archivo efímero y un modelo falso.*
 
@@ -47,15 +47,15 @@ Todavía no hay binarios publicados como versión. CI genera artefactos sin firm
 
 ## Primer caso en la TUI
 
-1. Ejecuta `irmind` sin subcomando. Elige los backends de firma y secretos con las flechas y Enter; si usas el almacén de archivo, introduce y confirma la passphrase en campos enmascarados. Funciona por SSH. Guarda la huella de la clave del analista fuera del equipo. Puedes omitir el paso opcional «Modelo de IA».
-2. En el inicio, escribe texto para filtrar títulos o usa `/cases open|sealed|inconsistent` para filtrar por estado. Escribe `/new`, indica un título y elige la severidad; Enter crea un caso local. El segundo paso permite añadir un alcance remoto y una ventana UTC.
-3. Abre el caso y escribe `/ingest`. Selecciona [examples/cloudtrail-alert.json](examples/cloudtrail-alert.json), que contiene únicamente datos sintéticos. IRMind calcula el hash en su ubicación; copiar el original es una opción explícita.
-4. Escribe `/model` para elegir Ollama, un servicio compatible con OpenAI, Anthropic, DeepSeek u OpenRouter. Ollama lista los modelos instalados en `http://127.0.0.1:11434`; las claves remotas se guardan en el backend de secretos. «Probar conexión» solo envía texto sintético. Confirma explícitamente la salida de datos para un proveedor remoto. La sesión se recarga dentro de la TUI.
-5. Abre de nuevo el caso y describe la alerta sintética. Enter envía. Escribe `/` para ver comandos, `Ctrl+K` para abrir la paleta, `/sidebar` para los paneles y `Ctrl+O` para desplegar una tarjeta seleccionada. PgUp/PgDn desplazan la vista. En una aprobación, usa flechas y Enter o escribe su número seguido de Enter. `/pause` o Esc cancela una tarea activa.
-6. Revisa la cronología y los registros indexados. Usa `/verify <directorio-origen>`, `/report`, `/seal` y `/export`. El sellado y la exportación muestran el hash y la huella de la clave antes de confirmar.
+1. Ejecuta `irmind`. El asistente configura los backends de firma y secretos; si eliges el archivo cifrado, introduce y confirma la passphrase en campos enmascarados. Guarda la huella de la clave del analista fuera del equipo. Elige un modelo en el asistente o escribe `/model` después. Ningún modelo está seleccionado por defecto.
+2. Escribe `/new`, introduce un título y elige la severidad con las flechas. Enter crea un caso local; el segundo paso del formulario permite añadir un alcance remoto opcional.
+3. En el caso, escribe `/ingest` y selecciona [el ejemplo sintético de CloudTrail](examples/cloudtrail-alert.json). IRMind calcula su hash en la ubicación original; la copia es opcional y explícita.
+4. Pregunta qué sugiere la asunción de rol sintética y pulsa Enter. La respuesta aparece de forma incremental.
+5. Revisa la llamada propuesta. Una consulta externa espera una aprobación firmada; elige una opción numerada con las flechas y Enter. Escribe `/` para ver comandos, `Ctrl+K` para la paleta y `/pause` para cancelar una tarea activa.
+6. Usa `/verify <directorio-origen>` para comprobar el original; revisa `/report` antes de `/seal` y `/export`. Estas dos acciones muestran el hash del caso y la huella de la clave antes de confirmar.
 
 Ningún LLM está habilitado por defecto. Puedes ingerir y verificar evidencia local sin uno.
-En los siguientes arranques, IRMind verifica y reabre el último caso abierto que usaste. Usa `/home` para volver a la lista o `/config` para desactivar esta opción.
+En los siguientes arranques, IRMind verifica y reabre el último caso abierto que usaste. Usa `/home` para volver a la lista o `/config` para desactivar esta opción. `/help` enumera los comandos y las teclas reservadas: Enter, Esc, flechas, Tab/Shift+Tab, PgUp/PgDn, Ctrl+C, Ctrl+K y Ctrl+O. Los caracteres imprimibles se escriben en el campo activo.
 
 ## Módulos
 
@@ -72,9 +72,6 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Almacenamiento S3 | almacenamiento en nube | `storage-s3` | experimental | [Objetos](docs/es/modules.md#almacenamiento-de-objetos-en-la-nube-s3-gcs-y-azure-blob) |
 | Almacenamiento GCS | almacenamiento en nube | `storage-gcs` | experimental | [Objetos](docs/es/modules.md#almacenamiento-de-objetos-en-la-nube-s3-gcs-y-azure-blob) |
 | Almacenamiento Azure Blob | almacenamiento en nube | `storage-azure` | experimental | [Objetos](docs/es/modules.md#almacenamiento-de-objetos-en-la-nube-s3-gcs-y-azure-blob) |
-| Objetos S3 | almacenamiento en la nube | `storage-s3` | experimental | [Módulos](docs/es/modules.md) |
-| Objetos GCS | almacenamiento en la nube | `storage-gcs` | experimental | [Módulos](docs/es/modules.md) |
-| Azure Blob | almacenamiento en la nube | `storage-azure` | experimental | [Módulos](docs/es/modules.md) |
 | CrowdStrike | EDR | `edr-crowdstrike` | experimental | [Módulos](docs/es/modules.md) |
 | SentinelOne | EDR | `edr-sentinelone` | experimental | [Módulos](docs/es/modules.md) |
 | MISP | TI interna | `ti-misp` | experimental | [Módulos](docs/es/modules.md) |

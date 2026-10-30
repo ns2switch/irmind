@@ -47,7 +47,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$branch"
-          git add docs/assets/demo.gif docs/assets/conversation.png docs/assets/command-menu.png docs/assets/approval-card.png
+          git add docs/assets/demo.gif docs/assets/*.png
           git commit -m 'docs: refresh synthetic demo' -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
           git push origin "$branch"
           gh pr create --base main --head "$branch" --title 'docs: refresh synthetic demo' --body 'VHS regenerated the offline synthetic GIF and screenshots. The tape, duration, size, flow and privacy checks passed.'

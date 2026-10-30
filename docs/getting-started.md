@@ -24,22 +24,32 @@ If unlocking fails, the wizard shows an actionable reason and lets you retry or 
 
 The normal build compiles all current product modules and both keystores, but enables no LLM or connector. The optional first-run “AI model” step, or `/model` later, offers Ollama local, OpenAI-compatible, Anthropic, DeepSeek, and OpenRouter. Ollama checks `http://127.0.0.1:11434` and lists installed models; if unavailable, start it with `ollama serve` and retry. For a remote provider, enter its URL, model, and masked API key. “Test connection” sends synthetic text only. Enabling remote data transfer requires explicit signed confirmation. Type `/modules` to see compiled and enabled modules. Select with arrows, use Tab for public fields, `/edit-param` to edit, and `/keystore` for credentials. The session reloads after an approved change.
 
-After the first run, IRMind normally reopens the most recently used open case after verifying its custody chain. A sealed, deleted, or invalid case takes you to the home screen; an invalid chain also shows a warning. Use `/home` to see all cases or `/config` to turn automatic resumption off. The home screen has no separate search field: type plain text in its bottom input to filter titles, or use `/cases all|open|sealed|inconsistent` to filter by status. Up/Down selects a case and Enter opens it.
+![AI model setup dialog with a list of providers and an option to configure one later](assets/model.png)
+
+After the first run, IRMind normally reopens the most recently used open case after verifying its custody chain. A sealed, deleted, or invalid case takes you to the home screen; an invalid chain also shows a warning. Use `/home` to see all cases or `/config` to turn automatic resumption off. On the home screen, type plain text in the bottom input to filter titles, or use `/cases all|open|sealed|inconsistent` to filter by status. Up/Down selects a case and Enter opens it.
+
+![Verified recent case reopened with a Resumed notice and the case conversation input](assets/resumed.png)
 
 `/new` starts with a required title and a severity list (Medium is selected by default). Enter creates a local case. Tab reaches the optional remote-scope step, where each source, account, project, host, object prefix, and UTC bound has a visible field and inline validation. A scope above the organization policy ceiling is rejected before creation. `/modules` groups readable module names by type; its detail pane shows technical IDs, editable public parameters, missing credential names, and the feature needed by an uncompiled module. `/model`, `/modules`, and `/keystore` open centered dialogs; Esc returns home.
 
-![Home screen with recent cases and one bottom input for search and commands](assets/home.png)
+![New case dialog with a title field, severity choices, and optional remote scope](assets/new.png)
+
+![Grouped module view with readable names, status, public settings, and credential presence](assets/modules.png)
+
+The offline screenshot fixture lists two illustrative modules; the normal build includes all current product modules.
+
+![Home screen with a recent case list and one input for filtering or slash commands](assets/home.png)
 
 If `config.toml` needs recovery, the TUI offers restoration or a field-by-field review before any case opens. Session flags and environment overrides that change destinations are shown and require confirmation; rejecting them uses the saved settings.
 
 ## A synthetic first case
 
-1. Type `/new`, enter a title such as “Demo CloudTrail alert,” select a severity, and leave remote source fields empty. That creates a local-only case with a signed event.
-2. In the case view, enter `/ingest` and select [the synthetic CloudTrail file](../examples/cloudtrail-alert.json). IRMind hashes it in place and writes a derived Parquet index. The original is copied only if you explicitly use `/ingest --copy-original <path>`.
-3. Use `/timeline` or `/graph` to inspect the indexed events. `/search <words>` finds matching JSON records. Use `/raw <hash> <index>` to inspect one indexed record.
-4. Type `/model` to select and test a model as described in [configuration](configuration.md). The session reloads without exiting IRMind. Open the case and ask: “What does the synthetic AssumeRole event suggest?”
-5. Review proposed calls in the conversation. Enter sends. Type `/` for command suggestions or press `Ctrl+K` for the palette. `/pause` or Esc cancels an active task.
-6. Run `/verify <source-root>` to check the original bytes, review `/report`, and use `/seal` and `/export` only after checking the displayed case hash and signing-key fingerprint.
+1. Type `/model` to choose and test a provider in the TUI, or skip it to work with local evidence only. See [configuration](configuration.md) for the provider choices.
+2. Type `/new`, enter a title such as “Demo CloudTrail alert,” and select a severity. Press Enter to create a signed local case; the remote scope is optional.
+3. Type `/ingest` and select [the synthetic CloudTrail file](../examples/cloudtrail-alert.json). IRMind hashes it in place and writes a derived Parquet index. It copies the original only if you explicitly use `/ingest --copy-original <path>`.
+4. Ask “What does the synthetic AssumeRole event suggest?” and press Enter. The response appears incrementally. Use `/timeline` or `/graph` to inspect indexed events and `/search <words>` to find matching records.
+5. Review tool proposals in the conversation. An external lookup requires a signed approval with numbered options; use the arrows and Enter. Type `/` for command suggestions or press Ctrl+K for the palette.
+6. Run `/verify <source-root>` to check original bytes, review `/report`, and use `/seal` and `/export` only after checking the displayed case hash and signing-key fingerprint.
 
 The export can be checked on a second computer with `irmind verify-export <PACKAGE> --expected-key <FINGERPRINT>`. See the [CLI reference](development/cli.md) for automation.
 
@@ -53,15 +63,15 @@ For large Parquet cases, add `--from=<UTC> --to=<UTC>`, `--account=<ID>` or `--p
 
 With a configured SIEM, `/siem-alert` retrieves one scoped alert by ID. The result appears as a guarded, foldable card in the same conversation. `/help` shows the argument order.
 
-![Conversation showing a synthetic CloudTrail case and a streaming model reply](assets/conversation.png)
+![Case conversation with a synthetic CloudTrail question and a model reply appearing incrementally](assets/conversation.png)
 
 PgUp/PgDn scroll the focused view. New model text follows the end only while you are there. Up/Down recall prompts when the input is empty. `/help` lists every command and the reserved keys. Printable characters always enter the input field; no letter executes a shortcut. Mouse wheel scrolling is enabled by default. To keep terminal text selection, set `mouse_capture = false` in [configuration](configuration.md) and accept the file change in the TUI.
 
-![Slash-command menu with commands and descriptions above the input field](assets/command-menu.png)
+![Slash-command menu listing available commands and descriptions above the case input](assets/command-menu.png)
 
 An external lookup waits for a signed approval. The card shows the exact arguments and the synthetic evidence fragment that supplied the tainted value.
 
-![Approval card showing an external lookup, its arguments, and the tainted source fragment](assets/approval-card.png)
+![Numbered approval card for a VirusTotal lookup showing exact arguments and a highlighted untrusted evidence fragment](assets/approval-card.png)
 
 ## Next
 
