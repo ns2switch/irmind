@@ -335,26 +335,24 @@ fn run_verify_export(path: &std::path::Path, expected_key: Option<&str>) -> Resu
 
 fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) -> Result<bool> {
     match command {
-        None => irmind_tui::run_workspace(
-            context.engine,
-            context.selected_model,
-            context.workspace_io,
-            context.module_statuses,
-            context.cancel,
-            irmind_tui::WorkspaceLaunch {
-                initial_case: None,
-                resume_last_case: context
-                    .workspace_io
-                    .config_store
-                    .load()?
-                    .resume_last_case
-                    .unwrap_or(true)
-                    .into(),
-                new_analyst_key: context.new_analyst_key,
-                overrides_active: context.overrides_active,
-                mouse_capture: context.mouse_capture,
-            },
-        ),
+        None => {
+            let saved = context.workspace_io.config_store.load()?;
+            irmind_tui::run_workspace(
+                context.engine,
+                context.selected_model,
+                context.workspace_io,
+                context.module_statuses,
+                context.cancel,
+                irmind_tui::WorkspaceLaunch {
+                    initial_case: None,
+                    resume_last_case: saved.resume_last_case.unwrap_or(true).into(),
+                    new_analyst_key: context.new_analyst_key,
+                    overrides_active: context.overrides_active,
+                    mouse_capture: context.mouse_capture,
+                    theme: saved.theme.as_deref(),
+                },
+            )
+        }
         Some(command) => context.run(command),
     }
 }

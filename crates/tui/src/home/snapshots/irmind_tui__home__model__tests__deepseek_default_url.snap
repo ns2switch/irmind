@@ -1,0 +1,6 @@
+---
+source: crates/tui/src/home/model.rs
+expression: screen(&state)
+---
+API URL (HTTPS, or HTTP on loopback; type to replace default):
+> https://api.deepseek.com/ (default)

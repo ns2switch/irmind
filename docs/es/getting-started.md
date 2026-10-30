@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit ae1b62bf3ba41673881a7076562ca5c2aa8e3ae9; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit a333bb3ffc4a9d695d1facf42461c43ce3d2dc7f; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -22,21 +22,27 @@ En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Cuando
 
 Al ejecutar `irmind` sin subcomando se abre la TUI. El asistente explica por qué se firman los casos y permite elegir `os` o `file` por separado para la firma y los secretos. Usa las flechas y Enter para elegir cada backend; las opciones no disponibles aparecen atenuadas con el motivo y no se pueden seleccionar. Ambos se compilan por defecto; IRMind nunca cambia de backend en silencio. Preselecciona `file` si no hay llavero del sistema. Pide dos veces la passphrase en campos enmascarados dentro de la TUI, comprueba su longitud y funciona por SSH sin sesión gráfica. Esc retrocede y Ctrl+C pide confirmación para salir. En el primer uso se crea la clave del analista y se muestra su huella pública. Guárdala fuera del equipo por un canal de confianza.
 
-Si falla el desbloqueo, el asistente muestra el motivo y permite reintentar o elegir otro backend. Una passphrase errónea no cierra la TUI. Los errores inesperados apuntan a `diagnostics.log` en el directorio de datos. La selección queda en `keystore.toml`. Escribe `/keystore` para ver los backends y la huella, gestionar credenciales, cambiar la passphrase o migrar. La entrada de secretos permanece enmascarada dentro de la TUI. Tras sustituir una credencial, los conectores activos conservan el valor anterior; escribe `/restart` para reiniciar la sesión.
+Si falla el desbloqueo, el asistente muestra el motivo y permite reintentar o elegir otro backend. Una passphrase errónea no cierra la TUI. Los errores inesperados apuntan a `diagnostics.log` en el directorio de datos. La selección queda en `keystore.toml`. Escribe `/settings keystore` para ver los backends y la huella, gestionar credenciales, cambiar la passphrase o migrar. La entrada de secretos permanece enmascarada dentro de la TUI. Tras sustituir una credencial, los conectores activos conservan el valor anterior; escribe `/restart` para reiniciar la sesión.
 
-La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no habilita ningún LLM ni conector. El paso opcional «Modelo de IA» del primer arranque, o `/model` después, ofrece Ollama local, compatible con OpenAI, Anthropic, DeepSeek y OpenRouter. Ollama comprueba `http://127.0.0.1:11434` y muestra los modelos instalados; si no responde, arráncalo con `ollama serve` y reintenta. Para un proveedor remoto, indica la URL, el modelo y la clave enmascarada. «Probar conexión» envía solo texto sintético. La salida remota de datos requiere confirmación firmada. Escribe `/modules` para ver los módulos, usa las flechas para seleccionarlos, Tab para elegir campos, `/edit-param` para editarlos y `/keystore` para gestionar credenciales. La sesión se recarga tras aprobar un cambio.
+La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no habilita ningún LLM ni conector. El paso opcional «Modelo de IA» del primer arranque, o `/settings model` después, ofrece Ollama, LM Studio y vLLM locales, además de los proveedores remotos documentados en [configuración](configuration.md). Ollama comprueba `http://127.0.0.1:11434`; si no responde, arráncalo con `ollama serve` y reintenta. Para un proveedor remoto, indica la URL y la clave enmascarada. Se pide permiso antes de consultar su lista de modelos o probarlo con texto sintético; habilitarlo para datos del caso requiere otra confirmación firmada. Escribe `/settings connectors` para ver los módulos, usa flechas para seleccionarlos y Tab y Enter para editar sus campos públicos. `/settings keystore` gestiona las credenciales. La sesión se recarga tras aprobar un cambio.
+
+![Pantalla de Ajustes con las secciones Modelo, Conectores, Llavero y Preferencias](../assets/settings.png)
 
 ![Diálogo de modelo con proveedores seleccionables y la opción de configurarlo más tarde](../assets/model.png)
 
-Después del primer uso, IRMind suele reabrir el último caso abierto tras verificar su cadena de custodia. Si está sellado, se ha eliminado o no supera la verificación, aparece el inicio; un fallo de verificación muestra además un aviso. Usa `/home` para ver todos los casos o `/config` para desactivar la reanudación. En el inicio, escribe texto normal en la entrada inferior para filtrar títulos, o usa `/cases all|open|sealed|inconsistent` para filtrar por estado. ↑/↓ selecciona un caso y Enter lo abre.
+Después del primer uso, IRMind suele reabrir el último caso abierto tras verificar su cadena de custodia. Si está sellado, se ha eliminado o no supera la verificación, aparece el inicio; un fallo de verificación muestra además un aviso. Usa `/home` para ver todos los casos o `/settings preferences` para desactivar la reanudación. En el inicio, escribe texto normal en la entrada inferior para filtrar títulos, o usa `/cases all|open|sealed|inconsistent` para filtrar por estado. ↑/↓ selecciona un caso y Enter lo abre.
 
 ![Último caso reabierto tras verificar su cadena, con aviso de reanudación y campo de conversación](../assets/resumed.png)
 
-`/new` empieza con título obligatorio y una lista de severidades (media preseleccionada). Enter crea un caso local. Tab lleva al paso opcional de alcance remoto: fuentes, cuentas, proyectos, hosts, prefijos de objetos y límites UTC tienen campos visibles y validación en línea. No se puede crear un alcance por encima del techo de la política. `/modules` agrupa los nombres legibles por tipo; el detalle muestra el ID técnico, los parámetros públicos editables, las credenciales que faltan y la feature de un módulo no compilado. `/model`, `/modules` y `/keystore` abren diálogos centrados; Esc vuelve al inicio.
+`/new` empieza con título obligatorio y una lista de severidades (media preseleccionada). Enter crea un caso local. Tab lleva al paso opcional de alcance remoto: fuentes, cuentas, proyectos, hosts, prefijos de objetos y límites UTC tienen campos visibles y validación en línea. No se puede crear un alcance por encima del techo de la política. `/settings connectors` agrupa los nombres legibles por tipo; el detalle muestra el ID técnico, los parámetros públicos editables, las credenciales que faltan y la feature de un módulo no compilado. `/settings model`, `/settings connectors` y `/settings keystore` abren diálogos centrados; Esc vuelve a Ajustes.
 
 ![Formulario de caso nuevo con título, severidad y alcance remoto opcional](../assets/new.png)
 
 ![Vista de módulos agrupados con nombres legibles, estado, parámetros y credenciales](../assets/modules.png)
+
+![Ajustes del llavero con backends de firma y secretos y presencia de credenciales sin mostrar valores](../assets/keystore.png)
+
+![Preferencias de reanudación del caso, ratón y tema](../assets/preferences.png)
 
 La demo sin conexión muestra dos módulos ilustrativos; la compilación normal incluye todos los módulos de producto actuales.
 
@@ -46,7 +52,7 @@ Si `config.toml` requiere recuperación, la TUI ofrece restaurarlo o revisar los
 
 ## Primer caso sintético
 
-1. Escribe `/model` para elegir y probar un proveedor en la TUI, o posponlo para trabajar solo con evidencia local. Consulta [configuración](configuration.md) para conocer los proveedores.
+1. Escribe `/settings model` para elegir y probar un proveedor en la TUI, o posponlo para trabajar solo con evidencia local. Consulta [configuración](configuration.md) para conocer los proveedores.
 2. Escribe `/new`, introduce un título como «Alerta de CloudTrail de prueba» y elige una severidad. Enter crea un caso local firmado; el alcance remoto es opcional.
 3. Escribe `/ingest` y selecciona [el archivo sintético de CloudTrail](../../examples/cloudtrail-alert.json). IRMind calcula su hash en la ubicación original y crea un índice Parquet. Solo copia el original si usas expresamente `/ingest --copy-original <ruta>`.
 4. Pregunta «¿Qué sugiere el evento AssumeRole sintético?» y pulsa Enter. La respuesta aparece de forma incremental. Usa `/timeline` o `/graph` para examinar los eventos y `/search <palabras>` para buscar registros.

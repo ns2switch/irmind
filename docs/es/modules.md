@@ -1,10 +1,10 @@
-Traducción de docs/modules.md en el commit 1062ed9ecebb5f0c6cbe3fbccb335de723e20dbe; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit a333bb3ffc4a9d695d1facf42461c43ce3d2dc7f; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
 Esta página es para quienes eligen conectores o backends de llavero. Cada apartado explica qué hace el módulo, sus permisos, configuración y límites. Guarda las credenciales según [configuración](configuration.md); los conectores no leen el llavero ni el entorno por su cuenta.
 
-La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Ninguno se activa automáticamente. En la TUI, usa `/model` para seleccionar y probar un proveedor, `/modules` para activar conectores y editar campos públicos, y `/keystore` para las credenciales. Los cambios persisten y la sesión se recarga. Una compilación mínima usa `--no-default-features --features keystore-file`; siempre se requiere un backend de firma y secretos. Las variables y flags de la CLI ofrecen overrides temporales para automatización.
+La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Ninguno se activa automáticamente. En la TUI, usa `/settings model` para seleccionar y probar un proveedor, `/settings connectors` para activar conectores y editar campos públicos, y `/settings keystore` para las credenciales. Los cambios persisten y la sesión se recarga. Una compilación mínima usa `--no-default-features --features keystore-file`; siempre se requiere un backend de firma y secretos. Las variables y flags de la CLI ofrecen overrides temporales para automatización.
 
 ## Compatible con OpenAI
 
@@ -15,6 +15,22 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 **Configuración:** Incluido en el binario estándar. Define `IRMIND_MODEL` y, si procede, `IRMIND_LLM_BASE_URL`. Selecciona `--llm-module llm-openai-compatible`. Guarda `OPENAI_API_KEY` solo para la URL oficial, o `IRMIND_LLM_API_KEY` para una URL personalizada.
 
 **Límites:** El stream debe incluir el uso final de tokens; si está incompleto, se detiene. La redacción por patrones no garantiza eliminar todo dato sensible. Obtén la aprobación del proveedor antes de enviar datos de incidentes.
+
+Los siguientes proveedores preconfigurados de `/settings model` usan este mismo módulo. Sus URL son valores predeterminados, no una autorización para enviar datos del caso. Sus documentos describen Chat Completions, streaming y llamadas a herramientas; el soporte real depende del modelo elegido. Los servicios locales deben estar en marcha con un modelo apto para herramientas. Si no se puede consultar la lista, introduce el ID del modelo a mano.
+
+| Proveedor | URL base predeterminada | Documentación oficial |
+| --- | --- | --- |
+| OpenAI | `https://api.openai.com/v1/` | [Chat Completions](https://platform.openai.com/docs/api-reference/chat/create) |
+| Mistral | `https://api.mistral.ai/v1/` | [API](https://docs.mistral.ai/api/) |
+| Groq | `https://api.groq.com/openai/v1/` | [API](https://console.groq.com/docs/api-reference) |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai/` | [Compatibilidad OpenAI](https://ai.google.dev/gemini-api/docs/openai/) |
+| xAI | `https://api.x.ai/v1/` | [Chat Completions](https://docs.x.ai/developers/rest-api-reference/inference/chat-completions) |
+| Together | `https://api.together.ai/v1/` | [Compatibilidad OpenAI](https://docs.together.ai/docs/inference/openai-compatibility) |
+| Ollama | `http://127.0.0.1:11434/v1/` | [Compatibilidad OpenAI](https://docs.ollama.com/api/openai-compatibility) |
+| LM Studio | `http://127.0.0.1:1234/v1/` | [Compatibilidad OpenAI](https://lmstudio.ai/docs/developer/openai-compat) |
+| vLLM | `http://127.0.0.1:8000/v1/` | [Servidor compatible](https://docs.vllm.ai/en/latest/serving/openai_compatible_server/) |
+
+Los servicios Azure OpenAI que requieren `api-version` en la URL no están soportados por el formulario. Una URL personalizada sigue disponible si cumple los requisitos de streaming, herramientas y tamaño limitado de respuesta.
 
 ## Anthropic
 
@@ -138,7 +154,7 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Permiso:** Acceso al almacén de credenciales del usuario actual. En Linux, Secret Service suele necesitar una sesión D-Bus.
 
-**Configuración:** Se compila por defecto con `keystore-os`. Elige `os` explícitamente para `signer`, `secrets` o ambos en el primer arranque. Usa `/keystore` para gestionar credenciales sin mostrar sus valores.
+**Configuración:** Se compila por defecto con `keystore-os`. Elige `os` explícitamente para `signer`, `secrets` o ambos en el primer arranque. Usa `/settings keystore` para gestionar credenciales sin mostrar sus valores.
 
 **Límites:** Una sesión SSH sin entorno gráfico puede no tener el llavero desbloqueado. Si este backend está seleccionado y no funciona, IRMind se detiene; la selección o migración a `file` debe ser explícita.
 
@@ -148,7 +164,7 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Permiso:** Escritura en el directorio privado de datos del usuario; no requiere red ni sesión gráfica.
 
-**Configuración:** Se compila por defecto con `keystore-file`. Elige `file` explícitamente para `signer`, `secrets` o ambos. La TUI pide la passphrase sin eco; la CLI admite `--passphrase-fd`. Usa `/keystore` para cambiar la passphrase o migrar.
+**Configuración:** Se compila por defecto con `keystore-file`. Elige `file` explícitamente para `signer`, `secrets` o ambos. La TUI pide la passphrase sin eco; la CLI admite `--passphrase-fd`. Usa `/settings keystore` para cambiar la passphrase o migrar.
 
 **Límites:** Argon2id y XChaCha20-Poly1305 protegen el archivo en reposo, pero una passphrase débil o una sesión comprometida pueden exponerlo desbloqueado. Conserva fuera de la máquina la huella pública. La migración queda en la cadena operativa global firmada y requiere reiniciar la sesión para activarse.
 

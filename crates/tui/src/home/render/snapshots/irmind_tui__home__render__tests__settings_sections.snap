@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: "snapshot_screen(&state,\nsuper::super::SettingsSection::ALL.iter().enumerate().map(|(index, section)|\nListItem::new(format!(\"{} {}\", if index == 0 { \">\" } else { \" \" },\nsection.label()))).collect())"
+---
+IRMind v0.1.0
+
+Settings · choose a section
+
+  > AI model
+    Connectors
+    Keystore and credentials
+    Preferences
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+↑/↓ choose · Enter open · Esc back

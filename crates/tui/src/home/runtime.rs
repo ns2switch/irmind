@@ -54,9 +54,18 @@ impl HomeRuntime<'_, '_, '_> {
             if !event::poll(Duration::from_millis(100))? {
                 continue;
             }
-            let Event::Key(key) = event::read()? else {
+            let input = event::read()?;
+            if let Event::Paste(value) = &input {
+                super::state::paste(&mut self.state, value);
+                continue;
+            }
+            let Event::Key(key) = input else {
                 continue;
             };
+            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('u') {
+                super::state::clear_active_field(&mut self.state);
+                continue;
+            }
             if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                 self.state.confirm_exit = crate::ExitConfirmation::Pending;
                 self.state.notice = "Exit IRMind? Enter confirms; Esc cancels.".into();
@@ -109,20 +118,20 @@ impl HomeRuntime<'_, '_, '_> {
                 Ok(Ok(models)) => {
                     self.state.model_setup.models = models;
                     self.state.model_setup.selected_model = 0;
-                    self.state.model_setup.step = super::model::ModelStep::OllamaModels;
+                    self.state.model_setup.step = super::model::ModelStep::AvailableModels;
                     self.state.model_setup.notice = if self.state.model_setup.models.is_empty() {
-                        "Ollama has no installed models; run `ollama pull <model>`".into()
+                        "No models returned; Tab enters a model ID manually".into()
                     } else {
-                        "Choose an installed model".into()
+                        "Choose an available model".into()
                     };
                 }
                 Ok(Err(error)) => {
-                    self.state.model_setup.step = super::model::ModelStep::OllamaModels;
-                    self.state.model_setup.notice = format!("Ollama: {error}");
+                    self.state.model_setup.step = super::model::ModelStep::AvailableModels;
+                    self.state.model_setup.notice = format!("Model list: {error}");
                 }
                 Err(_) => {
-                    self.state.model_setup.step = super::model::ModelStep::OllamaModels;
-                    self.state.model_setup.notice = "Ollama discovery failed".into();
+                    self.state.model_setup.step = super::model::ModelStep::AvailableModels;
+                    self.state.model_setup.notice = "Model discovery failed".into();
                 }
             }
         }
@@ -234,13 +243,14 @@ impl HomeRuntime<'_, '_, '_> {
             HomeAction::ChangeModule(change, confirmed) => {
                 return Ok(self.change_module(change, confirmed));
             }
-            HomeAction::DiscoverOllama => {
+            HomeAction::DiscoverModels => {
                 if self.model_models_task.is_none() {
                     let io_ops = self.io_ops;
-                    let url = self.state.model_setup.url.clone();
-                    self.state.model_setup.notice = "Checking Ollama…".into();
-                    self.model_models_task =
-                        Some(self.scope.spawn(move || io_ops.list_ollama_models(&url)));
+                    let draft = self.state.model_setup.draft();
+                    self.state.model_setup.notice = "Listing models…".into();
+                    self.model_models_task = Some(self.scope.spawn(move || {
+                        io_ops.list_provider_models(draft.provider, &draft.url, draft.key.as_ref())
+                    }));
                 }
             }
             HomeAction::ProbeModel(draft) => {
@@ -363,6 +373,19 @@ impl HomeRuntime<'_, '_, '_> {
                 false
             }
             Err(error) => {
+                if let ConfigChange::SetValue {
+                    module,
+                    field,
+                    value,
+                } = &change
+                {
+                    self.state.module_edit = Some(super::ModuleEdit {
+                        module: module.clone(),
+                        field: field.clone(),
+                        value: value.clone(),
+                        replace_on_type: false,
+                    });
+                }
                 self.state.notice = format!("Configuration change failed: {error}");
                 false
             }
@@ -391,7 +414,9 @@ impl HomeRuntime<'_, '_, '_> {
                 if self.state.mode == Mode::Keystore {
                     self.state.keystore = Some(self.io_ops.keystore_status()?);
                 }
-                self.state.notice = "Returned to case list".into();
+                if self.state.mode == Mode::List {
+                    self.state.notice = "Returned to case list".into();
+                }
             }
             Err(error) => {
                 let Some(case_error) = error.downcast_ref::<irmind_app::AppError>() else {

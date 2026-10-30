@@ -302,7 +302,9 @@ impl WorkspaceIo for RootWorkspaceIo {
         confirmed: bool,
     ) -> Result<bool> {
         let overridden = match &change {
-            ConfigChange::SetResumeLastCase(_) => false,
+            ConfigChange::SetResumeLastCase(_)
+            | ConfigChange::SetMouseCapture(_)
+            | ConfigChange::SetTheme(_) => false,
             ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
             ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
             ConfigChange::SetValue { module, field, .. } => {
@@ -364,6 +366,14 @@ impl WorkspaceIo for RootWorkspaceIo {
     }
     fn list_ollama_models(&self, base_url: &str) -> Result<Vec<String>> {
         model_probe::list_ollama_models(base_url)
+    }
+    fn list_provider_models(
+        &self,
+        provider: &str,
+        base_url: &str,
+        key: Option<&secrecy::SecretString>,
+    ) -> Result<Vec<String>> {
+        model_probe::list_provider_models(provider, base_url, key)
     }
     fn test_model_connection(
         &self,

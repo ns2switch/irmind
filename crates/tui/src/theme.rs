@@ -1,4 +1,22 @@
 use ratatui::style::{Color, Style};
+use std::cell::Cell;
+
+#[derive(Clone, Copy)]
+enum Choice {
+    Auto,
+    Light,
+    Dark,
+}
+
+thread_local! { static CHOICE: Cell<Choice> = const { Cell::new(Choice::Auto) }; }
+
+pub(crate) struct ThemeGuard(Choice);
+
+impl Drop for ThemeGuard {
+    fn drop(&mut self) {
+        CHOICE.set(self.0);
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(crate) struct Theme {
@@ -13,11 +31,28 @@ pub(crate) struct Theme {
 }
 
 impl Theme {
+    pub(crate) fn configure(choice: Option<&str>) -> ThemeGuard {
+        let previous = CHOICE.get();
+        let selected = match choice {
+            Some("light") => Choice::Light,
+            Some("dark") => Choice::Dark,
+            _ => Choice::Auto,
+        };
+        CHOICE.set(selected);
+        ThemeGuard(previous)
+    }
+
     pub(crate) fn detect() -> Self {
         if std::env::var_os("NO_COLOR").is_some() {
             return Self::plain();
         }
-        let configured = std::env::var("IRMIND_THEME").ok();
+        let configured = std::env::var("IRMIND_THEME")
+            .ok()
+            .or_else(|| match CHOICE.get() {
+                Choice::Auto => None,
+                Choice::Light => Some("light".into()),
+                Choice::Dark => Some("dark".into()),
+            });
         let terminal = std::env::var("COLORFGBG").ok();
         let light = Self::is_light(configured.as_deref(), terminal.as_deref());
         if light { Self::light() } else { Self::dark() }

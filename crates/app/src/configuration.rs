@@ -23,6 +23,8 @@ pub struct PersistentConfig {
     /// Presentation-only setting; omitted from the signed v1 representation when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mouse_capture: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
     /// Presentation-only setting; absence preserves the existing signed v1 bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resume_last_case: Option<bool>,
@@ -52,6 +54,8 @@ pub enum ConfigChange {
         value: String,
     },
     SetResumeLastCase(bool),
+    SetMouseCapture(bool),
+    SetTheme(String),
 }
 
 pub trait ConfigurationStore: Send + Sync {
@@ -72,6 +76,7 @@ impl Default for PersistentConfig {
             input_microusd_per_million: None,
             output_microusd_per_million: None,
             mouse_capture: None,
+            theme: None,
             resume_last_case: None,
             modules: BTreeMap::new(),
         }
@@ -100,6 +105,10 @@ fn manifest<'a>(
 impl PersistentConfig {
     pub fn validate(&self, manifests: &[&ModuleManifest]) -> Result<(), AppError> {
         if self.version != 1
+            || self
+                .theme
+                .as_deref()
+                .is_some_and(|theme| !matches!(theme, "auto" | "light" | "dark"))
             || self.modules.len() > 256
             || self.policy_path.as_ref().is_some_and(|path| {
                 path.is_empty() || path.len() > 4096 || path.chars().any(disallowed_char)
@@ -187,6 +196,8 @@ impl PersistentConfig {
                 }
             }
             ConfigChange::SetResumeLastCase(enabled) => next.resume_last_case = Some(enabled),
+            ConfigChange::SetMouseCapture(enabled) => next.mouse_capture = Some(enabled),
+            ConfigChange::SetTheme(theme) => next.theme = Some(theme),
         }
         next.validate(manifests)?;
         Ok(next)

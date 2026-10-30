@@ -11,6 +11,7 @@ mod workflow;
 
 use anyhow::Result;
 use crossterm::{
+    event::{DisableBracketedPaste, EnableBracketedPaste},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -40,6 +41,7 @@ pub enum ModuleKind {
 pub struct ModuleParameter {
     pub name: String,
     pub value: String,
+    pub defaulted: bool,
     pub required: bool,
     pub overridden: bool,
 }
@@ -99,6 +101,7 @@ pub struct WorkspaceLaunch<'a> {
     pub new_analyst_key: bool,
     pub overrides_active: bool,
     pub mouse_capture: bool,
+    pub theme: Option<&'a str>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -164,6 +167,17 @@ pub trait WorkspaceIo: Send + Sync {
     fn list_ollama_models(&self, _base_url: &str) -> Result<Vec<String>> {
         anyhow::bail!("Ollama discovery is unavailable in this workspace")
     }
+    fn list_provider_models(
+        &self,
+        provider: &str,
+        base_url: &str,
+        _key: Option<&SecretString>,
+    ) -> Result<Vec<String>> {
+        if provider == "llm-openai-compatible" && base_url.starts_with("http://127.0.0.1:11434/") {
+            return self.list_ollama_models(base_url);
+        }
+        anyhow::bail!("Model listing is unavailable in this workspace")
+    }
     fn test_model_connection(
         &self,
         _provider: &str,
@@ -187,7 +201,7 @@ pub(crate) fn prompt_hidden(
 impl TerminalSession {
     fn enter() -> Result<Self> {
         enable_raw_mode()?;
-        execute!(io::stdout(), EnterAlternateScreen)?;
+        execute!(io::stdout(), EnterAlternateScreen, EnableBracketedPaste)?;
         Ok(Self)
     }
 }
@@ -195,7 +209,7 @@ impl TerminalSession {
 impl Drop for TerminalSession {
     fn drop(&mut self) {
         let _ = disable_raw_mode();
-        let _ = execute!(io::stdout(), LeaveAlternateScreen);
+        let _ = execute!(io::stdout(), DisableBracketedPaste, LeaveAlternateScreen);
     }
 }
 
@@ -207,6 +221,7 @@ pub fn run_workspace(
     shutdown: &CancellationToken,
     launch: WorkspaceLaunch<'_>,
 ) -> Result<bool> {
+    let _theme = theme::Theme::configure(launch.theme);
     let _session = TerminalSession::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     home::run_home(

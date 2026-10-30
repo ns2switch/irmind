@@ -42,14 +42,14 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
         parameters: vec![ModuleParameter {
             name: "IRMIND_MODEL".into(),
             value: String::new(),
+            defaulted: false,
             required: true,
             overridden: false,
         }],
         credentials: Vec::new(),
         missing: Vec::new(),
     };
-    let mut edit = "/edit-param".chars().map(KeyCode::Char).collect::<Vec<_>>();
-    edit.push(KeyCode::Enter);
+    let mut edit = vec![KeyCode::Tab, KeyCode::Enter];
     edit.extend("synthetic-model".chars().map(KeyCode::Char));
     edit.push(KeyCode::Enter);
     assert!(tui.drive_module_screen(&[module.clone()], &edit).unwrap());

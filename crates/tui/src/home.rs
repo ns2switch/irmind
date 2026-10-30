@@ -41,6 +41,7 @@ pub(crate) struct CaseRow {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Mode {
     List,
+    Settings,
     New,
     Model,
     Modules,
@@ -49,6 +50,51 @@ pub(crate) enum Mode {
     Setup,
     Help,
     VerifyExport,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SettingsSection {
+    Model,
+    Connectors,
+    Keystore,
+    Preferences,
+}
+
+impl SettingsSection {
+    const ALL: [Self; 4] = [
+        Self::Model,
+        Self::Connectors,
+        Self::Keystore,
+        Self::Preferences,
+    ];
+
+    fn mode(self) -> Mode {
+        match self {
+            Self::Model => Mode::Model,
+            Self::Connectors => Mode::Modules,
+            Self::Keystore => Mode::Keystore,
+            Self::Preferences => Mode::Config,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Model => "AI model",
+            Self::Connectors => "Connectors",
+            Self::Keystore => "Keystore and credentials",
+            Self::Preferences => "Preferences",
+        }
+    }
+
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "model" => Some(Self::Model),
+            "connectors" | "modules" => Some(Self::Connectors),
+            "keystore" | "credentials" => Some(Self::Keystore),
+            "preferences" | "config" => Some(Self::Preferences),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -68,6 +114,11 @@ pub(crate) struct HomeState {
     pub(crate) mode: Mode,
     status_filter: Option<CaseStatus>,
     selected: usize,
+    settings_selected: usize,
+    settings_return: Mode,
+    preference_selected: usize,
+    ui_selection: UiSelection,
+    theme_choice: String,
     form: [String; 9],
     form_field: usize,
     remote_scope_step: RemoteScopeStep,
@@ -85,6 +136,7 @@ pub(crate) struct HomeState {
     model_setup: model::ModelSetup,
     keystore: Option<KeystoreStatus>,
     keystore_selected: usize,
+    keystore_action_selected: usize,
     confirm_credential_delete: bool,
     pending_migration: Option<&'static str>,
     restart_required: bool,
@@ -97,10 +149,17 @@ pub(crate) struct HomeState {
     resume_last_case: crate::ResumeMode,
 }
 
+struct UiSelection {
+    mouse_capture: bool,
+    keystore_action_focus: bool,
+    parameter_focused: bool,
+}
+
 struct ModuleEdit {
     module: String,
     field: String,
     value: String,
+    replace_on_type: bool,
 }
 
 impl HomeState {
@@ -110,6 +169,15 @@ impl HomeState {
             mode: if show_setup { Mode::Setup } else { Mode::List },
             status_filter: None,
             selected: 0,
+            settings_selected: 0,
+            settings_return: Mode::List,
+            preference_selected: 0,
+            ui_selection: UiSelection {
+                mouse_capture: true,
+                keystore_action_focus: false,
+                parameter_focused: false,
+            },
+            theme_choice: "auto".into(),
             form: [
                 String::new(),
                 "medium".into(),
@@ -137,6 +205,7 @@ impl HomeState {
             model_setup: model::ModelSetup::new(),
             keystore: None,
             keystore_selected: 0,
+            keystore_action_selected: 0,
             confirm_credential_delete: false,
             pending_migration: None,
             restart_required: false,
@@ -160,7 +229,9 @@ impl HomeState {
     fn refresh_keystore(&mut self, io_ops: &dyn WorkspaceIo) {
         match io_ops.keystore_status() {
             Ok(status) => self.keystore = Some(status),
-            Err(_) => self.notice = "Keystore status unavailable; use /keystore to retry".into(),
+            Err(_) => {
+                self.notice = "Keystore status unavailable; use /settings keystore to retry".into();
+            }
         }
     }
 
@@ -270,6 +341,8 @@ pub(crate) fn run_home(
     );
     state.set_modules(modules);
     state.resume_last_case = launch.resume_last_case;
+    state.ui_selection.mouse_capture = launch.mouse_capture;
+    state.theme_choice = launch.theme.unwrap_or("auto").into();
     state.overrides_active = launch.overrides_active;
     state.refresh_keystore(io_ops);
     {
@@ -417,11 +490,20 @@ pub(super) fn apply_case_exit(state: &mut HomeState, exit: &case::CaseExit) {
     state.mode = match exit {
         case::CaseExit::Home | case::CaseExit::Open(_) | case::CaseExit::Quit => Mode::List,
         case::CaseExit::New => Mode::New,
-        case::CaseExit::Model => Mode::Model,
-        case::CaseExit::Modules => Mode::Modules,
-        case::CaseExit::Config => Mode::Config,
-        case::CaseExit::Keystore => Mode::Keystore,
+        case::CaseExit::Settings(section, legacy) => {
+            if *legacy {
+                state.notice = "Now in /settings".into();
+            }
+            state.settings_return = Mode::Settings;
+            section
+                .as_deref()
+                .and_then(SettingsSection::parse)
+                .map_or(Mode::Settings, SettingsSection::mode)
+        }
     };
+    if state.mode == Mode::Model {
+        state.model_setup = model::ModelSetup::new();
+    }
     if let case::CaseExit::Open(name) = exit {
         state.input = format!("/open {name}");
     } else if matches!(exit, case::CaseExit::Quit) {

@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 08172a83df22ec719c7f9a7fbe83c064fc5e9229; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit a333bb3ffc4a9d695d1facf42461c43ce3d2dc7f; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -38,9 +38,9 @@ La tabla opcional `[scope]` fija un techo estricto para las lecturas remotas de 
 
 ## Ajustes no secretos
 
-La TUI guarda los ajustes no secretos en `config.toml` dentro del [directorio de datos estándar](platforms.md#datos-y-terminal). La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no activa ninguno. Escribe `/model` para elegir un proveedor y modelo; usa `/modules` para activar conectores y consultar sus campos públicos. Tab elige un campo, `/edit-param` lo edita y `/keystore` abre sus credenciales. La sesión se recarga tras un cambio. La salida de datos del equipo requiere confirmación explícita y firmada. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre debe existir un backend de firma y secretos.
+La TUI guarda los ajustes no secretos en `config.toml` dentro del [directorio de datos estándar](platforms.md#datos-y-terminal). La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no activa ninguno. `/settings` reúne Modelo, Conectores, Llavero y Preferencias; `/settings model` abre directamente el modelo. En Conectores, las flechas eligen un módulo, Tab elige un parámetro y Enter lo edita en un campo visible. El primer carácter escrito o pegado sustituye el valor predeterminado; Enter lo acepta y Ctrl+U lo borra. La URL se recorta y las barras repetidas de la ruta se normalizan antes de validarla. Las credenciales se escriben en campos enmascarados de Llavero. La sesión se recarga tras un cambio. La salida de datos del equipo requiere confirmación explícita y firmada. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre debe existir un backend de firma y secretos.
 
-`resume_last_case` vale `true` por defecto. Tras arrancar, la TUI reabre el último caso abierto que se usó solo si verifica su cadena de custodia. Un caso sellado o eliminado deja la pantalla de inicio; un fallo de verificación aparece allí como aviso. Usa `/config` para cambiar la opción. La referencia privada `last-case` se guarda junto a `config.toml` y no forma parte de la custodia. La automatización CLI no reanuda casos.
+`resume_last_case` vale `true` por defecto. Tras arrancar, la TUI reabre el último caso abierto que se usó solo si verifica su cadena de custodia. Un caso sellado o eliminado deja la pantalla de inicio; un fallo de verificación aparece allí como aviso. Usa `/settings preferences` para cambiar esta opción, el ratón o el tema (`auto`, `light`, `dark`). La referencia privada `last-case` se guarda junto a `config.toml` y no forma parte de la custodia. La automatización CLI no reanuda casos.
 
 Para automatización, el orden es **flag de CLI > variable de entorno > config.toml > valor por defecto**. Un override solo dura esa ejecución; la TUI no lo sustituye en silencio. El archivo contiene IDs de módulos, modelos, URLs, fuentes, índices, regiones y precios opcionales, pero nunca credenciales ni passphrases. Se rechazan los campos desconocidos o secretos. Ejemplo:
 
@@ -48,6 +48,7 @@ Para automatización, el orden es **flag de CLI > variable de entorno > config.t
 version = 1
 llm_module = "llm-openai-compatible"
 resume_last_case = true
+theme = "auto"
 
 [modules.llm-openai-compatible.values]
 IRMIND_MODEL = "modelo-local"
@@ -72,6 +73,7 @@ Estas variables de entorno prevalecen sobre los campos públicos correspondiente
 | --- | --- |
 | `IRMIND_HOME` | Directorio de datos local opcional. |
 | `IRMIND_POLICY` | Ruta del archivo TOML de política. |
+| `IRMIND_THEME`, `NO_COLOR` | Sobrescriben el tema de la TUI (`light` o `dark`) o desactivan el color durante la sesión. |
 | `IRMIND_LLM_MODULE` | Selección explícita del módulo de modelo; alternativa a `--llm-module`. |
 | `IRMIND_ENABLE_SPLUNK`, `IRMIND_ENABLE_AWS`, `IRMIND_ENABLE_CROWDSTRIKE`, `IRMIND_ENABLE_SENTINELONE`, `IRMIND_ENABLE_MISP`, `IRMIND_ENABLE_VIRUSTOTAL` | Overrides temporales para activar conectores (`true` o `false`). |
 | `IRMIND_ENABLE_STORAGE_S3`, `IRMIND_ENABLE_STORAGE_GCS`, `IRMIND_ENABLE_STORAGE_AZURE` | Overrides temporales para activar lectores de objetos (`true` o `false`). |
@@ -103,7 +105,7 @@ analyst_key_fingerprint = "<huella mostrada por IRMind>"
 
 Elige `os` o `file` por separado para cada capacidad. `os` usa Keychain, Credential Manager o Secret Service. `file` guarda ambas capacidades en `keystore.enc`, pide una passphrase sin eco una vez por sesión y funciona por SSH. Emplea Argon2id y XChaCha20-Poly1305; sigue siendo necesaria una passphrase sólida y una máquina protegida. Si el backend elegido no se abre, IRMind falla cerrado y ofrece un cambio explícito en la TUI. Nunca cambia en silencio.
 
-Escribe `/keystore` para ver los backends y comprobar qué credenciales existen. Usa `/cred-add`, `/cred-delete`, `/passphrase`, `/migrate-signer` o `/migrate-secrets` para cambiarlos. La migración conserva la huella pública del analista y deja un evento operativo global firmado incluso antes del primer caso. Tras cambiar una credencial, los conectores activos pueden conservar el valor anterior: escribe `/restart` para reiniciar la sesión. No escribas secretos en el texto del caso.
+Escribe `/settings keystore` para ver los backends y comprobar qué credenciales existen. Con Tab, flechas y Enter puedes añadir o borrar credenciales, cambiar la passphrase, migrar un backend o reiniciar la sesión. La migración conserva la huella pública del analista y deja un evento operativo global firmado incluso antes del primer caso. Tras cambiar una credencial, los conectores activos pueden conservar el valor anterior; elige Reiniciar sesión en esta sección. No escribas secretos en el texto del caso.
 
 La CLI lee la passphrase del terminal sin eco o de un descriptor abierto explícitamente con `--passphrase-fd <FD>`; Windows admite actualmente solo el descriptor `0`. IRMind no acepta passphrases ni secretos por argumentos o variables de entorno. `verify-export` no necesita desbloquear ningún backend.
 
@@ -129,6 +131,8 @@ Con `os`, las claves de firma usan otro servicio, `irmind`: `local-analyst` y `l
 
 ## Elegir un modelo
 
-No se selecciona ningún proveedor por defecto. En la TUI, escribe `/model` para elegir Ollama o un proveedor remoto, selecciona el modelo, prueba opcionalmente la conexión con texto sintético y confirma cualquier salida remota de datos. Usa `/modules` y `/edit-param` para los ajustes públicos avanzados. Para automatización, `--llm-module` y las variables de entorno correspondientes prevalecen sobre los ajustes guardados durante esa ejecución.
+No se selecciona ningún proveedor por defecto. En la TUI, escribe `/settings model` para elegir un proveedor, introducir o aceptar su URL y elegir un modelo de la lista o escribir su ID. Antes de consultar modelos o probar la conexión remota con texto sintético, se pide confirmación para enviar la clave. Habilitarlo para datos del caso exige otra confirmación firmada. Usa `/settings connectors` para los ajustes públicos avanzados. Para automatización, `--llm-module` y las variables de entorno correspondientes prevalecen sobre los ajustes guardados durante esa ejecución.
+
+Los proveedores locales preconfigurados son Ollama (`127.0.0.1:11434`), LM Studio (`127.0.0.1:1234`) y vLLM (`127.0.0.1:8000`). Los remotos son OpenAI, Anthropic, DeepSeek, OpenRouter, Mistral, Groq, Google Gemini mediante su endpoint compatible, xAI y Together. Los últimos cinco usan el módulo compatible con OpenAI existente. Si un servicio no expone una lista compatible, escribe el ID del modelo. El soporte de herramientas depende del modelo elegido; la prueba de conexión solo comprueba el acceso básico. Azure OpenAI con el parámetro `api-version` en la URL no está soportado por este formulario.
 
 Un servicio local sin clave puede usar HTTP solo en loopback; también admite HTTPS. Los servicios remotos requieren HTTPS y una clave propia del destino. Una URL personalizada nunca hereda `OPENAI_API_KEY`. Consulta [módulos](modules.md) para elegir otros proveedores compilados. Comprueba la retención, la región de procesamiento y la clasificación de datos antes de cualquier conexión externa.

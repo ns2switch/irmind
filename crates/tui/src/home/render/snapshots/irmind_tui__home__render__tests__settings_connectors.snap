@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: "snapshot_screen(&state, modules)"
+---
+IRMind v0.1.0
+
+  ╭ Modules ─────────────────────────────────────────────────────────────────╮
+  │SIEM                                 │Splunk                              │
+  │  Splunk                             │Status: missing configuration       │
+  │    missing configuration · API_KEY  │Technical ID: siem-splunk           │
+  │                                     │Configuration: missing API key      │
+  │                                     │Missing: API_KEY                    │
+  │                                     │Parameters · Tab selects, Enter     │
+  │                                     │edits                               │
+  │                                     │  base_url = https://example.invalid│
+  │                                     │(required)                          │
+  │                                     │Credentials · /settings keystore to │
+  │                                     │manage                              │
+  │                                     │  API_KEY: missing                  │
+  │                                     │                                    │
+  │                                     │                                    │
+  │                                     │                                    │
+  │                                     │                                    │
+  │                                     │                                    │
+  │                                     │                                    │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+
+↑/↓ choose · Tab field · Enter select · Esc back

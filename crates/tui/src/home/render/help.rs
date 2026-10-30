@@ -2,12 +2,13 @@ use super::{HomeState, Mode};
 
 pub(super) fn help_line(state: &HomeState) -> &'static str {
     match state.mode {
-        Mode::List => "↑/↓ choose · Enter open · /new create · /model AI · Ctrl+K commands",
+        Mode::List => "↑/↓ choose · Enter open · /new create · /settings configure",
+        Mode::Settings => "↑/↓ choose · Enter open · Esc back",
         Mode::New if state.remote_scope_step.is_remote() => {
             "Tab/Shift+Tab field · Enter create · Esc local step"
         }
         Mode::New => "Tab/Shift+Tab field · ↑/↓ severity · Enter create or expand · Esc back",
-        Mode::Config => "Enter toggle resume · Esc back",
+        Mode::Config => "↑/↓ choose · Enter change · Esc back",
         Mode::Modules => {
             if state.pending_module_change.is_some() {
                 "↑/↓ choose · Enter confirm · Esc back"
@@ -24,9 +25,9 @@ pub(super) fn help_line(state: &HomeState) -> &'static str {
             if state.confirm_credential_delete || state.pending_migration.is_some() {
                 "↑/↓ choose · Enter confirm · Esc back"
             } else if state.restart_required {
-                "/restart session · connectors may hold old credentials · Esc back"
+                "Tab actions · Enter choose · connectors may hold old credentials · Esc back"
             } else {
-                "↑/↓ choose · Enter continue · Esc back · /cred-add · /cred-delete"
+                "↑/↓ choose · Tab actions · Enter continue · Esc back"
             }
         }
         Mode::VerifyExport => "Tab next field · Enter verify · Esc back",
@@ -43,7 +44,7 @@ mod help_tests {
         state.mode = Mode::Keystore;
         assert!(!help_line(&state).contains("restart session"));
         state.restart_required = true;
-        assert!(help_line(&state).contains("/restart session"));
+        assert!(help_line(&state).contains("Tab actions"));
         assert!(help_line(&state).contains("connectors may hold old credentials"));
     }
 }

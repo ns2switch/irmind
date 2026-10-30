@@ -61,6 +61,20 @@ fn unset_mouse_capture_preserves_signed_v1_configuration_bytes() {
             .unwrap()
             .contains("\"resume_last_case\":false")
     );
+    let themed = PersistentConfig::default()
+        .changed(ConfigChange::SetTheme("dark".into()), &[])
+        .unwrap();
+    assert_eq!(themed.theme.as_deref(), Some("dark"));
+    assert!(
+        serde_json::to_string(&themed)
+            .unwrap()
+            .contains("\"theme\":\"dark\"")
+    );
+    assert!(
+        PersistentConfig::default()
+            .changed(ConfigChange::SetTheme("invalid".into()), &[])
+            .is_err()
+    );
 }
 
 #[test]

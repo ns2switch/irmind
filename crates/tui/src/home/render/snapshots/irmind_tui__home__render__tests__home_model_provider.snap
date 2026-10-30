@@ -6,20 +6,20 @@ IRMind v0.1.0
 
   ╭ Model setup ─────────────────────────────────────────────────────────────╮
   │Choose an AI model now, or continue without one.                          │
-  │> 1. Ollama local — Runs on this device; HTTP or HTTPS loopback           │
-  │  2. OpenAI compatible — Custom API endpoint                              │
-  │  3. Anthropic — Remote API; case data may leave this device              │
-  │  4. DeepSeek — Remote API; case data may leave this device               │
-  │  5. OpenRouter — Remote API; case data may leave this device             │
-  │  6. Later — No model is enabled                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
+  │> 1. Ollama — Local · 127.0.0.1:11434                                     │
+  │  2. LM Studio — Local · 127.0.0.1:1234                                   │
+  │  3. vLLM — Local · 127.0.0.1:8000                                        │
+  │  4. OpenAI — Remote · API key required                                   │
+  │  5. OpenAI compatible — Remote custom endpoint                           │
+  │  6. Anthropic — Remote · API key required                                │
+  │  7. DeepSeek — Remote · API key required                                 │
+  │  8. OpenRouter — Remote · API key required                               │
+  │  9. Mistral — Remote · API key required                                  │
+  │  10. Groq — Remote · API key required                                    │
+  │  11. Google Gemini — Remote · OpenAI-compatible API                      │
+  │  12. xAI — Remote · API key required                                     │
+  │  13. Together — Remote · API key required                                │
+  │  14. Later — No model is enabled                                         │
   │                                                                          │
   │                                                                          │
   │                                                                          │

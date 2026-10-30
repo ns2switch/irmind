@@ -34,9 +34,9 @@ The optional `[scope]` table is a hard ceiling for remote reads across cases. It
 
 ## Non-secret settings
 
-The TUI stores non-secret settings in `config.toml` in the [standard data directory](platforms.md#data-and-terminal-behavior). The normal build compiles all current product modules and both keystores but enables none. Type `/model` to choose a provider and model; type `/modules` to enable connectors and inspect their public fields. Tab selects a field, `/edit-param` edits it, and `/keystore` opens credentials. The session reloads inside the TUI after a change. Activation or endpoint changes that may send data off this computer require explicit signed confirmation. A minimal build uses `--no-default-features --features keystore-file` because a signer and secrets backend must remain available.
+The TUI stores non-secret settings in `config.toml` in the [standard data directory](platforms.md#data-and-terminal-behavior). The normal build compiles all current product modules and both keystores but enables none. `/settings` opens four sections: model, connectors, keystore, and preferences. `/settings model` opens one directly. In connectors, arrows select a module, Tab selects a parameter, and Enter edits it in a visible field. The first typed or pasted character replaces the displayed default; Enter accepts it and Ctrl+U clears it. A URL is trimmed and repeated path slashes are collapsed before validation. Credentials use masked fields in the keystore section. The session reloads inside the TUI after a change. Activation or endpoint changes that may send data off this computer require explicit signed confirmation. A minimal build uses `--no-default-features --features keystore-file` because a signer and secrets backend must remain available.
 
-`resume_last_case` defaults to `true`. After startup, the TUI reopens the most recently used open case only if its custody chain verifies. Sealed or deleted cases stay on the home screen; a verification failure appears there as a warning. Use `/config` to turn resumption off or on. The private `last-case` reference is stored beside `config.toml` and is not part of custody. CLI automation does not resume a case.
+`resume_last_case` defaults to `true`. After startup, the TUI reopens the most recently used open case only if its custody chain verifies. Sealed or deleted cases stay on the home screen; a verification failure appears there as a warning. Use `/settings preferences` to change resumption, mouse capture, or the `auto`, `light`, or `dark` theme. The private `last-case` reference is stored beside `config.toml` and is not part of custody. CLI automation does not resume a case.
 
 For automation, resolution order is **CLI flag > environment variable > config.toml > default**. An override lasts only for that run; the TUI does not silently replace it. The file contains module IDs, models, URLs, source IDs, indexes, regions, and optional pricing, but never credentials or passphrases. Unknown or secret manifest fields fail validation. Example:
 
@@ -45,6 +45,7 @@ version = 1
 llm_module = "llm-openai-compatible"
 mouse_capture = false # optional: leave terminal text selection available
 resume_last_case = true # optional: reopen the last verified open case
+theme = "auto" # optional: auto, light, or dark
 
 [modules.llm-openai-compatible.values]
 IRMIND_MODEL = "your-local-model"
@@ -69,6 +70,7 @@ These environment variables override their matching public fields. Set only valu
 | --- | --- |
 | `IRMIND_HOME` | Optional local data directory override. |
 | `IRMIND_POLICY` | Path to a policy TOML file. |
+| `IRMIND_THEME`, `NO_COLOR` | Override the TUI theme (`light` or `dark`), or disable color for the session. |
 | `IRMIND_LLM_MODULE` | Explicit model module selection; alternative to `--llm-module`. |
 | `IRMIND_ENABLE_SPLUNK`, `IRMIND_ENABLE_AWS`, `IRMIND_ENABLE_CROWDSTRIKE`, `IRMIND_ENABLE_SENTINELONE`, `IRMIND_ENABLE_MISP`, `IRMIND_ENABLE_VIRUSTOTAL` | Temporary connector enable overrides (`true` or `false`). |
 | `IRMIND_ENABLE_STORAGE_S3`, `IRMIND_ENABLE_STORAGE_GCS`, `IRMIND_ENABLE_STORAGE_AZURE` | Temporary object-storage enable overrides (`true` or `false`). |
@@ -100,7 +102,7 @@ analyst_key_fingerprint = "<fingerprint shown by IRMind>"
 
 Choose `os` or `file` independently for each capability. The OS backend uses Keychain, Credential Manager, or Secret Service. The encrypted-file backend keeps both capabilities in `keystore.enc`, prompts once per session without echo, and works over SSH. It uses Argon2id and XChaCha20-Poly1305; a strong passphrase and a protected host still matter. If a selected backend cannot be opened, IRMind fails closed and offers an explicit change in the TUI. It never falls back silently.
 
-Type `/keystore` to view active backends and credential presence. Use `/cred-add`, `/cred-delete`, `/passphrase`, `/migrate-signer`, or `/migrate-secrets` to change them. Migration preserves the analyst public-key fingerprint and writes a signed global operational event even before the first case exists. After a credential change, active connectors may retain the previous value: type `/restart` to restart the session. Never type secrets into case text.
+Type `/settings keystore` to view active backends and credential presence. Select an action with Tab, arrows, and Enter to add or delete a credential, change the file passphrase, migrate a backend, or restart the session. Migration preserves the analyst public-key fingerprint and writes a signed global operational event even before the first case exists. After a credential change, active connectors may retain the previous value; choose Restart session in that section. Never type secrets into case text.
 
 The CLI reads a file-backend passphrase from the terminal without echo or from an explicitly opened descriptor with `--passphrase-fd <FD>`; Windows currently accepts descriptor `0` only. IRMind does not accept passphrases or module secrets through arguments or environment variables. `verify-export` needs no keystore.
 
@@ -126,6 +128,8 @@ The OS backend stores signing keys under a separate `irmind` service: `local-ana
 
 ## Choose a model
 
-No provider is selected by default. In the TUI, type `/model` to choose Ollama or a remote provider, select its model, optionally test the connection with synthetic text, and confirm any remote data transfer. Use `/modules` and `/edit-param` for advanced public settings. For automation, `--llm-module` and the matching environment variables override the saved selection and fields for that run.
+No provider is selected by default. In the TUI, type `/settings model` to choose a preset, enter or accept its URL, choose a listed model or enter an ID manually, and optionally test the connection with synthetic text. For a remote provider, the model list or test requires an explicit confirmation before the API key is sent. Enabling it for case data requires a separate signed confirmation. Use `/settings connectors` for advanced public settings. For automation, `--llm-module` and the matching environment variables override the saved selection and fields for that run.
+
+The local presets are Ollama (`127.0.0.1:11434`), LM Studio (`127.0.0.1:1234`), and vLLM (`127.0.0.1:8000`). Remote presets are OpenAI, Anthropic, DeepSeek, OpenRouter, Mistral, Groq, Google Gemini's OpenAI-compatible endpoint, xAI, and Together. The latter five use the existing OpenAI-compatible module; no extra product module is needed. Model listing may be unavailable on a compatible service; the form still accepts a model ID. Tool support depends on the chosen model, and the connection test checks only basic access. Azure OpenAI endpoints requiring an `api-version` query parameter are not supported by this URL field.
 
 A keyless local service may use HTTP only on loopback; HTTPS works there too. Remote endpoints require HTTPS and a destination-specific key. A different custom URL never inherits `OPENAI_API_KEY`. Select other compiled providers with their module IDs and settings in [modules](modules.md). Confirm retention, processing region, and data classification before any external connection.

@@ -20,16 +20,28 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         }
         if let Some(destination) = match prompt.as_str() {
             "/new" => Some(super::CaseExit::New),
-            "/model" => Some(super::CaseExit::Model),
-            "/modules" => Some(super::CaseExit::Modules),
-            "/config" => Some(super::CaseExit::Config),
-            "/keystore" => Some(super::CaseExit::Keystore),
+            "/settings" => Some(super::CaseExit::Settings(None, false)),
+            "/model" => Some(super::CaseExit::Settings(Some("model".into()), true)),
+            "/modules" | "/edit-param" => {
+                Some(super::CaseExit::Settings(Some("connectors".into()), true))
+            }
+            "/config" => Some(super::CaseExit::Settings(Some("preferences".into()), true)),
+            "/keystore" | "/cred-add" | "/cred-delete" | "/passphrase" | "/migrate-signer"
+            | "/migrate-secrets" => Some(super::CaseExit::Settings(Some("keystore".into()), true)),
             "/open" => Some(super::CaseExit::Home),
             _ => prompt
                 .strip_prefix("/open ")
                 .map(|value| super::CaseExit::Open(value.into())),
         } {
             self.exit_to = destination;
+            return Ok(true);
+        }
+        if let Some(section) = prompt.strip_prefix("/settings ") {
+            self.exit_to = super::CaseExit::Settings(Some(section.trim().to_owned()), false);
+            return Ok(true);
+        }
+        if prompt.starts_with("/module ") {
+            self.exit_to = super::CaseExit::Settings(Some("connectors".into()), true);
             return Ok(true);
         }
         if prompt == "/sidebar" {
@@ -84,9 +96,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
 
     fn investigate_prompt(&mut self, prompt: String) {
         if self.model.is_none() {
-            self.state
-                .messages
-                .push("No LLM selected. Use /model to configure one, then try again.".into());
+            self.state.messages.push(
+                "No LLM selected. Use /settings model to configure one, then try again.".into(),
+            );
             return;
         }
         match self.engine.guard.screen(&prompt) {
@@ -227,23 +239,6 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 .state
                 .messages
                 .push(format!("Scope: {}", self.state.case.scope)),
-            "/modules" => self.state.messages.push(
-                self.modules
-                    .iter()
-                    .map(|module| {
-                        format!(
-                            "{}: {}",
-                            module.id,
-                            if module.enabled {
-                                "enabled"
-                            } else {
-                                "disabled"
-                            }
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            ),
             "/approvals" => {
                 self.state.approvals = self.engine.pending_approvals(self.id)?;
                 self.state.approval_sources =
@@ -268,8 +263,6 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             _ => {
                 if let Some(scope) = prompt.strip_prefix("/scope ") {
                     self.expand_scope(scope)?;
-                } else if let Some(id) = prompt.strip_prefix("/module ") {
-                    self.show_module(id);
                 } else {
                     return Ok(false);
                 }
@@ -295,23 +288,6 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             Err(error) => self.state.messages.push(format!("Scope error: {error}")),
         }
         Ok(())
-    }
-
-    fn show_module(&mut self, id: &str) {
-        if let Some(module) = self.modules.iter().find(|module| module.id == id) {
-            self.state.messages.push(format!(
-                "{} · {} · {}",
-                module.id,
-                if module.enabled {
-                    "enabled"
-                } else {
-                    "disabled"
-                },
-                module.configuration
-            ));
-        } else {
-            self.state.messages.push("Unknown module".into());
-        }
     }
 
     fn finding_command(&mut self, prompt: &str) -> Result<bool> {

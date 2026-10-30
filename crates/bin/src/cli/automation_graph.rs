@@ -352,6 +352,7 @@ impl AutomationContext<'_, '_> {
                         new_analyst_key,
                         overrides_active,
                         mouse_capture,
+                        theme: None,
                     },
                 );
             }

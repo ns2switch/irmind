@@ -587,7 +587,14 @@ pub fn run_keystore_wizard<T>(
         if !event::poll(Duration::from_millis(100))? {
             continue;
         }
-        let Event::Key(key) = event::read()? else {
+        let input = event::read()?;
+        if let Event::Paste(value) = &input {
+            for ch in value.chars().filter(|ch| !ch.is_control()).take(4096) {
+                let _ = wizard.key(KeyEvent::new(KeyCode::Char(ch), KeyModifiers::NONE));
+            }
+            continue;
+        }
+        let Event::Key(key) = input else {
             continue;
         };
         match wizard.key(key) {
@@ -639,7 +646,14 @@ pub(crate) fn prompt_secret(
                 rows[1],
             );
         })?;
-        let Event::Key(key) = event::read()? else {
+        let input = event::read()?;
+        if let Event::Paste(value) = &input {
+            for ch in value.chars().filter(|ch| !ch.is_control()).take(4096) {
+                let _ = update_secret(&mut secret, KeyCode::Char(ch));
+            }
+            continue;
+        }
+        let Event::Key(key) = input else {
             continue;
         };
         if key.kind != KeyEventKind::Press {
