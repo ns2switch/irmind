@@ -228,8 +228,15 @@ impl Engine<'_> {
                 >= self.policy.max_model_tokens_per_case
         });
         self.record_model_usage(id, usage, used_tokens).await?;
-        self.handle_round_response(case, model, turn, (answer, quota_exhausted), cancel, on_text)
-            .await
+        self.handle_round_response(
+            case,
+            model,
+            turn,
+            (answer, quota_exhausted),
+            cancel,
+            on_text,
+        )
+        .await
     }
 
     async fn handle_round_response(
