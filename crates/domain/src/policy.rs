@@ -22,6 +22,7 @@ pub struct PolicyRules {
     pub denied_tools: Vec<Tool>,
     pub scope: Option<CaseScope>,
     pub max_tool_calls_per_case: usize,
+    pub max_model_rounds_per_turn: usize,
     pub max_model_result_bytes: usize,
     pub max_model_tokens_per_case: u64,
     pub max_object_read_bytes: u64,
@@ -35,6 +36,7 @@ impl Default for PolicyRules {
             denied_tools: Vec::new(),
             scope: None,
             max_tool_calls_per_case: 100,
+            max_model_rounds_per_turn: 25,
             max_model_result_bytes: 10_000,
             max_model_tokens_per_case: 200_000,
             max_object_read_bytes: 1_073_741_824,
@@ -48,6 +50,8 @@ impl PolicyRules {
     pub fn validate(&self) -> Result<(), DomainError> {
         if self.max_tool_calls_per_case == 0
             || self.max_tool_calls_per_case > 10_000
+            || self.max_model_rounds_per_turn == 0
+            || self.max_model_rounds_per_turn > 100
             || self.max_model_result_bytes == 0
             || self.max_model_result_bytes > 100_000
             || self.max_model_tokens_per_case == 0

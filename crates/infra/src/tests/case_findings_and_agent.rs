@@ -197,7 +197,7 @@ fn failed_local_tool_call_has_signed_error_event() {
 }
 
 #[test]
-fn signed_case_call_quota_blocks_second_model_read() {
+fn tool_call_quota_ends_with_a_no_tool_summary() {
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(LocalStore::open(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
@@ -235,7 +235,12 @@ fn signed_case_call_quota_blocks_second_model_read() {
     let model = RepeatingReadModel {
         turns: Mutex::new(0),
     };
-    engine.investigate(&case.id, "check", &model).unwrap();
+    assert!(
+        engine
+            .investigate(&case.id, "check", &model)
+            .unwrap()
+            .contains("Limit reached")
+    );
     let entries = store.entries(&case.id).unwrap();
     assert_eq!(
         entries
@@ -244,11 +249,13 @@ fn signed_case_call_quota_blocks_second_model_read() {
             .count(),
         1
     );
+    assert!(!entries.iter().any(|e|
+        e.kind == irmind_domain::AuditEventKind::Denied && e.payload.contains("quota")));
     assert!(
-            entries
-                .iter()
-                .any(|e| e.kind == irmind_domain::AuditEventKind::Denied && e.payload.contains("quota"))
-        );
+        entries
+            .iter()
+            .any(|e| e.kind == irmind_domain::AuditEventKind::BudgetExceeded)
+    );
     assert_eq!(engine.verify(&case.id).unwrap(), entries.len());
 }
 
@@ -291,7 +298,12 @@ fn signed_model_usage_stops_case_before_followup_tool_dispatch() {
     let model = RepeatingReadModel {
         turns: Mutex::new(0),
     };
-    assert!(engine.investigate(&case.id, "check", &model).is_err());
+    assert!(
+        engine
+            .investigate(&case.id, "check", &model)
+            .unwrap()
+            .contains("limit")
+    );
     let entries = store.entries(&case.id).unwrap();
     assert!(
         entries
@@ -320,16 +332,17 @@ fn signed_approval_executes_external_port_once_and_screens_next_context() {
             let mut turns = self.0.lock().map_err(storage)?;
             *turns += 1;
             Ok(ModelResponse {
+                truncated: false,
                 text: String::new(),
                 raw: "proposal".into(),
-                calls: if *turns == 1 {
+                calls: model_calls(if *turns == 1 {
                     vec![ProposedCall {
                         tool: Tool::ThreatIntelExternal,
                         args: BTreeMap::from([("ioc".into(), "example.com".into())]),
                     }]
                 } else {
                     Vec::new()
-                },
+                }),
             })
         }
     }

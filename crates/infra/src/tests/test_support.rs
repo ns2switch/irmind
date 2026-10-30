@@ -106,7 +106,7 @@ impl LegacyModel for EdrModel {
         if !names.contains(&"edr_detections") || names.contains(&"siem_search") {
             return Err(AppError::Model("incorrect active tool catalog".into()));
         }
-        self.complete_with_usage(request.context().unwrap_or_default())
+        self.complete_with_usage(&request_context(request))
     }
 
     fn complete(&self, context: &str) -> Result<ModelResponse, AppError> {
@@ -114,9 +114,10 @@ impl LegacyModel for EdrModel {
         let mut turns = self.turns.lock().map_err(storage)?;
         *turns += 1;
         Ok(ModelResponse {
+            truncated: false,
             text: "done".into(),
             raw: format!("EDR turn {}", *turns),
-            calls: if *turns == 1 {
+            calls: model_calls(if *turns == 1 {
                 vec![ProposedCall {
                     tool: Tool::EdrDetections,
                     args: BTreeMap::from([
@@ -128,7 +129,7 @@ impl LegacyModel for EdrModel {
                 }]
             } else {
                 Vec::new()
-            },
+            }),
         })
     }
 }
@@ -227,6 +228,7 @@ impl LegacyModel for CaptureModel {
     fn complete(&self, context: &str) -> Result<ModelResponse, AppError> {
         *self.seen.lock().map_err(storage)? = context.to_owned();
         Ok(ModelResponse {
+            truncated: false,
             text: "done".into(),
             raw: "done".into(),
             calls: Vec::new(),
@@ -237,20 +239,39 @@ impl LegacyModel for CaptureModel {
 streaming_test_model!(RepeatingReadModel);
 
 impl LegacyModel for RepeatingReadModel {
+    fn complete_request(
+        &self,
+        request: &CompletionRequest,
+    ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
+        if request.tools.is_empty() {
+            return Ok((
+                ModelResponse {
+                    text: "Completed calls are recorded; further work is pending.".into(),
+                    raw: "summary".into(),
+                    calls: Vec::new(),
+                    truncated: false,
+                },
+                None,
+            ));
+        }
+        self.complete_with_usage(&request_context(request))
+    }
+
     fn complete(&self, _context: &str) -> Result<ModelResponse, AppError> {
         let mut turns = self.turns.lock().map_err(storage)?;
         *turns += 1;
         Ok(ModelResponse {
+            truncated: false,
             text: "done".into(),
             raw: format!("turn {}", *turns),
-            calls: if *turns <= 2 {
+            calls: model_calls(if *turns <= 2 {
                 vec![ProposedCall {
                     tool: Tool::GraphSummary,
                     args: BTreeMap::new(),
                 }]
             } else {
                 Vec::new()
-            },
+            }),
         })
     }
 
@@ -271,6 +292,7 @@ streaming_test_model!(QuietModel);
 impl LegacyModel for QuietModel {
     fn complete(&self, _context: &str) -> Result<ModelResponse, AppError> {
         Ok(ModelResponse {
+            truncated: false,
             text: "No verified findings yet.".into(),
             raw: "{}".into(),
             calls: Vec::new(),
@@ -303,15 +325,17 @@ impl LegacyModel for ObedientModel {
         seen.push(context.to_owned());
         if seen.len() == 1 {
             Ok(ModelResponse {
+                truncated: false,
                 text: String::new(),
                 raw: "malicious call".into(),
-                calls: vec![ProposedCall {
+                calls: model_calls(vec![ProposedCall {
                     tool: Tool::ThreatIntelExternal,
                     args: BTreeMap::from([("ioc".into(), "attacker.example".into())]),
-                }],
+                }]),
             })
         } else {
             Ok(ModelResponse {
+                truncated: false,
                 text: "investigation paused".into(),
                 raw: "final".into(),
                 calls: vec![],

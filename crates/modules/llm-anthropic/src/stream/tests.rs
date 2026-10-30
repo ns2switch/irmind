@@ -13,9 +13,14 @@ fn native_tool_stream_is_assembled_before_policy_receives_it() {
     );
     let (answer, usage) = parse(wire.as_bytes()).unwrap();
     assert_eq!(answer.calls.len(), 1);
-    assert_eq!(answer.calls[0].tool, Tool::EvidenceSearch);
+    assert_eq!(answer.calls[0].id(), "toolu_1");
+    assert_eq!(answer.calls[0].proposal().tool, Tool::EvidenceSearch);
     assert_eq!(
-        answer.calls[0].args.get("query").map(String::as_str),
+        answer.calls[0]
+            .proposal()
+            .args
+            .get("query")
+            .map(String::as_str),
         Some("AssumeRole")
     );
     assert_eq!(usage.input_tokens, 14);
@@ -49,4 +54,19 @@ fn preview_emits_only_complete_text_events() {
     let mut preview = TextPreview::default();
     assert!(preview.push(b"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hel").unwrap().is_empty());
     assert_eq!(preview.push(b"lo\"}}\n\n").unwrap(), ["hello"]);
+}
+
+#[test]
+fn max_tokens_keeps_partial_text_without_dispatching_tools() {
+    let wire = concat!(
+        "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":2}}}\n\n",
+        "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"partial\"}}\n\n",
+        "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+        "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\"},\"usage\":{\"output_tokens\":4}}\n\n",
+        "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+    );
+    let (answer, _) = parse(wire.as_bytes()).unwrap();
+    assert!(answer.truncated);
+    assert_eq!(answer.text, "partial");
+    assert!(answer.calls.is_empty());
 }

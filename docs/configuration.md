@@ -13,6 +13,7 @@ Pass `--policy policy.toml` or set `IRMIND_POLICY`. The repository's [policy.tom
 ```toml
 version = 1
 max_tool_calls_per_case = 100
+max_model_rounds_per_turn = 25
 max_model_result_bytes = 10000
 max_model_tokens_per_case = 200000
 max_object_read_bytes = 1073741824
@@ -31,6 +32,8 @@ to = "2026-10-23T23:59:59Z"
 ```
 
 The optional `[scope]` table is a hard ceiling for remote reads across cases. It can list accounts, projects, hosts, and object prefixes together, plus allowed sources and a UTC window. An object read outside either the case prefix or policy ceiling is denied, even with approval. Other remote reads outside the case scope may need analyst approval; a read outside the policy ceiling is denied. New cases and scope changes cannot exceed the ceiling. If a new policy narrows an existing case, its reads use the intersection and the TUI shows a warning. The current AWS connector requires an account; project queries remain unavailable until a connector supports them. Policy can tighten fixed tool rules, not enable denied actions. External enrichment needs a signed analyst approval; containment is disabled. Unknown fields fail validation.
+
+`max_model_rounds_per_turn` defaults to 25 if omitted and cannot exceed 100. At the limit, IRMind requests a final summary without tools and offers `/continue`. Tool-call and token limits still apply across the case.
 
 ## Non-secret settings
 

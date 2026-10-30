@@ -4,9 +4,21 @@ use super::*;
 use irmind_app::modules::{ModuleConfig, ModuleRegistry};
 use irmind_app::{
     CancellationToken, CloudAuditPort, CompletionRequest, CryptoPorts, Engine, EnginePorts,
-    FindingKind, InternalIntelPort, LlmPort, ModelResponse, ModelStream, ModelUsage, SiemPort,
-    ThreatIntelPort, async_trait,
+    FindingKind, InternalIntelPort, LlmPort, ModelResponse, ModelStream, ModelToolCall, ModelUsage,
+    SiemPort, ThreatIntelPort, async_trait,
 };
+
+#[allow(clippy::expect_used)]
+fn model_calls(proposals: Vec<ProposedCall>) -> Vec<ModelToolCall> {
+    proposals
+        .into_iter()
+        .enumerate()
+        .map(|(index, proposal)| {
+            ModelToolCall::from_proposal(&format!("test_call_{index}"), proposal)
+                .expect("synthetic proposal must be serializable")
+        })
+        .collect()
+}
 use irmind_domain::{
     Actor, Case, CaseId, Decision, ExecutionMode, PolicyRules, ProposedCall, Tool, evaluate,
 };
@@ -29,8 +41,23 @@ trait LegacyModel: Send + Sync {
         &self,
         request: &CompletionRequest,
     ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
-        self.complete_with_usage(request.context().unwrap_or_default())
+        self.complete_with_usage(&request_context(request))
     }
+}
+
+fn request_context(request: &CompletionRequest) -> String {
+    request
+        .messages
+        .iter()
+        .map(|message| {
+            if message.role == irmind_app::MessageRole::Tool {
+                format!("Tool result: {}", message.content)
+            } else {
+                message.content.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 macro_rules! streaming_test_model {
@@ -65,6 +92,8 @@ use test_support::{
     CaptureModel, EdrModel, FakeCloudAudit, FakeInternalIntel, FakeSiem, TestSigner,
     ingest_historical_fixture, ingest_synthetic, ingest_synthetic_result,
 };
+#[allow(clippy::expect_used)]
+mod agent_loop;
 mod approvals;
 mod case_findings_and_agent;
 mod concurrency_and_migrations;

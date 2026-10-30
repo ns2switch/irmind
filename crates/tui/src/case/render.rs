@@ -69,7 +69,13 @@ impl CaseRuntime<'_, '_, '_> {
                 } else {
                     String::new()
                 };
-                format!("{spinner} {verb}… {elapsed}s{transferred} · esc to interrupt")
+                let round = self
+                    .state
+                    .model_round
+                    .map_or_else(String::new, |(number, limit)| {
+                        format!(" · round {number}/{limit}")
+                    });
+                format!("{spinner} {verb}… {elapsed}s{round}{transferred} · esc to interrupt")
             },
         );
         if self.overrides_active {
@@ -89,7 +95,7 @@ impl CaseRuntime<'_, '_, '_> {
         for entry in self.state.entries.iter().skip(self.state.audit_cursor) {
             if matches!(
                 entry.kind,
-                AuditEventKind::Prompt | AuditEventKind::ModelReply
+                AuditEventKind::Prompt | AuditEventKind::FinalAnswer | AuditEventKind::Proposal
             ) && self
                 .state
                 .live_reply_cutoff_seq

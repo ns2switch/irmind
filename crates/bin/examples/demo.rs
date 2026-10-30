@@ -64,9 +64,19 @@ impl LlmPort for DemoModel {
             ModelEvent::TextDelta(text[text.len() / 2..].into()),
             ModelEvent::Completed {
                 response: ModelResponse {
+                    truncated: false,
                     text: text.into(),
                     raw: "synthetic-demo".into(),
-                    calls,
+                    calls: calls
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, proposal)| {
+                            irmind_app::ModelToolCall::from_proposal(
+                                &format!("demo_call_{index}"),
+                                proposal,
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
                 },
                 usage: None,
             },

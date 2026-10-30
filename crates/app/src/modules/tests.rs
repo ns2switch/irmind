@@ -68,6 +68,7 @@ impl LlmPort for TestLlm {
         _cancel: &CancellationToken,
     ) -> Result<ModelStream, AppError> {
         let response = ModelResponse {
+            truncated: false,
             text: "ok".into(),
             calls: Vec::new(),
             raw: "ok".into(),

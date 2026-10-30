@@ -63,9 +63,19 @@ impl LlmPort for FakeModel {
             Ok(ModelEvent::TextDelta("investigation".into())),
             Ok(ModelEvent::Completed {
                 response: ModelResponse {
+                    truncated: false,
                     text: "Synthetic investigation".into(),
                     raw: "synthetic".into(),
-                    calls,
+                    calls: calls
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, proposal)| {
+                            irmind_app::ModelToolCall::from_proposal(
+                                &format!("test_call_{index}"),
+                                proposal,
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
                 },
                 usage: None,
             }),

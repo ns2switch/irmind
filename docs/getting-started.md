@@ -54,7 +54,7 @@ If `config.toml` needs recovery, the TUI offers restoration or a field-by-field 
 2. Type `/new`, enter a title such as “Demo CloudTrail alert,” and select a severity. Press Enter to create a signed local case; the remote scope is optional.
 3. Type `/ingest` and select [the synthetic CloudTrail file](../examples/cloudtrail-alert.json). IRMind hashes it in place and writes a derived Parquet index. It copies the original only if you explicitly use `/ingest --copy-original <path>`.
 4. Ask “What does the synthetic AssumeRole event suggest?” and press Enter. The response appears incrementally. Use `/timeline` or `/graph` to inspect indexed events and `/search <words>` to find matching records.
-5. Review tool proposals in the conversation. An external lookup requires a signed approval with numbered options; use the arrows and Enter. Type `/` for command suggestions or press Ctrl+K for the palette.
+5. Review tool proposals in the conversation. An external lookup requires a signed approval with numbered options; use the arrows and Enter. Type `/` for command suggestions or press Ctrl+K for the palette. If a model limit stops the turn, use `/continue` after reviewing the summary.
 6. Run `/verify <source-root>` to check original bytes, review `/report`, and use `/seal` and `/export` only after checking the displayed case hash and signing-key fingerprint.
 
 The export can be checked on a second computer with `irmind verify-export <PACKAGE> --expected-key <FINGERPRINT>`. See the [CLI reference](development/cli.md) for automation.

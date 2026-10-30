@@ -1,4 +1,4 @@
-use irmind_app::{AppError, ModelResponse, ModelUsage};
+use irmind_app::{AppError, ModelResponse, ModelToolCall, ModelUsage};
 use irmind_domain::{ProposedCall, Tool};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -221,7 +221,10 @@ impl State {
             self.output_tokens = Some(output);
         }
         if let Some(reason) = value["delta"]["stop_reason"].as_str() {
-            if !matches!(reason, "end_turn" | "tool_use" | "stop_sequence") {
+            if !matches!(
+                reason,
+                "end_turn" | "tool_use" | "stop_sequence" | "max_tokens"
+            ) {
                 return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                     irmind_app::AdapterModelError::ProviderStoppedUnexpectedly,
                 )));
@@ -274,6 +277,9 @@ impl State {
                     initial,
                     partial,
                 } => {
+                    if self.finish.as_deref() == Some("max_tokens") {
+                        continue;
+                    }
                     if id.is_empty() {
                         return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                             irmind_app::AdapterModelError::MissingProviderToolID,
@@ -286,10 +292,14 @@ impl State {
                             AppError::Model(format!("invalid tool input: {error}"))
                         })?
                     };
-                    calls.push(parse_tool(&name, &args)?);
+                    let proposal = parse_tool(&name, &args)?;
+                    calls.push(ModelToolCall::new(id, proposal, args.to_string())?);
                 }
                 Block::Ignored => {}
             }
+        }
+        if self.finish.as_deref() == Some("max_tokens") {
+            calls.clear();
         }
         if self.finish.as_deref() == Some("tool_use") && calls.is_empty() {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
@@ -306,6 +316,7 @@ impl State {
                 text,
                 calls,
                 raw: self.raw,
+                truncated: self.finish.as_deref() == Some("max_tokens"),
             },
             usage,
         ))

@@ -47,7 +47,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     break;
                 };
                 match progress {
-                    irmind_app::ModelProgress::RoundStarted => {
+                    irmind_app::ModelProgress::RoundStarted { round, limit } => {
                         if self.state.model_preview.is_empty() {
                             self.state.conversation.discard_preview();
                         } else {
@@ -55,12 +55,27 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                             self.state.conversation.set_preview(safe);
                             self.state.conversation.finish_preview();
                         }
-                        update(&mut self.state, CaseMessage::ModelRoundStarted);
+                        update(
+                            &mut self.state,
+                            CaseMessage::ModelRoundStarted { round, limit },
+                        );
                         preview_dirty = false;
                     }
                     irmind_app::ModelProgress::TextDelta(delta) => {
                         update(&mut self.state, CaseMessage::ModelDelta(delta));
                         preview_dirty = true;
+                    }
+                    irmind_app::ModelProgress::ToolProposed(summary) => {
+                        let safe = self.engine.guard.screen(&summary)?.text;
+                        self.state.conversation.push(
+                            super::conversation::Card::new(
+                                super::conversation::CardKind::Proposal,
+                                safe,
+                                "waiting for policy decision",
+                                false,
+                            )
+                            .with_summary("waiting for policy decision"),
+                        );
                     }
                 }
             }
@@ -142,6 +157,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             self.state.needs_refresh = true;
         }
         self.state.running_since = None;
+        self.state.model_round = None;
         self.state.progress_status = None;
         Ok(())
     }

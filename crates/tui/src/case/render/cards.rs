@@ -18,7 +18,7 @@ pub(super) fn audit_card(
         AuditEventKind::Proposal | AuditEventKind::ToolDispatch => {
             Some(call_card(entry, state, engine)?)
         }
-        AuditEventKind::ModelReply => Some(Card::new(
+        AuditEventKind::FinalAnswer => Some(Card::new(
             CardKind::Model,
             "IRMind",
             engine.guard.screen(&entry.payload)?.text,

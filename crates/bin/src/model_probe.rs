@@ -47,6 +47,8 @@ pub(super) fn test_model_connection(
             content:
                 "Reply with OK. This is a synthetic connection test; no case data is included."
                     .into(),
+            tool_calls: Vec::new(),
+            tool_call_id: None,
         }],
         tools: Vec::new(),
         max_output_tokens: 8,

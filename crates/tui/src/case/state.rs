@@ -41,6 +41,7 @@ pub(super) struct CaseState {
     pub menu_selected: usize,
     pub menu_query: Option<String>,
     pub model_preview: String,
+    pub model_round: Option<(usize, usize)>,
     pub approvals: Vec<ApprovalRequest>,
     pub approval_sources: BTreeMap<String, ApprovalSource>,
     pub findings: Vec<Finding>,
@@ -66,7 +67,7 @@ pub(super) enum CaseMessage {
     Key(KeyCode, KeyModifiers, bool),
     Progress(String),
     ModelDelta(String),
-    ModelRoundStarted,
+    ModelRoundStarted { round: usize, limit: usize },
     TaskFinished(String),
 }
 
@@ -98,7 +99,8 @@ pub(crate) fn panel_findings_for(findings: &[Finding], tab: usize) -> Vec<&Findi
 /// Only updates screen state. I/O and tool execution follow the returned action.
 pub(super) fn update(state: &mut CaseState, message: CaseMessage) -> CaseAction {
     match message {
-        CaseMessage::ModelRoundStarted => {
+        CaseMessage::ModelRoundStarted { round, limit } => {
+            state.model_round = Some((round, limit));
             state.model_preview.clear();
             state.conversation.begin_preview();
             CaseAction::None
@@ -286,6 +288,7 @@ mod tests {
             menu_selected: 0,
             menu_query: None,
             model_preview: String::new(),
+            model_round: None,
             approvals: Vec::new(),
             approval_sources: BTreeMap::new(),
             findings: Vec::new(),
@@ -353,10 +356,22 @@ mod tests {
         ));
         assert_eq!(state.input, "cc");
         state.input.clear();
-        update(&mut state, CaseMessage::ModelRoundStarted);
+        update(
+            &mut state,
+            CaseMessage::ModelRoundStarted {
+                round: 1,
+                limit: 25,
+            },
+        );
         update(&mut state, CaseMessage::ModelDelta("partial answer".into()));
         assert_eq!(state.model_preview, "partial answer");
-        update(&mut state, CaseMessage::ModelRoundStarted);
+        update(
+            &mut state,
+            CaseMessage::ModelRoundStarted {
+                round: 2,
+                limit: 25,
+            },
+        );
         assert!(state.model_preview.is_empty());
         update(&mut state, CaseMessage::ModelDelta("enrichment.".into()));
         update(&mut state, CaseMessage::ModelDelta(" The".into()));
