@@ -4,6 +4,8 @@ This page is for operators choosing a connector or keystore. Each section states
 
 The normal binary includes every current product module and both keystores. None is enabled automatically. In the TUI, use `/settings model` to select and test an AI provider, `/settings connectors` to enable connectors and edit public fields, and `/settings keystore` for credentials. The changes persist and the session reloads inside the TUI. Use `--no-default-features --features keystore-file` for a minimal binary; at least one signer and secrets backend is required. The environment variables and CLI switches below provide temporary automation overrides.
 
+Splunk, MISP, CrowdStrike, SentinelOne, and S3-compatible storage can use a connector-specific CA PEM in `/settings connectors`. IRMind signs the file fingerprint in the non-secret configuration, checks it at startup, and adds that CA to system roots without disabling hostname verification. See [configuration](configuration.md#non-secret-settings).
+
 ## OpenAI-compatible
 
 **Does:** Streams model responses and proposed tool calls through the OpenAI Chat Completions protocol. It supports the official API, approved compatible endpoints, and local services such as Ollama.

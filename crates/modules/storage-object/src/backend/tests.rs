@@ -87,7 +87,7 @@ async fn s3_reads_recorded_object_from_local_server() {
         .with_endpoint(server.origin())
         .with_allow_http(true)
         .with_skip_signature(true)
-        .with_http_connector(SafeConnector)
+        .with_http_connector(SafeConnector::default())
         .build()
         .unwrap();
     recorded_provider_round_trip("s3", &crate::S3_MANIFEST, Arc::new(store)).await;
@@ -111,7 +111,7 @@ async fn s3_rejects_an_oversized_listing_before_parsing() {
         .with_endpoint(server.origin())
         .with_allow_http(true)
         .with_skip_signature(true)
-        .with_http_connector(SafeConnector)
+        .with_http_connector(SafeConnector::default())
         .build()
         .unwrap();
     let error = store
@@ -137,7 +137,7 @@ async fn gcs_reads_recorded_object_from_local_server() {
         .with_bucket_name("synthetic-audit")
         .with_base_url(server.origin().trim_end_matches('/'))
         .with_skip_signature(true)
-        .with_http_connector(SafeConnector)
+        .with_http_connector(SafeConnector::default())
         .build()
         .unwrap();
     recorded_provider_round_trip("gs", &crate::GCS_MANIFEST, Arc::new(store)).await;
@@ -160,7 +160,7 @@ async fn azure_reads_recorded_object_from_local_server() {
         .with_endpoint(server.origin().into())
         .with_allow_http(true)
         .with_skip_signature(true)
-        .with_http_connector(SafeConnector)
+        .with_http_connector(SafeConnector::default())
         .build()
         .unwrap();
     recorded_provider_round_trip("az", &crate::AZURE_MANIFEST, Arc::new(store)).await;

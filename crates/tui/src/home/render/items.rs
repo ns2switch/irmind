@@ -321,6 +321,12 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
         } => {
             format!("set {module}.{field}={value}")
         }
+        irmind_app::ConfigChange::SetCertificateAuthority {
+            module,
+            path,
+            sha256,
+            ..
+        } => format!("set {module} CA file={path}, SHA-256={sha256}"),
         irmind_app::ConfigChange::SetResumeLastCase(enabled) => {
             format!("resume recent case={enabled}")
         }

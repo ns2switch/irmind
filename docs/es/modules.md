@@ -6,6 +6,8 @@ Esta página es para quienes eligen conectores o backends de llavero. Cada apart
 
 La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Ninguno se activa automáticamente. En la TUI, usa `/settings model` para seleccionar y probar un proveedor, `/settings connectors` para activar conectores y editar campos públicos, y `/settings keystore` para las credenciales. Los cambios persisten y la sesión se recarga. Una compilación mínima usa `--no-default-features --features keystore-file`; siempre se requiere un backend de firma y secretos. Las variables y flags de la CLI ofrecen overrides temporales para automatización.
 
+Splunk, MISP, CrowdStrike, SentinelOne y S3 compatible admiten un PEM de CA propio en `/settings connectors`. IRMind firma la huella del archivo en la configuración no secreta, la comprueba al iniciar y añade esa CA a las raíces del sistema sin desactivar la verificación del nombre del servidor. Consulta [configuración](configuration.md#ajustes-no-secretos).
+
 ## Compatible con OpenAI
 
 **Función:** Transmite respuestas y propuestas de herramientas mediante el protocolo OpenAI Chat Completions. Admite la API oficial, servicios compatibles aprobados y servicios locales como Ollama.

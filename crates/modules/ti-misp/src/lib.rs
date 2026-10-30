@@ -27,6 +27,16 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
             secret: false,
         },
         ConfigField {
+            name: "IRMIND_MISP_CA_PEM",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_MISP_CA_SHA256",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "IRMIND_MISP_SOURCE_ID",
             required: true,
             secret: false,
@@ -103,13 +113,22 @@ impl Misp {
                 irmind_app::AdapterPolicyError::EmptyMISPAPIKey,
             )));
         }
-        let async_client = irmind_http::client_builder(std::time::Duration::from_secs(30), false)
-            .build()
-            .map_err(|_| {
-                AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
-                    irmind_app::AdapterStorageError::MISPHTTPClientUnavailable,
-                ))
-            })?;
+        let async_client = irmind_http::client_builder_with_ca(
+            std::time::Duration::from_secs(30),
+            false,
+            irmind_http::load_optional_ca(
+                config.value("IRMIND_MISP_CA_PEM"),
+                config.value("IRMIND_MISP_CA_SHA256"),
+            )
+            .map_err(|error| AppError::Policy(error.to_string()))?
+            .as_ref(),
+        )
+        .build()
+        .map_err(|_| {
+            AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                irmind_app::AdapterStorageError::MISPHTTPClientUnavailable,
+            ))
+        })?;
         Ok(Self {
             async_client,
             endpoint,

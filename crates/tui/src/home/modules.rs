@@ -114,6 +114,10 @@ pub(super) fn begin_edit(state: &mut HomeState) {
         state.notice = "This parameter is overridden by an environment variable".into();
         return;
     }
+    if field.name.ends_with("_CA_SHA256") {
+        state.notice = "The CA fingerprint is set by approving a CA PEM file".into();
+        return;
+    }
     state.module_edit = Some(ModuleEdit {
         module: module.id.clone(),
         field: field.name.clone(),

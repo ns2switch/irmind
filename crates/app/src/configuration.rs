@@ -53,6 +53,12 @@ pub enum ConfigChange {
         field: String,
         value: String,
     },
+    SetCertificateAuthority {
+        module: String,
+        path_field: String,
+        path: String,
+        sha256: String,
+    },
     SetResumeLastCase(bool),
     SetMouseCapture(bool),
     SetTheme(String),
@@ -147,6 +153,25 @@ impl PersistentConfig {
                     return Err(invalid());
                 }
             }
+            for (name, value) in &settings.values {
+                if let Some(prefix) = name.strip_suffix("_CA_PEM") {
+                    let digest_field = format!("{prefix}_CA_SHA256");
+                    if value.is_empty()
+                        || settings
+                            .values
+                            .get(&digest_field)
+                            .is_none_or(|digest| !valid_hash(digest))
+                    {
+                        return Err(invalid());
+                    }
+                }
+                if let Some(prefix) = name.strip_suffix("_CA_SHA256") {
+                    let path_field = format!("{prefix}_CA_PEM");
+                    if !valid_hash(value) || !settings.values.contains_key(&path_field) {
+                        return Err(invalid());
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -180,6 +205,9 @@ impl PersistentConfig {
                 field,
                 value,
             } => {
+                if field.ends_with("_CA_PEM") || field.ends_with("_CA_SHA256") {
+                    return Err(invalid());
+                }
                 let schema = manifest(&module, manifests)?;
                 if !schema
                     .config
@@ -195,6 +223,12 @@ impl PersistentConfig {
                     values.insert(field, value);
                 }
             }
+            ConfigChange::SetCertificateAuthority {
+                module,
+                path_field,
+                path,
+                sha256,
+            } => set_ca_values(&mut next, manifests, module, path_field, path, sha256)?,
             ConfigChange::SetResumeLastCase(enabled) => next.resume_last_case = Some(enabled),
             ConfigChange::SetMouseCapture(enabled) => next.mouse_capture = Some(enabled),
             ConfigChange::SetTheme(theme) => next.theme = Some(theme),
@@ -224,6 +258,42 @@ impl PersistentConfig {
     }
 }
 
+fn set_ca_values(
+    next: &mut PersistentConfig,
+    manifests: &[&ModuleManifest],
+    module: String,
+    path_field: String,
+    path: String,
+    sha256: String,
+) -> Result<(), AppError> {
+    let schema = manifest(&module, manifests)?;
+    let Some(prefix) = path_field.strip_suffix("_CA_PEM") else {
+        return Err(invalid());
+    };
+    let digest_field = format!("{prefix}_CA_SHA256");
+    if !schema
+        .config
+        .iter()
+        .any(|item| item.name == path_field && !item.secret)
+        || !schema
+            .config
+            .iter()
+            .any(|item| item.name == digest_field && !item.secret)
+        || (!path.is_empty() && (!valid_value(&path_field, &path) || !valid_hash(&sha256)))
+    {
+        return Err(invalid());
+    }
+    let values = &mut next.modules.entry(module).or_default().values;
+    if path.is_empty() {
+        values.remove(&path_field);
+        values.remove(&digest_field);
+    } else {
+        values.insert(path_field, path);
+        values.insert(digest_field, sha256);
+    }
+    Ok(())
+}
+
 fn valid_value(name: &str, value: &str) -> bool {
     if value.is_empty()
         || value.len() > 1024
@@ -246,6 +316,13 @@ fn valid_value(name: &str, value: &str) -> bool {
         && url.password().is_none()
         && url.query().is_none()
         && url.fragment().is_none()
+}
+
+fn valid_hash(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn disallowed_char(ch: char) -> bool {

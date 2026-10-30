@@ -301,6 +301,14 @@ impl WorkspaceIo for RootWorkspaceIo {
         change: ConfigChange,
         confirmed: bool,
     ) -> Result<bool> {
+        if let ConfigChange::SetCertificateAuthority { path, sha256, .. } = &change
+            && !path.is_empty()
+            && irmind_http::load_ca_file(Path::new(path))?.fingerprint() != sha256
+        {
+            return Err(anyhow!(
+                "the CA file changed after its fingerprint was shown"
+            ));
+        }
         let overridden = match &change {
             ConfigChange::SetResumeLastCase(_)
             | ConfigChange::SetMouseCapture(_)
@@ -318,6 +326,9 @@ impl WorkspaceIo for RootWorkspaceIo {
                                     .contains(&irmind_app::modules::ModulePort::Llm)
                         }))
             }
+            ConfigChange::SetCertificateAuthority {
+                module, path_field, ..
+            } => std::env::var_os(path_field).is_some() || self.module_overrides.contains(module),
         };
         if overridden {
             return Err(anyhow!(
@@ -333,6 +344,7 @@ impl WorkspaceIo for RootWorkspaceIo {
                 enabled: true,
             } => Some(module.as_str()),
             ConfigChange::SetValue { module, .. }
+            | ConfigChange::SetCertificateAuthority { module, .. }
                 if next.llm_module.as_deref() == Some(module.as_str())
                     || next
                         .modules
@@ -363,6 +375,9 @@ impl WorkspaceIo for RootWorkspaceIo {
             change,
             confirmed,
         )?)
+    }
+    fn ca_fingerprint(&self, path: &Path) -> Result<String> {
+        Ok(irmind_http::load_ca_file(path)?.fingerprint().to_owned())
     }
     fn list_ollama_models(&self, base_url: &str) -> Result<Vec<String>> {
         model_probe::list_ollama_models(base_url)

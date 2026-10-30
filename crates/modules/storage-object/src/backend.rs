@@ -77,6 +77,11 @@ impl StorageObject {
         let source_id = require_identifier(config, "IRMIND_STORAGE_S3_SOURCE_ID")?;
         let container = require_identifier(config, "IRMIND_STORAGE_S3_BUCKET")?;
         let region = require_identifier(config, "IRMIND_STORAGE_S3_REGION")?;
+        let ca = irmind_http::load_optional_ca(
+            config.value("IRMIND_STORAGE_S3_CA_PEM"),
+            config.value("IRMIND_STORAGE_S3_CA_SHA256"),
+        )
+        .map_err(|error| AppError::Policy(error.to_string()))?;
         let mut builder = object_store::aws::AmazonS3Builder::new()
             .with_bucket_name(&container)
             .with_region(region)
@@ -86,7 +91,7 @@ impl StorageObject {
                     .required_secret("AWS_SECRET_ACCESS_KEY")?
                     .expose_secret(),
             )
-            .with_http_connector(SafeConnector);
+            .with_http_connector(SafeConnector { ca });
         if let Some(token) = config.secret("AWS_SESSION_TOKEN") {
             builder = builder.with_token(token.expose_secret());
         }
@@ -115,7 +120,7 @@ impl StorageObject {
             .with_bucket_name(&container)
             .with_service_account_key(checked_service_account(config)?)
             .with_base_url("https://storage.googleapis.com")
-            .with_http_connector(SafeConnector);
+            .with_http_connector(SafeConnector::default());
         if let Some(endpoint) = checked_endpoint(config, "IRMIND_STORAGE_GCS_ENDPOINT")? {
             builder = builder.with_base_url(&endpoint);
         }
@@ -150,7 +155,7 @@ impl StorageObject {
                     .required_secret("AZURE_CLIENT_SECRET")?
                     .expose_secret(),
             )
-            .with_http_connector(SafeConnector);
+            .with_http_connector(SafeConnector::default());
         if let Some(endpoint) = checked_endpoint(config, "IRMIND_STORAGE_AZURE_ENDPOINT")? {
             builder = builder.with_endpoint(endpoint);
         }
