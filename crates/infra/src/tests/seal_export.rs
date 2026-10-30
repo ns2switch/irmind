@@ -32,9 +32,15 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
         .create_case("AWS alert", "account 123456789012")
         .unwrap();
     let cloudtrail = br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","sourceIPAddress":"203.0.113.8"}]}"#;
-    let hash = engine
-        .ingest(&case.id, cloudtrail, "cloudtrail.json")
-        .unwrap();
+    let hash = ingest_synthetic(
+        &engine,
+        store.as_ref(),
+        parser.as_ref(),
+        &case.id,
+        cloudtrail,
+        "cloudtrail.json",
+    );
+    store.put_evidence(&case.id, &hash, cloudtrail).unwrap();
     assert_typed_report_entities(&engine, &case.id, &hash);
     let finding_id = engine
         .add_finding(&case.id, FindingKind::Ioc, "203.0.113.8", &hash)
@@ -55,15 +61,18 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
             .unwrap()
             .contains("False hypothesis")
     );
-    assert!(store.entries(&case.id).unwrap().iter().any(|entry| {
-        entry.kind == irmind_domain::AuditEventKind::GraphIndexed
-            && entry.payload.contains("graph=duckdb-graph-v4")
-    }));
+    assert!(
+        store
+            .entries(&case.id)
+            .unwrap()
+            .iter()
+            .any(|entry| { entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV1 })
+    );
     assert!(
         store
             .graph_summary(&case.id)
             .unwrap()
-            .contains("203.0.113.8")
+            .contains("Parquet records=1")
     );
     let timeline = store.timeline(&case.id, 20).unwrap();
     assert_eq!(timeline.len(), 1);
@@ -98,22 +107,17 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
             .analyst_key_fingerprint,
         public_key
     );
-    let mut bundle: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-    let original = bundle.clone();
-    bundle["audit"][0]["kind"] = serde_json::json!("UnknownEvent");
-    fs::write(&path, serde_json::to_vec(&bundle).unwrap()).unwrap();
+    assert_eq!(
+        irmind_app::verify_export_details(&LocalExportVerifier, &path, None)
+            .unwrap()
+            .format_version,
+        4
+    );
+    let mut bundle = fs::read(&path).unwrap();
+    let middle = bundle.len() / 2;
+    bundle[middle] ^= 1;
+    fs::write(&path, bundle).unwrap();
     assert!(verify_export(&path).is_err());
-    bundle = original.clone();
-    bundle["seal"]["sig"] = serde_json::json!(last.sig);
-    fs::write(&path, serde_json::to_vec(&bundle).unwrap()).unwrap();
-    assert!(verify_export(&path).is_err());
-    bundle = original;
-    bundle["evidence"][&hash] = serde_json::Value::String(BASE64.encode(b"tampered"));
-    fs::write(&path, serde_json::to_vec(&bundle).unwrap()).unwrap();
-    assert!(matches!(
-        verify_export(&path),
-        Err(AppError::EvidenceMismatch(_))
-    ));
 }
 
 #[test]

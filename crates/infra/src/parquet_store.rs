@@ -23,6 +23,7 @@ use std::time::{Duration, Instant};
 mod compact;
 mod local;
 mod query;
+mod scan;
 mod store_bridge;
 mod writer;
 use writer::{
@@ -65,7 +66,7 @@ pub(crate) struct ParquetProfile {
     row: AtomicU64,
     parquet: AtomicU64,
     query_verify: AtomicU64,
-    query_sql: AtomicU64,
+    query_scan: AtomicU64,
 }
 
 impl ParquetProfile {
@@ -97,8 +98,8 @@ impl ParquetProfile {
             .fetch_add(Self::nanos(duration), Ordering::Relaxed);
     }
 
-    fn record_query_sql(&self, duration: Duration) {
-        self.query_sql
+    fn record_query_scan(&self, duration: Duration) {
+        self.query_scan
             .fetch_add(Self::nanos(duration), Ordering::Relaxed);
     }
 
@@ -110,7 +111,7 @@ impl ParquetProfile {
             Duration::from_nanos(self.row.load(Ordering::Relaxed)),
             Duration::from_nanos(self.parquet.load(Ordering::Relaxed)),
             Duration::from_nanos(self.query_verify.load(Ordering::Relaxed)),
-            Duration::from_nanos(self.query_sql.load(Ordering::Relaxed)),
+            Duration::from_nanos(self.query_scan.load(Ordering::Relaxed)),
         ]
     }
 }

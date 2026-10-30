@@ -24,8 +24,6 @@ pub enum AdapterStorageError {
     CrowdStrikeResponseHasNoResourcesArray,
     #[error("storage: CrowdStrike token response is invalid")]
     CrowdStrikeTokenResponseIsInvalid,
-    #[error("storage: DuckDB graph operation failed")]
-    DuckDBGraphOperationFailed,
     #[error("storage: MISP HTTP client unavailable")]
     MISPHTTPClientUnavailable,
     #[error("storage: MISP request failed")]

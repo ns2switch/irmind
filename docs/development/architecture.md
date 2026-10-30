@@ -14,7 +14,7 @@ shared filesystem and protocol crates support adapters without depending on them
 | --- | --- | --- |
 | Domain | `irmind-domain` | Cases, typed IDs, taint, risk, policy, approval challenges, pure custody rules. Depends on `std` and `sha2` for pure hashing. |
 | Application | `irmind-app` | Use cases, remote and local ports, registry, dispatch, report, and audit orchestration. |
-| Adapters | `irmind-mod-*`, `irmind-infra` | Product APIs, SQLite, DuckDB, evidence files, and signing backends. |
+| Adapters | `irmind-mod-*`, `irmind-infra` | Product APIs, SQLite, signed Parquet, evidence files, and signing backends. |
 | Shared support | `irmind-fs`, `irmind-keystore-transfer`, `irmind-llm-chat-completions` | Private file operations, encrypted key transfer, and common model protocol handling. No dependency on a product adapter. |
 | Mandatory security | `irmind-security` | Normalization, detection, redaction, and output screening. |
 | Presentation | `irmind-tui` | Analyst screens and commands; it calls application use cases. |
@@ -43,7 +43,7 @@ LLM response
 
 For SIEM searches, the domain parses a provider-neutral query with approved fields, operators, and bounded aggregations. The selected module maps those fields to its dialect and escapes values. A model cannot submit SPL text, and a pending call using the former `query` argument fails validation on recovery.
 
-The audit log and case state share a SQLite transaction. Case sealing signs a prepared final hash and evidence manifest. A separate case operational chain records cancellations after sealing. A global operational chain records keystore migrations and TUI configuration changes, including before any case exists. The versioned `config.toml` contains only manifest-approved public fields and is checked against its last signed configuration hash at startup. The DuckDB graph is derived from signed evidence and can be rebuilt.
+The audit log and case state share a SQLite transaction. Case sealing signs a prepared final hash and evidence manifest. A separate case operational chain records cancellations after sealing. A global operational chain records keystore migrations and TUI configuration changes, including before any case exists. The versioned `config.toml` contains only manifest-approved public fields and is checked against its last signed configuration hash at startup. The graph is derived from signed Parquet artifacts and can be rebuilt from originals.
 
 ## Add a product module
 

@@ -175,7 +175,16 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
             && entry.payload == "object read blocked before transfer"
     }));
     assert!(engine.verify(&case.id).is_ok());
-    assert!(engine.verify_graph(&case.id).is_ok());
+    let large = irmind_app::LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &JsonParser,
+    };
+    assert!(
+        large
+            .verify_parquet(&case.id, &CancellationToken::new())
+            .is_ok()
+    );
     let entries = store.entries(&case.id).unwrap();
     assert!(
         entries

@@ -95,7 +95,7 @@ fn initial_state(
             engine.evidence_store.evidence_hashes(id)?,
             engine.audit_log.entries(id)?,
             engine.audit_log.operations(id)?,
-            engine.graph.timeline(id, 30)?,
+            graph_timeline_or_notice(engine, id, &mut conversation)?,
         )
     };
     Ok(CaseState {
@@ -148,6 +148,28 @@ fn initial_state(
     })
 }
 
+fn graph_timeline_or_notice(
+    engine: &Engine<'_>,
+    id: &CaseId,
+    conversation: &mut Conversation,
+) -> Result<Vec<irmind_app::TimelineEvent>> {
+    match engine.graph.timeline(id, 30) {
+        Ok(events) => Ok(events),
+        Err(irmind_app::AppError::Policy(reason))
+            if reason.starts_with("derived graph is unavailable until legacy evidence") =>
+        {
+            conversation.push(Card::new(
+                CardKind::Notice,
+                "",
+                "This case has an old derived index. Use /migrate to rebuild Parquet from its original evidence. If originals are unavailable, the signed case history remains readable without graph queries.",
+                false,
+            ));
+            Ok(Vec::new())
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
 fn welcome_summary(
     case: &irmind_app::Case,
     model: Option<&dyn LlmPort>,
@@ -177,7 +199,9 @@ pub(crate) fn run_case(
     shutdown: &CancellationToken,
     presentation: CasePresentation<'_>,
 ) -> Result<CaseExit> {
-    verify_case_before_open(terminal, engine, id, shutdown)?;
+    if let Some(reason) = verify_case_before_open(terminal, engine, id, shutdown)? {
+        return run_signed_history_only(terminal, engine, id, shutdown, &reason);
+    }
     let mut state = initial_state(engine, id, model, io_ops, presentation.resumed)?;
     if io_ops.remember_last_case(id).is_err() {
         state.conversation.push(Card::new(
@@ -221,9 +245,9 @@ fn verify_case_before_open(
     engine: &Engine<'_>,
     id: &CaseId,
     shutdown: &CancellationToken,
-) -> Result<()> {
+) -> Result<Option<String>> {
     let cancel = shutdown.child_token();
-    std::thread::scope(|scope| -> Result<()> {
+    std::thread::scope(|scope| -> Result<Option<String>> {
         let worker_cancel = cancel.clone();
         let worker = scope.spawn(move || engine.open_case_verified(id, &worker_cancel));
         let started = Instant::now();
@@ -259,9 +283,80 @@ fn verify_case_before_open(
             engine.record_cancellation(id, irmind_app::CancelledOperation::Verify)?;
             return Err(irmind_app::AppError::Cancelled.into());
         }
-        verified?;
-        Ok(())
+        match verified {
+            Ok(_) => Ok(None),
+            Err(error) => {
+                engine.inspect_signed_chain_only(id, &cancel)?;
+                Ok(Some(engine.guard.screen(&error.to_string())?.text))
+            }
+        }
     })
+}
+
+fn run_signed_history_only(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    engine: &Engine<'_>,
+    id: &CaseId,
+    shutdown: &CancellationToken,
+    reason: &str,
+) -> Result<CaseExit> {
+    let case = engine.repo.get_case(id)?;
+    let title = engine.guard.screen(&case.title)?.text;
+    let entries = engine.audit_log.entries(id)?;
+    let mut offset = 0usize;
+    let mut confirm_exit = false;
+    loop {
+        terminal.draw(|frame| {
+            let visible = usize::from(frame.area().height).saturating_sub(5);
+            let mut lines = vec![
+                format!("IRMind · Signed history · {title}"),
+                format!("Original evidence unavailable or changed: {reason}"),
+                "Read-only view. Graph queries and case actions are disabled.".into(),
+            ];
+            lines.extend(entries.iter().skip(offset).take(visible).map(|entry| {
+                let hash = irmind_app::hex(&entry.hash);
+                format!(
+                    "{:>6}  {:<24}  {}…{}",
+                    entry.seq,
+                    entry.kind.as_str(),
+                    &hash[..8],
+                    &hash[57..]
+                )
+            }));
+            lines.push(if confirm_exit {
+                "Exit IRMind? Enter confirms · Esc stays".into()
+            } else {
+                "PgUp/PgDn scroll · Esc returns home · Ctrl+C exits".into()
+            });
+            frame.render_widget(Paragraph::new(lines.join("\n")), frame.area());
+        })?;
+        if shutdown.is_cancelled() {
+            return Ok(CaseExit::Home);
+        }
+        if !event::poll(Duration::from_millis(100))? {
+            continue;
+        }
+        let Event::Key(key) = event::read()? else {
+            continue;
+        };
+        if confirm_exit {
+            match key.code {
+                KeyCode::Enter => return Ok(CaseExit::Quit),
+                KeyCode::Esc => confirm_exit = false,
+                _ => {}
+            }
+            continue;
+        }
+        match key.code {
+            KeyCode::Esc => return Ok(CaseExit::Home),
+            KeyCode::PageUp => offset = offset.saturating_sub(20),
+            KeyCode::PageDown => offset = (offset + 20).min(entries.len().saturating_sub(1)),
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                confirm_exit = true;
+            }
+            _ => {}
+        }
+    }
 }
 
 fn load_approval_sources(

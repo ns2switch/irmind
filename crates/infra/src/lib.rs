@@ -3,7 +3,6 @@
 mod clock;
 mod config_toml;
 mod evidence_fs;
-mod graph_duckdb;
 mod graph_port;
 mod parquet_store;
 mod seal;
@@ -19,14 +18,11 @@ use ed25519_dalek::{Signature, Signer as _, SigningKey, VerifyingKey};
 use fs4::fs_std::FileExt as _;
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CaseExporter, CaseLock, CaseMutation, CaseSeal,
-    EventParser, EvidenceGraph, EvidenceStore, ExportVerifier, GLOBAL_OPERATION_SCOPE, GraphRecord,
-    Repository, SignedEntry, SignedOperation, Signer, TimelineEvent, Verifier, hex, seal_challenge,
-    sha256, verify_case_metadata,
+    EventParser, EvidenceGraph, EvidenceStore, ExportVerifier, GLOBAL_OPERATION_SCOPE, Repository,
+    SignedEntry, SignedOperation, Signer, TimelineEvent, Verifier, hex, seal_challenge, sha256,
+    verify_case_metadata,
 };
-use irmind_domain::{
-    Actor, AnalystApprovalVerifier, Case, CaseId, Provenance, Severity, SourceKind, Tainted,
-    valid_entity,
-};
+use irmind_domain::{Actor, AnalystApprovalVerifier, Case, CaseId, Severity, Tainted};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -34,8 +30,6 @@ use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-
-use graph_duckdb::GraphStore;
 
 fn storage(_error: impl std::fmt::Display) -> AppError {
     AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
@@ -49,7 +43,6 @@ fn storage_reason(message: &'static str) -> AppError {
 
 pub struct LocalStore {
     db: Mutex<Connection>,
-    graph: GraphStore,
     parquet: ParquetStore,
     graph_catalog: Mutex<std::collections::HashMap<CaseId, graph_port::CachedCatalog>>,
     evidence_dir: PathBuf,

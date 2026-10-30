@@ -9,7 +9,7 @@ This page is for contributors and evaluators planning around current limitations
 - A conversation-first TUI with a multiline prompt, scrollable signed activity cards, command completion, and an optional case sidebar. Case creation, evidence ingestion, investigation, approval, verification, sealing, and export remain in the same workspace.
 - Incremental model text in the TUI, IOC/hypothesis/ATT&CK panels with analyst confirmation, and evidence excerpts beside matching approvals.
 - Policy-gated reads and analyst-approved external enrichment, with a mandatory content guard.
-- Local SQLite custody and a derived Parquet store queried by DuckDB, with Ed25519 signatures from an explicitly selected OS or encrypted-file backend. Signed source manifests support large cases without an implicit copy of each original; a copy is an explicit option. The 1 GB and 15 GB synthetic benchmarks meet the local ingestion and query targets.
+- Local SQLite custody and a derived Parquet store queried directly with Arrow, with Ed25519 signatures from an explicitly selected OS or encrypted-file backend. Signed source manifests support large cases without an implicit copy of each original; a copy is an explicit option. The 1 GB and 15 GB synthetic benchmarks meet the local ingestion and query targets.
 - Explicitly selected LLM modules and optional Splunk, AWS, EDR, MISP, and VirusTotal connectors; Splunk searches use structured fields and aggregations.
 - Typed IOC, hypothesis, ATT&CK technique, and timeline proposals with analyst confirmation; reports cite confirmed evidence.
 - Case scopes with projects and an optional TOML policy ceiling for remote reads.
@@ -19,7 +19,7 @@ This page is for contributors and evaluators planning around current limitations
 
 The MVP has a fixed scope:
 
-1. Ingest 15–500 GB cases through signed source manifests, optional original copies, and partitioned Parquet. DuckDB will query only Parquet produced by IRMind. Verify reports missing or changed originals; a sampled check reports its limited coverage. Benchmark 1 GB and 15 GB on a standard runner.
+1. Ingest 15–500 GB cases through signed source manifests, optional original copies, and partitioned Parquet. Bounded Arrow scans query only signed Parquet produced by IRMind. Verify reports missing or changed originals; a sampled check reports its limited coverage. Benchmark 1 GB and 15 GB on a standard runner.
 2. Retrieve SIEM alerts and keep diagnostic tracing separate from signed custody events.
 3. Keep SIEM searches limited to structured fields, operators, time windows, and simple aggregations translated by the connector.
 4. Parse exported CloudTrail, GCP Cloud Audit Logs, Azure Activity and Entra ID sign-in logs, and generic JSON in streaming mode. Migrate existing cases with verification before and after.

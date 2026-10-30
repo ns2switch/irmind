@@ -13,9 +13,9 @@ rustup toolchain install 1.95.0
 cargo build --release --locked -p irmind
 ```
 
-CI prueba Ubuntu Linux, macOS arm64 y Windows x64 con el toolchain MSVC. SQLite y DuckDB se compilan desde fuentes incluidas. TLS usa rustls con las raíces de certificados nativas, incluidas las CA corporativas instaladas; IRMind no enlaza OpenSSL del sistema. Esta opción de raíces nativas puede diferir de las comprobaciones de política de un verificador específico de cada plataforma.
+CI prueba Ubuntu Linux, macOS arm64 y Windows x64 con el toolchain MSVC. SQLite se compila desde fuentes incluidas. Arrow y Parquet usan crates de Rust. TLS usa rustls con las raíces de certificados nativas, incluidas las CA corporativas instaladas; IRMind no enlaza OpenSSL del sistema. Esta opción de raíces nativas puede diferir de las comprobaciones de política de un verificador específico de cada plataforma.
 
-Instala un compilador de C/C++ antes de compilar: GCC o Clang y `pkg-config` en Linux, Xcode Command Line Tools en macOS, o Visual Studio Build Tools con MSVC C++ en Windows. La compilación de DuckDB incluido compila C++ en local. Para una compilación release sin caché, reserva aproximadamente 20–60 minutos y 20–30 GB libres; depende de la CPU, el compilador y la caché. Las [instrucciones de duckdb-rs](https://github.com/duckdb/duckdb-rs) explican esta compilación.
+Instala un compilador de C/C++ antes de compilar: GCC o Clang y `pkg-config` en Linux, Xcode Command Line Tools en macOS, o Visual Studio Build Tools con MSVC C++ en Windows. Una compilación release sin caché sigue compilando muchos crates de Rust y SQLite incluido. Reserva tiempo y disco adicionales; depende de la CPU, el compilador y la caché. Consulta las [mediciones](../development/benchmarks.md).
 
 ## Artefactos de CI y checksums
 
@@ -43,6 +43,6 @@ Usa Windows Terminal y el binario x64 MSVC. `os` utiliza Credential Manager; `fi
 
 ## Datos y terminal
 
-Sin `--home`, los datos se guardan en el directorio estándar de datos locales de cada plataforma: XDG en Linux, Application Support en macOS y LocalAppData en Windows. Los nombres de evidencia son hashes en minúsculas; las rutas de auditoría y exportación son relativas y usan `/`. Cada caso tiene una base SQLite de auditoría y un grafo derivado DuckDB.
+Sin `--home`, los datos se guardan en el directorio estándar de datos locales de cada plataforma: XDG en Linux, Application Support en macOS y LocalAppData en Windows. Los nombres de evidencia son hashes en minúsculas; las rutas de auditoría y exportación son relativas y usan `/`. SQLite guarda la auditoría y el estado del caso; los artefactos Parquet firmados proporcionan las consultas derivadas del grafo.
 
 La TUI usa la pantalla alternativa y sanea el texto externo antes de mostrarlo. Los tests automáticos comprueban secuencias de control y controles bidireccionales en los tres sistemas. La interacción visual aún requiere revisión manual en cada terminal antes de usarse en producción. Por SSH, solicita un terminal con `ssh -t`, elige `file` y escribe la passphrase en el campo enmascarado de la TUI. IRMind no cambia de backend en silencio. `verify-export` funciona sin desbloquear un llavero.

@@ -93,18 +93,25 @@ fn concurrent_ingest_serializes_a_case() {
         for number in 0..4 {
             let id = case.id.clone();
             let engine = &engine;
+            let store = &store;
             scope.spawn(move || {
                 let payload = format!("{{\"eventName\":\"Read\",\"host\":\"host-{number}\"}}");
-                engine
-                    .ingest(&id, payload.as_bytes(), "event.json")
-                    .unwrap();
+                ingest_synthetic(
+                    engine,
+                    store.as_ref(),
+                    &JsonParser,
+                    &id,
+                    payload.as_bytes(),
+                    &format!("event-{number}.json"),
+                );
             });
         }
     });
-    assert_eq!(engine.verify(&case.id).unwrap(), 9);
+    assert_eq!(engine.verify(&case.id).unwrap(), 13);
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn analyst_and_agent_entries_use_distinct_keys_in_one_export() {
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(LocalStore::open(root.path()).unwrap());
@@ -164,7 +171,14 @@ fn analyst_and_agent_entries_use_distinct_keys_in_one_export() {
     .unwrap();
     let case = attended.create_case("Alert", "local evidence").unwrap();
     assert!(matches!(
-        unattended.ingest(&case.id, b"{}", "log.json"),
+        ingest_synthetic_result(
+            &unattended,
+            store.as_ref(),
+            parser.as_ref(),
+            &case.id,
+            b"{}",
+            "log.json"
+        ),
         Err(AppError::PendingApproval(_))
     ));
     unattended
@@ -184,7 +198,7 @@ fn analyst_and_agent_entries_use_distinct_keys_in_one_export() {
 }
 
 #[test]
-fn legacy_sqlite_graph_moves_to_duckdb() {
+fn obsolete_graph_file_is_discarded_without_changing_the_signed_case() {
     let root = tempfile::tempdir().unwrap();
     let id = {
         let store = Arc::new(LocalStore::open(root.path()).unwrap());
@@ -192,8 +206,6 @@ fn legacy_sqlite_graph_moves_to_duckdb() {
             key: SigningKey::from_bytes(&[31u8; 32]),
             actor: Actor::Analyst,
         });
-        let guard = Arc::new(MandatoryGuard::new().unwrap());
-        let parser = Arc::new(JsonParser);
         let engine = Engine::new(
             EnginePorts::new(
                 store.clone(),
@@ -204,62 +216,28 @@ fn legacy_sqlite_graph_moves_to_duckdb() {
                     signer.clone(),
                     Arc::new(LocalVerifier::from_signer(signer.as_ref())),
                 ),
-                guard.clone(),
-                parser.clone(),
+                Arc::new(MandatoryGuard::new().unwrap()),
+                Arc::new(JsonParser),
             ),
             ExecutionMode::Attended,
             Arc::new(SystemClock),
         )
         .unwrap();
-        let case = engine.create_case("Migration", "local").unwrap();
-        let bytes = b"{\"eventName\":\"AssumeRole\",\"sourceIPAddress\":\"203.0.113.8\"}";
-        let hash = hex(&sha256(bytes));
-        store.put_evidence(&case.id, &hash, bytes).unwrap();
-        let conn = store.conn().unwrap();
-        conn.execute_batch(
-                "CREATE TABLE graph_index (case_id TEXT, hash TEXT, records INTEGER);
-                 CREATE TABLE graph_events (case_id TEXT, hash TEXT, record_index INTEGER, at TEXT, event TEXT);
-                 CREATE TABLE graph_observations (case_id TEXT, hash TEXT, record_index INTEGER, at TEXT, event TEXT, kind TEXT, value TEXT);
-                 CREATE TABLE graph_nodes (case_id TEXT, kind TEXT, value TEXT, first_seen TEXT, last_seen TEXT, count INTEGER);",
-            )
-            .unwrap();
-        conn.execute(
-            "INSERT INTO graph_index VALUES (?1,?2,1)",
-            params![case.id.as_str(), hash],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO graph_events VALUES (?1,?2,0,'2026-10-23T12:00:00Z','AssumeRole')",
-            params![case.id.as_str(), hash],
-        )
-        .unwrap();
-        conn.execute(
-                "INSERT INTO graph_observations VALUES (?1,?2,0,'2026-10-23T12:00:00Z','AssumeRole','ip','203.0.113.8')",
-                params![case.id.as_str(), hash],
-            )
-            .unwrap();
-        case.id
+        let id = engine.create_case("Migration", "local").unwrap().id;
+        assert_eq!(engine.verify(&id).unwrap(), 1);
+        id
     };
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
-    assert!(store.graph_summary(&id).unwrap().contains("203.0.113.8"));
-    assert_eq!(store.timeline(&id, 10).unwrap()[0].event, "AssumeRole");
+    let graph_dir = root.path().join("graph");
+    std::fs::create_dir_all(&graph_dir).unwrap();
+    let old_index = graph_dir.join(format!("{}.duckdb", id.as_str()));
+    std::fs::write(&old_index, b"derived index").unwrap();
+    let reopened = LocalStore::open(root.path()).unwrap();
+    assert!(!old_index.exists());
+    assert_eq!(reopened.entries(&id).unwrap().len(), 1);
     assert!(
-        root.path()
-            .join("graph")
-            .join(format!("{}.duckdb", id.as_str()))
-            .exists()
+        reopened
+            .graph_summary(&id)
+            .unwrap()
+            .contains("Parquet records=0")
     );
-    let legacy: i64 = store
-        .conn()
-        .unwrap()
-        .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='graph_index'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert_eq!(legacy, 0);
-    drop(store);
-    let reopened = Arc::new(LocalStore::open(root.path()).unwrap());
-    assert_eq!(reopened.timeline(&id, 10).unwrap().len(), 1);
 }

@@ -1,4 +1,5 @@
 use crate::*;
+use irmind_domain::SourceManifestV1;
 mod entity_details;
 mod render;
 pub use entity_details::EntityDetails;
@@ -135,12 +136,8 @@ impl Engine<'_> {
                 crate::FixedAppError::PolicyInvalidFindingValue,
             ));
         }
-        if !self
-            .evidence_store
-            .evidence_hashes(id)?
-            .iter()
-            .any(|hash| hash == evidence_hash)
-        {
+        let known_evidence = self.known_evidence(id, &self.audit_log.entries(id)?)?;
+        if !known_evidence.contains(evidence_hash) {
             return Err(AppError::Fixed(
                 crate::FixedAppError::PolicyFindingEvidenceIsAbsentFromCase,
             ));
@@ -154,11 +151,6 @@ impl Engine<'_> {
             dismissed: false,
             details,
         };
-        let known_evidence = self
-            .evidence_store
-            .evidence_hashes(id)?
-            .into_iter()
-            .collect();
         if !finding.valid_for(&known_evidence) {
             return Err(AppError::Fixed(
                 crate::FixedAppError::PolicyInvalidFindingValue,
@@ -256,11 +248,7 @@ impl Engine<'_> {
         id: &CaseId,
         entries: &[SignedEntry],
     ) -> Result<Vec<Finding>, AppError> {
-        let known_evidence = self
-            .evidence_store
-            .evidence_hashes(id)?
-            .into_iter()
-            .collect();
+        let known_evidence = self.known_evidence(id, entries)?;
         let mut findings = BTreeMap::<String, Finding>::new();
         for entry in entries {
             match entry.kind {
@@ -316,5 +304,25 @@ impl Engine<'_> {
             }
         }
         Ok(findings.into_values().collect())
+    }
+
+    fn known_evidence(
+        &self,
+        id: &CaseId,
+        entries: &[SignedEntry],
+    ) -> Result<std::collections::BTreeSet<String>, AppError> {
+        let mut hashes = self
+            .evidence_store
+            .evidence_hashes(id)?
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>();
+        for entry in entries {
+            if entry.kind == AuditEventKind::SourceManifestV1 {
+                let source = SourceManifestV1::decode(&entry.payload)
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                hashes.insert(source.sha256.as_str().to_owned());
+            }
+        }
+        Ok(hashes)
     }
 }

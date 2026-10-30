@@ -50,7 +50,7 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 | Command | Purpose |
 | --- | --- |
 | `irmind graph <CASE_ID>` | Show the case graph summary. |
-| `irmind graph-rebuild <CASE_ID>` | Rebuild the legacy DuckDB graph. Large cases use `verify-graph` with their source root. |
+| `irmind graph-rebuild <CASE_ID>` | Compatibility alias for `migrate`: convert copied originals into signed Parquet. Use `verify-graph` to rebuild and compare artifacts. |
 | `irmind verify-graph <CASE_ID> [--source-root <PATH>]` | Rebuild and compare Parquet with originals, or verify a legacy graph. |
 | `irmind timeline <CASE_ID>` | List timeline events. |
 | `irmind entity <CASE_ID> <KIND> <VALUE>` | Look up an entity. |

@@ -148,11 +148,10 @@ impl Engine<'_> {
         id: &CaseId,
         call: &AuthorizedCall,
         raw: Vec<u8>,
-        cancel: &CancellationToken,
+        _cancel: &CancellationToken,
     ) -> Result<(String, String), AppError> {
         let id = id.clone();
         let call_owned = call.clone();
-        let cancel_owned = cancel.clone();
         let stored = self
             .blocking_local(move |local| {
                 let hash = hex(&sha256(&raw));
@@ -164,7 +163,6 @@ impl Engine<'_> {
                     &format!("{} bytes from {}", raw.len(), call_owned.tool().as_str()),
                     Some(&hash),
                 )?;
-                local.index_remote_result(&id, &call_owned, &hash, &raw, &cancel_owned)?;
                 let screened = local.screen_model_result(
                     &id,
                     &raw,

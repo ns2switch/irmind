@@ -4,7 +4,7 @@ This page is for maintainers reviewing the versioned large-case custody format. 
 
 ## Legacy constraint
 
-The current ingest use case accepts a byte slice of at most 50 MB, writes a content-addressed local copy, and signs an `EvidenceIngested` entry. Verification expects that copy. Export v3 is a JSON document capped at 128 MiB and requires every audit evidence hash to be present in it. These rules cannot represent an uncopied 15–500 GB source or a manifest-only export.
+The retired ingestion path accepted a byte slice of at most 50 MB, wrote a content-addressed local copy, and signed an `EvidenceIngested` entry. Historical verification still expects that copy. Export v3 is a JSON document capped at 128 MiB and requires every audit evidence hash to be present in it. These rules cannot represent an uncopied 15–500 GB source or a manifest-only export.
 
 ## Signed records
 
@@ -31,7 +31,7 @@ Opening a large case verifies the signed chain and manifest structure without si
 
 Neighbor queries read only signed, hash-checked Parquet. They inspect at most 4,096 records containing the selected entity and explicitly label the result as partial when more records match. This bounds the self-join for ubiquitous entities; counts in a partial result apply only to the selected records, so the analyst must narrow the entity before treating them as case-wide counts.
 
-Path search keeps the legacy three-hop bound, expands at most 200 entities and 50 neighbors per entity, and stops at a 10-second budget. It reports a truncated search instead of claiming that a path does not exist when those bounds or the record sample are exhausted. If the deadline interrupts an active DuckDB query, it returns an error.
+Path search keeps the legacy three-hop bound, expands at most 200 entities and 50 neighbors per entity, and stops at a 10-second budget. It reports a truncated search instead of claiming that a path does not exist when those bounds or the record sample are exhausted. If the deadline interrupts a scan, it returns an error.
 
 A typed optional query filter selects date, account or project, and region partitions from signed artifact metadata before verification and scanning. An exact UTC predicate also filters records within boundary dates. Policy rejects model filters outside the case or organization scope; local callers enforce the case scope too. The TUI, model tool catalog, and CLI expose the same fields. Filtering a case that still contains legacy graph records fails clearly until migration completes.
 

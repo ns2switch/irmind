@@ -50,10 +50,13 @@ impl CaseWorkflow<'_, '_> {
             ))
         })?;
         let total = files.len();
-        let large = self
+        let (store, parser) = self
             .io_ops
             .large_case_store()
-            .zip(self.io_ops.streaming_parser());
+            .zip(self.io_ops.streaming_parser())
+            .ok_or(AppError::Policy(
+                "signed Parquet ingestion is unavailable".into(),
+            ))?;
         let source_root = if path.is_dir() {
             path
         } else {
@@ -70,7 +73,7 @@ impl CaseWorkflow<'_, '_> {
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
-        if let Some((store, parser)) = large {
+        {
             let use_cases = LargeCaseUseCases {
                 engine: self.engine,
                 store,
@@ -91,21 +94,6 @@ impl CaseWorkflow<'_, '_> {
                     total,
                     &format!("Created {bundles} signed Parquet bundles"),
                 );
-            }
-        } else {
-            for (index, file) in files.iter().enumerate() {
-                if cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
-                }
-                let source = &sources[index];
-                let bytes = self.io_ops.read_evidence(file).map_err(|_| {
-                    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
-                        irmind_app::AdapterStorageError::CannotReadSelectedEvidence,
-                    ))
-                })?;
-                self.engine.ingest_cancelable(id, &bytes, source, cancel)?;
-                let safe_source = self.engine.guard.screen(source)?.text;
-                progress(index + 1, total, &safe_source);
             }
         }
         Ok(total)
@@ -267,12 +255,7 @@ impl CaseWorkflow<'_, '_> {
         id: &CaseId,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
-        if self.has_source_manifests(id)? {
-            return Err(AppError::Policy(
-                "use /verify-graph <source-root> to rebuild and compare Parquet".into(),
-            ));
-        }
-        self.engine.rebuild_graph_cancelable(id, cancel)
+        self.migrate_legacy(id, cancel)
     }
 
     pub(crate) fn verify_graph(
@@ -288,7 +271,9 @@ impl CaseWorkflow<'_, '_> {
         if self.has_parquet_artifacts(id)? {
             return self.verify_parquet_rebuild(id, Path::new("."), cancel);
         }
-        self.engine.verify_graph_cancelable(id, cancel)
+        Err(AppError::Policy(
+            "no signed Parquet artifacts; migrate copied evidence first".into(),
+        ))
     }
 
     pub(crate) fn seal(&self, id: &CaseId) -> Result<(), AppError> {

@@ -30,13 +30,14 @@ fn fixture() -> (tempfile::TempDir, Arc<LocalStore>, Engine<'static>, CaseId) {
     for index in 0..2 {
         let bytes =
             format!(r#"{{"eventTime":"2026-10-27T12:00:00Z","eventName":"Synthetic{index}"}}"#);
-        engine
-            .ingest(
-                &case.id,
-                bytes.as_bytes(),
-                &format!("synthetic/{index}.json"),
-            )
-            .unwrap();
+        ingest_synthetic(
+            &engine,
+            store.as_ref(),
+            &JsonParser,
+            &case.id,
+            bytes.as_bytes(),
+            &format!("synthetic/{index}.json"),
+        );
     }
     (root, store, engine, case.id)
 }
@@ -92,7 +93,14 @@ fn explicit_verify_rechecks_old_entries_and_invalidates_the_checkpoint() {
     corrupt_old_entry(&store, &id);
     assert!(matches!(engine.verify(&id), Err(AppError::InvalidChain(_))));
     assert!(matches!(
-        engine.ingest(&id, br#"{"eventName":"Third"}"#, "synthetic/third.json"),
+        ingest_synthetic_result(
+            &engine,
+            store.as_ref(),
+            &JsonParser,
+            &id,
+            br#"{"eventName":"Third"}"#,
+            "synthetic/third.json"
+        ),
         Err(AppError::InvalidChain(_))
     ));
 }

@@ -88,8 +88,13 @@ impl Engine<'_> {
                 new_evidence.insert(hash.clone());
             }
         }
-        self.verify_new_evidence(id, &new_evidence, cancel)?;
-        crate::large_case::read_manifest_index(&entries)?;
+        let manifest = crate::large_case::read_manifest_index(&entries)?;
+        let source_hashes = manifest
+            .sources
+            .iter()
+            .map(|source| source.sha256.as_str().to_owned())
+            .collect::<HashSet<_>>();
+        self.verify_new_evidence(id, &new_evidence, &source_hashes, cancel)?;
         self.pending_requests_unlocked(&case, &entries)?;
         self.findings_unlocked(id, &entries)?;
         summarize_usage(&entries)?;
@@ -101,6 +106,7 @@ impl Engine<'_> {
         &self,
         id: &CaseId,
         hashes: &HashSet<String>,
+        source_hashes: &HashSet<String>,
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
         if hashes.is_empty() {
@@ -114,6 +120,9 @@ impl Engine<'_> {
         for hash in hashes {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
+            }
+            if source_hashes.contains(hash) && !listed.contains(hash) {
+                continue;
             }
             if !listed.contains(hash)
                 || hex(&sha256(&self.evidence_store.get_evidence(id, hash)?)) != *hash

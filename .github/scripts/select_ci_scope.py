@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 import time
-import tomllib
 from pathlib import Path
 
 
@@ -81,15 +80,9 @@ def main() -> None:
         raise ValueError("release dry run and Linux-only profiling cannot run together")
     scope = select_scope(event, os.environ["GITHUB_REF"], changed, labels,
                          recent_commit, release_dry_run)
-    lock = tomllib.loads(Path("Cargo.lock").read_text())
-    version = next(
-        package["version"] for package in lock["package"]
-        if package["name"] == "libduckdb-sys"
-    )
     with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="ascii") as output:
         for key, enabled in scope.items():
             output.write(f"{key}={str(enabled).lower()}\n")
-        output.write(f"duckdb_version={version}\n")
     if event == "schedule" and not scope["run_ci"]:
         print("Skipping nightly CI: main has no commit in the last 24 hours.")
 

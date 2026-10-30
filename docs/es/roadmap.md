@@ -9,7 +9,7 @@ Esta página es para quienes contribuyen al proyecto o evalúan sus límites act
 - Una TUI centrada en la conversación, con entrada multilínea, tarjetas desplazables de actividad firmada, autocompletado de comandos y un panel lateral opcional. En el mismo espacio se crean casos, se ingiere evidencia, se investiga, se aprueban llamadas, se verifica, se sella y se exporta.
 - Texto incremental del modelo, paneles de IOC, hipótesis y técnicas ATT&CK con confirmación del analista, y fragmentos de evidencia junto a las aprobaciones relacionadas.
 - Consultas de lectura sujetas a política y enriquecimiento externo aprobado por el analista, con un guard obligatorio.
-- Custodia local en SQLite y almacenamiento derivado en Parquet consultado con DuckDB, con firmas Ed25519 mediante un llavero del sistema o un archivo cifrado seleccionados explícitamente. Los manifiestos firmados permiten casos grandes sin copiar cada original de forma implícita; la copia es una opción expresa. Los benchmarks sintéticos de 1 GB y 15 GB cumplen los objetivos de ingesta y consulta locales.
+- Custodia local en SQLite y almacenamiento derivado en Parquet consultado directamente con Arrow, con firmas Ed25519 mediante un llavero del sistema o un archivo cifrado seleccionados explícitamente. Los manifiestos firmados permiten casos grandes sin copiar cada original de forma implícita; la copia es una opción expresa. Los benchmarks sintéticos de 1 GB y 15 GB cumplen los objetivos de ingesta y consulta locales.
 - Módulos LLM seleccionados explícitamente y conectores opcionales de Splunk, AWS, EDR, MISP y VirusTotal; Splunk usa campos y agregaciones estructurados.
 - Propuestas tipadas de IOC, hipótesis, técnicas ATT&CK y eventos de cronología; los informes citan evidencia confirmada.
 - Alcance del caso con proyectos y techo opcional de política TOML para consultas remotas.
@@ -19,7 +19,7 @@ Esta página es para quienes contribuyen al proyecto o evalúan sus límites act
 
 El MVP tiene un alcance cerrado:
 
-1. Ingerir casos de 15 a 500 GB con manifiestos firmados de los originales, copia opcional y Parquet particionado. DuckDB consultará solo Parquet generado por IRMind. La verificación informará de originales ausentes o cambiados; el muestreo indicará su cobertura limitada. Medir 1 GB y 15 GB en un runner estándar.
+1. Ingerir casos de 15 a 500 GB con manifiestos firmados de los originales, copia opcional y Parquet particionado. Las consultas acotadas con Arrow leerán solo Parquet firmado y generado por IRMind. La verificación informará de originales ausentes o cambiados; el muestreo indicará su cobertura limitada. Medir 1 GB y 15 GB en un runner estándar.
 2. Obtener alertas del SIEM y mantener las trazas de diagnóstico separadas de los eventos firmados de custodia.
 3. Mantener las consultas SIEM limitadas a campos, operadores, ventanas temporales y agregaciones sencillas estructurados que traduce el conector.
 4. Procesar en streaming exportaciones de CloudTrail, Cloud Audit Logs de GCP, Azure Activity y registros de inicio de sesión de Entra ID, además de JSON genérico. Migrar los casos existentes con verificación antes y después.

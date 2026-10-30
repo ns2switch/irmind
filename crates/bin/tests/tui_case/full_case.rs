@@ -69,7 +69,19 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
     let approval_panel = tui.render_approval_panel(&id).unwrap();
     assert!(approval_panel.contains("[TAINTED]"));
     assert!(approval_panel.contains("example.com"));
-    let hash = store.evidence_hashes(&id).unwrap().remove(0);
+    let hash = store
+        .entries(&id)
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV1)
+        .map(|entry| {
+            irmind_domain::SourceManifestV1::decode(&entry.payload)
+                .unwrap()
+                .sha256
+                .as_str()
+                .to_owned()
+        })
+        .unwrap();
     let ioc = tui
         .propose_entity(
             &id,
@@ -184,7 +196,11 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
             .any(|entry| entry.operation.contains("keystore-migration:secrets"))
     );
     assert!(store.operations(&id).unwrap().is_empty());
-    assert!(tui.verify(&id).unwrap() > 0);
+    assert!(
+        tui.verify_with_source_root(&id, root.path())
+            .unwrap()
+            .contains("Verified")
+    );
     tui.seal(&id).unwrap();
     let export = root.path().join("synthetic.irmind.json");
     let fingerprint = tui.export(&id, &export).unwrap();
@@ -207,9 +223,6 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
     tui.render_home().unwrap();
     assert!(screen(tui.terminal()).contains("sealed"));
 
-    let hash = store.evidence_hashes(&id).unwrap().remove(0);
-    std::fs::write(root.path().join("evidence").join(hash), b"tampered").unwrap();
-    let rejected_export = root.path().join("must-not-export.irmind.json");
-    assert!(tui.export(&id, &rejected_export).is_err());
-    assert!(!rejected_export.exists());
+    std::fs::write(&evidence, b"tampered").unwrap();
+    assert!(tui.verify_with_source_root(&id, root.path()).is_err());
 }

@@ -126,15 +126,20 @@ impl AutomationContext<'_, '_> {
             }
             Command::GraphRebuild { case_id } => {
                 let id = parse_id(&case_id)?;
-                let (has_sources, has_artifacts) = parquet_status(store.as_ref(), &id)?;
-                if has_sources || has_artifacts {
-                    return Err(anyhow!(
-                        "use verify-graph to rebuild and compare signed Parquet"
-                    ));
-                }
+                let parser = JsonParser;
+                let large = LargeCaseUseCases {
+                    engine,
+                    store: store.as_ref(),
+                    parser: &parser,
+                };
+                let converted = large.migrate_legacy(&id, cancel)?;
+                let bundles = if engine.repo.get_case(&id)?.sealed {
+                    0
+                } else {
+                    large.compact_case(&id, cancel)?
+                };
                 println!(
-                    "rebuilt {} graph records",
-                    engine.rebuild_graph_cancelable(&id, cancel)?
+                    "converted {converted} copied sources to signed Parquet; created {bundles} bundles"
                 );
             }
             Command::VerifyGraph {
@@ -158,10 +163,9 @@ impl AutomationContext<'_, '_> {
                     let count = large.verify_parquet_rebuild(&id, root, cancel)?;
                     println!("rebuilt and compared {count} Parquet sources");
                 } else {
-                    println!(
-                        "verified {} graph records",
-                        engine.verify_graph_cancelable(&id, cancel)?
-                    );
+                    return Err(anyhow!(
+                        "no signed Parquet artifacts; migrate copied evidence first"
+                    ));
                 }
             }
             Command::Timeline { case_id, filter } => {

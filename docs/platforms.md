@@ -11,9 +11,9 @@ rustup toolchain install 1.95.0
 cargo build --release --locked -p irmind
 ```
 
-CI tests Ubuntu Linux, macOS arm64, and Windows x64 with the MSVC toolchain. SQLite and DuckDB are built from bundled sources. Network TLS uses rustls with native certificate roots, including installed corporate CAs; IRMind does not link system OpenSSL. The native-root approach may differ from platform policy checks performed by a dedicated certificate verifier.
+CI tests Ubuntu Linux, macOS arm64, and Windows x64 with the MSVC toolchain. SQLite is built from bundled sources. Arrow and Parquet use Rust crates. Network TLS uses rustls with native certificate roots, including installed corporate CAs; IRMind does not link system OpenSSL. The native-root approach may differ from platform policy checks performed by a dedicated certificate verifier.
 
-Install a C/C++ compiler before building: GCC or Clang and `pkg-config` on Linux, Xcode Command Line Tools on macOS, or Visual Studio Build Tools with MSVC C++ on Windows. The bundled DuckDB build compiles C++ code locally. For a cold release build, budget roughly 20–60 minutes and 20–30 GB of free disk; the exact cost depends on CPU, compiler, and cache. The [duckdb-rs build instructions](https://github.com/duckdb/duckdb-rs) explain the bundled build.
+Install a C/C++ compiler before building: GCC or Clang and `pkg-config` on Linux, Xcode Command Line Tools on macOS, or Visual Studio Build Tools with MSVC C++ on Windows. A cold release build still compiles many Rust crates and bundled SQLite. Allow extra time and disk; the exact cost depends on CPU, compiler, and cache. See [benchmarks](development/benchmarks.md) for measured builds.
 
 ## CI artifacts and checksums
 
@@ -41,6 +41,6 @@ Use Windows Terminal and the x64 MSVC build. The `os` backend uses Credential Ma
 
 ## Data and terminal behavior
 
-Without `--home`, data goes to the platform's standard local application-data directory: XDG on Linux, Application Support on macOS, and LocalAppData on Windows. Evidence names are lower-case hashes; paths stored in the audit and export use relative `/` separators. Each case has a SQLite audit database and a DuckDB derived graph.
+Without `--home`, data goes to the platform's standard local application-data directory: XDG on Linux, Application Support on macOS, and LocalAppData on Windows. Evidence names are lower-case hashes; paths stored in the audit and export use relative `/` separators. SQLite holds the audit and case state; signed Parquet artifacts provide derived graph queries.
 
 The TUI uses the alternate screen and sanitizes external text before display. Automated tests cover control sequences and bidirectional controls on all three systems. Visual interaction still needs manual review in each terminal before production use. Over SSH, request a terminal (`ssh -t`), select `file` during setup, and enter the passphrase in the masked TUI field. Backend changes are explicit; IRMind never falls back silently. `verify-export` can run without unlocking a keystore.

@@ -229,7 +229,7 @@ fn neighbors_marks_bounded_results_instead_of_claiming_a_complete_count() {
         )
         .unwrap();
     let output = store
-        .neighbors_artifacts(
+        .neighbors_native(
             &case_id,
             &prepared.artifacts,
             &irmind_domain::GraphQueryFilter::default(),

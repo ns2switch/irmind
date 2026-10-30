@@ -54,7 +54,7 @@ pub use configuration::{
 };
 pub use custody::{SealPreview, export_case, export_case_v4, verify_export, verify_export_details};
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
-pub use ingest::{GraphRecord, GraphRelation, IngestProfile, TimelineEvent};
+pub use ingest::{GraphRecord, GraphRelation, TimelineEvent};
 pub use keystore::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
 pub use large_case::{LargeCaseUseCases, SourceCheckMode, SourceCheckReport};
 pub use ports::*;

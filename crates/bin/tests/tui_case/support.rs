@@ -172,6 +172,16 @@ impl WorkspaceIo for TestIo {
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter {
         self.0.as_ref()
     }
+    fn large_case_exporter(&self) -> Option<&dyn irmind_app::LargeCaseExporter> {
+        Some(self.0.as_ref())
+    }
+    fn large_case_store(&self) -> Option<&dyn irmind_app::LargeCaseStore> {
+        Some(self.0.as_ref())
+    }
+    fn streaming_parser(&self) -> Option<&dyn irmind_app::StreamingEventParser> {
+        static PARSER: JsonParser = JsonParser;
+        Some(&PARSER)
+    }
     fn keystore_status(&self) -> anyhow::Result<irmind_tui::KeystoreStatus> {
         Ok(irmind_tui::KeystoreStatus {
             signer_backend: "file".into(),
