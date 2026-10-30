@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 
 use irmind_app::{
-    AppError, CancellationToken, CompletionRequest, LlmPort, MessageRole, ModelEvent, ModelStream,
-    async_trait,
+    AppError, CancellationToken, CompletionMessage, CompletionRequest, LlmPort, MessageRole,
+    ModelEvent, ModelStream, async_trait,
     modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use secrecy::{ExposeSecret, SecretString};
@@ -42,6 +42,22 @@ pub struct Anthropic {
     endpoint: reqwest::Url,
     key: SecretString,
     model: String,
+}
+
+fn trusted_system(messages: &[CompletionMessage]) -> Result<String, AppError> {
+    let mut trusted = Vec::new();
+    for message in messages
+        .iter()
+        .filter(|message| message.role == MessageRole::System)
+    {
+        if message.content.contains("UNTRUSTED_") {
+            return Err(AppError::Model(
+                "untrusted data cannot be an Anthropic system instruction".into(),
+            ));
+        }
+        trusted.push(message.content.as_str());
+    }
+    Ok(trusted.join("\n"))
 }
 
 impl Anthropic {
@@ -128,13 +144,7 @@ impl Anthropic {
                 })
             })
             .collect::<Vec<_>>();
-        let system = request
-            .messages
-            .iter()
-            .filter(|message| message.role == MessageRole::System)
-            .map(|message| message.content.as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
+        let system = trusted_system(&request.messages)?;
         let mut messages = Vec::<serde_json::Value>::new();
         for message in request
             .messages
@@ -325,6 +335,45 @@ mod tests {
         final_request.tools.clear();
         let final_body = adapter.body(&final_request).unwrap();
         assert!(final_body.get("tools").is_none());
+    }
+
+    #[test]
+    fn untrusted_system_content_is_rejected_before_anthropic_request() {
+        let adapter = Anthropic::new("synthetic", "test-secret".into()).unwrap();
+        let request = CompletionRequest {
+            messages: vec![
+                irmind_app::CompletionMessage::text(
+                    MessageRole::System,
+                    "<UNTRUSTED_test>case title</UNTRUSTED_test>".into(),
+                ),
+                irmind_app::CompletionMessage::text(MessageRole::User, "hello".into()),
+            ],
+            tools: Vec::new(),
+            max_output_tokens: 64,
+            remaining_case_tokens: 128,
+        };
+        assert!(adapter.body(&request).is_err());
+        let safe = CompletionRequest {
+            messages: vec![
+                irmind_app::CompletionMessage::text(
+                    MessageRole::System,
+                    "Trusted IRMind instruction".into(),
+                ),
+                irmind_app::CompletionMessage::text(
+                    MessageRole::User,
+                    "<UNTRUSTED_test>case title</UNTRUSTED_test>".into(),
+                ),
+            ],
+            ..request
+        };
+        let body = adapter.body(&safe).unwrap();
+        assert_eq!(body["system"], "Trusted IRMind instruction");
+        assert!(
+            body["messages"][0]["content"]
+                .as_str()
+                .unwrap()
+                .contains("UNTRUSTED_test")
+        );
     }
 
     #[test]

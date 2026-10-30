@@ -1,4 +1,4 @@
-use super::TurnContext;
+use super::{TurnContext, untrusted_user_message};
 use crate::{
     AppError, AuditEventKind, AuditOrigin, CancellationToken, CaseId, CompletionMessage,
     CompletionRequest, Engine, LlmPort, MessageRole, isolate_untrusted,
@@ -69,14 +69,9 @@ impl Engine<'_> {
                 .summarize_chunk(id, model, &summary, &chunk, &turn.nonce, cancel)
                 .await?;
         }
-        let condensed = CompletionMessage::text(
-            MessageRole::System,
-            format!(
-                "Prior conversation summary (UNTRUSTED): <UNTRUSTED_{}>\n{}\n</UNTRUSTED_{}>",
-                turn.nonce,
-                isolate_untrusted(&summary, &turn.nonce),
-                turn.nonce
-            ),
+        let condensed = untrusted_user_message(
+            &format!("Prior conversation summary: {summary}"),
+            &turn.nonce,
         );
         if context_bytes(&turn.messages[..2])
             + condensed.content.len()

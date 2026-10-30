@@ -17,7 +17,7 @@ impl Engine<'_> {
         }
         self.verify_unlocked(id_owned)?;
         let entries = self.audit_log.entries(id_owned)?;
-        let history = self.conversation_history(&entries)?;
+        let (prior_summary, history) = self.conversation_history(&entries)?;
         let findings = self
             .findings_unlocked(id_owned, &entries)?
             .into_iter()
@@ -58,6 +58,7 @@ impl Engine<'_> {
             scope,
             timeline,
             findings,
+            prior_summary,
             history,
         })
     }
@@ -92,18 +93,18 @@ impl Engine<'_> {
     fn conversation_history(
         &self,
         entries: &[SignedEntry],
-    ) -> Result<Vec<CompletionMessage>, AppError> {
+    ) -> Result<(Option<String>, Vec<CompletionMessage>), AppError> {
         let after_summary = entries
             .iter()
             .rposition(|entry| entry.kind == AuditEventKind::ConversationSummary);
         let mut history = Vec::new();
-        if let Some(index) = after_summary {
-            let summary = self.guard.screen(&entries[index].payload)?.text;
-            history.push(CompletionMessage::text(
-                MessageRole::System,
-                format!("Prior conversation summary (UNTRUSTED): {summary}"),
-            ));
-        }
+        let prior_summary = after_summary
+            .map(|index| {
+                self.guard
+                    .screen(&entries[index].payload)
+                    .map(|screened| screened.text)
+            })
+            .transpose()?;
         let start = after_summary.map_or(0, |index| {
             entries[..index]
                 .iter()
@@ -128,6 +129,6 @@ impl Engine<'_> {
             let screened = self.guard.screen(&entry.payload)?.text;
             history.push(CompletionMessage::text(role, screened));
         }
-        Ok(history)
+        Ok((prior_summary, history))
     }
 }
