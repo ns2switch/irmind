@@ -1,0 +1,2 @@
+{"eventTime":"2026-10-23T10:14:00Z","eventName":"ConsoleLogin","eventSource":"signin.amazonaws.com","recipientAccountId":"000000000000","sourceIPAddress":"203.0.113.10","user":"demo-analyst","alert_id":"demo-alert-login","awsRegion":"eu-west-1"}
+{"eventTime":"2026-10-23T10:17:00Z","eventName":"AssumeRole","eventSource":"sts.amazonaws.com","recipientAccountId":"000000000000","sourceIPAddress":"203.0.113.10","user":"demo-analyst","alert_id":"demo-alert-role","awsRegion":"eu-west-1"}
