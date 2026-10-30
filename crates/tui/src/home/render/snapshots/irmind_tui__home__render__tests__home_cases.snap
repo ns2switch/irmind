@@ -4,7 +4,7 @@ expression: "snapshot_screen(&state, cases.clone())"
 ---
 IRMind v0.1.0
 Assisted Incident Response
-Keystore: file / file · Model: No model · /model to configure
+Keystore: file / file · Model: No model · /settings model to configure
 
 
 Recent cases · all
@@ -25,4 +25,4 @@ Recent cases · all
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │Find cases or type / for commands · /help for help                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-↑/↓ choose · Enter open · /new create · /model AI · Ctrl+K commands
+↑/↓ choose · Enter open · /new create · /settings configure

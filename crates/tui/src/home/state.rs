@@ -1,4 +1,6 @@
-use super::{CaseId, ConfigChange, HomeState, KeyCode, Mode, case, model, modules, new_case};
+use super::{
+    CaseId, ConfigChange, HomeState, KeyCode, Mode, SettingsSection, case, model, modules, new_case,
+};
 
 pub(crate) enum HomeAction {
     None,
@@ -13,7 +15,7 @@ pub(crate) enum HomeAction {
     Migrate(&'static str),
     ChangePassphrase,
     ChangeModule(ConfigChange, bool),
-    DiscoverOllama,
+    DiscoverModels,
     ProbeModel(model::ModelDraft),
     SaveModel(model::ModelDraft),
 }
@@ -39,7 +41,7 @@ pub(crate) fn update(state: &mut HomeState, key: KeyCode) -> HomeAction {
             "Restart IRMind before opening a case so changed credentials take effect".into();
         return HomeAction::None;
     }
-    if state.input.starts_with('/') && !matches!(state.mode, Mode::New | Mode::VerifyExport) {
+    if state.mode == Mode::List && state.input.starts_with('/') {
         match key {
             KeyCode::Tab | KeyCode::BackTab => {
                 complete_command(state, key == KeyCode::Tab);
@@ -74,6 +76,7 @@ pub(crate) fn update(state: &mut HomeState, key: KeyCode) -> HomeAction {
     }
     match state.mode {
         Mode::List => update_list(state, key),
+        Mode::Settings => update_settings(state, key),
         Mode::New => update_new_case(state, key),
         Mode::Model => update_model(state, key),
         Mode::VerifyExport => update_verify_export(state, key),
@@ -82,6 +85,38 @@ pub(crate) fn update(state: &mut HomeState, key: KeyCode) -> HomeAction {
         Mode::Setup => update_setup(state, key),
         Mode::Help => update_help(state, key),
         Mode::Keystore => update_keystore(state, key),
+    }
+}
+
+pub(crate) fn paste(state: &mut HomeState, value: &str) {
+    for ch in value.chars().filter(|ch| !ch.is_control()).take(4096) {
+        let _ = update(state, KeyCode::Char(ch));
+    }
+}
+
+pub(crate) fn clear_active_field(state: &mut HomeState) {
+    match state.mode {
+        Mode::New => state.form[state.form_field].clear(),
+        Mode::VerifyExport => state.verify_form[state.verify_field].clear(),
+        Mode::Model => match state.model_setup.step {
+            model::ModelStep::Url => {
+                state.model_setup.url.clear();
+                state.model_setup.url_edited = true;
+            }
+            model::ModelStep::Name => state.model_setup.name.clear(),
+            model::ModelStep::Key => {
+                state.model_setup.key = secrecy::SecretString::from(String::new());
+            }
+            _ => {}
+        },
+        Mode::Modules => {
+            if let Some(edit) = &mut state.module_edit {
+                edit.value.clear();
+                edit.replace_on_type = false;
+            }
+        }
+        Mode::List => state.input.clear(),
+        _ => {}
     }
 }
 
@@ -168,6 +203,13 @@ fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
             .map(|value| format!("/cases {value}"))
             .collect();
     }
+    if let Some(query) = source.strip_prefix("/settings ") {
+        return ["model", "connectors", "keystore", "preferences"]
+            .into_iter()
+            .filter(|value| value.starts_with(&query.to_ascii_lowercase()))
+            .map(|value| format!("/settings {value}"))
+            .collect();
+    }
     if source.contains(' ') {
         return Vec::new();
     }
@@ -180,20 +222,11 @@ fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
                     | "open"
                     | "cases"
                     | "home"
-                    | "model"
-                    | "modules"
-                    | "config"
-                    | "keystore"
+                    | "settings"
                     | "help"
                     | "quit"
                     | "verify-export"
                     | "restart"
-                    | "cred-add"
-                    | "cred-delete"
-                    | "passphrase"
-                    | "migrate-signer"
-                    | "migrate-secrets"
-                    | "edit-param"
             )
         })
         .map(|command| format!("/{}", command.name))
@@ -229,15 +262,16 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
             state.status_filter = None;
             state.selected = 0;
         }
-        "/modules" => state.mode = Mode::Modules,
-        "/config" => state.mode = Mode::Config,
-        "/model" => {
-            state.model_setup = model::ModelSetup::new();
-            state.mode = Mode::Model;
-        }
-        "/keystore" => {
-            state.mode = Mode::Keystore;
-            return HomeAction::LoadKeystore;
+        "/settings" => state.mode = Mode::Settings,
+        "/model" | "/modules" | "/keystore" | "/config" | "/edit-param" => {
+            state.notice = "Now in /settings".into();
+            let section = match input.trim() {
+                "/model" => SettingsSection::Model,
+                "/modules" | "/edit-param" => SettingsSection::Connectors,
+                "/keystore" => SettingsSection::Keystore,
+                _ => SettingsSection::Preferences,
+            };
+            return open_settings_section(state, section);
         }
         "/help" => {
             state.help_return = state.mode;
@@ -247,21 +281,17 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
         "/quit" => state.confirm_exit = crate::ExitConfirmation::Pending,
         "/verify-export" => state.mode = Mode::VerifyExport,
         "/restart" if state.restart_required => return HomeAction::Restart,
-        "/cred-add" if state.mode == Mode::Keystore => return HomeAction::AddCredential,
-        "/cred-delete" if state.mode == Mode::Keystore => {
-            state.confirm_credential_delete = true;
-            state.selected_option = 0;
+        "/cred-add" | "/cred-delete" | "/passphrase" | "/migrate-signer" | "/migrate-secrets" => {
+            state.notice = "Now in /settings".into();
+            return open_settings_section(state, SettingsSection::Keystore);
         }
-        "/passphrase" if state.mode == Mode::Keystore => return HomeAction::ChangePassphrase,
-        "/migrate-signer" if state.mode == Mode::Keystore => {
-            state.pending_migration = Some("signer");
-            state.selected_option = 0;
+        value if value.starts_with("/settings ") => {
+            let Some(section) = SettingsSection::parse(value[10..].trim()) else {
+                state.notice = "Choose model, connectors, keystore, or preferences".into();
+                return HomeAction::None;
+            };
+            return open_settings_section(state, section);
         }
-        "/migrate-secrets" if state.mode == Mode::Keystore => {
-            state.pending_migration = Some("secrets");
-            state.selected_option = 0;
-        }
-        "/edit-param" if state.mode == Mode::Modules => modules::begin_edit(state),
         value if value.starts_with("/open ") => return open_named_case(state, &value[6..]),
         value if value.starts_with("/cases ") => {
             match value[7..].trim().to_ascii_lowercase().as_str() {
@@ -278,6 +308,37 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
             state.selected = 0;
         }
         _ => state.notice = "Unknown command; use /help".into(),
+    }
+    HomeAction::None
+}
+
+fn open_settings_section(state: &mut HomeState, section: SettingsSection) -> HomeAction {
+    state.settings_selected = SettingsSection::ALL
+        .iter()
+        .position(|item| *item == section)
+        .unwrap_or(0);
+    state.settings_return = Mode::Settings;
+    state.mode = section.mode();
+    match section {
+        SettingsSection::Model => state.model_setup = model::ModelSetup::new(),
+        SettingsSection::Keystore => return HomeAction::LoadKeystore,
+        _ => {}
+    }
+    HomeAction::None
+}
+
+fn update_settings(state: &mut HomeState, key: KeyCode) -> HomeAction {
+    match key {
+        KeyCode::Esc => state.mode = Mode::List,
+        KeyCode::Up => state.settings_selected = state.settings_selected.saturating_sub(1),
+        KeyCode::Down => {
+            state.settings_selected =
+                (state.settings_selected + 1).min(SettingsSection::ALL.len() - 1);
+        }
+        KeyCode::Enter => {
+            return open_settings_section(state, SettingsSection::ALL[state.settings_selected]);
+        }
+        _ => {}
     }
     HomeAction::None
 }
@@ -308,13 +369,32 @@ fn update_new_case(state: &mut HomeState, key: KeyCode) -> HomeAction {
 fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
     match key {
         KeyCode::Esc => {
-            state.mode = Mode::List;
+            state.mode = state.settings_return;
             HomeAction::None
         }
-        KeyCode::Enter => HomeAction::ChangeModule(
-            ConfigChange::SetResumeLastCase(!state.resume_last_case.enabled()),
-            true,
-        ),
+        KeyCode::Up => {
+            state.preference_selected = state.preference_selected.saturating_sub(1);
+            HomeAction::None
+        }
+        KeyCode::Down => {
+            state.preference_selected = (state.preference_selected + 1).min(2);
+            HomeAction::None
+        }
+        KeyCode::Enter => {
+            let change = match state.preference_selected {
+                0 => ConfigChange::SetResumeLastCase(!state.resume_last_case.enabled()),
+                1 => ConfigChange::SetMouseCapture(!state.ui_selection.mouse_capture),
+                _ => ConfigChange::SetTheme(
+                    match state.theme_choice.as_str() {
+                        "auto" => "light",
+                        "light" => "dark",
+                        _ => "auto",
+                    }
+                    .into(),
+                ),
+            };
+            HomeAction::ChangeModule(change, true)
+        }
         _ => HomeAction::None,
     }
 }
@@ -386,8 +466,17 @@ fn update_keystore(state: &mut HomeState, key: KeyCode) -> HomeAction {
     }
     match key {
         KeyCode::Esc => {
-            state.mode = Mode::List;
+            state.mode = state.settings_return;
             state.input.clear();
+        }
+        KeyCode::Tab | KeyCode::BackTab => {
+            state.ui_selection.keystore_action_focus = !state.ui_selection.keystore_action_focus;
+        }
+        KeyCode::Up if state.ui_selection.keystore_action_focus => {
+            state.keystore_action_selected = state.keystore_action_selected.saturating_sub(1);
+        }
+        KeyCode::Down if state.ui_selection.keystore_action_focus => {
+            state.keystore_action_selected = (state.keystore_action_selected + 1).min(5);
         }
         KeyCode::Up => state.keystore_selected = state.keystore_selected.saturating_sub(1),
         KeyCode::Down => {
@@ -397,11 +486,29 @@ fn update_keystore(state: &mut HomeState, key: KeyCode) -> HomeAction {
                 .map_or(0, |item| item.credentials.len());
             state.keystore_selected = (state.keystore_selected + 1).min(count.saturating_sub(1));
         }
-        KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4096 => state.input.push(ch),
-        KeyCode::Backspace => {
-            state.input.pop();
+        KeyCode::Enter if state.ui_selection.keystore_action_focus => {
+            return match state.keystore_action_selected {
+                0 => HomeAction::AddCredential,
+                1 => {
+                    state.confirm_credential_delete = true;
+                    state.selected_option = 0;
+                    HomeAction::None
+                }
+                2 => HomeAction::ChangePassphrase,
+                3 | 4 => {
+                    state.pending_migration = Some(if state.keystore_action_selected == 3 {
+                        "signer"
+                    } else {
+                        "secrets"
+                    });
+                    state.selected_option = 0;
+                    HomeAction::None
+                }
+                _ if state.restart_required => HomeAction::Restart,
+                _ => HomeAction::None,
+            };
         }
-        KeyCode::Enter if !state.input.is_empty() => return execute_command(state),
+        KeyCode::Enter => return HomeAction::AddCredential,
         _ => {}
     }
     HomeAction::None
@@ -444,6 +551,122 @@ fn update_keystore_confirmation(state: &mut HomeState, key: KeyCode) -> Option<H
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{ModuleKind, ModuleParameter, ModuleSelectionSource, ModuleStatus};
+
+    fn deepseek() -> ModuleStatus {
+        ModuleStatus {
+            id: "llm-deepseek".into(),
+            compiled: true,
+            enabled: false,
+            configuration: "disabled".into(),
+            kind: ModuleKind::Llm,
+            selected: false,
+            selection_source: ModuleSelectionSource::Persistent,
+            parameters: vec![ModuleParameter {
+                name: "IRMIND_DEEPSEEK_BASE_URL".into(),
+                value: "https://api.deepseek.com/".into(),
+                defaulted: true,
+                required: false,
+                overridden: false,
+            }],
+            credentials: vec!["IRMIND_DEEPSEEK_API_KEY".into()],
+            missing: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn deepseek_url_uses_form_for_typed_and_pasted_slashes() {
+        let mut state = HomeState::new(Vec::new(), false);
+        state.set_modules(&[deepseek()]);
+        state.mode = Mode::Modules;
+        update(&mut state, KeyCode::Tab);
+        for ch in "https://api.deepseek.com//v1".chars() {
+            update(&mut state, KeyCode::Char(ch));
+        }
+        assert!(state.input.is_empty());
+        let action = update(&mut state, KeyCode::Enter);
+        assert!(matches!(action, HomeAction::ChangeModule(
+            ConfigChange::SetValue { value, .. }, false) if value == "https://api.deepseek.com/v1/"));
+
+        update(&mut state, KeyCode::Enter);
+        clear_active_field(&mut state);
+        paste(&mut state, "https://api.deepseek.com//v1\nignored");
+        assert_eq!(
+            state.module_edit.as_ref().map(|edit| edit.value.as_str()),
+            Some("https://api.deepseek.com//v1ignored")
+        );
+        let action = update(&mut state, KeyCode::Enter);
+        assert!(matches!(action, HomeAction::ChangeModule(
+            ConfigChange::SetValue { value, .. }, false) if value == "https://api.deepseek.com/v1ignored/"));
+    }
+
+    #[test]
+    fn deepseek_default_can_be_accepted_and_legacy_commands_redirect() {
+        let mut state = HomeState::new(Vec::new(), false);
+        state.set_modules(&[deepseek()]);
+        state.mode = Mode::Modules;
+        update(&mut state, KeyCode::Tab);
+        update(&mut state, KeyCode::Enter);
+        assert!(matches!(
+            update(&mut state, KeyCode::Enter),
+            HomeAction::None
+        ));
+        assert_eq!(state.notice, "Current value accepted");
+        for (command, mode) in [
+            ("/model", Mode::Model),
+            ("/modules", Mode::Modules),
+            ("/keystore", Mode::Keystore),
+            ("/config", Mode::Config),
+            ("/edit-param", Mode::Modules),
+        ] {
+            state.mode = Mode::List;
+            state.input = command.into();
+            let _ = execute_command(&mut state);
+            assert_eq!(state.mode, mode);
+            assert_eq!(state.notice, "Now in /settings");
+        }
+        assert_eq!(
+            command_options_for(&state, "/settings mo"),
+            ["/settings model"]
+        );
+    }
+
+    #[test]
+    fn model_form_accepts_url_and_secret_slashes_from_paste() {
+        let mut state = HomeState::new(Vec::new(), false);
+        state.mode = Mode::Model;
+        state.model_setup.provider = 6;
+        state.model_setup.step = model::ModelStep::Url;
+        state.model_setup.url = "https://api.deepseek.com/".into();
+        paste(&mut state, "https://api.deepseek.com//v1\n");
+        assert_eq!(state.model_setup.url, "https://api.deepseek.com//v1");
+        update(&mut state, KeyCode::Enter);
+        assert_eq!(state.model_setup.url, "https://api.deepseek.com/v1/");
+        paste(&mut state, "key/with/slashes\nignored");
+        assert_eq!(
+            secrecy::ExposeSecret::expose_secret(&state.model_setup.key),
+            "key/with/slashesignored"
+        );
+        assert!(matches!(
+            update(&mut state, KeyCode::Enter),
+            HomeAction::None
+        ));
+        assert!(matches!(
+            state.model_setup.step,
+            model::ModelStep::ConfirmDiscovery
+        ));
+    }
+
+    #[test]
+    fn numeric_provider_choice_opens_deepseek_url_form() {
+        let mut state = HomeState::new(Vec::new(), false);
+        state.set_modules(&[deepseek()]);
+        state.mode = Mode::Model;
+        update(&mut state, KeyCode::Char('7'));
+        update(&mut state, KeyCode::Enter);
+        assert!(matches!(state.model_setup.step, model::ModelStep::Url));
+        assert_eq!(state.model_setup.url, "https://api.deepseek.com/");
+    }
 
     #[test]
     #[allow(clippy::unwrap_used)]

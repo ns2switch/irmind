@@ -1,6 +1,7 @@
 use super::{
     Engine, HomeState, ListItem, LlmPort, Mode, ModuleStatus, Result, case, hex, model, sha256,
 };
+use crate::home::SettingsSection;
 use crate::home::module_catalog::{self, DisplayStatus};
 use crate::theme::Theme;
 use ratatui::style::Style;
@@ -16,19 +17,46 @@ pub(super) fn home_items(
 ) -> Result<Vec<ListItem<'static>>> {
     let fingerprint = hex(&sha256(&engine.signer.public_key()));
     let safe = |value: &str| -> Result<String> { Ok(engine.guard.screen(value)?.text) };
+    let escaped = |value: &str| -> Result<String> { Ok(case::escape_display(value)) };
     let content = match state.mode {
         Mode::List => case_items(state, engine)?,
+        Mode::Settings => SettingsSection::ALL
+            .iter()
+            .enumerate()
+            .map(|(index, section)| {
+                ListItem::new(format!(
+                    "{} {}",
+                    if index == state.settings_selected {
+                        ">"
+                    } else {
+                        " "
+                    },
+                    section.label()
+                ))
+            })
+            .collect(),
         Mode::New => Vec::new(),
-        Mode::Model => model_items(state, &safe)?,
-        Mode::Modules => module_items(state, modules, &safe)?,
-        Mode::Config => vec![ListItem::new(format!(
-            "Resume the most recent open case on startup: {} · Enter to change",
-            if state.resume_last_case.enabled() {
-                "on"
-            } else {
-                "off"
-            }
-        ))],
+        Mode::Model => model_items(state, &escaped)?,
+        Mode::Modules => module_items(state, modules, &escaped)?,
+        Mode::Config => vec![
+            ListItem::new(format!(
+                "Resume last case: {}",
+                if state.resume_last_case.enabled() {
+                    "on"
+                } else {
+                    "off"
+                }
+            )),
+            ListItem::new(format!(
+                "Mouse capture: {}",
+                if state.ui_selection.mouse_capture {
+                    "on"
+                } else {
+                    "off"
+                }
+            )),
+            ListItem::new(format!("Theme: {}", state.theme_choice)),
+        ],
         Mode::Keystore => keystore_items(state),
         Mode::VerifyExport => ["Package path", "Expected analyst key fingerprint"]
             .iter()
@@ -106,11 +134,11 @@ pub(super) fn module_detail(
         if !module.missing.is_empty() {
             rows.push(format!("Missing: {}", module.missing.join(", ")));
         }
-        rows.push("Parameters · Tab selects, /edit-param edits".into());
+        rows.push("Parameters · Tab selects, Enter edits".into());
         for (index, parameter) in module.parameters.iter().enumerate() {
             rows.push(format!(
                 "{} {} = {}{}{}",
-                if index == state.parameter_selected {
+                if state.ui_selection.parameter_focused && index == state.parameter_selected {
                     ">"
                 } else {
                     " "
@@ -123,6 +151,8 @@ pub(super) fn module_detail(
                 },
                 if parameter.required {
                     " (required)"
+                } else if parameter.defaulted {
+                    " (default)"
                 } else {
                     ""
                 },
@@ -134,7 +164,7 @@ pub(super) fn module_detail(
             ));
         }
         if !module.credentials.is_empty() {
-            rows.push("Credentials · /keystore to manage".into());
+            rows.push("Credentials · /settings keystore to manage".into());
             for name in &module.credentials {
                 let present = state.keystore.as_ref().is_some_and(|status| {
                     status
@@ -150,9 +180,6 @@ pub(super) fn module_detail(
         }
     } else {
         rows.push(format!("Feature: --features {}", module.id));
-    }
-    if let Some(edit) = &state.module_edit {
-        rows.push(format!("Editing {}: {}", edit.field, edit.value));
     }
     if let Some(change) = &state.pending_module_change {
         rows.push(format!("Confirm egress change: {}", change_summary(change)));
@@ -183,6 +210,8 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
         irmind_app::ConfigChange::SetResumeLastCase(enabled) => {
             format!("resume recent case={enabled}")
         }
+        irmind_app::ConfigChange::SetMouseCapture(enabled) => format!("mouse capture={enabled}"),
+        irmind_app::ConfigChange::SetTheme(theme) => format!("theme={theme}"),
     }
 }
 
@@ -211,7 +240,7 @@ fn case_items(state: &HomeState, engine: &Engine<'_>) -> Result<Vec<ListItem<'st
         .collect::<Result<Vec<_>>>()
 }
 
-fn keystore_items(state: &HomeState) -> Vec<ListItem<'static>> {
+pub(in crate::home) fn keystore_items(state: &HomeState) -> Vec<ListItem<'static>> {
     state.keystore.as_ref().map_or_else(Vec::new, |keystore| {
         let mut items = vec![
             ListItem::new(format!("Signer: {}", keystore.signer_backend)),
@@ -250,6 +279,29 @@ fn keystore_items(state: &HomeState) -> Vec<ListItem<'static>> {
                     ))
                 }),
         );
+        items.push(ListItem::new("Actions"));
+        for (index, label) in [
+            "Add or replace selected credential",
+            "Delete selected credential",
+            "Change file passphrase",
+            "Migrate signing backend",
+            "Migrate secrets backend",
+            "Restart session",
+        ]
+        .iter()
+        .enumerate()
+        {
+            items.push(ListItem::new(format!(
+                "{} {label}",
+                if state.ui_selection.keystore_action_focus
+                    && state.keystore_action_selected == index
+                {
+                    ">"
+                } else {
+                    " "
+                }
+            )));
+        }
         items
     })
 }
@@ -273,7 +325,7 @@ fn setup_items(
             "LLM: none selected; investigation is disabled"
         }),
         ListItem::new("Enter to choose an optional model, or Esc to continue without one."),
-        ListItem::new("Use /modules and /keystore to inspect configuration."),
+        ListItem::new("Use /settings to inspect configuration."),
         ListItem::new("Use /new to create a case; no CLI setup is required."),
     ]
 }
@@ -285,30 +337,16 @@ pub(in crate::home) fn model_items(
     let setup = &state.model_setup;
     let mut rows = Vec::new();
     match setup.step {
-        model::ModelStep::Provider => {
-            rows.push("Choose an AI model now, or continue without one.".to_owned());
-            for (index, (name, detail)) in model::PROVIDERS.iter().enumerate() {
-                let marker = if index == setup.provider { ">" } else { " " };
-                rows.push(format!("{marker} {}. {name} — {detail}", index + 1));
-            }
-        }
-        model::ModelStep::OllamaModels => {
-            rows.push("Installed Ollama models (Tab edits HTTP/HTTPS loopback URL):".into());
-            for (index, name) in setup.models.iter().enumerate() {
-                let marker = if index == setup.selected_model {
-                    ">"
-                } else {
-                    " "
-                };
-                rows.push(format!("{marker} {}. {name}", index + 1));
-            }
-            if setup.models.is_empty() {
-                rows.push("Ollama is unavailable. Start it with `ollama serve`, then press Enter to retry.".into());
-            }
+        model::ModelStep::Provider | model::ModelStep::AvailableModels => {
+            rows.extend(model_choice_rows(setup));
         }
         model::ModelStep::Url => {
             rows.push("API URL (HTTPS, or HTTP on loopback; type to replace default):".into());
-            rows.push(format!("> {}", setup.url));
+            rows.push(format!(
+                "> {}{}",
+                setup.url,
+                if setup.url_edited { "" } else { " (default)" }
+            ));
         }
         model::ModelStep::Name => {
             rows.push("Model name:".into());
@@ -323,13 +361,31 @@ pub(in crate::home) fn model_items(
                 "•".repeat(setup.key.expose_secret().chars().count().min(128))
             ));
         }
+        model::ModelStep::ConfirmDiscovery => {
+            rows.push(format!(
+                "Contact {} at {} using the entered API key?",
+                model::PROVIDERS[setup.provider].name,
+                setup.url
+            ));
+            rows.push(
+                "Only a model-list request or synthetic test text is sent; no case data.".into(),
+            );
+            rows.push(format!(
+                "{} 1. Skip",
+                if setup.selected_action == 0 { ">" } else { " " }
+            ));
+            rows.push(format!(
+                "{} 2. Continue",
+                if setup.selected_action == 1 { ">" } else { " " }
+            ));
+        }
         model::ModelStep::Review => {
             rows.extend(model_review_rows(setup));
         }
         model::ModelStep::ConfirmEgress => {
             rows.push(format!(
                 "Enable {}? Case data may be sent to {}.",
-                model::PROVIDERS[setup.provider].0,
+                model::PROVIDERS[setup.provider].name,
                 setup.url
             ));
             rows.push("The model remains disabled until you confirm this change.".into());
@@ -351,11 +407,43 @@ pub(in crate::home) fn model_items(
         .collect()
 }
 
+fn model_choice_rows(setup: &model::ModelSetup) -> Vec<String> {
+    let mut rows = Vec::new();
+    if setup.step == model::ModelStep::Provider {
+        rows.push("Choose an AI model now, or continue without one.".to_owned());
+        for (index, preset) in model::PROVIDERS.iter().enumerate() {
+            let marker = if index == setup.provider { ">" } else { " " };
+            rows.push(format!(
+                "{marker} {}. {} — {}",
+                index + 1,
+                preset.name,
+                preset.detail
+            ));
+        }
+    } else {
+        rows.push("Available models (Tab enters a model ID; Shift+Tab edits the URL):".into());
+        for (index, name) in setup.models.iter().enumerate() {
+            let marker = if index == setup.selected_model {
+                ">"
+            } else {
+                " "
+            };
+            rows.push(format!("{marker} {}. {name}", index + 1));
+        }
+        if setup.models.is_empty() {
+            rows.push(
+                "Model list unavailable. Enter retries; Tab enters a model ID manually.".into(),
+            );
+        }
+    }
+    rows
+}
+
 fn model_review_rows(setup: &model::ModelSetup) -> Vec<String> {
     let mut rows = vec![
         format!(
             "Provider: {} · Model: {}",
-            model::PROVIDERS[setup.provider].0,
+            model::PROVIDERS[setup.provider].name,
             setup.name
         ),
         format!("Endpoint: {}", setup.url),

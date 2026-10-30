@@ -34,18 +34,38 @@ Enter
 Sleep 500 ms
 Screenshot docs/assets/home.png
 Sleep 700 ms
-Type "/model"
+Type "/settings"
+Enter
+Sleep 500 ms
+Screenshot docs/assets/settings.png
+Sleep 300 ms
 Enter
 Sleep 500 ms
 Screenshot docs/assets/model.png
 Sleep 700 ms
 Escape
 Sleep 300 ms
-Type "/modules"
+Down
 Enter
 Sleep 500 ms
+Up
+Sleep 250 ms
 Screenshot docs/assets/modules.png
 Sleep 700 ms
+Escape
+Sleep 300 ms
+Down
+Enter
+Sleep 500 ms
+Screenshot docs/assets/keystore.png
+Sleep 300 ms
+Escape
+Down
+Enter
+Sleep 500 ms
+Screenshot docs/assets/preferences.png
+Sleep 300 ms
+Escape
 Escape
 Sleep 300 ms
 Type "/new"

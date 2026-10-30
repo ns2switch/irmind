@@ -42,7 +42,7 @@ where
     let summary = safe(&format!(
         "Keystore: {keystore} · Model: {}",
         model.map_or_else(
-            || "No model · /model to configure".to_owned(),
+            || "No model · /settings model to configure".to_owned(),
             LlmPort::descriptor,
         )
     ))?;
@@ -59,7 +59,7 @@ where
         .collect::<Result<Vec<_>>>()?;
     let form_check = super::new_case::check(state, engine);
     let module_detail = if state.mode == Mode::Modules {
-        items::module_detail(state, modules, &safe)?
+        items::module_detail(state, modules, &|value| Ok(case::escape_display(value)))?
     } else {
         Vec::new()
     };
@@ -81,6 +81,8 @@ where
             Layout::vertical([Constraint::Min(4), Constraint::Length(1)]).split(frame.area());
         if state.mode == Mode::List {
             draw_list_screen(frame, areas[0], state, &visual, content, &menu, theme);
+        } else if state.mode == Mode::Settings {
+            draw_settings_screen(frame, areas[0], &visual, content, &mut list_state, theme);
         } else {
             draw_dialog_screen(
                 frame,
@@ -98,6 +100,40 @@ where
         );
     })?;
     Ok(())
+}
+
+fn draw_settings_screen(
+    frame: &mut ratatui::Frame<'_>,
+    area: Rect,
+    visual: &HomeVisual<'_>,
+    content: Vec<ListItem<'static>>,
+    selected: &mut ListState,
+    theme: Theme,
+) {
+    frame.render_widget(
+        Paragraph::new(visual.title.to_owned()).style(theme.accent()),
+        Rect::new(area.x, area.y, area.width, 1),
+    );
+    frame.render_widget(
+        Paragraph::new("Settings · choose a section").style(theme.muted()),
+        Rect::new(area.x, area.y.saturating_add(2), area.width, 1),
+    );
+    frame.render_stateful_widget(
+        List::new(content).highlight_style(theme.accent()),
+        Rect::new(
+            area.x.saturating_add(2),
+            area.y.saturating_add(4),
+            area.width.saturating_sub(2),
+            area.height.saturating_sub(4),
+        ),
+        selected,
+    );
+    if !visual.notice.is_empty() {
+        frame.render_widget(
+            Paragraph::new(visual.notice.to_owned()).style(theme.warning()),
+            Rect::new(area.x, area.bottom().saturating_sub(1), area.width, 1),
+        );
+    }
 }
 
 fn draw_list_screen(
@@ -165,7 +201,7 @@ fn draw_case_list(
         let mut lines = vec![Line::from("No cases yet · /new to create one")];
         if !has_model {
             lines.push(Line::styled(
-                "No model? Use /model when you are ready to investigate.",
+                "No model? Use /settings model when you are ready to investigate.",
                 theme.muted(),
             ));
         }
@@ -394,11 +430,31 @@ fn draw_modules(
             ),
         split[1],
     );
+    if let Some(edit) = &state.module_edit {
+        let box_area = Rect::new(
+            split[1].x.saturating_add(2),
+            split[1].bottom().saturating_sub(5),
+            split[1].width.saturating_sub(3),
+            3,
+        );
+        frame.render_widget(Clear, box_area);
+        frame.render_widget(
+            Paragraph::new(case::escape_display(&edit.value)).block(
+                Block::default()
+                    .title(edit.field.as_str())
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(theme.accent()),
+            ),
+            box_area,
+        );
+    }
 }
 
 fn home_header(mode: Mode) -> &'static str {
     match mode {
         Mode::List => " Cases ",
+        Mode::Settings => " Settings ",
         Mode::New => " New case ",
         Mode::Model => " Model setup ",
         Mode::Modules => " Modules ",
@@ -413,6 +469,26 @@ fn home_header(mode: Mode) -> &'static str {
 fn home_list_state(state: &HomeState) -> ListState {
     let mut selected = ListState::default();
     match state.mode {
+        Mode::Settings => selected.select(Some(state.settings_selected)),
+        Mode::Model => match state.model_setup.step {
+            model::ModelStep::Provider => selected.select(Some(state.model_setup.provider + 1)),
+            model::ModelStep::AvailableModels if !state.model_setup.models.is_empty() => {
+                selected.select(Some(state.model_setup.selected_model + 1));
+            }
+            _ => {}
+        },
+        Mode::Config => selected.select(Some(state.preference_selected)),
+        Mode::Keystore => {
+            let count = state
+                .keystore
+                .as_ref()
+                .map_or(0, |status| status.credentials.len());
+            selected.select(Some(if state.ui_selection.keystore_action_focus {
+                4 + count + state.keystore_action_selected
+            } else {
+                3 + state.keystore_selected
+            }));
+        }
         Mode::Modules => {
             selected.select(Some(super::module_catalog::selected_row(
                 &state.modules,

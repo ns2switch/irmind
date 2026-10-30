@@ -47,18 +47,20 @@ No released binaries are available yet. CI produces unsigned artifacts only on r
 
 ## First case in the TUI
 
-1. Run `irmind`. The first-run guide sets up signing and secrets backends; enter and confirm a masked passphrase if you choose the file backend. Save the analyst key fingerprint outside this computer. Choose a model in the guide or type `/model` afterward. No model is selected by default.
+1. Run `irmind`. The first-run guide sets up signing and secrets backends; enter and confirm a masked passphrase if you choose the file backend. Save the analyst key fingerprint outside this computer. Choose a model in the guide or type `/settings model` afterward. No model is selected by default.
 2. Type `/new`, enter a title, and choose a severity with the arrow keys. Enter creates a local case; the second form step adds optional remote scope.
 3. In the case, type `/ingest` and select the synthetic [CloudTrail example](examples/cloudtrail-alert.json). IRMind hashes the file in place; copying the original is an explicit option.
 4. Ask what the synthetic role assumption suggests, then press Enter. The response streams into the conversation.
 5. Review the proposed tool call. An external lookup waits for a signed approval; choose a numbered option with the arrows and Enter. Type `/` for commands, `Ctrl+K` for the palette, and `/pause` to cancel active work.
 6. Use `/verify <source-root>` to check the original, then review `/report` before `/seal` and `/export`. The latter two show the case hash and signing-key fingerprint before confirmation.
 
-You can ingest, inspect, and verify local evidence without a model. On later starts, IRMind verifies and reopens your most recently used open case. Use `/home` for the case list or `/config` to disable this behavior. `/help` lists the slash commands and reserved keys: Enter, Esc, arrows, Tab/Shift+Tab, PgUp/PgDn, Ctrl+C, Ctrl+K, and Ctrl+O. Printable characters go into the active field.
+You can ingest, inspect, and verify local evidence without a model. On later starts, IRMind verifies and reopens your most recently used open case. Use `/home` for the case list or `/settings preferences` to disable this behavior. `/settings` also manages connectors, credentials, mouse capture, and theme. `/help` lists the slash commands and reserved keys: Enter, Esc, arrows, Tab/Shift+Tab, PgUp/PgDn, Ctrl+C, Ctrl+K, and Ctrl+O. Printable characters, including `/`, go into the focused form field; bracketed paste works there too.
 
 ## Modules
 
 The normal build includes every current product module and both keystores. None is enabled until selected and configured. A smaller build uses `--no-default-features --features keystore-file` (at least one signer and secrets backend is required). All modules are experimental.
+
+`/settings model` also has local LM Studio and vLLM presets and remote Mistral, Groq, Google Gemini, xAI, and Together presets. They reuse the OpenAI-compatible module; see [provider URLs and limits](docs/modules.md#openai-compatible).
 
 | Module | Type | Cargo feature | Status | Setup |
 | --- | --- | --- | --- | --- |

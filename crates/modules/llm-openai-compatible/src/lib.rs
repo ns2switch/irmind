@@ -54,6 +54,76 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
 pub struct OpenAiCompatible(ChatCompletionsClient);
 
 impl OpenAiCompatible {
+    pub async fn list_models(
+        provider: &str,
+        base_url: &str,
+        key: Option<&secrecy::SecretString>,
+    ) -> Result<Vec<String>, AppError> {
+        let secret = key.map(|value| value.expose_secret().to_owned());
+        let _validated = ChatCompletionsClient::new(base_url, "synthetic", secret)?;
+        let mut base = reqwest::Url::parse(base_url)
+            .map_err(|_| AppError::Model("invalid model-list URL".into()))?;
+        if !base.path().ends_with('/') {
+            base.set_path(&format!("{}/", base.path()));
+        }
+        let url = if provider == "llm-anthropic" {
+            base.join("v1/models")
+        } else {
+            base.join("models")
+        }
+        .map_err(|_| AppError::Model("invalid model-list endpoint".into()))?;
+        let loopback = url.host_str().is_some_and(|host| {
+            matches!(
+                host.trim_matches(['[', ']']),
+                "127.0.0.1" | "::1" | "localhost"
+            )
+        });
+        let client = irmind_http::client_builder(std::time::Duration::from_secs(5), loopback)
+            .build()
+            .map_err(|_| AppError::Model("cannot create model-list client".into()))?;
+        let request = client.get(url);
+        let request = if provider == "llm-anthropic" {
+            request.header("anthropic-version", "2023-06-01").header(
+                "x-api-key",
+                key.map_or("", secrecy::ExposeSecret::expose_secret),
+            )
+        } else if let Some(key) = key {
+            request.bearer_auth(key.expose_secret())
+        } else {
+            request
+        };
+        let response = request
+            .send()
+            .await
+            .map_err(|_| AppError::Model("model-list endpoint is unavailable".into()))?;
+        if !response.status().is_success() {
+            return Err(AppError::Model(format!(
+                "model list returned HTTP {}",
+                response.status()
+            )));
+        }
+        let bytes =
+            irmind_http::read_limited(response, 1_048_576, &irmind_app::CancellationToken::new())
+                .await
+                .map_err(|_| AppError::Model("model list is too large or unavailable".into()))?;
+        let value: serde_json::Value = serde_json::from_slice(&bytes)
+            .map_err(|_| AppError::Model("model list is invalid JSON".into()))?;
+        let models = value
+            .get("data")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| AppError::Model("model list has no data array".into()))?;
+        let mut names = models
+            .iter()
+            .filter_map(|item| item.get("id").and_then(serde_json::Value::as_str))
+            .filter(|id| id.len() <= 200 && !id.chars().any(char::is_control))
+            .take(200)
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        names.sort();
+        names.dedup();
+        Ok(names)
+    }
+
     pub async fn list_ollama_models(base_url: &str) -> Result<Vec<String>, AppError> {
         let mut url = reqwest::Url::parse(base_url)
             .map_err(|_| AppError::Model("invalid Ollama URL".into()))?;
@@ -167,6 +237,39 @@ impl LlmPort for OpenAiCompatible {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compatible_and_anthropic_model_lists_use_bounded_authenticated_requests() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        for (provider, target, header) in [
+            (MODULE_ID, "/v1/models", "authorization"),
+            ("llm-anthropic", "/v1/models", "x-api-key"),
+        ] {
+            let server =
+                irmind_testkit::MockServer::start(vec![irmind_testkit::MockResponse::json(
+                    r#"{"data":[{"id":"synthetic-b"},{"id":"synthetic-a"}]}"#,
+                )])
+                .unwrap();
+            let models = runtime
+                .block_on(OpenAiCompatible::list_models(
+                    provider,
+                    &format!(
+                        "{}{}",
+                        server.origin(),
+                        if provider == MODULE_ID { "v1/" } else { "" }
+                    ),
+                    Some(&secrecy::SecretString::from("synthetic/key")),
+                ))
+                .unwrap();
+            assert_eq!(models, ["synthetic-a", "synthetic-b"]);
+            let requests = server.finish().unwrap();
+            assert_eq!(requests[0].target, target);
+            assert!(requests[0].headers.contains_key(header));
+        }
+    }
 
     #[test]
     fn ollama_model_list_uses_bounded_loopback_request() {

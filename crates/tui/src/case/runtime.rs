@@ -80,6 +80,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                         break;
                     }
                     Event::Mouse(mouse) => self.handle_mouse(mouse),
+                    Event::Paste(value) => self.handle_paste(&value),
                     _ => {}
                 }
             }

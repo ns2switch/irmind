@@ -26,7 +26,8 @@ impl Command {
 
     pub(crate) fn syntax(&self) -> &'static str {
         match self.name {
-            "approve" | "deny" | "edit" | "module" => " <id>",
+            "approve" | "deny" | "edit" => " <id>",
+            "settings" => " [model|connectors|keystore|preferences]",
             "open" => " <case title or ID>",
             "evidence" | "raw" => " <hash>",
             "ingest" => " <path>",
@@ -127,7 +128,7 @@ pub(super) fn argument_candidates(
     approvals: &[String],
     findings: &[String],
     hashes: &[String],
-    modules: &[String],
+    _modules: &[String],
 ) -> Vec<String> {
     let Some((command, prefix)) = input.split_once(' ') else {
         return Vec::new();
@@ -143,7 +144,10 @@ pub(super) fn argument_candidates(
             .iter()
             .map(|value| (*value).into())
             .collect(),
-        "/module" => modules.to_vec(),
+        "/settings" => ["model", "connectors", "keystore", "preferences"]
+            .iter()
+            .map(|value| (*value).into())
+            .collect(),
         _ => Vec::new(),
     };
     values
@@ -222,8 +226,8 @@ mod tests {
             hashes
         );
         assert_eq!(
-            argument_candidates("/module llm", &approvals, &findings, &hashes, &modules),
-            modules
+            argument_candidates("/settings mo", &approvals, &findings, &hashes, &modules),
+            vec!["model"]
         );
         assert!(
             argument_candidates("/ingest ../../examples/cloud", &[], &[], &[], &[])

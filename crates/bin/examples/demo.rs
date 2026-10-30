@@ -247,12 +247,13 @@ fn main() -> Result<()> {
             new_analyst_key: false,
             overrides_active: false,
             mouse_capture: false,
+            theme: None,
         },
     )?;
     Ok(())
 }
 
-fn demo_modules() -> [ModuleStatus; 2] {
+fn demo_modules() -> [ModuleStatus; 3] {
     [
         ModuleStatus {
             id: "llm-openai-compatible".into(),
@@ -265,11 +266,30 @@ fn demo_modules() -> [ModuleStatus; 2] {
             parameters: vec![ModuleParameter {
                 name: "model".into(),
                 value: String::new(),
+                defaulted: false,
                 required: true,
                 overridden: false,
             }],
             credentials: vec!["OPENAI_API_KEY".into()],
             missing: vec!["model".into()],
+        },
+        ModuleStatus {
+            id: "llm-deepseek".into(),
+            compiled: true,
+            enabled: false,
+            configuration: "demo: not configured".into(),
+            kind: ModuleKind::Llm,
+            selected: false,
+            selection_source: ModuleSelectionSource::Persistent,
+            parameters: vec![ModuleParameter {
+                name: "IRMIND_DEEPSEEK_BASE_URL".into(),
+                value: "https://api.deepseek.com/".into(),
+                defaulted: true,
+                required: false,
+                overridden: false,
+            }],
+            credentials: vec!["DEEPSEEK_API_KEY".into()],
+            missing: vec!["DEEPSEEK_API_KEY".into()],
         },
         ModuleStatus {
             id: "siem-splunk".into(),

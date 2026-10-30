@@ -12,6 +12,26 @@ pub(super) fn list_ollama_models(base_url: &str) -> Result<Vec<String>> {
         .map_err(Into::into)
 }
 
+pub(super) fn list_provider_models(
+    provider: &str,
+    base_url: &str,
+    key: Option<&SecretString>,
+) -> Result<Vec<String>> {
+    let runtime = runtime()?;
+    if base_url.starts_with("http://127.0.0.1:11434/")
+        || base_url.starts_with("https://127.0.0.1:11434/")
+    {
+        return list_ollama_models(base_url);
+    }
+    runtime
+        .block_on(
+            irmind_mod_llm_openai_compatible::OpenAiCompatible::list_models(
+                provider, base_url, key,
+            ),
+        )
+        .map_err(Into::into)
+}
+
 pub(super) fn test_model_connection(
     provider: &str,
     base_url: &str,

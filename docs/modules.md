@@ -2,7 +2,7 @@
 
 This page is for operators choosing a connector or keystore. Each section states what it does, the least privilege it needs, how to enable it, and what it cannot do. Store credentials as described in [configuration](configuration.md); product modules never read a keystore or environment themselves.
 
-The normal binary includes every current product module and both keystores. None is enabled automatically. In the TUI, use `/model` to select and test an AI provider, `/modules` to enable connectors and edit public fields, and `/keystore` for credentials. The changes persist and the session reloads inside the TUI. Use `--no-default-features --features keystore-file` for a minimal binary; at least one signer and secrets backend is required. The environment variables and CLI switches below provide temporary automation overrides.
+The normal binary includes every current product module and both keystores. None is enabled automatically. In the TUI, use `/settings model` to select and test an AI provider, `/settings connectors` to enable connectors and edit public fields, and `/settings keystore` for credentials. The changes persist and the session reloads inside the TUI. Use `--no-default-features --features keystore-file` for a minimal binary; at least one signer and secrets backend is required. The environment variables and CLI switches below provide temporary automation overrides.
 
 ## OpenAI-compatible
 
@@ -13,6 +13,22 @@ The normal binary includes every current product module and both keystores. None
 **Configure:** Included in the standard binary. Set `IRMIND_MODEL` and optionally `IRMIND_LLM_BASE_URL`. Select `--llm-module llm-openai-compatible`. Store `OPENAI_API_KEY` in the selected secret backend only for the official URL, or `IRMIND_LLM_API_KEY` for a custom endpoint.
 
 **Limits:** Streaming must include final usage data; incomplete streams fail closed. Pattern redaction cannot guarantee that all sensitive content is removed. Obtain provider approval before sending incident data.
+
+The `/settings model` presets below use this same module. Their listed base URLs are defaults, not a license to send incident data. Chat Completions, streaming, and tool calling are documented by each provider; actual tool support still depends on the chosen model. The local services must be running and configured for tool capable models. Listing models is optional; enter a model ID manually if a service does not expose a compatible list.
+
+| Preset | Default base URL | Provider documentation |
+| --- | --- | --- |
+| OpenAI | `https://api.openai.com/v1/` | [Chat Completions](https://platform.openai.com/docs/api-reference/chat/create) |
+| Mistral | `https://api.mistral.ai/v1/` | [API reference](https://docs.mistral.ai/api/) |
+| Groq | `https://api.groq.com/openai/v1/` | [API reference](https://console.groq.com/docs/api-reference) |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai/` | [OpenAI compatibility](https://ai.google.dev/gemini-api/docs/openai/) |
+| xAI | `https://api.x.ai/v1/` | [Chat Completions](https://docs.x.ai/developers/rest-api-reference/inference/chat-completions) |
+| Together | `https://api.together.ai/v1/` | [OpenAI compatibility](https://docs.together.ai/docs/inference/openai-compatibility) |
+| Ollama | `http://127.0.0.1:11434/v1/` | [OpenAI compatibility](https://docs.ollama.com/api/openai-compatibility) |
+| LM Studio | `http://127.0.0.1:1234/v1/` | [OpenAI compatibility](https://lmstudio.ai/docs/developer/openai-compat) |
+| vLLM | `http://127.0.0.1:8000/v1/` | [OpenAI-compatible server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server/) |
+
+Azure OpenAI endpoints that require an `api-version` query parameter are not supported by the URL form. A custom endpoint is available, but it must meet the same streaming, tool calling, and bounded response requirements.
 
 ## Anthropic
 
@@ -136,7 +152,7 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 **Permission:** Access to the current user's OS credential store. Linux Secret Service normally needs a D-Bus session.
 
-**Configure:** Compiled by default with `keystore-os`. Choose `os` explicitly for `signer`, `secrets`, or both on first launch. Use `/keystore` to manage credentials without displaying their values.
+**Configure:** Compiled by default with `keystore-os`. Choose `os` explicitly for `signer`, `secrets`, or both on first launch. Use `/settings keystore` to manage credentials without displaying their values.
 
 **Limits:** A headless SSH session may lack an unlocked OS keyring. IRMind stops if this backend is selected but unavailable; select and migrate to `file` explicitly.
 
@@ -146,7 +162,7 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 **Permission:** Write access to the current user's private application-data directory; no network or graphical session is needed.
 
-**Configure:** Compiled by default with `keystore-file`. Choose `file` explicitly for `signer`, `secrets`, or both. The TUI prompts for a passphrase without echo; use `--passphrase-fd` for CLI automation. Use `/keystore` to change the passphrase or migrate a capability.
+**Configure:** Compiled by default with `keystore-file`. Choose `file` explicitly for `signer`, `secrets`, or both. The TUI prompts for a passphrase without echo; use `--passphrase-fd` for CLI automation. Use `/settings keystore` to change the passphrase or migrate a capability.
 
 **Limits:** Argon2id and XChaCha20-Poly1305 protect data at rest, but a weak passphrase or a compromised user session can expose an unlocked store. Keep the public-key fingerprint outside the machine. Migration is signed in the global operational chain and requires a session restart to take effect.
 

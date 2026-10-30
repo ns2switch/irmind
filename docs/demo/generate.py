@@ -22,12 +22,16 @@ EXAMPLE_SHA256 = "0b7f3a97647d64d5d917b09002f069f2cf15a058ea2406bceaf2d5fe5f02d0
 FILES = (
     "demo.gif", "resumed.png", "home.png", "model.png", "modules.png",
     "new.png", "command-menu.png", "conversation.png", "approval-card.png",
+    "settings.png", "keystore.png", "preferences.png",
 )
 EXPECTED_FLOW = (
     "Resumed · /home to view all cases",
     "Recent cases",
+    "Settings",
     "Model setup",
     "Modules",
+    "Keystore",
+    "Configuration",
     "New case",
     "Demo CloudTrail alert",
     "Evidence ingested",
@@ -62,11 +66,14 @@ def validate(directory: Path) -> None:
         raise ValueError(f"demo flow is incomplete: {', '.join(missing)}")
     for value in (
         str(Path.home()), getpass.getuser(), os.uname().nodename,
-        "/home/", "/Users/", "C:\\Users\\", "Analyst key:",
+        "/home/", "/Users/", "C:\\Users\\",
         "analyst_key_fingerprint",
     ):
         if value and value in transcript:
             raise ValueError("demo contains a personal path, identity, or key fingerprint")
+    if any("Analyst key:" in line and "Analyst key: ephemeral demo key" not in line
+           for line in transcript.splitlines()):
+        raise ValueError("demo contains an unreviewed analyst fingerprint")
     for name in FILES:
         path = directory / name
         if not path.is_file() or path.stat().st_size == 0:

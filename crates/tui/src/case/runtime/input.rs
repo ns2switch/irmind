@@ -5,6 +5,26 @@ use crate::case::{KeyCode, KeyModifiers};
 use crossterm::event::{MouseEvent, MouseEventKind};
 
 impl CaseRuntime<'_, '_, '_> {
+    pub(super) fn handle_paste(&mut self, value: &str) {
+        if self.state.picker.is_some() || self.state.confirmation.is_some() {
+            return;
+        }
+        let limit = if self.state.palette.is_some() {
+            80
+        } else {
+            20_000
+        };
+        let target = self.state.palette.as_mut().unwrap_or(&mut self.state.input);
+        for ch in value.replace("\r\n", "\n").replace('\r', "\n").chars() {
+            if (ch == '\n' || !ch.is_control()) && target.len() + ch.len_utf8() <= limit {
+                target.push(ch);
+            }
+        }
+        if self.state.palette.is_none() {
+            self.state.menu_open = self.state.input.starts_with('/');
+        }
+    }
+
     fn handle_navigation(&mut self, code: KeyCode, modifiers: KeyModifiers) -> bool {
         let page = self.state.conversation.viewport().saturating_sub(2).max(1);
         let page = isize::try_from(page).unwrap_or(isize::MAX);

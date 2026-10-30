@@ -133,30 +133,7 @@ impl StatusBuilder<'_> {
             .iter()
             .copied()
             .find(|item| item.id == id);
-        let parameters = manifest.map_or_else(Vec::new, |item| {
-            item.config
-                .iter()
-                .filter(|field| !field.secret)
-                .map(|field| ModuleParameter {
-                    name: field.name.into(),
-                    value: configuration::effective_value(
-                        id,
-                        field.name,
-                        self.saved,
-                        self.keystore.allow_environment,
-                    )
-                    .ok()
-                    .flatten()
-                    .unwrap_or_default(),
-                    required: field.required,
-                    overridden: (self.keystore.allow_environment
-                        && std::env::var_os(field.name).is_some())
-                        || self.keystore.module_overrides.contains(id)
-                        || (id.starts_with("llm-")
-                            && self.keystore.module_overrides.contains("llm")),
-                })
-                .collect()
-        });
+        let parameters = self.parameters(id, manifest);
         let credentials = manifest.map_or_else(Vec::new, |item| {
             item.config
                 .iter()
@@ -195,5 +172,86 @@ impl StatusBuilder<'_> {
                 )
             }),
         });
+    }
+
+    fn parameters(
+        &self,
+        id: &str,
+        manifest: Option<&irmind_app::modules::ModuleManifest>,
+    ) -> Vec<ModuleParameter> {
+        manifest.map_or_else(Vec::new, |item| {
+            item.config
+                .iter()
+                .filter(|field| !field.secret)
+                .map(|field| {
+                    let configured = configuration::effective_value(
+                        id,
+                        field.name,
+                        self.saved,
+                        self.keystore.allow_environment,
+                    )
+                    .ok()
+                    .flatten();
+                    let default = default_value(id, field.name);
+                    ModuleParameter {
+                        name: field.name.into(),
+                        value: configured
+                            .clone()
+                            .or_else(|| default.map(str::to_owned))
+                            .unwrap_or_default(),
+                        defaulted: configured.is_none() && default.is_some(),
+                        required: field.required,
+                        overridden: (self.keystore.allow_environment
+                            && std::env::var_os(field.name).is_some())
+                            || self.keystore.module_overrides.contains(id)
+                            || (id.starts_with("llm-")
+                                && self.keystore.module_overrides.contains("llm")),
+                    }
+                })
+                .collect()
+        })
+    }
+}
+
+fn default_value(module: &str, field: &str) -> Option<&'static str> {
+    match (module, field) {
+        ("llm-openai-compatible", "IRMIND_LLM_BASE_URL") => Some("https://api.openai.com/v1/"),
+        ("llm-anthropic", "IRMIND_ANTHROPIC_BASE_URL") => Some("https://api.anthropic.com/"),
+        ("llm-deepseek", "IRMIND_DEEPSEEK_BASE_URL") => Some("https://api.deepseek.com/"),
+        ("llm-openrouter", "IRMIND_OPENROUTER_BASE_URL") => Some("https://openrouter.ai/api/v1/"),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::default_value;
+
+    #[test]
+    fn llm_default_urls_are_visible_without_saved_values() {
+        for (module, field, url) in [
+            (
+                "llm-openai-compatible",
+                "IRMIND_LLM_BASE_URL",
+                "https://api.openai.com/v1/",
+            ),
+            (
+                "llm-anthropic",
+                "IRMIND_ANTHROPIC_BASE_URL",
+                "https://api.anthropic.com/",
+            ),
+            (
+                "llm-deepseek",
+                "IRMIND_DEEPSEEK_BASE_URL",
+                "https://api.deepseek.com/",
+            ),
+            (
+                "llm-openrouter",
+                "IRMIND_OPENROUTER_BASE_URL",
+                "https://openrouter.ai/api/v1/",
+            ),
+        ] {
+            assert_eq!(default_value(module, field), Some(url));
+        }
     }
 }

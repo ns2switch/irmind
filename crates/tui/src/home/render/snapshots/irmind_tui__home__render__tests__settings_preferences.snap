@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: "snapshot_screen(&state,\nvec![ListItem::new(\"Resume last case: on\"),\nListItem::new(\"Mouse capture: on\"), ListItem::new(\"Theme: auto\"),])"
+---
+IRMind v0.1.0
+
+  ╭ Configuration ───────────────────────────────────────────────────────────╮
+  │Resume last case: on                                                      │
+  │Mouse capture: on                                                         │
+  │Theme: auto                                                               │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+
+↑/↓ choose · Enter change · Esc back

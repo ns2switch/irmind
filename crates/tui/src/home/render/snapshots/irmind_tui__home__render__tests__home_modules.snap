@@ -10,13 +10,13 @@ IRMind v0.1.0
   │    disabled                         │Technical ID: siem-splunk           │
   │SIEM                                 │Configuration: missing API key      │
   │  Splunk                             │Missing: API_KEY                    │
-  │    missing configuration · API_KEY  │Parameters · Tab selects,           │
-  │Storage                              │/edit-param edits                   │
-  │  Google Cloud Storage               │> base_url = https://example.invalid│
+  │    missing configuration · API_KEY  │Parameters · Tab selects, Enter     │
+  │Storage                              │edits                               │
+  │  Google Cloud Storage               │  base_url = https://example.invalid│
   │    not compiled                     │(required)                          │
-  │                                     │Credentials · /keystore to manage   │
+  │                                     │Credentials · /settings keystore to │
+  │                                     │manage                              │
   │                                     │  API_KEY: missing                  │
-  │                                     │                                    │
   │                                     │                                    │
   │                                     │                                    │
   │                                     │                                    │
