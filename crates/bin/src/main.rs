@@ -9,6 +9,7 @@ mod diagnostics;
 mod keystore;
 mod model_probe;
 mod policy_config;
+mod recent_case;
 use cli::{
     Cli, Command, audit_source_name, input_files_large, read_evidence, write_private_output,
 };
@@ -141,6 +142,12 @@ fn compiled_credential_fields() -> Vec<&'static str> {
 }
 
 impl WorkspaceIo for RootWorkspaceIo {
+    fn load_last_case(&self) -> Result<Option<CaseId>> {
+        recent_case::load(&self.home)
+    }
+    fn remember_last_case(&self, id: &CaseId) -> Result<()> {
+        recent_case::save(&self.home, id)
+    }
     fn input_files(&self, root: &Path) -> Result<Vec<PathBuf>> {
         input_files_large(root)
     }
@@ -295,6 +302,7 @@ impl WorkspaceIo for RootWorkspaceIo {
         confirmed: bool,
     ) -> Result<bool> {
         let overridden = match &change {
+            ConfigChange::SetResumeLastCase(_) => false,
             ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
             ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
             ConfigChange::SetValue { module, field, .. } => {

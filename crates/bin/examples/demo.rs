@@ -5,8 +5,9 @@
 use anyhow::{Result, bail};
 use futures_util::stream;
 use irmind_app::{
-    AppError, CancellationToken, CaseExporter, CompletionRequest, CryptoPorts, Engine, EnginePorts,
-    LlmPort, ModelEvent, ModelResponse, ModelStream, SignerBackend, ThreatIntelPort,
+    AppError, CancellationToken, CaseExporter, CaseId, CompletionRequest, CryptoPorts, Engine,
+    EnginePorts, LlmPort, ModelEvent, ModelResponse, ModelStream, Severity, SignerBackend,
+    ThreatIntelPort,
 };
 use irmind_domain::{Actor, AuthorizedCall, ExecutionMode, ProposedCall, Tool};
 use irmind_infra::{LocalExportVerifier, LocalStore, LocalVerifier, SystemClock};
@@ -95,6 +96,7 @@ impl ThreatIntelPort for DemoIntel {
 
 struct DemoIo {
     store: Arc<LocalStore>,
+    recent: Option<CaseId>,
 }
 
 fn checked_example(path: &Path) -> Result<()> {
@@ -113,6 +115,10 @@ fn checked_example(path: &Path) -> Result<()> {
 }
 
 impl WorkspaceIo for DemoIo {
+    fn load_last_case(&self) -> Result<Option<CaseId>> {
+        Ok(self.recent.clone())
+    }
+
     fn input_files(&self, root: &Path) -> Result<Vec<PathBuf>> {
         checked_example(root)?;
         Ok(vec![root.to_path_buf()])
@@ -188,6 +194,11 @@ impl WorkspaceIo for DemoIo {
 }
 
 fn main() -> Result<()> {
+    let resume = match std::env::args().nth(1).as_deref() {
+        None => false,
+        Some("--resume") => true,
+        Some(_) => bail!("the offline demo only supports --resume"),
+    };
     let data = tempfile::tempdir()?;
     let store = Arc::new(LocalStore::open(data.path())?);
     let phrase = SecretString::from("offline synthetic demo phrase".to_owned());
@@ -209,8 +220,40 @@ fn main() -> Result<()> {
     let model = DemoModel(AtomicUsize::new(0));
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
         .with_threat_intel(&intel);
-    let io = DemoIo { store };
-    let modules = [
+    let recent = if resume {
+        Some(
+            engine
+                .create_case_with_severity(
+                    "Recent synthetic case",
+                    Severity::Medium,
+                    "local evidence only",
+                )?
+                .id,
+        )
+    } else {
+        None
+    };
+    let io = DemoIo { store, recent };
+    let modules = demo_modules();
+    irmind_tui::run_workspace(
+        &engine,
+        Some(&model),
+        &io,
+        &modules,
+        &CancellationToken::new(),
+        WorkspaceLaunch {
+            initial_case: None,
+            resume_last_case: irmind_tui::ResumeMode::Enabled,
+            new_analyst_key: false,
+            overrides_active: false,
+            mouse_capture: false,
+        },
+    )?;
+    Ok(())
+}
+
+fn demo_modules() -> [ModuleStatus; 2] {
+    [
         ModuleStatus {
             id: "llm-openai-compatible".into(),
             compiled: true,
@@ -226,6 +269,7 @@ fn main() -> Result<()> {
                 overridden: false,
             }],
             credentials: vec!["OPENAI_API_KEY".into()],
+            missing: vec!["model".into()],
         },
         ModuleStatus {
             id: "siem-splunk".into(),
@@ -237,20 +281,7 @@ fn main() -> Result<()> {
             selection_source: ModuleSelectionSource::Persistent,
             parameters: Vec::new(),
             credentials: vec!["SPLUNK_TOKEN".into()],
+            missing: vec!["SPLUNK_TOKEN".into()],
         },
-    ];
-    irmind_tui::run_workspace(
-        &engine,
-        Some(&model),
-        &io,
-        &modules,
-        &CancellationToken::new(),
-        WorkspaceLaunch {
-            initial_case: None,
-            new_analyst_key: false,
-            overrides_active: false,
-            mouse_capture: false,
-        },
-    )?;
-    Ok(())
+    ]
 }

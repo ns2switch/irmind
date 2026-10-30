@@ -52,6 +52,15 @@ fn unset_mouse_capture_preserves_signed_v1_configuration_bytes() {
             .contains("\"mouse_capture\":false")
     );
     assert!(config.validate(&[]).is_ok());
+    let resumed = PersistentConfig::default()
+        .changed(ConfigChange::SetResumeLastCase(false), &[])
+        .unwrap();
+    assert_eq!(resumed.resume_last_case, Some(false));
+    assert!(
+        serde_json::to_string(&resumed)
+            .unwrap()
+            .contains("\"resume_last_case\":false")
+    );
 }
 
 #[test]

@@ -23,6 +23,9 @@ pub struct PersistentConfig {
     /// Presentation-only setting; omitted from the signed v1 representation when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mouse_capture: Option<bool>,
+    /// Presentation-only setting; absence preserves the existing signed v1 bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_last_case: Option<bool>,
     #[serde(default)]
     pub modules: BTreeMap<String, ProductSettings>,
 }
@@ -48,6 +51,7 @@ pub enum ConfigChange {
         field: String,
         value: String,
     },
+    SetResumeLastCase(bool),
 }
 
 pub trait ConfigurationStore: Send + Sync {
@@ -68,6 +72,7 @@ impl Default for PersistentConfig {
             input_microusd_per_million: None,
             output_microusd_per_million: None,
             mouse_capture: None,
+            resume_last_case: None,
             modules: BTreeMap::new(),
         }
     }
@@ -181,6 +186,7 @@ impl PersistentConfig {
                     values.insert(field, value);
                 }
             }
+            ConfigChange::SetResumeLastCase(enabled) => next.resume_last_case = Some(enabled),
         }
         next.validate(manifests)?;
         Ok(next)

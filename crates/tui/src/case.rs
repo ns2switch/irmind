@@ -39,6 +39,7 @@ pub(crate) enum CaseExit {
     New,
     Model,
     Modules,
+    Config,
     Keystore,
     Quit,
     Open(String),
@@ -68,6 +69,7 @@ pub(crate) struct CasePresentation<'a> {
     pub modules: &'a [crate::ModuleStatus],
     pub overrides_active: bool,
     pub mouse_capture: bool,
+    pub resumed: bool,
 }
 
 fn initial_state(
@@ -75,16 +77,11 @@ fn initial_state(
     id: &CaseId,
     model: Option<&dyn LlmPort>,
     io_ops: &dyn WorkspaceIo,
+    resumed: bool,
 ) -> Result<CaseState> {
     let case = engine.repo.get_case(id)?;
     let backend = io_ops.keystore_status()?.signer_backend;
-    let case_summary = format!(
-        "{} · {}\nModel: {} · Keystore: {}\n/ingest adds evidence · /help opens help",
-        case.title,
-        case.severity.as_str(),
-        model.map_or_else(|| "no model".into(), LlmPort::descriptor),
-        backend,
-    );
+    let case_summary = welcome_summary(&case, model, &backend, resumed);
     let mut conversation = Conversation::new(std::env::var_os("NO_COLOR").is_none());
     conversation.push(Card::new(
         CardKind::Welcome,
@@ -154,6 +151,26 @@ fn initial_state(
     })
 }
 
+fn welcome_summary(
+    case: &irmind_app::Case,
+    model: Option<&dyn LlmPort>,
+    backend: &str,
+    resumed: bool,
+) -> String {
+    format!(
+        "{} · {}\nModel: {} · Keystore: {}\n/ingest adds evidence · /help opens help{}",
+        case.title,
+        case.severity.as_str(),
+        model.map_or_else(|| "no model".into(), LlmPort::descriptor),
+        backend,
+        if resumed {
+            "\nResumed · /home to view all cases"
+        } else {
+            ""
+        },
+    )
+}
+
 pub(crate) fn run_case(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     engine: &Engine<'_>,
@@ -164,7 +181,15 @@ pub(crate) fn run_case(
     presentation: CasePresentation<'_>,
 ) -> Result<CaseExit> {
     verify_case_before_open(terminal, engine, id, shutdown)?;
-    let state = initial_state(engine, id, model, io_ops)?;
+    let mut state = initial_state(engine, id, model, io_ops, presentation.resumed)?;
+    if io_ops.remember_last_case(id).is_err() {
+        state.conversation.push(Card::new(
+            CardKind::Notice,
+            "",
+            "Recent case could not be saved locally; this case is still verified.",
+            false,
+        ));
+    }
     let (progress_tx, progress_rx) = mpsc::channel::<String>();
     let (model_tx, model_rx) = mpsc::channel::<irmind_app::ModelProgress>();
     let (seal_tx, seal_rx) = mpsc::channel::<irmind_app::SealPreview>();

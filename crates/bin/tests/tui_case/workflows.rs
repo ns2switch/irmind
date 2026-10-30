@@ -46,6 +46,7 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
             overridden: false,
         }],
         credentials: Vec::new(),
+        missing: Vec::new(),
     };
     let mut edit = "/edit-param".chars().map(KeyCode::Char).collect::<Vec<_>>();
     edit.push(KeyCode::Enter);

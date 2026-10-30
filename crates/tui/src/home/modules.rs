@@ -1,4 +1,7 @@
-use super::{ConfigChange, HomeState, KeyCode, Mode, ModuleEdit, ModuleKind, state::HomeAction};
+use super::{
+    ConfigChange, HomeState, KeyCode, Mode, ModuleEdit, ModuleKind, module_catalog,
+    state::HomeAction,
+};
 
 pub(super) fn update_module_screen(state: &mut HomeState, key: KeyCode) -> HomeAction {
     if let Some(change) = state.pending_module_change.clone() {
@@ -36,15 +39,8 @@ pub(super) fn update_module_screen(state: &mut HomeState, key: KeyCode) -> HomeA
     }
     match key {
         KeyCode::Esc => state.mode = Mode::List,
-        KeyCode::Up => {
-            state.module_selected = state.module_selected.saturating_sub(1);
-            state.parameter_selected = 0;
-        }
-        KeyCode::Down => {
-            state.module_selected =
-                (state.module_selected + 1).min(state.modules.len().saturating_sub(1));
-            state.parameter_selected = 0;
-        }
+        KeyCode::Up => move_module(state, false),
+        KeyCode::Down => move_module(state, true),
         KeyCode::Tab => select_parameter(state, true),
         KeyCode::BackTab => select_parameter(state, false),
         KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4096 => state.input.push(ch),
@@ -56,6 +52,25 @@ pub(super) fn update_module_screen(state: &mut HomeState, key: KeyCode) -> HomeA
         _ => {}
     }
     HomeAction::None
+}
+
+fn move_module(state: &mut HomeState, forward: bool) {
+    let order = module_catalog::ordered(&state.modules)
+        .into_iter()
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    if let Some(current) = order
+        .iter()
+        .position(|index| *index == state.module_selected)
+    {
+        let next = if forward {
+            (current + 1).min(order.len().saturating_sub(1))
+        } else {
+            current.saturating_sub(1)
+        };
+        state.module_selected = order[next];
+        state.parameter_selected = 0;
+    }
 }
 
 fn select_parameter(state: &mut HomeState, forward: bool) {

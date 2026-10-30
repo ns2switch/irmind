@@ -5,24 +5,24 @@ expression: screen
 IRMind v0.1.0
 
   ╭ New case ────────────────────────────────────────────────────────────────╮
-  │Title: Synthetic alert                                                    │
-  │Severity: high                                                            │
+  │Local case · remote scope is optional                                     │
+  │                                                                          │
+  │╭Title *─────────────────────────────────────────────────────────────────╮│
+  ││For example: unusual role assumption                                    ││
+  │╰────────────────────────────────────────────────────────────────────────╯│
   │                                                                          │
   │                                                                          │
+  │╭Severity · ↑/↓──────────────────────────────────────────────────────────╮│
+  ││  1. Low                                                                ││
+  ││> 2. Medium                                                             ││
+  ││  3. High                                                               ││
+  ││  4. Critical                                                           ││
+  │╰────────────────────────────────────────────────────────────────────────╯│
   │                                                                          │
+  │Remote scope (optional) › Enter to edit                                   │
   │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
+  │Enter creates a local case.                                               │
   │                                                                          │
   ╰──────────────────────────────────────────────────────────────────────────╯
 
-Tab next field · Enter create · Esc back
+Tab/Shift+Tab field · ↑/↓ severity · Enter create or expand · Esc back

@@ -21,7 +21,8 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if let Some(destination) = match prompt.as_str() {
             "/new" => Some(super::CaseExit::New),
             "/model" => Some(super::CaseExit::Model),
-            "/modules" | "/config" => Some(super::CaseExit::Modules),
+            "/modules" => Some(super::CaseExit::Modules),
+            "/config" => Some(super::CaseExit::Config),
             "/keystore" => Some(super::CaseExit::Keystore),
             "/open" => Some(super::CaseExit::Home),
             _ => prompt

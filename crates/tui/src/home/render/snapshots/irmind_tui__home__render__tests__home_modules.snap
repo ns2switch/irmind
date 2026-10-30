@@ -5,24 +5,24 @@ expression: screen
 IRMind v0.1.0
 
   ╭ Modules ─────────────────────────────────────────────────────────────────╮
-  │llm-openai-compatible · compiled · disabled                               │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
-  │                                                                          │
+  │AI model                             │Splunk                              │
+  │  Anthropic                          │Status: missing configuration       │
+  │    disabled                         │Technical ID: siem-splunk           │
+  │SIEM                                 │Configuration: missing API key      │
+  │  Splunk                             │Missing: API_KEY                    │
+  │    missing configuration · API_KEY  │Parameters · Tab selects,           │
+  │Storage                              │/edit-param edits                   │
+  │  Google Cloud Storage               │> base_url = https://example.invalid│
+  │    not compiled                     │(required)                          │
+  │                                     │Credentials · /keystore to manage   │
+  │                                     │  API_KEY: missing                  │
+  │                                     │                                    │
+  │                                     │                                    │
+  │                                     │                                    │
+  │                                     │                                    │
+  │                                     │                                    │
+  │                                     │                                    │
+  │                                     │                                    │
   ╰──────────────────────────────────────────────────────────────────────────╯
 
 ↑/↓ choose · Tab field · Enter select · Esc back

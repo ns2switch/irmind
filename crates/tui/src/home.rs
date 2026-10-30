@@ -44,10 +44,23 @@ pub(crate) enum Mode {
     New,
     Model,
     Modules,
+    Config,
     Keystore,
     Setup,
     Help,
     VerifyExport,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum RemoteScopeStep {
+    Local,
+    Remote,
+}
+
+impl RemoteScopeStep {
+    fn is_remote(self) -> bool {
+        self == Self::Remote
+    }
 }
 
 pub(crate) struct HomeState {
@@ -57,6 +70,7 @@ pub(crate) struct HomeState {
     selected: usize,
     form: [String; 9],
     form_field: usize,
+    remote_scope_step: RemoteScopeStep,
     verify_form: [String; 2],
     verify_field: usize,
     notice: String,
@@ -80,6 +94,7 @@ pub(crate) struct HomeState {
     parameter_selected: usize,
     module_edit: Option<ModuleEdit>,
     pub(crate) pending_module_change: Option<ConfigChange>,
+    resume_last_case: crate::ResumeMode,
 }
 
 struct ModuleEdit {
@@ -107,6 +122,7 @@ impl HomeState {
                 String::new(),
             ],
             form_field: 0,
+            remote_scope_step: RemoteScopeStep::Local,
             verify_form: Default::default(),
             verify_field: 0,
             notice: String::new(),
@@ -130,14 +146,15 @@ impl HomeState {
             parameter_selected: 0,
             module_edit: None,
             pending_module_change: None,
+            resume_last_case: crate::ResumeMode::Enabled,
         }
     }
 
     pub(crate) fn set_modules(&mut self, modules: &[ModuleStatus]) {
         self.modules = modules.to_vec();
-        self.module_selected = self
-            .module_selected
-            .min(self.modules.len().saturating_sub(1));
+        self.module_selected = module_catalog::ordered(&self.modules)
+            .first()
+            .map_or(0, |(index, _)| *index);
     }
 
     fn refresh_keystore(&mut self, io_ops: &dyn WorkspaceIo) {
@@ -229,7 +246,10 @@ where
 mod render;
 pub(crate) use render::render_home;
 mod model;
+mod module_catalog;
 mod modules;
+mod new_case;
+mod resume;
 mod runtime;
 mod state;
 use runtime::HomeRuntime;
@@ -249,24 +269,19 @@ pub(crate) fn run_home(
         launch.new_analyst_key || engine.repo.list_cases()?.is_empty(),
     );
     state.set_modules(modules);
+    state.resume_last_case = launch.resume_last_case;
     state.overrides_active = launch.overrides_active;
     state.refresh_keystore(io_ops);
-    if let Some(id) = launch.initial_case {
-        let exit = case::run_case(
+    {
+        let mut startup = StartupCaseView {
             terminal,
             engine,
             model,
             io_ops,
-            id,
+            modules,
             shutdown,
-            case::CasePresentation {
-                overrides_active: launch.overrides_active,
-                modules,
-                mouse_capture: launch.mouse_capture,
-            },
-        )?;
-        apply_case_exit(&mut state, &exit);
-        state.rows = load_rows(engine)?;
+        };
+        startup.open(&mut state, launch)?;
     }
     let (tx, rx) = mpsc::channel::<(CaseId, CaseStatus)>();
     std::thread::scope(|scope| -> Result<bool> {
@@ -325,12 +340,86 @@ pub(crate) fn run_home(
     })
 }
 
+struct StartupCaseView<'a, 'ports> {
+    terminal: &'a mut Terminal<CrosstermBackend<io::Stdout>>,
+    engine: &'a Engine<'ports>,
+    model: Option<&'a dyn LlmPort>,
+    io_ops: &'a dyn WorkspaceIo,
+    modules: &'a [ModuleStatus],
+    shutdown: &'a CancellationToken,
+}
+
+impl StartupCaseView<'_, '_> {
+    fn open(&mut self, state: &mut HomeState, launch: WorkspaceLaunch<'_>) -> Result<()> {
+        if let Some(id) = launch.initial_case {
+            let exit = self.run_case(id, false, launch)?;
+            apply_case_exit(state, &exit);
+            state.rows = load_rows(self.engine)?;
+            return Ok(());
+        }
+        let remembered = if launch.resume_last_case.enabled() && !launch.new_analyst_key {
+            self.io_ops.load_last_case()
+        } else {
+            Ok(None)
+        };
+        let outcome = resume::attempt(
+            &state.rows,
+            remembered,
+            launch.resume_last_case.enabled(),
+            launch.new_analyst_key,
+            |id| self.run_case(id, true, launch),
+        );
+        match outcome {
+            resume::ResumeOutcome::Home(Some(notice)) => state.notice = notice,
+            resume::ResumeOutcome::Home(None) => {}
+            resume::ResumeOutcome::Opened(exit) => {
+                apply_case_exit(state, &exit);
+                state.rows = load_rows(self.engine)?;
+            }
+            resume::ResumeOutcome::Failed {
+                id,
+                notice,
+                inconsistent,
+            } => {
+                state.notice = notice;
+                if inconsistent && let Some(row) = state.rows.iter_mut().find(|row| row.id == id) {
+                    row.status = CaseStatus::Inconsistent;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn run_case(
+        &mut self,
+        id: &CaseId,
+        resumed: bool,
+        launch: WorkspaceLaunch<'_>,
+    ) -> Result<case::CaseExit> {
+        case::run_case(
+            self.terminal,
+            self.engine,
+            self.model,
+            self.io_ops,
+            id,
+            self.shutdown,
+            case::CasePresentation {
+                overrides_active: launch.overrides_active,
+                modules: self.modules,
+                mouse_capture: launch.mouse_capture,
+                resumed,
+            },
+        )
+    }
+}
+
 pub(super) fn apply_case_exit(state: &mut HomeState, exit: &case::CaseExit) {
     state.mode = match exit {
         case::CaseExit::Home | case::CaseExit::Open(_) | case::CaseExit::Quit => Mode::List,
         case::CaseExit::New => Mode::New,
         case::CaseExit::Model => Mode::Model,
         case::CaseExit::Modules => Mode::Modules,
+        case::CaseExit::Config => Mode::Config,
         case::CaseExit::Keystore => Mode::Keystore,
     };
     if let case::CaseExit::Open(name) = exit {

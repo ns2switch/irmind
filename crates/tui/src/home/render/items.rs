@@ -1,7 +1,10 @@
 use super::{
     Engine, HomeState, ListItem, LlmPort, Mode, ModuleStatus, Result, case, hex, model, sha256,
 };
+use crate::home::module_catalog::{self, DisplayStatus};
 use crate::theme::Theme;
+use ratatui::style::Style;
+use ratatui::text::Line;
 use secrecy::ExposeSecret as _;
 
 pub(super) fn home_items(
@@ -15,32 +18,17 @@ pub(super) fn home_items(
     let safe = |value: &str| -> Result<String> { Ok(engine.guard.screen(value)?.text) };
     let content = match state.mode {
         Mode::List => case_items(state, engine)?,
-        Mode::New => {
-            const NAMES: [&str; 9] = [
-                "Title",
-                "Severity (low/medium/high/critical)",
-                "Sources",
-                "Accounts",
-                "Projects",
-                "Hosts",
-                "Object prefixes (s3://, gs://, az://)",
-                "From UTC",
-                "To UTC",
-            ];
-            NAMES
-                .iter()
-                .enumerate()
-                .map(|(index, label)| -> Result<ListItem<'_>> {
-                    Ok(ListItem::new(safe(&format!(
-                        "{} {label}: {}",
-                        if index == state.form_field { ">" } else { " " },
-                        state.form[index]
-                    ))?))
-                })
-                .collect::<Result<Vec<_>>>()?
-        }
+        Mode::New => Vec::new(),
         Mode::Model => model_items(state, &safe)?,
         Mode::Modules => module_items(state, modules, &safe)?,
+        Mode::Config => vec![ListItem::new(format!(
+            "Resume the most recent open case on startup: {} · Enter to change",
+            if state.resume_last_case.enabled() {
+                "on"
+            } else {
+                "off"
+            }
+        ))],
         Mode::Keystore => keystore_items(state),
         Mode::VerifyExport => ["Package path", "Expected analyst key fingerprint"]
             .iter()
@@ -66,106 +54,67 @@ pub(super) fn home_items(
     Ok(content)
 }
 
-fn module_items(
-    state: &HomeState,
+pub(super) fn module_items(
+    _state: &HomeState,
     modules: &[ModuleStatus],
     safe: &impl Fn(&str) -> Result<String>,
 ) -> Result<Vec<ListItem<'static>>> {
     let mut items = Vec::new();
-    if let Some(change) = &state.pending_module_change {
-        let summary = match change {
-            irmind_app::ConfigChange::SelectLlm(id) => {
-                format!("select LLM {}", id.as_deref().unwrap_or("none"))
-            }
-            irmind_app::ConfigChange::SetEnabled { module, enabled } => {
-                format!("set {module} enabled={enabled}")
-            }
-            irmind_app::ConfigChange::SetValue {
-                module,
-                field,
-                value,
-            } => format!("set {module}.{field}={value}"),
-        };
-        items.push(ListItem::new(safe(&format!(
-            "Confirm egress change: {summary}"
-        ))?));
-        items.push(ListItem::new(format!(
-            "{} 1. Cancel   {} 2. Confirm and sign (↑/↓, Enter, or number then Enter)",
-            if state.selected_option == 0 { ">" } else { " " },
-            if state.selected_option == 1 { ">" } else { " " }
-        )));
-    }
-    if let Some(edit) = &state.module_edit {
-        items.push(ListItem::new(safe(&format!(
-            "Edit {}.{}: {}",
-            edit.module, edit.field, edit.value
-        ))?));
-    }
-    for (index, module) in modules.iter().enumerate() {
-        let status = if !module.compiled {
-            "not compiled"
-        } else if module.selected {
-            "selected"
-        } else if module.enabled {
-            "enabled"
-        } else {
-            "disabled"
-        };
-        let row = ListItem::new(safe(&format!(
-            "{} {} · {}{} · {}",
-            if index == state.module_selected {
-                ">"
-            } else {
-                " "
-            },
-            module.id,
-            status,
-            if module.selection_overridden() {
-                " (temporary override)"
-            } else {
-                ""
-            },
-            if module.compiled {
-                module.configuration.clone()
-            } else {
-                format!("not compiled; build with --features {}", module.id)
-            }
-        ))?);
-        items.push(if module.compiled {
-            row
-        } else {
-            row.style(Theme::detect().muted())
-        });
-        if index == state.module_selected {
-            items.extend(module_parameter_items(
-                module,
-                state.parameter_selected,
-                safe,
-            )?);
-            if !module.credentials.is_empty() {
-                items.push(ListItem::new(safe(&format!(
-                    "   Credentials: {} (use /keystore to manage)",
-                    module.credentials.join(", ")
-                ))?));
-            }
+    let theme = Theme::detect();
+    let mut last_group = "";
+    for (_, module) in module_catalog::ordered(modules) {
+        let group = module_catalog::group(&module.id);
+        if group != last_group {
+            items.push(ListItem::new(safe(group)?).style(theme.muted()));
+            last_group = group;
         }
+        let status = module_catalog::status(module);
+        let name = safe(&format!("  {}", module_catalog::label(&module.id)))?;
+        let status_text = if status == DisplayStatus::Missing && !module.missing.is_empty() {
+            format!("    {} · {}", status.label(), module.missing.join(", "))
+        } else {
+            format!("    {}", status.label())
+        };
+        let color = match status {
+            DisplayStatus::Active => theme.success,
+            DisplayStatus::Disabled | DisplayStatus::NotCompiled => theme.muted,
+            DisplayStatus::Missing => theme.warning,
+        };
+        items.push(ListItem::new(vec![
+            Line::styled(name, Style::default().fg(theme.text)),
+            Line::styled(safe(&status_text)?, Style::default().fg(color)),
+        ]));
     }
     Ok(items)
 }
 
-fn module_parameter_items(
-    module: &ModuleStatus,
-    selected: usize,
+pub(super) fn module_detail(
+    state: &HomeState,
+    modules: &[ModuleStatus],
     safe: &impl Fn(&str) -> Result<String>,
-) -> Result<Vec<ListItem<'static>>> {
-    module
-        .parameters
-        .iter()
-        .enumerate()
-        .map(|(index, parameter)| {
-            Ok(ListItem::new(safe(&format!(
-                "   {} {} = {}{}{}",
-                if index == selected { ">" } else { " " },
+) -> Result<Vec<String>> {
+    let Some(module) = modules.get(state.module_selected) else {
+        return Ok(vec!["Select a module".into()]);
+    };
+    let mut rows = vec![
+        module_catalog::label(&module.id).to_owned(),
+        format!("Status: {}", module_catalog::status(module).label()),
+        format!("Technical ID: {}", module.id),
+    ];
+    if module.compiled {
+        rows.push(format!("Configuration: {}", module.configuration));
+        if !module.missing.is_empty() {
+            rows.push(format!("Missing: {}", module.missing.join(", ")));
+        }
+        rows.push("Parameters · Tab selects, /edit-param edits".into());
+        for (index, parameter) in module.parameters.iter().enumerate() {
+            rows.push(format!(
+                "{} {} = {}{}{}",
+                if index == state.parameter_selected {
+                    ">"
+                } else {
+                    " "
+                },
                 parameter.name,
                 if parameter.value.is_empty() {
                     "<unset>"
@@ -178,13 +127,63 @@ fn module_parameter_items(
                     ""
                 },
                 if parameter.overridden {
-                    " (environment override)"
+                    " (override)"
                 } else {
                     ""
                 },
-            ))?))
-        })
-        .collect()
+            ));
+        }
+        if !module.credentials.is_empty() {
+            rows.push("Credentials · /keystore to manage".into());
+            for name in &module.credentials {
+                let present = state.keystore.as_ref().is_some_and(|status| {
+                    status
+                        .credentials
+                        .iter()
+                        .any(|item| item.name == *name && item.present)
+                });
+                rows.push(format!(
+                    "  {name}: {}",
+                    if present { "stored" } else { "missing" }
+                ));
+            }
+        }
+    } else {
+        rows.push(format!("Feature: --features {}", module.id));
+    }
+    if let Some(edit) = &state.module_edit {
+        rows.push(format!("Editing {}: {}", edit.field, edit.value));
+    }
+    if let Some(change) = &state.pending_module_change {
+        rows.push(format!("Confirm egress change: {}", change_summary(change)));
+        rows.push(format!(
+            "{} 1. Cancel   {} 2. Confirm and sign",
+            if state.selected_option == 0 { ">" } else { " " },
+            if state.selected_option == 1 { ">" } else { " " }
+        ));
+    }
+    rows.iter().map(|row| safe(row)).collect()
+}
+
+fn change_summary(change: &irmind_app::ConfigChange) -> String {
+    match change {
+        irmind_app::ConfigChange::SelectLlm(id) => {
+            format!("select LLM {}", id.as_deref().unwrap_or("none"))
+        }
+        irmind_app::ConfigChange::SetEnabled { module, enabled } => {
+            format!("set {module} enabled={enabled}")
+        }
+        irmind_app::ConfigChange::SetValue {
+            module,
+            field,
+            value,
+        } => {
+            format!("set {module}.{field}={value}")
+        }
+        irmind_app::ConfigChange::SetResumeLastCase(enabled) => {
+            format!("resume recent case={enabled}")
+        }
+    }
 }
 
 fn case_items(state: &HomeState, engine: &Engine<'_>) -> Result<Vec<ListItem<'static>>> {
