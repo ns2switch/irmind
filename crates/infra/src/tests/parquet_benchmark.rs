@@ -1,3 +1,4 @@
+use super::hunteval_eval;
 use super::*;
 use crate::parquet_store::ParquetProfile;
 use irmind_app::LargeCaseUseCases;
@@ -6,23 +7,23 @@ use std::time::Instant;
 #[test]
 #[ignore = "manual and weekly benchmark: synthetic 1 GB CloudTrail corpus"]
 fn parquet_benchmark_1gb() {
-    benchmark(1_000, 1);
+    benchmark(1_000, 1, "1gb");
 }
 
 #[test]
 #[ignore = "manual and weekly benchmark: synthetic 15 GB CloudTrail corpus"]
 fn parquet_benchmark_15gb() {
-    benchmark(1_000, 15);
+    benchmark(1_000, 15, "15gb");
 }
 
 #[test]
 #[ignore = "local diagnostic: 50 MB synthetic CloudTrail corpus"]
 fn parquet_benchmark_50mb() {
-    benchmark(50, 1);
+    benchmark(50, 1, "50mb");
 }
 
 #[allow(clippy::too_many_lines)]
-fn benchmark(files: usize, multiplier: usize) {
+fn benchmark(files: usize, multiplier: usize, label: &str) {
     let root = tempfile::tempdir().unwrap();
     let source_root = root.path().join("sources");
     fs::create_dir(&source_root).unwrap();
@@ -53,7 +54,7 @@ fn benchmark(files: usize, multiplier: usize) {
     )
     .unwrap();
     let case = engine
-        .create_case("Synthetic Parquet benchmark", "account 111122223333")
+        .create_case("Synthetic Parquet benchmark", "local synthetic sources")
         .unwrap();
     let ingest = LargeCaseUseCases {
         engine: &engine,
@@ -92,6 +93,26 @@ fn benchmark(files: usize, multiplier: usize) {
             eprintln!("PARQUET_PROGRESS files={} of {files}", start + 4);
         }
     }
+    let episodes = hunteval_eval::root_from_environment().map(|root| {
+        let episodes = hunteval_eval::load_episodes(&root);
+        let names = hunteval_eval::stage_sources(&source_root, &episodes);
+        total_bytes += names
+            .iter()
+            .map(|name| fs::metadata(source_root.join(name)).unwrap().len())
+            .sum::<u64>();
+        for batch in names.chunks(4) {
+            ingest
+                .ingest_local_batch(
+                    &case.id,
+                    &source_root,
+                    batch,
+                    false,
+                    &CancellationToken::new(),
+                )
+                .unwrap();
+        }
+        episodes
+    });
     let bundles = ingest
         .compact_case(&case.id, &CancellationToken::new())
         .unwrap();
@@ -130,17 +151,17 @@ fn benchmark(files: usize, multiplier: usize) {
                     .text_search(&case.id, "synthetic-000001", 10)
                     .map(|_| ()),
                 1 => store
-                    .entity_lookup(&case.id, "ip", "198.51.100.42")
+                    .entity_lookup(&case.id, "ip", "198.18.254.42")
                     .map(|_| ()),
                 2 => store
-                    .neighbors(&case.id, "ip", "198.51.100.42", 10)
+                    .neighbors(&case.id, "ip", "198.18.254.42", 10)
                     .map(|_| ()),
                 3 => store.timeline(&case.id, 10).map(|_| ()),
                 _ => store
                     .graph_path(
                         &case.id,
-                        ("ip", "198.51.100.42"),
-                        ("account", "111122223333"),
+                        ("ip", "198.18.254.42"),
+                        ("account", "999900001111"),
                     )
                     .map(|_| ()),
             };
@@ -167,6 +188,11 @@ fn benchmark(files: usize, multiplier: usize) {
         verify_time.as_secs_f64(),
         scan_time.as_secs_f64()
     );
+    if let Some(episodes) = episodes {
+        let mut metrics = std::collections::BTreeMap::new();
+        hunteval_eval::evaluate_case(store.as_ref(), &case.id, &episodes, &mut metrics);
+        hunteval_eval::report_metrics(label, &metrics);
+    }
 }
 
 fn directory_bytes(root: &Path) -> u64 {
@@ -199,15 +225,15 @@ fn representative_records(file_index: usize) -> String {
             "userIdentity": {
                 "type": "AssumedRole",
                 "principalId": format!("AROASYNTHETIC:{session}"),
-                "arn": format!("arn:aws:sts::111122223333:assumed-role/SyntheticAnalyst/{session}"),
-                "accountId": "111122223333",
+                "arn": format!("arn:aws:sts::999900001111:assumed-role/SyntheticAnalyst/{session}"),
+                "accountId": "999900001111",
                 "accessKeyId": "SYNTHETIC-DO-NOT-USE",
                 "sessionContext": {
                     "sessionIssuer": {
                         "type": "Role",
                         "principalId": "AROASYNTHETIC",
-                        "arn": "arn:aws:iam::111122223333:role/SyntheticAnalyst",
-                        "accountId": "111122223333",
+                        "arn": "arn:aws:iam::999900001111:role/SyntheticAnalyst",
+                        "accountId": "999900001111",
                         "userName": "SyntheticAnalyst"
                     },
                     "attributes": {
@@ -220,10 +246,10 @@ fn representative_records(file_index: usize) -> String {
             "eventSource": "sts.amazonaws.com",
             "eventName": "SyntheticBenchmark",
             "awsRegion": "eu-west-1",
-            "sourceIPAddress": "198.51.100.42",
+            "sourceIPAddress": "198.18.254.42",
             "userAgent": "aws-cli/2.15.22 Python/3.11.7 Linux/6.8.0 botocore/2.4.5",
             "requestParameters": {
-                "roleArn": "arn:aws:iam::111122223333:role/SyntheticTarget",
+                "roleArn": "arn:aws:iam::999900001111:role/SyntheticTarget",
                 "roleSessionName": session,
                 "durationSeconds": 3600,
                 "tags": [
@@ -233,7 +259,7 @@ fn representative_records(file_index: usize) -> String {
             },
             "responseElements": {
                 "assumedRoleUser": {
-                    "arn": format!("arn:aws:sts::111122223333:assumed-role/SyntheticTarget/{session}"),
+                    "arn": format!("arn:aws:sts::999900001111:assumed-role/SyntheticTarget/{session}"),
                     "assumedRoleId": format!("AROATARGET:{session}")
                 }
             },
@@ -242,7 +268,7 @@ fn representative_records(file_index: usize) -> String {
             "readOnly": false,
             "eventType": "AwsApiCall",
             "managementEvent": true,
-            "recipientAccountId": "111122223333",
+            "recipientAccountId": "999900001111",
             "eventCategory": "Management",
             "tlsDetails": {
                 "tlsVersion": "TLSv1.3",

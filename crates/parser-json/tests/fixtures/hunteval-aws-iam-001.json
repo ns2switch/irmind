@@ -1,0 +1,102 @@
+[
+  {
+    "event_id": "evt-0001",
+    "event_time": "2026-01-10T09:45:00Z",
+    "account_id": "111122223333",
+    "principal": "arn:aws:iam::111122223333:role/DeploymentRole",
+    "event_name": "DescribeInstances",
+    "resource": "arn:aws:ec2:us-east-1:111122223333:instance/i-001",
+    "source_ip": "10.0.2.15",
+    "user_agent": "aws-sdk-go"
+  },
+  {
+    "event_id": "evt-0002",
+    "event_time": "2026-01-10T09:51:00Z",
+    "account_id": "111122223333",
+    "principal": "arn:aws:iam::111122223333:user/alex",
+    "event_name": "ListRoles",
+    "resource": "arn:aws:iam::111122223333:root",
+    "source_ip": "198.51.100.24",
+    "user_agent": "aws-cli/2.15"
+  },
+  {
+    "event_id": "evt-0003",
+    "event_time": "2026-01-10T09:55:00Z",
+    "account_id": "111122223333",
+    "principal": "arn:aws:iam::111122223333:role/BackupRole",
+    "event_name": "PutObject",
+    "resource": "arn:aws:s3:::company-backups/daily.tar",
+    "source_ip": "10.0.3.20",
+    "user_agent": "aws-sdk-java"
+  },
+  {
+    "event_id": "evt-0004",
+    "event_time": "2026-01-10T10:30:00Z",
+    "account_id": "111122223333",
+    "principal": "arn:aws:iam::111122223333:user/alex",
+    "event_name": "AttachUserPolicy",
+    "resource": "arn:aws:iam::aws:policy/AdministratorAccess",
+    "source_ip": "203.0.113.77",
+    "user_agent": "aws-cli/2.15"
+  },
+  {
+    "event_id": "evt-0005",
+    "event_time": "2026-01-10T10:32:15Z",
+    "account_id": "444455556666",
+    "principal": "arn:aws:iam::111122223333:user/alex",
+    "event_name": "AssumeRole",
+    "resource": "arn:aws:iam::444455556666:role/CrossAccountAdmin",
+    "source_ip": "203.0.113.77",
+    "user_agent": "aws-cli/2.15"
+  },
+  {
+    "event_id": "evt-0006",
+    "event_time": "2026-01-10T10:35:00Z",
+    "account_id": "444455556666",
+    "principal": "arn:aws:iam::444455556666:role/CrossAccountAdmin",
+    "event_name": "CreateAccessKey",
+    "resource": "arn:aws:iam::444455556666:user/backup-admin",
+    "source_ip": "203.0.113.77",
+    "user_agent": "aws-cli/2.15"
+  },
+  {
+    "event_id": "evt-0007",
+    "event_time": "2026-01-10T10:40:00Z",
+    "account_id": "111122223333",
+    "principal": "arn:aws:iam::111122223333:role/MonitoringRole",
+    "event_name": "GetMetricData",
+    "resource": "arn:aws:cloudwatch:us-east-1:111122223333:metric/CPUUtilization",
+    "source_ip": "10.0.4.11",
+    "user_agent": "aws-sdk-python"
+  },
+  {
+    "event_id": "evt-0008",
+    "event_time": "2026-01-10T10:45:00Z",
+    "account_id": "444455556666",
+    "principal": "arn:aws:iam::444455556666:role/EmergencyAdmin",
+    "event_name": "AssumeRole",
+    "resource": "arn:aws:iam::444455556666:role/EmergencyAdmin",
+    "source_ip": "192.0.2.50",
+    "user_agent": "console.amazonaws.com"
+  },
+  {
+    "event_id": "evt-0009",
+    "event_time": "2026-01-10T10:50:00Z",
+    "account_id": "111122223333",
+    "principal": "arn:aws:iam::111122223333:role/DeploymentRole",
+    "event_name": "UpdateFunctionCode",
+    "resource": "arn:aws:lambda:us-east-1:111122223333:function:billing-worker",
+    "source_ip": "10.0.2.15",
+    "user_agent": "aws-sdk-go"
+  },
+  {
+    "event_id": "evt-0010",
+    "event_time": "2026-01-10T11:00:00Z",
+    "account_id": "111122223333",
+    "principal": "arn:aws:iam::111122223333:user/security-auditor",
+    "event_name": "GenerateCredentialReport",
+    "resource": "arn:aws:iam::111122223333:root",
+    "source_ip": "192.0.2.60",
+    "user_agent": "console.amazonaws.com"
+  }
+]

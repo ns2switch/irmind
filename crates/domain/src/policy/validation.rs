@@ -416,7 +416,18 @@ fn valid_entity_args(args: &BTreeMap<String, String>, allow_limit: bool) -> bool
 pub fn valid_entity(kind: &str, value: &str) -> bool {
     matches!(
         kind,
-        "ip" | "host" | "user" | "role" | "identity" | "domain" | "hash" | "account" | "key"
+        "ip" | "host"
+            | "user"
+            | "role"
+            | "identity"
+            | "domain"
+            | "hash"
+            | "account"
+            | "key"
+            | "principal"
+            | "resource"
+            | "user_agent"
+            | "event_id"
     ) && !value.is_empty()
         && value.len() <= 512
 }

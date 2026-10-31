@@ -43,3 +43,25 @@ Use a disposable bucket and a dedicated identity with only `s3:ListBucket` on on
 | Verdict: H5 pass/fail; connector pass/fail; follow-up issue | |
 
 Keep secrets, complete provider output, personal paths, and real incident data out of the record.
+
+## Optional HuntEval model evaluation
+
+This is a manual, synthetic-data check after the deterministic weekly evaluation. It never runs in CI and never sends HuntEval's hidden answers to the model. Use a dedicated IRMind test data directory with a model already configured in `/settings model`. The CLI may ask you to unlock the file keystore for each invocation; enter the passphrase in the terminal, never in an argument or environment variable.
+
+1. Check out [HuntEval](https://github.com/ns2switch/HuntEval) at commit `4cbb555a56bc17cb03b988ad2f15b1374eecf183`. From that checkout, run `sha256sum -c /path/to/irmind/scripts/hunteval.sha256` on Linux. The script also verifies the selected public source before the model run and its private answer afterward.
+2. Build IRMind and configure a model in the dedicated test directory. Run one episode with the development command below, replacing the paths and module ID. The command creates a case, ingests only `source/events.json`, asks the model to propose evidence-backed findings, verifies custody, and then scores exact IDs in the findings. It never auto-approves a tool call.
+
+```sh
+python3 scripts/hunteval_model_eval.py \
+  /path/to/HuntEval \
+  aws-iam-001 \
+  target/debug/irmind \
+  /path/to/dedicated-test-home \
+  llm-deepseek
+```
+
+3. Record event, entity and ATT&CK technique precision and recall, then review the narrative and its evidence hashes manually. Exact-ID scoring can miss a correct paraphrase and cannot judge whether a claim is supported. A pending approval remains pending; resolve it in the TUI and rerun only if that action is intended. Keep the dedicated test directory out of the public report and remove it when the manual review is complete.
+
+| HuntEval episode / IRMind commit / model | Event P/R | Entity P/R | ATT&CK P/R | Evidence citation and notes |
+| --- | --- | --- | --- | --- |
+| | | | | |

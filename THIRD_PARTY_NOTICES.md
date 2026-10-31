@@ -2,6 +2,18 @@
 
 IRMind is licensed under `MIT OR Apache-2.0`. Dependencies retain their own licenses. `Cargo.lock` records their versions, and `deny.toml` lists permitted license expressions.
 
+## HuntEval public episode fixture
+
+`crates/parser-json/tests/fixtures/hunteval-aws-iam-001.json` is copied from
+[`ns2switch/HuntEval`](https://github.com/ns2switch/HuntEval), commit
+`4cbb555a56bc17cb03b988ad2f15b1374eecf183`, path
+`datasets/aws/aws-iam-001/source/events.json`, SHA-256
+`f3bb0e0b52d86b5760dd69163479d3eeb4e97b1e6e81ab922127aa8d2646831d`.
+Copyright 2026 Aníbal Cañada. Licensed under Apache-2.0; see the upstream
+[`LICENSE`](https://github.com/ns2switch/HuntEval/blob/4cbb555a56bc17cb03b988ad2f15b1374eecf183/LICENSE).
+No private ground-truth file is copied into IRMind. The external evaluator
+downloads and verifies those files only when it runs.
+
 ## `option-ext` 0.2.0
 
 `option-ext` is licensed under [MPL-2.0](https://www.mozilla.org/en-US/MPL/2.0/). It is included in a larger work without changing the license of IRMind's own code. The source for the used version is available on [crates.io](https://crates.io/crates/option-ext/0.2.0) and in its [repository](https://github.com/soc/option-ext). Its files retain MPL-2.0 and are not relicensed under IRMind's license.
