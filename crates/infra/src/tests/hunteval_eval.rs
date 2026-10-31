@@ -3,6 +3,7 @@
 
 use super::*;
 use irmind_app::LargeCaseUseCases;
+use irmind_domain::GraphQueryFilter;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -85,10 +86,27 @@ pub(super) fn evaluate_case(
 ) {
     for episode in episodes {
         let stats = metrics.entry(episode.provider.clone()).or_default();
-        evaluate_events(store, id, episode, stats);
-        evaluate_entities(store, id, episode, stats);
-        evaluate_path(store, id, episode, stats);
+        let filter = episode_filter(episode);
+        evaluate_events(store, id, episode, &filter, stats);
+        evaluate_entities(store, id, episode, &filter, stats);
+        evaluate_path(store, id, episode, &filter, stats);
     }
+}
+
+fn episode_filter(episode: &Episode) -> GraphQueryFilter {
+    let times = episode
+        .events
+        .iter()
+        .map(|event| event["event_time"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    GraphQueryFilter::parse(
+        Some(times.iter().copied().min().unwrap()),
+        Some(times.iter().copied().max().unwrap()),
+        None,
+        None,
+        Some(&episode.provider),
+    )
+    .unwrap()
 }
 
 fn event_ref(episode: &Episode, event_id: &str) -> String {
@@ -119,13 +137,17 @@ fn evaluate_events(
     store: &LocalStore,
     id: &CaseId,
     episode: &Episode,
+    filter: &GraphQueryFilter,
     stats: &mut ProviderMetrics,
 ) {
     let mut times = Vec::new();
     for event_id in &episode.truth.malicious_event_ids {
         stats.event_total += 1;
         let (index, source) = event(episode, event_id);
-        let searched = timed(stats, "term", || store.text_search(id, event_id, 20)).unwrap();
+        let searched = timed(stats, "term", || {
+            store.text_search_filtered(id, filter, event_id, 20)
+        })
+        .unwrap();
         let pointer = format!("{}#{index}", episode.hash);
         assert!(
             searched.contains(&pointer),
@@ -133,12 +155,18 @@ fn evaluate_events(
             episode.truth.episode_id
         );
         let lookup = timed(stats, "event", || {
-            store.entity_lookup(id, "event_id", &event_ref(episode, event_id))
+            store.entity_lookup_filtered(id, filter, "event_id", &event_ref(episode, event_id))
         })
         .unwrap();
         assert!(!lookup.contains("count=0"), "event {event_id} missing");
         let timeline = timed(stats, "timeline", || {
-            store.entity_timeline(id, "event_id", &event_ref(episode, event_id), 20)
+            store.entity_timeline_filtered(
+                id,
+                filter,
+                "event_id",
+                &event_ref(episode, event_id),
+                20,
+            )
         })
         .unwrap();
         let at = source["event_time"].as_str().unwrap();
@@ -159,6 +187,7 @@ fn evaluate_entities(
     store: &LocalStore,
     id: &CaseId,
     episode: &Episode,
+    filter: &GraphQueryFilter,
     stats: &mut ProviderMetrics,
 ) {
     for value in &episode.truth.malicious_entity_ids {
@@ -168,9 +197,15 @@ fn evaluate_entities(
         } else {
             "principal"
         };
-        let found = timed(stats, "entity", || store.entity_lookup(id, kind, value)).unwrap();
+        let found = timed(stats, "entity", || {
+            store.entity_lookup_filtered(id, filter, kind, value)
+        })
+        .unwrap();
         assert!(!found.contains("count=0"), "entity {value} missing");
-        let neighbors = timed(stats, "neighbors", || store.neighbors(id, kind, value, 20)).unwrap();
+        let neighbors = timed(stats, "neighbors", || {
+            store.neighbors_filtered(id, filter, kind, value, 20)
+        })
+        .unwrap();
         assert!(
             neighbors.contains("co-observed"),
             "neighbors of {value} missing"
@@ -179,13 +214,19 @@ fn evaluate_entities(
     }
 }
 
-fn evaluate_path(store: &LocalStore, id: &CaseId, episode: &Episode, stats: &mut ProviderMetrics) {
+fn evaluate_path(
+    store: &LocalStore,
+    id: &CaseId,
+    episode: &Episode,
+    filter: &GraphQueryFilter,
+    stats: &mut ProviderMetrics,
+) {
     for pair in episode.truth.expected_attack_path.windows(2) {
         stats.path_total += 1;
         let from = event_ref(episode, &pair[0]);
         let to = event_ref(episode, &pair[1]);
         let path = timed(stats, "path", || {
-            store.graph_path(id, ("event_id", &from), ("event_id", &to))
+            store.graph_path_filtered(id, filter, ("event_id", &from), ("event_id", &to))
         })
         .unwrap();
         assert!(
