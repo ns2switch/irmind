@@ -8,6 +8,11 @@ pub(super) fn audit_card(
     state: &CaseState,
     engine: &Engine<'_>,
 ) -> Result<Option<Card>> {
+    // Source manifests carry bounded but untrusted parser rejection samples.
+    // The signed payload is custody data, not conversation text.
+    if is_hidden_custody_payload(entry.kind) {
+        return Ok(None);
+    }
     let card = match entry.kind {
         AuditEventKind::Prompt => Some(Card::new(
             CardKind::Analyst,
@@ -59,6 +64,15 @@ pub(super) fn audit_card(
         _ => None,
     };
     Ok(card)
+}
+
+fn is_hidden_custody_payload(kind: AuditEventKind) -> bool {
+    matches!(
+        kind,
+        AuditEventKind::SourceManifestV1
+            | AuditEventKind::SourceManifestV2
+            | AuditEventKind::ParquetArtifactV1
+    )
 }
 
 fn call_card(entry: &SignedEntry, state: &CaseState, engine: &Engine<'_>) -> Result<Card> {
@@ -302,7 +316,8 @@ fn highlight_match(excerpt: &str, args: &std::collections::BTreeMap<String, Stri
 
 #[cfg(test)]
 mod tests {
-    use super::friendly_call;
+    use super::{friendly_call, is_hidden_custody_payload};
+    use irmind_app::AuditEventKind;
 
     #[test]
     fn proposal_title_names_the_tool_and_primary_argument() {
@@ -310,5 +325,11 @@ mod tests {
             friendly_call("ti_lookup_external {\"ioc\":\"example.com\"}"),
             "VirusTotal lookup(example.com)"
         );
+    }
+
+    #[test]
+    fn rejected_parser_samples_in_signed_manifests_are_not_rendered_as_chat_cards() {
+        assert!(is_hidden_custody_payload(AuditEventKind::SourceManifestV2));
+        assert!(!is_hidden_custody_payload(AuditEventKind::ToolResult));
     }
 }
