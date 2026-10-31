@@ -1,6 +1,16 @@
 # Changelog
 
-This file records user-visible changes. IRMind 0.1.0 is a pre-release for evaluation with synthetic data.
+This file records user-visible changes. IRMind remains a pre-release for evaluation with synthetic data.
+
+## 0.1.1 — Community preview
+
+- Offer a temporary `/demo` case with synthetic HuntEval data and a scripted model, without a configured key or network connection.
+- Keep exact greetings conversational by withholding tools, while preserving the structured, signed agent conversation.
+- Select the compiled parser from a bounded content sample. Sign its version, detection confidence, selection mode, and bounded rejected-record count in `SourceManifestV2`; existing V1 manifests remain verifiable.
+- Provide user-level installers for Linux, macOS, and Windows, and a Linux aarch64 binary. The installers check release hashes and verify Sigstore and GitHub provenance when the tools are available.
+- Publish SHA256SUMS, keyless Sigstore bundles, GitHub build attestations, and an SPDX SBOM. Tag builds smoke-test both installers in clean Linux and Windows runners.
+
+Manual validation with a real model and a real connector remains pending. Use synthetic data only; this version is not suitable for real incidents or sensitive data.
 
 ## 0.1.0 — Pre-release (2026-10-31)
 
