@@ -390,3 +390,51 @@ jobs:
       - name: Clean release staging
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('release', 'artifacts')) if p.is_dir()]"
+  verify_install_linux:
+    needs: release
+    if: ${{ needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with: {cosign-release: 'v3.1.4'}
+      - name: Install and run the verified Linux release in a clean runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test ! -e "$HOME/.local/bin/irmind"
+          trap 'rm -f "$HOME/.local/bin/irmind"' EXIT
+          sh install.sh "$GITHUB_REF_NAME"
+          "$HOME/.local/bin/irmind" --version
+  verify_install_windows:
+    needs: release
+    if: ${{ needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with: {cosign-release: 'v3.1.4'}
+      - name: Install and run the verified Windows release in a clean runner
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $binary = Join-Path $env:LOCALAPPDATA 'IRMind\bin\irmind.exe'
+          if (Test-Path -LiteralPath $binary) { throw 'installer target is not clean' }
+          try {
+            ./install.ps1 -Version $env:GITHUB_REF_NAME
+            & $binary --version
+            if ($LASTEXITCODE -ne 0) { throw 'verified binary did not start' }
+          } finally {
+            Remove-Item -LiteralPath $binary -Force -ErrorAction SilentlyContinue
+          }
