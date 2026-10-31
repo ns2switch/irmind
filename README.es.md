@@ -1,4 +1,4 @@
-Traducción de README.md en el commit b899c4f6599b63d37f745f252363d35a3e2b1049; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit b2bcceadc1505a1a3977aaa847a96f58de957b98; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -103,6 +103,6 @@ Lee [security-model.md](docs/es/security-model.md) antes de conectar un proveedo
 - [Plataformas](docs/es/platforms.md) · [Seguridad](docs/es/security-model.md)
 - [Arquitectura](docs/development/architecture.md) y [CLI](docs/development/cli.md), solo en inglés
 - [Hoja de ruta](docs/es/roadmap.md)
-- [Contribuciones](CONTRIBUTING.md) · [Reporte privado de vulnerabilidades](SECURITY.md) · [Licencias](LICENSE-MIT)
+- [Contribuciones](CONTRIBUTING.es.md) · [Código de conducta](CODE_OF_CONDUCT.es.md) · [Reporte privado de vulnerabilidades](SECURITY.md) · [Licencias](LICENSE-MIT)
 
 Licencia dual **MIT OR Apache-2.0**; consulta [LICENSE-MIT](LICENSE-MIT) y [LICENSE-APACHE](LICENSE-APACHE).
