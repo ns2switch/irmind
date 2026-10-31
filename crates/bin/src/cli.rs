@@ -42,6 +42,11 @@ pub(super) struct Cli {
 
 #[derive(Subcommand, Clone)]
 pub(super) enum Command {
+    Demo {
+        /// Use the offline scripted model without checking local Ollama.
+        #[arg(long)]
+        scripted: bool,
+    },
     Case {
         #[command(subcommand)]
         command: CaseCommand,

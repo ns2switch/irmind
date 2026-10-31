@@ -61,14 +61,14 @@ tokio = { version = "1", default-features = false, features = ["rt", "signal"] }
 rpassword = "7.5"
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
+tempfile = "3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 
 [lints]
 workspace = true
 
 [dev-dependencies]
-tempfile = "3"
 ed25519-dalek = "2"
-futures-util = { version = "0.3", default-features = false, features = ["std"] }
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 crossterm = "0.29"
 expectrl = "0.8"

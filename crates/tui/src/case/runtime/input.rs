@@ -252,6 +252,9 @@ impl CaseRuntime<'_, '_, '_> {
                     if let Some((cancel, _, _)) = &self.active {
                         cancel.cancel();
                     }
+                    if self.io_ops.demo_mode() {
+                        self.shutdown.cancel();
+                    }
                     Ok(true)
                 }
                 KeyCode::Esc => {

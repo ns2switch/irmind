@@ -11,6 +11,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if prompt.is_empty() {
             return Ok(false);
         }
+        if self.demo_command(&prompt)? {
+            return Ok(false);
+        }
         if prompt == "/quit" {
             self.exit_to = super::CaseExit::Quit;
             return Ok(true);
@@ -44,29 +47,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             self.exit_to = super::CaseExit::Settings(Some("connectors".into()), true);
             return Ok(true);
         }
-        if prompt == "/sidebar" {
-            self.state.sidebar_visible = !self.state.sidebar_visible;
-            self.state.focus = if self.state.sidebar_visible {
-                super::Focus::Sidebar
-            } else {
-                super::Focus::Composer
-            };
-            return Ok(false);
-        }
-        if prompt == "/pause" {
-            if let Some((cancel, _, _)) = &self.active {
-                cancel.cancel();
-                self.state
-                    .messages
-                    .push("Cancelling active investigation…".into());
-            } else {
-                self.state
-                    .messages
-                    .push("No investigation is running.".into());
-            }
-            return Ok(false);
-        }
-        if self.continue_command(&prompt) {
+        if self.session_command(&prompt) {
             return Ok(false);
         }
         if self.active.is_some() {
@@ -85,6 +66,74 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             || self.evidence_command(&prompt))
         {
             self.investigate_prompt(prompt);
+        }
+        Ok(false)
+    }
+
+    fn session_command(&mut self, prompt: &str) -> bool {
+        if prompt == "/sidebar" {
+            self.state.sidebar_visible = !self.state.sidebar_visible;
+            self.state.focus = if self.state.sidebar_visible {
+                super::Focus::Sidebar
+            } else {
+                super::Focus::Composer
+            };
+            return true;
+        }
+        if prompt == "/pause" {
+            if let Some((cancel, _, _)) = &self.active {
+                cancel.cancel();
+                self.state
+                    .messages
+                    .push("Cancelling active investigation…".into());
+            } else {
+                self.state
+                    .messages
+                    .push("No investigation is running.".into());
+            }
+            return true;
+        }
+        self.continue_command(prompt)
+    }
+
+    fn demo_command(&mut self, prompt: &str) -> Result<bool> {
+        if prompt == "/demo check" {
+            match self.io_ops.demo_check(self.engine, self.id)? {
+                Some(result) => {
+                    let safe = self.engine.guard.screen(&result)?.text;
+                    self.state.conversation.push(
+                        Card::new(CardKind::ToolResult, "Demo check", safe.clone(), false)
+                            .with_summary(safe),
+                    );
+                }
+                None => self
+                    .state
+                    .messages
+                    .push("/demo check is available only in the demo".into()),
+            }
+            return Ok(true);
+        }
+        if prompt == "/demo" {
+            self.state.messages.push(if self.io_ops.demo_mode() {
+                "This is the demo. Use /demo check after confirming a finding.".into()
+            } else {
+                "Return to /home before starting /demo.".into()
+            });
+            return Ok(true);
+        }
+        if self.io_ops.demo_mode()
+            && [
+                "/export",
+                "/ingest",
+                "/settings",
+                "/objects",
+                "/object-read",
+            ]
+            .iter()
+            .any(|command| prompt == *command || prompt.starts_with(&format!("{command} ")))
+        {
+            self.state.messages.push("The demo uses only its bundled synthetic evidence. Leave the demo to configure connectors or export a real case.".into());
+            return Ok(true);
         }
         Ok(false)
     }

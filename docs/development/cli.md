@@ -21,6 +21,7 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 
 | Command | Purpose |
 | --- | --- |
+| `irmind demo` | Open an isolated, temporary synthetic investigation without real configuration or credentials. |
 | `irmind case new <TITLE> --scope <SCOPE> [--severity <LEVEL>]` | Create a signed case. |
 | `irmind case list` | List cases. |
 | `irmind case show <CASE_ID>` | Show case details. |

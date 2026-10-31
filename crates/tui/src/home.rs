@@ -335,7 +335,7 @@ pub(crate) fn run_home(
     modules: &[ModuleStatus],
     shutdown: &CancellationToken,
     launch: WorkspaceLaunch<'_>,
-) -> Result<bool> {
+) -> Result<crate::WorkspaceOutcome> {
     let mut state = HomeState::new(
         load_rows(engine)?,
         launch.new_analyst_key || engine.repo.list_cases()?.is_empty(),
@@ -358,7 +358,7 @@ pub(crate) fn run_home(
         startup.open(&mut state, launch)?;
     }
     let (tx, rx) = mpsc::channel::<(CaseId, CaseStatus)>();
-    std::thread::scope(|scope| -> Result<bool> {
+    std::thread::scope(|scope| -> Result<crate::WorkspaceOutcome> {
         let scan_cancel = shutdown.child_token();
         let rows = state
             .rows
@@ -403,7 +403,7 @@ pub(crate) fn run_home(
             migration_started: None,
             model_probe_task: None,
             model_models_task: None,
-            restart_requested: false,
+            outcome: crate::WorkspaceOutcome::Exit,
         };
         let outcome = runtime.run();
         scan_cancel.cancel();

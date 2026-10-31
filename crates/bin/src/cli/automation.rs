@@ -7,6 +7,9 @@ use super::{
 impl AutomationContext<'_, '_> {
     pub(crate) fn run(self, command: Command) -> Result<bool> {
         match command {
+            Command::Demo { .. } => {
+                Err(anyhow!("demo must start before opening persistent storage"))
+            }
             cmd @ Command::Case { .. } => self.handle_case(cmd),
             cmd @ Command::Ingest { .. } => self.handle_ingest(cmd),
             cmd @ Command::Migrate { .. } => self.handle_migrate(cmd),

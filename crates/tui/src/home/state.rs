@@ -6,6 +6,7 @@ pub(crate) enum HomeAction {
     None,
     Quit,
     Restart,
+    Demo,
     OpenCase(CaseId),
     CreateCase,
     LoadKeystore,
@@ -227,6 +228,7 @@ fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
                     | "quit"
                     | "verify-export"
                     | "restart"
+                    | "demo"
             )
         })
         .map(|command| format!("/{}", command.name))
@@ -257,6 +259,7 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
             state.remote_scope_step = super::RemoteScopeStep::Local;
             state.mode = Mode::New;
         }
+        "/demo" => return HomeAction::Demo,
         "/cases" | "/home" => {
             state.mode = Mode::List;
             state.status_filter = None;
@@ -552,6 +555,21 @@ fn update_keystore_confirmation(state: &mut HomeState, key: KeyCode) -> Option<H
 mod tests {
     use super::*;
     use crate::{ModuleKind, ModuleParameter, ModuleSelectionSource, ModuleStatus};
+
+    #[test]
+    fn demo_is_a_home_command_and_needs_enter() {
+        let mut state = HomeState::new(Vec::new(), false);
+        for ch in "/demo".chars() {
+            assert!(matches!(
+                update(&mut state, KeyCode::Char(ch)),
+                HomeAction::None
+            ));
+        }
+        assert!(matches!(
+            update(&mut state, KeyCode::Enter),
+            HomeAction::Demo
+        ));
+    }
 
     fn deepseek() -> ModuleStatus {
         ModuleStatus {

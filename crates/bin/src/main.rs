@@ -5,6 +5,17 @@ compile_error!("IRMind requires at least one signer and secret backend");
 
 mod cli;
 mod configuration;
+#[cfg(feature = "keystore-file")]
+mod demo;
+#[cfg(not(feature = "keystore-file"))]
+mod demo {
+    pub(super) fn run(
+        _shutdown: &irmind_app::CancellationToken,
+        _scripted: bool,
+    ) -> anyhow::Result<()> {
+        anyhow::bail!("demo requires a binary built with --features keystore-file")
+    }
+}
 mod diagnostics;
 mod keystore;
 mod model_probe;

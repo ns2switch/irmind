@@ -11,8 +11,11 @@ IRMind is licensed under `MIT OR Apache-2.0`. Dependencies retain their own lice
 `f3bb0e0b52d86b5760dd69163479d3eeb4e97b1e6e81ab922127aa8d2646831d`.
 Copyright 2026 Aníbal Cañada. Licensed under Apache-2.0; see the upstream
 [`LICENSE`](https://github.com/ns2switch/HuntEval/blob/4cbb555a56bc17cb03b988ad2f15b1374eecf183/LICENSE).
-No private ground-truth file is copied into IRMind. The external evaluator
-downloads and verifies those files only when it runs.
+`crates/bin/src/demo/expected.json` contains only the event IDs, entity IDs,
+and technique IDs needed for the offline demo check, derived from the same
+episode's `private/ground-truth.json`. It is parsed only when `/demo check`
+runs. The full ground-truth file is not included; the external evaluator
+downloads and verifies it only when it runs.
 
 ## `option-ext` 0.2.0
 

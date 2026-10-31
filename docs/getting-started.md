@@ -16,6 +16,12 @@ cargo build --release --locked -p irmind
 
 On Windows, run `.\target\release\irmind.exe` in Windows Terminal. When a CI artifact is available, you may instead download it and check `SHA256SUMS` before use. See [platforms](platforms.md) for system-specific steps. Builds are currently unsigned.
 
+## Try it in five minutes
+
+After installing, run `irmind demo`. You can also type `/demo` from the home screen. This starts an isolated temporary case with a small synthetic HuntEval episode, ephemeral signing keys, and a scripted model. No API key, passphrase, account, or network is needed. If a local Ollama model is available and advertises tool support, IRMind offers it as an optional local choice.
+
+The case opens while its bundled evidence is ingested. Ask what happened in the synthetic episode. The scripted model proposes a graph lookup, a finding, and a simulated external lookup. The external lookup still waits for your signed approval, but never reaches a real service. Confirm the proposed finding and type `/demo check` for a local comparison with the episode answers; those answers are loaded only for this check and never sent to a model. Exit with `/quit` and confirm. The temporary case, keys, and evidence are deleted. IRMind then points you to `/new` and `/settings` for normal use.
+
 ## First launch
 
 Running `irmind` without a subcommand opens the TUI. The first-run wizard explains why cases are signed and lets you choose `os` or `file` separately for signing and module secrets. Use Up/Down and Enter to choose each backend; unavailable options appear dimmed with a reason and cannot be selected. Both backends are compiled by default; IRMind never switches between them silently. The wizard preselects `file` when the system keyring is unavailable. It asks for the file passphrase twice in masked fields inside the TUI, checks its length, and works through an interactive SSH terminal without a graphical session. Esc goes back; Ctrl+C asks before exiting. On first use IRMind creates an analyst signing key and shows its public-key fingerprint. Save the fingerprint through a separate trusted channel. A lost key cannot be recovered from a case export.

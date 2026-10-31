@@ -358,7 +358,8 @@ impl AutomationContext<'_, '_> {
                         mouse_capture,
                         theme: None,
                     },
-                );
+                )
+                .map(|outcome| outcome == irmind_tui::WorkspaceOutcome::Restart);
             }
             _ => return Err(anyhow!("invalid command dispatch")),
         }

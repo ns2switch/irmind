@@ -1,5 +1,6 @@
 ---
 source: crates/tui/src/home/render/tests.rs
+assertion_line: 161
 expression: menu
 ---
 IRMind v0.1.0
@@ -11,17 +12,17 @@ Recent cases · all
 > Synthetic alert  ·  high  ·  open  ·  2026-10-29 12:00 UTC
 
 
-╭ Commands ──────────────────────────────────────────────────────────╮
-│> /home — Return to case list                                       │
-│  /cases — List cases; optional all|open|sealed|inconsistent        │
-│  /help — help                                                      │
-│  /new — Create a case                                              │
-│  /open — Open a case by title or ID                                │
-│  /quit — Return to case list                                       │
-│  /restart — Restart the session after a change                     │
-│  /settings — Configure model, connectors, keystore and preferences │
-│  /verify-export — Verify an exported package                       │
-╰────────────────────────────────────────────────────────────────────╯
+╭ Commands ────────────────────────────────────────────────────────────────╮
+│> /home — Return to case list                                             │
+│  /cases — List cases; optional all|open|sealed|inconsistent              │
+│  /demo — Start a synthetic demo from home; /demo check compares findings │
+│  /help — help                                                            │
+│  /new — Create a case                                                    │
+│  /open — Open a case by title or ID                                      │
+│  /quit — Return to case list                                             │
+│  /restart — Restart the session after a change                           │
+│  /settings — Configure model, connectors, keystore and preferences       │
+╰──────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │/                                                                             │
 ╰──────────────────────────────────────────────────────────────────────────────╯

@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod case;
+mod demo_choice;
 mod home;
 mod menu_layout;
 pub mod scripted;
@@ -88,6 +89,7 @@ pub struct KeystoreStatus {
     pub file_backend_active: bool,
 }
 
+pub use demo_choice::choose_demo_model;
 pub use setup::{KeystoreChoice, KeystoreWizard, run_keystore_wizard};
 pub use startup_review::{
     ConfigurationRecoveryChoice, OverrideReviewEntry, resolve_configuration_review,
@@ -110,6 +112,13 @@ pub enum ResumeMode {
     Disabled,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WorkspaceOutcome {
+    Exit,
+    Restart,
+    Demo,
+}
+
 impl ResumeMode {
     #[must_use]
     pub fn enabled(self) -> bool {
@@ -126,6 +135,15 @@ impl From<bool> for ResumeMode {
 /// Filesystem selection is presentation I/O. The composition root supplies the
 /// same bounded, no-follow reader used by the noninteractive ingest command.
 pub trait WorkspaceIo: Send + Sync {
+    fn demo_mode(&self) -> bool {
+        false
+    }
+    fn demo_initial_ingest(&self) -> Option<PathBuf> {
+        None
+    }
+    fn demo_check(&self, _engine: &Engine<'_>, _id: &irmind_app::CaseId) -> Result<Option<String>> {
+        Ok(None)
+    }
     fn load_last_case(&self) -> Result<Option<irmind_app::CaseId>> {
         Ok(None)
     }
@@ -223,7 +241,7 @@ pub fn run_workspace(
     modules: &[ModuleStatus],
     shutdown: &CancellationToken,
     launch: WorkspaceLaunch<'_>,
-) -> Result<bool> {
+) -> Result<WorkspaceOutcome> {
     let _theme = theme::Theme::configure(launch.theme);
     let _session = TerminalSession::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;

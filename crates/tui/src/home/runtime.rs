@@ -28,11 +28,11 @@ pub(super) struct HomeRuntime<'scope, 'env, 'ports> {
     pub(super) model_probe_task: Option<Worker<'scope>>,
     pub(super) model_models_task:
         Option<std::thread::ScopedJoinHandle<'scope, Result<Vec<String>>>>,
-    pub(super) restart_requested: bool,
+    pub(super) outcome: crate::WorkspaceOutcome,
 }
 
 impl HomeRuntime<'_, '_, '_> {
-    pub(super) fn run(&mut self) -> Result<bool> {
+    pub(super) fn run(&mut self) -> Result<crate::WorkspaceOutcome> {
         loop {
             if self.shutdown.is_cancelled() {
                 break;
@@ -96,7 +96,7 @@ impl HomeRuntime<'_, '_, '_> {
                 break;
             }
         }
-        Ok(self.restart_requested)
+        Ok(self.outcome)
     }
 
     fn poll_tasks(&mut self) -> Result<()> {
@@ -209,7 +209,11 @@ impl HomeRuntime<'_, '_, '_> {
             HomeAction::None => {}
             HomeAction::Quit => return Ok(true),
             HomeAction::Restart => {
-                self.restart_requested = true;
+                self.outcome = crate::WorkspaceOutcome::Restart;
+                return Ok(true);
+            }
+            HomeAction::Demo => {
+                self.outcome = crate::WorkspaceOutcome::Demo;
                 return Ok(true);
             }
             HomeAction::OpenCase(id) => self.open_case(&id)?,
@@ -277,7 +281,7 @@ impl HomeRuntime<'_, '_, '_> {
             super::model::save_configuration(self.io_ops, self.engine, self.modules, draft);
         match result {
             Ok(()) => {
-                self.restart_requested = true;
+                self.outcome = crate::WorkspaceOutcome::Restart;
                 true
             }
             Err(error) => {
@@ -326,7 +330,7 @@ impl HomeRuntime<'_, '_, '_> {
             .change_module_configuration(self.engine, change.clone(), confirmed)
         {
             Ok(true) => {
-                self.restart_requested = true;
+                self.outcome = crate::WorkspaceOutcome::Restart;
                 true
             }
             Ok(false) => {
