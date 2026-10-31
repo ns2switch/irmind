@@ -19,6 +19,9 @@ NON_IRMIND_FLAGS = {
     "--all-features",
     "--all-targets",
     "--amend",
+    "--bundle",
+    "--certificate-identity",
+    "--certificate-oidc-issuer",
     "--check",
     "--config",
     "--example",
@@ -37,6 +40,7 @@ TRANSLATIONS = {
     ROOT / "README.es.md": ROOT / "README.md",
     ROOT / "CONTRIBUTING.es.md": ROOT / "CONTRIBUTING.md",
     ROOT / "CODE_OF_CONDUCT.es.md": ROOT / "CODE_OF_CONDUCT.md",
+    ROOT / "SECURITY.es.md": ROOT / "SECURITY.md",
     ROOT / "docs/es/roadmap.md": ROOT / "docs/development/roadmap.md",
     **{
         ROOT / "docs/es" / name: ROOT / "docs" / name
