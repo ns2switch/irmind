@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 9de72907bf41d37d0d7e9c29c8cca76db8602e1d; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 3a60c444c467f58b832eb99f83b111eaec8b79fa; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -57,7 +57,7 @@ Consultas estructuradas y con presupuesto en Athena, CloudTrail Lake, Security L
 - Evaluar IRMind como deployment completo con el protocolo HuntEval.
 - Permitir hooks locales firmados antes o después de llamadas a herramientas.
 - Ofrecer un cliente MCP opcional y desactivado por defecto, con modelo de amenazas. Cada herramienta declara riesgo, pasa por política y devuelve contenido no confiable.
-- Aprobar el diseño de una API del motor antes de añadir `irmind serve`. El protocolo versionado transmite eventos por stdio, socket Unix o named pipe de Windows, sin TCP abierto por defecto. Las claves permanecen en IRMind: el cliente solicita aprobación, el analista confirma e IRMind firma.
+- Aprobar el diseño de una API del motor antes de añadir el futuro subcomando `serve` de `irmind`. El protocolo versionado transmite eventos por stdio, socket Unix o named pipe de Windows, sin TCP abierto por defecto. Las claves permanecen en IRMind: el cliente solicita aprobación, el analista confirma e IRMind firma.
 
 ## Criterios para 1.0
 
