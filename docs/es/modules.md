@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit a333bb3ffc4a9d695d1facf42461c43ce3d2dc7f; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit 5f0ed6431a60a1988732fbd5dfd38a4f6e869cca; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -146,9 +146,33 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Permiso:** Lectura solo del archivo local seleccionado.
 
-**Configuración:** Incluido y activo en todos los binarios. Usa el selector `/ingest` de la TUI o el [comando de ingesta de la CLI](../development/cli.md).
+**Configuración:** Compilado por defecto con `parser-json`; una compilación mínima puede omitirlo. Usa el selector `/ingest` de la TUI o el [comando de ingesta de la CLI](../development/cli.md).
 
 **Límites:** Se rechazan el JSON muy anidado y los registros individuales demasiado grandes. Los originales se identifican por hash en su ubicación; copiarlos requiere una elección explícita. La búsqueda Parquet compara subcadenas con límites y acepta filtros de fecha, cuenta o proyecto y región. Los índices derivados anteriores requieren migrar los originales copiados antes de consultar el grafo. Otros formatos necesitarán parsers futuros.
+
+## Parser de Elastic Common Schema
+
+**Función:** Detecta ECS NDJSON mediante `@timestamp` y `ecs.version`, o mediante campos característicos de evento y host. Convierte evento, host, usuario, origen, destino, proceso, archivo y URL en registros y entidades con hora UTC. Los campos restantes permanecen en el registro local.
+
+**Permiso:** Solo lectura del archivo local elegido.
+
+**Configuración:** Compilado por defecto con `parser-ecs`. `/ingest` lo elige automáticamente solo si hay una coincidencia única de confianza alta. En los demás casos, el analista decide. La selección y versión quedan en el manifiesto firmado.
+
+**Límites:** Experimental y probado solo con datos sintéticos. Cada registro admite hasta 4 MiB, 1.024 campos y 64 niveles; una fuente admite hasta diez millones de registros y 50 GiB. Las líneas inválidas se cuentan con muestras acotadas y escapadas, sin detener las siguientes. La hora se normaliza a segundos UTC; la fracción original queda en el registro local.
+
+El mapeo sigue la [referencia oficial de ECS](https://www.elastic.co/docs/reference/ecs/ecs-reference).
+
+## Parser de OCSF
+
+**Función:** Detecta OCSF JSON, incluidos registros con formato multilínea, o NDJSON mediante `class_uid`, `category_uid` y `metadata.version`. Mapea Authentication, API Activity, Network Activity, Process Activity, File Activity y Detection Finding. También lee exportaciones OCSF Parquet, incluidas las de Security Lake, con el lector Parquet existente. Los campos desconocidos se conservan localmente.
+
+**Permiso:** Lectura del archivo local y escritura de un archivo temporal privado al procesar Parquet. El temporal se borra al terminar.
+
+**Configuración:** Compilado por defecto con `parser-ocsf`. El JSON OCSF se elige automáticamente si la confianza alta es única. La cabecera Parquet sola no demuestra el esquema y recibe confianza baja; el analista debe confirmar. La elección se firma.
+
+**Límites:** Experimental y probado solo con datos sintéticos. Los límites de JSON son los mismos que en ECS. Cada Parquet admite hasta 2 GiB, los metadatos de cierre hasta 16 MiB, los grupos de filas hasta 256 MiB y cada fila mapeada hasta 4 MiB; un caso mayor puede usar varios archivos. Un Parquet estructuralmente dañado se rechaza como archivo porque no se puede resincronizar de forma segura; las líneas JSON inválidas se cuentan individualmente. Detection Finding no se confirma automáticamente como hallazgo del caso.
+
+El mapeo sigue el [esquema oficial de OCSF](https://github.com/ocsf/ocsf-schema).
 
 ## Llavero del sistema
 
