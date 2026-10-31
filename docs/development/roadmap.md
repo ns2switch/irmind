@@ -34,4 +34,6 @@ Every pull request and merge runs Linux checks. Pull requests touching platform 
 
 [Source-side queries](cloud-query-design.md) are the next step after the MVP: Athena, CloudTrail Lake, and Security Lake for AWS; BigQuery and Cloud Logging Log Analytics for GCP; and Azure Data Explorer and Log Analytics for Azure. Only structured queries are planned, with scan budgets and signed results. Remote re-verification of cloud originals after sealing, Chronicle and other product connectors, external anchoring of case seals, and the local gateway with watches remain deferred. The gateway must use a separate Agent key, allow only scoped reads without an analyst, and keep every approval analyst-signed. Containment remains outside the current scope.
 
+After the MVP, integrate IRMind as a deployment evaluated through the [HuntEval](https://github.com/ns2switch/HuntEval) protocol. The current model-free corpus check measures whether IRMind's parser and local graph recover public synthetic evidence; it does not score a complete agent deployment.
+
 No provider should be enabled by default. Before production use, the project also needs manual terminal testing, provider compliance approval, and a decision on signed binary distribution.

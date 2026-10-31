@@ -98,6 +98,7 @@ mod approvals;
 mod case_findings_and_agent;
 mod concurrency_and_migrations;
 mod custody_operations;
+mod hunteval_eval;
 mod incremental_custody;
 mod injection_and_taint;
 mod large_case_custody;

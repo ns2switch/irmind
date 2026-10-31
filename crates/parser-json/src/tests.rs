@@ -1,6 +1,85 @@
 use super::*;
 
 #[test]
+fn parses_attributed_hunteval_aws_episode_without_private_answers() {
+    let source = include_str!("../tests/fixtures/hunteval-aws-iam-001.json");
+    let records = JsonParser
+        .parse("hunteval/aws-iam-001/source/events.json", source.as_bytes())
+        .unwrap();
+    assert_eq!(records.len(), 10);
+    records[3].inspect(|record| {
+        assert_eq!(record.at, "2026-01-10T10:30:00Z");
+        assert_eq!(record.event, "AttachUserPolicy");
+        for (kind, value) in [
+            ("principal", "arn:aws:iam::111122223333:user/alex"),
+            ("account", "111122223333"),
+            ("ip", "203.0.113.77"),
+            ("user_agent", "aws-cli/2.15"),
+        ] {
+            assert!(record.entities.contains(&(kind.into(), value.into())));
+        }
+        assert!(
+            record
+                .entities
+                .iter()
+                .any(|(kind, value)| { kind == "event_id" && value.ends_with(":evt-0004") })
+        );
+        assert_eq!(record.relations.len(), 5);
+        assert!(!record.text.contains("malicious_event_ids"));
+        assert!(!record.text.contains("acceptable_conclusions"));
+    });
+}
+
+#[test]
+fn normalized_aws_azure_gcp_events_extract_the_same_typed_entities() {
+    for (provider, principal, resource) in [
+        (
+            "aws",
+            "arn:aws:iam::123456789012:user/alice",
+            "aws:resource:admin",
+        ),
+        ("azure", "suspected-identity", "azure:resource:admin"),
+        ("gcp", "suspected-identity", "gcp:resource:admin"),
+    ] {
+        let source = serde_json::json!([{
+            "event_id": "evt-0001", "event_time": "2026-01-01T00:00:00Z",
+            "account_id": format!("{provider}-account"), "principal": principal,
+            "event_name": "GrantPrivilege", "resource": resource,
+            "source_ip": "203.0.113.77", "user_agent": "hunteval-test/1.0",
+            "provider": provider
+        }]);
+        let records = JsonParser
+            .parse("normalized.json", source.to_string().as_bytes())
+            .unwrap();
+        records[0].inspect(|record| {
+            for (kind, value) in [
+                ("principal", principal),
+                ("resource", resource),
+                ("ip", "203.0.113.77"),
+                ("user_agent", "hunteval-test/1.0"),
+            ] {
+                assert!(record.entities.contains(&(kind.into(), value.into())));
+            }
+        });
+    }
+}
+
+#[test]
+fn malformed_normalized_event_fails_closed() {
+    let record = serde_json::json!({
+        "event_id": "evt-0001", "event_time": "2026-01-01T00:00:00Z",
+        "account_id": "test", "principal": "suspected-identity",
+        "event_name": "GrantPrivilege", "resource": "gcp:resource:admin",
+        "source_ip": "not-an-ip", "user_agent": "hunteval-test/1.0", "provider": "gcp"
+    });
+    assert!(
+        JsonParser
+            .parse("normalized.json", record.to_string().as_bytes())
+            .is_err()
+    );
+}
+
+#[test]
 fn indexes_cloudtrail_record() {
     let bytes = br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","sourceIPAddress":"203.0.113.8","userIdentity":{"arn":"arn:aws:iam::123456789012:role/Admin"}}]}"#;
     let records = JsonParser.parse("cloudtrail.json", bytes).unwrap();

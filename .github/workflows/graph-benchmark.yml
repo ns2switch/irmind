@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: true
 env:
   CARGO_INCREMENTAL: 0
-  CARGO_BUILD_JOBS: 1
   RUSTFLAGS: -C link-arg=-fuse-ld=mold
+  HUNTEVAL_COMMIT: 4cbb555a56bc17cb03b988ad2f15b1374eecf183
 jobs:
   graph_benchmark:
     runs-on: ubuntu-latest
@@ -23,11 +23,29 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with: {key: graph-benchmark-linux}
       - run: sudo apt-get update && sudo apt-get install -y mold
-      - name: Profile Parquet conversion with 1 GB and 15 GB synthetic corpora
+      - name: Fetch and verify pinned HuntEval public sources and private answers
+        shell: bash
+        run: |
+          set -euo pipefail
+          dataset_root=$(mktemp -d "$RUNNER_TEMP/hunteval.XXXXXXXX")
+          trap 'rm -rf "$dataset_root"' ERR
+          git -C "$dataset_root" init -q
+          git -C "$dataset_root" remote add origin https://github.com/ns2switch/HuntEval.git
+          git -C "$dataset_root" fetch -q --depth 1 origin "$HUNTEVAL_COMMIT"
+          git -C "$dataset_root" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$dataset_root" rev-parse HEAD)" = "$HUNTEVAL_COMMIT"
+          (cd "$dataset_root" && sha256sum -c "$GITHUB_WORKSPACE/scripts/hunteval.sha256")
+          echo "IRMIND_HUNTEVAL_ROOT=$dataset_root" >> "$GITHUB_ENV"
+      - name: Evaluate all 18 HuntEval episodes without a model
         shell: bash
         run: |
           set -o pipefail
-          cargo test -p irmind-infra parquet_benchmark_ --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee benchmark-results.txt
+          cargo test -p irmind-infra hunteval_reference_corpus --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee benchmark-results.txt
+      - name: Profile Parquet conversion and HuntEval needles in 1 GB and 15 GB
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p irmind-infra parquet_benchmark_ --release --locked -- --ignored --nocapture --test-threads 1 --skip parquet_benchmark_50mb 2>&1 | tee -a benchmark-results.txt
       - name: Measure warm build and binary size
         shell: bash
         run: |
@@ -45,3 +63,10 @@ jobs:
           name: graph-benchmark-results
           path: benchmark-results.txt
           if-no-files-found: warn
+      - name: Remove downloaded HuntEval files
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${IRMIND_HUNTEVAL_ROOT:-}" && "$IRMIND_HUNTEVAL_ROOT" == "$RUNNER_TEMP"/hunteval.* ]]; then
+            rm -rf -- "$IRMIND_HUNTEVAL_ROOT"
+          fi

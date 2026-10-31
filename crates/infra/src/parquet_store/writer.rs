@@ -43,6 +43,7 @@ impl RecordRow {
         let account = first_string(
             &value,
             &[
+                "/account_id",
                 "/recipientAccountId",
                 "/userIdentity/accountId",
                 "/resource/labels/project_id",
@@ -53,12 +54,24 @@ impl RecordRow {
         let region = first_string(
             &value,
             &[
+                "/provider",
                 "/awsRegion",
                 "/resource/labels/location",
                 "/region",
                 "/location",
             ],
         );
+        let region = if region.is_empty()
+            && value.get("event_id").is_some()
+            && value
+                .get("principal")
+                .and_then(Value::as_str)
+                .is_some_and(|principal| principal.starts_with("arn:aws:"))
+        {
+            "aws"
+        } else {
+            region
+        };
         let relations = record
             .relations
             .iter()

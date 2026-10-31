@@ -34,4 +34,6 @@ Cada PR y merge ejecuta los checks de Linux. Las PR que tocan código de platafo
 
 La [consulta en origen](../development/cloud-query-design.md) queda para justo después del MVP: Athena, CloudTrail Lake y Security Lake en AWS; BigQuery y Log Analytics de Cloud Logging en GCP; Azure Data Explorer y Log Analytics en Azure. Solo se prevén consultas estructuradas, con presupuestos de escaneo y resultados firmados. Chronicle, otros conectores de producto, el anclaje externo de los sellos y el gateway con watches siguen aplazados. El gateway deberá usar una clave Agent distinta, permitir solo lecturas dentro del alcance sin analista y exigir la firma del analista para cada aprobación. La contención queda fuera del alcance actual.
 
+Después del MVP, IRMind se integrará como deployment evaluable mediante el protocolo de [HuntEval](https://github.com/ns2switch/HuntEval). La evaluación determinista actual comprueba el parser y el grafo local con datos sintéticos públicos; todavía no puntúa al agente completo.
+
 Ningún proveedor se activa por defecto. Antes de usar el proyecto en producción también hacen falta pruebas manuales de la terminal, aprobación de compliance para el proveedor y una decisión sobre la firma de los binarios.
