@@ -121,6 +121,8 @@ pub enum FixedAppError {
     PolicyMissingValue,
     #[error("policy denied: model cost overflow")]
     PolicyModelCostOverflow,
+    #[error("policy denied: model proposed an unadvertised tool")]
+    PolicyModelProposedUnadvertisedTool,
     #[error("policy denied: model token count overflow")]
     PolicyModelTokenCountOverflow,
     #[error("policy denied: open finding not found")]
