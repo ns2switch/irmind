@@ -42,7 +42,7 @@ GCP and Azure enter the MVP only as object-storage read sources and exported-log
 
 For uncopied originals, the signed manifest proves what IRMind observed when it hashed each source, while later full verification requires access to that same source. Sampling verifies only selected originals. Neither mode claims that an unavailable source remains intact. Export without originals is verifiable as a signed manifest and case chain, not as a complete portable evidence package.
 
-Exit only when H0–H8 meet their stated acceptance criteria, the H5 manual test is documented, at least one connector has been tested against a real test environment, and a `v0.1.0` tag has a changelog and downloadable binaries. Synthetic recordings alone do not satisfy the connector test. Record the two manual results in [manual validation](manual-validation.md).
+The original MVP exit criteria remain: H0–H8 meet their stated acceptance criteria, the H5 manual test is documented, at least one connector has been tested against a real test environment, and the release has a changelog and downloadable binaries. Synthetic recordings alone do not satisfy the connector test. The analyst approved an explicit exception for `v0.1.0`: publish it as a pre-release before the two manual validations. They remain open and must be recorded in [manual validation](manual-validation.md); defects found later will be addressed in 0.1.x. Do not mark H5 or the live-connector gate complete merely because the tag exists.
 
 | MVP exit criterion | Status | Evidence or next action |
 | --- | --- | --- |
@@ -54,11 +54,11 @@ Exit only when H0–H8 meet their stated acceptance criteria, the H5 manual test
 | H5 manual test with real DeepSeek | Pending analyst | Run the first procedure in [manual validation](manual-validation.md) and record the result. |
 | One connector against a real test environment | Pending analyst | Run the Splunk lab procedure in [manual validation](manual-validation.md) and record the result. |
 | Release dry run without a tag | Done | [Manual CI run 41117075395](https://github.com/ns2switch/irmind/actions/runs/41117075395) passed on Linux, macOS and Windows, including checksums and both Windows export cross-checks. No tag or GitHub Release was created. |
-| `v0.1.0` tag, changelog and downloadable binaries | Pending analyst | The changelog is prepared. Create the tag only after both manual results and green `main`; the release workflow will publish CI artifacts. |
+| `v0.1.0` tag, changelog and downloadable binaries | Approved for pre-release | Publish from green `main` with unsigned, checksummed binaries. Manual H5 and live-connector gates remain pending by explicit analyst decision. |
 
 ## Release process
 
-The workspace version is `0.1.0`. Keep [CHANGELOG.md](../../CHANGELOG.md) as a draft until the MVP exit criteria above are met. Before the first tag, run the CI `release_dry_run` manual dispatch on a branch: it must build unsigned binaries and checksums for Linux, macOS and Windows and verify portable exports across platforms, without creating a tag or GitHub Release. Review the resulting artifacts and the green `main` checks. Only then create `v0.1.0` and publish its changelog and binaries. Do not treat a synthetic connector recording as the analyst's live test.
+The workspace version is `0.1.0`. The [release dry run](https://github.com/ns2switch/irmind/actions/runs/41117075395) already built unsigned binaries and checksums for Linux, macOS and Windows and verified portable exports across platforms. For the approved pre-release exception, tag the latest green `main`, verify the tag workflow and artifact checksums, then publish the GitHub pre-release with the changelog and the pending manual gates stated plainly. Do not treat a synthetic connector recording as the analyst's live test. Complete the two manual checks after release and fix any discovered defects in 0.1.x.
 
 ## Later unattended gateway
 
