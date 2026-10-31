@@ -1,8 +1,10 @@
-Traducción de README.md en el commit f65d0356df53f08824e1f36ad36ca70018889031; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 9de72907bf41d37d0d7e9c29c8cca76db8602e1d; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
 Cliente de IA en terminal para investigaciones de seguridad, con llamadas a herramientas sujetas a política y cadena de custodia firmada.
+
+IRMind es un asistente agéntico de terminal para respuesta a incidentes y análisis forense: el analista conversa con un agente que investiga evidencia local y remota, carga skills forenses cuando hacen falta y delega trabajo acotado en subagentes paralelos. El modelo propone, la política decide y todo queda firmado.
 
 ![Demostración sintética de IRMind: caso reanudado, comandos, ingesta, respuesta en streaming y aprobación numerada](docs/assets/demo.gif)
 
@@ -106,6 +108,19 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 - La redacción puede pasar datos por alto. Un firmante local puede reescribir una cadena completa si su huella no está fijada fuera del equipo. Esta versión no es apta para producción.
 
 Lee [security-model.md](docs/es/security-model.md) antes de conectar un proveedor.
+
+## Hoja de ruta
+
+- **v0.1.x:** Estabilizar la versión preliminar, validar un modelo y un conector, y añadir firma nativa por plataforma.
+- **v0.2:** Añadir parsers modulares y conectores SIEM con consultas estructuradas.
+- **v0.3:** Añadir skills forenses firmadas y de carga progresiva.
+- **v0.4:** Añadir subagentes paralelos acotados y eventos en streaming.
+- **Lanzamiento público:** Publicar la demo, el benchmark y el catálogo inicial de skills.
+- **v0.5:** Añadir consultas en origen con presupuestos.
+- **v0.6:** Añadir detecciones locales, informes exportables, extensiones controladas y una API del motor.
+- **1.0:** Estabilizar formatos firmados y completar revisiones externas de seguridad y conectores.
+
+La [hoja de ruta pública](docs/es/roadmap.md) describe intenciones, sin compromisos de publicación.
 
 ## Más información
 
