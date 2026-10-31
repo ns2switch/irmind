@@ -9,7 +9,7 @@ A terminal AI client for security investigations with policy-enforced tool calls
 *The demo uses synthetic evidence and an ephemeral key. Its scripted model needs no network or account.*
 
 > [!WARNING]
-> IRMind 0.1.0 is a preliminary release for evaluation with synthetic data. It has not passed manual validation with a real model or connector. Do not use it for real incidents or sensitive data.
+> IRMind 0.1.1 is a preliminary release for evaluation with synthetic data. It has not passed manual validation with a real model or connector. Do not use it for real incidents or sensitive data.
 
 ## What you can do
 
@@ -42,7 +42,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-The [v0.1.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) provides unsigned binaries. Releases from v0.1.1 add keyless Sigstore bundles and GitHub provenance. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
+The [v0.1.1 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.1.1) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
 
 ```sh
 # After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:
