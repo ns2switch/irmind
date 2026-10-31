@@ -315,3 +315,78 @@ jobs:
       - name: Clean staging
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('bin', 'foreign-export')) if p.is_dir()]"
+  release:
+    needs: [dco, linux, linux_arm64, windows, macos, linux_verify_windows, macos_verify_windows]
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.linux_arm64.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux_verify_windows.result == 'success' && needs.macos_verify_windows.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: irmind-linux, path: artifacts/linux-x86_64}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: irmind-linux-arm64, path: artifacts/linux-aarch64}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: irmind-macos-arm64, path: artifacts/macos-aarch64}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: irmind-windows, path: artifacts/windows-x86_64}
+      - name: Stage binaries and install scripts
+        run: |
+          mkdir -p release
+          cp artifacts/linux-x86_64/irmind release/irmind-linux-x86_64
+          cp artifacts/linux-aarch64/irmind release/irmind-linux-aarch64
+          cp artifacts/macos-aarch64/irmind release/irmind-macos-aarch64
+          cp artifacts/windows-x86_64/irmind.exe release/irmind-windows-x86_64.exe
+          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 release/
+      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: spdx-json
+          output-file: release/IRMind-SBOM.spdx.json
+          syft-version: v1.55.0
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Create and check the release checksum list
+        run: |
+          (cd release && sha256sum irmind-linux-x86_64 irmind-linux-aarch64 irmind-macos-aarch64 irmind-windows-x86_64.exe install.sh install.ps1 IRMind-SBOM.spdx.json LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
+          (cd release && sha256sum --check SHA256SUMS)
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with: {subject-path: 'release/irmind-*'}
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with: {subject-path: 'release/IRMind-SBOM.spdx.json'}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with: {cosign-release: 'v3.1.4'} # fixes GHSA-fx35-mq7g-6g98 in the bundled default
+      - name: Sign every binary and the checksum list with GitHub OIDC
+        run: |
+          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-windows-x86_64.exe release/SHA256SUMS; do
+            cosign sign-blob --yes --bundle "$file.sigstore.json" "$file"
+          done
+      - name: Verify every Sigstore bundle against this exact workflow ref
+        env:
+          EXPECTED_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/ci.yml@${{ github.ref }}
+        run: |
+          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-windows-x86_64.exe release/SHA256SUMS; do
+            cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "$EXPECTED_IDENTITY" --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: github.event_name == 'workflow_dispatch'
+        with: {name: signed-release-dry-run, path: release/, if-no-files-found: error}
+      - name: Publish the signed prerelease only for an existing tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/* --verify-tag --prerelease --generate-notes --title "IRMind $GITHUB_REF_NAME"
+          fi
+      - name: Clean release staging
+        if: always()
+        run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('release', 'artifacts')) if p.is_dir()]"

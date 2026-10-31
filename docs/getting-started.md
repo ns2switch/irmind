@@ -14,7 +14,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-On Windows, run `.\target\release\irmind.exe` in Windows Terminal. When a CI artifact is available, you may instead download it and check `SHA256SUMS` before use. See [platforms](platforms.md) for system-specific steps. Builds are currently unsigned.
+On Windows, run `.\target\release\irmind.exe` in Windows Terminal. For a release binary, check `SHA256SUMS`, its Sigstore bundle, and GitHub provenance before use. The v0.1.0 pre-release has only checksums; see [platforms](platforms.md) for the exact version-dependent steps.
 
 ## Try it in five minutes
 

@@ -1,4 +1,4 @@
-Traducción de docs/platforms.md en el commit f587b3f7d6e671ed3d4aa36c212d952c596997eb; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit e31fd5cc947308542888df4a52164d8892c56b93; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
@@ -19,15 +19,40 @@ Instala un compilador de C/C++ antes de compilar: GCC o Clang y `pkg-config` en 
 
 ## Verificar una versión antes de instalar
 
-Descarga el binario de tu sistema y `SHA256SUMS` desde la [versión en GitHub](https://github.com/ns2switch/irmind/releases). Comprueba el nombre exacto del binario en el archivo de hashes antes de ejecutarlo. La primera versión preliminar, v0.1.0, solo incluye hashes; las versiones posteriores añadirán firmas y procedencia. El hash comprueba los bytes frente a ese archivo, pero no la identidad del editor.
+Descarga el binario de tu sistema y `SHA256SUMS` desde la [versión en GitHub](https://github.com/ns2switch/irmind/releases). Comprueba el nombre exacto del binario en el archivo de hashes antes de ejecutarlo. La primera versión preliminar, v0.1.0, solo incluye hashes. Desde v0.1.1 hay bundles Sigstore y procedencia de GitHub. Un hash comprueba los bytes frente a un archivo, pero no la identidad del editor.
 
 | Sistema | Comprobación |
 | --- | --- |
-| Linux | Ejecuta `sha256sum -c SHA256SUMS` en el directorio de descarga. |
-| macOS | Ejecuta `shasum -a 256 -c SHA256SUMS` en ese directorio. |
-| Windows PowerShell | Compara `(Get-FileHash .\irmind.exe -Algorithm SHA256).Hash.ToLowerInvariant()` con la línea de `irmind.exe` en `SHA256SUMS`. |
+| Linux | Comprueba la línea del binario exacto con `sha256sum -c -`. |
+| macOS | Comprueba la línea del binario exacto con `shasum -a 256 -c -`. |
+| Windows PowerShell | Compara `Get-FileHash` con la única línea del binario exacto. |
 
-El repositorio incluye [install.sh](../../install.sh) e [install.ps1](../../install.ps1). Cuando una versión adjunte estos scripts, descárgalos y comprueba su hash contra `SHA256SUMS` **antes** de ejecutarlos. Detectan el sistema y verifican el hash del binario. Si `cosign` o `gh` están instalados, verifican también la firma y la procedencia; cualquier fallo impide instalar. Nunca solicitan permisos de administrador ni cambian `PATH`.
+El archivo de hashes enumera todos los assets; comprobar `SHA256SUMS` completo exige descargarlos todos. Si solo descargaste un binario, selecciona su línea y exige exactamente una coincidencia. En Linux o macOS:
+
+```sh
+binary=irmind-linux-x86_64 # sustituye por el nombre descargado
+line=$(awk -v name="$binary" '$2 == name { print }' SHA256SUMS)
+test -n "$line" && test "$(printf '%s\n' "$line" | wc -l)" -eq 1 || exit 1
+printf '%s\n' "$line" | sha256sum -c - # usa shasum -a 256 -c - en macOS
+```
+
+En Windows, compara el resultado en minúsculas de `Get-FileHash` con el hash de la única línea de `SHA256SUMS` para `irmind-windows-x86_64.exe`.
+
+Para v0.1.1 y posteriores, descarga además los bundles `.sigstore.json` del binario y de `SHA256SUMS`. Usa cosign **3.1.3 o posterior**: las versiones v3 anteriores sufren una [evasión de la comprobación de identidad con bundles antiguos](https://github.com/sigstore/cosign/security/advisories/GHSA-fx35-mq7g-6g98). Los instaladores rechazan esas versiones. Verifica ambos archivos con la identidad y el emisor exactos, sustituyendo `<TAG>` y `<BINARY>` por la versión y el nombre descargado:
+
+```sh
+cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/<TAG>" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+cosign verify-blob "<BINARY>" --bundle "<BINARY>.sigstore.json" \
+  --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/<TAG>" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify "<BINARY>" -R ns2switch/irmind
+```
+
+En Windows PowerShell, usa los mismos comandos de `cosign verify-blob` y `gh attestation verify` con rutas de Windows. La identidad del certificado debe corresponder al **tag que querías instalar**; comprobar solo que existe una firma no basta. La atestación vincula el hash del binario con el workflow de este repositorio. Consulta las guías de [Sigstore](https://docs.sigstore.dev/cosign/verifying/verify/) y [GitHub](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations).
+
+El repositorio incluye [install.sh](../../install.sh) e [install.ps1](../../install.ps1). Descarga el script y `SHA256SUMS`. Primero verifica el bundle Sigstore de `SHA256SUMS` contra el tag y la identidad exacta del workflow con el comando anterior; después comprueba **la línea exacta del hash del script** antes de ejecutarlo. En Linux o macOS usa `binary=install.sh` en el ejemplo anterior. En Windows compara `Get-FileHash .\install.ps1 -Algorithm SHA256` con su única línea en `SHA256SUMS`. El instalador detecta el sistema y verifica el hash del binario; si están disponibles, `cosign` y una versión actual de `gh` comprueban la firma y la procedencia. Cualquier fallo impide instalar. Nunca solicita permisos de administrador ni cambia `PATH`.
 
 ```sh
 # Linux o macOS, después de comprobar install.sh con SHA256SUMS:
@@ -41,7 +66,7 @@ sh ./install.sh v0.1.1
 
 Omite la versión para elegir la última publicada, incluida una preliminar. Un segundo argumento de POSIX o `-InstallDir` en PowerShell cambia el directorio del usuario. Por defecto se instala en `~/.local/bin` o `%LOCALAPPDATA%\IRMind\bin`. Si no está en `PATH`, el script indica cómo añadirlo manualmente.
 
-CI también genera artefactos sin firma en tags de versión y ejecuciones nocturnas relevantes. Las PR y los merges a `main` no publican binarios. Apple no notariza los binarios y Windows no usa Authenticode; ambos sistemas pueden mostrar avisos incluso después de verificar la descarga.
+CI también genera artefactos de prueba en ejecuciones nocturnas relevantes; no son versiones publicadas. Las PR y los merges a `main` no publican binarios. Apple no notariza los binarios y Windows no usa Authenticode; ambos sistemas pueden mostrar avisos incluso después de verificar la descarga.
 
 ## Linux
 
@@ -49,11 +74,11 @@ Usa un terminal compatible con xterm, como GNOME Terminal o Konsole. El backend 
 
 ## macOS
 
-Usa Terminal.app o iTerm2. `os` utiliza Keychain; `file` se puede elegir explícitamente por SSH. CI compila para Apple Silicon. Después de comprobar el checksum, Gatekeeper puede bloquear el binario descargado sin firma. Autoriza **solo ese binario** en Ajustes del Sistema → Privacidad y seguridad, o elimina únicamente su atributo de cuarentena con `xattr -d com.apple.quarantine ./irmind`. Nunca desactives Gatekeeper para todo el sistema.
+Usa Terminal.app o iTerm2. `os` utiliza Keychain; `file` se puede elegir explícitamente por SSH. CI compila para Apple Silicon. Después de verificar la versión, Gatekeeper puede bloquear un binario descargado sin firma de código de Apple. Autoriza **solo ese binario** en Ajustes del Sistema → Privacidad y seguridad, o elimina únicamente su atributo de cuarentena con `xattr -d com.apple.quarantine ./irmind`. Nunca desactives Gatekeeper para todo el sistema.
 
 ## Windows
 
-Usa Windows Terminal y el binario x64 MSVC. `os` utiliza Credential Manager; `file` está disponible si se selecciona explícitamente. IRMind comprueba que los archivos del caso y el almacén cifrado están restringidos al SID del usuario actual. SmartScreen o el antivirus corporativo pueden advertir sobre un binario sin firma. Comprueba el checksum y la procedencia y, si la política lo permite, solicita una excepción limitada al equipo de seguridad. No desactives la protección globalmente.
+Usa Windows Terminal y el binario x64 MSVC. `os` utiliza Credential Manager; `file` está disponible si se selecciona explícitamente. IRMind comprueba que los archivos del caso y el almacén cifrado están restringidos al SID del usuario actual. SmartScreen o el antivirus corporativo pueden advertir sobre un binario sin Authenticode. Comprueba el checksum, la identidad Sigstore y la procedencia y, si la política lo permite, solicita una excepción limitada al equipo de seguridad. No desactives la protección globalmente.
 
 ## Datos y terminal
 
