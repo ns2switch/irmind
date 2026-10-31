@@ -65,6 +65,14 @@ fi
 [ "$actual" = "$expected" ] || fail 'SHA-256 mismatch; nothing was installed'
 
 if command -v cosign >/dev/null 2>&1; then
+  cosign_version=$(cosign version 2>/dev/null | awk '$1 == "GitVersion:" { print $2; exit }')
+  printf '%s\n' "$cosign_version" | awk -F. '
+    $1 ~ /^v?[0-9]+$/ && $2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/ && NF == 3 {
+      major = $1; sub(/^v/, "", major)
+      if (major > 3 || (major == 3 && ($2 > 1 || ($2 == 1 && $3 >= 3)))) exit 0
+    }
+    { exit 1 }
+  ' || fail 'cosign 3.1.3 or newer is required for safe identity verification'
   identity="https://github.com/$repo/.github/workflows/ci.yml@refs/tags/$version"
   for file in "$asset" SHA256SUMS; do
     download "$base/$file.sigstore.json" "$temporary/$file.sigstore.json"
