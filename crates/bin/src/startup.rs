@@ -50,6 +50,10 @@ struct PreparedStartup {
 
 pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
     let cli = Cli::parse();
+    if let Some(Command::Demo { scripted }) = cli.command.as_ref() {
+        super::demo::run(cancel, *scripted)?;
+        return Ok(false);
+    }
     let interactive = matches!(&cli.command, None | Some(Command::Tui { .. }));
     if let Some(Command::VerifyExport { path, expected_key }) = &cli.command {
         return run_verify_export(path, expected_key.as_deref());
@@ -337,7 +341,7 @@ fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) ->
     match command {
         None => {
             let saved = context.workspace_io.config_store.load()?;
-            irmind_tui::run_workspace(
+            let outcome = irmind_tui::run_workspace(
                 context.engine,
                 context.selected_model,
                 context.workspace_io,
@@ -351,7 +355,15 @@ fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) ->
                     mouse_capture: context.mouse_capture,
                     theme: saved.theme.as_deref(),
                 },
-            )
+            )?;
+            match outcome {
+                irmind_tui::WorkspaceOutcome::Exit => Ok(false),
+                irmind_tui::WorkspaceOutcome::Restart => Ok(true),
+                irmind_tui::WorkspaceOutcome::Demo => {
+                    super::demo::run(context.cancel, false)?;
+                    Ok(false)
+                }
+            }
         }
         Some(command) => context.run(command),
     }

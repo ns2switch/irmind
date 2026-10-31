@@ -29,6 +29,7 @@ impl Command {
             "approve" | "deny" | "edit" => " <id>",
             "settings" => " [model|connectors|keystore|preferences]",
             "open" => " <case title or ID>",
+            "demo" => " [check]",
             "evidence" | "raw" => " <hash>",
             "ingest" => " <path>",
             "objects" => " <source> <scheme> <container> <prefix> <from> <to>",

@@ -78,7 +78,10 @@ fn initial_state(
 ) -> Result<CaseState> {
     let case = engine.repo.get_case(id)?;
     let backend = io_ops.keystore_status()?.signer_backend;
-    let case_summary = welcome_summary(&case, model, &backend, resumed);
+    let mut case_summary = welcome_summary(&case, model, &backend, resumed);
+    if io_ops.demo_mode() {
+        case_summary.insert_str(0, "Demo · synthetic data · deleted on exit\n");
+    }
     let mut conversation = Conversation::new(std::env::var_os("NO_COLOR").is_none());
     conversation.push(Card::new(
         CardKind::Welcome,
@@ -237,6 +240,21 @@ pub(crate) fn run_case(
             exit_to: CaseExit::Home,
         };
         let _mouse = MouseCapture::start(presentation.mouse_capture)?;
+        if let Some(path) = io_ops.demo_initial_ingest() {
+            let workflow = CaseWorkflow {
+                engine,
+                model,
+                io_ops,
+            };
+            let progress = runtime.progress_tx.clone();
+            runtime.start_task("Ingest", move |cancel| {
+                workflow
+                    .ingest_path(id, &path, &cancel, |done, count, source| {
+                        let _ = progress.send(format!("Demo evidence {done}/{count}: {source}"));
+                    })
+                    .map(|count| format!("Ingested {count} synthetic file"))
+            });
+        }
         runtime.run()
     })
 }

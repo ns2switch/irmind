@@ -2,6 +2,14 @@ use crate::crypto::{decrypt, derive, persist};
 use crate::*;
 
 impl FileKeystore {
+    /// Create a one-session vault without exposing its random passphrase to the caller.
+    pub fn ephemeral(home: &Path) -> Result<Self, AppError> {
+        let mut bytes = zeroize::Zeroizing::new([0_u8; 32]);
+        rand::rngs::OsRng.fill_bytes(&mut *bytes);
+        let phrase = SecretString::from(irmind_app::hex(&*bytes));
+        Self::open(home, &phrase, true)
+    }
+
     pub fn open(home: &Path, passphrase: &SecretString, create: bool) -> Result<Self, AppError> {
         let path = home.join("keystore.enc");
         let lock_path = home.join("keystore.lock");

@@ -6,7 +6,7 @@ A terminal AI client for security investigations with policy-enforced tool calls
 
 ![Synthetic IRMind TUI walkthrough showing a resumed case, slash commands, local evidence ingestion, streaming model text, and a numbered approval](docs/assets/demo.gif)
 
-*This offline demo uses synthetic evidence, an ephemeral file keystore, and a fake model.*
+*The demo uses synthetic evidence and an ephemeral key. Its scripted model needs no network or account.*
 
 > [!WARNING]
 > IRMind 0.1.0 is a preliminary release for evaluation with synthetic data. It has not passed manual validation with a real model or connector. Do not use it for real incidents or sensitive data.
@@ -43,6 +43,12 @@ cargo build --release --locked -p irmind
 ```
 
 The [v0.1.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) provides unsigned binaries. Verify `SHA256SUMS` before running one. Follow the [platform guide](docs/platforms.md) for checksums, keystore backends, SSH, and terminal support.
+
+## Try it in five minutes
+
+Run `irmind demo` from a verified build, or type `/demo` on the home screen. IRMind opens a temporary, signed case with a bundled synthetic HuntEval episode. It creates a random encrypted file keystore without asking for a passphrase and deletes the whole demo when you exit. If a local Ollama model advertises tool support, you may select it with the arrow keys; otherwise the clearly labeled scripted model runs offline. No remote model is used.
+
+Ask “What happened in this synthetic episode?” to see a local graph lookup, a proposed finding, and an external enrichment proposal that still needs signed approval. The external result is simulated and makes no network call. Confirm a finding, then type `/demo check` to compare it locally with the bundled answers. The answers never enter the model context. On exit, use `/new` and `/settings` to start a real case.
 
 ## First case in the TUI
 

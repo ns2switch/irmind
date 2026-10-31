@@ -125,6 +125,14 @@ impl OpenAiCompatible {
     }
 
     pub async fn list_ollama_models(base_url: &str) -> Result<Vec<String>, AppError> {
+        Ok(Self::ollama_metadata(base_url)
+            .await?
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect())
+    }
+
+    async fn ollama_metadata(base_url: &str) -> Result<Vec<(String, u64)>, AppError> {
         let mut url = reqwest::Url::parse(base_url)
             .map_err(|_| AppError::Model("invalid Ollama URL".into()))?;
         if !url.host_str().is_some_and(|host| {
@@ -170,13 +178,70 @@ impl OpenAiCompatible {
             .ok_or_else(|| AppError::Model("Ollama returned no model list".into()))?;
         Ok(models
             .iter()
-            .filter_map(|item| item.get("name").and_then(serde_json::Value::as_str))
-            .filter(|name| {
-                !name.is_empty() && name.len() <= 200 && name.chars().all(|ch| !ch.is_control())
+            .filter_map(|item| {
+                let name = item.get("name")?.as_str()?;
+                if name.is_empty() || name.len() > 200 || name.chars().any(char::is_control) {
+                    return None;
+                }
+                Some((
+                    name.to_owned(),
+                    item.get("size")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or(0),
+                ))
             })
             .take(100)
-            .map(str::to_owned)
             .collect())
+    }
+
+    /// Only offer local models whose Ollama metadata explicitly advertises tools.
+    pub async fn list_ollama_tool_models(base_url: &str) -> Result<Vec<String>, AppError> {
+        let names = Self::ollama_metadata(base_url).await?;
+        let mut url = reqwest::Url::parse(base_url)
+            .map_err(|_| AppError::Model("invalid Ollama URL".into()))?;
+        url.set_path("/api/show");
+        url.set_query(None);
+        let client = irmind_http::client_builder(std::time::Duration::from_secs(5), true)
+            .build()
+            .map_err(|_| AppError::Model("cannot create Ollama client".into()))?;
+        let mut supported = Vec::new();
+        for (name, _) in names
+            .into_iter()
+            .filter(|(name, size)| *size > 0 && !name.ends_with(":cloud"))
+            .take(25)
+        {
+            let Ok(response) = client
+                .post(url.clone())
+                .json(&serde_json::json!({"model": name}))
+                .send()
+                .await
+            else {
+                continue;
+            };
+            if !response.status().is_success() {
+                continue;
+            }
+            let Ok(bytes) = irmind_http::read_limited(
+                response,
+                1_048_576,
+                &irmind_app::CancellationToken::new(),
+            )
+            .await
+            else {
+                continue;
+            };
+            let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+                continue;
+            };
+            if value
+                .get("capabilities")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|items| items.iter().any(|item| item.as_str() == Some("tools")))
+            {
+                supported.push(name);
+            }
+        }
+        Ok(supported)
     }
 
     pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
@@ -296,6 +361,37 @@ mod tests {
                     "http://example.com/v1/"
                 ))
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn demo_offers_only_local_ollama_models_with_tools() {
+        let server = irmind_testkit::MockServer::start(vec![
+            irmind_testkit::MockResponse::json(
+                r#"{"models":[{"name":"tool-model","size":1024},{"name":"text-only","size":2048},{"name":"remote:cloud","size":0}]}"#,
+            ),
+            irmind_testkit::MockResponse::json(r#"{"capabilities":["completion","tools"]}"#),
+            irmind_testkit::MockResponse::json(r#"{"capabilities":["completion"]}"#),
+        ])
+        .unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let models = runtime
+            .block_on(OpenAiCompatible::list_ollama_tool_models(&format!(
+                "{}v1/",
+                server.origin()
+            )))
+            .unwrap();
+        assert_eq!(models, ["tool-model"]);
+        let requests = server.finish().unwrap();
+        assert_eq!(
+            requests
+                .iter()
+                .map(|request| request.target.as_str())
+                .collect::<Vec<_>>(),
+            ["/api/tags", "/api/show", "/api/show"]
         );
     }
 

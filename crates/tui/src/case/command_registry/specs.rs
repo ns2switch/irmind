@@ -248,6 +248,12 @@ pub(super) const COMMANDS: &[Command] = &[
         slash: true,
     },
     Command {
+        name: "demo",
+        description: "Start a synthetic demo from home; /demo check compares findings",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
         name: "open",
         description: "Open a case by title or ID",
         shortcut: "",

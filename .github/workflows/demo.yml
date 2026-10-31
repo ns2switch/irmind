@@ -29,12 +29,12 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: synthetic-demo
-      - name: Build offline TUI fixture
-        run: cargo build -p irmind --example demo --locked
+      - name: Build isolated public demo
+        run: cargo build -p irmind --no-default-features --features keystore-file --locked
       - name: Pull the pinned VHS image with its rendering dependencies
         run: docker pull ghcr.io/charmbracelet/vhs@sha256:9d5fc3dc0c160b0fb1d2212baff07e6bdf3fa9438c504a3237484567302fcf93
       - name: Render and verify synthetic assets without network access
-        run: python3 docs/demo/generate.py
+        run: python3 docs/demo/generate_community.py
       - name: Open a pull request if images changed
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -47,7 +47,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$branch"
-          git add docs/assets/demo.gif docs/assets/*.png
+          git add docs/assets/demo.gif
           git commit -m 'docs: refresh synthetic demo' -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
           git push origin "$branch"
-          gh pr create --base main --head "$branch" --title 'docs: refresh synthetic demo' --body 'VHS regenerated the offline synthetic GIF and screenshots. The tape, duration, size, flow and privacy checks passed.'
+          gh pr create --base main --head "$branch" --title 'docs: refresh synthetic demo' --body 'VHS regenerated the isolated synthetic demo GIF. The tape, duration, size, flow, and privacy checks passed.'
