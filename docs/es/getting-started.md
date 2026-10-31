@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit b899c4f6599b63d37f745f252363d35a3e2b1049; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit e31fd5cc947308542888df4a52164d8892c56b93; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -16,7 +16,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Cuando haya un artefacto de CI disponible, también puedes descargarlo y comprobar `SHA256SUMS` antes de usarlo. Consulta [plataformas](platforms.md) para los pasos de cada sistema. Los binarios aún no están firmados.
+En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Para un binario de versión, comprueba `SHA256SUMS`, su bundle Sigstore y la procedencia de GitHub antes de usarlo. La versión preliminar v0.1.0 solo tiene hashes; consulta [plataformas](platforms.md) para los pasos de cada versión.
 
 ## Pruébalo en cinco minutos
 

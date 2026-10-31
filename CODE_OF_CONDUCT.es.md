@@ -1,4 +1,4 @@
-Traducción de CODE_OF_CONDUCT.md en el commit b2bcceadc1505a1a3977aaa847a96f58de957b98; si hay diferencias, prevalece la versión en inglés.
+Traducción de CODE_OF_CONDUCT.md en el commit d85c1aa07cfffbfbdf30ac9f1e88b71e5e807efb; si hay diferencias, prevalece la versión en inglés.
 
 # Código de Conducta para Contribuyentes, versión 3.0
 
