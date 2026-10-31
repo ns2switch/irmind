@@ -6,26 +6,26 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 
 This page is for contributors and evaluators. It describes intentions, not release commitments. Read the [security model](../security-model.md) before connecting a service.
 
-## Delivered in 0.1.0
+## Delivered in 0.1.0 and 0.1.1
 
-The pre-release provides the terminal case workflow, policy-gated connectors, signed custody, guarded model conversations, and bounded Parquet queries over synthetic evidence. See the [changelog](../../CHANGELOG.md) for what shipped and its limitations. Manual model and live connector validation remain open.
+The pre-releases provide the terminal case workflow, policy-gated connectors, signed custody, guarded model conversations, bounded Parquet queries, a synthetic demo, a parser detection registry, verified installers, and Sigstore-signed and attested assets. See the [changelog](../../CHANGELOG.md) for what shipped and its limitations. Manual model and live connector validation remain open.
 
 ## v0.1.x: Stabilize the pre-release
 
 Stabilize the pre-release with manual validation, verifiable installation, and signed assets.
 
 - Validate H5 manually with DeepSeek and test one connector against a real test environment.
-- Add Sigstore keyless signatures, GitHub artifact attestations, and an SBOM for release assets, starting with v0.1.1.
+- Maintain Sigstore keyless signatures, GitHub artifact attestations, and an SBOM for release assets, delivered in v0.1.1.
 - Sign macOS binaries with Developer ID, hardened runtime, and `notarytool` notarization in a protected release environment that runs only on tags. The maintainer must provision the certificate and App Store Connect API key before implementation; secrets are never configured through a roadmap issue.
 - Apply to the SignPath Foundation open-source program for Windows Authenticode signing. Publish `CODE_SIGNING.md` to describe signed assets, release approval, and build provenance. The application is a maintainer task.
-- Publish checksum-verified install scripts and a Linux aarch64 binary. Homebrew, AUR, Nix, winget, and Scoop packaging is open to community maintainers.
+- Maintain checksum-verified install scripts and the Linux aarch64 binary, delivered in v0.1.1. Homebrew, AUR, Nix, winget, and Scoop packaging is open to community maintainers.
 - Reduce co-observation disk use, improve `entity_lookup`, and bound worst-case three-hop `path` queries ([issue #37](https://github.com/ns2switch/irmind/issues/37)).
 
 ## v0.2: Parsers and connectors
 
 Add detected log parsers and read-only structured-query connectors.
 
-- Add a detection registry. Each parser is a Cargo module activated only when its detector recognizes the log; ambiguous matches ask the analyst. A forced choice is audited.
+- Extend the detection registry delivered in v0.1.1. Each parser is a Cargo module activated only when its detector recognizes the log; ambiguous matches ask the analyst. A forced choice is audited.
 - Add experimental parsers for Windows EVTX; syslog; Linux authentication, auditd, journald, nginx, and Apache logs; ECS; OCSF; Velociraptor; Hayabusa; Chainsaw; plaso; EZTools; Zeek; Suricata EVE; and a user-defined declarative format.
 - Add experimental `siem-elastic` and `siem-chronicle` connectors with structured queries, minimum read permissions, synthetic contracts, and signed evidence. Community connector requests include Microsoft Sentinel and Wazuh.
 - Track remaining log formats as [good first issues](https://github.com/ns2switch/irmind/issues?q=is%3Aissue+label%3A%22good+first+issue%22).

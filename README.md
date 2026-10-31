@@ -110,7 +110,7 @@ Read [security-model.md](docs/security-model.md) before connecting a provider.
 
 ## Roadmap
 
-- **v0.1.x:** Stabilize the pre-release, validate a model and connector, and add verifiable release assets.
+- **v0.1.x:** Stabilize the pre-release, validate a model and connector, and add native platform signing.
 - **v0.2:** Add modular log parsers and structured-query SIEM connectors.
 - **v0.3:** Add signed, progressively loaded forensic skills.
 - **v0.4:** Add bounded parallel subagents and streamed engine events.
