@@ -107,7 +107,7 @@ fn concurrent_ingest_serializes_a_case() {
             });
         }
     });
-    assert_eq!(engine.verify(&case.id).unwrap(), 13);
+    assert_eq!(engine.verify(&case.id).unwrap(), 17);
 }
 
 #[test]

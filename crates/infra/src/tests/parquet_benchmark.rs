@@ -93,6 +93,9 @@ fn benchmark(files: usize, multiplier: usize, label: &str) {
             eprintln!("PARQUET_PROGRESS files={} of {files}", start + 4);
         }
     }
+    if label == "15gb" {
+        total_bytes += stage_worst_case_path(&source_root, &case.id, &ingest);
+    }
     let episodes = hunteval_eval::root_from_environment().map(|root| {
         let episodes = hunteval_eval::load_episodes(&root);
         let names = hunteval_eval::stage_sources(&source_root, &episodes);
@@ -120,8 +123,17 @@ fn benchmark(files: usize, multiplier: usize, label: &str) {
     let ingest_time = started.elapsed();
     let [hash_time, conversion_time, row_time, parquet_time, _, _] = profile.snapshot();
     let disk_bytes = directory_bytes(&root.path().join("case/parquet"));
+    let coobservation_bytes = store
+        .entries(&case.id)
+        .unwrap()
+        .iter()
+        .filter(|entry| entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV1)
+        .map(|entry| irmind_domain::ParquetArtifactV1::decode(&entry.payload).unwrap())
+        .filter(|artifact| artifact.schema_version == "irmind-coobservations-v1")
+        .map(|artifact| artifact.size)
+        .sum::<u64>();
     println!(
-        "PARQUET_INGEST bytes={total_bytes} files={files} hash_seconds={:.3} conversion_seconds={:.3} row_seconds={:.3} parquet_seconds={:.3} wall_seconds={:.3} parquet_bytes={disk_bytes}",
+        "PARQUET_INGEST bytes={total_bytes} files={files} hash_seconds={:.3} conversion_seconds={:.3} row_seconds={:.3} parquet_seconds={:.3} wall_seconds={:.3} parquet_bytes={disk_bytes} coobservation_bytes={coobservation_bytes}",
         hash_time.as_secs_f64(),
         conversion_time.as_secs_f64(),
         row_time.as_secs_f64(),
@@ -193,6 +205,44 @@ fn benchmark(files: usize, multiplier: usize, label: &str) {
         hunteval_eval::evaluate_case(store.as_ref(), &case.id, &episodes, &mut metrics);
         hunteval_eval::report_metrics(label, &metrics);
     }
+    if label == "15gb" {
+        let started = Instant::now();
+        let path = store
+            .graph_path(&case.id, ("account", "887700000000"), ("ip", "192.0.2.250"))
+            .unwrap();
+        println!(
+            "PARQUET_WORST_PATH seconds={:.3} truncated={}",
+            started.elapsed().as_secs_f64(),
+            path.contains("truncated")
+        );
+        assert!(path.contains("truncated"));
+    }
+}
+
+fn stage_worst_case_path(
+    source_root: &Path,
+    id: &CaseId,
+    ingest: &LargeCaseUseCases<'_, '_>,
+) -> u64 {
+    let mut records = Vec::new();
+    for ip in 1..=50 {
+        records.push(format!("{{\"eventTime\":\"2026-10-28T12:00:00Z\",\"eventName\":\"Branch\",\"recipientAccountId\":\"887700000000\",\"sourceIPAddress\":\"203.0.113.{ip}\"}}"));
+        for peer in 0..5 {
+            records.push(format!("{{\"eventTime\":\"2026-10-28T12:00:00Z\",\"eventName\":\"Branch\",\"recipientAccountId\":\"8877{ip:04}{peer:04}\",\"sourceIPAddress\":\"203.0.113.{ip}\"}}"));
+        }
+    }
+    let mut bytes = 0;
+    for (part, batch) in records.chunks(50).enumerate() {
+        let name = format!("worst-path-{part:02}.json");
+        let data = format!("{{\"Records\":[{}]}}", batch.join(","));
+        bytes += data.len() as u64;
+        fs::write(source_root.join(&name), data).unwrap();
+        ingest
+            .ingest_local(id, source_root, &name, false, &CancellationToken::new())
+            .unwrap();
+        fs::remove_file(source_root.join(name)).unwrap();
+    }
+    bytes
 }
 
 fn directory_bytes(root: &Path) -> u64 {

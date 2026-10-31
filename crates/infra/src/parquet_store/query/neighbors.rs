@@ -1,9 +1,9 @@
 use super::{
     AppError, CancellationToken, CaseId, GraphQueryFilter, Instant, MAX_NEIGHBOR_RECORDS,
     ParquetArtifactV1, ParquetStore, Predicate, QUERY_DEADLINE, ScanFlow, ScanSpec, TargetScan,
-    complete, number, text, time_rules,
+    complete, coobservation_available, number, text, time_rules,
 };
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 
 impl ParquetStore {
@@ -16,6 +16,10 @@ impl ParquetStore {
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        if coobservation_available(artifacts, filter) {
+            return self
+                .neighbors_from_coobservations(id, artifacts, filter, entity, limit, cancel);
+        }
         let deadline = Instant::now() + QUERY_DEADLINE;
         let TargetScan {
             records: targets,
@@ -39,7 +43,10 @@ impl ParquetStore {
                 for row in 0..batch.num_rows() {
                     let hash = text(batch, "source_hash", row)?;
                     let index = number(batch, "record_index", row)?;
-                    if !targets.contains(&(hash.to_owned(), index)) {
+                    if !targets
+                        .get(hash)
+                        .is_some_and(|indexes| indexes.contains(&index))
+                    {
                         continue;
                     }
                     let kind = text(batch, "entity_kind", row)?;
@@ -69,6 +76,42 @@ impl ParquetStore {
         Ok(output)
     }
 
+    fn neighbors_from_coobservations(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        filter: &GraphQueryFilter,
+        entity: (&str, &str),
+        limit: usize,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        let result = self.scan_coobservations(
+            id,
+            artifacts,
+            filter,
+            entity,
+            Instant::now() + QUERY_DEADLINE,
+            cancel,
+        )?;
+        complete(result.status)?;
+        let mut rows = result.neighbors.into_iter().collect::<Vec<_>>();
+        rows.sort_by(|left, right| right.1.0.cmp(&left.1.0).then_with(|| left.0.cmp(&right.0)));
+        rows.truncate(limit.min(20));
+        if rows.is_empty() {
+            return Ok("no neighbors in the bounded Parquet query; refine the entity".into());
+        }
+        let mut output = rows
+            .into_iter()
+            .map(|((kind, value), (count, _))| format!("{kind} {value} co-observed {count} times"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if result.sampled {
+            write!(output, "\nPartial result: sampled {MAX_NEIGHBOR_RECORDS} matching records; refine the entity to narrow the search.")
+                .map_err(super::super::storage)?;
+        }
+        Ok(output)
+    }
+
     pub(super) fn native_targets(
         &self,
         id: &CaseId,
@@ -83,7 +126,7 @@ impl ParquetStore {
             Predicate::Equal("entity_kind", entity.0.into()),
             Predicate::Equal("entity_value", entity.1.into()),
         ]);
-        let mut targets = HashSet::new();
+        let mut targets = HashMap::<String, HashSet<u64>>::new();
         let mut count = 0usize;
         let status = self.scan_artifacts(
             ScanSpec {
@@ -102,10 +145,10 @@ impl ParquetStore {
                     if count > MAX_NEIGHBOR_RECORDS {
                         return Ok(ScanFlow::Stop);
                     }
-                    targets.insert((
-                        text(batch, "source_hash", row)?.into(),
-                        number(batch, "record_index", row)?,
-                    ));
+                    targets
+                        .entry(text(batch, "source_hash", row)?.into())
+                        .or_default()
+                        .insert(number(batch, "record_index", row)?);
                 }
                 Ok(ScanFlow::Continue)
             },
