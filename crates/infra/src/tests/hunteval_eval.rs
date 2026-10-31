@@ -141,6 +141,16 @@ fn evaluate_events(
     stats: &mut ProviderMetrics,
 ) {
     let mut times = Vec::new();
+    let case_timeline = timed(stats, "case_timeline", || {
+        store.timeline_filtered(id, filter, 100)
+    })
+    .unwrap();
+    assert!(
+        case_timeline
+            .windows(2)
+            .all(|pair| pair[0].at >= pair[1].at),
+        "case timeline is not newest first"
+    );
     for event_id in &episode.truth.malicious_event_ids {
         stats.event_total += 1;
         let (index, source) = event(episode, event_id);
@@ -170,6 +180,11 @@ fn evaluate_events(
         })
         .unwrap();
         let at = source["event_time"].as_str().unwrap();
+        let row = case_timeline
+            .iter()
+            .find(|row| row.evidence_hash == episode.hash && row.record_index == index)
+            .unwrap_or_else(|| panic!("case timeline omitted {event_id}"));
+        assert_eq!(row.at, at, "case timeline timestamp differs for {event_id}");
         assert!(
             timeline.contains(at),
             "timeline {event_id} in {}",
