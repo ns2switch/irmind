@@ -1,4 +1,4 @@
-Traducción de README.md en el commit e31fd5cc947308542888df4a52164d8892c56b93; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit f65d0356df53f08824e1f36ad36ca70018889031; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -9,7 +9,7 @@ Cliente de IA en terminal para investigaciones de seguridad, con llamadas a herr
 *La demostración usa evidencia sintética y una clave efímera. El modelo guionizado no necesita red ni cuenta.*
 
 > [!WARNING]
-> IRMind 0.1.0 es una versión preliminar para evaluar con datos sintéticos. No ha superado la validación manual con un modelo ni con conectores reales. No la uses para incidentes reales ni datos sensibles.
+> IRMind 0.1.1 es una versión preliminar para evaluar con datos sintéticos. No ha superado la validación manual con un modelo ni con conectores reales. No la uses para incidentes reales ni datos sensibles.
 
 ## Qué puedes hacer
 
@@ -42,7 +42,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-La [versión preliminar v0.1.0](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) ofrece binarios sin firma. Desde v0.1.1 se añaden bundles Sigstore sin claves permanentes y procedencia de GitHub. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.1.1](https://github.com/ns2switch/irmind/releases/tag/v0.1.1) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
