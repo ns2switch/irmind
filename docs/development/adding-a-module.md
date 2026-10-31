@@ -16,7 +16,7 @@ Read the [architecture](architecture.md), [security model](../security-model.md)
 
 ## Add a connector
 
-1. Pick an existing port (`SiemPort`, `EdrPort`, `CloudAuditPort`, `ThreatIntelPort`, or `ObjectSource`). Discuss a new port before adding one. The [SIEM template](../../crates/module-template/) compiles and passes `run_siem_contract`; it is synthetic and is not registered in the binary.
+1. Pick an existing port (`SiemPort`, `EdrPort`, `CloudAuditPort`, `ThreatIntelPort`, or `ObjectSource`). Discuss a new port before adding one. The [SIEM template](../../crates/module-template/src/lib.rs) compiles and passes `run_siem_contract`; it is synthetic and is not registered in the binary.
 2. Define a `ModuleManifest` with an ID, port, tools, and configuration fields. Put non-secret settings in `config.toml`; declare secret fields for `SecretBackend`. The composition root injects secrets through `ModuleConfig`. The module must never read environment variables or a key store.
 3. Implement the port's single async `execute` method. Accept only `AuthorizedCall`, check the exact tool and source, respect `CancellationToken`, and bound requests and responses. Use HTTPS with host verification, no redirects, and an explicit timeout. Never put credentials, URLs with secrets, or evidence in errors or tracing.
 4. Keep product-specific query construction inside the adapter. Translate structured, policy-scoped fields into the product dialect with escaped values. Do not execute model-supplied free-form query text.
