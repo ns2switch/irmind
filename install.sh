@@ -76,11 +76,11 @@ else
   printf '%s\n' 'cosign is unavailable: verify the published Sigstore bundles manually for publisher identity.' >&2
 fi
 
-if command -v gh >/dev/null 2>&1; then
+if command -v gh >/dev/null 2>&1 && gh attestation verify --help >/dev/null 2>&1; then
   gh attestation verify "$temporary/$asset" -R "$repo" >/dev/null \
     || fail 'GitHub provenance verification failed; nothing was installed'
 else
-  printf '%s\n' "gh is unavailable: run gh attestation verify $asset -R $repo after downloading it." >&2
+  printf '%s\n' "gh attestation verify is unavailable: install a current GitHub CLI, then run gh attestation verify $asset -R $repo." >&2
 fi
 
 mkdir -p "$install_dir" || fail 'cannot create the user installation directory'
