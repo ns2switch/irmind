@@ -1,7 +1,7 @@
 use super::{
     AppError, CancellationToken, CaseId, GraphQueryFilter, Instant, ParquetArtifactV1,
-    ParquetStore, QUERY_DEADLINE, ScanFlow, ScanSpec, ScanStatus, TargetScan, number, text,
-    time_rules,
+    ParquetStore, QUERY_DEADLINE, ScanFlow, ScanSpec, ScanStatus, TargetScan,
+    coobservation_available, number, text, time_rules,
 };
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
@@ -82,6 +82,41 @@ impl ParquetStore {
         deadline: Instant,
         cancel: &CancellationToken,
     ) -> Result<Option<CandidateBatch>, AppError> {
+        if coobservation_available(artifacts, filter) {
+            let result = self.scan_coobservations(
+                id,
+                artifacts,
+                filter,
+                (&entity.0, &entity.1),
+                deadline,
+                cancel,
+            )?;
+            if result.status == ScanStatus::Deadline {
+                return Ok(None);
+            }
+            let partial = result.sampled || result.neighbors.len() > MAX_PATH_NEIGHBORS;
+            return Ok(Some(CandidateBatch {
+                entries: result
+                    .neighbors
+                    .into_iter()
+                    .take(MAX_PATH_NEIGHBORS)
+                    .map(|((kind, value), (_, source))| (kind, value, source))
+                    .collect(),
+                partial,
+            }));
+        }
+        self.path_candidates_legacy(id, artifacts, filter, entity, deadline, cancel)
+    }
+
+    fn path_candidates_legacy(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifactV1],
+        filter: &GraphQueryFilter,
+        entity: &Entity,
+        deadline: Instant,
+        cancel: &CancellationToken,
+    ) -> Result<Option<CandidateBatch>, AppError> {
         let TargetScan {
             records: targets,
             sampled,
@@ -113,7 +148,10 @@ impl ParquetStore {
                 for row in 0..batch.num_rows() {
                     let hash = text(batch, "source_hash", row)?;
                     let index = number(batch, "record_index", row)?;
-                    if !targets.contains(&(hash.to_owned(), index)) {
+                    if !targets
+                        .get(hash)
+                        .is_some_and(|indexes| indexes.contains(&index))
+                    {
                         continue;
                     }
                     let kind = text(batch, "entity_kind", row)?;

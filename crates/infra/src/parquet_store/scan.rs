@@ -10,6 +10,9 @@ use irmind_domain::GraphQueryFilter;
 use memchr::{memchr, memchr2};
 use parquet::arrow::ProjectionMask;
 use parquet::arrow::arrow_reader::{ArrowPredicateFn, ParquetRecordBatchReaderBuilder, RowFilter};
+use parquet::file::properties::ReaderProperties;
+use parquet::file::reader::{FileReader, SerializedFileReader};
+use parquet::file::serialized_reader::ReadOptionsBuilder;
 use sha2::{Digest, Sha256};
 use std::io::Read as _;
 use std::sync::mpsc::{SyncSender, sync_channel};
@@ -142,7 +145,10 @@ impl ParquetStore {
             .artifacts
             .iter()
             .filter(|artifact| {
-                artifact.schema_version == spec.schema && partition_matches(artifact, spec.filter)
+                (artifact.schema_version == spec.schema
+                    || (spec.schema == "irmind-entities-v1"
+                        && artifact.schema_version == "irmind-entities-v2"))
+                    && partition_matches(artifact, spec.filter)
             })
             .collect::<Vec<_>>();
         if selected.len() > MAX_QUERY_FILES {
@@ -197,39 +203,21 @@ impl ParquetStore {
         spec: &ScanSpec<'_>,
         sender: &SyncSender<Result<ScanMessage, AppError>>,
     ) -> Result<ScanStatus, AppError> {
-        if spec.cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        if Instant::now() >= spec.deadline {
-            return Ok(ScanStatus::Deadline);
-        }
-        artifact.validate().map_err(|_| super::invalid_source())?;
-        let verify_started = Instant::now();
-        let mut file = irmind_fs::open_regular_no_follow(case_dir, Path::new(&artifact.path))
-            .map_err(storage)?;
-        let Some((digest, size)) = hash_until_deadline(&mut file, spec.cancel, spec.deadline)?
-        else {
+        let Some(file) = self.verify_for_scan(case_dir, artifact, spec)? else {
             return Ok(ScanStatus::Deadline);
         };
-        if size != artifact.size || digest != super::parse_hash(&artifact.sha256)? {
-            return Err(AppError::EvidenceMismatch(artifact.sha256.as_str().into()));
-        }
-        file.seek(SeekFrom::Start(0)).map_err(storage)?;
-        if let Some(profile) = &self.profile {
-            profile.record_query_verify(verify_started.elapsed());
-        }
         let scan_started = Instant::now();
+        let bloom = bloom_reader(&file, artifact, spec.predicates)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).map_err(storage)?;
         let required = projection(&builder, spec.columns)?;
-        let groups = builder
-            .metadata()
-            .row_groups()
-            .iter()
-            .enumerate()
-            .filter_map(|(index, group)| {
-                row_group_matches(&builder, group, spec.predicates).then_some(index)
-            })
-            .collect::<Vec<_>>();
+        let mut groups = Vec::new();
+        for (index, group) in builder.metadata().row_groups().iter().enumerate() {
+            if row_group_matches(&builder, group, spec.predicates)
+                && bloom_matches(bloom.as_ref(), index, &builder, spec.predicates)?
+            {
+                groups.push(index);
+            }
+        }
         if groups.is_empty() {
             return Ok(ScanStatus::Complete);
         }
@@ -260,6 +248,87 @@ impl ParquetStore {
         }
         Ok(ScanStatus::Complete)
     }
+
+    fn verify_for_scan(
+        &self,
+        case_dir: &Path,
+        artifact: &ParquetArtifactV1,
+        spec: &ScanSpec<'_>,
+    ) -> Result<Option<std::fs::File>, AppError> {
+        if spec.cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        if Instant::now() >= spec.deadline {
+            return Ok(None);
+        }
+        artifact.validate().map_err(|_| super::invalid_source())?;
+        let verify_started = Instant::now();
+        let mut file = irmind_fs::open_regular_no_follow(case_dir, Path::new(&artifact.path))
+            .map_err(storage)?;
+        let Some((digest, size)) = hash_until_deadline(&mut file, spec.cancel, spec.deadline)?
+        else {
+            return Ok(None);
+        };
+        if size != artifact.size || digest != super::parse_hash(&artifact.sha256)? {
+            return Err(AppError::EvidenceMismatch(artifact.sha256.as_str().into()));
+        }
+        file.seek(SeekFrom::Start(0)).map_err(storage)?;
+        if let Some(profile) = &self.profile {
+            profile.record_query_verify(verify_started.elapsed());
+        }
+        Ok(Some(file))
+    }
+}
+
+fn bloom_reader(
+    file: &std::fs::File,
+    artifact: &ParquetArtifactV1,
+    predicates: &[Predicate],
+) -> Result<Option<SerializedFileReader<std::fs::File>>, AppError> {
+    if !predicates
+        .iter()
+        .any(|predicate| matches!(predicate, Predicate::Equal("entity_value", _)))
+        || !matches!(
+            artifact.schema_version.as_str(),
+            "irmind-entities-v2" | "irmind-coobservations-v1"
+        )
+    {
+        return Ok(None);
+    }
+    SerializedFileReader::new_with_options(
+        file.try_clone().map_err(storage)?,
+        ReadOptionsBuilder::new()
+            .with_reader_properties(
+                ReaderProperties::builder()
+                    .set_read_bloom_filter(true)
+                    .build(),
+            )
+            .build(),
+    )
+    .map(Some)
+    .map_err(storage)
+}
+
+fn bloom_matches(
+    reader: Option<&SerializedFileReader<std::fs::File>>,
+    row_group: usize,
+    builder: &ParquetRecordBatchReaderBuilder<std::fs::File>,
+    predicates: &[Predicate],
+) -> Result<bool, AppError> {
+    let Some(reader) = reader else {
+        return Ok(true);
+    };
+    let Some(value) = predicates.iter().find_map(|predicate| match predicate {
+        Predicate::Equal("entity_value", value) => Some(value),
+        _ => None,
+    }) else {
+        return Ok(true);
+    };
+    let column = builder.schema().index_of("entity_value").map_err(storage)?;
+    let group = reader.get_row_group(row_group).map_err(storage)?;
+    Ok(group
+        .get_column_bloom_filter(column)
+        .is_none_or(|filter| filter.check(&value.as_str())))
 }
 
 fn hash_until_deadline(

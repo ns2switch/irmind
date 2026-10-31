@@ -45,6 +45,7 @@ impl LargeCaseStore for ParquetStore {
             parser,
             cancel,
             profile: self.profile.as_deref(),
+            legacy_entities: self.legacy_entities,
         })?;
         let after = source.metadata().map_err(|error| {
             storage_phase(
@@ -224,13 +225,18 @@ impl LargeCaseStore for ParquetStore {
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
         let temporary = TempWorkspace::new(&self.root)?;
-        let fresh = ParquetStore::open(&temporary.path)?;
+        let mut fresh = ParquetStore::open(&temporary.path)?;
         let mut checked = 0usize;
         let mut rebuilt = Vec::new();
         for source in sources {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
+            fresh.legacy_entities = artifacts.iter().any(|artifact| {
+                artifact.source_hashes.len() == 1
+                    && artifact.source_hashes[0] == source.sha256
+                    && artifact.schema_version == "irmind-entities-v1"
+            });
             let prepared =
                 fresh.prepare_local(case_id, source_root, &source.source, false, parser, cancel)?;
             if prepared.manifest.sha256 != source.sha256 || prepared.manifest.size != source.size {

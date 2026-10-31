@@ -104,7 +104,7 @@ fn open_legacy_case_migrates_with_verified_chain_and_v4_export() {
             .unwrap(),
         0
     );
-    assert_eq!(engine.verify(&case.id).unwrap(), 5);
+    assert_eq!(engine.verify(&case.id).unwrap(), 6);
     assert_eq!(
         use_cases
             .verify_parquet_rebuild(&case.id, root.path(), &CancellationToken::new())
@@ -292,7 +292,7 @@ fn signed_bundles_replace_base_files_for_queries_and_rebuild_exactly() {
         large
             .compact_case(&case.id, &CancellationToken::new())
             .unwrap(),
-        2
+        3
     );
     assert_eq!(
         large
@@ -300,7 +300,7 @@ fn signed_bundles_replace_base_files_for_queries_and_rebuild_exactly() {
             .unwrap(),
         0
     );
-    assert_eq!(engine.verify(&case.id).unwrap(), 9);
+    assert_eq!(engine.verify(&case.id).unwrap(), 12);
     assert_eq!(
         large
             .verify_parquet_rebuild(&case.id, &source_root, &CancellationToken::new())
