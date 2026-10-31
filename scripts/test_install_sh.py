@@ -18,7 +18,7 @@ TOOLS = (
 
 
 class InstallerTests(unittest.TestCase):
-    def run_installer(self, *, tamper: bool = False, verifiers: bool = False, failure: bool = False):
+    def run_installer(self, *, tamper: bool = False, verifiers: bool = False, failure: bool = False, old_gh: bool = False):
         with tempfile.TemporaryDirectory(prefix="irmind-installer-test-") as temporary:
             root = Path(temporary)
             tools = root / "tools"
@@ -60,12 +60,14 @@ class InstallerTests(unittest.TestCase):
             if verifiers:
                 for name in ("cosign", "gh"):
                     tool = tools / name
-                    tool.write_text(
+                    script = (
                         "#!/bin/sh\n"
                         "printf '%s %s\\n' \"$0\" \"$*\" >> \"$VERIFY_LOG\"\n"
-                        "[ \"${VERIFY_FAIL:-0}\" != 1 ]\n",
-                        encoding="ascii",
                     )
+                    if name == "gh" and old_gh:
+                        script += "case $* in *--help*) exit 1;; esac\n"
+                    script += "[ \"${VERIFY_FAIL:-0}\" != 1 ]\n"
+                    tool.write_text(script, encoding="ascii")
                     tool.chmod(0o700)
             home = root / "home"
             home.mkdir()
@@ -102,6 +104,13 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("gh attestation verify", log)
         result, _ = self.run_installer(verifiers=True, failure=True)
         self.assertNotEqual(result.returncode, 0)
+
+    def test_old_gh_without_attestation_support_is_reported(self):
+        result, log = self.run_installer(verifiers=True, old_gh=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("install a current GitHub CLI", result.stderr)
+        self.assertIn("gh attestation verify --help", log)
+        self.assertNotIn("gh attestation verify /", log)
 
 
 if __name__ == "__main__":
