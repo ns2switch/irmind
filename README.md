@@ -42,7 +42,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-The [v0.1.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) provides unsigned binaries. Verify `SHA256SUMS` before running one. Follow the [platform guide](docs/platforms.md) for checksums, keystore backends, SSH, and terminal support.
+The [v0.1.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) provides unsigned binaries. Download a binary and `SHA256SUMS`, verify the exact checksum, then run it. Later releases attach [install.sh](install.sh) and [install.ps1](install.ps1) as a shorter route; download and verify the script itself before running it. The scripts verify the binary and, when available, its Sigstore signature and GitHub provenance. See the [platform guide](docs/platforms.md) for the steps and system-specific details.
 
 ## Try it in five minutes
 
