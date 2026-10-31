@@ -94,7 +94,9 @@ The normal build includes every current product module and both keystores. None 
 | SentinelOne | EDR | `edr-sentinelone` | experimental | [SentinelOne](docs/modules.md#sentinelone) |
 | MISP | internal threat intel | `ti-misp` | experimental | [MISP](docs/modules.md#misp) |
 | VirusTotal | external enrichment | `ti-virustotal` | experimental | [VirusTotal](docs/modules.md#virustotal) |
-| JSON and exported cloud log parser | local parser | included | experimental | [Local parser](docs/modules.md#streaming-json-and-exported-cloud-log-parser) |
+| JSON and exported cloud log parser | local parser | `parser-json` (default) | experimental | [Local parser](docs/modules.md#streaming-json-and-exported-cloud-log-parser) |
+| Elastic Common Schema parser | local parser | `parser-ecs` (default) | experimental | [ECS parser](docs/modules.md#elastic-common-schema-parser) |
+| OCSF JSON and Parquet parser | local parser | `parser-ocsf` (default) | experimental | [OCSF parser](docs/modules.md#ocsf-parser) |
 | OS keystore | signing and secrets | `keystore-os` (default) | experimental | [OS keystore](docs/modules.md#os-keystore) |
 | Encrypted-file keystore | signing and secrets | `keystore-file` (default) | experimental | [File keystore](docs/modules.md#file-keystore) |
 

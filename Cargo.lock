@@ -2451,7 +2451,9 @@ dependencies = [
  "irmind-mod-llm-deepseek",
  "irmind-mod-llm-openai-compatible",
  "irmind-mod-llm-openrouter",
+ "irmind-mod-parser-ecs",
  "irmind-mod-parser-json",
+ "irmind-mod-parser-ocsf",
  "irmind-mod-siem-splunk",
  "irmind-mod-storage-object",
  "irmind-mod-ti-misp",
@@ -2718,6 +2720,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-parser-ecs"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "irmind-app",
+ "irmind-domain",
+ "serde_json",
+]
+
+[[package]]
 name = "irmind-mod-parser-json"
 version = "0.1.0"
 dependencies = [
@@ -2725,6 +2737,19 @@ dependencies = [
  "irmind-domain",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-ocsf"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "chrono",
+ "irmind-app",
+ "irmind-domain",
+ "parquet",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -3425,6 +3450,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "seq-macro",
+ "serde_json",
  "snap",
  "twox-hash",
 ]

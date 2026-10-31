@@ -108,3 +108,14 @@ At 15 GB, ingestion remains under the 15-minute target, but the optimized Parque
 Entity lookup is 7.7% slower than the former SQL reader, within the 25% target; timeline is faster. Neighbors and direct path are below the 1.5-second p95 target. Term search uses the unchanged event scan: two optimized runs measured 3.206 s and 4.111 s, so the apparent regression against the 3.162-second baseline includes substantial runner variance. The worst measured three-hop path with 200 expansions took 10.056 s and explicitly reported truncation by the unchanged 10-second budget. A broad adversarial path can still be partial; the fast direct-path sample is not a bound for it.
 
 The optimized 15 GB needle check again recovered all 57 malicious events, 30 entities and 42 path segments, with zero parse errors. The highest episode-filtered query p95 remained 0.002 s for each provider. The optimized release binary was 46,734,792 B versus 44,145,224 B for the pinned baseline; Cargo.lock gained no dependencies. The run's warm release test build took 10 s and its separate binary build 56 s; those timings are cache-dependent and are not a cold-build comparison.
+
+## Experimental ECS and OCSF parser ingest
+
+This local, single-worker check used the same machine and test harness for both new parser modules. Each source was generated in a private temporary directory from a synthetic NDJSON record padded to roughly 1 KiB and removed with its derived Parquet after the run. The timed section includes source hashing, guarded parser selection already recorded in the test setup, normalization, signed manifest and audit writes, and Parquet conversion; it excludes source generation and the final explicit `verify`. `CARGO_BUILD_JOBS=1` and one test thread limited memory use. These numbers are local observations, not a standard-runner promise.
+
+| Parser | Synthetic bytes | Timed ingest | Throughput |
+| --- | ---: | ---: | ---: |
+| ECS NDJSON | 1,073,742,155 | 155.761 s | 6.57 MiB/s |
+| OCSF NDJSON | 1,073,742,992 | 170.475 s | 6.01 MiB/s |
+
+The 1 GiB `benchmark_one_gib_synthetic_ingest_per_parser` test in `parser_ingest` remains ignored in ordinary CI; run it manually with Cargo's ignored-test selector and one test thread. OCSF Parquet input has a small synthetic contract test but no 1 GiB throughput claim in this run.

@@ -144,9 +144,33 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 **Permission:** Read access to the selected local file only.
 
-**Configure:** Included and active in every binary. Use the TUI's `/ingest` picker or the [CLI ingest command](development/cli.md).
+**Configure:** Compiled by default with `parser-json`; a minimal build can omit it. Use the TUI's `/ingest` picker or the [CLI ingest command](development/cli.md).
 
 **Limits:** Deeply nested JSON and oversized individual records are rejected. Originals are hashed in place; copying one requires an explicit choice. Parquet searches use bounded substring matching and optional date, account or project, and region filters. Older derived indexes must be migrated from copied originals before graph queries are available. Other log formats need future parsers.
+
+## Elastic Common Schema parser
+
+**Does:** Detects ECS NDJSON from `@timestamp` and `ecs.version`, or characteristic ECS event and host fields. Maps event, host, user, source, destination, process, file, and URL fields into UTC records and entities. Unmapped fields remain in the local normalized record.
+
+**Permission:** Read access to the selected local file only.
+
+**Configure:** Compiled by default with `parser-ecs`. `/ingest` selects it automatically only with a unique high-confidence match; otherwise choose it explicitly after reviewing the candidates. The selection and parser version enter the signed source manifest.
+
+**Limits:** Experimental and tested with synthetic data only. Individual records are limited to 4 MiB, 1,024 fields, and 64 nesting levels; one source may contain at most ten million records and 50 GiB. Malformed lines are counted with bounded, escaped samples; they do not stop later lines. Timestamps are normalized to UTC seconds, while the original fractional value stays in the local record.
+
+The mapping follows the [official ECS field reference](https://www.elastic.co/docs/reference/ecs/ecs-reference).
+
+## OCSF parser
+
+**Does:** Detects OCSF JSON (including pretty-printed records) or NDJSON from `class_uid`, `category_uid`, and `metadata.version`. Maps Authentication, API Activity, Network Activity, Process Activity, File Activity, and Detection Finding. It also reads OCSF Parquet exports, including Security Lake files, through the existing Parquet reader. Unknown fields remain local as attributes.
+
+**Permission:** Read access to the selected local file and write access to a private temporary spool for Parquet input. The spool is deleted when parsing ends.
+
+**Configure:** Compiled by default with `parser-ocsf`. OCSF JSON is selected automatically on a unique high-confidence match. Parquet magic receives low confidence because the header alone cannot prove its schema, so the analyst must confirm it. The choice is signed.
+
+**Limits:** Experimental and tested with synthetic data only. JSON record limits match the ECS parser. Parquet files are limited to 2 GiB each, footer metadata to 16 MiB, row groups to 256 MiB, and mapped rows to 4 MiB; larger cases can ingest multiple files. Structurally corrupt Parquet files cannot be resynchronized safely and are rejected as a file, while malformed JSON lines are counted individually. Detection Finding is an unconfirmed source event, never an automatically confirmed case finding.
+
+The class mapping follows the [official OCSF schema](https://github.com/ocsf/ocsf-schema).
 
 ## OS keystore
 
