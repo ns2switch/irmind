@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 9de72907bf41d37d0d7e9c29c8cca76db8602e1d; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 5f0ed6431a60a1988732fbd5dfd38a4f6e869cca; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -95,7 +95,9 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | SentinelOne | EDR | `edr-sentinelone` | experimental | [Módulos](docs/es/modules.md) |
 | MISP | TI interna | `ti-misp` | experimental | [Módulos](docs/es/modules.md) |
 | VirusTotal | enriquecimiento externo | `ti-virustotal` | experimental | [Módulos](docs/es/modules.md) |
-| Parser JSON y logs de nube exportados | parser local | incluido | experimental | [Módulos](docs/es/modules.md) |
+| Parser JSON y logs de nube exportados | parser local | `parser-json` (por defecto) | experimental | [Módulos](docs/es/modules.md) |
+| Parser de Elastic Common Schema | parser local | `parser-ecs` (por defecto) | experimental | [ECS](docs/es/modules.md#parser-de-elastic-common-schema) |
+| Parser de OCSF JSON y Parquet | parser local | `parser-ocsf` (por defecto) | experimental | [OCSF](docs/es/modules.md#parser-de-ocsf) |
 | Llavero del sistema | firma y secretos | `keystore-os` (por defecto) | experimental | [Módulos](docs/es/modules.md#llavero-del-sistema) |
 | Archivo cifrado | firma y secretos | `keystore-file` (por defecto) | experimental | [Módulos](docs/es/modules.md#archivo-cifrado) |
 
