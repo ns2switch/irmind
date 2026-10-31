@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 6f88954e40a2cd29218d06ebf8bb9111609b28d8; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 63c11fcb409f8df79e2dbba8ca88a3c73aa5b9b2; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -9,8 +9,7 @@ Cliente de IA en terminal para investigaciones de seguridad, con llamadas a herr
 *Esta demostración sin conexión usa evidencia sintética, un llavero de archivo efímero y un modelo falso.*
 
 > [!WARNING]
-> IRMind está en desarrollo. Todavía no lo uses con incidentes reales ni datos sensibles.
-> Los ejemplos de este repositorio son sintéticos.
+> IRMind 0.1.0 es una versión preliminar para evaluar con datos sintéticos. No ha superado la validación manual con un modelo ni con conectores reales. No la uses para incidentes reales ni datos sensibles.
 
 ## Qué puedes hacer
 
@@ -43,7 +42,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-Todavía no hay binarios publicados como versión. CI genera artefactos sin firma solo para tags de versión y ejecuciones nocturnas tras cambios de código. Verifica `SHA256SUMS` antes de ejecutarlos. La [guía de plataformas](docs/es/platforms.md) explica las comprobaciones, los almacenes de claves y el uso por SSH.
+La [versión preliminar v0.1.0](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) ofrece binarios sin firma. Verifica `SHA256SUMS` antes de ejecutarlos. La [guía de plataformas](docs/es/platforms.md) explica las comprobaciones, los almacenes de claves y el uso por SSH.
 
 ## Primer caso en la TUI
 
