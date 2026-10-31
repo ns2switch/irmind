@@ -129,6 +129,9 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             {
                 Ok(text) => self.finish_success(label, text)?,
                 Err(irmind_app::AppError::Cancelled) => {
+                    if label == "Ingest" {
+                        self.state.pending_ingest = None;
+                    }
                     if label == "IRMind" {
                         self.state.conversation.discard_preview();
                     }
@@ -140,6 +143,24 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     );
                 }
                 Err(error) => {
+                    if label == "Ingest" {
+                        if let irmind_app::AppError::ParserSelection {
+                            source_name,
+                            candidates,
+                        } = error
+                        {
+                            self.state.parser_prompt = Some(super::state::ParserPrompt {
+                                source: source_name,
+                                candidates,
+                                selected: 0,
+                                typed_option: String::new(),
+                            });
+                            self.state.running_since = None;
+                            self.state.progress_status = None;
+                            return Ok(());
+                        }
+                        self.state.pending_ingest = None;
+                    }
                     if label == "IRMind" {
                         self.state.conversation.discard_preview();
                     }
@@ -163,6 +184,9 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
     }
 
     fn finish_success(&mut self, label: &'static str, text: String) -> Result<()> {
+        if label == "Ingest" {
+            self.state.pending_ingest = None;
+        }
         if label == "IRMind" {
             self.state.conversation.discard_preview();
             self.state.pending_final_reply = Some(self.engine.guard.screen(&text)?.text);

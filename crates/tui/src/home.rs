@@ -142,6 +142,7 @@ pub(crate) struct HomeState {
     restart_required: bool,
     overrides_active: bool,
     modules: Vec<ModuleStatus>,
+    parsers: Vec<(String, String)>,
     module_selected: usize,
     parameter_selected: usize,
     module_edit: Option<ModuleEdit>,
@@ -211,6 +212,7 @@ impl HomeState {
             restart_required: false,
             overrides_active: false,
             modules: Vec::new(),
+            parsers: Vec::new(),
             module_selected: 0,
             parameter_selected: 0,
             module_edit: None,
@@ -336,16 +338,7 @@ pub(crate) fn run_home(
     shutdown: &CancellationToken,
     launch: WorkspaceLaunch<'_>,
 ) -> Result<crate::WorkspaceOutcome> {
-    let mut state = HomeState::new(
-        load_rows(engine)?,
-        launch.new_analyst_key || engine.repo.list_cases()?.is_empty(),
-    );
-    state.set_modules(modules);
-    state.resume_last_case = launch.resume_last_case;
-    state.ui_selection.mouse_capture = launch.mouse_capture;
-    state.theme_choice = launch.theme.unwrap_or("auto").into();
-    state.overrides_active = launch.overrides_active;
-    state.refresh_keystore(io_ops);
+    let mut state = prepare_home_state(engine, io_ops, modules, launch)?;
     {
         let mut startup = StartupCaseView {
             terminal,
@@ -412,6 +405,32 @@ pub(crate) fn run_home(
             .map_err(|_| anyhow::anyhow!("case verification worker failed"))??;
         outcome
     })
+}
+
+fn prepare_home_state(
+    engine: &Engine<'_>,
+    io_ops: &dyn WorkspaceIo,
+    modules: &[ModuleStatus],
+    launch: WorkspaceLaunch<'_>,
+) -> Result<HomeState> {
+    let mut state = HomeState::new(
+        load_rows(engine)?,
+        launch.new_analyst_key || engine.repo.list_cases()?.is_empty(),
+    );
+    state.set_modules(modules);
+    if let Some(catalog) = io_ops.parser_catalog() {
+        state.parsers = catalog
+            .available()
+            .into_iter()
+            .map(|(name, version)| (name.into(), version.into()))
+            .collect();
+    }
+    state.resume_last_case = launch.resume_last_case;
+    state.ui_selection.mouse_capture = launch.mouse_capture;
+    state.theme_choice = launch.theme.unwrap_or("auto").into();
+    state.overrides_active = launch.overrides_active;
+    state.refresh_keystore(io_ops);
+    Ok(state)
 }
 
 struct StartupCaseView<'a, 'ports> {

@@ -3,7 +3,7 @@ use super::{
     SourceCheckMode, SourceManifestV1, sha256,
 };
 use crate::SignedOperation;
-use irmind_domain::{Actor, SealedParquetMigrationV1};
+use irmind_domain::{Actor, SealedParquetMigrationV1, SourceManifestV2};
 
 pub(crate) fn read_manifest_index(
     entries: &[crate::SignedEntry],
@@ -13,6 +13,7 @@ pub(crate) fn read_manifest_index(
     let mut source_hashes = BTreeSet::new();
     let mut source_names = BTreeSet::new();
     let mut artifact_paths = BTreeSet::new();
+    let mut parser_selections = BTreeMap::new();
     for entry in entries {
         match entry.kind {
             AuditEventKind::EvidenceIngested | AuditEventKind::GraphIndexed => {
@@ -36,6 +37,15 @@ pub(crate) fn read_manifest_index(
                 source_hashes.insert(source.sha256.clone());
                 sources.push(source);
             }
+            AuditEventKind::SourceManifestV2 => {
+                record_parser_manifest(
+                    entry,
+                    &mut source_names,
+                    &mut source_hashes,
+                    &mut sources,
+                    &mut parser_selections,
+                )?;
+            }
             AuditEventKind::ParquetArtifactV1 => {
                 if entry.evidence.is_some() {
                     return Err(AppError::InvalidChain(entry.seq));
@@ -57,6 +67,16 @@ pub(crate) fn read_manifest_index(
             _ => {}
         }
     }
+    validate_manifest_links(entries, &sources, &artifacts, parser_selections)?;
+    Ok(ManifestIndex { sources, artifacts })
+}
+
+fn validate_manifest_links(
+    entries: &[crate::SignedEntry],
+    sources: &[SourceManifestV1],
+    artifacts: &[ParquetArtifactV1],
+    parser_selections: BTreeMap<String, (SourceManifestV2, u64)>,
+) -> Result<(), AppError> {
     let indexed: BTreeSet<_> = artifacts
         .iter()
         .flat_map(|artifact| artifact.source_hashes.iter())
@@ -71,7 +91,41 @@ pub(crate) fn read_manifest_index(
             entries.last().map_or(0, |entry| entry.seq),
         ));
     }
-    Ok(ManifestIndex { sources, artifacts })
+    for (_, (selection, seq)) in parser_selections {
+        if !artifacts.iter().any(|artifact| {
+            artifact.source_hashes.len() == 1
+                && artifact.source_hashes[0] == selection.source.sha256
+                && artifact.parser_version == selection.parser_version
+        }) {
+            return Err(AppError::InvalidChain(seq));
+        }
+    }
+    Ok(())
+}
+
+fn record_parser_manifest(
+    entry: &crate::SignedEntry,
+    source_names: &mut BTreeSet<String>,
+    source_hashes: &mut BTreeSet<EvidenceHash>,
+    sources: &mut Vec<SourceManifestV1>,
+    parser_selections: &mut BTreeMap<String, (SourceManifestV2, u64)>,
+) -> Result<(), AppError> {
+    if entry.evidence.is_some() {
+        return Err(AppError::InvalidChain(entry.seq));
+    }
+    let selection =
+        SourceManifestV2::decode(&entry.payload).map_err(|_| AppError::InvalidChain(entry.seq))?;
+    let source = &selection.source;
+    if !source_names.insert(source.source.clone())
+        || parser_selections
+            .insert(source.source.clone(), (selection.clone(), entry.seq))
+            .is_some()
+    {
+        return Err(AppError::InvalidChain(entry.seq));
+    }
+    source_hashes.insert(source.sha256.clone());
+    sources.push(source.clone());
+    Ok(())
 }
 
 pub(crate) fn read_sealed_artifacts(

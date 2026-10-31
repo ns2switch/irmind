@@ -25,25 +25,34 @@ pub(super) fn home_items(
         Mode::New => Vec::new(),
         Mode::Model => model_items(state, &escaped)?,
         Mode::Modules => module_items(state, modules, &escaped)?,
-        Mode::Config => vec![
-            ListItem::new(format!(
-                "Resume last case: {}",
-                if state.resume_last_case.enabled() {
-                    "on"
-                } else {
-                    "off"
-                }
-            )),
-            ListItem::new(format!(
-                "Mouse capture: {}",
-                if state.ui_selection.mouse_capture {
-                    "on"
-                } else {
-                    "off"
-                }
-            )),
-            ListItem::new(format!("Theme: {}", state.theme_choice)),
-        ],
+        Mode::Config => {
+            let mut items = vec![
+                ListItem::new(format!(
+                    "Resume last case: {}",
+                    if state.resume_last_case.enabled() {
+                        "on"
+                    } else {
+                        "off"
+                    }
+                )),
+                ListItem::new(format!(
+                    "Mouse capture: {}",
+                    if state.ui_selection.mouse_capture {
+                        "on"
+                    } else {
+                        "off"
+                    }
+                )),
+                ListItem::new(format!("Theme: {}", state.theme_choice)),
+            ];
+            if !state.parsers.is_empty() {
+                items.push(ListItem::new("Compiled parsers · experimental"));
+                items.extend(state.parsers.iter().map(|(name, version)| {
+                    ListItem::new(format!("  {name} · {version} · experimental"))
+                }));
+            }
+            items
+        }
         Mode::Keystore => keystore_items(state),
         Mode::VerifyExport => ["Package path", "Expected analyst key fingerprint"]
             .iter()

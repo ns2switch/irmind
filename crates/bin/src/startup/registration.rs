@@ -6,6 +6,8 @@ use super::AwsCloudTrail;
 use super::CrowdStrike;
 #[cfg(feature = "llm-deepseek")]
 use super::DeepSeek;
+#[cfg(feature = "parser-json")]
+use super::JsonParser;
 #[cfg(feature = "ti-misp")]
 use super::Misp;
 #[cfg(feature = "llm-openrouter")]
@@ -17,9 +19,11 @@ use super::Splunk;
 #[cfg(feature = "ti-virustotal")]
 use super::VirusTotal;
 use super::{
-    BTreeMap, Cli, DEFAULT_LLM_MODULE, JsonParser, ModuleConfig, ModuleRegistry, OpenAiCompatible,
-    PersistentConfig, Result, SecretBackend, anyhow, configuration_issue, load_module_config,
+    BTreeMap, Cli, DEFAULT_LLM_MODULE, ModuleRegistry, OpenAiCompatible, PersistentConfig, Result,
+    SecretBackend, anyhow, configuration_issue, load_module_config,
 };
+#[cfg(feature = "parser-json")]
+use irmind_app::modules::ModuleConfig;
 #[cfg(any(
     feature = "storage-s3",
     feature = "storage-gcs",
@@ -36,6 +40,7 @@ pub(super) fn configured_registry(
 ) -> Result<(ModuleRegistry, BTreeMap<&'static str, String>)> {
     let mut registry = ModuleRegistry::new();
     let mut config_issues = BTreeMap::<&'static str, String>::new();
+    #[cfg(feature = "parser-json")]
     registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
     register_llm(
         cli,

@@ -4,10 +4,11 @@ use stream::{StreamInput, initial_hash, stream_records};
 use super::{
     AppError, BATCH_BYTES, BATCH_ROWS, BTreeMap, CancellationToken, CaseId, EvidenceHash, File,
     GraphRecord, HashingReader, Instant, LargeCaseStore, OpenOptions, ParquetArtifactV1,
-    ParquetProfile, ParquetStore, Partition, PartitionSinks, Path, PreparedSource, RecordRow, Seek,
-    SeekFrom, SourceManifestV1, StreamingEventParser, TempWorkspace, UNIX_EPOCH, Write,
-    batch_to_parquet, finish_parquet, invalid_source, parse_hash, storage, storage_phase,
+    ParquetProfile, ParquetStore, ParseReport, Partition, PartitionSinks, Path, PreparedSource,
+    RecordRow, Seek, SeekFrom, SourceManifestV1, StreamingEventParser, TempWorkspace, UNIX_EPOCH,
+    Write, batch_to_parquet, finish_parquet, invalid_source, parse_hash, storage, storage_phase,
 };
+use std::io::Read as _;
 
 impl LargeCaseStore for ParquetStore {
     fn prepare_local(
@@ -26,6 +27,13 @@ impl LargeCaseStore for ParquetStore {
             )
         })?;
         let (metadata, hash, size) = initial_hash(&mut source, cancel, self.profile.as_deref())?;
+        source.seek(SeekFrom::Start(0)).map_err(storage)?;
+        let mut format_sample = Vec::new();
+        (&mut source)
+            .take(64 * 1024)
+            .read_to_end(&mut format_sample)
+            .map_err(storage)?;
+        let format_sample_sha256 = irmind_app::sha256(&format_sample);
         let hash_value =
             EvidenceHash::parse(&irmind_app::hex(&hash)).map_err(|_| invalid_source())?;
         let conversion_started = Instant::now();
@@ -35,7 +43,7 @@ impl LargeCaseStore for ParquetStore {
                 irmind_app::AdapterStorageError::CannotPrepareParquetOutput,
             )
         })?;
-        let (records, open) = stream_records(StreamInput {
+        let (parse_report, open) = stream_records(StreamInput {
             source: &mut source,
             relative_path,
             hash,
@@ -63,7 +71,8 @@ impl LargeCaseStore for ParquetStore {
         if copy_original {
             self.copy_source(case_id, &mut source, &hash_value, cancel)?;
         }
-        let staged = finish_parquet(open, &hash_value).map_err(|error| {
+        let staged = finish_parquet(open, &hash_value, parser.version_for_source(relative_path)?)
+            .map_err(|error| {
             storage_phase(
                 error,
                 irmind_app::AdapterStorageError::CannotPrepareParquetOutput,
@@ -86,7 +95,9 @@ impl LargeCaseStore for ParquetStore {
         Ok(PreparedSource {
             manifest,
             artifacts,
-            records,
+            records: parse_report.accepted,
+            format_sample_sha256,
+            parse_report,
         })
     }
 
@@ -244,11 +255,12 @@ impl LargeCaseStore for ParquetStore {
             }
             let mut actual = prepared.artifacts;
             actual.sort_by(|a, b| a.path.cmp(&b.path));
+            let parser_version = parser.version_for_source(&source.source)?;
             let mut signed = artifacts
                 .iter()
                 .filter(|artifact| {
                     artifact.source_hashes.len() == 1
-                        && artifact.parser_version == "json-stream-v2"
+                        && artifact.parser_version == parser_version
                         && artifact.source_hashes.contains(&source.sha256)
                 })
                 .cloned()

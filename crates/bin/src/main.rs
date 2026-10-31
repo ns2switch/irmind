@@ -5,15 +5,15 @@ compile_error!("IRMind requires at least one signer and secret backend");
 
 mod cli;
 mod configuration;
-#[cfg(feature = "keystore-file")]
+#[cfg(all(feature = "keystore-file", feature = "parser-json"))]
 mod demo;
-#[cfg(not(feature = "keystore-file"))]
+#[cfg(not(all(feature = "keystore-file", feature = "parser-json")))]
 mod demo {
     pub(super) fn run(
         _shutdown: &irmind_app::CancellationToken,
         _scripted: bool,
     ) -> anyhow::Result<()> {
-        anyhow::bail!("demo requires a binary built with --features keystore-file")
+        anyhow::bail!("demo requires a binary built with keystore-file and parser-json")
     }
 }
 mod diagnostics;
@@ -33,7 +33,7 @@ use irmind_app::{
     AppError, AuditLog, CancellationToken, ConfigChange, ConfigurationStore, CryptoPorts, Engine,
     EnginePorts, EvidenceGraph, EvidenceStore, FindingKind, LargeCaseUseCases, PersistentConfig,
     Repository, SecretBackend, SignerBackend,
-    modules::{ModuleConfig, ModuleManifest, ModuleRegistry},
+    modules::{ModuleManifest, ModuleRegistry},
 };
 use irmind_domain::{CaseId, ExecutionMode, Severity};
 use irmind_infra::{
@@ -54,7 +54,12 @@ use irmind_mod_llm_deepseek::DeepSeek;
 use irmind_mod_llm_openai_compatible::{MODULE_ID as DEFAULT_LLM_MODULE, OpenAiCompatible};
 #[cfg(feature = "llm-openrouter")]
 use irmind_mod_llm_openrouter::OpenRouter;
+#[cfg(feature = "parser-json")]
 use irmind_mod_parser_json::JsonParser;
+#[cfg(not(feature = "parser-json"))]
+mod disabled_parser;
+#[cfg(not(feature = "parser-json"))]
+use disabled_parser::JsonParser;
 #[cfg(feature = "siem-splunk")]
 use irmind_mod_siem_splunk::Splunk;
 #[cfg(feature = "ti-misp")]
@@ -94,6 +99,7 @@ macro_rules! register_configured {
 }
 
 struct RootWorkspaceIo {
+    parser_catalog: irmind_app::modules::ParserCatalog,
     home: PathBuf,
     credential_fields: Vec<&'static str>,
     store: Arc<LocalStore>,
@@ -153,6 +159,23 @@ fn compiled_credential_fields() -> Vec<&'static str> {
 }
 
 impl WorkspaceIo for RootWorkspaceIo {
+    fn parser_catalog(&self) -> Option<&irmind_app::modules::ParserCatalog> {
+        Some(&self.parser_catalog)
+    }
+
+    fn read_format_sample(&self, path: &Path) -> Result<Vec<u8>> {
+        use std::io::Read as _;
+        let parent = path
+            .parent()
+            .ok_or_else(|| anyhow!("selected source has no parent"))?;
+        let name = path
+            .file_name()
+            .ok_or_else(|| anyhow!("selected source has no file name"))?;
+        let file = irmind_fs::open_regular_no_follow(parent, Path::new(name))?;
+        let mut sample = Vec::new();
+        file.take(64 * 1024).read_to_end(&mut sample)?;
+        Ok(sample)
+    }
     fn load_last_case(&self) -> Result<Option<CaseId>> {
         recent_case::load(&self.home)
     }

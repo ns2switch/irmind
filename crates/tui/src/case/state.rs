@@ -13,6 +13,63 @@ pub(super) enum Focus {
     Sidebar,
 }
 
+#[derive(Clone)]
+pub(super) struct PendingIngest {
+    pub path: std::path::PathBuf,
+    pub copy_original: bool,
+    pub forced_parser: Option<String>,
+    pub analyst_choices: BTreeMap<String, String>,
+}
+
+pub(super) struct ParserPrompt {
+    pub source: String,
+    pub candidates: Vec<(String, u8)>,
+    pub selected: usize,
+    pub typed_option: String,
+}
+
+pub(super) enum ParserPromptAction {
+    Keep,
+    Select(String),
+    Cancel,
+}
+
+impl ParserPrompt {
+    pub(super) fn update(&mut self, key: KeyCode) -> ParserPromptAction {
+        match key {
+            KeyCode::Esc => ParserPromptAction::Cancel,
+            KeyCode::Up => {
+                self.selected = self.selected.saturating_sub(1);
+                self.typed_option.clear();
+                ParserPromptAction::Keep
+            }
+            KeyCode::Down => {
+                self.selected = (self.selected + 1).min(self.candidates.len().saturating_sub(1));
+                self.typed_option.clear();
+                ParserPromptAction::Keep
+            }
+            KeyCode::Char(ch) if ch.is_ascii_digit() && self.typed_option.len() < 3 => {
+                self.typed_option.push(ch);
+                ParserPromptAction::Keep
+            }
+            KeyCode::Enter => {
+                let selected = self
+                    .typed_option
+                    .parse::<usize>()
+                    .ok()
+                    .and_then(|number| number.checked_sub(1))
+                    .unwrap_or(self.selected);
+                self.candidates
+                    .get(selected)
+                    .map_or(ParserPromptAction::Keep, |(parser, _)| {
+                        ParserPromptAction::Select(parser.clone())
+                    })
+            }
+            _ => ParserPromptAction::Keep,
+        }
+    }
+}
+
 pub(super) struct CaseState {
     pub case: Case,
     pub input: String,
@@ -52,6 +109,8 @@ pub(super) struct CaseState {
     pub selected_finding: usize,
     pub palette: Option<String>,
     pub picker: Option<PathPicker>,
+    pub pending_ingest: Option<PendingIngest>,
+    pub parser_prompt: Option<ParserPrompt>,
     pub confirmation: Option<Confirmation>,
     pub confirmed_action: Option<Confirmation>,
     pub hashes: Vec<String>,
@@ -252,6 +311,31 @@ mod tests {
     use irmind_app::CaseId;
 
     #[test]
+    fn parser_prompt_uses_arrows_or_number_then_enter_and_escape_cancels() {
+        let mut prompt = ParserPrompt {
+            source: "events.json".into(),
+            candidates: vec![("parser-json".into(), 45), ("parser-ecs".into(), 45)],
+            selected: 0,
+            typed_option: String::new(),
+        };
+        assert!(matches!(
+            prompt.update(KeyCode::Down),
+            ParserPromptAction::Keep
+        ));
+        assert!(
+            matches!(prompt.update(KeyCode::Enter), ParserPromptAction::Select(name) if name == "parser-ecs")
+        );
+        prompt.update(KeyCode::Char('1'));
+        assert!(
+            matches!(prompt.update(KeyCode::Enter), ParserPromptAction::Select(name) if name == "parser-json")
+        );
+        assert!(matches!(
+            prompt.update(KeyCode::Esc),
+            ParserPromptAction::Cancel
+        ));
+    }
+
+    #[test]
     #[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
     fn input_update_is_pure_and_submits_exact_text() {
         let mut state = CaseState {
@@ -299,6 +383,8 @@ mod tests {
             selected_finding: 0,
             palette: None,
             picker: None,
+            pending_ingest: None,
+            parser_prompt: None,
             confirmation: None,
             confirmed_action: None,
             hashes: Vec::new(),

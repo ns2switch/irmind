@@ -1,6 +1,7 @@
-use crate::{DomainError, EvidenceHash, canonical::put};
+use crate::{AuditEventKind, DomainError, EvidenceHash, canonical::put};
 
 const SOURCE_TAG: &[u8] = b"irmind-source-manifest-v1\0";
+const SOURCE_V2_TAG: &[u8] = b"irmind-source-manifest-v2\0";
 const ARTIFACT_TAG: &[u8] = b"irmind-parquet-artifact-v1\0";
 const MAX_PAYLOAD_BYTES: usize = 16_384;
 pub(super) const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
@@ -18,6 +19,125 @@ pub struct SourceManifestV1 {
     pub copied: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ParserSelectionMode {
+    Automatic,
+    Analyst,
+    Forced,
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct SourceManifestV2 {
+    pub source: SourceManifestV1,
+    pub parser_id: String,
+    pub parser_version: String,
+    pub confidence: u8,
+    pub selection: ParserSelectionMode,
+    pub timestamp_context: Option<String>,
+    pub rejected_records: u64,
+    pub rejected_sample: Vec<String>,
+}
+
+impl std::fmt::Debug for SourceManifestV2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SourceManifestV2")
+            .field("source_hash", &self.source.sha256)
+            .field("parser_id", &self.parser_id)
+            .field("parser_version", &self.parser_version)
+            .field("confidence", &self.confidence)
+            .field("selection", &self.selection)
+            .field("rejected_records", &self.rejected_records)
+            .field("rejected_sample", &"<redacted>")
+            .finish_non_exhaustive()
+    }
+}
+
+impl SourceManifestV2 {
+    pub fn encode(&self) -> Result<String, DomainError> {
+        self.validate()?;
+        let mut bytes = SOURCE_V2_TAG.to_vec();
+        put(&mut bytes, self.source.encode()?.as_bytes());
+        put(&mut bytes, self.parser_id.as_bytes());
+        put(&mut bytes, self.parser_version.as_bytes());
+        bytes.push(self.confidence);
+        bytes.push(match self.selection {
+            ParserSelectionMode::Automatic => 0,
+            ParserSelectionMode::Analyst => 1,
+            ParserSelectionMode::Forced => 2,
+        });
+        put_optional(&mut bytes, self.timestamp_context.as_deref());
+        bytes.extend_from_slice(&self.rejected_records.to_be_bytes());
+        bytes.push(
+            u8::try_from(self.rejected_sample.len()).map_err(|_| DomainError::InvalidManifest)?,
+        );
+        for sample in &self.rejected_sample {
+            put(&mut bytes, sample.as_bytes());
+        }
+        encode_payload(&bytes)
+    }
+
+    pub fn decode(payload: &str) -> Result<Self, DomainError> {
+        let bytes = decode_payload(payload, SOURCE_V2_TAG)?;
+        let mut reader = Reader::new(&bytes[SOURCE_V2_TAG.len()..]);
+        let source = SourceManifestV1::decode(&reader.string_limit(8192)?)?;
+        let parser_id = reader.string()?;
+        let parser_version = reader.string()?;
+        let confidence = reader.byte()?;
+        let selection = match reader.byte()? {
+            0 => ParserSelectionMode::Automatic,
+            1 => ParserSelectionMode::Analyst,
+            2 => ParserSelectionMode::Forced,
+            _ => return Err(DomainError::InvalidManifest),
+        };
+        let timestamp_context = reader.optional_string()?;
+        let rejected_records = reader.u64()?;
+        let count = usize::from(reader.byte()?);
+        if count > 3 {
+            return Err(DomainError::InvalidManifest);
+        }
+        let mut rejected_sample = Vec::with_capacity(count);
+        for _ in 0..count {
+            rejected_sample.push(reader.string()?);
+        }
+        reader.end()?;
+        let result = Self {
+            source,
+            parser_id,
+            parser_version,
+            confidence,
+            selection,
+            timestamp_context,
+            rejected_records,
+            rejected_sample,
+        };
+        result.validate()?;
+        Ok(result)
+    }
+
+    pub fn validate(&self) -> Result<(), DomainError> {
+        self.source.validate()?;
+        if self.parser_id.is_empty()
+            || self.parser_id.len() > 64
+            || !self
+                .parser_id
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+            || self.parser_version.is_empty()
+            || self.parser_version.len() > 128
+            || self.confidence > 100
+            || self
+                .timestamp_context
+                .as_ref()
+                .is_some_and(|value| value.len() > 128)
+            || self.rejected_sample.len() > 3
+            || self.rejected_sample.iter().any(|value| value.len() > 256)
+        {
+            return Err(DomainError::InvalidManifest);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParquetArtifactV1 {
     pub path: String,
@@ -32,6 +152,16 @@ pub struct ParquetArtifactV1 {
 }
 
 impl SourceManifestV1 {
+    pub fn decode_signed(kind: AuditEventKind, payload: &str) -> Result<Option<Self>, DomainError> {
+        match kind {
+            AuditEventKind::SourceManifestV1 => Self::decode(payload).map(Some),
+            AuditEventKind::SourceManifestV2 => {
+                SourceManifestV2::decode(payload).map(|manifest| Some(manifest.source))
+            }
+            _ => Ok(None),
+        }
+    }
+
     pub fn encode(&self) -> Result<String, DomainError> {
         self.validate()?;
         let mut bytes = SOURCE_TAG.to_vec();
@@ -168,7 +298,7 @@ fn valid_partition(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
-fn valid_source(source: &str) -> bool {
+pub(crate) fn valid_source(source: &str) -> bool {
     if source.len() > 1024 || source.contains(['?', '#', '\\', '\0']) {
         return false;
     }
@@ -274,8 +404,12 @@ impl<'a> Reader<'a> {
     }
 
     fn string(&mut self) -> Result<String, DomainError> {
+        self.string_limit(2048)
+    }
+
+    fn string_limit(&mut self, limit: usize) -> Result<String, DomainError> {
         let length = usize::try_from(self.u64()?).map_err(|_| DomainError::InvalidManifest)?;
-        if length > 2048 {
+        if length > limit {
             return Err(DomainError::InvalidManifest);
         }
         let bytes = self
@@ -284,6 +418,12 @@ impl<'a> Reader<'a> {
             .ok_or(DomainError::InvalidManifest)?;
         self.rest = &self.rest[length..];
         String::from_utf8(bytes.to_vec()).map_err(|_| DomainError::InvalidManifest)
+    }
+
+    fn byte(&mut self) -> Result<u8, DomainError> {
+        let value = *self.rest.first().ok_or(DomainError::InvalidManifest)?;
+        self.rest = &self.rest[1..];
+        Ok(value)
     }
 
     fn marker(&mut self) -> Result<u8, DomainError> {
@@ -328,6 +468,36 @@ impl<'a> Reader<'a> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn versioned_parser_manifest_round_trips_without_changing_v1() {
+        let source = SourceManifestV1 {
+            source: "logs/auth.log".into(),
+            size: 42,
+            modified_unix_seconds: Some(1_794_000_000),
+            version: None,
+            provider_checksum: None,
+            sha256: EvidenceHash::parse(&"a".repeat(64)).unwrap(),
+            copied: false,
+        };
+        let original_v1 = source.encode().unwrap();
+        let versioned = SourceManifestV2 {
+            source: source.clone(),
+            parser_id: "parser-linux".into(),
+            parser_version: "linux-v1".into(),
+            confidence: 92,
+            selection: ParserSelectionMode::Automatic,
+            timestamp_context: Some("year=2026;offset=0".into()),
+            rejected_records: 1,
+            rejected_sample: vec!["bad synthetic line".into()],
+        };
+        assert_eq!(
+            SourceManifestV2::decode(&versioned.encode().unwrap()),
+            Ok(versioned.clone())
+        );
+        assert_eq!(source.encode().unwrap(), original_v1);
+        assert!(SourceManifestV1::decode(&versioned.encode().unwrap()).is_err());
+    }
 
     #[test]
     fn source_round_trip_and_rejects_unsafe_uri() {

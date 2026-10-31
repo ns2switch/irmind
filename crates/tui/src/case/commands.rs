@@ -198,26 +198,24 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return Ok(true);
         }
         if let Some(path) = prompt.strip_prefix("/ingest ") {
+            let (forced_parser, path) = if let Some(rest) = path.strip_prefix("--parser ") {
+                let (parser, path) = rest
+                    .split_once(' ')
+                    .ok_or_else(|| anyhow::anyhow!("use /ingest --parser <name> <path>"))?;
+                (Some(parser.to_owned()), path)
+            } else {
+                (None, path)
+            };
             let (copy_original, path) = path
                 .strip_prefix("--copy-original ")
                 .map_or((false, path), |selected| (true, selected));
-            let path = PathBuf::from(path);
-            let workflow = self.workflow();
-            let id = self.id;
-            let progress = self.progress_tx.clone();
-            self.start_task("Ingest", move |cancel| {
-                workflow
-                    .ingest_path_with_copy(
-                        id,
-                        &path,
-                        copy_original,
-                        &cancel,
-                        |done, count, source| {
-                            let _ = progress.send(format!("Ingested {done}/{count}: {source}"));
-                        },
-                    )
-                    .map(|count| format!("Ingested {count} files"))
+            self.state.pending_ingest = Some(super::state::PendingIngest {
+                path: PathBuf::from(path),
+                copy_original,
+                forced_parser,
+                analyst_choices: std::collections::BTreeMap::new(),
             });
+            self.start_pending_ingest();
             return Ok(true);
         }
         if prompt == "/rebuild" {
@@ -244,6 +242,32 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return Ok(true);
         }
         self.seal_or_export_command(prompt)
+    }
+
+    pub(super) fn start_pending_ingest(&mut self) {
+        let Some(pending) = self.state.pending_ingest.clone() else {
+            return;
+        };
+        let workflow = self.workflow();
+        let id = self.id;
+        let progress = self.progress_tx.clone();
+        self.start_task("Ingest", move |cancel| {
+            workflow
+                .ingest_path_with_selections(
+                    crate::workflow::ingest::IngestRequest {
+                        id,
+                        path: &pending.path,
+                        copy_original: pending.copy_original,
+                        forced_parser: pending.forced_parser.as_deref(),
+                        analyst_choices: &pending.analyst_choices,
+                        cancel: &cancel,
+                    },
+                    |done, count, source| {
+                        let _ = progress.send(format!("Ingested {done}/{count}: {source}"));
+                    },
+                )
+                .map(|count| format!("Ingested {count} files"))
+        });
     }
 
     fn verify_command(&mut self, prompt: &str) -> Result<bool> {

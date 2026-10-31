@@ -140,6 +140,8 @@ fn initial_state(
         selected_finding: 0,
         palette: None,
         picker: None,
+        pending_ingest: None,
+        parser_prompt: None,
         confirmation: None,
         confirmed_action: None,
         hashes,

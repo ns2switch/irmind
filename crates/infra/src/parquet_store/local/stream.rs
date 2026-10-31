@@ -1,8 +1,8 @@
 use super::{
     AppError, BATCH_BYTES, BATCH_ROWS, BTreeMap, CancellationToken, EvidenceHash, File,
-    GraphRecord, HashingReader, Instant, ParquetProfile, ParquetStore, Partition, PartitionSinks,
-    Path, RecordRow, Seek, SeekFrom, StreamingEventParser, batch_to_parquet, invalid_source,
-    storage, storage_phase,
+    GraphRecord, HashingReader, Instant, ParquetProfile, ParquetStore, ParseReport, Partition,
+    PartitionSinks, Path, RecordRow, Seek, SeekFrom, StreamingEventParser, batch_to_parquet,
+    invalid_source, storage, storage_phase,
 };
 
 pub(super) struct StreamInput<'a> {
@@ -20,7 +20,7 @@ pub(super) struct StreamInput<'a> {
 
 pub(super) fn stream_records(
     input: StreamInput<'_>,
-) -> Result<(usize, BTreeMap<Partition, PartitionSinks>), AppError> {
+) -> Result<(ParseReport, BTreeMap<Partition, PartitionSinks>), AppError> {
     let StreamInput {
         source,
         relative_path,
@@ -66,8 +66,8 @@ pub(super) fn stream_records(
         }
         Ok(())
     };
-    let records = parser
-        .parse_reader(relative_path, &mut second_pass, hash, cancel, &mut emit)
+    let report = parser
+        .parse_reader_report(relative_path, &mut second_pass, hash, cancel, &mut emit)
         .map_err(|error| {
             storage_phase(
                 error,
@@ -94,10 +94,10 @@ pub(super) fn stream_records(
         legacy_entities,
         profile,
     )?;
-    if records == 0 {
+    if report.accepted == 0 {
         return Err(invalid_source());
     }
-    Ok((records, open))
+    Ok((report, open))
 }
 
 fn flush_batch(

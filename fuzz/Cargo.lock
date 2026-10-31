@@ -1201,6 +1201,7 @@ dependencies = [
  "irmind-domain",
  "irmind-fs",
  "keyring",
+ "memchr",
  "parquet",
  "rand",
  "rusqlite",

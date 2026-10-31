@@ -2,6 +2,78 @@ use super::*;
 use irmind_app::LargeCaseStore;
 
 #[test]
+fn signed_v2_manifest_counts_malformed_jsonl_without_dropping_later_records() {
+    let root = tempfile::tempdir().unwrap();
+    let source_root = root.path().join("inputs");
+    fs::create_dir(&source_root).unwrap();
+    let bytes = b"{\"eventTime\":\"2026-10-28T12:00:00Z\",\"eventName\":\"First\"}\n{broken\n{\"eventTime\":\"2026-10-28T12:01:00Z\",\"eventName\":\"Last\"}\n";
+    fs::write(source_root.join("events.jsonl"), bytes).unwrap();
+    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let signer = Arc::new(LocalSigner {
+        key: SigningKey::from_bytes(&[71u8; 32]),
+        actor: Actor::Analyst,
+    });
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(
+                signer.clone(),
+                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            ),
+            Arc::new(MandatoryGuard::new().unwrap()),
+            Arc::new(JsonParser),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )
+    .unwrap();
+    let case = engine
+        .create_case("synthetic malformed line", "local evidence only")
+        .unwrap();
+    let parquet = super::super::ParquetStore::open(root.path()).unwrap();
+    let use_cases = LargeCaseUseCases {
+        engine: &engine,
+        store: &parquet,
+        parser: &JsonParser,
+    };
+    let selection = std::collections::BTreeMap::from([(
+        "events.jsonl".to_owned(),
+        irmind_app::ParserSelection {
+            parser_id: "parser-json".into(),
+            parser_version: "json-stream-v2".into(),
+            confidence: 90,
+            mode: irmind_domain::ParserSelectionMode::Automatic,
+            timestamp_context: None,
+            format_sample_sha256: irmind_app::sha256(bytes),
+        },
+    )]);
+    use_cases
+        .ingest_local_batch_selected(
+            &case.id,
+            &source_root,
+            &["events.jsonl".into()],
+            false,
+            &selection,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    let manifest = store
+        .entries(&case.id)
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV2)
+        .unwrap();
+    let decoded = irmind_domain::SourceManifestV2::decode(&manifest.payload).unwrap();
+    assert_eq!(decoded.rejected_records, 1);
+    assert_eq!(decoded.rejected_sample.len(), 1);
+    assert_eq!(store.timeline(&case.id, 10).unwrap().len(), 2);
+    assert!(engine.verify(&case.id).is_ok());
+}
+
+#[test]
 #[allow(clippy::too_many_lines)]
 fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
     let root = tempfile::tempdir().unwrap();
@@ -41,15 +113,36 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
         store: &parquet,
         parser: parser.as_ref(),
     };
+    let selection = std::collections::BTreeMap::from([(
+        "cloudtrail.json".to_owned(),
+        irmind_app::ParserSelection {
+            parser_id: "parser-json".into(),
+            parser_version: "json-stream-v2".into(),
+            confidence: 90,
+            mode: irmind_domain::ParserSelectionMode::Automatic,
+            timestamp_context: None,
+            format_sample_sha256: irmind_app::sha256(&fs::read(&path).unwrap()),
+        },
+    )]);
     let hash = use_cases
-        .ingest_local(
+        .ingest_local_batch_selected(
             &case.id,
             &source_root,
-            "cloudtrail.json",
+            &["cloudtrail.json".into()],
             false,
+            &selection,
             &CancellationToken::new(),
         )
-        .unwrap();
+        .unwrap()[0]
+        .1
+        .clone();
+    assert!(
+        store
+            .entries(&case.id)
+            .unwrap()
+            .iter()
+            .any(|entry| { entry.kind == irmind_domain::AuditEventKind::SourceManifestV2 })
+    );
     assert_eq!(
         use_cases
             .ingest_local(

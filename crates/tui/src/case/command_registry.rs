@@ -31,7 +31,7 @@ impl Command {
             "open" => " <case title or ID>",
             "demo" => " [check]",
             "evidence" | "raw" => " <hash>",
-            "ingest" => " <path>",
+            "ingest" => " [--parser <name>] <path>",
             "objects" => " <source> <scheme> <container> <prefix> <from> <to>",
             "object-read" => " <number> [--copy-original]",
             "search" => " <words>",
@@ -129,12 +129,34 @@ pub(super) fn argument_candidates(
     approvals: &[String],
     findings: &[String],
     hashes: &[String],
-    _modules: &[String],
+    modules: &[String],
 ) -> Vec<String> {
     let Some((command, prefix)) = input.split_once(' ') else {
         return Vec::new();
     };
-    if matches!(command, "/ingest" | "/verify" | "/verify-graph") {
+    if command == "/ingest" {
+        if let Some(rest) = prefix.strip_prefix("--parser") {
+            let rest = rest.trim_start();
+            if let Some((name, path)) = rest.split_once(' ') {
+                return super::picker::safe_completions(path)
+                    .into_iter()
+                    .map(|candidate| format!("--parser {name} {candidate}"))
+                    .collect();
+            }
+            return modules
+                .iter()
+                .filter(|name| name.starts_with("parser-") && name.starts_with(rest))
+                .take(20)
+                .map(|name| format!("--parser {name}"))
+                .collect();
+        }
+        let mut candidates = super::picker::safe_completions(prefix);
+        if "--parser".starts_with(prefix) {
+            candidates.insert(0, "--parser".into());
+        }
+        return candidates;
+    }
+    if matches!(command, "/verify" | "/verify-graph") {
         return super::picker::safe_completions(prefix);
     }
     let values: Vec<String> = match command {
@@ -234,6 +256,22 @@ mod tests {
             argument_candidates("/ingest ../../examples/cloud", &[], &[], &[], &[])
                 .iter()
                 .any(|path| path.ends_with("cloudtrail-alert.json"))
+        );
+        let parser_modules = vec!["parser-json".into(), "llm-openai-compatible".into()];
+        assert_eq!(
+            argument_candidates("/ingest --parser par", &[], &[], &[], &parser_modules),
+            vec!["--parser parser-json"]
+        );
+        assert!(
+            argument_candidates(
+                "/ingest --parser parser-json ../../examples/cloud",
+                &[],
+                &[],
+                &[],
+                &parser_modules
+            )
+            .iter()
+            .any(|path| path.ends_with("cloudtrail-alert.json"))
         );
     }
 }
