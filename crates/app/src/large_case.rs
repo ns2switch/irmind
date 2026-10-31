@@ -6,7 +6,9 @@ use crate::{
 mod manifest;
 mod migration;
 mod verification;
-use irmind_domain::{EvidenceHash, ParquetArtifactV1, SourceManifestV1};
+use irmind_domain::{
+    EvidenceHash, ParquetArtifactV1, ParserSelectionMode, SourceManifestV1, SourceManifestV2,
+};
 use manifest::select_sources;
 pub(crate) use manifest::{read_manifest_index, read_sealed_artifacts};
 use std::collections::{BTreeMap, BTreeSet};
@@ -35,6 +37,16 @@ pub struct SourceCheckReport {
 pub(crate) struct ManifestIndex {
     pub sources: Vec<SourceManifestV1>,
     pub artifacts: Vec<ParquetArtifactV1>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ParserSelection {
+    pub parser_id: String,
+    pub parser_version: String,
+    pub confidence: u8,
+    pub mode: ParserSelectionMode,
+    pub timestamp_context: Option<String>,
+    pub format_sample_sha256: [u8; 32],
 }
 
 impl LargeCaseUseCases<'_, '_> {
@@ -145,6 +157,25 @@ impl LargeCaseUseCases<'_, '_> {
         copy_original: bool,
         cancel: &CancellationToken,
     ) -> Result<Vec<(String, EvidenceHash)>, AppError> {
+        self.ingest_local_batch_selected(
+            id,
+            source_root,
+            relative_paths,
+            copy_original,
+            &BTreeMap::new(),
+            cancel,
+        )
+    }
+
+    pub fn ingest_local_batch_selected(
+        &self,
+        id: &CaseId,
+        source_root: &Path,
+        relative_paths: &[String],
+        copy_original: bool,
+        selections: &BTreeMap<String, ParserSelection>,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<(String, EvidenceHash)>, AppError> {
         self.engine.require_attended_analyst("ingest source")?;
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
@@ -191,34 +222,17 @@ impl LargeCaseUseCases<'_, '_> {
                     pending.push(path);
                 }
             }
-            let prepared = std::thread::scope(|scope| {
-                let handles = pending
-                    .iter()
-                    .map(|path| {
-                        scope.spawn(move || {
-                            self.store.prepare_local(
-                                id,
-                                source_root,
-                                path,
-                                copy_original,
-                                self.parser,
-                                cancel,
-                            )
-                        })
-                    })
-                    .collect::<Vec<_>>();
-                handles
-                    .into_iter()
-                    .map(|handle| {
-                        handle.join().map_err(|_| {
-                            AppError::Policy("source preparation worker failed".into())
-                        })?
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-            })?;
+            let prepared =
+                self.prepare_sources_parallel(id, source_root, &pending, copy_original, cancel)?;
             for (path, source) in pending.iter().zip(prepared) {
                 known_sources.insert((*path).clone(), source.manifest.clone());
-                let hash = self.sign_prepared(id, source, cancel, &mut known_artifacts)?;
+                let hash = self.sign_prepared_with_selection(
+                    id,
+                    source,
+                    selections.get(*path),
+                    cancel,
+                    &mut known_artifacts,
+                )?;
                 ingested.push(((*path).clone(), hash));
             }
         }
@@ -226,10 +240,46 @@ impl LargeCaseUseCases<'_, '_> {
         Ok(ingested)
     }
 
-    pub(crate) fn sign_prepared(
+    fn prepare_sources_parallel(
+        &self,
+        id: &CaseId,
+        source_root: &Path,
+        pending: &[&String],
+        copy_original: bool,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<crate::PreparedSource>, AppError> {
+        std::thread::scope(|scope| {
+            let handles = pending
+                .iter()
+                .map(|path| {
+                    scope.spawn(move || {
+                        self.store.prepare_local(
+                            id,
+                            source_root,
+                            path,
+                            copy_original,
+                            self.parser,
+                            cancel,
+                        )
+                    })
+                })
+                .collect::<Vec<_>>();
+            handles
+                .into_iter()
+                .map(|handle| {
+                    handle
+                        .join()
+                        .map_err(|_| AppError::Policy("source preparation worker failed".into()))?
+                })
+                .collect::<Result<Vec<_>, _>>()
+        })
+    }
+
+    pub(crate) fn sign_prepared_with_selection(
         &self,
         id: &CaseId,
         prepared: crate::PreparedSource,
+        selection: Option<&ParserSelection>,
         cancel: &CancellationToken,
         known_artifacts: &mut BTreeMap<String, ParquetArtifactV1>,
     ) -> Result<EvidenceHash, AppError> {
@@ -248,11 +298,35 @@ impl LargeCaseUseCases<'_, '_> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let mut events = vec![(
-            AuditOrigin::System,
-            AuditEventKind::SourceManifestV1,
-            prepared.manifest.encode().map_err(|_| invalid_manifest())?,
-        )];
+        let source_event = match selection {
+            Some(selection) => {
+                if selection.parser_version != self.parser.streaming_version()
+                    || selection.parser_id != self.parser.parser_name()
+                    || selection.format_sample_sha256 != prepared.format_sample_sha256
+                {
+                    return Err(invalid_manifest());
+                }
+                let manifest = SourceManifestV2 {
+                    source: prepared.manifest.clone(),
+                    parser_id: selection.parser_id.clone(),
+                    parser_version: selection.parser_version.clone(),
+                    confidence: selection.confidence,
+                    selection: selection.mode,
+                    timestamp_context: selection.timestamp_context.clone(),
+                    rejected_records: prepared.parse_report.rejected,
+                    rejected_sample: prepared.parse_report.samples.clone(),
+                };
+                (
+                    AuditEventKind::SourceManifestV2,
+                    manifest.encode().map_err(|_| invalid_manifest())?,
+                )
+            }
+            None => (
+                AuditEventKind::SourceManifestV1,
+                prepared.manifest.encode().map_err(|_| invalid_manifest())?,
+            ),
+        };
+        let mut events = vec![(AuditOrigin::System, source_event.0, source_event.1)];
         let mut new_artifacts = Vec::new();
         let mut new_paths = BTreeSet::new();
         for artifact in prepared.artifacts {

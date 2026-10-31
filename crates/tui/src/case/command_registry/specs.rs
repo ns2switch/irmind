@@ -15,7 +15,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "ingest",
-        description: "Select and ingest evidence",
+        description: "Ingest evidence; --parser <name> <path> forces a parser",
         shortcut: "",
         slash: true,
     },

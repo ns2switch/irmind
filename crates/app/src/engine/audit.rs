@@ -4,6 +4,25 @@ use crate::{
 };
 
 impl Engine<'_> {
+    /// Record why unattended ingestion stopped without storing attacker-controlled
+    /// source names in the signed operational description.
+    pub fn record_parser_selection_required(
+        &self,
+        id: &CaseId,
+        reason: &'static str,
+    ) -> Result<(), AppError> {
+        if !matches!(reason, "ambiguous" | "low-confidence" | "unsupported") {
+            return Err(AppError::Policy("invalid parser refusal reason".into()));
+        }
+        self.audit(
+            id,
+            AuditOrigin::System,
+            AuditEventKind::ParserSelectionRequired,
+            reason,
+            None,
+        )
+    }
+
     pub(crate) fn audit(
         &self,
         id: &CaseId,

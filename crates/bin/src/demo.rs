@@ -25,7 +25,8 @@ use std::{
     },
 };
 
-const EVENTS: &[u8] = include_bytes!("../../parser-json/tests/fixtures/hunteval-aws-iam-001.json");
+const EVENTS: &[u8] =
+    include_bytes!("../../modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json");
 static PARSER: JsonParser = JsonParser;
 
 struct ScriptedModel {

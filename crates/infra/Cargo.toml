@@ -34,7 +34,7 @@ dbus = { version = "0.9", features = ["vendored"] }
 
 [dev-dependencies]
 irmind-security = { path = "../security", version = "0.1.0" }
-irmind-mod-parser-json = { path = "../parser-json", version = "0.1.0" }
+irmind-mod-parser-json = { path = "../modules/parser-json", version = "0.1.0" }
 irmind-testkit = { path = "../testkit", version = "0.1.0" }
 tempfile = "3"
 futures-util = "0.3"

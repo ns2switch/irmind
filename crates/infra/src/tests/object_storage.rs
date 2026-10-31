@@ -1,5 +1,6 @@
 use super::*;
 use futures_util::stream;
+use irmind_app::modules::{ModuleConfig, ModuleRegistry};
 use irmind_app::{LargeCaseStore, ObjectEntry, ObjectSource, ObjectSourceOutput, async_trait};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -85,6 +86,10 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
         actor: Actor::Analyst,
     });
     let parser = Arc::new(JsonParser);
+    let mut parser_registry = ModuleRegistry::new();
+    parser_registry
+        .register(Box::new(JsonParser), &ModuleConfig::new())
+        .unwrap();
     let source = FakeObjectSource {
         bytes: br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.8"}]}"#.to_vec(),
         reads: AtomicUsize::new(0),
@@ -113,6 +118,7 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     )
     .unwrap()
     .with_large_case_pipeline(store.clone(), parser)
+    .with_parser_catalog(parser_registry.parser_catalog())
     .with_object_source(&source)
     .unwrap()
     .with_policy(rules, "f".repeat(64))
@@ -189,12 +195,12 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     assert!(
         entries
             .iter()
-            .any(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV1)
+            .any(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV2)
     );
     assert_eq!(
         entries
             .iter()
-            .filter(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV1)
+            .filter(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV2)
             .count(),
         1
     );
@@ -226,9 +232,11 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
         .entries(&copied_case.id)
         .unwrap()
         .into_iter()
-        .find(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV1)
+        .find(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV2)
         .unwrap();
-    let manifest = irmind_domain::SourceManifestV1::decode(&copied_entry.payload).unwrap();
+    let manifest = irmind_domain::SourceManifestV2::decode(&copied_entry.payload)
+        .unwrap()
+        .source;
     assert!(manifest.copied);
     store
         .verify_copied_source(&copied_case.id, &manifest, &CancellationToken::new())
@@ -248,4 +256,71 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     .unwrap();
     let report = irmind_app::verify_export_details(&LocalExportVerifier, &package, None).unwrap();
     assert_eq!(report.source_bytes_verified, 1);
+}
+
+#[test]
+fn cloud_object_without_a_unique_high_confidence_parser_is_not_converted() {
+    let root = tempfile::tempdir().unwrap();
+    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let signer = Arc::new(LocalSigner {
+        key: SigningKey::from_bytes(&[94; 32]),
+        actor: Actor::Analyst,
+    });
+    let parser = Arc::new(JsonParser);
+    let mut parser_registry = ModuleRegistry::new();
+    parser_registry
+        .register(Box::new(JsonParser), &ModuleConfig::new())
+        .unwrap();
+    let source = FakeObjectSource {
+        bytes: br#"{"unrecognized":"format"}"#.to_vec(),
+        reads: AtomicUsize::new(0),
+    };
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(
+                signer.clone(),
+                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            ),
+            Arc::new(MandatoryGuard::new().unwrap()),
+            parser.clone(),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )
+    .unwrap()
+    .with_large_case_pipeline(store.clone(), parser)
+    .with_parser_catalog(parser_registry.parser_catalog())
+    .with_object_source(&source)
+    .unwrap();
+    let scope = format!(
+        "v3;sources=storage;accounts=;projects=;hosts=;objects=s3://synthetic-audit/AWSLogs/123/;from={FROM};to={TO}"
+    );
+    let case = engine.create_case("Unknown cloud format", &scope).unwrap();
+    engine
+        .request_tool_as_analyst(
+            &case.id,
+            object_proposal(Tool::ObjectList, "0"),
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    let result = engine
+        .request_tool_as_analyst(
+            &case.id,
+            object_proposal(Tool::ObjectRead, "1024"),
+            &CancellationToken::new(),
+        )
+        .unwrap_err();
+    assert!(matches!(result, AppError::ParserSelection { .. }));
+    assert_eq!(source.reads.load(Ordering::SeqCst), 1);
+    assert!(
+        !store
+            .entries(&case.id)
+            .unwrap()
+            .iter()
+            .any(|entry| { entry.kind == irmind_domain::AuditEventKind::SourceManifestV2 })
+    );
 }

@@ -1,7 +1,8 @@
 #![forbid(unsafe_code)]
 
 use irmind_app::{
-    AppError, EventParser, GraphRecord, GraphRelation, StreamingEventParser,
+    AppError, EventParser, GraphRecord, GraphRelation, LogParser, ParserConfidence,
+    StreamingEventParser,
     modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
     sha256,
 };
@@ -34,6 +35,10 @@ impl JsonParser {
 }
 
 impl StreamingEventParser for JsonParser {
+    fn parser_name(&self) -> &'static str {
+        "parser-json"
+    }
+
     fn streaming_version(&self) -> &'static str {
         "json-stream-v2"
     }
@@ -47,6 +52,37 @@ impl StreamingEventParser for JsonParser {
         emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
     ) -> Result<usize, AppError> {
         stream::parse_reader(source, reader, evidence_hash, cancel, emit)
+    }
+
+    fn parse_reader_report(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        evidence_hash: [u8; 32],
+        cancel: &irmind_app::CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<irmind_app::ParseReport, AppError> {
+        stream::parse_reader_report(source, reader, evidence_hash, cancel, emit)
+    }
+}
+
+impl LogParser for JsonParser {
+    fn detect(&self, _source_name: &str, sample: &[u8]) -> Option<ParserConfidence> {
+        let first = sample
+            .iter()
+            .copied()
+            .find(|byte| !byte.is_ascii_whitespace())?;
+        if !matches!(first, b'{' | b'[') {
+            return None;
+        }
+        let contains = |needle: &[u8]| sample.windows(needle.len()).any(|window| window == needle);
+        let known = (contains(b"eventVersion") && contains(b"eventTime"))
+            || (contains(b"\"Records\"") && contains(b"eventTime") && contains(b"eventName"))
+            || (contains(b"event_id")
+                && (contains(b"provider") || (contains(b"account_id") && contains(b"principal"))))
+            || contains(b"protoPayload")
+            || contains(b"createdDateTime");
+        ParserConfidence::new(if known { 90 } else { 45 }).ok()
     }
 }
 

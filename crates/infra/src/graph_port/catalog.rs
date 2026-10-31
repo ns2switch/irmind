@@ -126,9 +126,10 @@ fn collect_signed_artifacts(
                 }
                 sources.insert(hash);
             }
-            AuditEventKind::SourceManifestV1 => {
-                let source = SourceManifestV1::decode(&entry.payload)
-                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2 => {
+                let source = SourceManifestV1::decode_signed(entry.kind, &entry.payload)
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?
+                    .ok_or(AppError::InvalidChain(entry.seq))?;
                 new_source_hashes.insert(source.sha256.clone());
                 sources.insert(source.sha256);
                 new_sources = true;

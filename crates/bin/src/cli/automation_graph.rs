@@ -1,9 +1,11 @@
+use super::JsonParser;
 use super::{
     AuditLog, AutomationContext, Command, EvidenceGraph, EvidenceStore, Repository, Result, anyhow,
     parse_id, write_private_output,
 };
+use irmind_app::modules::ModuleRegistry;
 use irmind_app::{LargeCaseUseCases, SourceCheckMode};
-use irmind_mod_parser_json::JsonParser;
+use irmind_infra::LocalStore;
 use std::path::Path;
 
 impl AutomationContext<'_, '_> {
@@ -70,10 +72,13 @@ impl AutomationContext<'_, '_> {
         };
         let id = parse_id(&case_id)?;
         let entries = engine.verify_cancelable(&id, cancel)?;
-        let has_sources = store
-            .entries(&id)?
-            .iter()
-            .any(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV1);
+        let has_sources = store.entries(&id)?.iter().any(|entry| {
+            matches!(
+                entry.kind,
+                irmind_domain::AuditEventKind::SourceManifestV1
+                    | irmind_domain::AuditEventKind::SourceManifestV2
+            )
+        });
         if has_sources {
             let root = source_root.ok_or_else(|| {
                 anyhow!("source root required to verify originals; use --source-root")
@@ -111,6 +116,7 @@ impl AutomationContext<'_, '_> {
             engine,
             store,
             guard,
+            registry,
             cancel,
             ..
         } = self;
@@ -146,27 +152,14 @@ impl AutomationContext<'_, '_> {
                 case_id,
                 source_root,
             } => {
-                let id = parse_id(&case_id)?;
-                let (has_sources, has_artifacts) = parquet_status(store.as_ref(), &id)?;
-                if has_sources || has_artifacts {
-                    let root = source_root.as_deref().or_else(|| {
-                        (!has_sources).then_some(Path::new("."))
-                    }).ok_or_else(|| anyhow!(
-                        "source root required to rebuild and verify Parquet; use --source-root"
-                    ))?;
-                    let parser = JsonParser;
-                    let large = LargeCaseUseCases {
-                        engine,
-                        store: store.as_ref(),
-                        parser: &parser,
-                    };
-                    let count = large.verify_parquet_rebuild(&id, root, cancel)?;
-                    println!("rebuilt and compared {count} Parquet sources");
-                } else {
-                    return Err(anyhow!(
-                        "no signed Parquet artifacts; migrate copied evidence first"
-                    ));
-                }
+                verify_graph_command(
+                    engine,
+                    store.as_ref(),
+                    registry,
+                    cancel,
+                    &case_id,
+                    source_root.as_deref(),
+                )?;
             }
             Command::Timeline { case_id, filter } => {
                 let id = parse_id(&case_id)?;
@@ -367,14 +360,51 @@ impl AutomationContext<'_, '_> {
     }
 }
 
+fn verify_graph_command(
+    engine: &irmind_app::Engine<'_>,
+    store: &LocalStore,
+    registry: &ModuleRegistry,
+    cancel: &irmind_app::CancellationToken,
+    case_id: &str,
+    source_root: Option<&Path>,
+) -> Result<()> {
+    let id = parse_id(case_id)?;
+    let (has_sources, has_artifacts) = parquet_status(store, &id)?;
+    if !has_sources && !has_artifacts {
+        return Err(anyhow!(
+            "no signed Parquet artifacts; migrate copied evidence first"
+        ));
+    }
+    let root = source_root
+        .or_else(|| (!has_sources).then_some(Path::new(".")))
+        .ok_or_else(|| {
+            anyhow!("source root required to rebuild and verify Parquet; use --source-root")
+        })?;
+    let router = registry
+        .parser_catalog()
+        .rebuild_router(&store.entries(&id)?)?;
+    let large = LargeCaseUseCases {
+        engine,
+        store,
+        parser: &router,
+    };
+    let count = large.verify_parquet_rebuild(&id, root, cancel)?;
+    println!("rebuilt and compared {count} Parquet sources");
+    Ok(())
+}
+
 fn parquet_status(
     store: &irmind_infra::LocalStore,
     id: &irmind_app::CaseId,
 ) -> Result<(bool, bool)> {
     let entries = store.entries(id)?;
-    let has_sources = entries
-        .iter()
-        .any(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV1);
+    let has_sources = entries.iter().any(|entry| {
+        matches!(
+            entry.kind,
+            irmind_domain::AuditEventKind::SourceManifestV1
+                | irmind_domain::AuditEventKind::SourceManifestV2
+        )
+    });
     let mut has_artifacts = entries
         .iter()
         .any(|entry| entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV1);

@@ -4,7 +4,8 @@
 use arrow::array::{ArrayRef, StringArray, UInt64Array};
 use arrow::record_batch::RecordBatch;
 use irmind_app::{
-    AppError, CancellationToken, GraphRecord, LargeCaseStore, PreparedSource, StreamingEventParser,
+    AppError, CancellationToken, GraphRecord, LargeCaseStore, ParseReport, PreparedSource,
+    StreamingEventParser,
 };
 use irmind_domain::{CaseId, EvidenceHash, ParquetArtifactV1, SourceManifestV1};
 use parquet::arrow::ArrowWriter;

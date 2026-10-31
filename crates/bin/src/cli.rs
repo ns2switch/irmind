@@ -395,6 +395,7 @@ pub(super) struct AutomationContext<'a, 'ports> {
 mod automation;
 mod automation_graph;
 mod graph_filter;
+mod ingest;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]

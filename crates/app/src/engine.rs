@@ -104,6 +104,7 @@ pub struct Engine<'a> {
     pub(crate) object_sources: Vec<&'a dyn ObjectSource>,
     pub(crate) large_case_store: Option<Arc<dyn LargeCaseStore>>,
     pub(crate) streaming_parser: Option<Arc<dyn StreamingEventParser>>,
+    pub(crate) parser_catalog: Option<crate::modules::ParserCatalog>,
     pub(crate) pricing: Option<ModelPricing>,
     pub(crate) verified_cases: Arc<
         std::sync::Mutex<
@@ -182,6 +183,7 @@ impl<'a> Engine<'a> {
             object_sources: Vec::new(),
             large_case_store: self.large_case_store.clone(),
             streaming_parser: self.streaming_parser.clone(),
+            parser_catalog: self.parser_catalog.clone(),
             pricing: self.pricing,
             verified_cases: Arc::clone(&self.verified_cases),
             object_progress: Arc::clone(&self.object_progress),
@@ -318,6 +320,12 @@ impl<'a> Engine<'a> {
     ) -> Self {
         self.large_case_store = Some(store);
         self.streaming_parser = Some(parser);
+        self
+    }
+
+    #[must_use]
+    pub fn with_parser_catalog(mut self, catalog: crate::modules::ParserCatalog) -> Self {
+        self.parser_catalog = Some(catalog);
         self
     }
 }
