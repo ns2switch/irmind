@@ -8,6 +8,7 @@ use irmind_app::{
 use irmind_domain::{Provenance, SourceKind, Tainted, classify_field};
 use serde_json::Value;
 
+mod hunteval;
 mod profile;
 mod stream;
 pub use profile::{ParserProfile, ParserTiming};
@@ -137,8 +138,10 @@ fn parse_record(
     index: usize,
     value: &Value,
 ) -> Result<Tainted<GraphRecord>, AppError> {
+    let normalized = hunteval::is_normalized(value);
     let at = value
-        .get("eventTime")
+        .get("event_time")
+        .or_else(|| value.get("eventTime"))
         .or_else(|| value.get("timestamp"))
         .or_else(|| value.get("time"))
         .or_else(|| value.get("eventTimestamp"))
@@ -147,7 +150,8 @@ fn parse_record(
         .unwrap_or("")
         .to_owned();
     let event = value
-        .get("eventName")
+        .get("event_name")
+        .or_else(|| value.get("eventName"))
         .or_else(|| value.get("eventType"))
         .or_else(|| value.get("action"))
         .or_else(|| value.pointer("/protoPayload/methodName"))
@@ -156,9 +160,15 @@ fn parse_record(
         .and_then(Value::as_str)
         .unwrap_or("record")
         .to_owned();
-    let mut entities = Vec::new();
-    collect(value, &mut entities, 0);
-    let relations = cloudtrail_relations(value, &mut entities);
+    let (mut entities, relations) = if normalized {
+        let extracted = hunteval::extract(value, evidence_hash)?;
+        (extracted.entities, extracted.relations)
+    } else {
+        let mut entities = Vec::new();
+        collect(value, &mut entities, 0);
+        let relations = cloudtrail_relations(value, &mut entities);
+        (entities, relations)
+    };
     entities.sort();
     entities.dedup();
     Ok(Tainted::from_external(
