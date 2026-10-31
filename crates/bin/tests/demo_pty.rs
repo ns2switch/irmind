@@ -1,4 +1,4 @@
-#![cfg(unix)]
+#![cfg(all(unix, feature = "parser-json"))]
 #![allow(clippy::unwrap_used)]
 
 use expectrl::{Expect as _, Session};

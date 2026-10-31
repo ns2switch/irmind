@@ -317,9 +317,9 @@ impl Engine<'_> {
             .into_iter()
             .collect::<std::collections::BTreeSet<_>>();
         for entry in entries {
-            if entry.kind == AuditEventKind::SourceManifestV1 {
-                let source = SourceManifestV1::decode(&entry.payload)
-                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            if let Some(source) = SourceManifestV1::decode_signed(entry.kind, &entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?
+            {
                 hashes.insert(source.sha256.as_str().to_owned());
             }
         }

@@ -127,6 +127,9 @@ fn audit_panel(state: &CaseState) -> String {
 }
 
 pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Option<String>> {
+    if let Some(prompt) = &state.parser_prompt {
+        return parser_prompt_text(prompt, engine).map(Some);
+    }
     if let Some(picker) = &state.picker {
         let mut lines = vec![
             format!("Select evidence · {}", picker.current.display()),
@@ -186,4 +189,32 @@ pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Opt
         ));
     }
     Ok(None)
+}
+
+fn parser_prompt_text(
+    prompt: &crate::case::state::ParserPrompt,
+    engine: &Engine<'_>,
+) -> Result<String> {
+    let mut lines = vec![
+        format!("Choose parser for {}", prompt.source),
+        "The format is ambiguous or has low confidence. Review the source before continuing."
+            .into(),
+    ];
+    lines.extend(
+        prompt
+            .candidates
+            .iter()
+            .enumerate()
+            .map(|(index, (name, confidence))| {
+                format!(
+                    "{} {}. {} · {}% confidence",
+                    if index == prompt.selected { '>' } else { ' ' },
+                    index + 1,
+                    name,
+                    confidence
+                )
+            }),
+    );
+    lines.push("↑/↓ choose · Enter confirm · Esc cancel".into());
+    Ok(engine.guard.screen(&lines.join("\n"))?.text)
 }

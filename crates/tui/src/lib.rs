@@ -151,6 +151,12 @@ pub trait WorkspaceIo: Send + Sync {
         Ok(())
     }
     fn input_files(&self, root: &Path) -> Result<Vec<PathBuf>>;
+    fn parser_catalog(&self) -> Option<&irmind_app::modules::ParserCatalog> {
+        None
+    }
+    fn read_format_sample(&self, _path: &Path) -> Result<Vec<u8>> {
+        anyhow::bail!("bounded parser sampling is unavailable")
+    }
     fn read_evidence(&self, path: &Path) -> Result<Vec<u8>>;
     fn audit_source_name(&self, root: &Path, file: &Path) -> Result<String>;
     fn save_evidence(&self, path: &Path, bytes: &[u8]) -> Result<()>;

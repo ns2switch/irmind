@@ -8,7 +8,7 @@ IRMind is licensed under `MIT OR Apache-2.0`. Dependencies retain their own lice
 
 ## HuntEval public episode fixture
 
-`crates/parser-json/tests/fixtures/hunteval-aws-iam-001.json` is copied from
+`crates/modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json` is copied from
 [`ns2switch/HuntEval`](https://github.com/ns2switch/HuntEval), commit
 `4cbb555a56bc17cb03b988ad2f15b1374eecf183`, path
 `datasets/aws/aws-iam-001/source/events.json`, SHA-256

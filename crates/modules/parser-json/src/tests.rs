@@ -1,6 +1,27 @@
 use super::*;
 
 #[test]
+fn detection_accepts_known_cloud_json_and_requests_review_for_generic_json() {
+    let mut registry = ModuleRegistry::new();
+    registry
+        .register(Box::new(JsonParser), &ModuleConfig::new())
+        .unwrap();
+    let known = include_str!("../tests/fixtures/hunteval-aws-iam-001.json");
+    assert!(matches!(
+        registry.detect_parser("events.json", known.as_bytes()),
+        irmind_app::modules::ParserChoice::Auto(candidate) if candidate.id == "parser-json"
+    ));
+    assert!(matches!(
+        registry.detect_parser("generic.json", br#"{"hello":"world"}"#),
+        irmind_app::modules::ParserChoice::NeedsAnalyst(_)
+    ));
+    assert!(matches!(
+        registry.detect_parser("system.evtx", b"ElfFile"),
+        irmind_app::modules::ParserChoice::Unsupported
+    ));
+}
+
+#[test]
 fn parses_attributed_hunteval_aws_episode_without_private_answers() {
     let source = include_str!("../tests/fixtures/hunteval-aws-iam-001.json");
     let records = JsonParser
@@ -185,6 +206,67 @@ fn newline_json_stream_has_stable_record_pointers() {
         .unwrap();
     assert_eq!(count, 2);
     assert_eq!(pointers, [0, 1]);
+}
+
+#[test]
+fn streamed_file_records_keep_parser_and_byte_offset_provenance() {
+    let bytes = b"{\"eventName\":\"First\"}\n{\"eventName\":\"Second\"}\n";
+    let mut offsets = Vec::new();
+    JsonParser
+        .parse_reader(
+            "events.jsonl",
+            &mut bytes.as_slice(),
+            sha256(bytes),
+            &irmind_app::CancellationToken::new(),
+            &mut |record| {
+                let location = record.provenance().parser_location().unwrap();
+                assert_eq!(location.source(), "events.jsonl");
+                assert_eq!(location.parser_id(), "parser-json");
+                offsets.push(location.byte_offset());
+                Ok(())
+            },
+        )
+        .unwrap();
+    assert_eq!(offsets, [0, 22]);
+
+    let array = b"[{\"eventName\":\"A\"},{\"eventName\":\"B\"}]";
+    offsets.clear();
+    JsonParser
+        .parse_reader(
+            "array.json",
+            &mut array.as_slice(),
+            sha256(array),
+            &irmind_app::CancellationToken::new(),
+            &mut |record| {
+                offsets.push(record.provenance().parser_location().unwrap().byte_offset());
+                Ok(())
+            },
+        )
+        .unwrap();
+    assert_eq!(offsets, [1, 19]);
+}
+
+#[test]
+fn malformed_jsonl_row_is_counted_and_later_row_survives() {
+    let bytes = b"{\"eventName\":\"First\"}\n{broken\n{\"eventName\":\"Last\"}\n";
+    let mut names = Vec::new();
+    let report = StreamingEventParser::parse_reader_report(
+        &JsonParser,
+        "events.jsonl",
+        &mut bytes.as_slice(),
+        sha256(bytes),
+        &irmind_app::CancellationToken::new(),
+        &mut |record| {
+            record.inspect(|value| names.push(value.event.clone()));
+            Ok(())
+        },
+    )
+    .unwrap();
+    assert_eq!(names, ["First", "Last"]);
+    assert_eq!(report.accepted, 2);
+    assert_eq!(report.rejected, 1);
+    assert_eq!(report.samples.len(), 1);
+    assert!(report.samples[0].contains("broken"));
 }
 
 #[test]

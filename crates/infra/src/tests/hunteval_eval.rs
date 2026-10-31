@@ -292,7 +292,8 @@ fn private_answers_are_never_ingested_or_displayed() {
     let private_root = root.path().join("private");
     fs::create_dir(&source_root).unwrap();
     fs::create_dir(&private_root).unwrap();
-    let public = include_bytes!("../../../parser-json/tests/fixtures/hunteval-aws-iam-001.json");
+    let public =
+        include_bytes!("../../../modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json");
     fs::write(source_root.join("events.json"), public).unwrap();
     let secret_marker = "PRIVATE_TRUTH_MUST_NOT_ENTER_CASE_12345";
     fs::write(

@@ -6,10 +6,13 @@ use irmind_app::{CaseSeal, SignedEntry, hex, seal_challenge, sha256, verify_case
 use irmind_domain::{Actor, CaseId, Severity};
 use serde_json::json;
 use std::process::Command;
+#[cfg(feature = "parser-json")]
 use std::sync::Arc;
 
+#[cfg(feature = "parser-json")]
 struct FixtureSigner(SigningKey);
 
+#[cfg(feature = "parser-json")]
 impl irmind_app::Signer for FixtureSigner {
     fn actor(&self) -> Actor {
         Actor::Analyst
@@ -24,6 +27,7 @@ impl irmind_app::Signer for FixtureSigner {
     }
 }
 
+#[cfg(feature = "parser-json")]
 fn synthetic_export_v4(path: &std::path::Path) -> String {
     use irmind_app::{
         CancellationToken, CryptoPorts, Engine, EnginePorts, LargeCaseUseCases, export_case_v4,
@@ -192,6 +196,7 @@ fn export_verifies_without_a_keyring() {
 }
 
 #[test]
+#[cfg(feature = "parser-json")]
 fn portable_export_fixture() {
     let scratch = tempfile::tempdir().unwrap();
     let root = std::env::var_os("IRMIND_PORTABLE_EXPORT_DIR")

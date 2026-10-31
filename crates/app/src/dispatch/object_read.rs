@@ -1,12 +1,13 @@
 use crate::{
     AppError, AuditEventKind, AuditOrigin, AuthorizedCall, CancellationToken, CaseId, Engine,
-    LargeCaseUseCases, ObjectEntry, ObjectSourceOutput, PreparedSource,
+    LargeCaseUseCases, LogParser, ObjectEntry, ObjectSourceOutput, ParserSelection, PreparedSource,
 };
 use futures_util::StreamExt as _;
-use irmind_domain::{EvidenceHash, SourceManifestV1, UtcTimestamp};
+use irmind_domain::{EvidenceHash, ParserSelectionMode, SourceManifestV1, UtcTimestamp};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use std::collections::BTreeMap;
+use std::io::Read as _;
 use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
@@ -212,17 +213,18 @@ impl Engine<'_> {
         cancel: &CancellationToken,
     ) -> Result<(String, String), AppError> {
         let store = self.large_case_store.clone().ok_or(AppError::RemoteTool)?;
-        let parser = self.streaming_parser.clone().ok_or(AppError::RemoteTool)?;
+        let catalog = self.parser_catalog.clone().ok_or(AppError::RemoteTool)?;
         let id = id.clone();
         let root = source_root.to_path_buf();
         let cancel = cancel.clone();
         self.blocking_local(move |local| {
+            let (parser, selection) = select_object_parser(&catalog, &root, &manifest.source)?;
             let mut prepared: PreparedSource = store.prepare_local(
                 &id,
                 &root,
                 "download.json",
                 manifest.copied,
-                parser.as_ref(),
+                parser.as_ref() as &dyn crate::StreamingEventParser,
                 &cancel,
             )?;
             if prepared.manifest.sha256 != manifest.sha256
@@ -240,9 +242,15 @@ impl Engine<'_> {
             let large = LargeCaseUseCases {
                 engine: &local,
                 store: store.as_ref(),
-                parser: parser.as_ref(),
+                parser: parser.as_ref() as &dyn crate::StreamingEventParser,
             };
-            let hash = large.sign_prepared(&id, prepared, &cancel, &mut known)?;
+            let hash = large.sign_prepared_with_selection(
+                &id,
+                prepared,
+                Some(&selection),
+                &cancel,
+                &mut known,
+            )?;
             local.audit(
                 &id,
                 AuditOrigin::System,
@@ -257,6 +265,46 @@ impl Engine<'_> {
         })
         .await
     }
+}
+
+fn select_object_parser(
+    catalog: &crate::modules::ParserCatalog,
+    root: &std::path::Path,
+    source: &str,
+) -> Result<(Arc<dyn LogParser>, ParserSelection), AppError> {
+    let mut sample = Vec::with_capacity(64 * 1024);
+    std::fs::File::open(root.join("download.json"))
+        .map_err(|_| AppError::RemoteTool)?
+        .take(64 * 1024)
+        .read_to_end(&mut sample)
+        .map_err(|_| AppError::RemoteTool)?;
+    let selected = match catalog.detect(source, &sample) {
+        crate::modules::ParserChoice::Auto(candidate) => candidate,
+        crate::modules::ParserChoice::NeedsAnalyst(candidates) => {
+            return Err(AppError::ParserSelection {
+                source_name: source.into(),
+                candidates: candidates
+                    .into_iter()
+                    .map(|candidate| (candidate.id.into(), candidate.confidence.value()))
+                    .collect(),
+            });
+        }
+        crate::modules::ParserChoice::Unsupported => {
+            return Err(AppError::Policy(
+                "cloud object format is unsupported".into(),
+            ));
+        }
+    };
+    let parser = catalog.get(selected.id)?;
+    let selection = ParserSelection {
+        parser_id: selected.id.into(),
+        parser_version: parser.streaming_version().into(),
+        confidence: selected.confidence.value(),
+        mode: ParserSelectionMode::Automatic,
+        timestamp_context: None,
+        format_sample_sha256: crate::sha256(&sample),
+    };
+    Ok((parser, selection))
 }
 
 fn require_signed_listing(

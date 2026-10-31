@@ -1,7 +1,6 @@
 use super::{
-    AuditLog, AutomationContext, CaseCommand, Command, FindingKind, JsonParser, LargeCaseUseCases,
-    Repository, Result, Severity, anyhow, audit_source_name, input_files_large,
-    parse_approval_args, parse_id, terminal_safe_path,
+    AutomationContext, CaseCommand, Command, FindingKind, JsonParser, LargeCaseUseCases,
+    Repository, Result, Severity, anyhow, parse_approval_args, parse_id,
 };
 
 impl AutomationContext<'_, '_> {
@@ -88,85 +87,6 @@ impl AutomationContext<'_, '_> {
                     println!("case scope updated and signed");
                 }
             },
-            _ => return Err(anyhow!("invalid command dispatch")),
-        }
-        Ok(false)
-    }
-
-    fn handle_ingest(self, command: Command) -> Result<bool> {
-        let Self {
-            engine,
-            store,
-            cancel,
-            ..
-        } = self;
-        match command {
-            Command::Ingest {
-                case_id,
-                path,
-                copy_original,
-            } => {
-                let id = parse_id(&case_id)?;
-                engine.verify_cancelable(&id, cancel)?;
-                if store.get_case(&id)?.sealed {
-                    return Err(anyhow!("case is sealed"));
-                }
-                let files = input_files_large(&path)?;
-                let indexed: std::collections::BTreeMap<String, irmind_domain::SourceManifestV1> =
-                    store
-                        .entries(&id)?
-                        .into_iter()
-                        .filter(|entry| {
-                            entry.kind == irmind_domain::AuditEventKind::SourceManifestV1
-                        })
-                        .filter_map(|entry| {
-                            irmind_domain::SourceManifestV1::decode(&entry.payload)
-                                .ok()
-                                .map(|source| (source.source.clone(), source))
-                        })
-                        .collect();
-                let parser = JsonParser;
-                let large = LargeCaseUseCases {
-                    engine,
-                    store: store.as_ref(),
-                    parser: &parser,
-                };
-                let source_root = if path.is_dir() {
-                    path.as_path()
-                } else {
-                    path.parent()
-                        .ok_or_else(|| anyhow!("source has no parent"))?
-                };
-                for files in files.chunks(4) {
-                    let mut pending = Vec::new();
-                    for file in files {
-                        let source = audit_source_name(&path, file)?;
-                        if let Some(existing) = indexed.get(&source) {
-                            large
-                                .store
-                                .verify_local_source(source_root, existing, cancel)?;
-                            println!("skipped {}", terminal_safe_path(file));
-                        } else {
-                            pending.push(source);
-                        }
-                    }
-                    for (source, hash) in large.ingest_local_batch(
-                        &id,
-                        source_root,
-                        &pending,
-                        copy_original,
-                        cancel,
-                    )? {
-                        println!(
-                            "{} {}",
-                            hash.as_str(),
-                            terminal_safe_path(&source_root.join(source))
-                        );
-                    }
-                }
-                let bundles = large.compact_case(&id, cancel)?;
-                println!("created {bundles} signed Parquet bundles");
-            }
             _ => return Err(anyhow!("invalid command dispatch")),
         }
         Ok(false)

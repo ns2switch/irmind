@@ -8,12 +8,14 @@ license.workspace = true
 [features]
 default = [
     "keystore-os", "keystore-file",
+    "parser-json",
     "llm-anthropic", "llm-deepseek", "llm-openrouter",
     "siem-splunk", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
     "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
 ]
 keystore-os = ["dep:irmind-mod-keystore-os"]
 keystore-file = ["dep:irmind-mod-keystore-file"]
+parser-json = ["dep:irmind-mod-parser-json"]
 persistent-keyring = ["irmind-infra/persistent-keyring"]
 llm-anthropic = ["dep:irmind-mod-llm-anthropic"]
 llm-deepseek = ["dep:irmind-mod-llm-deepseek"]
@@ -36,7 +38,7 @@ irmind-domain = { path = "../domain", version = "0.1.0" }
 irmind-security = { path = "../security", version = "0.1.0" }
 irmind-infra = { path = "../infra", version = "0.1.0" }
 irmind-fs = { path = "../fs", version = "0.1.0" }
-irmind-mod-parser-json = { path = "../parser-json", version = "0.1.0" }
+irmind-mod-parser-json = { path = "../modules/parser-json", version = "0.1.0", optional = true }
 irmind-mod-llm-openai-compatible = { path = "../modules/llm-openai-compatible", version = "0.1.0" }
 irmind-mod-keystore-os = { path = "../modules/keystore-os", version = "0.1.0", optional = true }
 irmind-mod-keystore-file = { path = "../modules/keystore-file", version = "0.1.0", optional = true }
@@ -75,7 +77,7 @@ expectrl = "0.8"
 
 [[example]]
 name = "demo"
-required-features = ["keystore-file"]
+required-features = ["keystore-file", "parser-json"]
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

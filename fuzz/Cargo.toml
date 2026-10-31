@@ -16,7 +16,7 @@ libfuzzer-sys = "0.4"
 irmind-app = { path = "../crates/app", version = "0.1.0" }
 irmind-domain = { path = "../crates/domain", version = "0.1.0" }
 irmind-security = { path = "../crates/security", version = "0.1.0" }
-irmind-mod-parser-json = { path = "../crates/parser-json", version = "0.1.0" }
+irmind-mod-parser-json = { path = "../crates/modules/parser-json", version = "0.1.0" }
 irmind-infra = { path = "../crates/infra", version = "0.1.0", optional = true }
 tempfile = "3"
 serde_json = "1"
