@@ -37,23 +37,29 @@ impl ParquetStore {
         let mut visited = HashSet::from([start.clone()]);
         let mut previous = Breadcrumbs::new();
         let mut expanded = 0usize;
-        let mut truncated = false;
+        let mut truncation = None;
         while let Some((current, depth)) = queue.pop_front() {
             if depth >= MAX_PATH_HOPS {
                 continue;
             }
-            if expanded >= MAX_PATH_EXPANSIONS || Instant::now() >= deadline {
-                truncated = true;
+            if expanded >= MAX_PATH_EXPANSIONS {
+                truncation = Some("200-entity expansion limit");
+                break;
+            }
+            if Instant::now() >= deadline {
+                truncation = Some("10-second time budget");
                 break;
             }
             expanded += 1;
             let Some(batch) =
                 self.path_candidates_native(id, artifacts, filter, &current, deadline, cancel)?
             else {
-                truncated = true;
+                truncation = Some("10-second time budget");
                 break;
             };
-            truncated |= batch.partial;
+            if batch.partial && truncation.is_none() {
+                truncation = Some("sample or 50-neighbor limit");
+            }
             for (kind, value, source) in batch.entries {
                 let next = (kind, value);
                 if !visited.insert(next.clone()) {
@@ -66,8 +72,10 @@ impl ParquetStore {
                 queue.push_back((next, depth + 1));
             }
         }
-        if truncated {
-            Ok("no path found within 3 hops / 200 expanded entities / 50 neighbors per entity / 10 seconds; search was truncated".into())
+        if let Some(reason) = truncation {
+            Ok(format!(
+                "no path found within 3 hops / 200 expanded entities / 50 neighbors per entity / 10 seconds; search was truncated ({reason})"
+            ))
         } else {
             Ok("no co-observation path found within 3 hops".into())
         }

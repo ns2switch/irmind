@@ -211,9 +211,10 @@ fn benchmark(files: usize, multiplier: usize, label: &str) {
             .graph_path(&case.id, ("account", "887700000000"), ("ip", "192.0.2.250"))
             .unwrap();
         println!(
-            "PARQUET_WORST_PATH seconds={:.3} truncated={}",
+            "PARQUET_WORST_PATH seconds={:.3} truncated={} time_budget={}",
             started.elapsed().as_secs_f64(),
-            path.contains("truncated")
+            path.contains("truncated"),
+            path.contains("10-second time budget")
         );
         assert!(path.contains("truncated"));
     }
