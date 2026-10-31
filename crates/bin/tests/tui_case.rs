@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![cfg(feature = "parser-json")]
 #![allow(clippy::unwrap_used)]
 
 use crossterm::event::KeyCode;

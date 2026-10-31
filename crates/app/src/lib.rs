@@ -10,8 +10,8 @@ use irmind_domain::{
     ExecutionMode, PendingApproval, PolicyRules, Tainted,
 };
 pub use irmind_domain::{
-    AuditEventKind, Case, CaseId, CaseScope, GraphQueryFilter, ProposedCall, Provenance,
-    SealedParquetMigrationV1, Severity, SourceKind, Tool,
+    AuditEventKind, Case, CaseId, CaseScope, GraphQueryFilter, ParserSelectionMode, ProposedCall,
+    Provenance, SealedParquetMigrationV1, Severity, SourceKind, SourceManifestV1, Tool,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -56,7 +56,7 @@ pub use custody::{SealPreview, export_case, export_case_v4, verify_export, verif
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::{GraphRecord, GraphRelation, TimelineEvent};
 pub use keystore::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
-pub use large_case::{LargeCaseUseCases, SourceCheckMode, SourceCheckReport};
+pub use large_case::{LargeCaseUseCases, ParserSelection, SourceCheckMode, SourceCheckReport};
 pub use ports::*;
 use ports::{isolate_untrusted, remote_tool_error, run_async, safe_markdown};
 pub use report::{EntityDetails, Finding, FindingKind};

@@ -190,6 +190,10 @@ pub trait EventParser: Send + Sync {
 /// again while parsing before it commits any signed manifest entry.
 pub trait StreamingEventParser: Send + Sync {
     fn streaming_version(&self) -> &'static str;
+    fn parser_name(&self) -> &'static str;
+    fn version_for_source(&self, _source: &str) -> Result<&'static str, AppError> {
+        Ok(self.streaming_version())
+    }
     fn parse_reader(
         &self,
         source: &str,
@@ -198,12 +202,66 @@ pub trait StreamingEventParser: Send + Sync {
         cancel: &CancellationToken,
         emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
     ) -> Result<usize, AppError>;
+
+    fn parse_reader_report(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        evidence_hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        let accepted = self.parse_reader(source, reader, evidence_hash, cancel, emit)?;
+        Ok(ParseReport {
+            accepted,
+            rejected: 0,
+            samples: Vec::new(),
+        })
+    }
+}
+
+pub struct ParseReport {
+    pub accepted: usize,
+    pub rejected: u64,
+    pub samples: Vec<String>,
+}
+
+/// Confidence is intentionally bounded and independent of parser-specific
+/// heuristics. File names may raise a candidate, but not prove the format.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct ParserConfidence(u8);
+
+impl ParserConfidence {
+    pub fn new(value: u8) -> Result<Self, AppError> {
+        if value > 100 {
+            return Err(AppError::Policy("parser confidence exceeds 100".into()));
+        }
+        Ok(Self(value))
+    }
+
+    #[must_use]
+    pub fn value(self) -> u8 {
+        self.0
+    }
+
+    #[must_use]
+    pub fn is_high(self) -> bool {
+        self.0 >= 80
+    }
+}
+
+/// Format-specific, bounded evidence decoder. `detect` receives at most 64 KiB
+/// from the caller and must remain pure and cheap.
+pub trait LogParser: EventParser + StreamingEventParser {
+    fn detect(&self, source_name: &str, sample: &[u8]) -> Option<ParserConfidence>;
 }
 
 pub struct PreparedSource {
     pub manifest: SourceManifestV1,
     pub artifacts: Vec<ParquetArtifactV1>,
     pub records: usize,
+    pub format_sample_sha256: [u8; 32],
+    pub parse_report: ParseReport,
 }
 
 /// The local adapter owns all paths and derived files. The application signs

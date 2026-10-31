@@ -5,6 +5,8 @@ use irmind_app::{
 };
 use std::path::Path;
 
+pub(crate) mod ingest;
+
 /// Presentation controller shared by keyboard actions and `TestBackend` tests.
 #[derive(Clone, Copy)]
 pub(crate) struct CaseWorkflow<'a, 'ports> {
@@ -24,79 +26,6 @@ impl CaseWorkflow<'_, '_> {
             .engine
             .create_case_with_severity(title, severity, scope)?
             .id)
-    }
-
-    pub(crate) fn ingest_path(
-        &self,
-        id: &CaseId,
-        path: &Path,
-        cancel: &CancellationToken,
-        progress: impl FnMut(usize, usize, &str),
-    ) -> Result<usize, AppError> {
-        self.ingest_path_with_copy(id, path, false, cancel, progress)
-    }
-
-    pub(crate) fn ingest_path_with_copy(
-        &self,
-        id: &CaseId,
-        path: &Path,
-        copy_original: bool,
-        cancel: &CancellationToken,
-        mut progress: impl FnMut(usize, usize, &str),
-    ) -> Result<usize, AppError> {
-        let files = self.io_ops.input_files(path).map_err(|_| {
-            AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
-                irmind_app::AdapterStorageError::CannotListSelectedEvidence,
-            ))
-        })?;
-        let total = files.len();
-        let (store, parser) = self
-            .io_ops
-            .large_case_store()
-            .zip(self.io_ops.streaming_parser())
-            .ok_or(AppError::Policy(
-                "signed Parquet ingestion is unavailable".into(),
-            ))?;
-        let source_root = if path.is_dir() {
-            path
-        } else {
-            path.parent()
-                .ok_or(AppError::Policy("selected source has no parent".into()))?
-        };
-        let sources = files
-            .iter()
-            .map(|file| {
-                self.io_ops.audit_source_name(path, file).map_err(|_| {
-                    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
-                        irmind_app::AdapterStorageError::InvalidSelectedEvidencePath,
-                    ))
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        {
-            let use_cases = LargeCaseUseCases {
-                engine: self.engine,
-                store,
-                parser,
-            };
-            for (group_index, group) in sources.chunks(4).enumerate() {
-                let ingested =
-                    use_cases.ingest_local_batch(id, source_root, group, copy_original, cancel)?;
-                for (offset, (source, _)) in ingested.into_iter().enumerate() {
-                    let safe_source = self.engine.guard.screen(&source)?.text;
-                    progress(group_index * 4 + offset + 1, total, &safe_source);
-                }
-            }
-            let bundles = use_cases.compact_case(id, cancel)?;
-            if bundles > 0 {
-                progress(
-                    total,
-                    total,
-                    &format!("Created {bundles} signed Parquet bundles"),
-                );
-            }
-        }
-        Ok(total)
     }
 
     pub(crate) fn investigate(
@@ -193,10 +122,17 @@ impl CaseWorkflow<'_, '_> {
             .large_case_store()
             .zip(self.io_ops.streaming_parser())
             .ok_or(AppError::Policy("large-case storage is unavailable".into()))?;
+        let router = self
+            .io_ops
+            .parser_catalog()
+            .map(|catalog| catalog.rebuild_router(&self.engine.audit_log.entries(id)?))
+            .transpose()?;
         LargeCaseUseCases {
             engine: self.engine,
             store,
-            parser,
+            parser: router.as_ref().map_or(parser, |router| {
+                router as &dyn irmind_app::StreamingEventParser
+            }),
         }
         .verify_parquet_rebuild(id, root, cancel)
     }
@@ -224,12 +160,12 @@ impl CaseWorkflow<'_, '_> {
     }
 
     pub(crate) fn has_source_manifests(&self, id: &CaseId) -> Result<bool, AppError> {
-        Ok(self
-            .engine
-            .audit_log
-            .entries(id)?
-            .iter()
-            .any(|entry| entry.kind == AuditEventKind::SourceManifestV1))
+        Ok(self.engine.audit_log.entries(id)?.iter().any(|entry| {
+            matches!(
+                entry.kind,
+                AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2
+            )
+        }))
     }
 
     fn has_parquet_artifacts(&self, id: &CaseId) -> Result<bool, AppError> {

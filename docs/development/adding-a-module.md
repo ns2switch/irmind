@@ -8,11 +8,11 @@ Read the [architecture](architecture.md), [security model](../security-model.md)
 
 ## Add a parser
 
-1. Choose a source format and link its official schema in the pull request. Put the parser in `crates/parser-json` when it is a profile of JSON; propose a new parser crate only when the format needs a distinct decoder.
-2. Implement `EventParser` and, for large files, `StreamingEventParser`. Emit `Tainted<GraphRecord>` with a typed `Provenance` pointing to the source record. Validate timestamps, field sizes, nesting depth, and record count. Check `CancellationToken` between records or batches.
+1. Choose a source format and link its official schema in the pull request. Each parser lives in `crates/modules/parser-<name>`, including JSON profiles.
+2. Implement `LogParser` (`EventParser` and `StreamingEventParser`). Keep `detect` pure and bounded to the first 64 KiB; return confidence 0–100, and treat the filename only as a weak hint. Emit `Tainted<GraphRecord>` with a typed `Provenance` containing source, parser, and record offset. Validate timestamps, field sizes, nesting depth, and record count. Check `CancellationToken` between records or batches.
 3. Map source fields to normalized events and deterministic entities. Preserve the original bytes as evidence. Keep source parsing separate from model-facing text; the guard processes text when it is shown or sent to the model.
-4. Add small synthetic fixtures for valid, malformed, truncated, and hostile records. Include each supported provider variant and a test for deterministic ordering. Never commit real incident logs.
-5. Run the parser tests, graph reconstruction and verification tests, Clippy, and `cargo-deny`. Document supported versions, missing fields, limits, and an example in [modules](../modules.md).
+4. Add small synthetic fixtures for valid, malformed, truncated, and hostile records. Include each supported provider variant, a HuntEval-style synthetic episode, a detection-matrix row, a fuzz target for detect and parse, and a test for deterministic ordering. Never commit real incident logs. A malformed line must be counted with at most three bounded untrusted excerpts while later lines continue.
+5. Register the module behind a Cargo feature in the composition root; include it in the default build but allow `--no-default-features` to omit it. Verify that a unique high-confidence detector is chosen automatically, low confidence or a tie opens the TUI chooser, and unattended ingestion fails closed. Run the parser tests, graph reconstruction and verification tests, Clippy, nightly fuzzing, and `cargo-deny`. Document supported versions, missing fields, limits, and an example in [modules](../modules.md).
 
 ## Add a connector
 

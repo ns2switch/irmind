@@ -26,9 +26,14 @@ pub(super) fn module_statuses(
         saved,
         out: vec![ModuleStatus {
             id: "parser-json".into(),
-            compiled: true,
-            enabled: true,
-            configuration: "valid; built-in parser".into(),
+            compiled: cfg!(feature = "parser-json"),
+            enabled: cfg!(feature = "parser-json"),
+            configuration: if cfg!(feature = "parser-json") {
+                "experimental; json-stream-v2"
+            } else {
+                "not compiled; enable --features parser-json"
+            }
+            .into(),
             kind: ModuleKind::Local,
             selected: false,
             selection_source: ModuleSelectionSource::Persistent,

@@ -250,9 +250,10 @@ impl ChainState {
                     .map_err(|_| AppError::InvalidChain(entry.seq))?;
                 self.source_hashes.insert(hash.to_owned());
             }
-            AuditEventKind::SourceManifestV1 => {
-                let source = SourceManifestV1::decode(&entry.payload)
+            AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2 => {
+                let source = SourceManifestV1::decode_signed(entry.kind, &entry.payload)
                     .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                let source = source.ok_or(AppError::InvalidChain(entry.seq))?;
                 if entry.evidence.is_some() || self.source_count >= MAX_SOURCE_MANIFESTS {
                     return Err(AppError::InvalidChain(entry.seq));
                 }

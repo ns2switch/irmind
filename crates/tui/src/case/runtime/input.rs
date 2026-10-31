@@ -6,7 +6,10 @@ use crossterm::event::{MouseEvent, MouseEventKind};
 
 impl CaseRuntime<'_, '_, '_> {
     pub(super) fn handle_paste(&mut self, value: &str) {
-        if self.state.picker.is_some() || self.state.confirmation.is_some() {
+        if self.state.picker.is_some()
+            || self.state.confirmation.is_some()
+            || self.state.parser_prompt.is_some()
+        {
             return;
         }
         let limit = if self.state.palette.is_some() {
@@ -170,6 +173,16 @@ impl CaseRuntime<'_, '_, '_> {
                 } else {
                     format!("/{selected}")
                 };
+                if command == "/ingest"
+                    && (selected == "--parser"
+                        || (selected.starts_with("--parser ")
+                            && selected.split_whitespace().count() == 2))
+                {
+                    self.state.input = format!("{chosen} ");
+                    self.state.menu_query = None;
+                    self.state.menu_selected = 0;
+                    return Ok(Some(false));
+                }
                 if prefix.is_some()
                     && !matches!(
                         command,
@@ -279,6 +292,10 @@ impl CaseRuntime<'_, '_, '_> {
             self.state.menu_open = false;
             return Ok(false);
         }
+        if self.state.parser_prompt.is_some() {
+            self.handle_parser_prompt_key(code)?;
+            return Ok(false);
+        }
         if shortcut == Some("palette") {
             self.state.palette = Some(String::new());
             self.state.picker = None;
@@ -309,6 +326,30 @@ impl CaseRuntime<'_, '_, '_> {
             CaseMessage::Key(code, modifiers, self.active.is_some()),
         );
         self.apply_action(action)
+    }
+
+    fn handle_parser_prompt_key(&mut self, code: KeyCode) -> Result<()> {
+        let Some(mut prompt) = self.state.parser_prompt.take() else {
+            return Ok(());
+        };
+        match prompt.update(code) {
+            crate::case::state::ParserPromptAction::Cancel => {
+                self.state.pending_ingest = None;
+                self.engine
+                    .record_cancellation(self.id, irmind_app::CancelledOperation::Ingest)?;
+                self.state
+                    .messages
+                    .push("Parser selection cancelled and audited".into());
+            }
+            crate::case::state::ParserPromptAction::Select(parser) => {
+                if let Some(pending) = self.state.pending_ingest.as_mut() {
+                    pending.analyst_choices.insert(prompt.source, parser);
+                    self.start_pending_ingest();
+                }
+            }
+            crate::case::state::ParserPromptAction::Keep => self.state.parser_prompt = Some(prompt),
+        }
+        Ok(())
     }
 
     fn apply_action(&mut self, action: CaseAction) -> Result<bool> {

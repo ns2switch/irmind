@@ -2,7 +2,7 @@ use crate::{
     AppError, AuditLog, CaseId, EvidenceStore, LocalStore, OpenOptions, Path, PathBuf, Read,
     Repository, Write, fs, hex, params, private_file, sha256, storage, storage_reason,
 };
-use irmind_domain::{AuditEventKind, SourceManifestV1};
+use irmind_domain::SourceManifestV1;
 
 pub(crate) fn read_evidence_file(path: &Path) -> Result<Vec<u8>, AppError> {
     let file = fs::File::open(path).map_err(storage)?;
@@ -30,12 +30,11 @@ impl LocalStore {
     fn signed_source(&self, id: &CaseId, hash: &str) -> Result<Option<SourceManifestV1>, AppError> {
         self.signed_parquet_artifacts(id)?;
         for entry in self.entries(id)? {
-            if entry.kind == AuditEventKind::SourceManifestV1 {
-                let source = SourceManifestV1::decode(&entry.payload)
-                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                if source.sha256.as_str() == hash {
-                    return Ok(Some(source));
-                }
+            if let Some(source) = SourceManifestV1::decode_signed(entry.kind, &entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?
+                && source.sha256.as_str() == hash
+            {
+                return Ok(Some(source));
             }
         }
         Ok(None)

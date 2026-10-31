@@ -183,6 +183,7 @@ impl LocalStore {
             matches!(
                 entry.kind,
                 irmind_domain::AuditEventKind::SourceManifestV1
+                    | irmind_domain::AuditEventKind::SourceManifestV2
                     | irmind_domain::AuditEventKind::ParquetArtifactV1
             )
         }) {

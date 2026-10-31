@@ -21,6 +21,11 @@ pub enum AppError {
     Policy(String),
     #[error("analyst approval required: {0}")]
     PendingApproval(String),
+    #[error("analyst must choose a parser for the source")]
+    ParserSelection {
+        source_name: String,
+        candidates: Vec<(String, u8)>,
+    },
     #[error("invalid case id")]
     InvalidCaseId,
     #[error("case is sealed")]

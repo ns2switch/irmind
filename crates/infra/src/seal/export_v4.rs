@@ -22,6 +22,18 @@ pub(super) struct HeaderV4 {
     pub seal: CaseSeal,
 }
 
+struct ExportV4Request<'a> {
+    id: &'a CaseId,
+    path: &'a Path,
+    source_root: Option<&'a Path>,
+    include_originals: bool,
+    cancel: &'a CancellationToken,
+    header: HeaderV4,
+    entry_count: u64,
+    evidence: Vec<String>,
+    source_count: u64,
+}
+
 impl LargeCaseExporter for LocalStore {
     fn export_case_v4(
         &self,
@@ -59,71 +71,108 @@ impl LocalStore {
         };
         let entry_count = self.last_entry(id)?.ok_or(AppError::InvalidChain(0))?.seq;
         let evidence = self.evidence_hashes(id)?;
-        let source_count = self
-            .conn()?
-            .query_row(
-                "SELECT COUNT(*) FROM audit WHERE case_id=?1 AND kind=?2",
-                params![id.as_str(), AuditEventKind::SourceManifestV1.as_str()],
-                |row| row.get::<_, u64>(0),
-            )
-            .map_err(storage)?;
+        let source_count = self.source_manifest_count(id)?;
         let mut created = false;
-        let result = (|| {
-            let mut options = OpenOptions::new();
-            options.write(true).create_new(true);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::OpenOptionsExt as _;
-                options.mode(0o600);
-            }
-            let mut out = options.open(path).map_err(storage)?;
-            created = true;
-            private_file(path).map_err(storage)?;
-            out.write_all(MAGIC_V4).map_err(storage)?;
-            write_frame(&mut out, &serde_json::to_vec(&header).map_err(storage)?)?;
-            out.write_all(&entry_count.to_be_bytes()).map_err(storage)?;
-            let written = self.for_each_audit_entry(id, |entry| {
-                if cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
-                }
-                write_frame(&mut out, &serde_json::to_vec(&entry).map_err(storage)?)
-            })?;
-            if written as u64 != entry_count {
-                return Err(AppError::InvalidChain(entry_count));
-            }
-            out.write_all(&(evidence.len() as u64).to_be_bytes())
-                .map_err(storage)?;
-            for hash in &evidence {
-                if cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
-                }
-                let content = self.get_evidence(id, hash)?;
-                out.write_all(hash.as_bytes()).map_err(storage)?;
-                out.write_all(&(content.len() as u64).to_be_bytes())
-                    .map_err(storage)?;
-                out.write_all(&content).map_err(storage)?;
-            }
-            out.write_all(&if include_originals { source_count } else { 0 }.to_be_bytes())
-                .map_err(storage)?;
-            if include_originals {
-                self.write_source_bytes(id, source_root, &mut out, cancel)?;
-            }
-            let operations = self.operations(id)?;
-            out.write_all(&(operations.len() as u64).to_be_bytes())
-                .map_err(storage)?;
-            for operation in operations {
-                if cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
-                }
-                write_frame(&mut out, &serde_json::to_vec(&operation).map_err(storage)?)?;
-            }
-            out.sync_all().map_err(storage)?;
-            Ok(header.seal.analyst_key_fingerprint.clone())
-        })();
+        let result = self.write_v4_body(
+            &ExportV4Request {
+                id,
+                path,
+                source_root,
+                include_originals,
+                cancel,
+                header,
+                entry_count,
+                evidence,
+                source_count,
+            },
+            &mut created,
+        );
         if result.is_err() && created {
             let _ = fs::remove_file(path);
         }
         result
+    }
+
+    fn source_manifest_count(&self, id: &CaseId) -> Result<u64, AppError> {
+        self.conn()?
+            .query_row(
+                "SELECT COUNT(*) FROM audit WHERE case_id=?1 AND kind IN (?2, ?3)",
+                params![
+                    id.as_str(),
+                    AuditEventKind::SourceManifestV1.as_str(),
+                    AuditEventKind::SourceManifestV2.as_str()
+                ],
+                |row| row.get::<_, u64>(0),
+            )
+            .map_err(storage)
+    }
+
+    fn write_v4_body(
+        &self,
+        request: &ExportV4Request<'_>,
+        created: &mut bool,
+    ) -> Result<String, AppError> {
+        let ExportV4Request {
+            id,
+            path,
+            source_root,
+            include_originals,
+            cancel,
+            header,
+            entry_count,
+            evidence,
+            source_count,
+        } = request;
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt as _;
+            options.mode(0o600);
+        }
+        let mut out = options.open(path).map_err(storage)?;
+        *created = true;
+        private_file(path).map_err(storage)?;
+        out.write_all(MAGIC_V4).map_err(storage)?;
+        write_frame(&mut out, &serde_json::to_vec(&header).map_err(storage)?)?;
+        out.write_all(&entry_count.to_be_bytes()).map_err(storage)?;
+        let written = self.for_each_audit_entry(id, |entry| {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            write_frame(&mut out, &serde_json::to_vec(&entry).map_err(storage)?)
+        })?;
+        if written as u64 != *entry_count {
+            return Err(AppError::InvalidChain(*entry_count));
+        }
+        out.write_all(&(evidence.len() as u64).to_be_bytes())
+            .map_err(storage)?;
+        for hash in evidence {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let content = self.get_evidence(id, hash)?;
+            out.write_all(hash.as_bytes()).map_err(storage)?;
+            out.write_all(&(content.len() as u64).to_be_bytes())
+                .map_err(storage)?;
+            out.write_all(&content).map_err(storage)?;
+        }
+        out.write_all(&if *include_originals { *source_count } else { 0 }.to_be_bytes())
+            .map_err(storage)?;
+        if *include_originals {
+            self.write_source_bytes(id, *source_root, &mut out, cancel)?;
+        }
+        let operations = self.operations(id)?;
+        out.write_all(&(operations.len() as u64).to_be_bytes())
+            .map_err(storage)?;
+        for operation in operations {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            write_frame(&mut out, &serde_json::to_vec(&operation).map_err(storage)?)?;
+        }
+        out.sync_all().map_err(storage)?;
+        Ok(header.seal.analyst_key_fingerprint.clone())
     }
 
     fn write_source_bytes(
@@ -134,11 +183,11 @@ impl LocalStore {
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
         self.for_each_audit_entry(id, |entry| {
-            if entry.kind != AuditEventKind::SourceManifestV1 {
+            let Some(manifest) = SourceManifestV1::decode_signed(entry.kind, &entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?
+            else {
                 return Ok(());
-            }
-            let manifest = SourceManifestV1::decode(&entry.payload)
-                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            };
             let mut input = if let Some(root) = source_root {
                 irmind_fs::open_regular_no_follow(root, Path::new(&manifest.source))
                     .map_err(storage)?

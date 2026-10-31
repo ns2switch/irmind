@@ -48,6 +48,7 @@ impl<'a> Engine<'a> {
             object_sources: Vec::new(),
             large_case_store: None,
             streaming_parser: None,
+            parser_catalog: None,
             pricing: None,
             verified_cases: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             object_progress: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),

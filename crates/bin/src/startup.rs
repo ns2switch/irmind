@@ -19,10 +19,10 @@ use super::VirusTotal;
 use super::{
     Arc, AuditLog, BTreeMap, CancellationToken, Cli, Command, ConfigurationStore, Context,
     CryptoPorts, DEFAULT_LLM_MODULE, Engine, EnginePorts, ExecutionMode, JsonParser,
-    LocalExportVerifier, LocalStore, LocalVerifier, MandatoryGuard, ModuleConfig, ModuleRegistry,
-    ModuleStatus, OpenAiCompatible, Parser, PathBuf, PersistentConfig, ProjectDirs, Repository,
-    Result, RootWorkspaceIo, SecretBackend, SignerBackend, SystemClock, TomlConfigurationStore,
-    anyhow, cli, compiled_credential_fields, configuration, configuration_issue, keystore,
+    LocalExportVerifier, LocalStore, LocalVerifier, MandatoryGuard, ModuleRegistry, ModuleStatus,
+    OpenAiCompatible, Parser, PathBuf, PersistentConfig, ProjectDirs, Repository, Result,
+    RootWorkspaceIo, SecretBackend, SignerBackend, SystemClock, TomlConfigurationStore, anyhow,
+    cli, compiled_credential_fields, configuration, configuration_issue, keystore,
     load_module_config, load_policy, load_pricing,
 };
 use irmind_app::ContentGuard as _;
@@ -177,6 +177,7 @@ impl PreparedStartup {
         let signer_backend = active.signer_backend;
         let new_analyst_key = interactive && active.new_analyst_key;
         let workspace_io = RootWorkspaceIo {
+            parser_catalog: registry.parser_catalog(),
             home: home.clone(),
             credential_fields: compiled_credential_fields(),
             store: store.clone(),
@@ -227,12 +228,13 @@ impl PreparedStartup {
                     self.store.clone(),
                     CryptoPorts::new(self.active.signer.clone(), self.verifier.clone()),
                     self.guard.clone(),
-                    registry.parser()?,
+                    registry.parser().unwrap_or_else(|_| Arc::new(JsonParser)),
                 ),
                 ExecutionMode::Attended,
                 Arc::new(SystemClock),
             )?
-            .with_large_case_pipeline(self.store.clone(), Arc::new(JsonParser)),
+            .with_large_case_pipeline(self.store.clone(), Arc::new(JsonParser))
+            .with_parser_catalog(registry.parser_catalog()),
         )?;
         apply_session_policy(
             engine,

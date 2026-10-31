@@ -272,7 +272,11 @@ impl ArtifactSink {
         Ok(())
     }
 
-    fn finish(mut self, hash: &EvidenceHash) -> Result<StagedArtifact, AppError> {
+    fn finish(
+        mut self,
+        hash: &EvidenceHash,
+        parser_version: &str,
+    ) -> Result<StagedArtifact, AppError> {
         let writer = self.writer.take().ok_or_else(invalid_source)?;
         writer.close().map_err(storage)?;
         let temporary = self.temporary.as_ref().ok_or_else(invalid_source)?;
@@ -291,7 +295,7 @@ impl ArtifactSink {
                 size,
                 sha256: EvidenceHash::parse(&irmind_app::hex(&digest))
                     .map_err(|_| invalid_source())?,
-                parser_version: "json-stream-v2".into(),
+                parser_version: parser_version.into(),
                 schema_version: self.kind.schema().into(),
                 partition_date: self.partition.date.clone(),
                 partition_account: self.partition.account.clone(),
@@ -379,13 +383,14 @@ pub(super) fn batch_to_parquet(
 pub(super) fn finish_parquet(
     open: BTreeMap<Partition, PartitionSinks>,
     hash: &EvidenceHash,
+    parser_version: &str,
 ) -> Result<Vec<StagedArtifact>, AppError> {
     let mut artifacts = Vec::new();
     for sinks in open.into_values() {
-        artifacts.push(sinks.events.finish(hash)?);
-        artifacts.push(sinks.entities.finish(hash)?);
+        artifacts.push(sinks.events.finish(hash, parser_version)?);
+        artifacts.push(sinks.entities.finish(hash, parser_version)?);
         if let Some(coobservations) = sinks.coobservations {
-            artifacts.push(coobservations.finish(hash)?);
+            artifacts.push(coobservations.finish(hash, parser_version)?);
         }
     }
     Ok(artifacts)
