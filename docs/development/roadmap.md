@@ -71,7 +71,7 @@ Add local detections, evidence-linked reports, controlled extensions, and a head
 - Evaluate IRMind as a complete deployment through the HuntEval protocol.
 - Add signed local hooks before or after tool calls.
 - Offer an optional MCP client, disabled by default. Each MCP tool declares risk, passes through policy, and returns untrusted content; its design includes a threat model.
-- Approve an engine API design before implementing a headless `serve` subcommand in the IRMind CLI. The versioned protocol streams events over stdio, a Unix socket, or a Windows named pipe, with no open TCP listener by default. Keys stay inside IRMind: a client requests approval, the analyst confirms, and IRMind signs.
+- Approve an engine API design before implementing the planned headless `serve` subcommand for `irmind`. The versioned protocol streams events over stdio, a Unix socket, or a Windows named pipe, with no open TCP listener by default. Keys stay inside IRMind: a client requests approval, the analyst confirms, and IRMind signs.
 
 ## 1.0 criteria
 
