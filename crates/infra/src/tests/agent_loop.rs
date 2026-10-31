@@ -85,7 +85,7 @@ fn tool_messages_keep_ids_untrusted_results_and_signed_history() {
     );
     assert!(
         engine
-            .investigate(&id, "hello", &model)
+            .investigate(&id, "What happened next?", &model)
             .expect("second turn")
             .contains("Hello")
     );
@@ -128,7 +128,7 @@ fn tool_messages_keep_ids_untrusted_results_and_signed_history() {
             .messages
             .last()
             .map(|message| message.content.as_str()),
-        Some("hello")
+        Some("What happened next?")
     );
     assert!(
         store
@@ -209,6 +209,7 @@ fn greeting_is_a_user_message_and_needs_no_tool() {
     );
     let requests = model.0.lock().unwrap();
     assert_eq!(requests.len(), 1);
+    assert!(requests[0].tools.is_empty());
     assert_eq!(
         requests[0]
             .messages
@@ -234,6 +235,52 @@ fn greeting_is_a_user_message_and_needs_no_tool() {
             .iter()
             .any(|entry| entry.kind == irmind_domain::AuditEventKind::ToolDispatch)
     );
+}
+
+#[test]
+fn provider_tool_call_during_a_greeting_is_denied_before_dispatch() {
+    struct UnadvertisedTool;
+    #[async_trait]
+    impl LlmPort for UnadvertisedTool {
+        async fn complete(
+            &self,
+            request: CompletionRequest,
+            _cancel: &CancellationToken,
+        ) -> Result<ModelStream, AppError> {
+            assert!(request.tools.is_empty());
+            Ok(irmind_app::single_completion_stream(
+                ModelResponse {
+                    text: String::new(),
+                    calls: model_calls(vec![ProposedCall {
+                        tool: Tool::GraphSummary,
+                        args: BTreeMap::new(),
+                    }]),
+                    raw: "synthetic unadvertised call".into(),
+                    truncated: false,
+                },
+                None,
+            ))
+        }
+    }
+    let (_root, store, engine, id) = engine_fixture();
+    let result = engine.investigate(&id, "¡HoLa!", &UnadvertisedTool);
+    assert!(matches!(
+        result,
+        Err(AppError::Fixed(
+            irmind_app::FixedAppError::PolicyModelProposedUnadvertisedTool
+        ))
+    ));
+    let entries = store.entries(&id).unwrap();
+    assert!(entries.iter().any(|entry| {
+        entry.kind == irmind_domain::AuditEventKind::Denied
+            && entry.payload == "model proposed a tool in a tool-free turn"
+    }));
+    assert!(!entries.iter().any(|entry| {
+        matches!(
+            entry.kind,
+            irmind_domain::AuditEventKind::ToolDispatch | irmind_domain::AuditEventKind::ToolResult
+        )
+    }));
 }
 
 #[test]
