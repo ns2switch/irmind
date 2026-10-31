@@ -2,6 +2,9 @@
 
 use super::*;
 use irmind_mod_parser_json::JsonParser;
+use parquet::file::properties::ReaderProperties;
+use parquet::file::reader::{FileReader, SerializedFileReader};
+use parquet::file::serialized_reader::ReadOptionsBuilder;
 
 #[test]
 fn source_and_parquet_are_streamed_and_verified_independently() {
@@ -49,6 +52,74 @@ fn source_and_parquet_are_streamed_and_verified_independently() {
     store
         .verify_artifact(&id, &prepared.artifacts[0], &CancellationToken::new())
         .unwrap();
+}
+
+#[test]
+fn new_entity_artifact_has_a_value_bloom_filter() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(
+        root.path().join("events.json"),
+        br#"{"Records":[{"eventTime":"2026-10-28T12:00:00Z","eventName":"Read","recipientAccountId":"123456789012","sourceIPAddress":"203.0.113.5"},{"eventTime":"2026-10-28T12:00:01Z","eventName":"Read","recipientAccountId":"123456789012","sourceIPAddress":"203.0.113.4"}]}"#,
+    )
+    .unwrap();
+    let id = CaseId::parse("44444444-4444-4444-4444-444444444444").unwrap();
+    let store = ParquetStore::open(root.path()).unwrap();
+    let prepared = store
+        .prepare_local(
+            &id,
+            root.path(),
+            "events.json",
+            false,
+            &JsonParser,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    let artifact = prepared
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.schema_version == "irmind-entities-v2")
+        .unwrap();
+    let file = File::open(store.case_dir(&id).unwrap().join(&artifact.path)).unwrap();
+    let reader = SerializedFileReader::new_with_options(
+        file,
+        ReadOptionsBuilder::new()
+            .with_reader_properties(
+                ReaderProperties::builder()
+                    .set_read_bloom_filter(true)
+                    .build(),
+            )
+            .build(),
+    )
+    .unwrap();
+    let group = reader.get_row_group(0).unwrap();
+    let bloom = group.get_column_bloom_filter(5).unwrap();
+    assert!(bloom.check(&"203.0.113.4"));
+    let batches = parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder::try_new(
+        File::open(store.case_dir(&id).unwrap().join(&artifact.path)).unwrap(),
+    )
+    .unwrap()
+    .build()
+    .unwrap();
+    let mut keys = Vec::new();
+    for batch in batches {
+        let batch = batch.unwrap();
+        let kinds = batch
+            .column_by_name("entity_kind")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let values = batch
+            .column_by_name("entity_value")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        for row in 0..batch.num_rows() {
+            keys.push((kinds.value(row).to_owned(), values.value(row).to_owned()));
+        }
+    }
+    assert!(keys.windows(2).all(|pair| pair[0] <= pair[1]));
 }
 
 #[test]
