@@ -6,6 +6,47 @@ use parquet::file::properties::ReaderProperties;
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use parquet::file::serialized_reader::ReadOptionsBuilder;
 
+#[cfg(windows)]
+#[test]
+fn concurrent_identical_sources_publish_all_three_artifacts() {
+    for _ in 0..16 {
+        let root = tempfile::tempdir().unwrap();
+        let sources = root.path().join("sources");
+        fs::create_dir(&sources).unwrap();
+        let content = br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin"}"#;
+        fs::write(sources.join("a.json"), content).unwrap();
+        fs::write(sources.join("b.json"), content).unwrap();
+        let id = CaseId::parse("99999999-9999-9999-9999-999999999999").unwrap();
+        let store = ParquetStore::open(root.path()).unwrap();
+        let outcomes = std::thread::scope(|scope| {
+            let a = scope.spawn(|| {
+                store.prepare_local(
+                    &id,
+                    &sources,
+                    "a.json",
+                    false,
+                    &JsonParser,
+                    &CancellationToken::new(),
+                )
+            });
+            let b = scope.spawn(|| {
+                store.prepare_local(
+                    &id,
+                    &sources,
+                    "b.json",
+                    false,
+                    &JsonParser,
+                    &CancellationToken::new(),
+                )
+            });
+            [a.join().unwrap(), b.join().unwrap()]
+        });
+        for outcome in outcomes {
+            assert_eq!(outcome.unwrap().artifacts.len(), 3);
+        }
+    }
+}
+
 #[test]
 fn source_and_parquet_are_streamed_and_verified_independently() {
     let root = tempfile::tempdir().unwrap();

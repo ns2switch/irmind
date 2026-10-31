@@ -58,6 +58,7 @@ fn parquet_filters_prune_partitions_and_exact_utc_window() {
     let rows = store.timeline_filtered(&case.id, &filter, 10).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].event, "BetaEvent");
+    assert_latest_timeline(&store, &case.id);
     let search = store
         .text_search_filtered(&case.id, &filter, "Event", 10)
         .unwrap();
@@ -77,6 +78,27 @@ fn parquet_filters_prune_partitions_and_exact_utc_window() {
             .is_err()
     );
     assert_two_hop_path(&store, &case.id, &filter);
+}
+
+fn assert_latest_timeline(store: &LocalStore, id: &CaseId) {
+    let latest = store.timeline(id, 1).unwrap();
+    assert_eq!(latest[0].event, "GammaEvent");
+    let latest = store.timeline(id, 2).unwrap();
+    assert_eq!(
+        latest
+            .iter()
+            .map(|row| row.event.as_str())
+            .collect::<Vec<_>>(),
+        ["GammaEvent", "BetaEvent"]
+    );
+    let latest = store.timeline(id, 3).unwrap();
+    assert_eq!(
+        latest
+            .iter()
+            .map(|row| row.event.as_str())
+            .collect::<Vec<_>>(),
+        ["GammaEvent", "BetaEvent", "AlphaEvent"]
+    );
 }
 
 fn assert_two_hop_path(store: &LocalStore, id: &CaseId, filter: &GraphQueryFilter) {
