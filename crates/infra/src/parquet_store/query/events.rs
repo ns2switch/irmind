@@ -4,6 +4,7 @@ use super::{
     time_rules,
 };
 use irmind_app::TimelineEvent;
+use std::collections::BTreeMap;
 
 impl ParquetStore {
     pub(crate) fn search_native(
@@ -65,26 +66,44 @@ impl ParquetStore {
     ) -> Result<Vec<TimelineEvent>, AppError> {
         let limit = limit.min(100);
         let mut hits = Vec::new();
-        let status = self.scan_artifacts(
-            ScanSpec {
-                id,
-                artifacts,
-                filter,
-                schema: "irmind-events-v2",
-                columns: &["event_time", "event", "source_hash", "record_index"],
-                predicates: &time_rules(filter),
-                deadline: Instant::now() + QUERY_DEADLINE,
-                cancel,
-            },
-            |batch| {
-                for row in 0..batch.num_rows() {
-                    hits.push(EventHit::from_batch(batch, row)?);
-                }
-                recent(&mut hits, limit);
-                Ok(ScanFlow::Continue)
-            },
-        )?;
-        complete(status)?;
+        let deadline = Instant::now() + QUERY_DEADLINE;
+        let rules = time_rules(filter);
+        let mut dates = BTreeMap::<&str, Vec<ParquetArtifactV1>>::new();
+        for artifact in artifacts.iter().filter(|artifact| {
+            artifact.schema_version == "irmind-events-v2"
+                && super::super::scan::partition_matches(artifact, filter)
+        }) {
+            dates
+                .entry(&artifact.partition_date)
+                .or_default()
+                .push(artifact.clone());
+        }
+        let unknown = dates.remove("unknown");
+        for group in dates.values().rev().chain(unknown.iter()) {
+            let status = self.scan_artifacts(
+                ScanSpec {
+                    id,
+                    artifacts: group,
+                    filter,
+                    schema: "irmind-events-v2",
+                    columns: &["event_time", "event", "source_hash", "record_index"],
+                    predicates: &rules,
+                    deadline,
+                    cancel,
+                },
+                |batch| {
+                    for row in 0..batch.num_rows() {
+                        hits.push(EventHit::from_batch(batch, row)?);
+                    }
+                    recent(&mut hits, limit);
+                    Ok(ScanFlow::Continue)
+                },
+            )?;
+            complete(status)?;
+            if hits.len() >= limit {
+                break;
+            }
+        }
         hits.into_iter()
             .map(|hit| {
                 Ok(TimelineEvent {
