@@ -32,7 +32,7 @@ The agent loop keeps case context separate from the analyst's message. Provider-
 | H7 Graph | Streaming custody manifests and partitioned Parquet for 15–500 GB investigations; Arrow and Parquet scan signed, hash-checked IRMind artifacts with bounded term and graph queries. CloudTrail, GCP Cloud Audit Logs, Azure Activity and Entra ID sign-in logs, and generic JSON have streaming parsers. | Existing cases migrate without breaking verification; a standard runner converts 15 GB in under 15 minutes and query p95 stays under 10 seconds, with 1 GB and 15 GB phase profiles. |
 | H8 Integrations | Cloud, SIEM, EDR, and threat-intelligence modules passing shared port contracts; S3, GCS, and Azure Blob object storage are Read-only ingestion sources. | Each module has recorded-response tests and a setup guide; the three object backends pass a shared streaming contract and enforce case scope. |
 
-H7 is **done** as of 2026-10-29. The [standard-runner benchmark](https://github.com/ns2switch/irmind/actions/runs/40776509647) converted the synthetic 15 GB corpus in 216.761 seconds, kept measured query p95 below 10 seconds, and recorded the 1 GB profile. Migration, source verification, and graph verification have automated tests. This milestone covers local Parquet storage; cloud object reads remain H8 work.
+H7 is **done**. The [standard-runner benchmark](https://github.com/ns2switch/irmind/actions/runs/40776509647) converted the synthetic 15 GB corpus in 216.761 seconds, kept measured query p95 below 10 seconds, and recorded the 1 GB profile. Migration, source verification, and graph verification have automated tests. This milestone covers local Parquet storage; cloud object reads remain H8 work.
 
 ## Historical 0.1.0 scope
 
