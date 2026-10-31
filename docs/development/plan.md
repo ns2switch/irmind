@@ -1,6 +1,6 @@
 # IRMind reference plan
 
-This internal plan records the acceptance criteria and decisions behind the 0.1.0 pre-release. Future sequence and ownership follow the [public roadmap](roadmap.md), which supersedes any older "after MVP" wording below. The English version is authoritative.
+This internal plan records historical acceptance criteria and decisions behind the first pre-releases. Future sequence and ownership follow the [public roadmap](roadmap.md); this document does not set future release dates or assign the unattended gateway to this repository. The English version is authoritative.
 
 ## Principles
 
@@ -57,12 +57,12 @@ The original MVP exit criteria remain: H0–H8 meet their stated acceptance crit
 | H5 conversation-loop correction | Done | PR #31 integrated with the trusted-system-role security correction; no manual DeepSeek test was run before merge. H5 as a whole remains open. |
 | H5 manual test with real DeepSeek | Pending analyst | Run the first procedure in [manual validation](manual-validation.md) and record the result. |
 | One connector against a real test environment | Pending analyst | Run the Splunk lab procedure in [manual validation](manual-validation.md) and record the result. |
-| Release dry run without a tag | Done | [Manual CI run 41117075395](https://github.com/ns2switch/irmind/actions/runs/41117075395) passed on Linux, macOS and Windows, including checksums and both Windows export cross-checks. No tag or GitHub Release was created. |
-| `v0.1.0` tag, changelog and downloadable binaries | Approved for pre-release | Publish from green `main` with unsigned, checksummed binaries. Manual H5 and live-connector gates remain pending by explicit analyst decision. |
+| Release dry run without a tag | Done | [Manual CI run 41117075395](https://github.com/ns2switch/irmind/actions/runs/41117075395) passed on Linux, macOS and Windows before the first tag. |
+| `v0.1.0` and `v0.1.1` tags, changelog and downloadable binaries | Done with explicit validation exception | Both pre-releases were published from green `main`; v0.1.1 adds signed and attested assets. Manual H5 and live-connector gates remain pending. |
 
 ## Historical 0.1.0 release process
 
-The workspace version is `0.1.0`. The [release dry run](https://github.com/ns2switch/irmind/actions/runs/41117075395) already built unsigned binaries and checksums for Linux, macOS and Windows and verified portable exports across platforms. For the approved pre-release exception, tag the latest green `main`, verify the tag workflow and artifact checksums, then publish the GitHub pre-release with the changelog and the pending manual gates stated plainly. Do not treat a synthetic connector recording as the analyst's live test. Complete the two manual checks after release and fix any discovered defects in 0.1.x.
+The 0.1.0 release used unsigned, checksummed binaries. The 0.1.1 release added keyless Sigstore bundles, GitHub attestations, an SBOM, and verified installers. Both were published with an explicit exception for the pending manual model and live-connector checks. Do not treat a synthetic connector recording as the analyst's live test; record those checks in [manual validation](manual-validation.md) and fix any discovered defects in 0.1.x. The [public roadmap](roadmap.md) governs future work.
 
 ## Gateway compatibility for a separate repository
 
