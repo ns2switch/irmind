@@ -18,7 +18,7 @@ TOOLS = (
 
 
 class InstallerTests(unittest.TestCase):
-    def run_installer(self, *, tamper: bool = False, verifiers: bool = False, failure: bool = False, old_gh: bool = False):
+    def run_installer(self, *, tamper: bool = False, verifiers: bool = False, failure: bool = False, old_gh: bool = False, old_cosign: bool = False):
         with tempfile.TemporaryDirectory(prefix="irmind-installer-test-") as temporary:
             root = Path(temporary)
             tools = root / "tools"
@@ -64,6 +64,9 @@ class InstallerTests(unittest.TestCase):
                         "#!/bin/sh\n"
                         "printf '%s %s\\n' \"$0\" \"$*\" >> \"$VERIFY_LOG\"\n"
                     )
+                    if name == "cosign":
+                        version = "v3.0.6" if old_cosign else "v3.1.4"
+                        script += f'if [ "$1" = version ]; then printf "GitVersion: {version}\\n"; exit 0; fi\n'
                     if name == "gh" and old_gh:
                         script += "case $* in *--help*) exit 1;; esac\n"
                     script += "[ \"${VERIFY_FAIL:-0}\" != 1 ]\n"
@@ -83,7 +86,7 @@ class InstallerTests(unittest.TestCase):
                 env=env, capture_output=True, text=True, check=False,
             )
             installed = target / "irmind"
-            self.assertEqual(installed.is_file(), not (tamper or failure), result.stderr)
+            self.assertEqual(installed.is_file(), not (tamper or failure or old_cosign), result.stderr)
             if installed.is_file():
                 self.assertEqual(installed.read_bytes(), binary)
             self.assertEqual(list(root.glob("irmind-install.*")), [])
@@ -111,6 +114,12 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("install a current GitHub CLI", result.stderr)
         self.assertIn("gh attestation verify --help", log)
         self.assertNotIn("gh attestation verify /", log)
+
+    def test_vulnerable_cosign_is_rejected_before_verification(self):
+        result, log = self.run_installer(verifiers=True, old_cosign=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cosign 3.1.3 or newer", result.stderr)
+        self.assertNotIn("cosign verify-blob", log)
 
 
 if __name__ == "__main__":
