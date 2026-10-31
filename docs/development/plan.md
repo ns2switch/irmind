@@ -1,6 +1,6 @@
 # IRMind reference plan
 
-This internal plan is for maintainers tracking acceptance criteria. Public readers should use the [roadmap](roadmap.md). The English version is authoritative.
+This internal plan records the acceptance criteria and decisions behind the 0.1.0 pre-release. Future sequence and ownership follow the [public roadmap](roadmap.md), which supersedes any older "after MVP" wording below. The English version is authoritative.
 
 ## Principles
 
@@ -34,13 +34,15 @@ The agent loop keeps case context separate from the analyst's message. Provider-
 
 H7 is **done** as of 2026-10-29. The [standard-runner benchmark](https://github.com/ns2switch/irmind/actions/runs/40776509647) converted the synthetic 15 GB corpus in 216.761 seconds, kept measured query p95 below 10 seconds, and recorded the 1 GB profile. Migration, source verification, and graph verification have automated tests. This milestone covers local Parquet storage; cloud object reads remain H8 work.
 
-## MVP
+## Historical 0.1.0 scope
+
+This section records the pre-release scope; it is not a schedule for future work.
 
 New experimental log formats use one Cargo crate per parser. The parser registry probes at most 64 KiB per source, chooses only a unique high-confidence match automatically, asks the analyst on ambiguity, and refuses unattended selection. Parser identity, version, confidence, and selection mode are signed in `SourceManifestV2`; historical V1 manifests remain verifiable. A source-specific rebuild uses the signed parser version. Line-delimited formats count rejected records and keep at most three bounded untrusted excerpts. A malformed monolithic JSON array cannot be safely resynchronized, so its file is rejected while other case evidence remains intact.
 
 The MVP includes P: signed source manifests, optional original copies, partitioned Parquet, bounded direct queries over signed Parquet, the four streaming source parsers, representative 1 GB and 15 GB benchmarks, and verified migration of existing cases. It also includes R: read-only S3, GCS, and Azure Blob ingestion with explicit credentials, signed case scope v3 for bucket/container prefixes, transfer budgets, a prior signed listing, one streamed download to a private temporary spool, and a shared streaming contract. Existing v1/v2 scopes and signed audit, seal, and export layouts remain unchanged. C5 (SIEM alert retrieval and tracing), C6 (structured SIEM queries), and the existing H8 module contracts remain in scope. [Cloud query engines](cloud-query-design.md) are designed now but implemented after the MVP.
 
-GCP and Azure enter the MVP only as object-storage read sources and exported-log parsers. Remote re-verification of cloud originals after a case is sealed, source-side queries, Chronicle, other GCP and Azure product connectors, external anchoring of case seals, and the local gateway with watches remain after the MVP. In the MVP, a signed repeat read rechecks a remote original while the case is open; a sealed case can verify an explicitly retained copy offline.
+The 0.1.0 scope included GCP and Azure only as object-storage read sources and exported-log parsers. The new roadmap places Chronicle with the v0.2 connectors, source-side queries and remote re-verification in v0.5, and the unattended gateway and watches in another repository after the engine API. A signed repeat read rechecks a remote original while a case is open; a sealed case can verify an explicitly retained copy offline.
 
 For uncopied originals, the signed manifest proves what IRMind observed when it hashed each source, while later full verification requires access to that same source. Sampling verifies only selected originals. Neither mode claims that an unavailable source remains intact. Export without originals is verifiable as a signed manifest and case chain, not as a complete portable evidence package.
 
@@ -58,13 +60,13 @@ The original MVP exit criteria remain: H0–H8 meet their stated acceptance crit
 | Release dry run without a tag | Done | [Manual CI run 41117075395](https://github.com/ns2switch/irmind/actions/runs/41117075395) passed on Linux, macOS and Windows, including checksums and both Windows export cross-checks. No tag or GitHub Release was created. |
 | `v0.1.0` tag, changelog and downloadable binaries | Approved for pre-release | Publish from green `main` with unsigned, checksummed binaries. Manual H5 and live-connector gates remain pending by explicit analyst decision. |
 
-## Release process
+## Historical 0.1.0 release process
 
 The workspace version is `0.1.0`. The [release dry run](https://github.com/ns2switch/irmind/actions/runs/41117075395) already built unsigned binaries and checksums for Linux, macOS and Windows and verified portable exports across platforms. For the approved pre-release exception, tag the latest green `main`, verify the tag workflow and artifact checksums, then publish the GitHub pre-release with the changelog and the pending manual gates stated plainly. Do not treat a synthetic connector recording as the analyst's live test. Complete the two manual checks after release and fix any discovered defects in 0.1.x.
 
-## Later unattended gateway
+## Gateway compatibility for a separate repository
 
-Do not implement the gateway yet. Preserve distinct Analyst and Agent signing keys, `ExecutionMode`, unattended scoped reads only, analyst-signed approvals, and service-safe concurrent use cases.
+This repository does not implement the unattended gateway or watches. Preserve distinct Analyst and Agent signing keys, `ExecutionMode`, unattended scoped reads only, analyst-signed approvals, and service-safe concurrent use cases so a separate project can use the engine API.
 
 ## Accepted design choices
 

@@ -4,6 +4,8 @@
 
 A terminal AI client for security investigations with policy-enforced tool calls and a signed chain of custody.
 
+IRMind is an agentic terminal assistant for incident response and digital forensics: the analyst converses with an agent that investigates local and remote evidence, loads forensic skills when needed, and delegates bounded work to parallel subagents. The model proposes, policy decides, and every action is signed.
+
 ![Synthetic IRMind TUI walkthrough showing a resumed case, slash commands, local evidence ingestion, streaming model text, and a numbered approval](docs/assets/demo.gif)
 
 *The demo uses synthetic evidence and an ephemeral key. Its scripted model needs no network or account.*
@@ -105,6 +107,19 @@ The normal build includes every current product module and both keystores. None 
 - Pattern-based redaction can miss data, and a local signer can rewrite an entire chain unless its key fingerprint is pinned elsewhere. Do not treat this build as production-ready.
 
 Read [security-model.md](docs/security-model.md) before connecting a provider.
+
+## Roadmap
+
+- **v0.1.x:** Stabilize the pre-release, validate a model and connector, and add verifiable release assets.
+- **v0.2:** Add modular log parsers and structured-query SIEM connectors.
+- **v0.3:** Add signed, progressively loaded forensic skills.
+- **v0.4:** Add bounded parallel subagents and streamed engine events.
+- **Public launch:** Publish the demo, benchmark, and initial community skills catalog.
+- **v0.5:** Add budgeted source-side cloud queries.
+- **v0.6:** Add local detections, exportable reports, controlled extensions, and a headless engine API.
+- **1.0:** Stabilize signed formats and complete external security and connector validation.
+
+See the [public roadmap](docs/development/roadmap.md) for scope and limits; these are intentions, not release commitments.
 
 ## Documentation
 
