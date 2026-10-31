@@ -1,6 +1,6 @@
 # Platforms
 
-This page is for people installing IRMind on Linux, macOS, or Windows, including headless SSH hosts. It covers builds, unsigned CI binaries, keystore backends, and terminal behavior. Start with [getting started](getting-started.md) for the case workflow.
+This page is for people installing IRMind on Linux, macOS, or Windows, including headless SSH hosts. It covers source builds, release verification, keystore backends, and terminal behavior. Start with [getting started](getting-started.md) for the case workflow.
 
 ## Build from source
 
@@ -15,17 +15,31 @@ CI tests Ubuntu Linux, macOS arm64, and Windows x64 with the MSVC toolchain. SQL
 
 Install a C/C++ compiler before building: GCC or Clang and `pkg-config` on Linux, Xcode Command Line Tools on macOS, or Visual Studio Build Tools with MSVC C++ on Windows. A cold release build still compiles many Rust crates and bundled SQLite. Allow extra time and disk; the exact cost depends on CPU, compiler, and cache. See [benchmarks](development/benchmarks.md) for measured builds.
 
-## CI artifacts and checksums
+## Verify a release before installing
 
-No released binaries are available yet. Release tags and nightly runs after code changes produce an unsigned artifact for each platform. Pull requests and merges to `main` do not publish binaries. Each artifact includes both project licenses, third-party notices, and `SHA256SUMS`. Download from a trusted run and compare the checksum **before** executing the file:
+Download the binary for your system and `SHA256SUMS` from the [GitHub release](https://github.com/ns2switch/irmind/releases). Check the exact binary name in the checksum file before executing it. The first pre-release, v0.1.0, has only checksums; later releases will add signed bundles and provenance. A checksum alone checks the downloaded bytes against that file, not the publisher's identity.
 
 | System | Check |
 | --- | --- |
-| Linux | Run `sha256sum -c SHA256SUMS` in the extracted artifact directory. |
+| Linux | Run `sha256sum -c SHA256SUMS` in the downloaded asset directory. |
 | macOS | Run `shasum -a 256 -c SHA256SUMS` in that directory. |
 | Windows PowerShell | Compare `(Get-FileHash .\irmind.exe -Algorithm SHA256).Hash.ToLowerInvariant()` with the line for `irmind.exe` in `SHA256SUMS`. |
 
-The binaries are not signed, notarized, or Authenticode signed. Their checksum proves correspondence with the chosen CI artifact, not the identity of a publisher. A decision on distribution signing is scheduled for review by 2027-04-24.
+The source tree contains [install.sh](../install.sh) and [install.ps1](../install.ps1). Starting with a release that attaches these scripts, download the script and its matching `SHA256SUMS` and verify the script's checksum before running it. The scripts detect your system, verify the selected binary's checksum, and, when installed, use `cosign` and `gh` to verify its signature and provenance. A failed check stops the installation. They never request administrator privileges or change `PATH`.
+
+```sh
+# Linux or macOS, after checking install.sh against the release SHA256SUMS:
+sh ./install.sh v0.1.1
+```
+
+```powershell
+# Windows, after checking install.ps1 against the release SHA256SUMS:
+& .\install.ps1 -Version v0.1.1
+```
+
+Omit the version to select the newest published release, including a pre-release. An optional second POSIX argument or `-InstallDir` PowerShell argument chooses another user-owned directory. By default the binary goes to `~/.local/bin` on Linux and macOS or `%LOCALAPPDATA%\IRMind\bin` on Windows. If it is outside `PATH`, the script prints the path to add manually.
+
+CI also produces unsigned artifacts on release tags and relevant nightly runs. Pull requests and merges to `main` do not publish binaries. Apple notarization and Windows Authenticode are not available yet, so those systems may still warn after verification.
 
 ## Linux
 
