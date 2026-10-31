@@ -83,6 +83,12 @@ try {
     if ($actual -cne $expected) { Fail 'SHA-256 mismatch; nothing was installed' }
 
     if (Get-Command cosign -ErrorAction SilentlyContinue) {
+        $cosignVersionOutput = & cosign version 2>$null
+        if ($LASTEXITCODE -ne 0) { Fail 'cannot determine cosign version' }
+        $cosignVersionMatch = [regex]::Match(($cosignVersionOutput -join "`n"), '(?m)^\s*GitVersion:\s*v?([0-9]+\.[0-9]+\.[0-9]+)\s*$')
+        if (-not $cosignVersionMatch.Success -or [version]$cosignVersionMatch.Groups[1].Value -lt [version]'3.1.3') {
+            Fail 'cosign 3.1.3 or newer is required for safe identity verification'
+        }
         $identity = "https://github.com/$repo/.github/workflows/ci.yml@refs/tags/$Version"
         foreach ($file in @($asset, 'SHA256SUMS')) {
             $bundle = Join-Path $temporary "$file.sigstore.json"
