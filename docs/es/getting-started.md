@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 6f88954e40a2cd29218d06ebf8bb9111609b28d8; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit b899c4f6599b63d37f745f252363d35a3e2b1049; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -17,6 +17,12 @@ cargo build --release --locked -p irmind
 ```
 
 En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Cuando haya un artefacto de CI disponible, también puedes descargarlo y comprobar `SHA256SUMS` antes de usarlo. Consulta [plataformas](platforms.md) para los pasos de cada sistema. Los binarios aún no están firmados.
+
+## Pruébalo en cinco minutos
+
+Tras instalar IRMind, ejecuta `irmind demo`. También puedes escribir `/demo` en el inicio. Se abre un caso temporal aislado con un pequeño episodio sintético de HuntEval, claves efímeras y un modelo guionizado. No necesitas clave de API, passphrase, cuenta ni red. Si hay un modelo de Ollama local con soporte de herramientas, IRMind lo ofrece como opción local.
+
+El caso se abre mientras ingiere la evidencia incluida. Pregunta qué pasó en el episodio sintético. El modelo guionizado propone una búsqueda, un hallazgo y una consulta externa simulada. Esta última sigue esperando tu aprobación firmada, pero no contacta con ningún servicio real. Confirma el hallazgo y escribe `/demo check` para compararlo localmente con las respuestas del episodio. Estas solo se cargan en ese momento y nunca llegan al modelo. Sal con `/quit` y confirma. El caso, las claves y la evidencia temporales se borran. IRMind te indica que uses `/new` y `/settings` para trabajar normalmente.
 
 ## Primer arranque
 

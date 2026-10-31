@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 63c11fcb409f8df79e2dbba8ca88a3c73aa5b9b2; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit b899c4f6599b63d37f745f252363d35a3e2b1049; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -6,7 +6,7 @@ Cliente de IA en terminal para investigaciones de seguridad, con llamadas a herr
 
 ![Demostración sintética de IRMind: caso reanudado, comandos, ingesta, respuesta en streaming y aprobación numerada](docs/assets/demo.gif)
 
-*Esta demostración sin conexión usa evidencia sintética, un llavero de archivo efímero y un modelo falso.*
+*La demostración usa evidencia sintética y una clave efímera. El modelo guionizado no necesita red ni cuenta.*
 
 > [!WARNING]
 > IRMind 0.1.0 es una versión preliminar para evaluar con datos sintéticos. No ha superado la validación manual con un modelo ni con conectores reales. No la uses para incidentes reales ni datos sensibles.
@@ -43,6 +43,12 @@ cargo build --release --locked -p irmind
 ```
 
 La [versión preliminar v0.1.0](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) ofrece binarios sin firma. Verifica `SHA256SUMS` antes de ejecutarlos. La [guía de plataformas](docs/es/platforms.md) explica las comprobaciones, los almacenes de claves y el uso por SSH.
+
+## Pruébalo en cinco minutos
+
+Ejecuta `irmind demo` desde una compilación verificada o escribe `/demo` en el inicio. IRMind abre un caso temporal y firmado con un episodio sintético de HuntEval. Crea un llavero cifrado con una passphrase aleatoria, sin pedírtela, y borra toda la demo al salir. Si un modelo de Ollama local declara soporte de herramientas, puedes elegirlo con las flechas; en caso contrario, usa el modelo guionizado, claramente identificado y sin conexión. Nunca se utiliza un proveedor remoto.
+
+Pregunta «¿Qué ocurrió en este episodio sintético?» para ver una búsqueda local, un hallazgo propuesto y una consulta de enriquecimiento que sigue requiriendo aprobación firmada. El resultado externo es simulado y no hace llamadas de red. Confirma un hallazgo y escribe `/demo check` para compararlo localmente con las respuestas incluidas. Estas nunca entran en el contexto del modelo. Al salir, usa `/new` y `/settings` para empezar un caso real.
 
 ## Primer caso en la TUI
 
