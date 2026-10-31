@@ -2,6 +2,8 @@ use super::{
     AppError, CancellationToken, CaseId, EvidenceHash, File, OpenOptions, ParquetArtifactV1,
     ParquetStore, Path, StagedArtifact, fs, invalid_source, storage,
 };
+use arrow::compute::{SortColumn, lexsort_to_indices, take};
+use arrow::record_batch::RecordBatch;
 use parquet::arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder};
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
@@ -153,6 +155,11 @@ fn write_compact(
                 return Err(AppError::Cancelled);
             }
             let batch = batch.map_err(storage)?;
+            let batch = if optimized {
+                sort_entity_batch(&batch)?
+            } else {
+                batch
+            };
             if writer.is_none() {
                 writer = Some(
                     ArrowWriter::try_new(
@@ -168,6 +175,13 @@ fn write_compact(
                 .ok_or_else(invalid_source)?
                 .write(&batch)
                 .map_err(storage)?;
+            if optimized {
+                writer
+                    .as_mut()
+                    .ok_or_else(invalid_source)?
+                    .flush()
+                    .map_err(storage)?;
+            }
         }
     }
     writer
@@ -183,4 +197,27 @@ fn write_compact(
     file.sync_all().map_err(storage)?;
     let (digest, size) = ParquetStore::hash_reader(&mut file, cancel)?;
     Ok((size, digest))
+}
+
+fn sort_entity_batch(batch: &RecordBatch) -> Result<RecordBatch, AppError> {
+    let keys = ["entity_kind", "entity_value", "source_hash", "record_index"]
+        .iter()
+        .map(|name| {
+            batch
+                .column_by_name(name)
+                .cloned()
+                .map(|values| SortColumn {
+                    values,
+                    options: None,
+                })
+                .ok_or_else(invalid_source)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let indices = lexsort_to_indices(&keys, None).map_err(storage)?;
+    let columns = batch
+        .columns()
+        .iter()
+        .map(|column| take(column, &indices, None).map_err(storage))
+        .collect::<Result<Vec<_>, _>>()?;
+    RecordBatch::try_new(batch.schema(), columns).map_err(storage)
 }

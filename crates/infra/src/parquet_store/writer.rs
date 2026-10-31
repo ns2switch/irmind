@@ -261,11 +261,15 @@ impl ArtifactSink {
     }
 
     fn append(&mut self, batch: &RecordBatch) -> Result<(), AppError> {
-        self.writer
-            .as_mut()
-            .ok_or_else(invalid_source)?
-            .write(batch)
-            .map_err(storage)
+        let writer = self.writer.as_mut().ok_or_else(invalid_source)?;
+        writer.write(batch).map_err(storage)?;
+        if matches!(
+            self.kind,
+            ArtifactKind::Entities | ArtifactKind::Coobservations
+        ) {
+            writer.flush().map_err(storage)?;
+        }
+        Ok(())
     }
 
     fn finish(mut self, hash: &EvidenceHash) -> Result<StagedArtifact, AppError> {
