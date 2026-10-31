@@ -57,6 +57,7 @@ pub struct ParquetStore {
     root: PathBuf,
     finish_lock: std::sync::Mutex<()>,
     profile: Option<Arc<ParquetProfile>>,
+    legacy_entities: bool,
 }
 
 #[derive(Default)]
@@ -127,6 +128,7 @@ impl ParquetStore {
             root,
             finish_lock: std::sync::Mutex::new(()),
             profile: None,
+            legacy_entities: false,
         })
     }
 

@@ -3,19 +3,21 @@ use crate::parquet_store::scan::{Predicate, ScanFlow, ScanSpec, ScanStatus};
 use arrow::array::{StringArray, UInt64Array};
 use arrow::record_batch::RecordBatch;
 use irmind_domain::GraphQueryFilter;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
+mod coobservations;
 mod entity;
 mod events;
 mod neighbors;
 mod path;
+use coobservations::coobservation_available;
 
 pub(super) const QUERY_DEADLINE: Duration = Duration::from_secs(10);
 pub(super) const MAX_NEIGHBOR_RECORDS: usize = 4096;
 
 pub(super) struct TargetScan {
-    pub records: HashSet<(String, u64)>,
+    pub records: HashMap<String, HashSet<u64>>,
     pub sampled: bool,
     pub status: ScanStatus,
 }

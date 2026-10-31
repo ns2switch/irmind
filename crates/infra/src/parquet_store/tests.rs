@@ -23,7 +23,11 @@ fn source_and_parquet_are_streamed_and_verified_independently() {
         )
         .unwrap();
     assert_eq!(prepared.records, 1);
-    assert_eq!(prepared.artifacts.len(), 2);
+    assert_eq!(prepared.artifacts.len(), 3);
+    assert!(prepared.artifacts.iter().any(|artifact| {
+        artifact.schema_version == "irmind-coobservations-v1"
+            && artifact.source_hashes == vec![prepared.manifest.sha256.clone()]
+    }));
     assert!(!prepared.manifest.copied);
     assert!(
         prepared.artifacts[0]
@@ -45,6 +49,166 @@ fn source_and_parquet_are_streamed_and_verified_independently() {
     store
         .verify_artifact(&id, &prepared.artifacts[0], &CancellationToken::new())
         .unwrap();
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn old_entity_artifacts_remain_queryable_and_rebuildable() {
+    let root = tempfile::tempdir().unwrap();
+    let sources = root.path().join("sources");
+    fs::create_dir(&sources).unwrap();
+    fs::write(
+        sources.join("events.json"),
+        br#"{"Records":[{"eventTime":"2026-10-28T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123456789012","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.4"}]}"#,
+    )
+    .unwrap();
+    let old_id = CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+    let new_id = CaseId::parse("22222222-2222-2222-2222-222222222222").unwrap();
+    let mut store = ParquetStore::open(root.path()).unwrap();
+    store.legacy_entities = true;
+    let old = store
+        .prepare_local(
+            &old_id,
+            &sources,
+            "events.json",
+            false,
+            &JsonParser,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    store.legacy_entities = false;
+    let new = store
+        .prepare_local(
+            &new_id,
+            &sources,
+            "events.json",
+            false,
+            &JsonParser,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    assert_eq!(old.artifacts.len(), 2);
+    assert_eq!(new.artifacts.len(), 3);
+    let filter = irmind_domain::GraphQueryFilter::default();
+    let cancel = CancellationToken::new();
+    let lookup = |id: &CaseId, artifacts: &[ParquetArtifactV1]| {
+        (
+            store
+                .entity_native(id, artifacts, &filter, "ip", "203.0.113.4", &cancel)
+                .unwrap(),
+            store
+                .neighbors_native(id, artifacts, &filter, ("ip", "203.0.113.4"), 10, &cancel)
+                .unwrap(),
+            store
+                .path_native(
+                    id,
+                    artifacts,
+                    &filter,
+                    ("ip", "203.0.113.4"),
+                    ("account", "123456789012"),
+                    &cancel,
+                )
+                .unwrap(),
+        )
+    };
+    assert_eq!(
+        lookup(&old_id, &old.artifacts),
+        lookup(&new_id, &new.artifacts)
+    );
+    assert_eq!(
+        store
+            .rebuild_compare(
+                &old_id,
+                &sources,
+                &[old.manifest],
+                &old.artifacts,
+                &JsonParser,
+                &cancel
+            )
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        store
+            .rebuild_compare(
+                &new_id,
+                &sources,
+                &[new.manifest],
+                &new.artifacts,
+                &JsonParser,
+                &cancel
+            )
+            .unwrap(),
+        1
+    );
+}
+
+#[test]
+fn mixed_old_and_new_artifacts_keep_full_neighbor_results() {
+    let root = tempfile::tempdir().unwrap();
+    let sources = root.path().join("sources");
+    fs::create_dir(&sources).unwrap();
+    for (name, ip) in [("old.json", "203.0.113.4"), ("new.json", "203.0.113.5")] {
+        fs::write(
+            sources.join(name),
+            format!("{{\"Records\":[{{\"eventTime\":\"2026-10-28T12:00:00Z\",\"eventName\":\"Read\",\"recipientAccountId\":\"123456789012\",\"sourceIPAddress\":\"{ip}\"}}]}}"),
+        )
+        .unwrap();
+    }
+    let id = CaseId::parse("33333333-3333-3333-3333-333333333333").unwrap();
+    let mut store = ParquetStore::open(root.path()).unwrap();
+    store.legacy_entities = true;
+    let old = store
+        .prepare_local(
+            &id,
+            &sources,
+            "old.json",
+            false,
+            &JsonParser,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    store.legacy_entities = false;
+    let new = store
+        .prepare_local(
+            &id,
+            &sources,
+            "new.json",
+            false,
+            &JsonParser,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    let artifacts = old
+        .artifacts
+        .into_iter()
+        .chain(new.artifacts)
+        .collect::<Vec<_>>();
+    let result = store
+        .neighbors_native(
+            &id,
+            &artifacts,
+            &irmind_domain::GraphQueryFilter::default(),
+            ("account", "123456789012"),
+            10,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    assert!(result.contains("ip 203.0.113.4 co-observed 1 times"));
+    assert!(result.contains("ip 203.0.113.5 co-observed 1 times"));
+    assert_eq!(
+        store
+            .rebuild_compare(
+                &id,
+                &sources,
+                &[old.manifest, new.manifest],
+                &artifacts,
+                &JsonParser,
+                &CancellationToken::new(),
+            )
+            .unwrap(),
+        2
+    );
 }
 
 #[test]
@@ -159,6 +323,10 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
         store.summary_native(&id, artifacts, &cancel).unwrap(),
         "Parquet records=3; first=2026-10-28T12:00:00Z; last=2026-10-28T12:10:00Z"
     );
+    let coobservations = artifacts
+        .iter()
+        .find(|artifact| artifact.schema_version == "irmind-coobservations-v1")
+        .unwrap();
     let narrowed = irmind_domain::GraphQueryFilter::parse(
         Some("2026-10-28T12:04:00Z"),
         Some("2026-10-28T12:10:00Z"),
@@ -182,6 +350,15 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
             .collect::<Vec<_>>(),
         [2, 1]
     );
+    fs::write(
+        store.case_dir(&id).unwrap().join(&coobservations.path),
+        b"changed",
+    )
+    .unwrap();
+    assert!(matches!(
+        store.neighbors_native(&id, artifacts, &filter, ("ip", "203.0.113.4"), 10, &cancel),
+        Err(AppError::EvidenceMismatch(_))
+    ));
     let tampered = store.case_dir(&id).unwrap().join(&artifacts[0].path);
     fs::write(tampered, b"changed").unwrap();
     assert!(matches!(

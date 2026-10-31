@@ -8,7 +8,8 @@ use serde_json::Value;
 use std::sync::Arc;
 
 mod batch;
-use batch::{entity_batch, record_batch};
+use batch::{coobservation_batch, entity_batch, record_batch};
+use parquet::schema::types::ColumnPath;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(super) struct Partition {
@@ -113,6 +114,7 @@ impl RecordRow {
             + self.event.len()
             + self.at.len()
             + self.hash.len()
+            + self.entities.len().saturating_mul(self.entity_pairs.len())
             + self
                 .entity_pairs
                 .iter()
@@ -162,20 +164,25 @@ pub(super) struct ArtifactSink {
 enum ArtifactKind {
     Events,
     Entities,
+    LegacyEntities,
+    Coobservations,
 }
 
 impl ArtifactKind {
     fn suffix(self) -> &'static str {
         match self {
             Self::Events => "events",
-            Self::Entities => "entities",
+            Self::Entities | Self::LegacyEntities => "entities",
+            Self::Coobservations => "coobservations",
         }
     }
 
     fn schema(self) -> &'static str {
         match self {
             Self::Events => "irmind-events-v2",
-            Self::Entities => "irmind-entities-v1",
+            Self::Entities => "irmind-entities-v2",
+            Self::LegacyEntities => "irmind-entities-v1",
+            Self::Coobservations => "irmind-coobservations-v1",
         }
     }
 }
@@ -183,6 +190,7 @@ impl ArtifactKind {
 pub(super) struct PartitionSinks {
     events: ArtifactSink,
     entities: ArtifactSink,
+    coobservations: Option<ArtifactSink>,
 }
 
 impl Drop for ArtifactSink {
@@ -221,10 +229,21 @@ impl ArtifactSink {
         let result = (|| {
             let file = options.open(&temporary).map_err(storage)?;
             irmind_fs::private_file(&temporary).map_err(storage)?;
-            let properties = WriterProperties::builder()
+            let mut properties = WriterProperties::builder()
                 .set_compression(Compression::SNAPPY)
-                .set_max_row_group_row_count(Some(8192))
-                .build();
+                .set_max_row_group_row_count(Some(
+                    if matches!(kind, ArtifactKind::Events | ArtifactKind::LegacyEntities) {
+                        8192
+                    } else {
+                        1024
+                    },
+                ));
+            if matches!(kind, ArtifactKind::Entities | ArtifactKind::Coobservations) {
+                properties = properties
+                    .set_column_bloom_filter_enabled(ColumnPath::from("entity_value"), true)
+                    .set_column_bloom_filter_fpp(ColumnPath::from("entity_value"), 0.01);
+            }
+            let properties = properties.build();
             let writer =
                 ArrowWriter::try_new(file, batch.schema(), Some(properties)).map_err(storage)?;
             Ok(Self {
@@ -290,13 +309,17 @@ pub(super) fn batch_to_parquet(
     hash: &EvidenceHash,
     grouped: &mut BTreeMap<Partition, Vec<RecordRow>>,
     open: &mut BTreeMap<Partition, PartitionSinks>,
+    legacy_entities: bool,
 ) -> Result<(), AppError> {
     for (partition, rows) in std::mem::take(grouped) {
         if rows.is_empty() {
             continue;
         }
         let events = record_batch(&rows)?;
-        let entities = entity_batch(&rows)?;
+        let entities = entity_batch(&rows, !legacy_entities)?;
+        let coobservations = (!legacy_entities)
+            .then(|| coobservation_batch(&rows))
+            .transpose()?;
         if !open.contains_key(&partition) {
             if open.len() >= 64 {
                 return Err(AppError::Policy(
@@ -318,14 +341,33 @@ pub(super) fn batch_to_parquet(
                         hash,
                         partition.clone(),
                         &entities,
-                        ArtifactKind::Entities,
+                        if legacy_entities {
+                            ArtifactKind::LegacyEntities
+                        } else {
+                            ArtifactKind::Entities
+                        },
                     )?,
+                    coobservations: coobservations
+                        .as_ref()
+                        .map(|batch| {
+                            ArtifactSink::new(
+                                case_dir,
+                                hash,
+                                partition.clone(),
+                                batch,
+                                ArtifactKind::Coobservations,
+                            )
+                        })
+                        .transpose()?,
                 },
             );
         }
         let sinks = open.get_mut(&partition).ok_or_else(invalid_source)?;
         sinks.events.append(&events)?;
         sinks.entities.append(&entities)?;
+        if let (Some(sink), Some(batch)) = (&mut sinks.coobservations, &coobservations) {
+            sink.append(batch)?;
+        }
     }
     Ok(())
 }
@@ -338,6 +380,9 @@ pub(super) fn finish_parquet(
     for sinks in open.into_values() {
         artifacts.push(sinks.events.finish(hash)?);
         artifacts.push(sinks.entities.finish(hash)?);
+        if let Some(coobservations) = sinks.coobservations {
+            artifacts.push(coobservations.finish(hash)?);
+        }
     }
     Ok(artifacts)
 }

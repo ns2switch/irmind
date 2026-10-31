@@ -5,6 +5,7 @@ use super::{
 use parquet::arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder};
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
+use parquet::schema::types::ColumnPath;
 use std::collections::BTreeSet;
 
 impl ParquetStore {
@@ -88,7 +89,10 @@ fn validate_sources(
         if source.parser_version != "json-stream-v2"
             || !matches!(
                 source.schema_version.as_str(),
-                "irmind-events-v2" | "irmind-entities-v1"
+                "irmind-events-v2"
+                    | "irmind-entities-v1"
+                    | "irmind-entities-v2"
+                    | "irmind-coobservations-v1"
             )
             || source.schema_version != first.schema_version
             || source.source_hashes.len() != 1
@@ -110,10 +114,21 @@ fn write_compact(
     output: File,
     cancel: &CancellationToken,
 ) -> Result<(u64, [u8; 32]), AppError> {
-    let properties = WriterProperties::builder()
+    let schema = sources
+        .first()
+        .ok_or_else(invalid_source)?
+        .schema_version
+        .as_str();
+    let optimized = matches!(schema, "irmind-entities-v2" | "irmind-coobservations-v1");
+    let mut properties = WriterProperties::builder()
         .set_compression(Compression::SNAPPY)
-        .set_max_row_group_row_count(Some(8192))
-        .build();
+        .set_max_row_group_row_count(Some(if optimized { 1024 } else { 8192 }));
+    if optimized {
+        properties = properties
+            .set_column_bloom_filter_enabled(ColumnPath::from("entity_value"), true)
+            .set_column_bloom_filter_fpp(ColumnPath::from("entity_value"), 0.01);
+    }
+    let properties = properties.build();
     let mut output = Some(output);
     let mut writer: Option<ArrowWriter<File>> = None;
     for source in sources {

@@ -15,6 +15,7 @@ pub(super) struct StreamInput<'a> {
     pub(super) parser: &'a dyn StreamingEventParser,
     pub(super) cancel: &'a CancellationToken,
     pub(super) profile: Option<&'a ParquetProfile>,
+    pub(super) legacy_entities: bool,
 }
 
 pub(super) fn stream_records(
@@ -30,6 +31,7 @@ pub(super) fn stream_records(
         parser,
         cancel,
         profile,
+        legacy_entities,
     } = input;
     source.seek(SeekFrom::Start(0)).map_err(|error| {
         storage_phase(
@@ -52,16 +54,14 @@ pub(super) fn stream_records(
         buffered = buffered.saturating_add(row.estimated_bytes());
         grouped.entry(row.partition.clone()).or_default().push(row);
         if buffered >= BATCH_BYTES || grouped.values().map(Vec::len).sum::<usize>() >= BATCH_ROWS {
-            let parquet_started = Instant::now();
-            batch_to_parquet(case_dir, hash_value, &mut grouped, &mut open).map_err(|error| {
-                storage_phase(
-                    error,
-                    irmind_app::AdapterStorageError::CannotPrepareParquetOutput,
-                )
-            })?;
-            if let Some(profile) = profile {
-                profile.record_parquet(parquet_started.elapsed());
-            }
+            flush_batch(
+                case_dir,
+                hash_value,
+                &mut grouped,
+                &mut open,
+                legacy_entities,
+                profile,
+            )?;
             buffered = 0;
         }
         Ok(())
@@ -86,8 +86,30 @@ pub(super) fn stream_records(
     if cancel.is_cancelled() {
         return Err(AppError::Cancelled);
     }
+    flush_batch(
+        case_dir,
+        hash_value,
+        &mut grouped,
+        &mut open,
+        legacy_entities,
+        profile,
+    )?;
+    if records == 0 {
+        return Err(invalid_source());
+    }
+    Ok((records, open))
+}
+
+fn flush_batch(
+    case_dir: &Path,
+    hash_value: &EvidenceHash,
+    grouped: &mut BTreeMap<Partition, Vec<RecordRow>>,
+    open: &mut BTreeMap<Partition, PartitionSinks>,
+    legacy_entities: bool,
+    profile: Option<&ParquetProfile>,
+) -> Result<(), AppError> {
     let parquet_started = Instant::now();
-    batch_to_parquet(case_dir, hash_value, &mut grouped, &mut open).map_err(|error| {
+    batch_to_parquet(case_dir, hash_value, grouped, open, legacy_entities).map_err(|error| {
         storage_phase(
             error,
             irmind_app::AdapterStorageError::CannotPrepareParquetOutput,
@@ -96,10 +118,7 @@ pub(super) fn stream_records(
     if let Some(profile) = profile {
         profile.record_parquet(parquet_started.elapsed());
     }
-    if records == 0 {
-        return Err(invalid_source());
-    }
-    Ok((records, open))
+    Ok(())
 }
 
 pub(super) fn initial_hash(

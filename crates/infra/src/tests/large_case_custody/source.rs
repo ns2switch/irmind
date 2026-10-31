@@ -62,7 +62,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
             .unwrap(),
         hash
     );
-    assert_eq!(engine.verify(&case.id).unwrap(), 4);
+    assert_eq!(engine.verify(&case.id).unwrap(), 5);
     let source_report = use_cases
         .verify_sources(
             &case.id,
@@ -84,7 +84,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
         use_cases
             .verify_parquet(&case.id, &CancellationToken::new())
             .unwrap(),
-        2
+        3
     );
     assert_eq!(
         use_cases
@@ -194,7 +194,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
         )
         .unwrap();
     assert_eq!(changed.missing_or_changed, vec![hash.as_str().to_owned()]);
-    assert_eq!(engine.verify(&case.id).unwrap(), 5);
+    assert_eq!(engine.verify(&case.id).unwrap(), 6);
 }
 
 #[test]
@@ -304,9 +304,9 @@ fn parallel_batch_signs_sources_in_order_and_reuses_identical_artifact() {
             .iter()
             .filter(|e| e.kind == AuditEventKind::ParquetArtifactV1)
             .count(),
-        2
+        3
     );
-    assert_eq!(engine.verify(&case.id).unwrap(), 5);
+    assert_eq!(engine.verify(&case.id).unwrap(), 6);
     fs::write(source_root.join("a.json"), b"changed").unwrap();
     assert!(
         cases
@@ -319,5 +319,5 @@ fn parallel_batch_signs_sources_in_order_and_reuses_identical_artifact() {
             )
             .is_err()
     );
-    assert_eq!(engine.verify(&case.id).unwrap(), 5);
+    assert_eq!(engine.verify(&case.id).unwrap(), 6);
 }
