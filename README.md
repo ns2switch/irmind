@@ -104,7 +104,7 @@ Read [security-model.md](docs/security-model.md) before connecting a provider.
 
 ## Contributing and security
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for the DCO and synthetic-data rules. Report vulnerabilities privately through [SECURITY.md](SECURITY.md). Do not include real incident data in issues or pull requests.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for the DCO and synthetic-data rules, and follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately through [SECURITY.md](SECURITY.md). Do not include real incident data in issues or pull requests.
 
 ## License
 

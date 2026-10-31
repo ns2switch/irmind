@@ -2,6 +2,10 @@
 
 IRMind is licensed under `MIT OR Apache-2.0`. Dependencies retain their own licenses. `Cargo.lock` records their versions, and `deny.toml` lists permitted license expressions.
 
+## Contributor Covenant 3.0
+
+`CODE_OF_CONDUCT.md` and `CODE_OF_CONDUCT.es.md` are adapted from [Contributor Covenant 3.0](https://www.contributor-covenant.org/version/3/0/), stewarded by the Organization for Ethical Source. Copyright remains with its contributors. The text is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); our adaptations and Spanish translation retain that license. This notice does not change the license of IRMind's code.
+
 ## HuntEval public episode fixture
 
 `crates/parser-json/tests/fixtures/hunteval-aws-iam-001.json` is copied from

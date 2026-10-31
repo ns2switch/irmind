@@ -35,6 +35,8 @@ NON_IRMIND_FLAGS = {
 }
 TRANSLATIONS = {
     ROOT / "README.es.md": ROOT / "README.md",
+    ROOT / "CONTRIBUTING.es.md": ROOT / "CONTRIBUTING.md",
+    ROOT / "CODE_OF_CONDUCT.es.md": ROOT / "CODE_OF_CONDUCT.md",
     ROOT / "docs/es/roadmap.md": ROOT / "docs/development/roadmap.md",
     **{
         ROOT / "docs/es" / name: ROOT / "docs" / name

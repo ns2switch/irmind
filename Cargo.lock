@@ -2785,6 +2785,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-module-template"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-security"
 version = "0.1.0"
 dependencies = [
