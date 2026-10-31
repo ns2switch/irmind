@@ -22,6 +22,8 @@ use windows_sys::Win32::Storage::FileSystem::{
 };
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
+static ACL_UPDATE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 struct Token(HANDLE);
 impl Drop for Token {
     fn drop(&mut self) {
@@ -143,6 +145,10 @@ fn sid_text(sid: &[u8]) -> io::Result<String> {
 }
 
 pub(crate) fn private_windows(path: &Path) -> io::Result<()> {
+    // Win32 can expose an intermediate DACL while another thread updates the same path.
+    let _acl_guard = ACL_UPDATE_LOCK
+        .lock()
+        .map_err(|_| denied("Windows ACL update lock is poisoned"))?;
     let metadata = fs::symlink_metadata(path)?;
     let sid = current_user_sid()?;
     let sid_text = sid_text(&sid)?;
