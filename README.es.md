@@ -1,4 +1,4 @@
-Traducción de README.md en el commit b2bcceadc1505a1a3977aaa847a96f58de957b98; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit f587b3f7d6e671ed3d4aa36c212d952c596997eb; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -42,7 +42,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-La [versión preliminar v0.1.0](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) ofrece binarios sin firma. Verifica `SHA256SUMS` antes de ejecutarlos. La [guía de plataformas](docs/es/platforms.md) explica las comprobaciones, los almacenes de claves y el uso por SSH.
+La [versión preliminar v0.1.0](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) ofrece binarios sin firma. Descarga el binario y `SHA256SUMS`, comprueba el hash exacto y solo entonces ejecútalo. Las versiones posteriores adjuntarán [install.sh](install.sh) e [install.ps1](install.ps1) como atajo; descarga y verifica también el script antes de usarlo. Los scripts comprueban el binario y, si están disponibles, su firma Sigstore y procedencia de GitHub. La [guía de plataformas](docs/es/platforms.md) detalla los pasos.
 
 ## Pruébalo en cinco minutos
 

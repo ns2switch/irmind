@@ -77,6 +77,8 @@ jobs:
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: 'cargo-nextest,cargo-deny', fallback: none}
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_select_ci_scope.py
+      - run: sh -n install.sh
+      - run: python3 -B scripts/test_install_sh.py
       - run: cargo fmt --all -- --check
       - run: python3 scripts/check_no_rust_includes.py
       - run: python3 scripts/code_metrics.py --check-audit-literals
@@ -114,8 +116,8 @@ jobs:
         run: |
           mkdir -p dist
           cp target/release/irmind dist/irmind
-          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md dist/
-          (cd dist && sha256sum irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
+          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
+          (cd dist && sha256sum irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
           (cd dist && sha256sum --check SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.release_build == 'true'
@@ -128,6 +130,34 @@ jobs:
       - name: Clean staging
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'portable-export', 'verify-bin')) if p.is_dir()]"
+  linux_arm64:
+    needs: [linux, dco]
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.release_build == 'true' && inputs.profile_linux != true }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+        with: {targets: aarch64-unknown-linux-gnu}
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: linux-arm64-${{ hashFiles('Cargo.lock') }}
+          cache-targets: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo build --release -p irmind --locked
+      - name: Package ARM64 binary and checksum
+        run: |
+          mkdir -p dist
+          cp target/release/irmind dist/irmind
+          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
+          (cd dist && sha256sum irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
+          (cd dist && sha256sum --check SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: {name: irmind-linux-arm64, path: dist/, if-no-files-found: error}
+      - name: Clean staging
+        if: always()
+        run: python -c "from pathlib import Path; from shutil import rmtree; p=Path('dist'); rmtree(p) if p.is_dir() else None"
   windows:
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true }}
     needs: [linux, dco]
@@ -157,6 +187,9 @@ jobs:
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
       - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
+      - name: Parse the PowerShell installer without running it
+        run: |
+          pwsh -NoProfile -Command '$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile("install.ps1",[ref]$tokens,[ref]$errors) | Out-Null; if ($errors.Count) { throw ($errors -join "`n") }'
       - name: Stage CLI test executable for cross-platform verification
         if: needs.dco.outputs.cross_verify == 'true'
         run: mkdir -p verify-bin && cp target/x86_64-pc-windows-msvc/ci/irmind.exe verify-bin/irmind.exe
@@ -171,8 +204,8 @@ jobs:
         run: |
           mkdir -p dist
           cp target/x86_64-pc-windows-msvc/release/irmind.exe dist/irmind.exe
-          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md dist/
-          python -c "from pathlib import Path; import hashlib; root=Path('dist'); names=('irmind.exe','LICENSE-MIT','LICENSE-APACHE','THIRD_PARTY_NOTICES.md'); (root/'SHA256SUMS').write_bytes(''.join(hashlib.sha256((root/name).read_bytes()).hexdigest()+'  '+name+'\n' for name in names).encode('ascii'))"
+          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
+          python -c "from pathlib import Path; import hashlib; root=Path('dist'); names=('irmind.exe','LICENSE-MIT','LICENSE-APACHE','THIRD_PARTY_NOTICES.md','install.sh','install.ps1'); (root/'SHA256SUMS').write_bytes(''.join(hashlib.sha256((root/name).read_bytes()).hexdigest()+'  '+name+'\n' for name in names).encode('ascii'))"
           python -c "from pathlib import Path; assert b'\r' not in Path('dist/SHA256SUMS').read_bytes()"
           (cd dist && sha256sum --check SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -250,8 +283,8 @@ jobs:
         run: |
           mkdir -p dist
           cp target/aarch64-apple-darwin/release/irmind dist/irmind
-          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md dist/
-          (cd dist && shasum -a 256 irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
+          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
+          (cd dist && shasum -a 256 irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
           (cd dist && shasum -a 256 -c SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.release_build == 'true'

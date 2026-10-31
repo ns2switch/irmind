@@ -1,8 +1,8 @@
-Traducción de docs/platforms.md en el commit 1062ed9ecebb5f0c6cbe3fbccb335de723e20dbe; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit f587b3f7d6e671ed3d4aa36c212d952c596997eb; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
-Esta página es para quienes instalan IRMind en Linux, macOS o Windows, también en equipos a los que acceden por SSH. Explica compilación, binarios sin firma, backends de llavero y terminales. Empieza por [primeros pasos](getting-started.md) para el flujo de un caso.
+Esta página es para quienes instalan IRMind en Linux, macOS o Windows, también por SSH. Explica la compilación, la verificación de descargas, los llaveros y los terminales. Empieza por [primeros pasos](getting-started.md) para el flujo de un caso.
 
 ## Compilar desde el código
 
@@ -17,17 +17,31 @@ CI prueba Ubuntu Linux, macOS arm64 y Windows x64 con el toolchain MSVC. SQLite 
 
 Instala un compilador de C/C++ antes de compilar: GCC o Clang y `pkg-config` en Linux, Xcode Command Line Tools en macOS, o Visual Studio Build Tools con MSVC C++ en Windows. Una compilación release sin caché sigue compilando muchos crates de Rust y SQLite incluido. Reserva tiempo y disco adicionales; depende de la CPU, el compilador y la caché. Consulta las [mediciones](../development/benchmarks.md).
 
-## Artefactos de CI y checksums
+## Verificar una versión antes de instalar
 
-Todavía no hay binarios publicados como versión. Los tags de versión y las ejecuciones nocturnas tras cambios de código generan un artefacto sin firma por plataforma. Las PR y los merges a `main` no publican binarios. Cada artefacto incluye las dos licencias del proyecto, los avisos de terceros y `SHA256SUMS`. Descárgalo de una ejecución de confianza y compara el checksum **antes** de ejecutar el archivo:
+Descarga el binario de tu sistema y `SHA256SUMS` desde la [versión en GitHub](https://github.com/ns2switch/irmind/releases). Comprueba el nombre exacto del binario en el archivo de hashes antes de ejecutarlo. La primera versión preliminar, v0.1.0, solo incluye hashes; las versiones posteriores añadirán firmas y procedencia. El hash comprueba los bytes frente a ese archivo, pero no la identidad del editor.
 
 | Sistema | Comprobación |
 | --- | --- |
-| Linux | Ejecuta `sha256sum -c SHA256SUMS` en el directorio extraído. |
+| Linux | Ejecuta `sha256sum -c SHA256SUMS` en el directorio de descarga. |
 | macOS | Ejecuta `shasum -a 256 -c SHA256SUMS` en ese directorio. |
 | Windows PowerShell | Compara `(Get-FileHash .\irmind.exe -Algorithm SHA256).Hash.ToLowerInvariant()` con la línea de `irmind.exe` en `SHA256SUMS`. |
 
-Los binarios no tienen firma de código, notarización ni Authenticode. El checksum demuestra que el archivo coincide con el artefacto de CI elegido, no quién lo publicó. La decisión sobre firma de distribución se revisará antes del 24 de abril de 2027.
+El repositorio incluye [install.sh](../../install.sh) e [install.ps1](../../install.ps1). Cuando una versión adjunte estos scripts, descárgalos y comprueba su hash contra `SHA256SUMS` **antes** de ejecutarlos. Detectan el sistema y verifican el hash del binario. Si `cosign` o `gh` están instalados, verifican también la firma y la procedencia; cualquier fallo impide instalar. Nunca solicitan permisos de administrador ni cambian `PATH`.
+
+```sh
+# Linux o macOS, después de comprobar install.sh con SHA256SUMS:
+sh ./install.sh v0.1.1
+```
+
+```powershell
+# Windows, después de comprobar install.ps1 con SHA256SUMS:
+& .\install.ps1 -Version v0.1.1
+```
+
+Omite la versión para elegir la última publicada, incluida una preliminar. Un segundo argumento de POSIX o `-InstallDir` en PowerShell cambia el directorio del usuario. Por defecto se instala en `~/.local/bin` o `%LOCALAPPDATA%\IRMind\bin`. Si no está en `PATH`, el script indica cómo añadirlo manualmente.
+
+CI también genera artefactos sin firma en tags de versión y ejecuciones nocturnas relevantes. Las PR y los merges a `main` no publican binarios. Apple no notariza los binarios y Windows no usa Authenticode; ambos sistemas pueden mostrar avisos incluso después de verificar la descarga.
 
 ## Linux
 
