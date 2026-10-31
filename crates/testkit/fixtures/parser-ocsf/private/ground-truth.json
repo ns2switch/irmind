@@ -1,0 +1,1 @@
+{"malicious_event_indexes":[0,1],"entities":[["user","synthetic-user"],["host","lab-host"],["finding","Synthetic suspicious logon"]],"conclusion":"Synthetic OCSF finding for parser evaluation only"}

@@ -34,13 +34,13 @@ jobs:
           install -m 0755 .tools/cargo-fuzz "$HOME/.cargo/bin/cargo-fuzz"
       - name: Copy versioned seeds to temporary corpora
         run: |
-          for target in guard parsers canonical spl export; do
+          for target in guard parsers parser_ecs parser_ocsf canonical spl export; do
             mkdir -p "fuzz/corpus/$target"
             cp "fuzz/seeds/$target/"* "fuzz/corpus/$target/"
           done
       - name: Fuzz guard, parser, canonical format and SPL
         run: |
-          for target in guard parsers canonical spl; do
+          for target in guard parsers parser_ecs parser_ocsf canonical spl; do
             cargo fuzz run "$target" -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
           done
       - name: Fuzz exported packages within memory budget

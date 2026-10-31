@@ -2,6 +2,10 @@
 
 This file records user-visible changes. IRMind remains a pre-release for evaluation with synthetic data.
 
+## Unreleased
+
+- Add experimental, auto-detected Elastic Common Schema NDJSON and OCSF JSON/Parquet parsers as optional Cargo modules compiled by default. Both normalize bounded records into signed local Parquet and preserve source provenance; ambiguous Parquet detection asks the analyst.
+
 ## 0.1.1 — Community preview
 
 - Offer a temporary `/demo` case with synthetic HuntEval data and a scripted model, without a configured key or network connection.

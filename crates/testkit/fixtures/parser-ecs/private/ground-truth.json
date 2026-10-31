@@ -1,0 +1,1 @@
+{"malicious_event_indexes":[0,1],"entities":[["user","synthetic-user"],["host","lab-host"],["ip","192.0.2.14"]],"conclusion":"Synthetic authentication pattern for parser evaluation only"}

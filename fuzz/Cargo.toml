@@ -17,6 +17,8 @@ irmind-app = { path = "../crates/app", version = "0.1.0" }
 irmind-domain = { path = "../crates/domain", version = "0.1.0" }
 irmind-security = { path = "../crates/security", version = "0.1.0" }
 irmind-mod-parser-json = { path = "../crates/modules/parser-json", version = "0.1.0" }
+irmind-mod-parser-ecs = { path = "../crates/modules/parser-ecs", version = "0.1.0" }
+irmind-mod-parser-ocsf = { path = "../crates/modules/parser-ocsf", version = "0.1.0" }
 irmind-infra = { path = "../crates/infra", version = "0.1.0", optional = true }
 tempfile = "3"
 serde_json = "1"
@@ -31,6 +33,20 @@ bench = false
 [[bin]]
 name = "parsers"
 path = "fuzz_targets/parsers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_ecs"
+path = "fuzz_targets/parser_ecs.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_ocsf"
+path = "fuzz_targets/parser_ocsf.rs"
 test = false
 doc = false
 bench = false

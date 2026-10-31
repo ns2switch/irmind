@@ -22,8 +22,16 @@ use super::{
     BTreeMap, Cli, DEFAULT_LLM_MODULE, ModuleRegistry, OpenAiCompatible, PersistentConfig, Result,
     SecretBackend, anyhow, configuration_issue, load_module_config,
 };
-#[cfg(feature = "parser-json")]
+#[cfg(any(
+    feature = "parser-json",
+    feature = "parser-ecs",
+    feature = "parser-ocsf"
+))]
 use irmind_app::modules::ModuleConfig;
+#[cfg(feature = "parser-ecs")]
+use irmind_mod_parser_ecs::EcsParser;
+#[cfg(feature = "parser-ocsf")]
+use irmind_mod_parser_ocsf::OcsfParser;
 #[cfg(any(
     feature = "storage-s3",
     feature = "storage-gcs",
@@ -42,6 +50,10 @@ pub(super) fn configured_registry(
     let mut config_issues = BTreeMap::<&'static str, String>::new();
     #[cfg(feature = "parser-json")]
     registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-ecs")]
+    registry.register(Box::new(EcsParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-ocsf")]
+    registry.register(Box::new(OcsfParser), &ModuleConfig::new())?;
     register_llm(
         cli,
         saved,

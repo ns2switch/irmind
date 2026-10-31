@@ -24,24 +24,38 @@ pub(super) fn module_statuses(
         issues,
         keystore,
         saved,
-        out: vec![ModuleStatus {
-            id: "parser-json".into(),
-            compiled: cfg!(feature = "parser-json"),
-            enabled: cfg!(feature = "parser-json"),
-            configuration: if cfg!(feature = "parser-json") {
-                "experimental; json-stream-v2"
+        out: Vec::new(),
+    };
+    for (id, compiled, version) in [
+        (
+            "parser-json",
+            cfg!(feature = "parser-json"),
+            "json-stream-v2",
+        ),
+        ("parser-ecs", cfg!(feature = "parser-ecs"), "ecs-ndjson-v1"),
+        (
+            "parser-ocsf",
+            cfg!(feature = "parser-ocsf"),
+            "ocsf-stream-v1",
+        ),
+    ] {
+        builder.out.push(ModuleStatus {
+            id: id.into(),
+            compiled,
+            enabled: compiled,
+            configuration: if compiled {
+                format!("experimental; {version}")
             } else {
-                "not compiled; enable --features parser-json"
-            }
-            .into(),
+                format!("not compiled; enable --features {id}")
+            },
             kind: ModuleKind::Local,
             selected: false,
             selection_source: ModuleSelectionSource::Persistent,
             parameters: Vec::new(),
             credentials: Vec::new(),
             missing: Vec::new(),
-        }],
-    };
+        });
+    }
     for (id, compiled) in [
         ("keystore-os", cfg!(feature = "keystore-os")),
         ("keystore-file", cfg!(feature = "keystore-file")),
