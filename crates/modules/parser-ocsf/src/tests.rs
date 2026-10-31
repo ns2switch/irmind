@@ -209,3 +209,44 @@ fn oversized_parquet_footer_is_rejected_before_decoder_allocation() {
     );
     assert!(result.is_err());
 }
+
+#[test]
+fn oversized_parquet_row_keeps_only_a_bounded_sample() -> Result<(), Box<dyn std::error::Error>> {
+    let metadata = StructArray::from(vec![(
+        Arc::new(Field::new("version", DataType::Utf8, false)),
+        Arc::new(StringArray::from(vec!["1.4.0"])) as ArrayRef,
+    )]);
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("class_uid", DataType::Int64, false),
+        Field::new("category_uid", DataType::Int64, false),
+        Field::new("metadata", metadata.data_type().clone(), false),
+        Field::new("time", DataType::Int64, false),
+        Field::new("activity_name", DataType::Utf8, false),
+    ]));
+    let batch = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(Int64Array::from(vec![3002])) as ArrayRef,
+            Arc::new(Int64Array::from(vec![3])) as ArrayRef,
+            Arc::new(metadata) as ArrayRef,
+            Arc::new(Int64Array::from(vec![1_767_323_045_000_i64])) as ArrayRef,
+            Arc::new(StringArray::from(vec!["x".repeat(4 * 1024 * 1024)])) as ArrayRef,
+        ],
+    )?;
+    let mut file = tempfile::tempfile()?;
+    let mut writer = ArrowWriter::try_new(file.try_clone()?, schema, None)?;
+    writer.write(&batch)?;
+    writer.close()?;
+    file.seek(SeekFrom::Start(0))?;
+    let report = OcsfParser.parse_reader_report(
+        "oversized.parquet",
+        &mut file,
+        [7; 32],
+        &CancellationToken::new(),
+        &mut |_| Ok(()),
+    )?;
+    assert_eq!((report.accepted, report.rejected), (0, 1));
+    assert_eq!(report.samples.len(), 1);
+    assert!(report.samples[0].len() <= 256);
+    Ok(())
+}

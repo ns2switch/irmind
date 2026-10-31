@@ -65,8 +65,9 @@ pub(super) fn parse(
         }
         let row = row.map_err(|_| policy_error("corrupt OCSF Parquet row"))?;
         let value = row.to_json_value();
-        if value.to_string().len() > MAX_ROW_BYTES {
-            report.rejected += 1;
+        let encoded = value.to_string();
+        if encoded.len() > MAX_ROW_BYTES {
+            reject_row(&mut report, &encoded);
             continue;
         }
         if let Ok(record) = record::parse(index, &value) {
@@ -81,20 +82,23 @@ pub(super) fn parse(
             )?;
             report.accepted += 1;
         } else {
-            report.rejected += 1;
-            if report.samples.len() < 3 {
-                report.samples.push(
-                    value
-                        .to_string()
-                        .chars()
-                        .flat_map(char::escape_default)
-                        .take(256)
-                        .collect(),
-                );
-            }
+            reject_row(&mut report, &encoded);
         }
     }
     Ok(report)
+}
+
+fn reject_row(report: &mut ParseReport, encoded: &str) {
+    report.rejected += 1;
+    if report.samples.len() < 3 {
+        report.samples.push(
+            encoded
+                .chars()
+                .flat_map(char::escape_default)
+                .take(256)
+                .collect(),
+        );
+    }
 }
 
 fn validate_row_groups(
