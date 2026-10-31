@@ -34,11 +34,7 @@ const READ_CHUNK: usize = 1024 * 1024;
 const BATCH_ROWS: usize = 8192;
 const BATCH_BYTES: usize = 8 * 1024 * 1024;
 
-fn storage(error: impl std::fmt::Display) -> AppError {
-    #[cfg(test)]
-    eprintln!("Parquet storage diagnostic: {error}");
-    #[cfg(not(test))]
-    let _ = error;
+fn storage(_error: impl std::fmt::Display) -> AppError {
     AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
         irmind_app::AdapterStorageError::LocalStorageOperationFailed,
     ))

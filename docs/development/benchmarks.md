@@ -85,3 +85,26 @@ The 1 GB and 15 GB standard-runner needle measurements are collected by the [man
 The needle queries use the episode's observed UTC window and provider, so partition pruning excludes the unrelated noise. The generic query samples above intentionally use a common entity across the synthetic corpus and show the broad-query cost. The run also measured an 8-second warm release test rebuild and a 44,145,224-byte release binary; neither is an ingestion latency.
 
 The first 15 GB run exposed the unfiltered reader's 10-second path budget: one attack-path lookup returned its explicit truncated result. The evaluator now supplies the episode's observed UTC window and provider as normal graph filters, so signed partition pruning narrows each query without raising the budget or bypassing artifact hash verification. The unfiltered truncation remains a measured limitation for broad questions on large cases.
+
+## Sorted entities and signed co-observations
+
+The [optimized standard-runner run](https://github.com/ns2switch/irmind/actions/runs/41192440990) uses the same pinned HuntEval commit and synthetic corpus generator as the [baseline run](https://github.com/ns2switch/irmind/actions/runs/41190348193). These are separate GitHub Linux runners of the same class, not guaranteed to be the same physical host. Entity rows are sorted by `(kind, value)` within bounded batches and written with 1,024-row groups and value-column Bloom filters. A signed co-observation artifact stores each entity's record pointer and peers. Neighbor and path queries use it when the case has a complete set; old or mixed cases retain the previous path. Recent timeline queries visit the newest signed date partitions first and stop only when older dates cannot enter the requested top N. Every selected artifact is still rehashed before reading. Page indexes were not enabled because the observed gains came from row-group and Bloom pruning; they need a separate measured comparison before adding write cost.
+
+| Corpus | Baseline ingest | Optimized ingest | Baseline Parquet | Optimized Parquet | Co-observation artifact |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 GB plus 18 episodes | 25.816 s | 40.093 s | 301,259,285 B | 782,415,667 B | 417,450,101 B |
+| 15 GB plus 18 episodes | 229.378 s | 447.208 s | 1,803,662,772 B | 8,451,871,774 B | 5,723,788,884 B |
+
+At 15 GB, ingestion remains under the 15-minute target, but the optimized Parquet store uses 6,648,209,002 additional bytes. Co-observations account for most of that increase. The phase measurements in the optimized run were 11.933 s of source hashing, 1,017.292 s of conversion CPU across workers, 157.730 s of row preparation and 284.224 s of Parquet writing; these overlap and do not sum to wall time. This space and write-time tradeoff needs review before applying the design to 500 GB cases.
+
+| Warm 15 GB query p95 | Baseline direct reader | Optimized reader | Former SQL reader |
+| --- | ---: | ---: | ---: |
+| Term search | 3.162 s | 4.111 s | 7.925 s |
+| Entity lookup | 2.306 s | 1.726 s | 1.603 s |
+| Neighbors | 8.093 s | 0.578 s | 0.477 s |
+| Timeline | 2.650 s | 0.028 s | 1.056 s |
+| Direct path | 8.190 s | 0.617 s | 0.470 s |
+
+Entity lookup is 7.7% slower than the former SQL reader, within the 25% target; timeline is faster. Neighbors and direct path are below the 1.5-second p95 target. Term search uses the unchanged event scan: two optimized runs measured 3.206 s and 4.111 s, so the apparent regression against the 3.162-second baseline includes substantial runner variance. The worst measured three-hop path with 200 expansions took 10.056 s and explicitly reported truncation by the unchanged 10-second budget. A broad adversarial path can still be partial; the fast direct-path sample is not a bound for it.
+
+The optimized 15 GB needle check again recovered all 57 malicious events, 30 entities and 42 path segments, with zero parse errors. The highest episode-filtered query p95 remained 0.002 s for each provider. The optimized release binary was 46,734,792 B versus 44,145,224 B for the pinned baseline; Cargo.lock gained no dependencies. The run's warm release test build took 10 s and its separate binary build 56 s; those timings are cache-dependent and are not a cold-build comparison.
