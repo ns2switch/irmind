@@ -9,8 +9,7 @@ A terminal AI client for security investigations with policy-enforced tool calls
 *This offline demo uses synthetic evidence, an ephemeral file keystore, and a fake model.*
 
 > [!WARNING]
-> IRMind is under development. Do not use it for real incidents or sensitive data yet.
-> The examples in this repository are synthetic.
+> IRMind 0.1.0 is a preliminary release for evaluation with synthetic data. It has not passed manual validation with a real model or connector. Do not use it for real incidents or sensitive data.
 
 ## What you can do
 
@@ -43,7 +42,7 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-No released binaries are available yet. CI produces unsigned artifacts only on release tags and on nightly runs after code changes. Verify `SHA256SUMS` before running one. Follow the [platform guide](docs/platforms.md) for checksums, keystore backends, SSH, and terminal support.
+The [v0.1.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) provides unsigned binaries. Verify `SHA256SUMS` before running one. Follow the [platform guide](docs/platforms.md) for checksums, keystore backends, SSH, and terminal support.
 
 ## First case in the TUI
 

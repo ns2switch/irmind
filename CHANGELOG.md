@@ -1,8 +1,8 @@
 # Changelog
 
-This file records user-visible changes. The 0.1.0 entry is a draft until the MVP exit criteria in the [reference plan](docs/development/plan.md) are met and the release is tagged.
+This file records user-visible changes. IRMind 0.1.0 is a pre-release for evaluation with synthetic data.
 
-## 0.1.0 — Unreleased
+## 0.1.0 — Pre-release (2026-10-31)
 
 - Investigate a signed case from the terminal, with a guided first run, conversation, approvals, findings, and evidence views.
 - Enforce case and organization scope before remote tool calls; require an analyst signature for external enrichment.
@@ -15,4 +15,4 @@ This file records user-visible changes. The 0.1.0 entry is a draft until the MVP
 - Configure model, connector, and keystore backends in the TUI. No model or connector is enabled by default.
 - Build unsigned binaries for Linux, macOS, and Windows with SHA-256 checksums.
 
-The release remains blocked on the documented manual DeepSeek and live test-connector validations. Do not create the tag until those results are recorded.
+This pre-release is published without the manual H5 validation with DeepSeek or a connector test against a real test environment. Both remain pending and may lead to fixes in 0.1.x. Do not use this version for real incidents or sensitive data. The signed co-observation artifact's disk use, entity lookup latency, and worst-case three-hop path query are tracked in [issue #37](https://github.com/ns2switch/irmind/issues/37). Binaries are unsigned; verify the supplied SHA-256 checksums before use.
