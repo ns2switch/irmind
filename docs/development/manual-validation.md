@@ -4,7 +4,7 @@ This guide is for the analyst closing the two manual release gates. Use only the
 
 ## H5: real DeepSeek model
 
-1. Wait until the reviewed Phase L conversation-loop correction is in `main`. Build the default binary from that commit and start `irmind` in a fresh test data directory. Complete the file-keystore guide and keep its analyst fingerprint outside that directory. In `/settings model`, choose DeepSeek, enter the approved model and API key in the masked field, and run **Test connection**. Confirm the remote-data warning; the probe contains no case evidence.
+1. Build the default binary from `main` and start `irmind` in a fresh test data directory. Complete the file-keystore guide and keep its analyst fingerprint outside that directory. In `/settings model`, choose DeepSeek, enter the approved model and API key in the masked field, and run **Test connection**. Confirm the remote-data warning; the probe contains no case evidence.
 2. Create a case with `/new`, then ingest `examples/cloudtrail-alert.json` with `/ingest`. Keep its source file available for full verification.
 3. Ask `Hello.` and check that the model replies naturally without an unnecessary tool call. Then ask it to explain the synthetic `ConsoleLogin` and `AssumeRole` events, cite the evidence hash, and identify uncertainty. Check that tool calls, if any, follow the policy and that the answer does not invent evidence.
 4. Ask a follow-up referring to the first answer. Check that the conversation continues, streaming finishes cleanly, and a tool result is not requested repeatedly. Use `/verify` with the source root and record the outcome. A response cut by a token limit should remain visible and offer a continuation path.
