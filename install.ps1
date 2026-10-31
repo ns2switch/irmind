@@ -93,11 +93,16 @@ try {
     } else {
         Write-Warning 'cosign is unavailable; verify the published Sigstore bundles manually for publisher identity.'
     }
+    $ghSupportsAttestations = $false
     if (Get-Command gh -ErrorAction SilentlyContinue) {
+        & gh attestation verify --help *> $null
+        $ghSupportsAttestations = $LASTEXITCODE -eq 0
+    }
+    if ($ghSupportsAttestations) {
         & gh attestation verify $binary -R $repo | Out-Null
         if ($LASTEXITCODE -ne 0) { Fail 'GitHub provenance verification failed; nothing was installed' }
     } else {
-        Write-Warning "gh is unavailable; run gh attestation verify $asset -R $repo after downloading it."
+        Write-Warning "gh attestation verify is unavailable; install a current GitHub CLI, then run gh attestation verify $asset -R $repo."
     }
 
     [System.IO.Directory]::CreateDirectory($InstallDir) | Out-Null
