@@ -81,7 +81,7 @@ Do not implement the gateway yet. Preserve distinct Analyst and Agent signing ke
 
 ## Distribution
 
-Release tags and nightly CI runs after code changes produce unsigned binaries with `SHA256SUMS`. Pull requests and merges to `main` run development checks without release builds. Signing, notarization, and Authenticode are deferred. Review this decision by 2027-04-24 or before external binary distribution.
+The v0.1.0 pre-release has unsigned binaries and `SHA256SUMS`. From v0.1.1, release tags publish binaries and a checksum list signed with keyless Sigstore, plus GitHub build attestations and an attested SPDX SBOM. Relevant nightly runs build test artifacts but do not publish a release. Pull requests and merges to `main` run development checks without release builds. Apple notarization and Windows Authenticode remain deferred.
 
 ## Documentation
 

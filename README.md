@@ -42,7 +42,17 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-The [v0.1.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) provides unsigned binaries. Download a binary and `SHA256SUMS`, verify the exact checksum, then run it. Later releases attach [install.sh](install.sh) and [install.ps1](install.ps1) as a shorter route; download and verify the script itself before running it. The scripts verify the binary and, when available, its Sigstore signature and GitHub provenance. See the [platform guide](docs/platforms.md) for the steps and system-specific details.
+The [v0.1.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.1.0) provides unsigned binaries. Releases from v0.1.1 add keyless Sigstore bundles and GitHub provenance. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
+
+```sh
+# After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:
+tag=v0.1.1; binary=irmind-linux-x86_64
+for file in "$binary" SHA256SUMS; do
+  cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
+done
+awk -v name="$binary" '$2 == name { print }' SHA256SUMS | sha256sum -c -
+gh attestation verify "$binary" -R ns2switch/irmind
+```
 
 ## Try it in five minutes
 

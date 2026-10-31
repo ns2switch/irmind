@@ -17,15 +17,40 @@ Install a C/C++ compiler before building: GCC or Clang and `pkg-config` on Linux
 
 ## Verify a release before installing
 
-Download the binary for your system and `SHA256SUMS` from the [GitHub release](https://github.com/ns2switch/irmind/releases). Check the exact binary name in the checksum file before executing it. The first pre-release, v0.1.0, has only checksums; later releases will add signed bundles and provenance. A checksum alone checks the downloaded bytes against that file, not the publisher's identity.
+Download the binary for your system and `SHA256SUMS` from the [GitHub release](https://github.com/ns2switch/irmind/releases). Check the exact binary name in the checksum file before executing it. The first pre-release, v0.1.0, has only checksums. Releases from v0.1.1 include Sigstore bundles and GitHub provenance. A checksum alone checks bytes against that file, not the publisher's identity.
 
 | System | Check |
 | --- | --- |
-| Linux | Run `sha256sum -c SHA256SUMS` in the downloaded asset directory. |
-| macOS | Run `shasum -a 256 -c SHA256SUMS` in that directory. |
-| Windows PowerShell | Compare `(Get-FileHash .\irmind.exe -Algorithm SHA256).Hash.ToLowerInvariant()` with the line for `irmind.exe` in `SHA256SUMS`. |
+| Linux | Check the one line for your exact binary with `sha256sum -c -`. |
+| macOS | Check the one line for your exact binary with `shasum -a 256 -c -`. |
+| Windows PowerShell | Compare `Get-FileHash` with the one line for your exact binary. |
 
-The source tree contains [install.sh](../install.sh) and [install.ps1](../install.ps1). Starting with a release that attaches these scripts, download the script and its matching `SHA256SUMS` and verify the script's checksum before running it. The scripts detect your system, verify the selected binary's checksum, and, when installed, use `cosign` and `gh` to verify its signature and provenance. A failed check stops the installation. They never request administrator privileges or change `PATH`.
+The checksum file lists every release asset, so a full `SHA256SUMS` check needs every asset downloaded. With only one binary, select its line and require one match before checking it. On Linux or macOS:
+
+```sh
+binary=irmind-linux-x86_64 # replace with the downloaded asset name
+line=$(awk -v name="$binary" '$2 == name { print }' SHA256SUMS)
+test -n "$line" && test "$(printf '%s\n' "$line" | wc -l)" -eq 1 || exit 1
+printf '%s\n' "$line" | sha256sum -c - # use shasum -a 256 -c - on macOS
+```
+
+On Windows, compare the lowercase `Get-FileHash` result with the digest in the single matching `SHA256SUMS` line for `irmind-windows-x86_64.exe`.
+
+For v0.1.1 and later, also download the matching `.sigstore.json` bundles for the binary and `SHA256SUMS`. Use cosign **3.1.3 or newer**: earlier v3 releases have a [legacy-bundle identity-verification bypass](https://github.com/sigstore/cosign/security/advisories/GHSA-fx35-mq7g-6g98). The installers reject those versions. Verify both files with the exact GitHub Actions identity and issuer below, replacing `<TAG>` and `<BINARY>` with the downloaded release tag and filename:
+
+```sh
+cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/<TAG>" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+cosign verify-blob "<BINARY>" --bundle "<BINARY>.sigstore.json" \
+  --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/<TAG>" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify "<BINARY>" -R ns2switch/irmind
+```
+
+For Windows PowerShell, use the same `cosign verify-blob` and `gh attestation verify` commands with Windows paths. Check the certificate identity against the **tag you intended to install**; checking only that a signature exists is insufficient. The attestation binds the binary digest to this repository's build workflow. [Sigstore's verification guide](https://docs.sigstore.dev/cosign/verifying/verify/) and [GitHub's attestation guide](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations) explain the checks.
+
+The source tree contains [install.sh](../install.sh) and [install.ps1](../install.ps1). Download the script and its matching `SHA256SUMS`. First verify the `SHA256SUMS` Sigstore bundle against the expected tag and workflow identity using the command above; then check the **script's exact checksum line** before running it. On Linux or macOS, set `binary=install.sh` in the checksum example above. On Windows, compare `Get-FileHash .\install.ps1 -Algorithm SHA256` with its single matching line. The scripts detect your system, verify the selected binary's checksum, and, when available, use `cosign` and a current `gh` to verify its signature and provenance. A failed verification stops the installation. They never request administrator privileges or change `PATH`.
 
 ```sh
 # Linux or macOS, after checking install.sh against the release SHA256SUMS:
@@ -39,7 +64,7 @@ sh ./install.sh v0.1.1
 
 Omit the version to select the newest published release, including a pre-release. An optional second POSIX argument or `-InstallDir` PowerShell argument chooses another user-owned directory. By default the binary goes to `~/.local/bin` on Linux and macOS or `%LOCALAPPDATA%\IRMind\bin` on Windows. If it is outside `PATH`, the script prints the path to add manually.
 
-CI also produces unsigned artifacts on release tags and relevant nightly runs. Pull requests and merges to `main` do not publish binaries. Apple notarization and Windows Authenticode are not available yet, so those systems may still warn after verification.
+CI also produces test artifacts on relevant nightly runs; these are not GitHub Releases. Pull requests and merges to `main` do not publish binaries. Apple notarization and Windows Authenticode are not available yet, so those systems may still warn after verification.
 
 ## Linux
 
@@ -47,11 +72,11 @@ Use a terminal compatible with xterm, such as GNOME Terminal or Konsole. The `os
 
 ## macOS
 
-Use Terminal.app or iTerm2. The `os` backend uses Keychain; the `file` backend is available for explicit SSH use. CI targets Apple Silicon. After verifying the checksum, Gatekeeper may block the unsigned downloaded binary. Allow **that binary only** in System Settings → Privacy & Security, or remove only its quarantine attribute with `xattr -d com.apple.quarantine ./irmind`. Never disable Gatekeeper system-wide.
+Use Terminal.app or iTerm2. The `os` backend uses Keychain; the `file` backend is available for explicit SSH use. CI targets Apple Silicon. After verifying the release, Gatekeeper may block a downloaded binary without Apple code signing. Allow **that binary only** in System Settings → Privacy & Security, or remove only its quarantine attribute with `xattr -d com.apple.quarantine ./irmind`. Never disable Gatekeeper system-wide.
 
 ## Windows
 
-Use Windows Terminal and the x64 MSVC build. The `os` backend uses Credential Manager; `file` is available when it is explicitly selected. IRMind checks that local case files and the encrypted store are restricted to the current user's SID. SmartScreen or corporate antivirus may warn about an unsigned binary. Verify the checksum and provenance, then request a narrow exception from your security team if policy allows it. Do not disable protection globally.
+Use Windows Terminal and the x64 MSVC build. The `os` backend uses Credential Manager; `file` is available when it is explicitly selected. IRMind checks that local case files and the encrypted store are restricted to the current user's SID. SmartScreen or corporate antivirus may warn about a binary without Authenticode. Verify the checksum, Sigstore identity, and provenance, then request a narrow exception from your security team if policy allows it. Do not disable protection globally.
 
 ## Data and terminal behavior
 
