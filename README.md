@@ -106,6 +106,8 @@ The normal build includes every current product module and both keystores. None 
 | plaso parser | local parser | `parser-plaso` (default) | experimental | [plaso](docs/modules.md#plaso-parser) |
 | Declarative parser | local parser | `parser-declarative` (default) | experimental | [Custom formats](docs/parsers.md) |
 | EZTools parser | local parser | `parser-eztools` (default) | experimental | [EZTools](docs/modules.md#eztools-parser) |
+| Zeek parser | local parser | `parser-zeek` (default) | experimental | [Zeek](docs/modules.md#zeek-parser) |
+| Suricata EVE parser | local parser | `parser-suricata` (default) | experimental | [Suricata](docs/modules.md#suricata-eve-parser) |
 | OS keystore | signing and secrets | `keystore-os` (default) | experimental | [OS keystore](docs/modules.md#os-keystore) |
 | Encrypted-file keystore | signing and secrets | `keystore-file` (default) | experimental | [File keystore](docs/modules.md#file-keystore) |
 

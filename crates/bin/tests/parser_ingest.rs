@@ -8,7 +8,9 @@
     feature = "parser-hayabusa",
     feature = "parser-chainsaw",
     feature = "parser-plaso",
-    feature = "parser-eztools"
+    feature = "parser-eztools",
+    feature = "parser-zeek",
+    feature = "parser-suricata"
 ))]
 
 use arrow::{
@@ -30,7 +32,9 @@ use irmind_mod_parser_hayabusa::HayabusaParser;
 use irmind_mod_parser_json::JsonParser;
 use irmind_mod_parser_ocsf::OcsfParser;
 use irmind_mod_parser_plaso::PlasoParser;
+use irmind_mod_parser_suricata::SuricataParser;
 use irmind_mod_parser_velociraptor::VelociraptorParser;
+use irmind_mod_parser_zeek::ZeekParser;
 
 use irmind_security::MandatoryGuard;
 use parquet::arrow::ArrowWriter;
@@ -217,6 +221,18 @@ fn parser_modules_ingest_sign_and_rebuild_without_private_answers() {
             &EztoolsParser as &dyn StreamingEventParser,
             include_str!("../../testkit/fixtures/parser-eztools/private/ground-truth.json"),
         ),
+        (
+            "zeek.log",
+            include_bytes!("../../testkit/fixtures/parser-zeek/source/events.log").as_slice(),
+            &ZeekParser as &dyn StreamingEventParser,
+            include_str!("../../testkit/fixtures/parser-zeek/private/ground-truth.json"),
+        ),
+        (
+            "suricata.jsonl",
+            include_bytes!("../../testkit/fixtures/parser-suricata/source/eve.jsonl").as_slice(),
+            &SuricataParser as &dyn StreamingEventParser,
+            include_str!("../../testkit/fixtures/parser-suricata/private/ground-truth.json"),
+        ),
     ] {
         fs::write(source_root.join(name), bytes).unwrap();
         let case = engine.create_case(name, "local evidence only").unwrap();
@@ -260,29 +276,10 @@ fn parser_modules_ingest_sign_and_rebuild_without_private_answers() {
         assert_eq!(decoded.timestamp_context.as_deref(), Some("normalized-utc"));
         let timeline = store.timeline(&case.id, 10).unwrap();
         assert_eq!(timeline.len(), 2);
-        if let Ok(answer) = serde_json::from_str::<serde_json::Value>(private_answer) {
-            if let Some(events) = answer
-                .get("malicious_events")
-                .and_then(serde_json::Value::as_array)
-            {
-                for event in events.iter().filter_map(serde_json::Value::as_str) {
-                    assert!(timeline.iter().any(|entry| entry.event == event));
-                }
-            }
-            if let Some(entities) = answer
-                .get("malicious_entities")
-                .and_then(serde_json::Value::as_array)
-            {
-                for entity in entities.iter().filter_map(serde_json::Value::as_str) {
-                    assert!(
-                        store
-                            .entity_lookup(&case.id, "host", entity)
-                            .unwrap()
-                            .contains(entity)
-                    );
-                }
-            }
+        if matches!(parser.parser_name(), "parser-zeek" | "parser-suricata") {
+            assert_eq!((timeline[0].record_index, timeline[1].record_index), (0, 1));
         }
+        check_ground_truth(store.as_ref(), &case.id, &timeline, private_answer, parser);
         assert_eq!(
             use_cases
                 .verify_parquet_rebuild(&case.id, &source_root, &CancellationToken::new())
@@ -296,20 +293,76 @@ fn parser_modules_ingest_sign_and_rebuild_without_private_answers() {
                 .unwrap()
                 .contains(private_answer)
         );
-        if let Ok(answer) = serde_json::from_str::<serde_json::Value>(private_answer)
-            && let Some(marker) = answer
-                .get("private_marker")
-                .and_then(serde_json::Value::as_str)
-        {
-            assert!(!store.graph_summary(&case.id).unwrap().contains(marker));
-            assert!(!store.entries(&case.id).unwrap().iter().any(|entry| {
-                entry
-                    .payload
-                    .as_bytes()
-                    .windows(marker.len())
-                    .any(|window| window == marker.as_bytes())
-            }));
+    }
+}
+
+fn check_ground_truth(
+    store: &LocalStore,
+    case_id: &irmind_domain::CaseId,
+    timeline: &[irmind_app::TimelineEvent],
+    private_answer: &str,
+    parser: &dyn StreamingEventParser,
+) {
+    let Ok(answer) = serde_json::from_str::<serde_json::Value>(private_answer) else {
+        return;
+    };
+    if let Some(events) = answer
+        .get("malicious_events")
+        .and_then(serde_json::Value::as_array)
+    {
+        for event in events.iter().filter_map(serde_json::Value::as_str) {
+            assert!(timeline.iter().any(|entry| entry.event == event));
         }
+    }
+    if let Some(entities) = answer
+        .get("malicious_entities")
+        .and_then(serde_json::Value::as_array)
+    {
+        for entity in entities.iter().filter_map(serde_json::Value::as_str) {
+            assert!(
+                store
+                    .entity_lookup(case_id, "host", entity)
+                    .unwrap()
+                    .contains(entity)
+            );
+        }
+    }
+    if matches!(parser.parser_name(), "parser-zeek" | "parser-suricata") {
+        for entity in answer
+            .get("entities")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let Some(pair) = entity.as_array() else {
+                continue;
+            };
+            let Some(kind) = pair.first().and_then(serde_json::Value::as_str) else {
+                continue;
+            };
+            let Some(value) = pair.get(1).and_then(serde_json::Value::as_str) else {
+                continue;
+            };
+            assert!(
+                store
+                    .entity_lookup(case_id, kind, value)
+                    .unwrap()
+                    .contains(value)
+            );
+        }
+    }
+    if let Some(marker) = answer
+        .get("private_marker")
+        .and_then(serde_json::Value::as_str)
+    {
+        assert!(!store.graph_summary(case_id).unwrap().contains(marker));
+        assert!(!store.entries(case_id).unwrap().iter().any(|entry| {
+            entry
+                .payload
+                .as_bytes()
+                .windows(marker.len())
+                .any(|window| window == marker.as_bytes())
+        }));
     }
 }
 
@@ -376,6 +429,22 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() {
                 .unwrap(),
             &EztoolsParser as &dyn StreamingEventParser,
         ),
+        (
+            "zeek.log",
+            include_bytes!("../../testkit/fixtures/parser-zeek/source/events.log")
+                .split(|byte| *byte == b'\n')
+                .nth(8)
+                .unwrap(),
+            &ZeekParser as &dyn StreamingEventParser,
+        ),
+        (
+            "suricata.jsonl",
+            include_bytes!("../../testkit/fixtures/parser-suricata/source/eve.jsonl")
+                .split(|byte| *byte == b'\n')
+                .next()
+                .unwrap(),
+            &SuricataParser as &dyn StreamingEventParser,
+        ),
     ] {
         if std::env::var("IRMIND_BENCH_PARSER").is_ok_and(|filter| !name.starts_with(&filter)) {
             continue;
@@ -387,7 +456,11 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() {
         let is_csv = std::path::Path::new(name)
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("csv"));
-        let encoded = if is_csv {
+        let is_zeek = name == "zeek.log";
+        let encoded = if is_zeek {
+            let source = std::str::from_utf8(line).unwrap().trim_end();
+            format!("{source}\t{}", "x".repeat(900))
+        } else if is_csv {
             let source = std::str::from_utf8(line).unwrap().trim_end();
             format!("{source},{}", "x".repeat(900))
         } else {
@@ -405,6 +478,9 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() {
                     b"RunTime,ExecutableName,SourceFilename,PathValidated,SyntheticPadding\n",
                 )
                 .unwrap();
+        }
+        if is_zeek {
+            writer.write_all(b"#separator \\x09\n#set_separator\t,\n#empty_field\t(empty)\n#unset_field\t-\n#path\tconn\n#open\t2026-09-22-12-00-00\n#fields\tts\tuid\tid.orig_h\tid.orig_p\tid.resp_h\tid.resp_p\tproto\tservice\tsynthetic_padding\n#types\ttime\tstring\taddr\tport\taddr\tport\tenum\tstring\tstring\n").unwrap();
         }
         let target = 1024_u64 * 1024 * 1024;
         let mut written = 0_u64;

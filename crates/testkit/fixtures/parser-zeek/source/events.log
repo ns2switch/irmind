@@ -1,0 +1,10 @@
+#separator \x09
+#set_separator	,
+#empty_field	(empty)
+#unset_field	-
+#path	conn
+#open	2026-09-22-12-00-00
+#fields	ts	uid	id.orig_h	id.orig_p	id.resp_h	id.resp_p	proto	service
+#types	time	string	addr	port	addr	port	enum	string
+1790000000.123456	CsyntheticZeek1	192.0.2.14	55123	198.51.100.22	443	tcp	ssl
+1790000000.123457	CsyntheticZeek1	192.0.2.14	55124	198.51.100.22	443	tcp	ssl
