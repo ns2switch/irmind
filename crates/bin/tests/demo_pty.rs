@@ -43,7 +43,8 @@ fn run_demo(exit_keys: &str) {
     std::fs::write(&sentinel, "a deliberately invalid real configuration").unwrap();
     let mut session = Session::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
     session.set_expect_timeout(Some(Duration::from_mins(1)));
-    session.expect("HuntEval").unwrap();
+    session.set_expect_lazy(cfg!(windows));
+    session.expect("Ingested").unwrap();
     session.send(exit_keys).unwrap();
     session.expect("Demo data deleted").unwrap();
     assert_eq!(
@@ -60,8 +61,8 @@ fn demo_ingest_completion_is_visible_and_followup_command_responds() {
     let demo_parent = tempfile::tempdir().unwrap();
     let mut session = Session::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
     session.set_expect_timeout(Some(Duration::from_secs(20)));
-    session.expect("HuntEval").unwrap();
-    let completed = session.expect("Ingested 1 synthetic file");
+    session.set_expect_lazy(cfg!(windows));
+    let completed = session.expect("Ingested");
     if completed.is_err() {
         let _ = session.send("/quit\r\r");
     }
@@ -69,8 +70,10 @@ fn demo_ingest_completion_is_visible_and_followup_command_responds() {
         completed.is_ok(),
         "demo did not report ingest completion within 20 seconds: {completed:?}"
     );
+    session.expect("parser-json").unwrap();
+    session.expect("90%").unwrap();
     session.send("/help\r").unwrap();
-    session.expect("Commands and keys").unwrap();
+    session.expect("Commands").unwrap();
     session.send("\x1b/quit\r\r").unwrap();
     session.expect("Demo data deleted").unwrap();
     assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 0);

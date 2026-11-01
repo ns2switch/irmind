@@ -5,7 +5,9 @@ use futures_util::stream;
 use irmind_app::{
     AppError, CancellationToken, CaseExporter, CaseId, CompletionRequest, CryptoPorts, Engine,
     EnginePorts, LlmPort, ModelEvent, ModelResponse, ModelStream, ModelToolCall, Severity,
-    SignerBackend, ThreatIntelPort, hex, sha256,
+    SignerBackend, ThreatIntelPort, hex,
+    modules::{ModuleConfig, ModuleRegistry, ParserCatalog},
+    sha256,
 };
 use irmind_domain::{Actor, AgentId, AuthorizedCall, ExecutionMode, ProposedCall, Tool};
 use irmind_infra::{LocalExportVerifier, LocalStore, LocalVerifier, SystemClock};
@@ -27,7 +29,12 @@ use std::{
 
 const EVENTS: &[u8] =
     include_bytes!("../../modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json");
-static PARSER: JsonParser = JsonParser;
+
+fn demo_parser_catalog() -> Result<ParserCatalog, AppError> {
+    let mut registry = ModuleRegistry::new();
+    registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
+    Ok(registry.parser_catalog())
+}
 
 struct ScriptedModel {
     round: AtomicUsize,
@@ -120,6 +127,7 @@ struct DemoIo {
     source: PathBuf,
     fingerprint: String,
     ingest_pending: AtomicBool,
+    parser_catalog: ParserCatalog,
 }
 
 impl DemoIo {
@@ -171,6 +179,23 @@ impl WorkspaceIo for DemoIo {
         self.checked_source(root)?;
         Ok(vec![root.to_path_buf()])
     }
+    fn parser_catalog(&self) -> Option<&ParserCatalog> {
+        Some(&self.parser_catalog)
+    }
+    fn read_format_sample(&self, path: &Path) -> Result<Vec<u8>> {
+        use std::io::Read as _;
+        self.checked_source(path)?;
+        let parent = path
+            .parent()
+            .ok_or_else(|| anyhow!("selected source has no parent"))?;
+        let name = path
+            .file_name()
+            .ok_or_else(|| anyhow!("selected source has no file name"))?;
+        let file = irmind_fs::open_regular_no_follow(parent, Path::new(name))?;
+        let mut sample = Vec::new();
+        file.take(64 * 1024).read_to_end(&mut sample)?;
+        Ok(sample)
+    }
     fn read_evidence(&self, path: &Path) -> Result<Vec<u8>> {
         self.checked_source(path)?;
         Ok(std::fs::read(path)?)
@@ -195,9 +220,6 @@ impl WorkspaceIo for DemoIo {
     }
     fn large_case_store(&self) -> Option<&dyn irmind_app::LargeCaseStore> {
         Some(self.store.as_ref())
-    }
-    fn streaming_parser(&self) -> Option<&dyn irmind_app::StreamingEventParser> {
-        Some(&PARSER)
     }
     fn keystore_status(&self) -> Result<KeystoreStatus> {
         Ok(KeystoreStatus {
@@ -285,6 +307,7 @@ fn run_in_directory(
     let agent_id = AgentId::parse("demo-agent").map_err(|_| anyhow!("invalid demo agent ID"))?;
     let _agent = keystore.create(Actor::Agent(agent_id))?;
     let fingerprint = hex(&sha256(&signer.public_key()));
+    let parser_catalog = demo_parser_catalog()?;
     let ports = EnginePorts::new(
         store.clone(),
         store.clone(),
@@ -300,7 +323,8 @@ fn run_in_directory(
     let intel = SyntheticIntel;
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
         .with_threat_intel(&intel)
-        .with_large_case_pipeline(store.clone(), Arc::new(JsonParser));
+        .with_large_case_pipeline(store.clone(), Arc::new(JsonParser))
+        .with_parser_catalog(parser_catalog.clone());
     let case = engine.create_case_with_severity(
         "HuntEval · synthetic AWS IAM episode",
         Severity::Medium,
@@ -311,6 +335,7 @@ fn run_in_directory(
         source,
         fingerprint,
         ingest_pending: AtomicBool::new(true),
+        parser_catalog,
     };
     let modules = [ModuleStatus {
         id: selected
@@ -378,6 +403,7 @@ mod tests {
             source: temp.path().join("events.json"),
             fingerprint: String::new(),
             ingest_pending: AtomicBool::new(false),
+            parser_catalog: demo_parser_catalog().unwrap(),
         };
         let result = io.demo_check(&engine, &case.id).unwrap().unwrap();
         assert!(result.contains("events 0/3"));
@@ -439,6 +465,7 @@ mod tests {
             source: temp.path().join("events.json"),
             fingerprint: String::new(),
             ingest_pending: AtomicBool::new(false),
+            parser_catalog: demo_parser_catalog().unwrap(),
         };
         let result = io.demo_check(&engine, &case.id).unwrap().unwrap();
         assert!(result.contains("events 3/3"), "{result}");

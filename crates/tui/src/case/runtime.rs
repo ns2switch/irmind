@@ -123,12 +123,9 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
         }
         if let Some((_, task, label)) = self.active.take() {
             self.state.model_preview.clear();
-            match task
-                .join()
-                .map_err(|_| anyhow::anyhow!("investigation thread panicked"))?
-            {
-                Ok(text) => self.finish_success(label, text)?,
-                Err(irmind_app::AppError::Cancelled) => {
+            match task.join() {
+                Ok(Ok(text)) => self.finish_success(label, text)?,
+                Ok(Err(irmind_app::AppError::Cancelled)) => {
                     if label == "Ingest" {
                         self.state.pending_ingest = None;
                     }
@@ -142,7 +139,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                         CaseMessage::TaskFinished(format!("{label} cancelled and audited")),
                     );
                 }
-                Err(error) => {
+                Ok(Err(error)) => {
                     if label == "Ingest" {
                         if let irmind_app::AppError::ParserSelection {
                             source_name,
@@ -157,6 +154,12 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                             });
                             self.state.running_since = None;
                             self.state.progress_status = None;
+                            update(
+                                &mut self.state,
+                                CaseMessage::TaskFinished(
+                                    "Choose a parser and press Enter, or Esc to cancel.".into(),
+                                ),
+                            );
                             return Ok(());
                         }
                         self.state.pending_ingest = None;
@@ -166,20 +169,35 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     }
                     update(
                         &mut self.state,
-                        CaseMessage::TaskFinished(format!("Error: {error}")),
+                        CaseMessage::TaskFinished(format!(
+                            "{label} failed: {error}. Retry the command or use /help."
+                        )),
+                    );
+                }
+                Err(_) => {
+                    update(
+                        &mut self.state,
+                        CaseMessage::TaskFinished(format!(
+                            "{label} failed unexpectedly. Retry the command or use /help."
+                        )),
                     );
                 }
             }
-            self.state.case = self.engine.repo.get_case(self.id)?;
-            self.state.approvals = self.engine.pending_approvals(self.id)?;
-            self.state.approval_sources =
-                super::load_approval_sources(self.engine, self.id, &self.state.approvals)?;
-            self.state.findings = self.engine.findings(self.id)?;
-            self.state.needs_refresh = true;
+            self.refresh_after_task()?;
         }
         self.state.running_since = None;
         self.state.model_round = None;
         self.state.progress_status = None;
+        Ok(())
+    }
+
+    fn refresh_after_task(&mut self) -> Result<()> {
+        self.state.case = self.engine.repo.get_case(self.id)?;
+        self.state.approvals = self.engine.pending_approvals(self.id)?;
+        self.state.approval_sources =
+            super::load_approval_sources(self.engine, self.id, &self.state.approvals)?;
+        self.state.findings = self.engine.findings(self.id)?;
+        self.state.needs_refresh = true;
         Ok(())
     }
 
@@ -283,7 +301,7 @@ fn is_result_card_label(label: &str) -> bool {
 }
 
 fn should_show_completion(label: &str) -> bool {
-    !matches!(label, "IRMind" | "Ingest" | "Cloud objects")
+    !matches!(label, "IRMind" | "Cloud objects")
 }
 
 #[cfg(test)]

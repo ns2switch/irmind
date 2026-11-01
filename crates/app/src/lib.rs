@@ -11,7 +11,8 @@ use irmind_domain::{
 };
 pub use irmind_domain::{
     AuditEventKind, Case, CaseId, CaseScope, GraphQueryFilter, ParserSelectionMode, ProposedCall,
-    Provenance, SealedParquetMigrationV1, Severity, SourceKind, SourceManifestV1, Tool,
+    Provenance, SealedParquetMigrationV1, Severity, SourceKind, SourceManifestV1, SourceManifestV2,
+    Tool,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};

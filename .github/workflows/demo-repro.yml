@@ -10,9 +10,47 @@ jobs:
   macos:
     runs-on: macos-latest
     timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
+      - name: Reproduce the published v0.1.1 binary in a PTY
+        run: |
+          trap 'rm -rf release-old' EXIT
+          mkdir -p release-old
+          gh release download v0.1.1 -p irmind-macos-aarch64 -p SHA256SUMS -D release-old
+          (cd release-old && grep 'irmind-macos-aarch64$' SHA256SUMS | shasum -a 256 -c -)
+          chmod +x release-old/irmind-macos-aarch64
+          python3 - <<'PY'
+          import fcntl, os, pty, select, struct, subprocess, tempfile, termios, time
+          with tempfile.TemporaryDirectory() as real_home, tempfile.TemporaryDirectory() as scratch:
+              master, slave = pty.openpty()
+              fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 32, 120, 0, 0))
+              env = dict(os.environ, TERM='xterm-256color', NO_COLOR='1', TMPDIR=scratch)
+              proc = subprocess.Popen(
+                  [os.path.abspath('release-old/irmind-macos-aarch64'), '--home', real_home, 'demo', '--scripted'],
+                  stdin=slave, stdout=slave, stderr=slave, env=env,
+              )
+              os.close(slave)
+              output = bytearray()
+              until = time.monotonic() + 30
+              try:
+                  while time.monotonic() < until:
+                      readable, _, _ = select.select([master], [], [], 0.2)
+                      if readable:
+                          try:
+                              output.extend(os.read(master, 65536))
+                          except OSError:
+                              break
+                  assert b'HuntEval' in output, 'the release did not open the demo case'
+                  assert b'Ingested' not in output, 'the published binary did not reproduce the missing completion'
+                  print('Confirmed: v0.1.1 opens the case but never displays ingest completion.')
+              finally:
+                  proc.terminate()
+                  proc.wait(timeout=5)
+                  os.close(master)
+          PY
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
