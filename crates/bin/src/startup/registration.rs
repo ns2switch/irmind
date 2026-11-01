@@ -34,6 +34,8 @@ use super::{
     feature = "parser-eztools",
     feature = "parser-syslog",
     feature = "parser-linux",
+    feature = "parser-zeek",
+    feature = "parser-suricata",
 ))]
 use irmind_app::modules::ModuleConfig;
 #[cfg(feature = "parser-chainsaw")]
@@ -50,6 +52,10 @@ use irmind_mod_parser_ocsf::OcsfParser;
 use irmind_mod_parser_plaso::PlasoParser;
 #[cfg(feature = "parser-velociraptor")]
 use irmind_mod_parser_velociraptor::VelociraptorParser;
+#[cfg(feature = "parser-zeek")]
+use irmind_mod_parser_zeek::ZeekParser;
+#[cfg(feature = "parser-suricata")]
+use irmind_mod_parser_suricata::SuricataParser;
 
 #[cfg(any(
     feature = "storage-s3",
@@ -115,6 +121,10 @@ fn register_parsers(
     data_root: &std::path::Path,
 ) -> Result<()> {
     let _ = (&issues, data_root);
+    #[cfg(feature = "parser-zeek")]
+    registry.register(Box::new(ZeekParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-suricata")]
+    registry.register(Box::new(SuricataParser), &ModuleConfig::new())?;
     #[cfg(feature = "parser-json")]
     registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
     #[cfg(feature = "parser-ecs")]

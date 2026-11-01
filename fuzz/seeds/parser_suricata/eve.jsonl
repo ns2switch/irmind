@@ -1,0 +1,2 @@
+{"timestamp":"2026-10-23T00:00:00.123456+0000","flow_id":9001001,"event_type":"alert","src_ip":"192.0.2.25","src_port":50321,"dest_ip":"198.51.100.44","dest_port":443,"proto":"TCP","alert":{"signature":"Synthetic suspicious TLS connection","signature_id":900001,"category":"Synthetic test","action":"allowed","severity":2}}
+{"timestamp":"2026-10-23T00:00:00.123457+0000","flow_id":9001001,"event_type":"tls","src_ip":"192.0.2.25","src_port":50321,"dest_ip":"198.51.100.44","dest_port":443,"tls":{"sni":"synthetic.example.test"}}

@@ -12,6 +12,8 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-suricata = { path = "../crates/modules/parser-suricata" }
+irmind-mod-parser-zeek = { path = "../crates/modules/parser-zeek" }
 libfuzzer-sys = "0.4"
 irmind-app = { path = "../crates/app", version = "0.1.0" }
 irmind-domain = { path = "../crates/domain", version = "0.1.0" }
@@ -136,6 +138,20 @@ bench = false
 [[bin]]
 name = "parser_linux"
 path = "fuzz_targets/parser_linux.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_zeek"
+path = "fuzz_targets/parser_zeek.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_suricata"
+path = "fuzz_targets/parser_suricata.rs"
 test = false
 doc = false
 bench = false

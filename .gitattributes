@@ -9,6 +9,7 @@
 **/fixtures/**/*.json text eol=lf
 **/fixtures/**/*.txt text eol=lf
 **/fixtures/**/*.csv text eol=lf
+**/fixtures/**/*.log text eol=lf
 **/corpus/**/*.json text eol=lf
 **/corpus/**/*.txt text eol=lf
 **/seeds/**/*.json text eol=lf
