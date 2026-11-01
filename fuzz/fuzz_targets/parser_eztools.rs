@@ -6,8 +6,11 @@ fuzz_target!(|bytes: &[u8]| {
     if bytes.len() <= 65_536 {
         let _ = EztoolsParser.detect("fuzz.log", bytes);
         let _ = EztoolsParser.parse_reader_report(
-            "fuzz.log", &mut bytes.as_ref(), sha256(bytes),
-            &CancellationToken::new(), &mut |_| Ok(()),
+            "fuzz.log",
+            &mut bytes.as_ref(),
+            sha256(bytes),
+            &CancellationToken::new(),
+            &mut |_| Ok(()),
         );
     }
 });
