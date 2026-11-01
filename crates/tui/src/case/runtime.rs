@@ -206,7 +206,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     .into(),
             );
         }
-        if label != "IRMind" && label != "Ingest" && label != "Cloud objects" {
+        if should_show_completion(label) {
             if is_result_card_label(label)
                 && !text.starts_with("approval pending:")
                 && !text.starts_with("denied:")
@@ -280,4 +280,18 @@ fn is_result_card_label(label: &str) -> bool {
             | "Source record"
             | "Case timeline"
     )
+}
+
+fn should_show_completion(label: &str) -> bool {
+    !matches!(label, "IRMind" | "Ingest" | "Cloud objects")
+}
+
+#[cfg(test)]
+mod completion_tests {
+    use super::should_show_completion;
+
+    #[test]
+    fn ingest_completion_remains_visible_after_progress_clears() {
+        assert!(should_show_completion("Ingest"));
+    }
 }
