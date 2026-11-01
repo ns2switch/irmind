@@ -4,7 +4,12 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.1.2 — Demo ingest repair
+
+- Show a persistent completion or actionable error after the demo's background ingestion, so the case never appears stuck after evidence is found.
+- Use the same parser detection registry and signed `SourceManifestV2` path as ordinary case ingestion in the demo.
 - Add experimental, auto-detected Elastic Common Schema NDJSON and OCSF JSON/Parquet parsers as optional Cargo modules compiled by default. Both normalize bounded records into signed local Parquet and preserve source provenance; ambiguous Parquet detection asks the analyst.
+- Add experimental parsers for Velociraptor, Hayabusa, Chainsaw, Plaso, and common Eric Zimmerman CSV exports, with synthetic fixtures and parser detection.
 
 ## 0.1.1 — Community preview
 

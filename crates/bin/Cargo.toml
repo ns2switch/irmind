@@ -1,6 +1,6 @@
 [package]
 name = "irmind"
-version = "0.1.1"
+version = "0.1.2"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -42,7 +42,7 @@ storage-azure = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/azu
 [dependencies]
 irmind-app = { path = "../app", version = "0.1.0" }
 irmind-http = { path = "../http", version = "0.1.0" }
-irmind-tui = { path = "../tui", version = "0.1.0" }
+irmind-tui = { path = "../tui", version = "0.1.2" }
 irmind-domain = { path = "../domain", version = "0.1.0" }
 irmind-security = { path = "../security", version = "0.1.0" }
 irmind-infra = { path = "../infra", version = "0.1.0" }
