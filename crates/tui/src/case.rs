@@ -264,6 +264,12 @@ pub(crate) fn run_case(
         };
         let _mouse = MouseCapture::start(presentation.mouse_capture)?;
         if let Some(path) = io_ops.demo_initial_ingest() {
+            runtime.state.pending_ingest = Some(state::PendingIngest {
+                path: path.clone(),
+                copy_original: false,
+                forced_parser: None,
+                analyst_choices: std::collections::BTreeMap::new(),
+            });
             let workflow = CaseWorkflow {
                 engine,
                 model,
