@@ -582,6 +582,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "csv"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52cd9d68cf7efc6ddfaaee42e7288d3a99d613d4b50f76ce9827ae0c6e14f938"
+dependencies = [
+ "csv-core",
+ "itoa",
+ "ryu",
+ "serde_core",
+]
+
+[[package]]
+name = "csv-core"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "704a3c26996a80471189265814dbc2c257598b96b8a7feae2d31ace646bb9782"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "curve25519-dalek"
 version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1179,9 +1200,14 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "irmind-infra",
+ "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-ecs",
+ "irmind-mod-parser-eztools",
+ "irmind-mod-parser-hayabusa",
  "irmind-mod-parser-json",
  "irmind-mod-parser-ocsf",
+ "irmind-mod-parser-plaso",
+ "irmind-mod-parser-velociraptor",
  "irmind-security",
  "libfuzzer-sys",
  "serde_json",
@@ -1210,7 +1236,19 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "toml",
+]
+
+[[package]]
+name = "irmind-mod-parser-chainsaw"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "irmind-app",
+ "irmind-domain",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1220,6 +1258,30 @@ dependencies = [
  "chrono",
  "irmind-app",
  "irmind-domain",
+ "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-eztools"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "csv",
+ "irmind-app",
+ "irmind-domain",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-hayabusa"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "csv",
+ "irmind-app",
+ "irmind-domain",
+ "serde",
  "serde_json",
 ]
 
@@ -1242,7 +1304,28 @@ dependencies = [
  "irmind-domain",
  "parquet",
  "serde_json",
- "tempfile",
+]
+
+[[package]]
+name = "irmind-mod-parser-plaso"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "irmind-app",
+ "irmind-domain",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-velociraptor"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "irmind-app",
+ "irmind-domain",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

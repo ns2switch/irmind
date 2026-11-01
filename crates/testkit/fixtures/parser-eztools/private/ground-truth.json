@@ -1,0 +1,16 @@
+{
+  "malicious_events": [
+    "PECmd timeline"
+  ],
+  "malicious_entities": [
+    "lab-host"
+  ],
+  "attack_path": [
+    "lab-host",
+    "PECmd timeline"
+  ],
+  "techniques": [
+    "T1059.001"
+  ],
+  "private_marker": "PRIVATE_ANSWER_ONLY_EZTOOLS"
+}

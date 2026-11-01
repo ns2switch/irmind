@@ -25,13 +25,29 @@ use super::{
 #[cfg(any(
     feature = "parser-json",
     feature = "parser-ecs",
-    feature = "parser-ocsf"
+    feature = "parser-ocsf",
+    feature = "parser-velociraptor",
+    feature = "parser-hayabusa",
+    feature = "parser-chainsaw",
+    feature = "parser-plaso",
+    feature = "parser-eztools",
 ))]
 use irmind_app::modules::ModuleConfig;
+#[cfg(feature = "parser-chainsaw")]
+use irmind_mod_parser_chainsaw::ChainsawParser;
 #[cfg(feature = "parser-ecs")]
 use irmind_mod_parser_ecs::EcsParser;
+#[cfg(feature = "parser-eztools")]
+use irmind_mod_parser_eztools::EztoolsParser;
+#[cfg(feature = "parser-hayabusa")]
+use irmind_mod_parser_hayabusa::HayabusaParser;
 #[cfg(feature = "parser-ocsf")]
 use irmind_mod_parser_ocsf::OcsfParser;
+#[cfg(feature = "parser-plaso")]
+use irmind_mod_parser_plaso::PlasoParser;
+#[cfg(feature = "parser-velociraptor")]
+use irmind_mod_parser_velociraptor::VelociraptorParser;
+
 #[cfg(any(
     feature = "storage-s3",
     feature = "storage-gcs",
@@ -54,6 +70,17 @@ pub(super) fn configured_registry(
     registry.register(Box::new(EcsParser), &ModuleConfig::new())?;
     #[cfg(feature = "parser-ocsf")]
     registry.register(Box::new(OcsfParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-velociraptor")]
+    registry.register(Box::new(VelociraptorParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-hayabusa")]
+    registry.register(Box::new(HayabusaParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-chainsaw")]
+    registry.register(Box::new(ChainsawParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-plaso")]
+    registry.register(Box::new(PlasoParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-eztools")]
+    registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
+
     register_llm(
         cli,
         saved,

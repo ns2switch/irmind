@@ -19,6 +19,12 @@ irmind-security = { path = "../crates/security", version = "0.1.0" }
 irmind-mod-parser-json = { path = "../crates/modules/parser-json", version = "0.1.0" }
 irmind-mod-parser-ecs = { path = "../crates/modules/parser-ecs", version = "0.1.0" }
 irmind-mod-parser-ocsf = { path = "../crates/modules/parser-ocsf", version = "0.1.0" }
+irmind-mod-parser-velociraptor = { path = "../crates/modules/parser-velociraptor", version = "0.1.0" }
+irmind-mod-parser-hayabusa = { path = "../crates/modules/parser-hayabusa", version = "0.1.0" }
+irmind-mod-parser-chainsaw = { path = "../crates/modules/parser-chainsaw", version = "0.1.0" }
+irmind-mod-parser-plaso = { path = "../crates/modules/parser-plaso", version = "0.1.0" }
+irmind-mod-parser-eztools = { path = "../crates/modules/parser-eztools", version = "0.1.0" }
+
 irmind-infra = { path = "../crates/infra", version = "0.1.0", optional = true }
 tempfile = "3"
 serde_json = "1"
@@ -74,3 +80,38 @@ bench = false
 required-features = ["export"]
 
 [workspace]
+
+[[bin]]
+name = "parser_velociraptor"
+path = "fuzz_targets/parser_velociraptor.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_hayabusa"
+path = "fuzz_targets/parser_hayabusa.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_chainsaw"
+path = "fuzz_targets/parser_chainsaw.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_plaso"
+path = "fuzz_targets/parser_plaso.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_eztools"
+path = "fuzz_targets/parser_eztools.rs"
+test = false
+doc = false
+bench = false

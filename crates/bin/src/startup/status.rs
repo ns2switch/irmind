@@ -26,36 +26,7 @@ pub(super) fn module_statuses(
         saved,
         out: Vec::new(),
     };
-    for (id, compiled, version) in [
-        (
-            "parser-json",
-            cfg!(feature = "parser-json"),
-            "json-stream-v2",
-        ),
-        ("parser-ecs", cfg!(feature = "parser-ecs"), "ecs-ndjson-v1"),
-        (
-            "parser-ocsf",
-            cfg!(feature = "parser-ocsf"),
-            "ocsf-stream-v1",
-        ),
-    ] {
-        builder.out.push(ModuleStatus {
-            id: id.into(),
-            compiled,
-            enabled: compiled,
-            configuration: if compiled {
-                format!("experimental; {version}")
-            } else {
-                format!("not compiled; enable --features {id}")
-            },
-            kind: ModuleKind::Local,
-            selected: false,
-            selection_source: ModuleSelectionSource::Persistent,
-            parameters: Vec::new(),
-            credentials: Vec::new(),
-            missing: Vec::new(),
-        });
-    }
+    append_parser_statuses(&mut builder);
     for (id, compiled) in [
         ("keystore-os", cfg!(feature = "keystore-os")),
         ("keystore-file", cfg!(feature = "keystore-file")),
@@ -78,6 +49,64 @@ pub(super) fn module_statuses(
     }
     append_product_statuses(cli, &mut builder);
     builder.out
+}
+
+fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
+    for (id, compiled, version) in [
+        (
+            "parser-json",
+            cfg!(feature = "parser-json"),
+            "json-stream-v2",
+        ),
+        ("parser-ecs", cfg!(feature = "parser-ecs"), "ecs-ndjson-v1"),
+        (
+            "parser-ocsf",
+            cfg!(feature = "parser-ocsf"),
+            "ocsf-stream-v1",
+        ),
+        (
+            "parser-velociraptor",
+            cfg!(feature = "parser-velociraptor"),
+            "velociraptor-json-v1",
+        ),
+        (
+            "parser-hayabusa",
+            cfg!(feature = "parser-hayabusa"),
+            "hayabusa-json-csv-v1",
+        ),
+        (
+            "parser-chainsaw",
+            cfg!(feature = "parser-chainsaw"),
+            "chainsaw-json-v1",
+        ),
+        (
+            "parser-plaso",
+            cfg!(feature = "parser-plaso"),
+            "plaso-json-v1",
+        ),
+        (
+            "parser-eztools",
+            cfg!(feature = "parser-eztools"),
+            "eztools-csv-v1",
+        ),
+    ] {
+        builder.out.push(ModuleStatus {
+            id: id.into(),
+            compiled,
+            enabled: compiled,
+            configuration: if compiled {
+                format!("experimental; {version}")
+            } else {
+                format!("not compiled; enable --features {id}")
+            },
+            kind: ModuleKind::Local,
+            selected: false,
+            selection_source: ModuleSelectionSource::Persistent,
+            parameters: Vec::new(),
+            credentials: Vec::new(),
+            missing: Vec::new(),
+        });
+    }
 }
 
 fn append_product_statuses(cli: &Cli, builder: &mut StatusBuilder<'_>) {

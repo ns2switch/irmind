@@ -1,0 +1,17 @@
+{
+  "malicious_events": [
+    "windows:registry:key",
+    "fs:stat"
+  ],
+  "malicious_entities": [
+    "lab-host"
+  ],
+  "attack_path": [
+    "lab-host",
+    "windows:registry:key"
+  ],
+  "techniques": [
+    "T1547.001"
+  ],
+  "private_marker": "PRIVATE_ANSWER_ONLY_PLASO"
+}

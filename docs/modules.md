@@ -172,6 +172,58 @@ The mapping follows the [official ECS field reference](https://www.elastic.co/do
 
 The class mapping follows the [official OCSF schema](https://github.com/ocsf/ocsf-schema).
 
+## Velociraptor parser
+
+The five DFIR parsers below index times at UTC-second precision. Their local records retain the original timestamp, and the signed source manifest records the normalization context.
+
+**Does:** Reads bounded JSONL artifact results with typed timestamp, artifact, host, user, process, command, and IP fields. Preserves unmapped fields as untrusted local record text.
+
+**Permission:** Local read access to the selected export; no network or execution rights.
+
+**Configure:** Compiled by default with `parser-velociraptor`. Detection requires artifact markers in the content; an ambiguous choice needs analyst confirmation.
+
+**Limits:** Experimental, synthetic fixtures only. Missing or ambiguous timestamps are rejected per record. [Velociraptor documentation](https://docs.velociraptor.app/docs/).
+
+## Hayabusa parser
+
+**Does:** Reads CSV and JSONL timelines, including rule title, severity, host and channel, as source events for analyst review. Detection names stay unconfirmed until the analyst confirms findings.
+
+**Permission:** Local read access to the selected export.
+
+**Configure:** Compiled by default with `parser-hayabusa`. Use UTC output or a timestamp with an explicit offset; the parser refuses timestamps lacking an offset.
+
+**Limits:** Experimental. It accepts bounded records and counts malformed rows. [Hayabusa output reference](https://github.com/Yamato-Security/hayabusa/blob/main/website/docs/output/index.md).
+
+## Chainsaw parser
+
+**Does:** Reads bounded hunt and search JSONL or JSON arrays, mapping rule, time, computer and user while retaining the original record as untrusted data.
+
+**Permission:** Local read access to the selected export.
+
+**Configure:** Compiled by default with `parser-chainsaw`. Unique high-confidence content detection selects it; otherwise `/ingest` asks.
+
+**Limits:** Experimental. Missing UTC offsets are rejected. [Chainsaw usage](https://github.com/WithSecureOpenSource/chainsaw/wiki/Usage).
+
+## plaso parser
+
+**Does:** Reads psort `json_line` records, retaining the parser and `data_type` in the source event. It accepts RFC 3339 `datetime` or microsecond Unix `timestamp`.
+
+**Permission:** Local read access to the selected export.
+
+**Configure:** Compiled by default with `parser-plaso`. Detection requires plaso parser, data type and time fields.
+
+**Limits:** Experimental. Oversized or malformed rows are rejected individually. [plaso output reference](https://plaso.readthedocs.io/en/latest/_modules/plaso/output/json_line.html).
+
+## EZTools parser
+
+**Does:** Reads CSV outputs for PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch, SrumECmd and EvtxECmd using exact column-name signatures.
+
+**Permission:** Local read access to the selected export.
+
+**Configure:** Compiled by default with `parser-eztools`. Unknown column sets require a parser update; filename alone never proves the format.
+
+**Limits:** Experimental. Rows without a usable timestamp are rejected. Timestamps without an offset are interpreted as UTC; the normalization context is recorded in the signed source manifest. [EZTools CSV header reference](https://github.com/EricZimmerman/TLEFilePlugins/blob/master/TLEFileEZTools/EZTools.cs).
+
 ## OS keystore
 
 **Does:** Signs as Analyst or Agent and stores module credentials in Keychain, Credential Manager, or Secret Service.
