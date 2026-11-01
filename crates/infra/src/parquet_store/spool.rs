@@ -73,7 +73,15 @@ mod tests {
         let id = case();
         let spool = store.create_private_object_spool(&id, 128).unwrap();
         let path = spool.path().to_path_buf();
-        assert!(path.starts_with(root.path().join("parquet").join(id.as_str()).join("spool")));
+        let canonical_root = fs::canonicalize(root.path()).unwrap();
+        assert!(
+            path.starts_with(
+                canonical_root
+                    .join("parquet")
+                    .join(id.as_str())
+                    .join("spool")
+            )
+        );
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt as _;
