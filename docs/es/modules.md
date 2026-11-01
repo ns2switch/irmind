@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 5f0ed6431a60a1988732fbd5dfd38a4f6e869cca; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit 639cbab2c7a7db603c8ec1315435d04e84aa9a1b; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -98,7 +98,7 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Uso en la TUI:** Ejecuta `/objects <fuente> <s3|gs|az> <bucket-o-contenedor> <prefijo> <desde-UTC> <hasta-UTC>` para ver hasta 20 objetos y el volumen estimado. Acota una lista truncada. Ejecuta `/object-read <número>` para confirmar la versión y la transferencia. Añade `--copy-original` si quieres conservar una copia local explícita. El indicador de actividad muestra los bytes transferidos y el tiempo transcurrido; Esc o `/pause` cancela. Una segunda lectura compara el original con su manifiesto firmado.
 
-**Límites:** La lectura exige una lista completa y firmada del objeto y su versión, un límite de bytes por objeto y el presupuesto del caso. Las páginas de listado de más de 8 MiB se rechazan antes de analizarlas. Por encima de `object_transfer_approval_bytes` exige otra aprobación firmada del analista. Las transferencias fallidas consumen la reserva. Los bytes descargados se guardan una vez en un directorio temporal privado y se eliminan tras la conversión local. Una segunda lectura con el caso abierto compara el original firmado y puede generar costes. Para verificar sin red después del sellado, conserva una copia local explícita antes de sellar. No se usan credenciales ambientales. `object_store` expone ETags, pero no un checksum nativo portable; el manifiesto guarda el ETag como control opaco de versión y firma el SHA-256 propio de IRMind.
+**Límites:** La lectura exige una lista completa y firmada del objeto y su versión, un límite de bytes por objeto y el presupuesto del caso. Las páginas de listado de más de 8 MiB se rechazan antes de analizarlas. Por encima de `object_transfer_approval_bytes` exige otra aprobación firmada del analista. Las transferencias fallidas consumen la reserva. Los bytes descargados se guardan una vez bajo el directorio de datos del caso, tras comprobar el espacio libre frente al tamaño firmado, y se eliminan al terminar, fallar o cancelar. Una segunda lectura con el caso abierto compara el original firmado y puede generar costes. Para verificar sin red después del sellado, conserva una copia local explícita antes de sellar. No se usan credenciales ambientales. `object_store` expone ETags, pero no un checksum nativo portable; el manifiesto guarda el ETag como control opaco de versión y firma el SHA-256 propio de IRMind.
 
 ## CrowdStrike
 
@@ -166,7 +166,7 @@ El mapeo sigue la [referencia oficial de ECS](https://www.elastic.co/docs/refere
 
 **Función:** Detecta OCSF JSON, incluidos registros con formato multilínea, o NDJSON mediante `class_uid`, `category_uid` y `metadata.version`. Mapea Authentication, API Activity, Network Activity, Process Activity, File Activity y Detection Finding. También lee exportaciones OCSF Parquet, incluidas las de Security Lake, con el lector Parquet existente. Los campos desconocidos se conservan localmente.
 
-**Permiso:** Lectura del archivo local y escritura de un archivo temporal privado al procesar Parquet. El temporal se borra al terminar.
+**Permiso:** Lectura del archivo local. OCSF Parquet local se lee directamente con acceso aleatorio, sin copia creada por el parser. Los flujos de objetos en la nube usan un temporal privado dentro del directorio de datos del caso que se elimina al terminar.
 
 **Configuración:** Compilado por defecto con `parser-ocsf`. El JSON OCSF se elige automáticamente si la confianza alta es única. La cabecera Parquet sola no demuestra el esquema y recibe confianza baja; el analista debe confirmar. La elección se firma.
 
