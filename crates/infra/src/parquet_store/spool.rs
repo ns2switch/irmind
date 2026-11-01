@@ -74,13 +74,12 @@ mod tests {
         let spool = store.create_private_object_spool(&id, 128).unwrap();
         let path = spool.path().to_path_buf();
         let canonical_root = fs::canonicalize(root.path()).unwrap();
-        assert!(
-            path.starts_with(
-                canonical_root
-                    .join("parquet")
-                    .join(id.as_str())
-                    .join("spool")
-            )
+        assert_eq!(
+            fs::canonicalize(path.parent().unwrap()).unwrap(),
+            canonical_root
+                .join("parquet")
+                .join(id.as_str())
+                .join("spool")
         );
         #[cfg(unix)]
         {
