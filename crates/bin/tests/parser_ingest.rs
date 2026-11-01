@@ -3,7 +3,12 @@
 #![cfg(all(
     feature = "parser-json",
     feature = "parser-ecs",
-    feature = "parser-ocsf"
+    feature = "parser-ocsf",
+    feature = "parser-velociraptor",
+    feature = "parser-hayabusa",
+    feature = "parser-chainsaw",
+    feature = "parser-plaso",
+    feature = "parser-eztools"
 ))]
 
 use arrow::{
@@ -18,9 +23,15 @@ use irmind_app::{
 };
 use irmind_domain::{Actor, AuditEventKind, ExecutionMode, ParserSelectionMode};
 use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
+use irmind_mod_parser_chainsaw::ChainsawParser;
 use irmind_mod_parser_ecs::EcsParser;
+use irmind_mod_parser_eztools::EztoolsParser;
+use irmind_mod_parser_hayabusa::HayabusaParser;
 use irmind_mod_parser_json::JsonParser;
 use irmind_mod_parser_ocsf::OcsfParser;
+use irmind_mod_parser_plaso::PlasoParser;
+use irmind_mod_parser_velociraptor::VelociraptorParser;
+
 use irmind_security::MandatoryGuard;
 use parquet::arrow::ArrowWriter;
 use std::{
@@ -139,7 +150,7 @@ fn local_ocsf_parquet_is_signed_and_rebuilds_without_a_parser_spool()
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn ecs_and_ocsf_ingest_sign_and_rebuild_without_private_answers() {
+fn parser_modules_ingest_sign_and_rebuild_without_private_answers() {
     let root = tempfile::tempdir().unwrap();
     let source_root = root.path().join("sources");
     fs::create_dir(&source_root).unwrap();
@@ -174,6 +185,37 @@ fn ecs_and_ocsf_ingest_sign_and_rebuild_without_private_answers() {
             include_bytes!("../../testkit/fixtures/parser-ocsf/source/events.ndjson").as_slice(),
             &OcsfParser as &dyn StreamingEventParser,
             include_str!("../../testkit/fixtures/parser-ocsf/private/ground-truth.json"),
+        ),
+        (
+            "velociraptor.jsonl",
+            include_bytes!("../../testkit/fixtures/parser-velociraptor/source/events.jsonl")
+                .as_slice(),
+            &VelociraptorParser as &dyn StreamingEventParser,
+            include_str!("../../testkit/fixtures/parser-velociraptor/private/ground-truth.json"),
+        ),
+        (
+            "hayabusa.jsonl",
+            include_bytes!("../../testkit/fixtures/parser-hayabusa/source/events.jsonl").as_slice(),
+            &HayabusaParser as &dyn StreamingEventParser,
+            include_str!("../../testkit/fixtures/parser-hayabusa/private/ground-truth.json"),
+        ),
+        (
+            "chainsaw.jsonl",
+            include_bytes!("../../testkit/fixtures/parser-chainsaw/source/events.jsonl").as_slice(),
+            &ChainsawParser as &dyn StreamingEventParser,
+            include_str!("../../testkit/fixtures/parser-chainsaw/private/ground-truth.json"),
+        ),
+        (
+            "plaso.jsonl",
+            include_bytes!("../../testkit/fixtures/parser-plaso/source/events.jsonl").as_slice(),
+            &PlasoParser as &dyn StreamingEventParser,
+            include_str!("../../testkit/fixtures/parser-plaso/private/ground-truth.json"),
+        ),
+        (
+            "eztools.csv",
+            include_bytes!("../../testkit/fixtures/parser-eztools/source/events.csv").as_slice(),
+            &EztoolsParser as &dyn StreamingEventParser,
+            include_str!("../../testkit/fixtures/parser-eztools/private/ground-truth.json"),
         ),
     ] {
         fs::write(source_root.join(name), bytes).unwrap();
@@ -215,7 +257,32 @@ fn ecs_and_ocsf_ingest_sign_and_rebuild_without_private_answers() {
         assert_eq!(decoded.parser_version, parser.streaming_version());
         assert_eq!(decoded.confidence, 95);
         assert_eq!(decoded.selection, ParserSelectionMode::Automatic);
-        assert_eq!(store.timeline(&case.id, 10).unwrap().len(), 2);
+        assert_eq!(decoded.timestamp_context.as_deref(), Some("normalized-utc"));
+        let timeline = store.timeline(&case.id, 10).unwrap();
+        assert_eq!(timeline.len(), 2);
+        if let Ok(answer) = serde_json::from_str::<serde_json::Value>(private_answer) {
+            if let Some(events) = answer
+                .get("malicious_events")
+                .and_then(serde_json::Value::as_array)
+            {
+                for event in events.iter().filter_map(serde_json::Value::as_str) {
+                    assert!(timeline.iter().any(|entry| entry.event == event));
+                }
+            }
+            if let Some(entities) = answer
+                .get("malicious_entities")
+                .and_then(serde_json::Value::as_array)
+            {
+                for entity in entities.iter().filter_map(serde_json::Value::as_str) {
+                    assert!(
+                        store
+                            .entity_lookup(&case.id, "host", entity)
+                            .unwrap()
+                            .contains(entity)
+                    );
+                }
+            }
+        }
         assert_eq!(
             use_cases
                 .verify_parquet_rebuild(&case.id, &source_root, &CancellationToken::new())
@@ -229,6 +296,20 @@ fn ecs_and_ocsf_ingest_sign_and_rebuild_without_private_answers() {
                 .unwrap()
                 .contains(private_answer)
         );
+        if let Ok(answer) = serde_json::from_str::<serde_json::Value>(private_answer)
+            && let Some(marker) = answer
+                .get("private_marker")
+                .and_then(serde_json::Value::as_str)
+        {
+            assert!(!store.graph_summary(&case.id).unwrap().contains(marker));
+            assert!(!store.entries(&case.id).unwrap().iter().any(|entry| {
+                entry
+                    .payload
+                    .as_bytes()
+                    .windows(marker.len())
+                    .any(|window| window == marker.as_bytes())
+            }));
+        }
     }
 }
 
@@ -255,18 +336,76 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() {
                 .unwrap(),
             &OcsfParser as &dyn StreamingEventParser,
         ),
+        (
+            "velociraptor.jsonl",
+            include_bytes!("../../testkit/fixtures/parser-velociraptor/source/events.jsonl")
+                .split(|byte| *byte == b'\n')
+                .next()
+                .unwrap(),
+            &VelociraptorParser as &dyn StreamingEventParser,
+        ),
+        (
+            "hayabusa.jsonl",
+            include_bytes!("../../testkit/fixtures/parser-hayabusa/source/events.jsonl")
+                .split(|byte| *byte == b'\n')
+                .next()
+                .unwrap(),
+            &HayabusaParser as &dyn StreamingEventParser,
+        ),
+        (
+            "chainsaw.jsonl",
+            include_bytes!("../../testkit/fixtures/parser-chainsaw/source/events.jsonl")
+                .split(|byte| *byte == b'\n')
+                .next()
+                .unwrap(),
+            &ChainsawParser as &dyn StreamingEventParser,
+        ),
+        (
+            "plaso.jsonl",
+            include_bytes!("../../testkit/fixtures/parser-plaso/source/events.jsonl")
+                .split(|byte| *byte == b'\n')
+                .next()
+                .unwrap(),
+            &PlasoParser as &dyn StreamingEventParser,
+        ),
+        (
+            "eztools.csv",
+            include_bytes!("../../testkit/fixtures/parser-eztools/source/events.csv")
+                .split(|byte| *byte == b'\n')
+                .nth(1)
+                .unwrap(),
+            &EztoolsParser as &dyn StreamingEventParser,
+        ),
     ] {
+        if std::env::var("IRMIND_BENCH_PARSER").is_ok_and(|filter| !name.starts_with(&filter)) {
+            continue;
+        }
         let root = tempfile::tempdir().unwrap();
         let source_root = root.path().join("sources");
         fs::create_dir(&source_root).unwrap();
         let source_path = source_root.join(name);
-        let mut row: serde_json::Value = serde_json::from_slice(line).unwrap();
-        row.as_object_mut().unwrap().insert(
-            "synthetic_padding".into(),
-            serde_json::Value::String("x".repeat(900)),
-        );
-        let encoded = row.to_string();
+        let is_csv = std::path::Path::new(name)
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("csv"));
+        let encoded = if is_csv {
+            let source = std::str::from_utf8(line).unwrap().trim_end();
+            format!("{source},{}", "x".repeat(900))
+        } else {
+            let mut row: serde_json::Value = serde_json::from_slice(line).unwrap();
+            row.as_object_mut().unwrap().insert(
+                "synthetic_padding".into(),
+                serde_json::Value::String("x".repeat(900)),
+            );
+            row.to_string()
+        };
         let mut writer = BufWriter::new(fs::File::create(&source_path).unwrap());
+        if is_csv {
+            writer
+                .write_all(
+                    b"RunTime,ExecutableName,SourceFilename,PathValidated,SyntheticPadding\n",
+                )
+                .unwrap();
+        }
         let target = 1024_u64 * 1024 * 1024;
         let mut written = 0_u64;
         while written < target {

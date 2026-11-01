@@ -1,0 +1,17 @@
+{
+  "malicious_events": [
+    "Synthetic service",
+    "Synthetic service launch"
+  ],
+  "malicious_entities": [
+    "lab-host"
+  ],
+  "attack_path": [
+    "lab-host",
+    "Synthetic service"
+  ],
+  "techniques": [
+    "T1543.003"
+  ],
+  "private_marker": "PRIVATE_ANSWER_ONLY_CHAINSAW"
+}

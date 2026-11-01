@@ -1,0 +1,2 @@
+{"datetime":"2026-10-23T12:02:00Z","timestamp":1792756920000000,"parser":"winreg","data_type":"windows:registry:key","user":"analyst","hostname":"lab-host","filename":"C:/Synthetic/Run","source_short":"REG"}
+{"datetime":"2026-10-23T12:04:00Z","timestamp":1792757040000000,"parser":"filestat","data_type":"fs:stat","user":"analyst","hostname":"lab-host","filename":"C:/Synthetic/payload.exe","source_short":"FILE"}

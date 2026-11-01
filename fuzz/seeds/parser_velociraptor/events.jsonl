@@ -1,0 +1,1 @@
+{"Timestamp":"2026-10-23T12:00:00Z","Artifact":"Windows.System.Pslist","_Source":"lab-host","Host":"lab-host","User":"analyst","Process":"powershell.exe","CommandLine":"powershell.exe -NoProfile","SourceIP":"192.0.2.5"}

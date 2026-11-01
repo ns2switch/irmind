@@ -118,4 +118,20 @@ This local, single-worker check used the same machine and test harness for both 
 | ECS NDJSON | 1,073,742,155 | 155.761 s | 6.57 MiB/s |
 | OCSF NDJSON | 1,073,742,992 | 170.475 s | 6.01 MiB/s |
 
-The 1 GiB `benchmark_one_gib_synthetic_ingest_per_parser` test in `parser_ingest` remains ignored in ordinary CI; run it manually with Cargo's ignored-test selector and one test thread. OCSF Parquet input has a small synthetic contract test but no 1 GiB throughput claim in this run.
+The 1 GiB `benchmark_one_gib_synthetic_ingest_per_parser` test in `parser_ingest` remains ignored in ordinary CI; run it manually with Cargo's ignored-test selector and one test thread. OCSF Parquet input has a small synthetic contract test but no 1 GiB throughput claim in this run. [Issue #61](https://github.com/ns2switch/irmind/issues/61) tracks the 25 MiB/s target without reducing parser limits.
+
+## Experimental DFIR parser ingest
+
+The same local, single-worker harness measured the five DFIR parsers on one synthetic 1 GiB source each. The measured interval covers hashing, parser selection, normalization, Parquet conversion and signed custody writes. It excludes fixture generation and the final explicit verification. Each run used a private temporary case directory that was removed afterwards. These are local measurements, not a standard-runner guarantee.
+
+| Parser | Format | Synthetic bytes | Timed ingest | Throughput |
+| --- | --- | ---: | ---: | ---: |
+| Velociraptor | JSONL | 1,073,742,201 | 133.364 s | 7.68 MiB/s |
+| Hayabusa | JSONL | 1,073,742,752 | 136.713 s | 7.49 MiB/s |
+| Chainsaw | JSONL | 1,073,742,965 | 123.149 s | 8.32 MiB/s |
+| plaso | JSONL | 1,073,741,994 | 111.110 s | 9.22 MiB/s |
+| EZTools | CSV | 1,073,742,432 | 237.634 s | 4.31 MiB/s |
+
+The benchmark uses repeated small records and a complete local ingest, so the numbers include costs outside the parser itself. The low CSV and JSONL throughput needs profiling before setting a release target.
+
+With default features and the same `cargo build -p irmind --release --locked` profile, the main-branch binary measured 47,733,368 B and the binary with these five parsers measured 48,314,232 B (+580,864 B, 1.22%). The workspace lockfile rose from 539 to 546 packages: five local parser crates plus `csv` and `csv-core`.

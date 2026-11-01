@@ -1,0 +1,17 @@
+{
+  "malicious_events": [
+    "windows_event_4688",
+    "windows_event_4698"
+  ],
+  "malicious_entities": [
+    "lab-host"
+  ],
+  "attack_path": [
+    "lab-host",
+    "windows_event_4698"
+  ],
+  "techniques": [
+    "T1053.005"
+  ],
+  "private_marker": "PRIVATE_ANSWER_ONLY_HAYABUSA"
+}

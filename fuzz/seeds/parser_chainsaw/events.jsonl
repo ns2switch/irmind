@@ -1,0 +1,1 @@
+{"group":"Synthetic service","kind":"individual","document":{"kind":"evtx","data":{"Event":{"System":{"Computer":"lab-host","EventID":7045,"TimeCreated":{"SystemTime":"2026-10-23T12:01:00Z"}},"EventData":{"SubjectUserName":"analyst","NewProcessName":"C:/Synthetic/service.exe"}}}}}

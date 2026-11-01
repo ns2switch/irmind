@@ -11,7 +11,7 @@ concurrency:
 jobs:
   fuzz:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     env:
       CARGO_INCREMENTAL: 0
     steps:
@@ -34,13 +34,13 @@ jobs:
           install -m 0755 .tools/cargo-fuzz "$HOME/.cargo/bin/cargo-fuzz"
       - name: Copy versioned seeds to temporary corpora
         run: |
-          for target in guard parsers parser_ecs parser_ocsf canonical spl export; do
+          for target in guard parsers parser_ecs parser_ocsf parser_velociraptor parser_hayabusa parser_chainsaw parser_plaso parser_eztools canonical spl export; do
             mkdir -p "fuzz/corpus/$target"
             cp "fuzz/seeds/$target/"* "fuzz/corpus/$target/"
           done
       - name: Fuzz guard, parser, canonical format and SPL
         run: |
-          for target in guard parsers parser_ecs parser_ocsf canonical spl; do
+          for target in guard parsers parser_ecs parser_ocsf parser_velociraptor parser_hayabusa parser_chainsaw parser_plaso parser_eztools canonical spl; do
             cargo fuzz run "$target" -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
           done
       - name: Fuzz exported packages within memory budget

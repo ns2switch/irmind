@@ -312,7 +312,12 @@ impl LargeCaseUseCases<'_, '_> {
                     parser_version: selection.parser_version.clone(),
                     confidence: selection.confidence,
                     selection: selection.mode,
-                    timestamp_context: selection.timestamp_context.clone(),
+                    timestamp_context: Some(
+                        selection
+                            .timestamp_context
+                            .clone()
+                            .unwrap_or_else(|| "normalized-utc".into()),
+                    ),
                     rejected_records: prepared.parse_report.rejected,
                     rejected_sample: prepared.parse_report.samples.clone(),
                 };

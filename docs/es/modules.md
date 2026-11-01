@@ -174,6 +174,28 @@ El mapeo sigue la [referencia oficial de ECS](https://www.elastic.co/docs/refere
 
 El mapeo sigue el [esquema oficial de OCSF](https://github.com/ocsf/ocsf-schema).
 
+## Parser de velociraptor
+
+Los cinco parsers DFIR siguientes indexan tiempos con precisión de segundos UTC. El registro local conserva el instante original y el manifiesto firmado registra el contexto de normalización.
+
+Lee resultados JSONL de artefactos con campos tipados de tiempo, host, usuario, proceso e IP. Requiere acceso de lectura al archivo; no ejecuta el contenido. Compilado por defecto con `parser-velociraptor`. Experimental y validado solo con datos sintéticos. Los registros sin tiempo válido se rechazan de forma individual. [Referencia](https://docs.velociraptor.app/docs/).
+
+## Parser de hayabusa
+
+Lee timelines CSV y JSONL y conserva el título de regla como evento no confirmado. Requiere acceso de lectura al archivo. Compilado por defecto con `parser-hayabusa`. Experimental; exige una zona horaria explícita y cuenta las filas malformadas. [Referencia](https://github.com/Yamato-Security/hayabusa/blob/main/website/docs/output/index.md).
+
+## Parser de chainsaw
+
+Lee JSONL y arrays JSON de hunt y search, con límites de tamaño y memoria. Requiere acceso de lectura al archivo. Compilado por defecto con `parser-chainsaw`. Experimental; los registros sin hora válida se rechazan. [Referencia](https://github.com/WithSecureOpenSource/chainsaw/wiki/Usage).
+
+## Parser de plaso
+
+Lee `json_line` de psort y conserva parser y `data_type` como procedencia. Requiere acceso de lectura al archivo. Compilado por defecto con `parser-plaso`. Experimental; acepta `datetime` con zona o `timestamp` Unix en microsegundos. [Referencia](https://plaso.readthedocs.io/en/latest/_modules/plaso/output/json_line.html).
+
+## Parser de eztools
+
+Lee CSV de PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch, SrumECmd y EvtxECmd mediante nombres exactos de columnas. Requiere acceso de lectura al archivo. Compilado por defecto con `parser-eztools`. Experimental; los encabezados desconocidos no se adivinan por el nombre del archivo. Las fechas sin zona se interpretan como UTC y el contexto queda en el manifiesto firmado. [Referencia](https://github.com/EricZimmerman/TLEFilePlugins/blob/master/TLEFileEZTools/EZTools.cs).
+
 ## Llavero del sistema
 
 **Función:** Firma como Analyst o Agent y guarda credenciales de módulos en Keychain, Credential Manager o Secret Service.
