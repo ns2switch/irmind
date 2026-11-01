@@ -1,5 +1,5 @@
 use super::*;
-use futures_util::stream;
+use futures_util::{StreamExt as _, stream};
 use irmind_app::modules::{ModuleConfig, ModuleRegistry};
 use irmind_app::{LargeCaseStore, ObjectEntry, ObjectSource, ObjectSourceOutput, async_trait};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -11,6 +11,8 @@ const URI: &str = "s3://synthetic-audit/AWSLogs/123/a.json";
 struct FakeObjectSource {
     bytes: Vec<u8>,
     reads: AtomicUsize,
+    stream_mode: AtomicUsize,
+    spool_probe: std::sync::Mutex<Option<std::path::PathBuf>>,
 }
 
 impl FakeObjectSource {
@@ -35,7 +37,7 @@ impl ObjectSource for FakeObjectSource {
     async fn execute(
         &self,
         call: &irmind_domain::AuthorizedCall,
-        _: &CancellationToken,
+        cancel: &CancellationToken,
     ) -> Result<ObjectSourceOutput, AppError> {
         let entry = self.entry();
         if call.tool() == &Tool::ObjectList {
@@ -49,7 +51,36 @@ impl ObjectSource for FakeObjectSource {
             return Err(AppError::RemoteTool);
         }
         self.reads.fetch_add(1, Ordering::SeqCst);
-        let chunks = stream::iter(vec![Ok(self.bytes.clone())]);
+        let mode = self.stream_mode.load(Ordering::SeqCst);
+        let chunks = if mode == 0 {
+            vec![Ok(self.bytes.clone())]
+        } else {
+            vec![Ok(self.bytes[..1].to_vec()), Err(AppError::RemoteTool)]
+        };
+        let probe = self.spool_probe.lock().unwrap().clone();
+        let cancel = cancel.clone();
+        let chunks = stream::iter(chunks).enumerate().map(move |(index, chunk)| {
+            if let Some(dir) = &probe {
+                let files = std::fs::read_dir(dir).unwrap().count();
+                assert_eq!(files, 1, "object bytes must spool inside the case");
+                assert!(
+                    !std::fs::read_dir(std::env::temp_dir())
+                        .unwrap()
+                        .any(|entry| {
+                            entry
+                                .unwrap()
+                                .file_name()
+                                .to_string_lossy()
+                                .starts_with("irmind-object-")
+                        }),
+                    "object bytes must not spool at the system temporary root"
+                );
+            }
+            if mode == 2 && index == 0 {
+                cancel.cancel();
+            }
+            chunk
+        });
         Ok(ObjectSourceOutput::Object {
             metadata: entry,
             chunks: Box::pin(chunks),
@@ -78,6 +109,7 @@ fn object_proposal(tool: Tool, max_bytes: &str) -> ProposedCall {
 
 #[test]
 #[allow(clippy::too_many_lines)]
+#[allow(clippy::cognitive_complexity)]
 fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(LocalStore::open(root.path()).unwrap());
@@ -93,6 +125,8 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     let source = FakeObjectSource {
         bytes: br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.8"}]}"#.to_vec(),
         reads: AtomicUsize::new(0),
+        stream_mode: AtomicUsize::new(0),
+        spool_probe: std::sync::Mutex::new(None),
     };
     let rules = PolicyRules {
         max_object_read_bytes: 1_024,
@@ -127,6 +161,19 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
         "v3;sources=storage;accounts=;projects=;hosts=;objects=s3://synthetic-audit/AWSLogs/123/;from={FROM};to={TO}"
     );
     let case = engine.create_case("Remote object", &scope).unwrap();
+    let spool_dir = root
+        .path()
+        .join("parquet")
+        .join(case.id.as_str())
+        .join("spool");
+    let orphan = store.create_object_spool(&case.id, 1).unwrap();
+    let (orphan_file, orphan_path) = orphan.keep().unwrap();
+    drop(orphan_file);
+    engine
+        .open_case_verified(&case.id, &CancellationToken::new())
+        .unwrap();
+    assert!(!orphan_path.exists());
+    *source.spool_probe.lock().unwrap() = Some(spool_dir.clone());
     let listed = engine
         .request_tool_as_analyst(
             &case.id,
@@ -149,6 +196,7 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     let executed = engine.approve(&case.id, &approvals[0].id).unwrap();
     assert!(executed.starts_with("approval executed; evidence "));
     assert_eq!(source.reads.load(Ordering::SeqCst), 1);
+    assert_eq!(std::fs::read_dir(&spool_dir).unwrap().count(), 0);
     let progress = engine.object_transfer_progress(&case.id).unwrap().unwrap();
     assert_eq!(
         progress,
@@ -211,6 +259,12 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     );
 
     let copied_case = engine.create_case("Copied cloud original", &scope).unwrap();
+    let copied_spool = root
+        .path()
+        .join("parquet")
+        .join(copied_case.id.as_str())
+        .join("spool");
+    *source.spool_probe.lock().unwrap() = Some(copied_spool.clone());
     engine
         .request_tool_as_analyst(
             &copied_case.id,
@@ -228,6 +282,7 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     assert!(pending.starts_with("approval pending:"));
     let approvals = engine.pending_approvals(&copied_case.id).unwrap();
     engine.approve(&copied_case.id, &approvals[0].id).unwrap();
+    assert_eq!(std::fs::read_dir(&copied_spool).unwrap().count(), 0);
     let copied_entry = store
         .entries(&copied_case.id)
         .unwrap()
@@ -256,6 +311,36 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     .unwrap();
     let report = irmind_app::verify_export_details(&LocalExportVerifier, &package, None).unwrap();
     assert_eq!(report.source_bytes_verified, 1);
+
+    for mode in [1, 2] {
+        source.stream_mode.store(mode, Ordering::SeqCst);
+        let failed_case = engine
+            .create_case("Interrupted cloud read", &scope)
+            .unwrap();
+        let failed_spool = root
+            .path()
+            .join("parquet")
+            .join(failed_case.id.as_str())
+            .join("spool");
+        *source.spool_probe.lock().unwrap() = Some(failed_spool.clone());
+        engine
+            .request_tool_as_analyst(
+                &failed_case.id,
+                object_proposal(Tool::ObjectList, "0"),
+                &CancellationToken::new(),
+            )
+            .unwrap();
+        engine
+            .request_tool_as_analyst(
+                &failed_case.id,
+                object_proposal(Tool::ObjectRead, "1024"),
+                &CancellationToken::new(),
+            )
+            .unwrap();
+        let approval = engine.pending_approvals(&failed_case.id).unwrap();
+        assert!(engine.approve(&failed_case.id, &approval[0].id).is_err());
+        assert_eq!(std::fs::read_dir(&failed_spool).unwrap().count(), 0);
+    }
 }
 
 #[test]
@@ -274,6 +359,8 @@ fn cloud_object_without_a_unique_high_confidence_parser_is_not_converted() {
     let source = FakeObjectSource {
         bytes: br#"{"unrecognized":"format"}"#.to_vec(),
         reads: AtomicUsize::new(0),
+        stream_mode: AtomicUsize::new(0),
+        spool_probe: std::sync::Mutex::new(None),
     };
     let engine = Engine::new(
         EnginePorts::new(

@@ -4,6 +4,18 @@ use super::{
 };
 
 impl LargeCaseStore for crate::LocalStore {
+    fn create_object_spool(
+        &self,
+        case_id: &CaseId,
+        expected_bytes: u64,
+    ) -> Result<tempfile::NamedTempFile, AppError> {
+        self.parquet.create_object_spool(case_id, expected_bytes)
+    }
+
+    fn clean_orphan_spools(&self, case_id: &CaseId) -> Result<usize, AppError> {
+        self.parquet.clean_orphan_spools(case_id)
+    }
+
     fn prepare_local(
         &self,
         case_id: &CaseId,

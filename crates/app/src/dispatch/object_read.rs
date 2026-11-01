@@ -58,7 +58,7 @@ impl Engine<'_> {
             local.verify_ingest_checkpoint(&id, &CancellationToken::new())?;
             let entries = local.audit_log.entries(&id)?;
             crate::large_case::read_manifest_index(&entries)?;
-            require_signed_listing(&local, &id, &entries, &args, &uri, requested)?;
+            let _ = require_signed_listing(&local, &id, &entries, &args, &uri, requested)?;
             let used = entries
                 .iter()
                 .filter(|entry| {
@@ -119,27 +119,35 @@ impl Engine<'_> {
         call: &AuthorizedCall,
         cancel: &CancellationToken,
     ) -> Result<(String, String), AppError> {
+        let listed = self.signed_object_for_read(id, call).await?;
+        let store = self.large_case_store.clone().ok_or(AppError::RemoteTool)?;
+        let case = id.clone();
+        let spool = self
+            .blocking_local(move |_| store.create_object_spool(&case, listed.size))
+            .await?;
         let ObjectSourceOutput::Object { metadata, chunks } =
             self.dispatch_object_source(call, cancel).await?
         else {
             return Err(AppError::RemoteTool);
         };
         validate_metadata(call, &metadata)?;
+        self.validate_against_signed_listing(id, call, &metadata)
+            .await?;
         let progress = Arc::new(AtomicU64::new(0));
         self.object_progress
             .lock()
             .map_err(|_| AppError::Storage("object progress unavailable".into()))?
             .insert(id.clone(), (metadata.size, Arc::clone(&progress)));
-        let spool = tempfile::Builder::new()
-            .prefix("irmind-object-")
-            .tempdir()
-            .map_err(|_| AppError::RemoteTool)?;
-        let path = spool.path().join("download.json");
-        let mut file = tokio::fs::File::create(&path)
-            .await
-            .map_err(|_| AppError::RemoteTool)?;
+        let mut file = tokio::fs::File::from_std(
+            spool
+                .as_file()
+                .try_clone()
+                .map_err(|_| AppError::RemoteTool)?,
+        );
         let hash = spool_stream(&mut file, chunks, metadata.size, &progress, cancel).await?;
-        file.sync_all().await.map_err(|_| AppError::RemoteTool)?;
+        file.sync_all().await.map_err(|_| {
+            AppError::Storage("cannot sync object spool in case data directory".into())
+        })?;
         drop(file);
         let copy_original = call.arg("copy_original") == Some("true");
         let manifest = SourceManifestV1 {
@@ -157,6 +165,38 @@ impl Engine<'_> {
         }
         self.prepare_and_sign_object(id, spool.path(), manifest, cancel)
             .await
+    }
+
+    async fn signed_object_for_read(
+        &self,
+        id: &CaseId,
+        call: &AuthorizedCall,
+    ) -> Result<ObjectEntry, AppError> {
+        let id = id.clone();
+        let args = call.proposal_args().clone();
+        let uri = object_uri(call)?;
+        let max_bytes = call
+            .arg("max_bytes")
+            .and_then(|value| value.parse::<u64>().ok())
+            .ok_or(AppError::RemoteTool)?;
+        self.blocking_local(move |local| {
+            let entries = local.audit_log.entries(&id)?;
+            require_signed_listing(&local, &id, &entries, &args, &uri, max_bytes)
+        })
+        .await
+    }
+
+    async fn validate_against_signed_listing(
+        &self,
+        id: &CaseId,
+        call: &AuthorizedCall,
+        actual: &ObjectEntry,
+    ) -> Result<(), AppError> {
+        let listed = self.signed_object_for_read(id, call).await?;
+        if listed != *actual {
+            return Err(AppError::RemoteTool);
+        }
+        Ok(())
     }
 
     async fn compare_existing_object(
@@ -208,21 +248,30 @@ impl Engine<'_> {
     async fn prepare_and_sign_object(
         &self,
         id: &CaseId,
-        source_root: &std::path::Path,
+        spool_path: &std::path::Path,
         manifest: SourceManifestV1,
         cancel: &CancellationToken,
     ) -> Result<(String, String), AppError> {
         let store = self.large_case_store.clone().ok_or(AppError::RemoteTool)?;
         let catalog = self.parser_catalog.clone().ok_or(AppError::RemoteTool)?;
         let id = id.clone();
-        let root = source_root.to_path_buf();
+        let root = spool_path
+            .parent()
+            .ok_or(AppError::RemoteTool)?
+            .to_path_buf();
+        let relative = spool_path
+            .file_name()
+            .and_then(std::ffi::OsStr::to_str)
+            .ok_or(AppError::RemoteTool)?
+            .to_owned();
         let cancel = cancel.clone();
         self.blocking_local(move |local| {
-            let (parser, selection) = select_object_parser(&catalog, &root, &manifest.source)?;
+            let (parser, selection) =
+                select_object_parser(&catalog, &root, &relative, &manifest.source)?;
             let mut prepared: PreparedSource = store.prepare_local(
                 &id,
                 &root,
-                "download.json",
+                &relative,
                 manifest.copied,
                 parser.as_ref() as &dyn crate::StreamingEventParser,
                 &cancel,
@@ -270,10 +319,11 @@ impl Engine<'_> {
 fn select_object_parser(
     catalog: &crate::modules::ParserCatalog,
     root: &std::path::Path,
+    relative: &str,
     source: &str,
 ) -> Result<(Arc<dyn LogParser>, ParserSelection), AppError> {
     let mut sample = Vec::with_capacity(64 * 1024);
-    std::fs::File::open(root.join("download.json"))
+    std::fs::File::open(root.join(relative))
         .map_err(|_| AppError::RemoteTool)?
         .take(64 * 1024)
         .read_to_end(&mut sample)
@@ -314,8 +364,8 @@ fn require_signed_listing(
     args: &BTreeMap<String, String>,
     uri: &str,
     max_bytes: u64,
-) -> Result<(), AppError> {
-    let listed = entries
+) -> Result<ObjectEntry, AppError> {
+    entries
         .iter()
         .rev()
         .filter(|entry| {
@@ -323,33 +373,28 @@ fn require_signed_listing(
         })
         .filter_map(|entry| entry.evidence.as_deref())
         .take(20)
-        .any(|hash| {
+        .find_map(|hash| {
             let Ok(raw) = engine.evidence_store.get_evidence(id, hash) else {
-                return false;
+                return None;
             };
             let Ok(listing) = serde_json::from_slice::<SignedListing>(&raw) else {
-                return false;
+                return None;
             };
-            !listing.truncated
-                && args.get("source") == Some(&listing.source)
-                && listing.objects.iter().any(|item| {
-                    item.uri == uri
-                        && item.size <= max_bytes
-                        && args
-                            .get("version")
-                            .is_none_or(|version| item.version.as_deref() == Some(version))
-                        && args.get("etag").is_none_or(|etag| {
-                            item.provider_checksum.as_deref() == Some(&format!("etag:{etag}"))
-                        })
-                })
-        });
-    if listed {
-        Ok(())
-    } else {
-        Err(AppError::Policy(
-            "list the exact object and version before reading".into(),
-        ))
-    }
+            if listing.truncated || args.get("source") != Some(&listing.source) {
+                return None;
+            }
+            listing.objects.into_iter().find(|item| {
+                item.uri == uri
+                    && item.size <= max_bytes
+                    && args
+                        .get("version")
+                        .is_none_or(|version| item.version.as_deref() == Some(version))
+                    && args.get("etag").is_none_or(|etag| {
+                        item.provider_checksum.as_deref() == Some(&format!("etag:{etag}"))
+                    })
+            })
+        })
+        .ok_or_else(|| AppError::Policy("list the exact object and version before reading".into()))
 }
 
 fn object_uri(call: &AuthorizedCall) -> Result<String, AppError> {
@@ -412,9 +457,9 @@ async fn spool_stream(
             return Err(AppError::RemoteTool);
         }
         digest.update(&chunk);
-        file.write_all(&chunk)
-            .await
-            .map_err(|_| AppError::RemoteTool)?;
+        file.write_all(&chunk).await.map_err(|_| {
+            AppError::Storage("cannot write object spool in case data directory".into())
+        })?;
         progress.store(seen, Ordering::Relaxed);
     }
     if seen != expected {

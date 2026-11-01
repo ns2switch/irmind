@@ -6,6 +6,11 @@
     feature = "parser-ocsf"
 ))]
 
+use arrow::{
+    array::{Array, ArrayRef, Int64Array, StringArray, StructArray},
+    datatypes::{DataType, Field, Schema},
+    record_batch::RecordBatch,
+};
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,
@@ -17,10 +22,11 @@ use irmind_mod_parser_ecs::EcsParser;
 use irmind_mod_parser_json::JsonParser;
 use irmind_mod_parser_ocsf::OcsfParser;
 use irmind_security::MandatoryGuard;
+use parquet::arrow::ArrowWriter;
 use std::{
     collections::BTreeMap,
     fs,
-    io::{BufWriter, Read as _, Write as _},
+    io::{BufWriter, Read as _, Seek as _, SeekFrom, Write as _},
     sync::Arc,
     time::Instant,
 };
@@ -37,6 +43,98 @@ impl Signer for SyntheticSigner {
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, AppError> {
         Ok(self.0.sign(message).to_bytes().to_vec())
     }
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn local_ocsf_parquet_is_signed_and_rebuilds_without_a_parser_spool()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = tempfile::tempdir()?;
+    let source_root = root.path().join("sources");
+    fs::create_dir(&source_root)?;
+    let source_path = source_root.join("ocsf.parquet");
+    let metadata = StructArray::from(vec![(
+        Arc::new(Field::new("version", DataType::Utf8, false)),
+        Arc::new(StringArray::from(vec!["1.4.0"])) as ArrayRef,
+    )]);
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("class_uid", DataType::Int64, false),
+        Field::new("category_uid", DataType::Int64, false),
+        Field::new("metadata", metadata.data_type().clone(), false),
+        Field::new("time", DataType::Int64, false),
+    ]));
+    let batch = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(Int64Array::from(vec![3002])) as ArrayRef,
+            Arc::new(Int64Array::from(vec![3])) as ArrayRef,
+            Arc::new(metadata) as ArrayRef,
+            Arc::new(Int64Array::from(vec![1_767_323_045_000_i64])) as ArrayRef,
+        ],
+    )?;
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(&source_path)?;
+    let mut writer = ArrowWriter::try_new(file.try_clone()?, schema, None)?;
+    writer.write(&batch)?;
+    writer.close()?;
+    file.seek(SeekFrom::Start(0))?;
+    let mut sample = vec![0u8; 64 * 1024];
+    let sample_size = file.read(&mut sample)?;
+    let store = Arc::new(LocalStore::open(&root.path().join("data"))?);
+    let signer = Arc::new(SyntheticSigner(SigningKey::from_bytes(&[44; 32])));
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(
+                signer.clone(),
+                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            ),
+            Arc::new(MandatoryGuard::new()?),
+            Arc::new(JsonParser),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )?;
+    let case = engine.create_case("Synthetic OCSF Parquet", "local evidence only")?;
+    let parser = OcsfParser;
+    let selection = BTreeMap::from([(
+        "ocsf.parquet".to_owned(),
+        ParserSelection {
+            parser_id: parser.parser_name().into(),
+            parser_version: parser.streaming_version().into(),
+            confidence: 55,
+            mode: ParserSelectionMode::Analyst,
+            timestamp_context: None,
+            format_sample_sha256: sha256(&sample[..sample_size]),
+        },
+    )]);
+    let use_cases = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &parser,
+    };
+    use_cases.ingest_local_batch_selected(
+        &case.id,
+        &source_root,
+        &["ocsf.parquet".into()],
+        false,
+        &selection,
+        &CancellationToken::new(),
+    )?;
+    assert_eq!(fs::read_dir(&source_root)?.count(), 1);
+    assert_eq!(store.timeline(&case.id, 10)?.len(), 1);
+    assert_eq!(
+        use_cases.verify_parquet_rebuild(&case.id, &source_root, &CancellationToken::new())?,
+        1
+    );
+    engine.verify(&case.id)?;
+    Ok(())
 }
 
 #[test]

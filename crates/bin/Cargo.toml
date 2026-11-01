@@ -76,6 +76,8 @@ workspace = true
 
 [dev-dependencies]
 ed25519-dalek = "2"
+arrow = { version = "=59.3.0", default-features = false }
+parquet = { version = "=59.3.0", default-features = false, features = ["arrow", "snap"] }
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 crossterm = "0.29"
 expectrl = "0.8"

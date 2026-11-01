@@ -2431,6 +2431,7 @@ name = "irmind"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "arrow",
  "clap",
  "crossterm",
  "directories",
@@ -2461,6 +2462,7 @@ dependencies = [
  "irmind-security",
  "irmind-tui",
  "libc",
+ "parquet",
  "ratatui",
  "rpassword",
  "secrecy",

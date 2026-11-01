@@ -2,7 +2,8 @@ use crate::{policy_error, record};
 use irmind_app::{AppError, CancellationToken, GraphRecord, ParseReport};
 use irmind_domain::{ParserLocation, Provenance, SourceKind, Tainted};
 use parquet::file::reader::{FileReader, SerializedFileReader};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom};
 
 const MAX_PARQUET_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_RECORDS: usize = 10_000_000;
@@ -12,43 +13,29 @@ const MAX_ROW_BYTES: usize = 4 * 1024 * 1024;
 
 pub(super) fn parse(
     source: &str,
-    mut reader: impl Read,
+    file: &mut File,
     evidence_hash: [u8; 32],
     cancel: &CancellationToken,
     emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
-    // The parser port offers Read, while Parquet needs random access to its
-    // footer. A private, automatically removed spool bounds memory usage.
-    let mut spool =
-        tempfile::tempfile().map_err(|_| policy_error("cannot create private OCSF spool"))?;
-    let mut total = 0u64;
-    let mut buffer = vec![0u8; 64 * 1024];
-    loop {
-        if cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        let count = reader
-            .read(&mut buffer)
-            .map_err(|_| policy_error("cannot read OCSF Parquet"))?;
-        if count == 0 {
-            break;
-        }
-        total = total.saturating_add(count as u64);
-        if total > MAX_PARQUET_BYTES {
-            return Err(policy_error("OCSF Parquet exceeds 2 GiB per file"));
-        }
-        spool
-            .write_all(&buffer[..count])
-            .map_err(|_| policy_error("cannot spool OCSF Parquet"))?;
+    if cancel.is_cancelled() {
+        return Err(AppError::Cancelled);
     }
-    spool
-        .sync_all()
-        .map_err(|_| policy_error("cannot sync OCSF spool"))?;
-    validate_footer(&mut spool, total)?;
-    let file = SerializedFileReader::new(spool)
-        .map_err(|_| policy_error("invalid OCSF Parquet structure"))?;
-    validate_row_groups(file.metadata())?;
-    let rows = file
+    let size = file
+        .metadata()
+        .map_err(|_| policy_error("cannot inspect OCSF Parquet"))?
+        .len();
+    if size > MAX_PARQUET_BYTES {
+        return Err(policy_error("OCSF Parquet exceeds 2 GiB per file"));
+    }
+    validate_footer(file, size)?;
+    let reader = SerializedFileReader::new(
+        file.try_clone()
+            .map_err(|_| policy_error("cannot open OCSF Parquet"))?,
+    )
+    .map_err(|_| policy_error("invalid OCSF Parquet structure"))?;
+    validate_row_groups(reader.metadata())?;
+    let rows = reader
         .get_row_iter(None)
         .map_err(|_| policy_error("cannot read OCSF Parquet rows"))?;
     let mut report = ParseReport {

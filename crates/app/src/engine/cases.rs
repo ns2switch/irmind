@@ -11,6 +11,12 @@ impl<'a> Engine<'a> {
         cancel: &crate::CancellationToken,
     ) -> Result<Case, AppError> {
         let _case_lock = self.repo.lock_case(id)?;
+        if let Some(store) = &self.large_case_store {
+            let removed = store.clean_orphan_spools(id)?;
+            if removed != 0 {
+                tracing::info!(target: "irmind::operations", removed, "removed orphaned object spools");
+            }
+        }
         self.verify_unlocked_cancelable(id, cancel)?;
         self.repo.get_case(id)
     }

@@ -25,6 +25,7 @@ mod compact;
 mod local;
 mod query;
 mod scan;
+mod spool;
 mod store_bridge;
 mod writer;
 use writer::{
