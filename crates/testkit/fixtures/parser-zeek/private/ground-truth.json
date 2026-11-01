@@ -1,0 +1,27 @@
+{
+  "malicious_event_indexes": [
+    0,
+    1
+  ],
+  "entities": [
+    [
+      "uid",
+      "CsyntheticZeek1"
+    ],
+    [
+      "ip",
+      "192.0.2.14"
+    ],
+    [
+      "ip",
+      "198.51.100.22"
+    ]
+  ],
+  "path": [
+    "192.0.2.14",
+    "CsyntheticZeek1",
+    "198.51.100.22"
+  ],
+  "conclusion": "Synthetic repeated connection in one microsecond-scale interval",
+  "private_marker": "zeek-private-ground-truth-synthetic"
+}

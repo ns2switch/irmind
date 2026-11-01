@@ -89,6 +89,12 @@ fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
             cfg!(feature = "parser-eztools"),
             "eztools-csv-v1",
         ),
+        ("parser-zeek", cfg!(feature = "parser-zeek"), "zeek-log-v1"),
+        (
+            "parser-suricata",
+            cfg!(feature = "parser-suricata"),
+            "suricata-eve-v1",
+        ),
     ] {
         builder.out.push(ModuleStatus {
             id: id.into(),

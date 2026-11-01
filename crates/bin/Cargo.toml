@@ -11,6 +11,7 @@ default = [
     "parser-json",
     "parser-ecs", "parser-ocsf",
     "parser-velociraptor", "parser-hayabusa", "parser-chainsaw", "parser-plaso", "parser-eztools",
+    "parser-zeek", "parser-suricata",
     "llm-anthropic", "llm-deepseek", "llm-openrouter",
     "siem-splunk", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
     "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
@@ -25,6 +26,8 @@ parser-hayabusa = ["dep:irmind-mod-parser-hayabusa"]
 parser-chainsaw = ["dep:irmind-mod-parser-chainsaw"]
 parser-plaso = ["dep:irmind-mod-parser-plaso"]
 parser-eztools = ["dep:irmind-mod-parser-eztools"]
+parser-zeek = ["dep:irmind-mod-parser-zeek"]
+parser-suricata = ["dep:irmind-mod-parser-suricata"]
 persistent-keyring = ["irmind-infra/persistent-keyring"]
 llm-anthropic = ["dep:irmind-mod-llm-anthropic"]
 llm-deepseek = ["dep:irmind-mod-llm-deepseek"]
@@ -55,6 +58,8 @@ irmind-mod-parser-hayabusa = { path = "../modules/parser-hayabusa", version = "0
 irmind-mod-parser-chainsaw = { path = "../modules/parser-chainsaw", version = "0.1.0", optional = true }
 irmind-mod-parser-plaso = { path = "../modules/parser-plaso", version = "0.1.0", optional = true }
 irmind-mod-parser-eztools = { path = "../modules/parser-eztools", version = "0.1.0", optional = true }
+irmind-mod-parser-zeek = { path = "../modules/parser-zeek", version = "0.1.0", optional = true }
+irmind-mod-parser-suricata = { path = "../modules/parser-suricata", version = "0.1.0", optional = true }
 irmind-mod-llm-openai-compatible = { path = "../modules/llm-openai-compatible", version = "0.1.0" }
 irmind-mod-keystore-os = { path = "../modules/keystore-os", version = "0.1.0", optional = true }
 irmind-mod-keystore-file = { path = "../modules/keystore-file", version = "0.1.0", optional = true }

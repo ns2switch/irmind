@@ -134,4 +134,30 @@ The same local, single-worker harness measured the five DFIR parsers on one synt
 
 The benchmark uses repeated small records and a complete local ingest, so the numbers include costs outside the parser itself. The low CSV and JSONL throughput needs profiling before setting a release target.
 
+### Shared ingest-path profile
+
+The same machine, source generator, 1 GiB file and application revision were used for `parser-json` and two typed DFIR parsers. Each pair read identical source bytes. The table uses an optimized release test build with one file and one worker. Times are seconds of wall clock; phase counters do not include source generation or the final explicit `verify`. Source hashing is the initial pass. The parser verifies the source hash again while reading it; this second-pass work is included in the conversion residual. Parquet includes co-observation generation, sorting, compression and durable artifact publication. Custody includes artifact rehashing and the signed audit transaction.
+
+| Source / parser | Total | Initial hash | JSON decode | Entity extraction | Row preparation | Parquet | Artifact rehash | Signed audit |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Velociraptor / typed | 13.229 | 0.525 | 0.435 | 0.955 | 2.591 | 6.292 | 0.047 | 0.005 |
+| Velociraptor / `parser-json` | 13.797 | 0.518 | 0.797 | 1.914 | 2.077 | 6.968 | 0.018 | 0.165 |
+| Hayabusa / typed | 13.727 | 0.533 | 0.378 | 1.230 | 2.614 | 6.440 | 0.045 | 0.020 |
+| Hayabusa / `parser-json` | 7.242 | 0.522 | 0.703 | 1.724 | 2.039 | 0.956 | 0.004 | 0.006 |
+
+The phases are disjoint timed regions except for untimed framing, validation and metadata work, which explains the residual. Repeat measurements of the Velociraptor file with `parser-json` ranged from 9.753 to 13.797 seconds as the machine and filesystem cache warmed. The typed parsers extract more entities than generic JSON on the same bytes; the extra signed co-observations change Parquet output volume. In the typed runs, Parquet took about 47–48% of total time, row preparation about 19–20%, while JSON decode plus entity extraction took about 10–12%. The signed audit transaction took 0.005–0.020 seconds in the typed runs. The row stage currently parses normalized JSON text again to locate partition fields.
+
+The earlier debug test numbers (7–10 MiB/s for these three parsers) do not indicate a regression from the 15 GB release benchmark. On this same 1 GiB corpus, release runs reached 74–141 MiB/s; the older 15 GB run used an optimized build and four independent source workers. The next performance work should profile and reduce row reparsing and co-observation sorting/writing before changing parser deserialization. It must keep the bounded parser, original-source rehash, signed artifacts and cancellation. [Issue #61](https://github.com/ns2switch/irmind/issues/61) tracks the follow-up.
+
 With default features and the same `cargo build -p irmind --release --locked` profile, the main-branch binary measured 47,733,368 B and the binary with these five parsers measured 48,314,232 B (+580,864 B, 1.22%). The workspace lockfile rose from 539 to 546 packages: five local parser crates plus `csv` and `csv-core`.
+
+## Experimental network parser ingest
+
+The same local release-profile, single-file harness measured the network parsers. The timed interval includes source hashing, parsing, entity extraction, Parquet conversion with co-observations, and signed custody. Fixture generation and the final explicit `verify` are excluded. These measurements are local and do not establish throughput on a standard runner.
+
+| Parser | Format | Synthetic bytes | Timed ingest | Throughput |
+| --- | --- | ---: | ---: | ---: |
+| Zeek | TSV | 1,073,742,288 | 18.419 s | 55.59 MiB/s |
+| Suricata | EVE JSONL | 1,073,743,067 | 30.054 s | 34.07 MiB/s |
+
+Both benchmarks used one Cargo job and one test thread, with private temporary case directories removed after the run. The full fractional source timestamps remain in the original records, while the current signed Parquet index still stores seconds. [Issue #143](https://github.com/ns2switch/irmind/issues/143) tracks a versioned microsecond index and stable tie ordering; it requires an approved design before implementation.

@@ -35,7 +35,9 @@ fn existing_json_detection_rejects_unrelated_logs() -> Result<(), irmind_app::Ap
     feature = "parser-hayabusa",
     feature = "parser-chainsaw",
     feature = "parser-plaso",
-    feature = "parser-eztools"
+    feature = "parser-eztools",
+    feature = "parser-zeek",
+    feature = "parser-suricata"
 ))]
 mod matrix {
     use irmind_app::{
@@ -49,7 +51,9 @@ mod matrix {
     use irmind_mod_parser_json::JsonParser;
     use irmind_mod_parser_ocsf::OcsfParser;
     use irmind_mod_parser_plaso::PlasoParser;
+    use irmind_mod_parser_suricata::SuricataParser;
     use irmind_mod_parser_velociraptor::VelociraptorParser;
+    use irmind_mod_parser_zeek::ZeekParser;
 
     const JSON: &[u8] =
         include_bytes!("../../modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json");
@@ -64,6 +68,9 @@ mod matrix {
     const PLASO: &[u8] = include_bytes!("../../testkit/fixtures/parser-plaso/source/events.jsonl");
     const EZTOOLS: &[u8] =
         include_bytes!("../../testkit/fixtures/parser-eztools/source/events.csv");
+    const ZEEK: &[u8] = include_bytes!("../../testkit/fixtures/parser-zeek/source/events.log");
+    const SURICATA: &[u8] =
+        include_bytes!("../../testkit/fixtures/parser-suricata/source/eve.jsonl");
 
     #[test]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
@@ -76,6 +83,8 @@ mod matrix {
         registry.register(Box::new(ChainsawParser), &ModuleConfig::new())?;
         registry.register(Box::new(PlasoParser), &ModuleConfig::new())?;
         registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
+        registry.register(Box::new(ZeekParser), &ModuleConfig::new())?;
+        registry.register(Box::new(SuricataParser), &ModuleConfig::new())?;
 
         for (name, sample, expected) in [
             ("cloud.json", JSON, "parser-json"),
@@ -86,6 +95,8 @@ mod matrix {
             ("chainsaw.jsonl", CHAINSAW, "parser-chainsaw"),
             ("plaso.jsonl", PLASO, "parser-plaso"),
             ("eztools.csv", EZTOOLS, "parser-eztools"),
+            ("zeek.log", ZEEK, "parser-zeek"),
+            ("suricata.jsonl", SURICATA, "parser-suricata"),
         ] {
             let choice = registry.detect_parser(name, sample);
             let ParserChoice::Auto(found) = choice else {
@@ -107,23 +118,19 @@ mod matrix {
                 ("parser-chainsaw", ChainsawParser.detect(name, sample)),
                 ("parser-plaso", PlasoParser.detect(name, sample)),
                 ("parser-eztools", EztoolsParser.detect(name, sample)),
+                ("parser-zeek", ZeekParser.detect(name, sample)),
+                ("parser-suricata", SuricataParser.detect(name, sample)),
             ];
-            let expected_scores: [Option<u8>; 8] = match expected {
-                "parser-json" => [Some(90), None, None, None, None, None, None, None],
-                "parser-ecs" => [Some(45), Some(95), None, None, None, None, None, None],
-                "parser-ocsf" => [Some(45), None, Some(95), None, None, None, None, None],
-                "parser-velociraptor" => [Some(45), None, None, Some(95), None, None, None, None],
-                "parser-hayabusa" => [Some(45), None, None, None, Some(95), None, None, None],
-                "parser-chainsaw" => [Some(45), None, None, None, None, Some(95), None, None],
-                "parser-plaso" => [Some(45), None, None, None, None, None, Some(95), None],
-                "parser-eztools" => [None, None, None, None, None, None, None, Some(95)],
-                _ => {
-                    return Err(irmind_app::AppError::Policy(
-                        "unknown parser fixture".into(),
-                    ));
-                }
-            };
-            for ((id, confidence), score) in observed.into_iter().zip(expected_scores) {
+            for (id, confidence) in observed {
+                let score = if id == expected {
+                    Some(if id == "parser-json" { 90 } else { 95 })
+                } else if id == "parser-json"
+                    && !matches!(expected, "parser-eztools" | "parser-zeek")
+                {
+                    Some(45)
+                } else {
+                    None
+                };
                 assert_eq!(confidence.map(irmind_app::ParserConfidence::value), score);
                 if id != expected {
                     assert!(!confidence.is_some_and(irmind_app::ParserConfidence::is_high));

@@ -428,6 +428,24 @@ pub fn valid_entity(kind: &str, value: &str) -> bool {
             | "resource"
             | "user_agent"
             | "event_id"
+            | "uid"
+            | "flow"
+            | "finding"
     ) && !value.is_empty()
         && value.len() <= 512
+}
+
+#[cfg(test)]
+mod network_entity_tests {
+    use super::valid_entity;
+
+    #[test]
+    fn network_correlation_kinds_remain_bounded() {
+        for kind in ["uid", "flow", "finding"] {
+            assert!(valid_entity(kind, "synthetic"));
+            assert!(!valid_entity(kind, ""));
+            assert!(!valid_entity(kind, &"x".repeat(513)));
+        }
+        assert!(!valid_entity("arbitrary_kind", "synthetic"));
+    }
 }
