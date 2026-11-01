@@ -24,6 +24,8 @@ irmind-mod-parser-hayabusa = { path = "../crates/modules/parser-hayabusa", versi
 irmind-mod-parser-chainsaw = { path = "../crates/modules/parser-chainsaw", version = "0.1.0" }
 irmind-mod-parser-plaso = { path = "../crates/modules/parser-plaso", version = "0.1.0" }
 irmind-mod-parser-eztools = { path = "../crates/modules/parser-eztools", version = "0.1.0" }
+irmind-mod-parser-zeek = { path = "../crates/modules/parser-zeek", version = "0.1.0" }
+irmind-mod-parser-suricata = { path = "../crates/modules/parser-suricata", version = "0.1.0" }
 
 irmind-infra = { path = "../crates/infra", version = "0.1.0", optional = true }
 tempfile = "3"
@@ -112,6 +114,20 @@ bench = false
 [[bin]]
 name = "parser_eztools"
 path = "fuzz_targets/parser_eztools.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_zeek"
+path = "fuzz_targets/parser_zeek.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_suricata"
+path = "fuzz_targets/parser_suricata.rs"
 test = false
 doc = false
 bench = false

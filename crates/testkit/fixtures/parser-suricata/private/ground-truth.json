@@ -1,0 +1,31 @@
+{
+  "malicious_event_indexes": [
+    0,
+    1
+  ],
+  "entities": [
+    [
+      "flow",
+      "9001001"
+    ],
+    [
+      "ip",
+      "192.0.2.25"
+    ],
+    [
+      "ip",
+      "198.51.100.44"
+    ],
+    [
+      "finding",
+      "Synthetic suspicious TLS connection"
+    ]
+  ],
+  "path": [
+    "192.0.2.25",
+    "9001001",
+    "198.51.100.44"
+  ],
+  "conclusion": "Synthetic alert and TLS activity linked by flow ID",
+  "private_marker": "suricata-private-ground-truth-synthetic"
+}

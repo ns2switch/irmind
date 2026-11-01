@@ -31,6 +31,8 @@ use super::{
     feature = "parser-chainsaw",
     feature = "parser-plaso",
     feature = "parser-eztools",
+    feature = "parser-zeek",
+    feature = "parser-suricata",
 ))]
 use irmind_app::modules::ModuleConfig;
 #[cfg(feature = "parser-chainsaw")]
@@ -45,8 +47,12 @@ use irmind_mod_parser_hayabusa::HayabusaParser;
 use irmind_mod_parser_ocsf::OcsfParser;
 #[cfg(feature = "parser-plaso")]
 use irmind_mod_parser_plaso::PlasoParser;
+#[cfg(feature = "parser-suricata")]
+use irmind_mod_parser_suricata::SuricataParser;
 #[cfg(feature = "parser-velociraptor")]
 use irmind_mod_parser_velociraptor::VelociraptorParser;
+#[cfg(feature = "parser-zeek")]
+use irmind_mod_parser_zeek::ZeekParser;
 
 #[cfg(any(
     feature = "storage-s3",
@@ -80,6 +86,10 @@ pub(super) fn configured_registry(
     registry.register(Box::new(PlasoParser), &ModuleConfig::new())?;
     #[cfg(feature = "parser-eztools")]
     registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-zeek")]
+    registry.register(Box::new(ZeekParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-suricata")]
+    registry.register(Box::new(SuricataParser), &ModuleConfig::new())?;
 
     register_llm(
         cli,

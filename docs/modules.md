@@ -224,6 +224,26 @@ The five DFIR parsers below index times at UTC-second precision. Their local rec
 
 **Limits:** Experimental. Rows without a usable timestamp are rejected. Timestamps without an offset are interpreted as UTC; the normalization context is recorded in the signed source manifest. [EZTools CSV header reference](https://github.com/EricZimmerman/TLEFilePlugins/blob/master/TLEFileEZTools/EZTools.cs).
 
+## Zeek parser
+
+**Does:** Reads Zeek's tab-separated logs with `#path`, `#fields` and `#types`, and Zeek JSON logs. It maps conn, dns, http, ssl, files, x509, notice and weird records. The `uid` entity connects records from different logs. The original fractional epoch timestamp stays in the local record; the current signed Parquet timeline still indexes UTC seconds.
+
+**Permission:** Read access to the selected export only. The parser does not run Zeek or open a network connection.
+
+**Configure:** Compiled by default with `parser-zeek`. A unique high-confidence content match selects it automatically; `/ingest` asks when detection is ambiguous. The parser and choice enter the signed source manifest.
+
+**Limits:** Experimental and validated only with synthetic data. A record is limited to 4 MiB, 1,024 fields and 64 JSON nesting levels; a source is limited to ten million records and 50 GiB. Malformed records are counted and sampled in bounded, escaped form. Only the default tab field separator is supported. The current signed partition scheme is date/account/region; host is indexed as an entity. [Zeek log format](https://docs.zeek.org/en/current/tutorial/logs.html) and [log types](https://docs.zeek.org/en/current/reference/zeekscript/log-files.html).
+
+## Suricata EVE parser
+
+**Does:** Reads EVE JSONL for alert, flow, dns, http, tls, fileinfo and anomaly events. It links records through `flow_id`. Alert signatures are unconfirmed source findings for analyst review, never confirmed case findings. The original timestamp and offset stay in the local record; the current signed Parquet timeline indexes UTC seconds.
+
+**Permission:** Read access to the selected export only. The parser does not run Suricata or open a network connection.
+
+**Configure:** Compiled by default with `parser-suricata`. Detection requires a supported `event_type`, a timestamp and `flow_id` in the sample; ambiguous inputs require analyst selection. The choice is signed.
+
+**Limits:** Experimental and validated only with synthetic data. It applies the same record, JSON shape, source and rejection limits as the Zeek parser. Timestamps without an explicit offset are rejected. Host is indexed as an entity within the current date/account/region partition scheme. [Suricata EVE format](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).
+
 ## OS keystore
 
 **Does:** Signs as Analyst or Agent and stores module credentials in Keychain, Credential Manager, or Secret Service.

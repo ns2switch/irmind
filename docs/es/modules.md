@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit e1a4ceee964092a878e9a2ef2a327cd4bb562393; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit ba18f18627596c2923efaef66c14feb2e1d921a4; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -195,6 +195,18 @@ Lee `json_line` de psort y conserva parser y `data_type` como procedencia. Requi
 ## Parser de eztools
 
 Lee CSV de PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch, SrumECmd y EvtxECmd mediante nombres exactos de columnas. Requiere acceso de lectura al archivo. Compilado por defecto con `parser-eztools`. Experimental; los encabezados desconocidos no se adivinan por el nombre del archivo. Las fechas sin zona se interpretan como UTC y el contexto queda en el manifiesto firmado. [Referencia](https://github.com/EricZimmerman/TLEFilePlugins/blob/master/TLEFileEZTools/EZTools.cs).
+
+## Parser de Zeek
+
+Lee logs TSV de Zeek con `#path`, `#fields` y `#types`, y logs JSON de Zeek. Mapea conn, dns, http, ssl, files, x509, notice y weird; la entidad `uid` enlaza registros de distintos logs. Solo requiere lectura del archivo local. Viene compilado por defecto con `parser-zeek` y es experimental, probado solo con datos sintéticos. La marca temporal original con fracciones queda en el registro local; la timeline Parquet firmada actual indexa segundos UTC.
+
+Limita cada registro a 4 MiB, 1.024 campos y 64 niveles JSON, y cada fuente a diez millones de registros y 50 GiB. Cuenta los registros malformados y guarda muestras acotadas y escapadas. Solo admite el separador de campos tabulado predeterminado. El host se indexa como entidad; el esquema firmado actual particiona por fecha, cuenta y región. [Formato de Zeek](https://docs.zeek.org/en/current/tutorial/logs.html).
+
+## Parser de Suricata EVE
+
+Lee EVE JSONL para alert, flow, dns, http, tls, fileinfo y anomaly. Relaciona registros mediante `flow_id`. Una firma de alerta se conserva como hallazgo de origen sin confirmar; nunca confirma automáticamente un hallazgo del caso. Solo requiere lectura del archivo local. Viene compilado por defecto con `parser-suricata` y es experimental, probado solo con datos sintéticos.
+
+Aplica los mismos límites de tamaño, estructura JSON y recuento que Zeek. Rechaza marcas temporales sin zona explícita. Conserva en el registro local la marca original y su zona; la timeline firmada actual usa segundos UTC. El host se indexa como entidad dentro del esquema de partición actual. [Formato EVE](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).
 
 ## Llavero del sistema
 

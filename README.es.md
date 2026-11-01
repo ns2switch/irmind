@@ -1,4 +1,4 @@
-Traducción de README.md en el commit e1a4ceee964092a878e9a2ef2a327cd4bb562393; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit ba18f18627596c2923efaef66c14feb2e1d921a4; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -103,6 +103,8 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Parser de Chainsaw | parser local | `parser-chainsaw` (por defecto) | experimental | [Chainsaw](docs/es/modules.md#parser-de-chainsaw) |
 | Parser de plaso | parser local | `parser-plaso` (por defecto) | experimental | [plaso](docs/es/modules.md#parser-de-plaso) |
 | Parser de EZTools | parser local | `parser-eztools` (por defecto) | experimental | [EZTools](docs/es/modules.md#parser-de-eztools) |
+| Parser de Zeek | parser local | `parser-zeek` (por defecto) | experimental | [Zeek](docs/es/modules.md#parser-de-zeek) |
+| Parser de Suricata EVE | parser local | `parser-suricata` (por defecto) | experimental | [Suricata](docs/es/modules.md#parser-de-suricata-eve) |
 | Llavero del sistema | firma y secretos | `keystore-os` (por defecto) | experimental | [Módulos](docs/es/modules.md#llavero-del-sistema) |
 | Archivo cifrado | firma y secretos | `keystore-file` (por defecto) | experimental | [Módulos](docs/es/modules.md#archivo-cifrado) |
 
