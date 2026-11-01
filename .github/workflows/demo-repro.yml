@@ -1,0 +1,31 @@
+name: Demo ingest reproduction
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/demo-repro.yml'
+      - 'crates/bin/tests/demo_pty.rs'
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: demo-repro-macos-${{ hashFiles('Cargo.lock') }}
+      - run: cargo test -p irmind --test demo_pty demo_ingest_completion_is_visible_and_followup_command_responds --locked -- --nocapture --test-threads=1
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: demo-repro-windows-${{ hashFiles('Cargo.lock') }}
+      - run: cargo test -p irmind --test demo_pty demo_ingest_completion_is_visible_and_followup_command_responds --locked -- --nocapture --test-threads=1
