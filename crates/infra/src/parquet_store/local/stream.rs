@@ -7,6 +7,7 @@ use super::{
 
 pub(super) struct StreamInput<'a> {
     pub(super) source: &'a mut File,
+    pub(super) sample: &'a [u8],
     pub(super) relative_path: &'a str,
     pub(super) hash: [u8; 32],
     pub(super) hash_value: &'a EvidenceHash,
@@ -23,6 +24,7 @@ pub(super) fn stream_records(
 ) -> Result<(ParseReport, BTreeMap<Partition, PartitionSinks>), AppError> {
     let StreamInput {
         source,
+        sample,
         relative_path,
         hash,
         hash_value,
@@ -33,13 +35,6 @@ pub(super) fn stream_records(
         profile,
         legacy_entities,
     } = input;
-    source.seek(SeekFrom::Start(0)).map_err(|error| {
-        storage_phase(
-            storage(error),
-            irmind_app::AdapterStorageError::CannotOpenParquetSource,
-        )
-    })?;
-    let mut second_pass = HashingReader::new(source);
     let mut open: BTreeMap<Partition, PartitionSinks> = BTreeMap::new();
     let mut grouped: BTreeMap<Partition, Vec<RecordRow>> = BTreeMap::new();
     let mut buffered = 0usize;
@@ -66,23 +61,19 @@ pub(super) fn stream_records(
         }
         Ok(())
     };
-    let report = parser
-        .parse_reader_report(relative_path, &mut second_pass, hash, cancel, &mut emit)
-        .map_err(|error| {
-            storage_phase(
-                error,
-                irmind_app::AdapterStorageError::CannotParseParquetSource,
-            )
-        })?;
-    second_pass.drain(cancel).map_err(|error| {
-        storage_phase(
-            error,
-            irmind_app::AdapterStorageError::CannotOpenParquetSource,
-        )
-    })?;
-    if second_pass.bytes != size || second_pass.finish() != hash {
-        return Err(AppError::EvidenceMismatch(hash_value.as_str().into()));
-    }
+    let report = parse_and_verify(
+        VerifiedInput {
+            source,
+            sample,
+            relative_path,
+            parser,
+            hash,
+            hash_value,
+            size,
+            cancel,
+        },
+        &mut emit,
+    )?;
     if cancel.is_cancelled() {
         return Err(AppError::Cancelled);
     }
@@ -98,6 +89,69 @@ pub(super) fn stream_records(
         return Err(invalid_source());
     }
     Ok((report, open))
+}
+
+struct VerifiedInput<'a> {
+    source: &'a mut File,
+    sample: &'a [u8],
+    relative_path: &'a str,
+    parser: &'a dyn StreamingEventParser,
+    hash: [u8; 32],
+    hash_value: &'a EvidenceHash,
+    size: u64,
+    cancel: &'a CancellationToken,
+}
+
+fn parse_and_verify(
+    input: VerifiedInput<'_>,
+    emit: &mut dyn FnMut(irmind_domain::Tainted<GraphRecord>) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
+    let VerifiedInput {
+        source,
+        sample,
+        relative_path,
+        parser,
+        hash,
+        hash_value,
+        size,
+        cancel,
+    } = input;
+    source.seek(SeekFrom::Start(0)).map_err(storage)?;
+    if parser.prefers_local_file(relative_path, sample) {
+        let report = parser
+            .parse_local_file_report(relative_path, source, hash, cancel, emit)
+            .map_err(|error| {
+                storage_phase(
+                    error,
+                    irmind_app::AdapterStorageError::CannotParseParquetSource,
+                )
+            })?;
+        source.seek(SeekFrom::Start(0)).map_err(storage)?;
+        let (observed_hash, observed_size) = ParquetStore::hash_reader(source, cancel)?;
+        if observed_size != size || observed_hash != hash {
+            return Err(AppError::EvidenceMismatch(hash_value.as_str().into()));
+        }
+        return Ok(report);
+    }
+    let mut second_pass = HashingReader::new(source);
+    let report = parser
+        .parse_reader_report(relative_path, &mut second_pass, hash, cancel, emit)
+        .map_err(|error| {
+            storage_phase(
+                error,
+                irmind_app::AdapterStorageError::CannotParseParquetSource,
+            )
+        })?;
+    second_pass.drain(cancel).map_err(|error| {
+        storage_phase(
+            error,
+            irmind_app::AdapterStorageError::CannotOpenParquetSource,
+        )
+    })?;
+    if second_pass.bytes != size || second_pass.finish() != hash {
+        return Err(AppError::EvidenceMismatch(hash_value.as_str().into()));
+    }
+    Ok(report)
 }
 
 fn flush_batch(

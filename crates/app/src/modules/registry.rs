@@ -104,6 +104,12 @@ impl StreamingEventParser for RebuildParser {
         "signed-parser-router"
     }
 
+    fn prefers_local_file(&self, source: &str, sample: &[u8]) -> bool {
+        self.sources
+            .get(source)
+            .is_some_and(|parser| parser.prefers_local_file(source, sample))
+    }
+
     fn version_for_source(&self, source: &str) -> Result<&'static str, AppError> {
         self.sources
             .get(source)
@@ -127,6 +133,22 @@ impl StreamingEventParser for RebuildParser {
                 "source has no signed parser selection".into(),
             ))?
             .parse_reader(source, reader, evidence_hash, cancel, emit)
+    }
+
+    fn parse_local_file_report(
+        &self,
+        source: &str,
+        file: &mut std::fs::File,
+        evidence_hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<crate::ParseReport, AppError> {
+        self.sources
+            .get(source)
+            .ok_or(AppError::Policy(
+                "source has no signed parser selection".into(),
+            ))?
+            .parse_local_file_report(source, file, evidence_hash, cancel, emit)
     }
 }
 

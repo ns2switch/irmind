@@ -96,7 +96,7 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 **Use in the TUI:** Run `/objects <source> <s3|gs|az> <bucket-or-container> <prefix> <from-UTC> <to-UTC>` to list up to 20 objects and see the estimated bytes. Narrow a truncated listing. Run `/object-read <number>` to confirm the selected version and transfer. Add `--copy-original` to keep an explicit local original. The activity indicator shows transferred bytes and elapsed time; Esc or `/pause` cancels. A repeated read checks an already signed original against its manifest.
 
-**Limits:** Reads require a complete signed listing of the exact object and version, a per-read byte ceiling, and the case transfer budget. A listing page over 8 MiB is rejected before parsing. Above `object_transfer_approval_bytes`, a second signed analyst approval is required. Failed transfers consume their reserved budget. Cloud bytes are spooled once into a private temporary directory and removed after local conversion. A repeated read in an open case rechecks the signed original and may incur provider charges. For offline verification after sealing, explicitly retain a local copy before sealing. No ambient cloud profiles, CLI sessions, or instance credentials are used. `object_store` exposes ETags but not a portable native provider checksum; the manifest records the ETag as an opaque version guard and signs IRMind's own SHA-256.
+**Limits:** Reads require a complete signed listing of the exact object and version, a per-read byte ceiling, and the case transfer budget. A listing page over 8 MiB is rejected before parsing. Above `object_transfer_approval_bytes`, a second signed analyst approval is required. Failed transfers consume their reserved budget. Cloud bytes are spooled once under the case data directory after a free-space check against the signed size, then removed on success, error, or cancellation. A repeated read in an open case rechecks the signed original and may incur provider charges. For offline verification after sealing, explicitly retain a local copy before sealing. No ambient cloud profiles, CLI sessions, or instance credentials are used. `object_store` exposes ETags but not a portable native provider checksum; the manifest records the ETag as an opaque version guard and signs IRMind's own SHA-256.
 
 ## CrowdStrike
 
@@ -164,7 +164,7 @@ The mapping follows the [official ECS field reference](https://www.elastic.co/do
 
 **Does:** Detects OCSF JSON (including pretty-printed records) or NDJSON from `class_uid`, `category_uid`, and `metadata.version`. Maps Authentication, API Activity, Network Activity, Process Activity, File Activity, and Detection Finding. It also reads OCSF Parquet exports, including Security Lake files, through the existing Parquet reader. Unknown fields remain local as attributes.
 
-**Permission:** Read access to the selected local file and write access to a private temporary spool for Parquet input. The spool is deleted when parsing ends.
+**Permission:** Read access to the selected local file. Local OCSF Parquet is read directly with random access, without a parser-created copy. Cloud object streams use a private, automatically removed spool inside the case data directory before parsing.
 
 **Configure:** Compiled by default with `parser-ocsf`. OCSF JSON is selected automatically on a unique high-confidence match. Parquet magic receives low confidence because the header alone cannot prove its schema, so the analyst must confirm it. The choice is signed.
 

@@ -3,6 +3,7 @@ use crate::{
     SignedEntry, SignedOperation, Tainted, TimelineEvent,
 };
 use irmind_domain::{ParquetArtifactV1, SourceManifestV1};
+use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 pub trait CaseLock: Send {}
@@ -191,6 +192,11 @@ pub trait EventParser: Send + Sync {
 pub trait StreamingEventParser: Send + Sync {
     fn streaming_version(&self) -> &'static str;
     fn parser_name(&self) -> &'static str;
+    /// A parser may request random access only when the bounded source sample
+    /// identifies a format that needs it. Other parsers stay streaming.
+    fn prefers_local_file(&self, _source: &str, _sample: &[u8]) -> bool {
+        false
+    }
     fn version_for_source(&self, _source: &str) -> Result<&'static str, AppError> {
         Ok(self.streaming_version())
     }
@@ -217,6 +223,19 @@ pub trait StreamingEventParser: Send + Sync {
             rejected: 0,
             samples: Vec::new(),
         })
+    }
+
+    /// Optional local-file route. The caller rehashes the complete file after
+    /// parsing and rejects any change before signing the source manifest.
+    fn parse_local_file_report(
+        &self,
+        source: &str,
+        file: &mut File,
+        evidence_hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        self.parse_reader_report(source, file, evidence_hash, cancel, emit)
     }
 }
 
@@ -267,6 +286,21 @@ pub struct PreparedSource {
 /// The local adapter owns all paths and derived files. The application signs
 /// the returned manifests before any derived file is exposed to model tools.
 pub trait LargeCaseStore: Send + Sync {
+    /// Creates a private, automatically removed object spool under this case's
+    /// data directory. Implementations check available space before creating it.
+    fn create_object_spool(
+        &self,
+        _case_id: &CaseId,
+        _expected_bytes: u64,
+    ) -> Result<tempfile::NamedTempFile, AppError> {
+        Err(AppError::Policy("case spool is unavailable".into()))
+    }
+
+    /// Removes orphaned spools while the caller holds the case lock.
+    fn clean_orphan_spools(&self, _case_id: &CaseId) -> Result<usize, AppError> {
+        Ok(0)
+    }
+
     fn prepare_local(
         &self,
         case_id: &CaseId,

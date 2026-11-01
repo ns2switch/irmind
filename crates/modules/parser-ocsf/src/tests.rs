@@ -152,7 +152,7 @@ fn excessive_field_count_is_rejected() -> Result<(), AppError> {
 }
 
 #[test]
-fn parquet_input_uses_bounded_private_spool() -> Result<(), Box<dyn std::error::Error>> {
+fn local_parquet_file_is_read_without_creating_a_spool() -> Result<(), Box<dyn std::error::Error>> {
     let metadata = StructArray::from(vec![(
         Arc::new(Field::new("version", DataType::Utf8, false)),
         Arc::new(StringArray::from(vec!["1.4.0"])) as ArrayRef,
@@ -174,13 +174,19 @@ fn parquet_input_uses_bounded_private_spool() -> Result<(), Box<dyn std::error::
             Arc::new(StringArray::from(vec!["Synthetic activity"])) as ArrayRef,
         ],
     )?;
-    let mut file = tempfile::tempfile()?;
+    let root = tempfile::tempdir()?;
+    let path = root.path().join("source.parquet");
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(&path)?;
     let mut writer = ArrowWriter::try_new(file.try_clone()?, schema, None)?;
     writer.write(&batch)?;
     writer.close()?;
     file.seek(SeekFrom::Start(0))?;
     let mut records = Vec::new();
-    let count = OcsfParser.parse_reader(
+    let report = OcsfParser.parse_local_file_report(
         "episode.parquet",
         &mut file,
         [9; 32],
@@ -190,24 +196,42 @@ fn parquet_input_uses_bounded_private_spool() -> Result<(), Box<dyn std::error::
             Ok(())
         },
     )?;
-    assert_eq!(count, 1);
+    assert_eq!(report.accepted, 1);
     assert_eq!(records.len(), 1);
+    assert_eq!(std::fs::read_dir(root.path())?.count(), 1);
     Ok(())
 }
 
 #[test]
-fn oversized_parquet_footer_is_rejected_before_decoder_allocation() {
+fn nonseekable_parquet_is_rejected_without_implicit_system_spool() {
+    let result = OcsfParser.parse_reader_report(
+        "remote.parquet",
+        &mut Cursor::new(b"PAR1synthetic"),
+        [0; 32],
+        &CancellationToken::new(),
+        &mut |_| Ok(()),
+    );
+    assert!(matches!(result, Err(AppError::Policy(_))));
+}
+
+#[test]
+fn oversized_parquet_footer_is_rejected_before_decoder_allocation()
+-> Result<(), Box<dyn std::error::Error>> {
     let mut forged = b"PAR1".to_vec();
     forged.extend_from_slice(&u32::MAX.to_le_bytes());
     forged.extend_from_slice(b"PAR1");
-    let result = OcsfParser.parse_reader(
+    let mut file = tempfile::tempfile()?;
+    std::io::Write::write_all(&mut file, &forged)?;
+    file.seek(SeekFrom::Start(0))?;
+    let result = OcsfParser.parse_local_file_report(
         "forged.parquet",
-        &mut Cursor::new(forged),
+        &mut file,
         [0; 32],
         &CancellationToken::new(),
         &mut |_| Ok(()),
     );
     assert!(result.is_err());
+    Ok(())
 }
 
 #[test]
@@ -238,7 +262,7 @@ fn oversized_parquet_row_keeps_only_a_bounded_sample() -> Result<(), Box<dyn std
     writer.write(&batch)?;
     writer.close()?;
     file.seek(SeekFrom::Start(0))?;
-    let report = OcsfParser.parse_reader_report(
+    let report = OcsfParser.parse_local_file_report(
         "oversized.parquet",
         &mut file,
         [7; 32],

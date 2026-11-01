@@ -11,6 +11,18 @@ use super::{
 use std::io::Read as _;
 
 impl LargeCaseStore for ParquetStore {
+    fn create_object_spool(
+        &self,
+        case_id: &CaseId,
+        expected_bytes: u64,
+    ) -> Result<tempfile::NamedTempFile, AppError> {
+        self.create_private_object_spool(case_id, expected_bytes)
+    }
+
+    fn clean_orphan_spools(&self, case_id: &CaseId) -> Result<usize, AppError> {
+        self.remove_orphaned_object_spools(case_id)
+    }
+
     fn prepare_local(
         &self,
         case_id: &CaseId,
@@ -45,6 +57,7 @@ impl LargeCaseStore for ParquetStore {
         })?;
         let (parse_report, open) = stream_records(StreamInput {
             source: &mut source,
+            sample: &format_sample,
             relative_path,
             hash,
             hash_value: &hash_value,

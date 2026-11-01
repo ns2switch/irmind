@@ -7,7 +7,7 @@ use irmind_app::{
 };
 use irmind_domain::Tainted;
 use serde_json::Value;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
 mod json_stream;
 mod parquet_input;
@@ -93,6 +93,32 @@ impl StreamingEventParser for OcsfParser {
         "parser-ocsf"
     }
 
+    fn prefers_local_file(&self, _source: &str, sample: &[u8]) -> bool {
+        sample.starts_with(b"PAR1")
+    }
+
+    fn parse_local_file_report(
+        &self,
+        source: &str,
+        file: &mut std::fs::File,
+        evidence_hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        file.seek(SeekFrom::Start(0))
+            .map_err(|_| policy_error("cannot seek OCSF source"))?;
+        let mut magic = [0; 4];
+        file.read_exact(&mut magic)
+            .map_err(|_| policy_error("cannot read OCSF source"))?;
+        file.seek(SeekFrom::Start(0))
+            .map_err(|_| policy_error("cannot seek OCSF source"))?;
+        if &magic == b"PAR1" {
+            parquet_input::parse(source, file, evidence_hash, cancel, emit)
+        } else {
+            self.parse_reader_report(source, file, evidence_hash, cancel, emit)
+        }
+    }
+
     fn streaming_version(&self) -> &'static str {
         "ocsf-stream-v1"
     }
@@ -131,7 +157,9 @@ impl StreamingEventParser for OcsfParser {
         }
         let input = Cursor::new(magic[..read].to_vec()).chain(reader);
         if read == magic.len() && &magic == b"PAR1" {
-            parquet_input::parse(source, input, evidence_hash, cancel, emit)
+            Err(policy_error(
+                "OCSF Parquet requires a seekable local or case-spooled file",
+            ))
         } else {
             json_stream::parse(source, input, evidence_hash, cancel, emit)
         }
