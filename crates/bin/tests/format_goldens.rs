@@ -163,7 +163,11 @@ fn parser_goldens(out: &mut Goldens) {
         let source = format!("{name}.log");
         let path = root.path().join(&source);
         fs::write(&path, bytes).unwrap();
-        fs::File::open(&path)
+        // Windows requires a writable handle for setting file timestamps.
+        fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
             .unwrap()
             .set_modified(
                 std::time::UNIX_EPOCH + std::time::Duration::from_secs(FixedClock.now().unwrap()),
