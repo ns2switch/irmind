@@ -41,7 +41,9 @@ pub(super) fn validate_threats(
     Ok(())
 }
 pub(super) fn encode(value: &Value) -> Result<Vec<u8>, AppError> {
-    serde_json::to_vec(value).map_err(|_| {
+    let mut value = value.clone();
+    value.sort_all_objects();
+    serde_json::to_vec(&value).map_err(|_| {
         AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
             irmind_app::AdapterStorageError::CannotEncodeSentinelOneEvidence,
         ))

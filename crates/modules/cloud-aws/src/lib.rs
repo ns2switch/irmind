@@ -185,13 +185,15 @@ impl AwsCloudTrail {
             .filter_map(|event| event.cloud_trail_event())
             .map(|record| serde_json::from_str::<Value>(record).unwrap_or_else(|_| json!(record)))
             .collect::<Vec<_>>();
-        let raw = serde_json::to_vec(&json!({
+        let mut value = json!({
             "source": self.source_id,
             "account": request.account,
             "events": events,
             "truncated": output.next_token().is_some()
-        }))
-        .map_err(|error| AppError::Storage(error.to_string()))?;
+        });
+        value.sort_all_objects();
+        let raw =
+            serde_json::to_vec(&value).map_err(|error| AppError::Storage(error.to_string()))?;
         if raw.len() > 5_000_000 {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::CloudTrailResponseExceeds5MB,
@@ -242,7 +244,7 @@ impl AwsCloudTrail {
     async fn identity_async(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
         let (account, kind, name) = self.identity_request(call)?;
         self.verify_aws_identity(account).await?;
-        let value = match kind {
+        let mut value = match kind {
             "role" => {
                 let output = self
                     .iam
@@ -287,6 +289,7 @@ impl AwsCloudTrail {
                 )));
             }
         };
+        value.sort_all_objects();
         serde_json::to_vec(&value).map_err(|error| AppError::Storage(error.to_string()))
     }
 }
