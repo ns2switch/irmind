@@ -109,6 +109,28 @@ impl RemoteScopeStep {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum HintMode {
+    Enabled,
+    Disabled,
+}
+
+impl HintMode {
+    fn enabled(self) -> bool {
+        self == Self::Enabled
+    }
+}
+
+impl From<bool> for HintMode {
+    fn from(enabled: bool) -> Self {
+        if enabled {
+            Self::Enabled
+        } else {
+            Self::Disabled
+        }
+    }
+}
+
 pub(crate) struct HomeState {
     rows: Vec<CaseRow>,
     pub(crate) mode: Mode,
@@ -130,6 +152,7 @@ pub(crate) struct HomeState {
     menu_query: Option<String>,
     palette_return: Option<Mode>,
     help_return: Mode,
+    help_topic: Option<String>,
     help_selected: usize,
     confirm_exit: crate::ExitConfirmation,
     selected_option: usize,
@@ -148,6 +171,7 @@ pub(crate) struct HomeState {
     module_edit: Option<ModuleEdit>,
     pub(crate) pending_module_change: Option<ConfigChange>,
     resume_last_case: crate::ResumeMode,
+    show_hints: HintMode,
 }
 
 struct UiSelection {
@@ -200,6 +224,7 @@ impl HomeState {
             menu_query: None,
             palette_return: None,
             help_return: Mode::List,
+            help_topic: None,
             help_selected: 0,
             confirm_exit: crate::ExitConfirmation::Inactive,
             selected_option: 0,
@@ -218,6 +243,7 @@ impl HomeState {
             module_edit: None,
             pending_module_change: None,
             resume_last_case: crate::ResumeMode::Enabled,
+            show_hints: HintMode::Enabled,
         }
     }
 
@@ -426,6 +452,7 @@ fn prepare_home_state(
             .collect();
     }
     state.resume_last_case = launch.resume_last_case;
+    state.show_hints = io_ops.show_hints().into();
     state.ui_selection.mouse_capture = launch.mouse_capture;
     state.theme_choice = launch.theme.unwrap_or("auto").into();
     state.overrides_active = launch.overrides_active;

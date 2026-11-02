@@ -29,6 +29,7 @@ use std::{
 
 const EVENTS: &[u8] =
     include_bytes!("../../modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json");
+static DEMO_VERIFICATION_PARSER: JsonParser = JsonParser;
 
 fn demo_parser_catalog() -> Result<ParserCatalog, AppError> {
     let mut registry = ModuleRegistry::new();
@@ -175,6 +176,15 @@ impl WorkspaceIo for DemoIo {
             events.0, events.1, entities.0, entities.1, techniques.0, techniques.1
         )))
     }
+    fn demo_export_identity(&self) -> Option<(PathBuf, String)> {
+        Some((
+            self.source.parent()?.join("demo-export.irmind.json"),
+            self.fingerprint.clone(),
+        ))
+    }
+    fn demo_source_root(&self) -> Option<PathBuf> {
+        self.source.parent().map(Path::to_path_buf)
+    }
     fn input_files(&self, root: &Path) -> Result<Vec<PathBuf>> {
         self.checked_source(root)?;
         Ok(vec![root.to_path_buf()])
@@ -209,6 +219,12 @@ impl WorkspaceIo for DemoIo {
         bail!("demo cannot save files outside its temporary directory")
     }
     fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String> {
+        let Some((allowed, fingerprint)) = self.demo_export_identity() else {
+            bail!("demo export destination is unavailable");
+        };
+        if path != allowed || expected_key != fingerprint {
+            bail!("demo verifies only its own temporary export and analyst key");
+        }
         let (fingerprint, entries) =
             irmind_app::verify_export(&LocalExportVerifier, path, Some(expected_key))?;
         Ok(format!(
@@ -218,8 +234,16 @@ impl WorkspaceIo for DemoIo {
     fn case_exporter(&self) -> &dyn CaseExporter {
         self.store.as_ref()
     }
+    fn large_case_exporter(&self) -> Option<&dyn irmind_app::LargeCaseExporter> {
+        Some(self.store.as_ref())
+    }
     fn large_case_store(&self) -> Option<&dyn irmind_app::LargeCaseStore> {
         Some(self.store.as_ref())
+    }
+    fn streaming_parser(&self) -> Option<&dyn irmind_app::StreamingEventParser> {
+        // Verification requires the existing large-case use case's parser port.
+        // Demo ingest still selects the parser through ParserCatalog.
+        Some(&DEMO_VERIFICATION_PARSER)
     }
     fn keystore_status(&self) -> Result<KeystoreStatus> {
         Ok(KeystoreStatus {

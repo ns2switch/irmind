@@ -1,4 +1,5 @@
 use super::conversation::Conversation;
+use super::demo_guide::{DemoEvent, DemoGuide};
 use super::{Confirmation, Instant, KeyCode, KeyModifiers, PathPicker};
 use irmind_app::{
     ApprovalRequest, ApprovalSource, Case, Finding, FindingKind, SignedEntry, SignedOperation,
@@ -83,6 +84,8 @@ pub(super) struct CaseState {
     pub object_listing_window: Option<(String, String)>,
     pub object_listing_after_seq: u64,
     pub conversation: Conversation,
+    pub demo_guide: Option<DemoGuide>,
+    pub demo_pending_event: Option<DemoEvent>,
     pub audit_cursor: usize,
     pub live_reply_cutoff_seq: Option<u64>,
     pub pending_final_reply: Option<String>,
@@ -357,6 +360,8 @@ mod tests {
             object_listing_window: None,
             object_listing_after_seq: 0,
             conversation: Conversation::new(false),
+            demo_guide: None,
+            demo_pending_event: None,
             audit_cursor: 0,
             live_reply_cutoff_seq: None,
             pending_final_reply: None,

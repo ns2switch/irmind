@@ -167,43 +167,59 @@ impl CaseRuntime<'_, '_, '_> {
                     (self.state.menu_selected + 1).min(options.len().saturating_sub(1));
             }
             KeyCode::Enter if !options.is_empty() => {
-                let selected = &options[self.state.menu_selected.min(options.len() - 1)];
-                let chosen = if prefix.is_some() {
-                    format!("{command} {selected}")
-                } else {
-                    format!("/{selected}")
-                };
-                if command == "/ingest"
-                    && (selected == "--parser"
-                        || (selected.starts_with("--parser ")
-                            && selected.split_whitespace().count() == 2))
-                {
-                    self.state.input = format!("{chosen} ");
-                    self.state.menu_query = None;
-                    self.state.menu_selected = 0;
-                    return Ok(Some(false));
-                }
-                if prefix.is_some()
-                    && !matches!(
-                        command,
-                        "/approve" | "/confirm" | "/evidence" | "/ingest" | "/module"
-                    )
-                {
-                    self.state.input = chosen;
-                    self.state.menu_open = false;
-                    return Ok(Some(false));
-                }
-                self.state.menu_open = false;
-                self.state.input = chosen;
-                let action = update(
-                    &mut self.state,
-                    CaseMessage::Key(KeyCode::Enter, KeyModifiers::NONE, self.active.is_some()),
-                );
-                return self.apply_action(action).map(Some);
+                return self.handle_menu_enter(command, prefix, &source, &options);
             }
             _ => return Ok(None),
         }
         Ok(Some(false))
+    }
+
+    fn handle_menu_enter(
+        &mut self,
+        command: &str,
+        prefix: Option<&str>,
+        source: &str,
+        options: &[String],
+    ) -> Result<Option<bool>> {
+        let selected = &options[self.state.menu_selected.min(options.len() - 1)];
+        let exact = prefix.is_none()
+            && command_registry::matches(source)
+                .iter()
+                .any(|item| source == format!("/{}", item.name));
+        let chosen = if exact {
+            source.to_owned()
+        } else if prefix.is_some() {
+            format!("{command} {selected}")
+        } else {
+            format!("/{selected}")
+        };
+        if command == "/ingest"
+            && (selected == "--parser"
+                || (selected.starts_with("--parser ") && selected.split_whitespace().count() == 2))
+        {
+            self.state.input = format!("{chosen} ");
+            self.state.menu_query = None;
+            self.state.menu_selected = 0;
+            return Ok(Some(false));
+        }
+        if prefix.is_some()
+            && chosen != self.state.input
+            && !matches!(
+                command,
+                "/approve" | "/confirm" | "/evidence" | "/ingest" | "/module"
+            )
+        {
+            self.state.input = chosen;
+            self.state.menu_open = false;
+            return Ok(Some(false));
+        }
+        self.state.menu_open = false;
+        self.state.input = chosen;
+        let action = update(
+            &mut self.state,
+            CaseMessage::Key(KeyCode::Enter, KeyModifiers::NONE, self.active.is_some()),
+        );
+        self.apply_action(action).map(Some)
     }
 
     fn menu_options(&self, source: &str) -> Vec<String> {

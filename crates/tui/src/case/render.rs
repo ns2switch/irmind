@@ -11,6 +11,27 @@ pub(crate) use panels::{approval_panel, entity_panel};
 use panels::{overlay_text, panel_text};
 
 impl CaseRuntime<'_, '_, '_> {
+    fn demo_guide_text(&self) -> Result<Option<String>> {
+        self.state
+            .demo_guide
+            .as_ref()
+            .and_then(|guide| {
+                guide.panel(
+                    self.state
+                        .approvals
+                        .first()
+                        .map(|approval| approval.id.as_str()),
+                    self.state
+                        .findings
+                        .iter()
+                        .find(|finding| !finding.confirmed && !finding.dismissed)
+                        .map(|finding| finding.id.as_str()),
+                )
+            })
+            .map(|text| self.engine.guard.screen(&text).map(|safe| safe.text))
+            .transpose()
+            .map_err(Into::into)
+    }
     fn refresh_usage(&mut self) -> Result<()> {
         let last_seq = self.state.entries.last().map_or(0, |entry| entry.seq);
         if last_seq == self.state.usage_cache_seq {
@@ -159,9 +180,14 @@ impl CaseRuntime<'_, '_, '_> {
                     .map(|visible| visible.text)
             })
             .transpose()?;
+        let guide = self.demo_guide_text()?;
         let size = self.terminal.size()?;
-        let chat_area =
-            super::view::conversation_area(size.into(), &shown_input, self.state.sidebar_visible);
+        let chat_area = super::view::conversation_area(
+            size.into(),
+            &shown_input,
+            self.state.sidebar_visible,
+            guide.is_some(),
+        );
         self.state
             .conversation
             .set_viewport(usize::from(chat_area.width), usize::from(chat_area.height));
@@ -183,6 +209,7 @@ impl CaseRuntime<'_, '_, '_> {
             self.terminal,
             &CaseFrame {
                 title: &title,
+                guide: guide.as_deref(),
                 messages: "",
                 visible_lines: Some(&visible_lines),
                 input: &shown_input,

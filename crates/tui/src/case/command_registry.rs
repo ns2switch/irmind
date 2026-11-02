@@ -29,7 +29,7 @@ impl Command {
             "approve" | "deny" | "edit" => " <id>",
             "settings" => " [model|connectors|keystore|preferences]",
             "open" => " <case title or ID>",
-            "demo" => " [check]",
+            "demo" => " [next|back|hint|skip|hide|show|check|exit]",
             "evidence" | "raw" => " <hash>",
             "ingest" => " [--parser <name>] <path>",
             "objects" => " <source> <scheme> <container> <prefix> <from> <to>",
@@ -99,6 +99,43 @@ pub(crate) fn help() -> String {
     output
 }
 
+pub(crate) fn help_for(name: &str) -> String {
+    let name = name.trim().trim_start_matches('/');
+    let Some(command) = COMMANDS
+        .iter()
+        .find(|command| command.slash && command.name == name)
+    else {
+        return format!("Unknown command /{name}. Use /help to list commands.");
+    };
+    let example = match name {
+        "demo" => "/demo next",
+        "ingest" => "/ingest examples/cloudtrail-alert.json",
+        "search" => "/search 203.0.113.77",
+        "neighbors" => "/neighbors ip 203.0.113.77",
+        "settings" => "/settings model",
+        "help" => "/help search",
+        _ => "",
+    };
+    let example = if example.is_empty() {
+        format!("/{name}{}", command.syntax())
+    } else {
+        example.into()
+    };
+    let related = COMMANDS
+        .iter()
+        .filter(|other| other.slash && other.name != name && other.category() == command.category())
+        .take(3)
+        .map(|other| format!("/{}", other.name))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "/{}{}\n{}\nExample: {example}\nRelated: {related}",
+        command.name,
+        command.syntax(),
+        command.description,
+    )
+}
+
 pub(super) fn shortcut_name(code: KeyCode, modifiers: KeyModifiers) -> Option<&'static str> {
     if modifiers.contains(KeyModifiers::ALT) {
         return None;
@@ -160,6 +197,12 @@ pub(super) fn argument_candidates(
         return super::picker::safe_completions(prefix);
     }
     let values: Vec<String> = match command {
+        "/demo" => [
+            "next", "back", "hint", "skip", "hide", "show", "check", "exit",
+        ]
+        .iter()
+        .map(|value| (*value).into())
+        .collect(),
         "/approve" | "/deny" | "/edit" => approvals.to_vec(),
         "/confirm" | "/dismiss" => findings.to_vec(),
         "/evidence" | "/evidence-save" | "/raw" => hashes.to_vec(),
@@ -272,6 +315,18 @@ mod tests {
             )
             .iter()
             .any(|path| path.ends_with("cloudtrail-alert.json"))
+        );
+    }
+
+    #[test]
+    fn command_help_includes_example_and_related_actions() {
+        let guide = help_for("demo");
+        assert!(guide.contains("Example: /demo next"));
+        assert!(guide.contains("Related:"));
+        assert!(help_for("unknown").contains("Unknown command"));
+        assert_eq!(
+            argument_candidates("/demo ne", &[], &[], &[], &[]),
+            vec!["next"]
         );
     }
 }

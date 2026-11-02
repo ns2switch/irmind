@@ -1,5 +1,6 @@
 mod input;
 use super::CaseExit;
+use super::demo_guide::DemoEvent;
 use super::state::{CaseMessage, CaseState, update};
 use super::{
     ActiveTask, CancellationToken, CaseId, CaseWorkflow, Confirmation, CrosstermBackend, Duration,
@@ -154,6 +155,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                             });
                             self.state.running_since = None;
                             self.state.progress_status = None;
+                            self.state.demo_pending_event = None;
                             update(
                                 &mut self.state,
                                 CaseMessage::TaskFinished(
@@ -188,6 +190,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
         self.state.running_since = None;
         self.state.model_round = None;
         self.state.progress_status = None;
+        self.state.demo_pending_event = None;
         Ok(())
     }
 
@@ -236,6 +239,43 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     CaseMessage::TaskFinished(format!("{label}: {text}")),
                 );
             }
+        }
+        self.record_demo_task(label)?;
+        Ok(())
+    }
+
+    fn record_demo_task(&mut self, label: &str) -> Result<()> {
+        let parser = if label == "Ingest" && self.state.demo_guide.is_some() {
+            self.engine
+                .audit_log
+                .entries(self.id)?
+                .into_iter()
+                .rev()
+                .find(|entry| entry.kind == irmind_app::AuditEventKind::SourceManifestV2)
+                .map(|entry| irmind_app::SourceManifestV2::decode(&entry.payload))
+                .transpose()
+                .map_err(|error| anyhow::anyhow!("Invalid signed demo manifest: {error:?}"))?
+                .map(|manifest| (manifest.parser_id, manifest.confidence))
+        } else {
+            None
+        };
+        let Some(guide) = self.state.demo_guide.as_mut() else {
+            return Ok(());
+        };
+        if let Some((name, confidence)) = parser {
+            guide.record_ingest(&name, confidence);
+        }
+        let event = match label {
+            "IRMind" => Some(DemoEvent::QuestionAnswered),
+            "Approval" => Some(DemoEvent::ApprovalResolved),
+            "Verify" | "Verify originals" => Some(DemoEvent::CustodyVerified),
+            "Seal" => Some(DemoEvent::Sealed),
+            "Export" => Some(DemoEvent::Exported),
+            "Verify export" => Some(DemoEvent::ExportVerified),
+            _ => self.state.demo_pending_event.take(),
+        };
+        if let Some(event) = event {
+            guide.record(event);
         }
         Ok(())
     }

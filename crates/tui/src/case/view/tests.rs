@@ -24,6 +24,7 @@ fn narrow_terminal_keeps_prompt_and_new_content_indicator() {
     ];
     let view = CaseFrame {
         title: "Synthetic",
+        guide: None,
         messages: "",
         visible_lines: Some(&lines),
         input: "first line\nsecond line",
@@ -53,9 +54,42 @@ fn narrow_terminal_keeps_prompt_and_new_content_indicator() {
     assert!(shown.contains("1 approval pending"));
     assert!(!shown.contains("Ctrl+B sidebar"));
     assert_eq!(
-        conversation_area(Rect::new(0, 0, 80, 24), view.input, false).width,
+        conversation_area(Rect::new(0, 0, 80, 24), view.input, false, false).width,
         80
     );
+}
+
+#[test]
+fn guided_demo_panel_stays_visible_above_the_conversation() {
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let lines = [Line::from("⏺ Synthetic result")];
+    let view = CaseFrame {
+        title: "Synthetic",
+        guide: Some("Demo 3/10 · Evidence\nDo: /demo next\nWhy: The original stays in place."),
+        messages: "",
+        visible_lines: Some(&lines),
+        input: "",
+        input_focused: true,
+        panel: "",
+        overlay: None,
+        menu: None,
+        tab: 0,
+        sidebar_visible: false,
+        sidebar_scroll: 0,
+        overlay_scroll: 0,
+        new_content: false,
+        model: "scripted demo model",
+        tokens: 0,
+        cost: "",
+        pending: 0,
+        detections: 0,
+        status: "idle",
+    };
+    draw_case(&mut terminal, &view).unwrap();
+    let shown = screen(&terminal);
+    assert!(shown.contains("Demo 3/10"));
+    assert!(shown.contains("/demo next"));
+    assert!(shown.contains("Synthetic result"));
 }
 
 #[test]
@@ -73,6 +107,7 @@ fn expanded_card_and_scrolled_sidebar_are_visible_in_test_backend() {
     let lines = chat.visible_lines();
     let mut view = CaseFrame {
         title: "Synthetic",
+        guide: None,
         messages: "",
         visible_lines: Some(&lines),
         input: "",
@@ -120,6 +155,7 @@ fn cloud_listing_and_transfer_confirmation_fit_in_a_narrow_terminal() {
     let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
     let view = CaseFrame {
         title: "Synthetic cloud case",
+        guide: None,
         messages: "",
         visible_lines: Some(&lines),
         input: "",
@@ -158,6 +194,7 @@ fn visual_states_have_versioned_terminal_snapshots() {
     let lines0 = chat.visible_lines();
     let mut view = CaseFrame {
         title: "Synthetic case",
+        guide: None,
         messages: "",
         visible_lines: Some(&lines0),
         input: "",
@@ -258,6 +295,7 @@ fn consecutive_model_rounds_have_separate_messages() {
         &mut terminal,
         &CaseFrame {
             title: "Synthetic case",
+            guide: None,
             messages: "",
             visible_lines: Some(&lines),
             input: "",

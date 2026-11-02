@@ -41,7 +41,7 @@ The TUI stores non-secret settings in `config.toml` in the [standard data direct
 
 For Splunk, MISP, CrowdStrike, SentinelOne, and an S3-compatible storage endpoint, `/settings connectors` also accepts an optional CA PEM file. IRMind shows and signs its SHA-256 fingerprint alongside the path. The PEM augments the operating system trust roots; TLS hostname checks remain enabled. The file is read again and its hash checked when the connector starts, so replacing it requires another approval. Clear the path to remove the connector-specific CA. Do not put a private key in this file.
 
-`resume_last_case` defaults to `true`. After startup, the TUI reopens the most recently used open case only if its custody chain verifies. Sealed or deleted cases stay on the home screen; a verification failure appears there as a warning. Use `/settings preferences` to change resumption, mouse capture, or the `auto`, `light`, or `dark` theme. The private `last-case` reference is stored beside `config.toml` and is not part of custody. CLI automation does not resume a case.
+`resume_last_case` and `show_hints` default to `true`. After startup, the TUI reopens the most recently used open case only if its custody chain verifies. Sealed or deleted cases stay on the home screen; a verification failure appears there as a warning. Use `/settings preferences` to change resumption, context hints, mouse capture, or the `auto`, `light`, or `dark` theme. The private `last-case` reference is stored beside `config.toml` and is not part of custody. CLI automation does not resume a case.
 
 For automation, resolution order is **CLI flag > environment variable > config.toml > default**. An override lasts only for that run; the TUI does not silently replace it. The file contains module IDs, models, URLs, source IDs, indexes, regions, and optional pricing, but never credentials or passphrases. Unknown or secret manifest fields fail validation. Example:
 
@@ -50,6 +50,7 @@ version = 1
 llm_module = "llm-openai-compatible"
 mouse_capture = false # optional: leave terminal text selection available
 resume_last_case = true # optional: reopen the last verified open case
+show_hints = true # optional: show guidance for empty cases and pending approvals
 theme = "auto" # optional: auto, light, or dark
 
 [modules.llm-openai-compatible.values]

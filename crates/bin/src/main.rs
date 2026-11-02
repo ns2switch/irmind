@@ -159,6 +159,11 @@ fn compiled_credential_fields() -> Vec<&'static str> {
 }
 
 impl WorkspaceIo for RootWorkspaceIo {
+    fn show_hints(&self) -> bool {
+        self.config_store
+            .load()
+            .map_or(true, |config| config.show_hints.unwrap_or(true))
+    }
     fn parser_catalog(&self) -> Option<&irmind_app::modules::ParserCatalog> {
         Some(&self.parser_catalog)
     }
@@ -345,6 +350,7 @@ impl WorkspaceIo for RootWorkspaceIo {
         }
         let overridden = match &change {
             ConfigChange::SetResumeLastCase(_)
+            | ConfigChange::SetShowHints(_)
             | ConfigChange::SetMouseCapture(_)
             | ConfigChange::SetTheme(_) => false,
             ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),

@@ -9,7 +9,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "help",
-        description: "help",
+        description: "Show commands; /help <command> explains one command",
         shortcut: "",
         slash: true,
     },
@@ -249,7 +249,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "demo",
-        description: "Start a synthetic demo from home; /demo check compares findings",
+        description: "Guide a synthetic investigation; next, back, hint, skip, check or exit",
         shortcut: "",
         slash: true,
     },
