@@ -18,9 +18,21 @@ On Windows, run `.\target\release\irmind.exe` in Windows Terminal. For a release
 
 ## Try it in five minutes
 
-After installing, run `irmind demo`. You can also type `/demo` from the home screen. This starts an isolated temporary case with a small synthetic HuntEval episode, ephemeral signing keys, and a scripted model. No API key, passphrase, account, or network is needed. If a local Ollama model is available and advertises tool support, IRMind offers it as an optional local choice.
+Run `irmind demo` first. You can also type `/demo` from the home screen. It opens an isolated temporary case with a synthetic HuntEval episode, ephemeral signing keys, and a scripted model. No API key, passphrase, account, or network is needed. If a local Ollama model supports tools, you may choose it instead; it stays local.
 
-The case opens while its bundled evidence is ingested. Ask what happened in the synthetic episode. The scripted model proposes a graph lookup, a finding, and a simulated external lookup. The external lookup still waits for your signed approval, but never reaches a real service. Confirm the proposed finding and type `/demo check` for a local comparison with the episode answers; those answers are loaded only for this check and never sent to a model. Exit with `/quit` and confirm. The temporary case, keys, and evidence are deleted. IRMind then points you to `/new` and `/settings` for normal use.
+A fixed guide shows the current step, the exact command, and why it matters. Wait for the initial ingest result before moving on. The ten steps cover the signed case, parser and evidence, local graph queries, a question to the agent, a signed approval, a confirmed finding, `/demo check`, and custody verification, sealing, export, and package verification. The expected HuntEval answers are loaded only when you run `/demo check`; they never enter the model context.
+
+Use `/demo next` after completing a step. `/demo back`, `/demo hint`, `/demo skip`, and `/demo hide` help you navigate; `/demo` shows the guide again. Other commands still work without advancing the current step. `/demo exit` deletes the temporary case, keys, and evidence and points you to `/new` and `/settings`. Use `/help demo` for examples and related commands.
+
+![The fixed demo guide explains the synthetic case and the first action](ux/demo-guide/welcome.png)
+
+![The demo shows the selected parser and detection confidence after ingestion](ux/demo-guide/evidence.png)
+
+![The demo guide suggests local timeline, search, and neighbor queries](ux/demo-guide/explore.png)
+
+![The guide explains why an external lookup waits for signed approval](ux/demo-guide/approval.png)
+
+![The final custody step asks the analyst to verify, seal, export, and verify the package](ux/demo-guide/custody.png)
 
 ## First launch
 
@@ -46,7 +58,7 @@ After the first run, IRMind normally reopens the most recently used open case af
 
 ![Keystore settings showing separate signing and secrets backends and credential presence without values](assets/keystore.png)
 
-![Preferences settings for recent-case resumption, mouse capture, and theme](assets/preferences.png)
+![Preferences settings for recent-case resumption, mouse capture, context hints, and theme](assets/preferences.png)
 
 The offline screenshot fixture lists two illustrative modules; the normal build includes all current product modules.
 
@@ -77,7 +89,7 @@ With a configured SIEM, `/siem-alert` retrieves one scoped alert by ID. The resu
 
 ![Case conversation with a synthetic CloudTrail question and a model reply appearing incrementally](assets/conversation.png)
 
-PgUp/PgDn scroll the focused view. New model text follows the end only while you are there. Up/Down recall prompts when the input is empty. `/help` lists every command and the reserved keys. Printable characters always enter the input field; no letter executes a shortcut. Mouse wheel scrolling is enabled by default. To keep terminal text selection, set `mouse_capture = false` in [configuration](configuration.md) and accept the file change in the TUI.
+PgUp/PgDn scroll the focused view. New model text follows the end only while you are there. Up/Down recall prompts when the input is empty. `/help` lists every command and the reserved keys; `/help <command>` adds an example and related commands. Printable characters always enter the input field; no letter executes a shortcut. Mouse wheel scrolling is enabled by default. To keep terminal text selection, set `mouse_capture = false` in [configuration](configuration.md) and accept the file change in the TUI. Context hints are on by default and can be turned off in `/settings preferences`.
 
 ![Slash-command menu listing available commands and descriptions above the case input](assets/command-menu.png)
 

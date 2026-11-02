@@ -278,6 +278,7 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
         }
         "/help" => {
             state.help_return = state.mode;
+            state.help_topic = None;
             state.help_selected = 0;
             state.mode = Mode::Help;
         }
@@ -294,6 +295,12 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
                 return HomeAction::None;
             };
             return open_settings_section(state, section);
+        }
+        value if value.starts_with("/help ") => {
+            state.help_return = state.mode;
+            state.help_topic = Some(value[6..].trim().to_owned());
+            state.help_selected = 0;
+            state.mode = Mode::Help;
         }
         value if value.starts_with("/open ") => return open_named_case(state, &value[6..]),
         value if value.starts_with("/cases ") => {
@@ -380,13 +387,14 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
             HomeAction::None
         }
         KeyCode::Down => {
-            state.preference_selected = (state.preference_selected + 1).min(2);
+            state.preference_selected = (state.preference_selected + 1).min(3);
             HomeAction::None
         }
         KeyCode::Enter => {
             let change = match state.preference_selected {
                 0 => ConfigChange::SetResumeLastCase(!state.resume_last_case.enabled()),
                 1 => ConfigChange::SetMouseCapture(!state.ui_selection.mouse_capture),
+                2 => ConfigChange::SetShowHints(!state.show_hints.enabled()),
                 _ => ConfigChange::SetTheme(
                     match state.theme_choice.as_str() {
                         "auto" => "light",
@@ -736,6 +744,17 @@ mod tests {
         assert!(irmind_app::Severity::parse(&state.form[1]).is_ok());
         assert!(state.form[2].is_empty());
         assert_eq!(state.scope(), "local evidence only");
+    }
+
+    #[test]
+    fn preference_can_disable_context_hints() {
+        let mut state = HomeState::new(Vec::new(), false);
+        state.mode = Mode::Config;
+        state.preference_selected = 2;
+        assert!(matches!(
+            update(&mut state, KeyCode::Enter),
+            HomeAction::ChangeModule(ConfigChange::SetShowHints(false), true)
+        ));
     }
 
     #[test]

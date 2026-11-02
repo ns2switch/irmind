@@ -19,6 +19,7 @@ pub(crate) mod command_registry;
 mod commands;
 mod confirmation;
 mod conversation;
+mod demo_guide;
 mod markdown;
 mod operation;
 mod picker;
@@ -80,18 +81,7 @@ fn initial_state(
     resumed: bool,
 ) -> Result<CaseState> {
     let case = engine.repo.get_case(id)?;
-    let backend = io_ops.keystore_status()?.signer_backend;
-    let mut case_summary = welcome_summary(&case, model, &backend, resumed);
-    if io_ops.demo_mode() {
-        case_summary.insert_str(0, "Demo · synthetic data · deleted on exit\n");
-    }
-    let mut conversation = Conversation::new(std::env::var_os("NO_COLOR").is_none());
-    conversation.push(Card::new(
-        CardKind::Welcome,
-        concat!("IRMind v", env!("CARGO_PKG_VERSION")),
-        engine.guard.screen(&case_summary)?.text,
-        false,
-    ));
+    let mut conversation = welcome_conversation(engine, &case, model, io_ops, resumed)?;
     let approvals = engine.pending_approvals(id)?;
     let approval_sources = load_approval_sources(engine, id, &approvals)?;
     let findings = engine.findings(id)?;
@@ -104,6 +94,18 @@ fn initial_state(
             graph_timeline_or_notice(engine, id, &mut conversation)?,
         )
     };
+    add_context_hints(
+        &mut conversation,
+        io_ops.show_hints() && !io_ops.demo_mode(),
+        HintContext {
+            no_evidence: no_case_evidence(
+                hashes.is_empty(),
+                entries.iter().map(|entry| entry.kind),
+            ),
+            no_model: model.is_none(),
+            pending_approval: !approvals.is_empty(),
+        },
+    );
     Ok(CaseState {
         case,
         input: String::new(),
@@ -117,6 +119,8 @@ fn initial_state(
         object_listing_window: None,
         object_listing_after_seq: 0,
         conversation,
+        demo_guide: io_ops.demo_mode().then(demo_guide::DemoGuide::new),
+        demo_pending_event: None,
         audit_cursor: 0,
         live_reply_cutoff_seq: None,
         pending_final_reply: None,
@@ -155,6 +159,87 @@ fn initial_state(
         running_since: None,
         progress_status: None,
     })
+}
+
+fn welcome_conversation(
+    engine: &Engine<'_>,
+    case: &irmind_app::Case,
+    model: Option<&dyn LlmPort>,
+    io_ops: &dyn WorkspaceIo,
+    resumed: bool,
+) -> Result<Conversation> {
+    let backend = io_ops.keystore_status()?.signer_backend;
+    let mut case_summary = welcome_summary(case, model, &backend, resumed);
+    if io_ops.demo_mode() {
+        case_summary.insert_str(0, "Demo · synthetic data · deleted on exit\n");
+    }
+    let mut conversation = Conversation::new(std::env::var_os("NO_COLOR").is_none());
+    conversation.push(Card::new(
+        CardKind::Welcome,
+        concat!("IRMind v", env!("CARGO_PKG_VERSION")),
+        engine.guard.screen(&case_summary)?.text,
+        false,
+    ));
+    Ok(conversation)
+}
+
+#[derive(Clone, Copy)]
+struct HintContext {
+    no_evidence: bool,
+    no_model: bool,
+    pending_approval: bool,
+}
+
+fn no_case_evidence(
+    copied_hashes_empty: bool,
+    mut kinds: impl Iterator<Item = AuditEventKind>,
+) -> bool {
+    copied_hashes_empty
+        && !kinds.any(|kind| {
+            matches!(
+                kind,
+                AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2
+            )
+        })
+}
+
+#[cfg(test)]
+mod hint_tests {
+    use super::{AuditEventKind, no_case_evidence};
+
+    #[test]
+    fn signed_source_manifests_count_as_evidence_without_a_local_copy() {
+        assert!(no_case_evidence(true, std::iter::empty()));
+        for kind in [
+            AuditEventKind::SourceManifestV1,
+            AuditEventKind::SourceManifestV2,
+        ] {
+            assert!(!no_case_evidence(true, std::iter::once(kind)));
+        }
+    }
+}
+
+fn add_context_hints(conversation: &mut Conversation, enabled: bool, context: HintContext) {
+    if !enabled {
+        return;
+    }
+    let hints = [
+        (
+            context.no_evidence,
+            "No evidence yet · use /ingest to add a file.",
+        ),
+        (
+            context.no_model,
+            "No model selected · use /settings model to configure one.",
+        ),
+        (
+            context.pending_approval,
+            "Approval pending · use /approvals, then /approve or /deny.",
+        ),
+    ];
+    for (_, hint) in hints.into_iter().filter(|(show, _)| *show) {
+        conversation.push(Card::new(CardKind::Notice, "Hint", hint, false));
+    }
 }
 
 fn graph_timeline_or_notice(

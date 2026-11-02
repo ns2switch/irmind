@@ -13,6 +13,7 @@ use unicode_width::UnicodeWidthStr;
 
 pub(crate) struct CaseFrame<'a> {
     pub title: &'a str,
+    pub guide: Option<&'a str>,
     pub messages: &'a str,
     pub visible_lines: Option<&'a [Line<'static>]>,
     pub input: &'a str,
@@ -42,8 +43,14 @@ pub(crate) fn composer_height(input: &str, width: u16) -> u16 {
     u16::try_from(lines.clamp(1, 5)).unwrap_or(5) + 2
 }
 
-pub(crate) fn conversation_area(area: Rect, input: &str, sidebar_visible: bool) -> Rect {
+pub(crate) fn conversation_area(
+    area: Rect,
+    input: &str,
+    sidebar_visible: bool,
+    guide_visible: bool,
+) -> Rect {
     let sections = Layout::vertical([
+        Constraint::Length(if guide_visible { 6 } else { 0 }),
         Constraint::Min(3),
         Constraint::Length(composer_height(input, area.width)),
         Constraint::Length(1),
@@ -51,9 +58,9 @@ pub(crate) fn conversation_area(area: Rect, input: &str, sidebar_visible: bool) 
     .split(area);
     if sidebar_visible && area.width >= 110 {
         Layout::horizontal([Constraint::Percentage(68), Constraint::Percentage(32)])
-            .split(sections[0])[0]
+            .split(sections[1])[0]
     } else {
-        sections[0]
+        sections[1]
     }
 }
 
@@ -68,18 +75,37 @@ where
         let area = frame.area();
         let theme = Theme::detect();
         let sections = Layout::vertical([
+            Constraint::Length(if view.guide.is_some() { 6 } else { 0 }),
             Constraint::Min(3),
             Constraint::Length(composer_height(view.input, area.width)),
             Constraint::Length(1),
         ])
         .split(area);
-        draw_thread(frame, view, area, sections[0], theme);
-        draw_prompt(frame, view, sections[1], theme);
-        draw_footer(frame, view, sections[2], theme);
-        draw_menu(frame, view, area, sections[1], theme);
+        if let Some(guide) = view.guide {
+            draw_guide(frame, guide, sections[0], theme);
+        }
+        draw_thread(frame, view, area, sections[1], theme);
+        draw_prompt(frame, view, sections[2], theme);
+        draw_footer(frame, view, sections[3], theme);
+        draw_menu(frame, view, area, sections[2], theme);
         draw_overlay(frame, view, area, theme);
     })?;
     Ok(())
+}
+
+fn draw_guide(frame: &mut ratatui::Frame<'_>, guide: &str, area: Rect, theme: Theme) {
+    frame.render_widget(
+        Paragraph::new(guide)
+            .style(Style::default().fg(theme.text))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(theme.accent)),
+            )
+            .wrap(Wrap { trim: false }),
+        area,
+    );
 }
 
 fn draw_thread(

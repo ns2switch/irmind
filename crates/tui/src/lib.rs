@@ -135,6 +135,9 @@ impl From<bool> for ResumeMode {
 /// Filesystem selection is presentation I/O. The composition root supplies the
 /// same bounded, no-follow reader used by the noninteractive ingest command.
 pub trait WorkspaceIo: Send + Sync {
+    fn show_hints(&self) -> bool {
+        true
+    }
     fn demo_mode(&self) -> bool {
         false
     }
@@ -143,6 +146,12 @@ pub trait WorkspaceIo: Send + Sync {
     }
     fn demo_check(&self, _engine: &Engine<'_>, _id: &irmind_app::CaseId) -> Result<Option<String>> {
         Ok(None)
+    }
+    fn demo_export_identity(&self) -> Option<(PathBuf, String)> {
+        None
+    }
+    fn demo_source_root(&self) -> Option<PathBuf> {
+        None
     }
     fn load_last_case(&self) -> Result<Option<irmind_app::CaseId>> {
         Ok(None)

@@ -28,6 +28,9 @@ pub struct PersistentConfig {
     /// Presentation-only setting; absence preserves the existing signed v1 bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resume_last_case: Option<bool>,
+    /// Presentation-only setting; absence keeps existing signed configuration bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_hints: Option<bool>,
     #[serde(default)]
     pub modules: BTreeMap<String, ProductSettings>,
 }
@@ -60,6 +63,7 @@ pub enum ConfigChange {
         sha256: String,
     },
     SetResumeLastCase(bool),
+    SetShowHints(bool),
     SetMouseCapture(bool),
     SetTheme(String),
 }
@@ -84,6 +88,7 @@ impl Default for PersistentConfig {
             mouse_capture: None,
             theme: None,
             resume_last_case: None,
+            show_hints: None,
             modules: BTreeMap::new(),
         }
     }
@@ -230,6 +235,7 @@ impl PersistentConfig {
                 sha256,
             } => set_ca_values(&mut next, manifests, module, path_field, path, sha256)?,
             ConfigChange::SetResumeLastCase(enabled) => next.resume_last_case = Some(enabled),
+            ConfigChange::SetShowHints(enabled) => next.show_hints = Some(enabled),
             ConfigChange::SetMouseCapture(enabled) => next.mouse_capture = Some(enabled),
             ConfigChange::SetTheme(theme) => next.theme = Some(theme),
         }

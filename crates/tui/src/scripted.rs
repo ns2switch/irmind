@@ -187,6 +187,7 @@ where
             &mut self.terminal,
             &case::CaseFrame {
                 title: &title,
+                guide: None,
                 messages: &message,
                 visible_lines: None,
                 input: "",
@@ -252,6 +253,7 @@ where
             &mut self.terminal,
             &case::CaseFrame {
                 title: &title,
+                guide: None,
                 messages: "",
                 visible_lines: None,
                 input: "",

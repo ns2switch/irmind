@@ -43,6 +43,14 @@ pub(super) fn home_items(
                         "off"
                     }
                 )),
+                ListItem::new(format!(
+                    "Context hints: {}",
+                    if state.show_hints.enabled() {
+                        "on"
+                    } else {
+                        "off"
+                    }
+                )),
                 ListItem::new(format!("Theme: {}", state.theme_choice)),
             ];
             if !state.parsers.is_empty() {
@@ -70,7 +78,13 @@ pub(super) fn home_items(
             })
             .collect(),
         Mode::Setup => setup_items(&fingerprint, model.is_some(), new_analyst_key),
-        Mode::Help => case::command_registry::help()
+        Mode::Help => state
+            .help_topic
+            .as_deref()
+            .map_or_else(
+                case::command_registry::help,
+                case::command_registry::help_for,
+            )
             .lines()
             .map(|line| Ok(ListItem::new(safe(line)?)))
             .collect::<Result<Vec<_>>>()?,
@@ -339,6 +353,7 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
         irmind_app::ConfigChange::SetResumeLastCase(enabled) => {
             format!("resume recent case={enabled}")
         }
+        irmind_app::ConfigChange::SetShowHints(enabled) => format!("context hints={enabled}"),
         irmind_app::ConfigChange::SetMouseCapture(enabled) => format!("mouse capture={enabled}"),
         irmind_app::ConfigChange::SetTheme(theme) => format!("theme={theme}"),
     }

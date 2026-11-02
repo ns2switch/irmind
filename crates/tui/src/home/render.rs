@@ -199,7 +199,7 @@ fn draw_case_list(
     );
     if state.rows.is_empty() {
         let mut lines = vec![Line::from("No cases yet · /new to create one")];
-        if !has_model {
+        if !has_model && state.show_hints.enabled() {
             lines.push(Line::styled(
                 "No model? Use /settings model when you are ready to investigate.",
                 theme.muted(),

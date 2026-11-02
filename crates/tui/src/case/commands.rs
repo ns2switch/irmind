@@ -1,5 +1,6 @@
 use super::command_registry;
 use super::conversation::{Card, CardKind};
+use super::demo_guide::DemoEvent;
 use super::runtime::CaseRuntime;
 use super::{CaseWorkflow, FindingKind, PathBuf, PathPicker, Result, parse_approval_args};
 use irmind_app::CaseScope;
@@ -10,6 +11,14 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     pub(super) fn submit(&mut self, prompt: String) -> Result<bool> {
         if prompt.is_empty() {
             return Ok(false);
+        }
+        if let Some(name) = prompt.strip_prefix("/help ") {
+            self.state.messages.push(command_registry::help_for(name));
+            return Ok(false);
+        }
+        if prompt == "/demo exit" && self.io_ops.demo_mode() {
+            self.exit_to = super::CaseExit::Quit;
+            return Ok(true);
         }
         if self.demo_command(&prompt)? {
             return Ok(false);
@@ -97,6 +106,39 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     }
 
     fn demo_command(&mut self, prompt: &str) -> Result<bool> {
+        if prompt.starts_with("/demo ") && !self.io_ops.demo_mode() {
+            self.state
+                .messages
+                .push("Start /demo from the home screen first.".into());
+            return Ok(true);
+        }
+        if let Some(action) = prompt.strip_prefix("/demo ")
+            && let Some(guide) = self.state.demo_guide.as_mut()
+        {
+            match action {
+                "next" => guide.next(),
+                "back" => guide.back(),
+                "hint" => guide.hint(),
+                "skip" => guide.skip(),
+                "hide" => guide.hide(),
+                "show" => guide.show(),
+                "check" => {}
+                _ => {
+                    self.state.messages.push(
+                        "Use /demo next, back, hint, skip, hide, show, check, or exit.".into(),
+                    );
+                    return Ok(true);
+                }
+            }
+            if action != "check" {
+                if matches!(action, "next" | "back" | "skip") {
+                    self.state
+                        .messages
+                        .push(format!("Demo step {}/10", guide.step() + 1));
+                }
+                return Ok(true);
+            }
+        }
         if prompt == "/demo check" {
             match self.io_ops.demo_check(self.engine, self.id)? {
                 Some(result) => {
@@ -105,6 +147,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                         Card::new(CardKind::ToolResult, "Demo check", safe.clone(), false)
                             .with_summary(safe),
                     );
+                    if let Some(guide) = self.state.demo_guide.as_mut() {
+                        guide.record(DemoEvent::Checked);
+                    }
                 }
                 None => self
                     .state
@@ -114,28 +159,109 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return Ok(true);
         }
         if prompt == "/demo" {
-            self.state.messages.push(if self.io_ops.demo_mode() {
-                "This is the demo. Use /demo check after confirming a finding.".into()
-            } else {
-                "Return to /home before starting /demo.".into()
-            });
+            self.state
+                .messages
+                .push(if let Some(guide) = self.state.demo_guide.as_mut() {
+                    guide.show();
+                    "The demo guide is visible. Use /demo hint for this step.".into()
+                } else {
+                    "Return to /home before starting /demo.".into()
+                });
+            return Ok(true);
+        }
+        if self.demo_verify_command(prompt)
+            || self.demo_export_command(prompt)?
+            || self.demo_verify_export_command(prompt)
+        {
             return Ok(true);
         }
         if self.io_ops.demo_mode()
-            && [
-                "/export",
-                "/ingest",
-                "/settings",
-                "/objects",
-                "/object-read",
-            ]
-            .iter()
-            .any(|command| prompt == *command || prompt.starts_with(&format!("{command} ")))
+            && ["/ingest", "/settings", "/objects", "/object-read"]
+                .iter()
+                .any(|command| prompt == *command || prompt.starts_with(&format!("{command} ")))
         {
             self.state.messages.push("The demo uses only its bundled synthetic evidence. Leave the demo to configure connectors or export a real case.".into());
             return Ok(true);
         }
         Ok(false)
+    }
+
+    fn demo_export_command(&mut self, prompt: &str) -> Result<bool> {
+        if self.io_ops.demo_mode() && (prompt == "/export" || prompt.starts_with("/export ")) {
+            if self.active.is_some() {
+                self.state
+                    .messages
+                    .push("Wait for the current task or use /pause.".into());
+                return Ok(true);
+            }
+            let Some((path, _)) = self.io_ops.demo_export_identity() else {
+                self.state
+                    .messages
+                    .push("Demo export is unavailable. Use /help demo.".into());
+                return Ok(true);
+            };
+            let command = format!("/export {}", path.display());
+            if prompt != "/export" && prompt != command {
+                self.state.messages.push(
+                    "The demo exports only inside its temporary directory. Use /export.".into(),
+                );
+                return Ok(true);
+            }
+            self.seal_or_export_command(&command)?;
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    fn demo_verify_command(&mut self, prompt: &str) -> bool {
+        if prompt != "/verify" || !self.io_ops.demo_mode() {
+            return false;
+        }
+        let Some(root) = self.io_ops.demo_source_root() else {
+            self.state
+                .messages
+                .push("Demo source is unavailable. Retry /demo.".into());
+            return true;
+        };
+        let workflow = self.workflow();
+        let id = self.id;
+        self.start_task("Verify originals", move |cancel| {
+            workflow.verify_with_source_root(id, &root, irmind_app::SourceCheckMode::Full, &cancel)
+        });
+        true
+    }
+
+    fn demo_verify_export_command(&mut self, prompt: &str) -> bool {
+        if prompt == "/verify-export" && self.io_ops.demo_mode() {
+            if self.active.is_some() {
+                self.state
+                    .messages
+                    .push("Wait for the current task or use /pause.".into());
+                return true;
+            }
+            let Some((path, fingerprint)) = self.io_ops.demo_export_identity() else {
+                self.state
+                    .messages
+                    .push("Demo export is unavailable. Use /help demo.".into());
+                return true;
+            };
+            let io_ops = self.io_ops;
+            self.start_task("Verify export", move |cancel| {
+                if cancel.is_cancelled() {
+                    return Err(irmind_app::AppError::Cancelled);
+                }
+                let checked = io_ops
+                    .verify_export(&path, &fingerprint)
+                    .map_err(|error| irmind_app::AppError::Policy(error.to_string()))?;
+                if cancel.is_cancelled() {
+                    Err(irmind_app::AppError::Cancelled)
+                } else {
+                    Ok(checked)
+                }
+            });
+            return true;
+        }
+        false
     }
 
     fn continue_command(&mut self, prompt: &str) -> bool {
@@ -325,10 +451,14 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     fn case_command(&mut self, prompt: &str) -> Result<bool> {
         match prompt {
             "/help" => self.state.messages.push(command_registry::help()),
-            "/scope" => self
-                .state
-                .messages
-                .push(format!("Scope: {}", self.state.case.scope)),
+            "/scope" => {
+                self.state
+                    .messages
+                    .push(format!("Scope: {}", self.state.case.scope));
+                if let Some(guide) = self.state.demo_guide.as_mut() {
+                    guide.record(DemoEvent::ScopeViewed);
+                }
+            }
             "/approvals" => {
                 self.state.approvals = self.engine.pending_approvals(self.id)?;
                 self.state.approval_sources =
@@ -401,14 +531,24 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             }
         } else if let Some(finding_id) = prompt.strip_prefix("/confirm ") {
             match self.engine.confirm_finding(self.id, finding_id) {
-                Ok(()) => self.state.messages.push("Finding confirmed".into()),
+                Ok(()) => {
+                    self.state.messages.push("Finding confirmed".into());
+                    if let Some(guide) = self.state.demo_guide.as_mut() {
+                        guide.record(DemoEvent::FindingResolved);
+                    }
+                }
                 Err(error) => self.state.messages.push(format!("Finding error: {error}")),
             }
             self.refresh_findings()?;
         } else if let Some(rest) = prompt.strip_prefix("/dismiss ") {
             if let Some((finding_id, reason)) = rest.split_once(' ') {
                 match self.engine.dismiss_finding(self.id, finding_id, reason) {
-                    Ok(()) => self.state.messages.push("Finding dismissed".into()),
+                    Ok(()) => {
+                        self.state.messages.push("Finding dismissed".into());
+                        if let Some(guide) = self.state.demo_guide.as_mut() {
+                            guide.record(DemoEvent::FindingResolved);
+                        }
+                    }
                     Err(error) => self.state.messages.push(format!("Finding error: {error}")),
                 }
                 self.refresh_findings()?;

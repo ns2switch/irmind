@@ -1,4 +1,5 @@
 use super::{CaseRuntime, PathBuf, Result, parse_approval_args};
+use crate::case::demo_guide::DemoEvent;
 
 impl CaseRuntime<'_, '_, '_> {
     pub(super) fn approval_command(&mut self, prompt: &str) -> Result<bool> {
@@ -7,7 +8,12 @@ impl CaseRuntime<'_, '_, '_> {
         } else if let Some(rest) = prompt.strip_prefix("/deny ") {
             if let Some((request_id, reason)) = rest.split_once(' ') {
                 match self.engine.deny(self.id, request_id, reason) {
-                    Ok(result) => self.state.messages.push(result),
+                    Ok(result) => {
+                        self.state.messages.push(result);
+                        if let Some(guide) = self.state.demo_guide.as_mut() {
+                            guide.record(DemoEvent::ApprovalResolved);
+                        }
+                    }
                     Err(error) => self.state.messages.push(format!("Approval error: {error}")),
                 }
             } else {

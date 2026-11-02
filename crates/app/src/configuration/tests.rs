@@ -148,6 +148,15 @@ fn unset_mouse_capture_preserves_signed_v1_configuration_bytes() {
         .changed(ConfigChange::SetResumeLastCase(false), &[])
         .unwrap();
     assert_eq!(resumed.resume_last_case, Some(false));
+    let no_hints = PersistentConfig::default()
+        .changed(ConfigChange::SetShowHints(false), &[])
+        .unwrap();
+    assert_eq!(no_hints.show_hints, Some(false));
+    assert!(
+        serde_json::to_string(&no_hints)
+            .unwrap()
+            .contains("\"show_hints\":false")
+    );
     assert!(
         serde_json::to_string(&resumed)
             .unwrap()

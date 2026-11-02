@@ -45,7 +45,7 @@ La TUI guarda los ajustes no secretos en `config.toml` dentro del [directorio de
 
 Para Splunk, MISP, CrowdStrike, SentinelOne y un servicio S3 compatible, `/settings connectors` admite un archivo PEM de CA opcional. IRMind muestra y firma su huella SHA-256 junto con la ruta. El PEM se añade a las raíces del sistema; la comprobación del nombre del servidor sigue activa. Al iniciar el conector se vuelve a comprobar el hash, por lo que sustituir el archivo exige otra aprobación. Borra la ruta para retirar esa CA. No guardes una clave privada en el archivo.
 
-`resume_last_case` vale `true` por defecto. Tras arrancar, la TUI reabre el último caso abierto que se usó solo si verifica su cadena de custodia. Un caso sellado o eliminado deja la pantalla de inicio; un fallo de verificación aparece allí como aviso. Usa `/settings preferences` para cambiar esta opción, el ratón o el tema (`auto`, `light`, `dark`). La referencia privada `last-case` se guarda junto a `config.toml` y no forma parte de la custodia. La automatización CLI no reanuda casos.
+`resume_last_case` y `show_hints` valen `true` por defecto. Tras arrancar, la TUI reabre el último caso abierto que se usó solo si verifica su cadena de custodia. Un caso sellado o eliminado deja la pantalla de inicio; un fallo de verificación aparece allí como aviso. Usa `/settings preferences` para cambiar la reanudación, las pistas de contexto, el ratón o el tema (`auto`, `light`, `dark`). La referencia privada `last-case` se guarda junto a `config.toml` y no forma parte de la custodia. La automatización CLI no reanuda casos.
 
 Para automatización, el orden es **flag de CLI > variable de entorno > config.toml > valor por defecto**. Un override solo dura esa ejecución; la TUI no lo sustituye en silencio. El archivo contiene IDs de módulos, modelos, URLs, fuentes, índices, regiones y precios opcionales, pero nunca credenciales ni passphrases. Se rechazan los campos desconocidos o secretos. Ejemplo:
 
@@ -53,6 +53,7 @@ Para automatización, el orden es **flag de CLI > variable de entorno > config.t
 version = 1
 llm_module = "llm-openai-compatible"
 resume_last_case = true
+show_hints = true
 theme = "auto"
 
 [modules.llm-openai-compatible.values]

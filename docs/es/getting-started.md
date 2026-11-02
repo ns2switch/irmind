@@ -20,9 +20,21 @@ En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Para u
 
 ## Pruébalo en cinco minutos
 
-Tras instalar IRMind, ejecuta `irmind demo`. También puedes escribir `/demo` en el inicio. Se abre un caso temporal aislado con un pequeño episodio sintético de HuntEval, claves efímeras y un modelo guionizado. No necesitas clave de API, passphrase, cuenta ni red. Si hay un modelo de Ollama local con soporte de herramientas, IRMind lo ofrece como opción local.
+Ejecuta primero `irmind demo`. También puedes escribir `/demo` en el inicio. Se abre un caso temporal aislado con un episodio sintético de HuntEval, claves efímeras y un modelo guionizado. No necesitas clave de API, passphrase, cuenta ni red. Si Ollama tiene un modelo local con soporte de herramientas, puedes elegirlo; permanece en el equipo.
 
-El caso se abre mientras ingiere la evidencia incluida. Pregunta qué pasó en el episodio sintético. El modelo guionizado propone una búsqueda, un hallazgo y una consulta externa simulada. Esta última sigue esperando tu aprobación firmada, pero no contacta con ningún servicio real. Confirma el hallazgo y escribe `/demo check` para compararlo localmente con las respuestas del episodio. Estas solo se cargan en ese momento y nunca llegan al modelo. Sal con `/quit` y confirma. El caso, las claves y la evidencia temporales se borran. IRMind te indica que uses `/new` y `/settings` para trabajar normalmente.
+Una guía fija muestra el paso actual, el comando exacto y por qué importa. Espera a que termine la ingesta inicial. Los diez pasos cubren el caso firmado, el parser y la evidencia, las consultas locales al grafo, una pregunta al agente, la aprobación firmada, un hallazgo confirmado, `/demo check`, y la verificación, el sellado, la exportación y la verificación del paquete. Las respuestas esperadas de HuntEval solo se cargan al ejecutar `/demo check` y nunca llegan al contexto del modelo.
+
+Usa `/demo next` después de completar cada paso. `/demo back`, `/demo hint`, `/demo skip` y `/demo hide` permiten navegar; `/demo` vuelve a mostrar la guía. Otros comandos siguen funcionando sin adelantar el paso. `/demo exit` borra el caso, las claves y la evidencia temporales y señala `/new` y `/settings`. `/help demo` muestra ejemplos y comandos relacionados.
+
+![La guía fija presenta el caso sintético y la primera acción](../ux/demo-guide/welcome.png)
+
+![La demo muestra el parser elegido y la confianza de detección tras la ingesta](../ux/demo-guide/evidence.png)
+
+![La guía propone consultas locales de timeline, búsqueda y vecinos](../ux/demo-guide/explore.png)
+
+![La guía explica por qué una consulta externa espera aprobación firmada](../ux/demo-guide/approval.png)
+
+![El paso de custodia pide verificar, sellar, exportar y verificar el paquete](../ux/demo-guide/custody.png)
 
 ## Primer arranque
 
@@ -48,7 +60,7 @@ Después del primer uso, IRMind suele reabrir el último caso abierto tras verif
 
 ![Ajustes del llavero con backends de firma y secretos y presencia de credenciales sin mostrar valores](../assets/keystore.png)
 
-![Preferencias de reanudación del caso, ratón y tema](../assets/preferences.png)
+![Preferencias de reanudación del caso, ratón, pistas de contexto y tema](../assets/preferences.png)
 
 La demo sin conexión muestra dos módulos ilustrativos; la compilación normal incluye todos los módulos de producto actuales.
 
@@ -79,7 +91,7 @@ Con un SIEM configurado, `/siem-alert` obtiene una alerta dentro del alcance por
 
 ![Conversación de un caso sintético de CloudTrail con la pregunta y una respuesta incremental del modelo](../assets/conversation.png)
 
-PgUp/PgDn desplazan la vista enfocada. El texto nuevo del modelo sigue el final solo si ya estás allí. ↑/↓ recuperan entradas anteriores cuando el campo está vacío. `/help` lista todos los comandos y las teclas reservadas. Los caracteres imprimibles siempre se escriben en el campo; ninguna letra ejecuta un atajo. La rueda del ratón funciona por defecto. Para seleccionar texto con el terminal, pon `mouse_capture = false` en la [configuración](configuration.md) y acepta el cambio desde la TUI.
+PgUp/PgDn desplazan la vista enfocada. El texto nuevo del modelo sigue el final solo si ya estás allí. ↑/↓ recuperan entradas anteriores cuando el campo está vacío. `/help` lista todos los comandos y las teclas reservadas; `/help <comando>` añade un ejemplo y comandos relacionados. Los caracteres imprimibles siempre se escriben en el campo; ninguna letra ejecuta un atajo. La rueda del ratón funciona por defecto. Para seleccionar texto con el terminal, pon `mouse_capture = false` en la [configuración](configuration.md) y acepta el cambio desde la TUI. Las pistas de contexto están activadas por defecto y se pueden desactivar en `/settings preferences`.
 
 ![Menú de comandos con nombres y descripciones sobre la entrada del caso](../assets/command-menu.png)
 

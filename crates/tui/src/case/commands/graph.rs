@@ -1,4 +1,5 @@
 use super::{CaseRuntime, Result};
+use crate::case::demo_guide::DemoEvent;
 use irmind_app::{AppError, CaseId, EvidenceGraph, GraphQueryFilter};
 
 enum GraphAction {
@@ -37,6 +38,14 @@ impl CaseRuntime<'_, '_, '_> {
         };
         match action {
             Ok(action) => {
+                if self.state.demo_guide.is_some() {
+                    self.state.demo_pending_event = match (command, rest.trim()) {
+                        ("/timeline", "") => Some(DemoEvent::TimelineViewed),
+                        ("/search", "203.0.113.77") => Some(DemoEvent::TermSearched),
+                        ("/neighbors", "ip 203.0.113.77") => Some(DemoEvent::NeighborsViewed),
+                        _ => None,
+                    };
+                }
                 let graph = self.engine.graph.clone();
                 let id = self.id.clone();
                 self.start_task(title, move |cancel| {
