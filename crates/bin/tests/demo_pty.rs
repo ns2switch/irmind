@@ -3,12 +3,15 @@
 
 use std::{process::Command, time::Duration};
 
+#[path = "support/terminal_screen.rs"]
+mod terminal_screen;
+
 #[cfg(unix)]
 use expectrl::{Expect as _, session::OsSession as DemoSession};
 
 #[cfg(windows)]
 mod windows_pty {
-    use super::{Command, Duration};
+    use super::{Command, Duration, terminal_screen::TerminalScreen};
     use portable_pty::{CommandBuilder, PtySize, native_pty_system};
     use std::{
         io::{Read as _, Write as _},
@@ -22,7 +25,7 @@ mod windows_pty {
         input: Box<dyn std::io::Write + Send>,
         output: Receiver<Result<Vec<u8>, String>>,
         seen: Vec<u8>,
-        cursor: usize,
+        screen: TerminalScreen,
         answered_cursor_queries: usize,
         timeout: Duration,
     }
@@ -81,7 +84,7 @@ mod windows_pty {
                 input,
                 output,
                 seen: Vec::new(),
-                cursor: 0,
+                screen: TerminalScreen::new(32, 100),
                 answered_cursor_queries: 0,
                 timeout: Duration::from_secs(10),
             })
@@ -95,23 +98,20 @@ mod windows_pty {
             let needle = needle.as_ref();
             let started = Instant::now();
             loop {
-                if let Some(offset) = self.seen[self.cursor..]
-                    .windows(needle.len())
-                    .position(|part| part == needle.as_bytes())
-                {
-                    self.cursor += offset + needle.len();
-                    return Ok(self.seen[..self.cursor].to_vec());
+                if self.screen.text().contains(needle) {
+                    return Ok(self.seen.clone());
                 }
                 if started.elapsed() >= self.timeout {
                     return Err(format!(
-                        "timed out after {}s waiting for {needle}; read {} PTY bytes; first bytes: {:?}",
+                        "timed out after {}s waiting for {needle}; read {} PTY bytes; screen: {:?}",
                         self.timeout.as_secs(),
                         self.seen.len(),
-                        String::from_utf8_lossy(&self.seen[..self.seen.len().min(512)])
+                        self.screen.text()
                     ));
                 }
                 match self.output.recv_timeout(Duration::from_millis(25)) {
                     Ok(Ok(chunk)) => {
+                        self.screen.feed(&chunk);
                         self.seen.extend_from_slice(&chunk);
                         self.answer_cursor_queries()?;
                     }
@@ -181,6 +181,10 @@ fn demo_command(real_home: &std::path::Path, demo_parent: &std::path::Path) -> C
         command
             .arg("/d")
             .arg("/c")
+            .arg("chcp")
+            .arg("65001")
+            .arg(">nul")
+            .arg("&&")
             .arg(env!("CARGO_BIN_EXE_irmind"))
             .arg("--home")
             .arg(real_home)
@@ -284,6 +288,8 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
     session.expect("2/10").unwrap();
     eprintln!("guide step 2 visible");
     session.send("/scope\r").unwrap();
+    #[cfg(windows)]
+    session.expect("Do: /demo next").unwrap();
     session.send("/demo next\r").unwrap();
     session.expect("3/10").unwrap();
     eprintln!("guide step 3 visible");
@@ -298,7 +304,16 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
         ("/neighbors ip 203.0.113.77", "complete."),
     ] {
         session.send(format!("{command}\r")).unwrap();
-        session.expect(next_instruction).unwrap();
+        let instruction = if cfg!(windows) {
+            if next_instruction == "complete." {
+                "Step complete.".to_owned()
+            } else {
+                format!("Do: /{next_instruction}")
+            }
+        } else {
+            next_instruction.to_owned()
+        };
+        session.expect(instruction).unwrap();
         eprintln!("graph completed: {command}");
     }
     session.send("/demo next\r").unwrap();
@@ -308,6 +323,8 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
         .send("What happened in this synthetic AWS IAM episode?\r")
         .unwrap();
     session.expect("points").unwrap();
+    #[cfg(windows)]
+    session.expect("Do: /demo next").unwrap();
     eprintln!("agent answered");
     session.send("/demo next\r").unwrap();
     session.expect("6/10").unwrap();
@@ -320,11 +337,15 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
     std::thread::sleep(Duration::from_millis(250));
     eprintln!("guide step 7 visible");
     session.send("/confirm \t\r").unwrap();
+    #[cfg(windows)]
+    session.expect("Do: /demo next").unwrap();
     session.send("/demo next\r").unwrap();
     session.expect("8/10").unwrap();
     eprintln!("finding confirmed");
     eprintln!("guide step 8 visible");
     session.send("/demo check\r").unwrap();
+    #[cfg(windows)]
+    session.expect("Do: /demo next").unwrap();
     session.send("/demo next\r").unwrap();
     // Reaching step 9 proves that /demo check ran: next cannot advance until
     // the guide records the comparison. Text within the result card can be
