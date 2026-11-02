@@ -163,7 +163,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 .messages
                 .push(if let Some(guide) = self.state.demo_guide.as_mut() {
                     guide.show();
-                    "The demo guide is visible. Use /demo hint for this step.".into()
+                    "The demo guide is visible.".into()
                 } else {
                     "Return to /home before starting /demo.".into()
                 });

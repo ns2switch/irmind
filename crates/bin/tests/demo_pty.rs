@@ -91,7 +91,7 @@ mod windows_pty {
             self.timeout = timeout.unwrap_or(Duration::from_secs(60));
         }
 
-        pub(super) fn expect(&mut self, needle: impl AsRef<str>) -> Result<(), String> {
+        pub(super) fn expect(&mut self, needle: impl AsRef<str>) -> Result<Vec<u8>, String> {
             let needle = needle.as_ref();
             let started = Instant::now();
             loop {
@@ -100,7 +100,7 @@ mod windows_pty {
                     .position(|part| part == needle.as_bytes())
                 {
                     self.cursor += offset + needle.len();
-                    return Ok(());
+                    return Ok(self.seen[..self.cursor].to_vec());
                 }
                 if started.elapsed() >= self.timeout {
                     return Err(format!(
@@ -212,7 +212,7 @@ fn run_demo(exit_keys: &str) {
     session.set_expect_timeout(Some(Duration::from_mins(1)));
     #[cfg(unix)]
     session.set_expect_lazy(false);
-    session.expect("Ingested").unwrap();
+    session.expect("ready:").unwrap();
     session.send(exit_keys).unwrap();
     session.expect("Demo data deleted").unwrap();
     assert_eq!(
@@ -232,7 +232,7 @@ fn demo_ingest_completion_is_visible_and_followup_command_responds() {
     session.set_expect_timeout(Some(Duration::from_secs(20)));
     #[cfg(unix)]
     session.set_expect_lazy(false);
-    let completed = session.expect("Ingested");
+    let completed = session.expect("ready:");
     if completed.is_err() {
         let _ = session.send("/quit\r\r");
     }
@@ -240,6 +240,13 @@ fn demo_ingest_completion_is_visible_and_followup_command_responds() {
         completed.is_ok(),
         "demo did not report ingest completion within 20 seconds: {completed:?}"
     );
+    #[cfg(unix)]
+    let initial = completed.unwrap().as_bytes().to_vec();
+    #[cfg(windows)]
+    let initial = completed.unwrap();
+    let initial = String::from_utf8_lossy(&initial);
+    assert!(!initial.contains("Try"));
+    assert!(!initial.contains("adds evidence"));
     session.expect("parser-json").unwrap();
     session.expect("90%").unwrap();
     session.send("/help\r").unwrap();
@@ -271,7 +278,7 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
     session.set_expect_lazy(false);
     session.expect("1/10").unwrap();
     eprintln!("guide step 1 visible");
-    session.expect("Ingested").unwrap();
+    session.expect("ready:").unwrap();
     eprintln!("ingest complete");
     session.send("/demo next\r").unwrap();
     session.expect("2/10").unwrap();
@@ -362,7 +369,7 @@ fn control_c_cleans_the_demo_from_every_guide_step() {
         session.set_expect_timeout(Some(Duration::from_secs(20)));
         #[cfg(unix)]
         session.set_expect_lazy(false);
-        session.expect("Ingested").unwrap();
+        session.expect("ready:").unwrap();
         for next in 2..=step {
             session.send("/demo skip\r").unwrap();
             session.expect(format!("{next}/10")).unwrap();

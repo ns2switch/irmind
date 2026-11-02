@@ -21,10 +21,11 @@ Env PS1 "demo$ "
 Env TERM "xterm-256color"
 
 Hide
-Type "mkdir -p /tmp/irmind-demo-guide && clear && env -i HOME=/tmp/irmind-demo-guide USER=demo LOGNAME=demo HOSTNAME=demo PATH=/usr/local/bin:/usr/bin:/bin TERM=xterm-256color /vhs/target/debug/irmind demo --scripted"
+Type "mkdir -p /tmp/irmind-demo-guide && clear && env -i HOME=/tmp/irmind-demo-guide USER=demo LOGNAME=demo HOSTNAME=demo PATH=/usr/local/bin:/usr/bin:/bin TERM=xterm-256color /build/debug/irmind demo --scripted"
 Enter
-Sleep 6 s
+Sleep 8 s
 Show
+Sleep 700 ms
 Screenshot "/out/welcome.png"
 Sleep 700 ms
 

@@ -169,20 +169,12 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     if label == "IRMind" {
                         self.state.conversation.discard_preview();
                     }
-                    update(
-                        &mut self.state,
-                        CaseMessage::TaskFinished(format!(
-                            "{label} failed: {error}. Retry the command or use /help."
-                        )),
-                    );
+                    let message = self.task_failure(label, &error.to_string());
+                    update(&mut self.state, CaseMessage::TaskFinished(message));
                 }
                 Err(_) => {
-                    update(
-                        &mut self.state,
-                        CaseMessage::TaskFinished(format!(
-                            "{label} failed unexpectedly. Retry the command or use /help."
-                        )),
-                    );
+                    let message = self.task_failure(label, "unexpected task failure");
+                    update(&mut self.state, CaseMessage::TaskFinished(message));
                 }
             }
             self.refresh_after_task()?;
@@ -192,6 +184,20 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
         self.state.progress_status = None;
         self.state.demo_pending_event = None;
         Ok(())
+    }
+
+    fn task_failure(&self, label: &str, reason: &str) -> String {
+        let retry = if self
+            .state
+            .demo_guide
+            .as_ref()
+            .is_some_and(|guide| !guide.hidden())
+        {
+            "See the current guide step."
+        } else {
+            "Retry the command or use /help."
+        };
+        format!("{label} failed: {reason}. {retry}")
     }
 
     fn refresh_after_task(&mut self) -> Result<()> {

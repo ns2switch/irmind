@@ -42,6 +42,7 @@ TRANSLATIONS = {
     ROOT / "CODE_OF_CONDUCT.es.md": ROOT / "CODE_OF_CONDUCT.md",
     ROOT / "SECURITY.es.md": ROOT / "SECURITY.md",
     ROOT / "docs/es/roadmap.md": ROOT / "docs/development/roadmap.md",
+    ROOT / "docs/es/manual-validation.md": ROOT / "docs/development/manual-validation.md",
     **{
         ROOT / "docs/es" / name: ROOT / "docs" / name
         for name in ("getting-started.md", "configuration.md", "modules.md", "security-model.md", "platforms.md")

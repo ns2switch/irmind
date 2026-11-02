@@ -4,6 +4,14 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.1.3 — Guided demo
+
+- Guide the isolated synthetic demo through ten event-driven steps, from evidence exploration and signed approval to findings, custody verification and export.
+- Keep one current instruction in the guide. Show completed ingestion as a fact, without competing command suggestions.
+- Add command-specific help and optional empty-state hints, with a full tutorial PTY test on Linux, macOS and Windows.
+- Record H5 as complete by analyst decision after a natural greeting with real DeepSeek and no unnecessary tool calls. Investigation citations, follow-up, streaming and verification remain pending analyst records; the real-connector validation remains pending.
+- Refresh synthetic tutorial screenshots from the actual 0.1.3 binary.
+
 ## 0.1.2 — Demo ingest repair
 
 - Show a persistent completion or actionable error after the demo's background ingestion, so the case never appears stuck after evidence is found.
