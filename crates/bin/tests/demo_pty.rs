@@ -18,6 +18,7 @@ mod windows_pty {
 
     pub(super) struct DemoSession {
         child: Box<dyn portable_pty::Child + Send + Sync>,
+        _master: Box<dyn portable_pty::MasterPty + Send>,
         input: Box<dyn std::io::Write + Send>,
         output: Receiver<Result<Vec<u8>, String>>,
         seen: Vec<u8>,
@@ -52,12 +53,9 @@ mod windows_pty {
                 .slave
                 .spawn_command(builder)
                 .map_err(|error| error.to_string())?;
-            let input = pair
-                .master
-                .take_writer()
-                .map_err(|error| error.to_string())?;
-            let mut reader = pair
-                .master
+            let master = pair.master;
+            let input = master.take_writer().map_err(|error| error.to_string())?;
+            let mut reader = master
                 .try_clone_reader()
                 .map_err(|error| error.to_string())?;
             let (sender, output) = mpsc::channel();
@@ -79,6 +77,7 @@ mod windows_pty {
             });
             Ok(Self {
                 child,
+                _master: master,
                 input,
                 output,
                 seen: Vec::new(),
