@@ -21,7 +21,7 @@ Keep the existing encoding of every signed or reconstructed value. For a `serde_
 
 ## Golden verification
 
-`crates/bin/tests/fixtures/formats-v1.json` was captured from the unchanged implementation before this correction. Fixed synthetic keys, case ID, clock and source modification times make it reproducible. It contains bytes and SHA-256 for nine parsers' normalized rows, source V1/V2 manifests, generated Parquet artifact envelopes (including their actual file hashes), signed configuration/definition operations, audit entries, the seal file and V3/V4 exports. It contains no real evidence or keys.
+`crates/bin/tests/fixtures/formats-v1.json` was captured from the unchanged implementation before this correction. Fixed synthetic keys, case ID, clock and source modification times make it reproducible. It contains bytes and SHA-256 for nine parsers' normalized rows, source V1/V2 manifests, generated Parquet artifact envelopes (including their actual file hashes), signed configuration/definition operations, audit entries, the seal file and V3/V4 exports. It contains no real evidence or keys. `.gitattributes` fixes LF for JSONL as well as JSON/NDJSON: Windows must test identical fixture bytes, rather than a CRLF checkout. Raw DFIR records deliberately retain their original line endings; production evidence is never rewritten to satisfy the fixture.
 
 The normal Linux suite runs `format_goldens`. The additional `json_formats` job explicitly enables `serde_json/preserve_order` and runs the same test against the same checked-in bytes and hashes. It never regenerates or approves goldens. Features shown for build dependencies by `cargo tree` do not replace explicitly enabling the feature in the tested target's dependency graph.
 

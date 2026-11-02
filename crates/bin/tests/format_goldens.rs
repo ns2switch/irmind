@@ -350,5 +350,11 @@ fn signed_and_reconstructed_format_goldens_are_unchanged() {
     signed_configuration_goldens(&mut actual, &store, &engine, root.path());
     export_goldens(&mut actual, &store, &engine, root.path());
     let expected: Goldens = serde_json::from_str(include_str!("fixtures/formats-v1.json")).unwrap();
-    assert_eq!(actual, expected);
+    assert_eq!(
+        actual.keys().collect::<Vec<_>>(),
+        expected.keys().collect::<Vec<_>>()
+    );
+    for (key, value) in &expected {
+        assert_eq!(actual.get(key), Some(value), "format golden {key}");
+    }
 }
