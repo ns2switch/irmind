@@ -1,0 +1,24 @@
+version = 1
+name = "custom-access"
+description = "Synthetic comma-separated access events"
+
+[input]
+format = "csv"
+delimiter = ","
+header = true
+
+[detect]
+header = ["time", "host", "user", "source_ip", "action", "outcome"]
+confidence = 70
+
+[mapping]
+time = "time"
+host = "host"
+user = "user"
+source_ip = "source_ip"
+action = "action"
+outcome = "outcome"
+
+[timestamp]
+format = "rfc3339"
+default_timezone = "UTC"

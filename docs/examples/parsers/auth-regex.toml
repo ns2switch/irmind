@@ -1,0 +1,23 @@
+version = 1
+name = "custom-auth"
+description = "Synthetic fixed-format authentication lines"
+
+[input]
+format = "regex"
+pattern = '^(?P<time>[^ ]+) host=(?P<host>[^ ]+) user=(?P<user>[^ ]+) src=(?P<source_ip>[^ ]+) action=(?P<action>[^ ]+) result=(?P<outcome>[^ ]+)$'
+
+[detect]
+pattern = '^[^ ]+ host=[^ ]+ user=[^ ]+ src=[^ ]+ action=[^ ]+ result=[^ ]+$'
+confidence = 70
+
+[mapping]
+time = "time"
+host = "host"
+user = "user"
+source_ip = "source_ip"
+action = "action"
+outcome = "outcome"
+
+[timestamp]
+format = "rfc3339"
+default_timezone = "UTC"

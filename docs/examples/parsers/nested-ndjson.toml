@@ -1,0 +1,22 @@
+version = 1
+name = "custom-nested"
+description = "Synthetic nested JSON authentication events"
+
+[input]
+format = "ndjson"
+
+[detect]
+required_fields = ["/custom_event/time", "/custom_event/host", "/custom_event/action"]
+confidence = 70
+
+[mapping]
+time = "/custom_event/time"
+host = "/custom_event/host"
+user = "/custom_event/identity/user"
+source_ip = "/custom_event/network/source_ip"
+action = "/custom_event/action"
+outcome = "/custom_event/result"
+
+[timestamp]
+format = "rfc3339"
+default_timezone = "UTC"
