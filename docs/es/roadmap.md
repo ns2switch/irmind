@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 3a60c444c467f58b832eb99f83b111eaec8b79fa; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit a59d6745083d597b3154325685f7c9c8a67a8bbc; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -8,11 +8,11 @@ Esta página es para quienes contribuyen o evalúan el proyecto. Expresa intenci
 
 ## Entregado en 0.1.0 y 0.1.1
 
-Las versiones preliminares incluyen la TUI para casos, conectores sujetos a política, custodia firmada, conversaciones protegidas, consultas acotadas sobre Parquet, demo sintética, registro de detección de parsers, instaladores verificados y binarios firmados y atestados con Sigstore. El [registro de cambios](../../CHANGELOG.md) detalla lo entregado. Siguen pendientes las pruebas manuales con un modelo y un conector reales.
+Las versiones preliminares incluyen la TUI para casos, conectores sujetos a política, custodia firmada, conversaciones protegidas, consultas acotadas sobre Parquet, demo sintética, registro de detección de parsers, instaladores verificados y binarios firmados y atestados con Sigstore. El [registro de cambios](../../CHANGELOG.md) detalla lo entregado. H5 está hecha por decisión del analista; siguen pendientes de registro los pasos no descritos y la validación de un conector real.
 
 ## v0.1.x: estabilizar la versión preliminar
 
-- Validar H5 manualmente con DeepSeek y probar un conector en un entorno real de pruebas.
+- H5 está hecha por decisión del analista tras probar un saludo con DeepSeek real. Registrar los pasos restantes y probar un conector en un entorno real. Consulta el [registro de validación](manual-validation.md#registro-de-resultados).
 - Mantener la firma Sigstore sin claves, las atestaciones de GitHub y el SBOM entregados en v0.1.1.
 - Firmar los binarios de macOS con Developer ID, hardened runtime y notarización mediante `notarytool`, desde un entorno de release protegido que solo se ejecuta para tags. La persona mantenedora debe proporcionar el certificado y la clave de App Store Connect antes de implementarlo.
 - Solicitar acceso al programa SignPath Foundation para firmar Windows con Authenticode. Publicar `CODE_SIGNING.md` con la política de firma, aprobación de releases y procedencia de builds. La solicitud corresponde a la persona mantenedora.
