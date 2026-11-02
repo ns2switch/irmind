@@ -4,7 +4,7 @@
 use std::{process::Command, time::Duration};
 
 #[cfg(unix)]
-use expectrl::{Expect as _, Session as DemoSession};
+use expectrl::{Expect as _, session::OsSession as DemoSession};
 
 #[cfg(windows)]
 mod windows_pty {
@@ -91,7 +91,8 @@ mod windows_pty {
             self.timeout = timeout.unwrap_or(Duration::from_secs(60));
         }
 
-        pub(super) fn expect(&mut self, needle: &str) -> Result<(), String> {
+        pub(super) fn expect(&mut self, needle: impl AsRef<str>) -> Result<(), String> {
+            let needle = needle.as_ref();
             let started = Instant::now();
             loop {
                 if let Some(offset) = self.seen[self.cursor..]
@@ -127,9 +128,9 @@ mod windows_pty {
             }
         }
 
-        pub(super) fn send(&mut self, value: &str) -> Result<(), String> {
+        pub(super) fn send(&mut self, value: impl AsRef<str>) -> Result<(), String> {
             self.input
-                .write_all(value.as_bytes())
+                .write_all(value.as_ref().as_bytes())
                 .map_err(|error| error.to_string())
         }
 
@@ -287,7 +288,7 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
         ("/search 203.0.113.77", "search"),
         ("/neighbors ip 203.0.113.77", "neighbors"),
     ] {
-        session.send(&format!("{command}\r")).unwrap();
+        session.send(format!("{command}\r")).unwrap();
         session.expect(result).unwrap();
         eprintln!("graph result: {result}");
     }
@@ -320,6 +321,14 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
     session.send("/demo next\r").unwrap();
     session.expect("9/10").unwrap();
     eprintln!("guide step 9 visible");
+    complete_demo_custody(&mut session);
+    session.send("/demo exit\r\r").unwrap();
+    session.expect("Demo data deleted").unwrap();
+    assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 0);
+    assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
+}
+
+fn complete_demo_custody(session: &mut DemoSession) {
     session.send("/verify\r").unwrap();
     session.expect("Verified").unwrap();
     session.send("/seal\r").unwrap();
@@ -339,10 +348,6 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
     session.send("/demo next\r").unwrap();
     session.expect("10/10").unwrap();
     eprintln!("guide step 10 visible");
-    session.send("/demo exit\r\r").unwrap();
-    session.expect("Demo data deleted").unwrap();
-    assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 0);
-    assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
 }
 
 #[test]
@@ -358,13 +363,16 @@ fn control_c_cleans_the_demo_from_every_guide_step() {
         session.expect("Ingested").unwrap();
         for next in 2..=step {
             session.send("/demo skip\r").unwrap();
-            session.expect(&format!("{next}/10")).unwrap();
+            session.expect(format!("{next}/10")).unwrap();
         }
         session.send("\x03\r").unwrap();
-        let _completion = session.expect("Demo data deleted").unwrap();
+        #[cfg(unix)]
+        let completion = session.expect("Demo data deleted").unwrap();
+        #[cfg(windows)]
+        session.expect("Demo data deleted").unwrap();
         #[cfg(unix)]
         assert!(
-            _completion
+            completion
                 .as_bytes()
                 .windows(8)
                 .any(|bytes| bytes == b"\x1b[?1049l"),

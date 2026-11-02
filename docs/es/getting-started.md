@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit e31fd5cc947308542888df4a52164d8892c56b93; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 7933256136e1501041869f043d1b64949e79c0be; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
