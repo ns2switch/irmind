@@ -1,4 +1,4 @@
-Traducción de docs/development/manual-validation.md en el commit a59d6745083d597b3154325685f7c9c8a67a8bbc; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/manual-validation.md en el commit 2570e840584ba72decd0e35f3096362b1e3b4494; si hay diferencias, prevalece la versión en inglés.
 
 # Validación manual del MVP
 
@@ -34,7 +34,10 @@ Usa un bucket desechable y una identidad con `s3:ListBucket` en un prefijo y `s3
 
 | Comprobación | Registro |
 | --- | --- |
-| Fecha, modelo exacto, sistema operativo y commit | Pendiente de registrar por el analista; no facilitados. |
+| Fecha de la prueba | 2026-11-01, facilitada por el analista. |
+| Modelo | `deepseek v4.1 flash`, facilitado por el analista. |
+| Sistema operativo | Debian Linux 12, facilitado por el analista. |
+| Versión / commit de IRMind | Versión 0.1.2; no se ha facilitado un commit exacto. |
 | Operador y proveedor | Analista; servicio real de DeepSeek. |
 | Prueba de conexión H5 | Pendiente de registrar por el analista. |
 | Saludo H5 | Observado por el analista: reconoce `hola` como saludo y responde con naturalidad, sin llamadas a herramientas innecesarias. |
