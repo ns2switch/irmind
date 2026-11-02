@@ -1,4 +1,4 @@
-Traducción de README.md en el commit e1a4ceee964092a878e9a2ef2a327cd4bb562393; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit eb6637f06b3af70cbc6c7bb8242883b612d13894; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -11,7 +11,7 @@ IRMind es un asistente agéntico de terminal para respuesta a incidentes y anál
 *La demostración usa evidencia sintética y una clave efímera. El modelo guionizado no necesita red ni cuenta.*
 
 > [!WARNING]
-> IRMind 0.1.1 es una versión preliminar para evaluar con datos sintéticos. No ha superado la validación manual con un modelo ni con conectores reales. No la uses para incidentes reales ni datos sensibles.
+> IRMind 0.1.2 es una versión preliminar para evaluar con datos sintéticos. No ha superado la validación manual con un modelo ni con conectores reales. No la uses para incidentes reales ni datos sensibles.
 
 ## Qué puedes hacer
 
@@ -44,11 +44,11 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-La [versión preliminar v0.1.1](https://github.com/ns2switch/irmind/releases/tag/v0.1.1) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.1.2](https://github.com/ns2switch/irmind/releases/tag/v0.1.2) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.1.1; binary=irmind-linux-x86_64
+tag=v0.1.2; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done

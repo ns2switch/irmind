@@ -1,7 +1,10 @@
 use crate::{WorkspaceIo, workflow::CaseWorkflow};
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use irmind_app::{CancellationToken, CaseId, Engine, FindingKind, LlmPort, summarize_usage};
+use irmind_app::{
+    AppError, AuditEventKind, CancellationToken, CaseId, Engine, FindingKind, LlmPort,
+    SourceManifestV2, summarize_usage,
+};
 use ratatui::widgets::Paragraph;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{
@@ -196,6 +199,24 @@ fn welcome_summary(
     )
 }
 
+fn demo_ingest_result(engine: &Engine<'_>, id: &CaseId, count: usize) -> Result<String, AppError> {
+    let entry = engine
+        .audit_log
+        .entries(id)?
+        .into_iter()
+        .rev()
+        .find(|entry| entry.kind == AuditEventKind::SourceManifestV2)
+        .ok_or(AppError::Policy(
+            "demo parser selection was not signed".into(),
+        ))?;
+    let manifest =
+        SourceManifestV2::decode(&entry.payload).map_err(|_| AppError::InvalidChain(entry.seq))?;
+    Ok(format!(
+        "Ingested {count} synthetic file · {} ({}% confidence). Try /timeline.",
+        manifest.parser_id, manifest.confidence
+    ))
+}
+
 pub(crate) fn run_case(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     engine: &Engine<'_>,
@@ -243,6 +264,12 @@ pub(crate) fn run_case(
         };
         let _mouse = MouseCapture::start(presentation.mouse_capture)?;
         if let Some(path) = io_ops.demo_initial_ingest() {
+            runtime.state.pending_ingest = Some(state::PendingIngest {
+                path: path.clone(),
+                copy_original: false,
+                forced_parser: None,
+                analyst_choices: std::collections::BTreeMap::new(),
+            });
             let workflow = CaseWorkflow {
                 engine,
                 model,
@@ -250,11 +277,10 @@ pub(crate) fn run_case(
             };
             let progress = runtime.progress_tx.clone();
             runtime.start_task("Ingest", move |cancel| {
-                workflow
-                    .ingest_path(id, &path, &cancel, |done, count, source| {
-                        let _ = progress.send(format!("Demo evidence {done}/{count}: {source}"));
-                    })
-                    .map(|count| format!("Ingested {count} synthetic file"))
+                let count = workflow.ingest_path(id, &path, &cancel, |done, count, source| {
+                    let _ = progress.send(format!("Demo evidence {done}/{count}: {source}"));
+                })?;
+                demo_ingest_result(engine, id, count)
             });
         }
         runtime.run()
