@@ -97,4 +97,4 @@ The experimental `parser-declarative` module is integrated through [PR #151](htt
 
 ## Pending timestamp precision proposal
 
-[Parquet artifact V2](parquet-artifact-v2-design.md) addresses [issue #143](https://github.com/ns2switch/irmind/issues/143): precise UTC instants, stable equal-time ordering, compatible reads and explicit verified migration. It is a design proposal awaiting analyst approval. Do not implement its schema, envelope or port changes before approval. Existing parsers must retain full source timestamps while the current derived index remains second precision.
+[Parquet artifact V2](parquet-artifact-v2-design.md) addresses [issue #143](https://github.com/ns2switch/irmind/issues/143): precise UTC instants, stable equal-time ordering, compatible reads and explicit verified migration. The analyst approved the direction with amendments for generic, bounded scope partitions and signed overflow. The revised document awaits review before implementation; no schema, envelope or port implementation is authorized yet. Existing parsers must retain full source timestamps while the current derived index remains second precision.
