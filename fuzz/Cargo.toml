@@ -23,6 +23,7 @@ irmind-mod-parser-velociraptor = { path = "../crates/modules/parser-velociraptor
 irmind-mod-parser-hayabusa = { path = "../crates/modules/parser-hayabusa", version = "0.1.0" }
 irmind-mod-parser-chainsaw = { path = "../crates/modules/parser-chainsaw", version = "0.1.0" }
 irmind-mod-parser-plaso = { path = "../crates/modules/parser-plaso", version = "0.1.0" }
+irmind-mod-parser-declarative = { path = "../crates/modules/parser-declarative", version = "0.1.0" }
 irmind-mod-parser-eztools = { path = "../crates/modules/parser-eztools", version = "0.1.0" }
 
 irmind-infra = { path = "../crates/infra", version = "0.1.0", optional = true }
@@ -112,6 +113,13 @@ bench = false
 [[bin]]
 name = "parser_eztools"
 path = "fuzz_targets/parser_eztools.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_declarative"
+path = "fuzz_targets/parser_declarative.rs"
 test = false
 doc = false
 bench = false

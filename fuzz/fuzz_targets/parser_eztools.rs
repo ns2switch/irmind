@@ -7,7 +7,7 @@ fuzz_target!(|bytes: &[u8]| {
         let _ = EztoolsParser.detect("fuzz.log", bytes);
         let _ = EztoolsParser.parse_reader_report(
             "fuzz.log",
-            &mut bytes.as_ref(),
+            &mut std::io::Cursor::new(bytes),
             sha256(bytes),
             &CancellationToken::new(),
             &mut |_| Ok(()),

@@ -75,3 +75,18 @@ Preferences lists compiled parsers as today, including this module and its activ
 - Fuzz detection and parsing for at least ten minutes locally and include the target in the weekly workflow. Measure a synthetic 1 GiB input and binary size before/after, with no unmeasured throughput claim.
 
 The three proposed definitions in [docs/examples/parsers](../examples/parsers/README.md) illustrate the intended syntax. They are specifications until the parser implementation is complete and tested.
+
+## Draft implementation evidence
+
+The core library now validates the three example definitions and decodes bounded CSV, JSON/NDJSON and regex records. It keeps source offsets, full timestamp text, rejected-record samples and taint provenance. It extracts selected JSON scalars without building a `serde_json::Value` tree. Regex matching uses bounded linear-time compilation and copies only mapped captures.
+
+| Local check | Observed result |
+| --- | --- |
+| Core unit tests | 9 passed, including cancellation, malformed neighboring records, depth/field limits, duplicate keys, quoted CSV newlines and exact fractional epoch time |
+| Workspace fmt and clippy with warnings denied | Passed |
+| Nightly AddressSanitizer fuzzing | 10 minutes, 1,042,080 inputs, no failures; peak RSS 385 MiB under a 512 MiB limit |
+| Default-feature fuzz targets | All built successfully after the explicit-reader correction |
+| Fuzz corpus and artifacts | Disposable local corpus removed after the run; versioned synthetic seeds retained |
+| Production dependency resolution | Existing third-party package versions reused; the lockfile adds only the new IRMind parser crate |
+
+The application does not register this core yet. Remaining work is the reviewed identity/catalog extension, the module's common-port implementation and default feature, signed definition storage/recovery, parser preview and preference views, shared contracts/detection matrix, synthetic episode, user documentation in both languages, and the 1 GiB ingestion/binary-size measurements. No throughput or full-ingestion claim is made by these core-only tests.

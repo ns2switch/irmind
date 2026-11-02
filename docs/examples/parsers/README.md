@@ -1,6 +1,6 @@
 # Proposed declarative parser examples
 
-These examples are for contributors reviewing the [declarative parser design](../../development/declarative-parser-design.md). They specify the proposed syntax; they are not executable until that parser is implemented and tested.
+These examples are for contributors reviewing the [declarative parser design](../../development/declarative-parser-design.md). They compile and parse their synthetic inputs in the core unit tests. TUI installation and catalog integration remain pending; the application does not register them yet.
 
 - [CSV access events](access-csv.toml): an exact header and named columns.
 - [Nested NDJSON authentication](nested-ndjson.toml): JSON Pointer paths and required fields.
