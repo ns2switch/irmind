@@ -84,11 +84,13 @@ fn collect_json_strings(value: &serde_json::Value, output: &mut Vec<String>) {
 
 fn json_string_stream(input: &str) -> String {
     let mut strings = Vec::new();
-    if let Ok(value) = serde_json::from_str::<serde_json::Value>(input) {
+    if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(input) {
+        value.sort_all_objects();
         collect_json_strings(&value, &mut strings);
     } else {
         for line in input.lines() {
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
+            if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(line) {
+                value.sort_all_objects();
                 collect_json_strings(&value, &mut strings);
             }
         }

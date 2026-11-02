@@ -69,10 +69,11 @@ pub(super) fn validated_listing(
     if sum != total_bytes {
         return Err(AppError::RemoteTool);
     }
-    serde_json::to_vec(&serde_json::json!({
+    let mut value = serde_json::json!({
         "source": source, "objects": objects, "total_bytes": total_bytes, "truncated": truncated
-    }))
-    .map_err(|_| AppError::RemoteTool)
+    });
+    value.sort_all_objects();
+    serde_json::to_vec(&value).map_err(|_| AppError::RemoteTool)
 }
 
 #[cfg(test)]

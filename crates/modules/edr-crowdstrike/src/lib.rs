@@ -338,7 +338,9 @@ fn validate_alerts(response: &Value, aid: &str, from: &str, to: &str) -> Result<
     Ok(())
 }
 fn encode(value: &Value) -> Result<Vec<u8>, AppError> {
-    serde_json::to_vec(value).map_err(|_| {
+    let mut value = value.clone();
+    value.sort_all_objects();
+    serde_json::to_vec(&value).map_err(|_| {
         AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
             irmind_app::AdapterStorageError::CannotEncodeCrowdStrikeEvidence,
         ))

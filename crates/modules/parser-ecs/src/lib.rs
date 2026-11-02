@@ -248,7 +248,7 @@ fn parse_record(index: usize, value: &Value) -> Result<GraphRecord, AppError> {
     }
     entities.sort();
     entities.dedup();
-    let normalized = json!({
+    let mut normalized = json!({
         "at": at, "action": event, "result": field(value, "/event/outcome"),
         "host": field(value, "/host/name"), "user": field(value, "/user/name"),
         "process": field(value, "/process/name"), "command_line": field(value, "/process/command_line"),
@@ -257,6 +257,7 @@ fn parse_record(index: usize, value: &Value) -> Result<GraphRecord, AppError> {
         "file": field(value, "/file/path"), "url": field(value, "/url/full"),
         "attributes": value,
     });
+    normalized.sort_all_objects();
     Ok(GraphRecord {
         index,
         at,

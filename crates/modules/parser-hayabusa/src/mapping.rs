@@ -66,7 +66,11 @@ pub(super) fn parse_csv(
         .iter()
         .zip(row.iter())
         .collect::<std::collections::BTreeMap<_, _>>();
-    make_record(index, &fields, serde_json::json!(normalized).to_string())
+    make_record(
+        index,
+        &fields,
+        serde_json::to_string(&normalized).map_err(|_| bad())?,
+    )
 }
 fn make_record(index: usize, row: &Row<'_>, text: String) -> Result<GraphRecord, AppError> {
     let raw = row.timestamp.ok_or_else(bad)?;

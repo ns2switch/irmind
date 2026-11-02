@@ -127,11 +127,13 @@ pub(super) fn parse_csv(
     }
     entities.sort();
     entities.dedup();
+    let mut normalized = serde_json::json!({"tool": tool, "columns": headers.iter().zip(row.iter()).collect::<std::collections::BTreeMap<_, _>>()});
+    normalized.sort_all_objects();
     Ok(GraphRecord {
         index,
         at,
         event: tool.into(),
-        text: serde_json::json!({"tool":tool,"columns":headers.iter().zip(row.iter()).collect::<std::collections::BTreeMap<_,_>>()}).to_string(),
+        text: normalized.to_string(),
         entities,
         relations: Vec::new(),
     })

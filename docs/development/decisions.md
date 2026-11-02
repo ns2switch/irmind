@@ -98,3 +98,11 @@ The prompt-injection corpus intentionally contains English and Spanish attack sa
 **Decision:** Approve the revised [artifact-v2 design](parquet-artifact-v2-design.md). First prove JSON map-order independence without changing existing formats or goldens, then deliver syslog/Linux, then implement V2 in separate reviewed steps. Start the host-partition cap at 64; use the 15 GB benchmark to select its default and keep 1,024 as a hard ceiling.
 
 **Consequences:** EVTX follows V2 as the official decoder in an isolated Cargo workspace and bounded, network-disabled subprocess, rather than a fork or a dependency in IRMind's workspace. Helper outputs are untrusted and keep record/offset provenance. Its release binary requires signatures, attestations, checksum, SBOM, an unsafe report and at least one hour of malformed-EVTX fuzzing. Dependency/distribution approval is required before merge. No signed format changes in this documentation PR.
+
+## JSON map-order independence
+
+**Context:** Cargo features can replace serde_json's sorted map with an insertion-ordered map, affecting normalized records, bounded extraction and derived artifact hashes.
+
+**Decision:** Preserve historical bytes with explicit recursive lexical sorting at Value boundaries; keep typed field order, ordered collections and original evidence bytes. Test a frozen pre-change corpus with and without `serde_json/preserve_order` in CI. See [the serialization audit](json-format-order.md).
+
+**Consequences:** No format, tag, signature challenge or existing golden changes. A mismatch requires analyst review. Future parsers follow the same rule; EVTX remains isolated in its separate workspace after artifact V2.

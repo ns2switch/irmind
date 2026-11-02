@@ -37,7 +37,7 @@ pub(super) fn parse(index: usize, value: &Value) -> Result<GraphRecord, AppError
     let mut entities = entities(value);
     entities.sort();
     entities.dedup();
-    let normalized = json!({
+    let mut normalized = json!({
         "at": at, "action": action, "result": field(value, "/status"),
         "host": field(value, "/device/hostname"),
         "user": field(value, "/actor/user/name").or_else(|| field(value, "/user/name")),
@@ -52,6 +52,7 @@ pub(super) fn parse(index: usize, value: &Value) -> Result<GraphRecord, AppError
         "region": field(value, "/cloud/region"),
         "attributes": value,
     });
+    normalized.sort_all_objects();
     Ok(GraphRecord {
         index,
         at,

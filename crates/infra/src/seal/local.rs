@@ -142,7 +142,8 @@ impl LocalStore {
         if path.exists() {
             return Err(storage_reason("case seal already exists"));
         }
-        let value = json!({"case_id": id.as_str(), "seq": seal.seq, "hash": hex(&seal.hash), "signature": hex(&seal.sig), "public_key": hex(&seal.public_key), "analyst_key_fingerprint": seal.analyst_key_fingerprint});
+        let mut value = json!({"case_id": id.as_str(), "seq": seal.seq, "hash": hex(&seal.hash), "signature": hex(&seal.sig), "public_key": hex(&seal.public_key), "analyst_key_fingerprint": seal.analyst_key_fingerprint});
+        value.sort_all_objects();
         let bytes = serde_json::to_vec_pretty(&value).map_err(storage)?;
         let temporary =
             self.seal_dir

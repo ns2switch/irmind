@@ -130,6 +130,26 @@ jobs:
       - name: Clean staging
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'portable-export', 'verify-bin')) if p.is_dir()]"
+  json_formats:
+    needs: [linux, dco]
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.run_ci == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: json-formats-${{ hashFiles('Cargo.lock') }}
+          add-rust-environment-hash-key: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        with: {tool: cargo-nextest, fallback: none}
+      - name: Compare historical bytes and hashes with insertion-ordered JSON enabled
+        env:
+          IRMIND_EXPECT_PRESERVE_ORDER: '1'
+        run: cargo nextest run -p irmind --test format_goldens --all-features --features serde_json/preserve_order --cargo-profile ci --locked
   linux_arm64:
     needs: [linux, dco]
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.release_build == 'true' && inputs.profile_linux != true }}

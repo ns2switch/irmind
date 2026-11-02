@@ -77,12 +77,10 @@ impl RecordSink<'_> {
             return Err(AppError::Cancelled);
         }
         let started = Instant::now();
-        let mut record = parse_record(
-            self.source,
-            self.evidence_hash,
-            self.count,
-            &normalize_record(value),
-        )?;
+        let mut value = normalize_record(value);
+        // Preserve the historical lexical traversal, including extraction caps.
+        value.sort_all_objects();
+        let mut record = parse_record(self.source, self.evidence_hash, self.count, &value)?;
         if self.byte_count.is_some() {
             record = record.with_parser_location(
                 ParserLocation::new(self.source, "parser-json", self.record_offset)

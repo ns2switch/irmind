@@ -51,7 +51,8 @@ pub(super) fn parse(
             return Err(AppError::Cancelled);
         }
         let row = row.map_err(|_| policy_error("corrupt OCSF Parquet row"))?;
-        let value = row.to_json_value();
+        let mut value = row.to_json_value();
+        value.sort_all_objects();
         let encoded = value.to_string();
         if encoded.len() > MAX_ROW_BYTES {
             reject_row(&mut report, &encoded);

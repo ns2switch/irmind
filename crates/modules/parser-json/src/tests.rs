@@ -345,3 +345,40 @@ fn streaming_reader_rejects_oversized_record_before_emitting_it() {
     assert!(result.is_err());
     assert_eq!(emitted, 0);
 }
+
+#[test]
+fn normalized_json_and_capped_entity_selection_ignore_object_insertion_order() {
+    let fields = (0..40)
+        .map(|index| format!("\"userName{index:02}\":\"synthetic-{index:02}\""))
+        .collect::<Vec<_>>();
+    let forward = format!("{{{}}}", fields.join(","));
+    let reverse = format!(
+        "{{{}}}",
+        fields.iter().rev().cloned().collect::<Vec<_>>().join(",")
+    );
+    let parse = |input: &str| {
+        let mut rows = Vec::new();
+        JsonParser
+            .parse_reader(
+                "synthetic.json",
+                &mut input.as_bytes(),
+                [0; 32],
+                &irmind_app::CancellationToken::new(),
+                &mut |record| {
+                    record.inspect(|row| rows.push(row.clone()));
+                    Ok(())
+                },
+            )
+            .unwrap();
+        rows
+    };
+    let rows = parse(&forward);
+    assert_eq!(rows, parse(&reverse));
+    assert_eq!(rows[0].entities.len(), 32);
+    assert!(
+        rows[0]
+            .entities
+            .iter()
+            .all(|(_, value)| value.as_str() <= "synthetic-31")
+    );
+}
