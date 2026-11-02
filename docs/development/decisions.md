@@ -90,3 +90,11 @@ The prompt-injection corpus intentionally contains English and Spanish attack sa
 **Decision:** Add default-compatible borrowed identity methods to the streaming parser port and owned catalog keys. Keep legacy native methods. Sign the full bounded definition in the existing global operation envelope, retain the SHA-256 in the existing source parser-version string, and resolve historical versions from verified signed snapshots. New local compiler/store ports keep parsing pure and storage at the composition boundary. No external package version or signed wire tag changes.
 
 **Consequences:** A declaration cannot outrank a native high-confidence match. Changed or unsigned files stay disabled, and restoration is explicit. A post-signing write failure is recoverable without weakening approval or custody. The reviewed artifact-v2 design remains unimplemented. The analyst approved the additive parser-port changes; they are integrated in [PR #151](https://github.com/ns2switch/irmind/pull/151).
+
+## Approved precision and EVTX isolation order
+
+**Context:** Parser expansion needs precise timestamps without changing historical JSON normalization through Cargo feature unification.
+
+**Decision:** Approve the revised [artifact-v2 design](parquet-artifact-v2-design.md). First prove JSON map-order independence without changing existing formats or goldens, then deliver syslog/Linux, then implement V2 in separate reviewed steps. Start the host-partition cap at 64; use the 15 GB benchmark to select its default and keep 1,024 as a hard ceiling.
+
+**Consequences:** EVTX follows V2 as the official decoder in an isolated Cargo workspace and bounded, network-disabled subprocess, rather than a fork or a dependency in IRMind's workspace. Helper outputs are untrusted and keep record/offset provenance. Its release binary requires signatures, attestations, checksum, SBOM, an unsafe report and at least one hour of malformed-EVTX fuzzing. Dependency/distribution approval is required before merge. No signed format changes in this documentation PR.
