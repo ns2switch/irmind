@@ -90,3 +90,11 @@ The prompt-injection corpus intentionally contains English and Spanish attack sa
 **Decision:** Add default-compatible borrowed identity methods to the streaming parser port and owned catalog keys. Keep legacy native methods. Sign the full bounded definition in the existing global operation envelope, retain the SHA-256 in the existing source parser-version string, and resolve historical versions from verified signed snapshots. New local compiler/store ports keep parsing pure and storage at the composition boundary. No external package version or signed wire tag changes.
 
 **Consequences:** A declaration cannot outrank a native high-confidence match. Changed or unsigned files stay disabled, and restoration is explicit. A post-signing write failure is recoverable without weakening approval or custody. The reviewed artifact-v2 design remains unimplemented. The analyst approved the additive parser-port changes; they are integrated in [PR #151](https://github.com/ns2switch/irmind/pull/151).
+
+## EVTX dependency gate (proposal)
+
+**Context:** The next binary-log parser needs an EVTX decoder, but the reviewed published `evtx` library forces serde_json preserve_order and brings transitive SIMD unsafe code even with default features disabled.
+
+**Proposed decision:** Seek analyst approval before adding the dependency. Prefer a minimal pinned/upstreamable optional-feature patch that keeps preserve_order disabled and proves existing-parser and historical Parquet equivalence; otherwise continue with syslog first. No dependency or runtime implementation is added by this review.
+
+**Consequences:** License and maintenance evidence are recorded in [the dependency review](evtx-parser-review.md). Transitive unsafe exposure and bounded rendering still need review. An existing parser's signed output cannot change silently to enable EVTX.
