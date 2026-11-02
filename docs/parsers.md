@@ -10,6 +10,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 
 | Parser | Input | Detection | Mapped fields | Status |
 | --- | --- | --- | --- | --- |
+| Syslog | RFC 5424 / RFC 3164, plain or gzip | PRI and timestamp/header shape; 95 / 90 | UTC time, host, application, PID, facility, severity, message and raw data | experimental |
 | JSON and exported cloud logs | JSON/NDJSON; AWS, GCP, Azure and HuntEval | Recognized record fields | Time, identities, accounts, resources and IPs | experimental |
 | ECS | NDJSON | ECS version and timestamp/characteristic fields | Event, host, user, source, destination, process, file, URL | experimental |
 | OCSF | JSON/NDJSON or local Parquet | Class, category and schema metadata; Parquet needs confirmation | Authentication, API, network, process, file and findings | experimental |
@@ -40,3 +41,7 @@ Accepted files live in `parsers/active/` under the private data directory, with 
 The definition hash is part of the parser version in the existing source manifest. Rebuilding an old case resolves that exact signed version, even after replacement or deactivation. Exported manifests retain the pinned hash; reconstructing on another machine also requires the matching approved definition. Export verification itself does not execute definitions. Symlink definitions are rejected. Temporary writes stay within the private data directory and are removed after completion or error; startup cleans orphaned definition temporaries.
 
 All mapped records retain taint and source/parser/offset provenance. The guard screens preview, evidence shown on screen and model context. A definition cannot grant a tool permission or alter organization policy. Keep expected answers from synthetic evaluation episodes outside the source directory you ingest.
+
+### Legacy syslog time
+
+RFC 3164 needs a year and UTC offset supplied by the analyst. IRMind records the inference and never fills these from the machine clock. See the [syslog configuration and limits](development/syslog-parser.md).

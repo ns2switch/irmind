@@ -1,4 +1,4 @@
-Traducción de docs/parsers.md en el commit fda2702d91de43a20df21ce9b936b87c240b4355; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/parsers.md en el commit c6087e07320d77640e88c70461010cd57f1a43c1; si hay diferencias, prevalece la versión en inglés.
 
 # Parsers de logs
 
@@ -16,6 +16,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | ECS | NDJSON | Versión de ECS e instante/campos característicos | Evento, host, usuario, origen, destino, proceso, archivo, URL | experimental |
 | OCSF | JSON/NDJSON o Parquet local | Clase, categoría y metadatos; Parquet requiere confirmación | Autenticación, API, red, procesos, archivos y hallazgos | experimental |
 | Herramientas DFIR | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Marcadores o cabecera CSV exacta | Instante, host, usuario, proceso, acción y entidades disponibles | experimental |
+| Syslog | RFC 5424/RFC 3164, texto o gzip acotado | PRI y forma de cabecera/instante, no extensión | Host, aplicación, PID, facility, severity, mensaje y tiempo completo | experimental |
 | Declarativo | CSV, JSON, NDJSON o regex acotada | Cabecera exacta, campos JSON o regex; máximo 70 % | Mapeo explícito descrito abajo | experimental |
 
 ## Un formato propio sin Rust
@@ -42,3 +43,7 @@ Los archivos aceptados viven en `parsers/active/` dentro del directorio de datos
 El hash de la definición forma parte de la versión del parser en el manifiesto existente. Reconstruir un caso usa esa versión exacta, incluso tras cambiarla o desactivarla. El manifiesto exportado conserva el hash; reconstruir en otra máquina requiere también la definición aprobada correspondiente. Verificar una exportación no ejecuta definiciones. Se rechazan enlaces simbólicos. Las escrituras temporales quedan dentro del directorio privado y se borran al terminar o fallar; el arranque limpia temporales huérfanos.
 
 Los registros conservan taint y procedencia de fuente, parser y offset. El guard sanea vista previa, evidencia mostrada y contexto del modelo. Una definición no concede permisos ni cambia el techo de la organización. Mantén las respuestas esperadas de episodios sintéticos fuera del directorio de fuentes que ingieres.
+
+### Tiempo de syslog clásico
+
+RFC 3164 necesita un año y un desplazamiento UTC proporcionados por el analista. IRMind registra la inferencia y nunca los toma del reloj del sistema. Consulta [la configuración y los límites de syslog](../development/syslog-parser.md).

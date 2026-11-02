@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit fda2702d91de43a20df21ce9b936b87c240b4355; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit c6087e07320d77640e88c70461010cd57f1a43c1; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -229,3 +229,7 @@ Lee CSV de PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd bat
 ## Contrato de proveedores
 
 Para añadir un módulo, consulta la [guía de arquitectura](../development/architecture.md) y la suite de contratos compartida de `irmind-testkit`. No actives un proveedor por defecto.
+
+## Parser Syslog
+
+Para ingerir logs RFC 5424 o RFC 3164, `parser-syslog` es un módulo local experimental compilado por defecto. También admite gzip con límites de entrada y salida. No necesita credenciales ni red. RFC 3164 exige año y desplazamiento UTC explícitos: ambos quedan firmados como contexto inferido. Consulta [el contrato y la configuración](../development/syslog-parser.md) y [la selección de parsers](parsers.md). Se conserva la precisión del original; el índice derivado actual aún usa segundos.

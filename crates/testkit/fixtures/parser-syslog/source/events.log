@@ -1,0 +1,3 @@
+<34>1 2026-11-01T00:02:03.123456Z synthetic-host sshd 321 AUTH - Failed synthetic login from 203.0.113.77
+<34>1 2026-11-01T00:02:04.000001Z synthetic-host sshd 321 AUTH - Accepted synthetic login from 203.0.113.77
+<85>1 2026-11-01T00:02:05.000002Z synthetic-host cron 654 TASK - Created synthetic persistence task

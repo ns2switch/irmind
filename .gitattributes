@@ -13,3 +13,7 @@
 **/corpus/**/*.txt text eol=lf
 **/seeds/**/*.json text eol=lf
 **/seeds/**/*.txt text eol=lf
+
+**/fixtures/**/*.log text eol=lf
+**/seeds/**/*.log text eol=lf
+*.gz -text

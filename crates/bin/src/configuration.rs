@@ -7,6 +7,8 @@ pub(super) use overrides::{EgressOverride, collect_egress_overrides};
 
 pub(super) fn compiled_manifests() -> Vec<&'static ModuleManifest> {
     vec![
+        #[cfg(feature = "parser-syslog")]
+        &irmind_mod_parser_syslog::MANIFEST,
         &irmind_mod_llm_openai_compatible::MANIFEST,
         #[cfg(feature = "llm-anthropic")]
         &irmind_mod_llm_anthropic::MANIFEST,

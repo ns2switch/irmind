@@ -102,6 +102,10 @@ The experimental `parser-declarative` module is integrated through [PR #151](htt
 ## Approved parser and precision work order
 
 1. Make signed, hashed and reconstructed output independent of `serde_json::Map` order; test unchanged golden bytes with `preserve_order` enabled. A changed existing golden requires analyst review.
-2. Deliver separate syslog and Linux modules without new dependencies, retaining explicit/inferred timestamp context.
+2. Deliver separate syslog and Linux modules, retaining explicit/inferred timestamp context. The analyst approved reviewed `flate2` for bounded gzip; Linux adds no new dependencies.
 3. Implement the approved artifact-v2 design in the separate PRs listed above.
 4. Add EVTX through an isolated `irmind-evtx` helper in its own Cargo workspace, using official upstream `evtx` without a fork. Its features must not unify with the main workspace. The helper has no network or shell, fixed arguments, bounded runtime/output and untrusted NDJSON with source provenance. Rejection is atomic; unavailable helpers remain visible as unavailable. Include signed release/install assets, attestations, SBOM and an unsafe report. Run malformed-input fuzzing for at least one hour and nightly. Ask before merge because it adds dependencies and a distributed binary.
+
+## Native syslog parser
+
+The experimental feature-gated `parser-syslog` uses the shared detection registry and existing SourceManifestV2. RFC 5424 retains source precision; RFC 3164 binds explicit year and fixed offset into the signed inference context and parser version. Bounded gzip uses the reviewed, analyst-approved `flate2` dependency. Synthetic contracts, signed ingestion/reconstruction, unchanged-format goldens, fuzzing and local throughput measurements are documented in [the parser contract](syslog-parser.md) and [benchmarks](benchmarks.md). Linux remains the next module; artifact-V2 implementation has not started.

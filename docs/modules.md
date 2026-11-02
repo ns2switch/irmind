@@ -257,3 +257,7 @@ The five DFIR parsers below index times at UTC-second precision. Their local rec
 ## Provider contract
 
 Contributors adding a module should use [the architecture guide](development/architecture.md) and the shared contract suite in `irmind-testkit`. Do not enable a provider by default.
+
+## Syslog parser
+
+For analysts importing line-oriented RFC 5424 or RFC 3164 logs, `parser-syslog` is an experimental local module compiled by default. It also supports bounded gzip streams. No credentials or network permissions are required. RFC 3164 requires an explicit year and UTC offset; both are signed as inferred context. See the [parser contract and configuration](development/syslog-parser.md) and [parser selection](parsers.md). Full source precision is retained while the current derived index remains second precision.

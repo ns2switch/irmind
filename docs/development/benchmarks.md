@@ -167,3 +167,43 @@ Native fixture scores remain unchanged. Every declarative candidate is below the
 The versioned matrix test checks every native fixture against the three declarations and every custom fixture against all native parsers and declarations. Shared streaming contracts cover all three declarative formats. Low confidence deliberately requires selection even with one candidate; no false high-confidence declarative match was observed.
 
 Nightly AddressSanitizer fuzzing of detection and parsing ran **600 seconds**, exercising **1,042,080 inputs**, with no crashes and peak RSS 385 MiB under a 512 MiB limit. Disposable corpora and artifacts were removed. The target also runs in weekly fuzzing.
+
+## Experimental syslog parser
+
+The synthetic 1 GiB test uses roughly 1 KiB RFC 5424 rows and the same selected-parser, signed-source pipeline as the TUI. Sources are generated immediately before ingestion, so the OS page cache is warm. The local Linux x86_64 test profile is unoptimized, with one build/test worker; these numbers are not a standard-runner or parser-only claim. The timed operation includes source hashing, normalization, extraction, Parquet/co-observation output and signed custody. Explicit verification runs afterwards. No model, network service or real incident data is used.
+
+The parser's first ASAN fuzz run completed its 600-second budget without failure. A second run seeded with valid gzip completed normally after 602.850 seconds including its incremental build: 2,392,307 executions, 7,661 new units, peak RSS 441 MiB, zero failures. Each run uses a temporary corpus removed on exit, at most 64 KiB per input, a 1 GiB RSS limit and a 30-second per-input timeout.
+
+| Measure | Result |
+| --- | --- |
+| Synthetic source | 1,073,741,832 bytes |
+| Selected-source ingestion | 152.901 s |
+| End-to-end throughput | 6.697 MiB/s |
+| Post-ingestion verification | passed |
+
+This includes all hashing, artifact output and custody work; it does not identify parsing as the bottleneck. No performance optimization or issue #61 closure is claimed. Binary-size comparison uses the same unoptimized development profile before and after the module, not release artifacts.
+
+| Same local all-feature development build | Main `b1e2141` | Syslog module |
+| --- | ---: | ---: |
+| Binary bytes | 107,102,152 | 107,625,352 |
+| Change | — | +523,200 (+0.49%) |
+
+Both builds use the pinned toolchain, the same main base and unoptimized development profile. These are local debug sizes, not published release assets. Two 600-second ASAN runs amount to 0.333 hours of local fuzzing; no failures were observed.
+
+### Syslog detection matrix
+
+Values are confidence percentages for the versioned public fixtures; `—` means no match. The three example declarative definitions match none of these native fixtures. Existing native scores are unchanged.
+
+| Fixture | JSON | ECS | OCSF | Velociraptor | Hayabusa | Chainsaw | plaso | EZTools | Syslog |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| JSON/cloud | 90 | — | — | — | — | — | — | — | — |
+| ECS | 45 | 95 | — | — | — | — | — | — | — |
+| OCSF JSON | 45 | — | 95 | — | — | — | — | — | — |
+| Velociraptor | 45 | — | — | 95 | — | — | — | — | — |
+| Hayabusa | 45 | — | — | — | 95 | — | — | — | — |
+| Chainsaw | 45 | — | — | — | — | 95 | — | — | — |
+| plaso | 45 | — | — | — | — | — | 95 | — | — |
+| EZTools CSV | — | — | — | — | — | — | — | 95 | — |
+| Syslog RFC 5424 | — | — | — | — | — | — | — | — | 95 |
+
+No high-confidence false positive or tie was observed in this matrix. Unit contracts separately check RFC 3164 (90%) and content-detected gzip. New frozen fixtures add 18 byte/hash pairs covering syslog normalization, source manifests and actual Parquet artifact envelopes; the original 67 pairs remain unchanged under both JSON map implementations.
