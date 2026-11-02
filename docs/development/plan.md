@@ -94,3 +94,7 @@ English is authoritative. Public guides live under `docs/`; Spanish user guides 
 ## Declarative parser block
 
 The experimental `parser-declarative` module is integrated through [PR #151](https://github.com/ns2switch/irmind/pull/151) behind a default Cargo feature. Definitions are strict, bounded TOML, compiled only from approved bytes, with low-confidence detection requiring analyst selection. New additive parser identity methods borrow dynamic names/versions; catalog keys own their strings. Native parser methods keep their defaults. Signed `SourceManifestV2` and `ParquetArtifactV1` tags and encodings remain unchanged: the existing parser-version field contains the definition SHA-256. Install/change/deactivate/restore use the current signed global operational envelope and private atomic storage. Historical resolution uses verified signed snapshots. The analyst approved the additive port changes before merge; the artifact-v2 proposal in #143 remains design-only and requires separate approval before implementation.
+
+## Pending timestamp precision proposal
+
+[Parquet artifact V2](parquet-artifact-v2-design.md) addresses [issue #143](https://github.com/ns2switch/irmind/issues/143): precise UTC instants, stable equal-time ordering, compatible reads and explicit verified migration. It is a design proposal awaiting analyst approval. Do not implement its schema, envelope or port changes before approval. Existing parsers must retain full source timestamps while the current derived index remains second precision.
