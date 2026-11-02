@@ -155,68 +155,78 @@ fn normalized_rows(
 }
 
 fn parser_goldens(out: &mut Goldens) {
-    let root = tempfile::tempdir().unwrap();
-    let store = ParquetStore::open(root.path()).unwrap();
+    for (name, parser, bytes) in parsers() {
+        one_parser_golden(out, name, parser.as_ref(), bytes);
+    }
+}
+
+fn one_parser_golden(
+    out: &mut Goldens,
+    name: &str,
+    parser: &dyn StreamingEventParser,
+    bytes: &[u8],
+) {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let store = ParquetStore::open(root).unwrap();
     let id = CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
     let cancel = CancellationToken::new();
-    for (name, parser, bytes) in parsers() {
-        let source = format!("{name}.log");
-        let path = root.path().join(&source);
-        fs::write(&path, bytes).unwrap();
-        // Windows requires a writable handle for setting file timestamps.
-        fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&path)
-            .unwrap()
-            .set_modified(
-                std::time::UNIX_EPOCH + std::time::Duration::from_secs(FixedClock.now().unwrap()),
-            )
-            .unwrap();
-        let rows = normalized_rows(parser.as_ref(), &source, bytes, &cancel);
-        assert!(!rows.is_empty(), "{name}");
+    let source = format!("{name}.log");
+    let path = root.join(&source);
+    fs::write(&path, bytes).unwrap();
+    // Windows requires a writable handle for setting file timestamps.
+    fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&path)
+        .unwrap()
+        .set_modified(
+            std::time::UNIX_EPOCH + std::time::Duration::from_secs(FixedClock.now().unwrap()),
+        )
+        .unwrap();
+    let rows = normalized_rows(parser, &source, bytes, &cancel);
+    assert!(!rows.is_empty(), "{name}");
+    record(
+        out,
+        &format!("parser/{name}"),
+        &serde_json::to_vec(&rows).unwrap(),
+    );
+    let prepared = store
+        .prepare_local(&id, root, &source, false, parser, &cancel)
+        .unwrap();
+    record(
+        out,
+        &format!("manifest/{name}"),
+        prepared.manifest.encode().unwrap().as_bytes(),
+    );
+    let manifest_v2 = irmind_domain::SourceManifestV2 {
+        source: prepared.manifest.clone(),
+        parser_id: parser.identity().name.into(),
+        parser_version: parser.identity().version.into(),
+        confidence: 90,
+        selection: irmind_domain::ParserSelectionMode::Automatic,
+        timestamp_context: parser.timestamp_context().map(str::to_owned),
+        rejected_records: 0,
+        rejected_sample: vec![],
+    };
+    record(
+        out,
+        &format!("manifest-v2/{name}"),
+        manifest_v2.encode().unwrap().as_bytes(),
+    );
+    for artifact in &prepared.artifacts {
+        store.verify_artifact(&id, artifact, &cancel).unwrap();
         record(
             out,
-            &format!("parser/{name}"),
-            &serde_json::to_vec(&rows).unwrap(),
+            &format!(
+                "artifact/{name}/{}/{}/{}/{}",
+                artifact.schema_version,
+                artifact.partition_date,
+                artifact.partition_account,
+                artifact.partition_region
+            ),
+            artifact.encode().unwrap().as_bytes(),
         );
-        let prepared = store
-            .prepare_local(&id, root.path(), &source, false, parser.as_ref(), &cancel)
-            .unwrap();
-        record(
-            out,
-            &format!("manifest/{name}"),
-            prepared.manifest.encode().unwrap().as_bytes(),
-        );
-        let manifest_v2 = irmind_domain::SourceManifestV2 {
-            source: prepared.manifest.clone(),
-            parser_id: parser.identity().name.into(),
-            parser_version: parser.identity().version.into(),
-            confidence: 90,
-            selection: irmind_domain::ParserSelectionMode::Automatic,
-            timestamp_context: parser.timestamp_context().map(str::to_owned),
-            rejected_records: 0,
-            rejected_sample: vec![],
-        };
-        record(
-            out,
-            &format!("manifest-v2/{name}"),
-            manifest_v2.encode().unwrap().as_bytes(),
-        );
-        for artifact in &prepared.artifacts {
-            store.verify_artifact(&id, artifact, &cancel).unwrap();
-            record(
-                out,
-                &format!(
-                    "artifact/{name}/{}/{}/{}/{}",
-                    artifact.schema_version,
-                    artifact.partition_date,
-                    artifact.partition_account,
-                    artifact.partition_region
-                ),
-                artifact.encode().unwrap().as_bytes(),
-            );
-        }
     }
 }
 
@@ -356,5 +366,42 @@ fn signed_and_reconstructed_format_goldens_are_unchanged() {
     );
     for (key, value) in &expected {
         assert_eq!(actual.get(key), Some(value), "format golden {key}");
+    }
+}
+
+#[test]
+#[cfg(feature = "parser-syslog")]
+fn syslog_signed_and_reconstructed_format_goldens_are_unchanged() {
+    use irmind_mod_parser_syslog::{LegacyTimestamp, SyslogParser};
+    let mut actual = Goldens::new();
+    let modern = SyslogParser::default();
+    let classic = SyslogParser::new(Some(LegacyTimestamp::new(2026, 60).unwrap()));
+    for (name, parser, bytes) in [
+        (
+            "syslog",
+            &modern,
+            include_bytes!("../../testkit/fixtures/parser-syslog/source/events.log").as_slice(),
+        ),
+        (
+            "syslog-classic",
+            &classic,
+            include_bytes!("../../../fuzz/seeds/parser_syslog/classic.log").as_slice(),
+        ),
+        (
+            "syslog-gzip",
+            &modern,
+            include_bytes!("../../../fuzz/seeds/parser_syslog/compressed.gz").as_slice(),
+        ),
+    ] {
+        one_parser_golden(&mut actual, name, parser, bytes);
+    }
+    let expected: Goldens =
+        serde_json::from_str(include_str!("fixtures/formats-syslog-v1.json")).unwrap();
+    assert_eq!(
+        actual.keys().collect::<Vec<_>>(),
+        expected.keys().collect::<Vec<_>>()
+    );
+    for (key, value) in &expected {
+        assert_eq!(actual.get(key), Some(value), "syslog format golden {key}");
     }
 }

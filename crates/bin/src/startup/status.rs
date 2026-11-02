@@ -58,6 +58,11 @@ fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
             cfg!(feature = "parser-json"),
             "json-stream-v2",
         ),
+        (
+            "parser-syslog",
+            cfg!(feature = "parser-syslog"),
+            "syslog-v1",
+        ),
         ("parser-ecs", cfg!(feature = "parser-ecs"), "ecs-ndjson-v1"),
         (
             "parser-ocsf",
@@ -93,8 +98,10 @@ fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
         builder.out.push(ModuleStatus {
             id: id.into(),
             compiled,
-            enabled: compiled,
-            configuration: if compiled {
+            enabled: compiled && builder.registry.manifest(id).is_some(),
+            configuration: if let Some(issue) = builder.issues.get(id) {
+                issue.clone()
+            } else if compiled {
                 format!("experimental; {version}")
             } else {
                 format!("not compiled; enable --features {id}")

@@ -156,6 +156,24 @@ impl PreparedStartup {
         }))
     }
 
+    fn parser_catalog(&self, registry: &ModuleRegistry) -> irmind_app::modules::ParserCatalog {
+        #[cfg(not(feature = "parser-declarative"))]
+        let resolver: Option<Arc<dyn irmind_app::modules::ParserResolver>> = None;
+        #[cfg(feature = "parser-declarative")]
+        let resolver = Some(
+            self.definitions
+                .resolver(Arc::new(irmind_mod_parser_declarative::DeclarativeCompiler)),
+        );
+        #[cfg(feature = "parser-syslog")]
+        let resolver: Option<Arc<dyn irmind_app::modules::ParserResolver>> = Some(Arc::new(
+            irmind_mod_parser_syslog::HistoricalResolver::new(resolver),
+        ));
+        resolver.map_or_else(
+            || registry.parser_catalog(),
+            |resolver| registry.parser_catalog().with_resolver(resolver),
+        )
+    }
+
     fn run(self, cancel: &CancellationToken) -> Result<bool> {
         let (registry, config_issues) = configured_registry(
             &self.cli,
@@ -167,12 +185,7 @@ impl PreparedStartup {
         #[cfg(feature = "parser-declarative")]
         let registry =
             super::parser_definitions::register(registry, &self.definitions, &self.home)?;
-        let catalog = registry.parser_catalog();
-        #[cfg(feature = "parser-declarative")]
-        let catalog = catalog.with_resolver(
-            self.definitions
-                .resolver(Arc::new(irmind_mod_parser_declarative::DeclarativeCompiler)),
-        );
+        let catalog = self.parser_catalog(&registry);
         let engine = self.compose_engine(&registry, catalog.clone())?;
         let Self {
             cli,

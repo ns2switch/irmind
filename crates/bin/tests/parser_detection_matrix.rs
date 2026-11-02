@@ -76,6 +76,11 @@ mod matrix {
         registry.register(Box::new(ChainsawParser), &ModuleConfig::new())?;
         registry.register(Box::new(PlasoParser), &ModuleConfig::new())?;
         registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
+        #[cfg(feature = "parser-syslog")]
+        registry.register(
+            Box::new(irmind_mod_parser_syslog::SyslogParser::default()),
+            &ModuleConfig::new(),
+        )?;
 
         #[cfg(feature = "parser-declarative")]
         registry.register(
@@ -85,6 +90,12 @@ mod matrix {
             &ModuleConfig::new(),
         )?;
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-syslog")]
+            (
+                "synthetic.log",
+                include_bytes!("../../testkit/fixtures/parser-syslog/source/events.log").as_slice(),
+                "parser-syslog",
+            ),
             ("cloud.json", JSON, "parser-json"),
             ("ecs.ndjson", ECS, "parser-ecs"),
             ("ocsf.ndjson", OCSF, "parser-ocsf"),
@@ -139,7 +150,19 @@ mod matrix {
             ("parser-plaso", PlasoParser.detect(name, sample)),
             ("parser-eztools", EztoolsParser.detect(name, sample)),
         ];
+        #[cfg(feature = "parser-syslog")]
+        assert_eq!(
+            irmind_mod_parser_syslog::SyslogParser::default()
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            if expected == "parser-syslog" {
+                Some(95)
+            } else {
+                None
+            }
+        );
         let expected_scores: [Option<u8>; 8] = match expected {
+            "parser-syslog" => [None; 8],
             "parser-json" => [Some(90), None, None, None, None, None, None, None],
             "parser-ecs" => [Some(45), Some(95), None, None, None, None, None, None],
             "parser-ocsf" => [Some(45), None, Some(95), None, None, None, None, None],

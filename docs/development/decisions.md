@@ -106,3 +106,11 @@ The prompt-injection corpus intentionally contains English and Spanish attack sa
 **Decision:** Preserve historical bytes with explicit recursive lexical sorting at Value boundaries; keep typed field order, ordered collections and original evidence bytes. Test a frozen pre-change corpus with and without `serde_json/preserve_order` in CI. See [the serialization audit](json-format-order.md).
 
 **Consequences:** No format, tag, signature challenge or existing golden changes. A mismatch requires analyst review. Future parsers follow the same rule; EVTX remains isolated in its separate workspace after artifact V2.
+
+## Syslog streaming and timestamp context
+
+**Context:** Legacy syslog omits year and zone, and gzip support needs a reviewed decoder. Guessing from the machine clock would undermine reconstruction.
+
+**Decision:** Keep syslog in its own optional, default-compiled parser module. Inject explicit year and fixed UTC offset at composition; bind them in the existing parser-version and SourceManifestV2 context fields. Resolve historical versions from those canonical values. The analyst approved flate2 after review; pin 1.1.10 with the miniz_oxide backend and bound input, output, records and samples.
+
+**Consequences:** No new port or signed-format changes. Source precision remains intact; V1 indexing stays second resolution until artifact V2. Invalid gzip is atomic, and parsed content stays tainted. The module does not infer DST or year rollover and does not widen graph-query policy. See the [contract](syslog-parser.md).
