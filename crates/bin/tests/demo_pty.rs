@@ -290,14 +290,16 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
     session.send("/demo next\r").unwrap();
     session.expect("4/10").unwrap();
     eprintln!("guide step 4 visible");
-    for (command, result) in [
-        ("/timeline", "timeline"),
-        ("/search 203.0.113.77", "search"),
-        ("/neighbors ip 203.0.113.77", "neighbors"),
+    // Command names also occur in the input and guide before a query finishes.
+    // Only its successful completion changes the guide's next instruction.
+    for (command, next_instruction) in [
+        ("/timeline", "search"),
+        ("/search 203.0.113.77", "neighbors"),
+        ("/neighbors ip 203.0.113.77", "complete."),
     ] {
         session.send(format!("{command}\r")).unwrap();
-        session.expect(result).unwrap();
-        eprintln!("graph result: {result}");
+        session.expect(next_instruction).unwrap();
+        eprintln!("graph completed: {command}");
     }
     session.send("/demo next\r").unwrap();
     session.expect("5/10").unwrap();
