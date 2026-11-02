@@ -5,6 +5,7 @@
 *.yml text eol=lf
 *.json text eol=lf
 *.ndjson text eol=lf
+*.jsonl text eol=lf
 **/fixtures/**/*.json text eol=lf
 **/fixtures/**/*.txt text eol=lf
 **/fixtures/**/*.csv text eol=lf
