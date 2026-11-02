@@ -45,7 +45,7 @@ TRANSLATIONS = {
     ROOT / "docs/es/manual-validation.md": ROOT / "docs/development/manual-validation.md",
     **{
         ROOT / "docs/es" / name: ROOT / "docs" / name
-        for name in ("getting-started.md", "configuration.md", "modules.md", "security-model.md", "platforms.md")
+        for name in ("getting-started.md", "configuration.md", "modules.md", "security-model.md", "platforms.md", "parsers.md")
     },
 }
 
@@ -162,8 +162,10 @@ def source_cli() -> tuple[set[str], set[str], set[str]]:
 
 
 def source_tui_flags() -> set[str]:
-    source = (ROOT / "crates/tui/src/case/commands/export.rs").read_text(encoding="utf-8")
-    return set(re.findall(r'strip_prefix\("/[a-z-]+ (--[a-z-]+)"\)', source))
+    source = "\n".join((ROOT / name).read_text(encoding="utf-8") for name in (
+        "crates/tui/src/case/commands/export.rs", "crates/tui/src/case/commands.rs"
+    ))
+    return set(re.findall(r'strip_prefix\("(?:/[a-z-]+ )?(--[a-z-]+) ?"\)', source))
 
 
 def check_cli(paths: list[Path], binary: Path | None) -> tuple[int, list[str]]:

@@ -27,6 +27,7 @@ impl Command {
     pub(crate) fn syntax(&self) -> &'static str {
         match self.name {
             "approve" | "deny" | "edit" => " <id>",
+            "parsers" => " [test <definition> <file>]",
             "settings" => " [model|connectors|keystore|preferences]",
             "open" => " <case title or ID>",
             "demo" => " [next|back|hint|skip|hide|show|check|exit]",

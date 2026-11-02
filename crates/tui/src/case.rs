@@ -39,6 +39,7 @@ pub(crate) use view::{CaseFrame, draw_case};
 
 #[derive(Clone)]
 pub(crate) enum CaseExit {
+    Restart,
     Home,
     New,
     Settings(Option<String>, bool),

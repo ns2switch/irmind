@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/parsers/view.rs
+expression: text
+---
+Declarative parsers · experimental
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1. Install definition
+2. Test definition (no ingestion)
+3. Deactivate definition
+4. Restore approved file
+Action:
+Only signed definitions are active.
+
+
+↑/↓ select · Tab action/field · Enter continue · PgUp/PgDn scroll · Esc back

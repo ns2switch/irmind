@@ -2497,6 +2497,7 @@ dependencies = [
  "irmind-mod-llm-openai-compatible",
  "irmind-mod-llm-openrouter",
  "irmind-mod-parser-chainsaw",
+ "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-hayabusa",
@@ -2780,6 +2781,21 @@ dependencies = [
  "irmind-domain",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-declarative"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "csv",
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+ "regex",
+ "serde",
+ "serde_json",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]

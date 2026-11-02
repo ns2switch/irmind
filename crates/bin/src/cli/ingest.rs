@@ -181,15 +181,15 @@ fn plan_ingest(
         let sample = io.read_format_sample(file)?;
         match catalog.detect(&source, &sample) {
             ParserChoice::Auto(candidate) => {
-                let parser = catalog.get(candidate.id)?;
+                let parser = catalog.get(&candidate.id)?;
                 plan.push((
                     source,
                     ParserSelection {
-                        parser_id: candidate.id.into(),
-                        parser_version: parser.streaming_version().into(),
+                        parser_id: candidate.id,
+                        parser_version: parser.identity().version.into(),
                         confidence: candidate.confidence.value(),
                         mode: ParserSelectionMode::Automatic,
-                        timestamp_context: None,
+                        timestamp_context: parser.timestamp_context().map(str::to_owned),
                         format_sample_sha256: irmind_app::sha256(&sample),
                     },
                 ));

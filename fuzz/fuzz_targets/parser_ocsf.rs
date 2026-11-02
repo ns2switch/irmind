@@ -9,7 +9,7 @@ fuzz_target!(|bytes: &[u8]| {
         let _ = OcsfParser.detect("fuzz.ndjson", bytes);
         let _ = OcsfParser.parse_reader_report(
             "fuzz.ndjson",
-            &mut bytes.as_ref(),
+            &mut std::io::Cursor::new(bytes),
             sha256(bytes),
             &CancellationToken::new(),
             &mut |_| Ok(()),

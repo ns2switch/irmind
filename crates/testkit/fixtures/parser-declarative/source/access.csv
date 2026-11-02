@@ -1,0 +1,2 @@
+time,host,user,source_ip,action,outcome
+2026-10-23T10:00:00.000001Z,synthetic-linux-01,alice,203.0.113.77,ssh_login,success

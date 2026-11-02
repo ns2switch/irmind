@@ -7,6 +7,8 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum FixedAppError {
+    #[error(transparent)]
+    Definition(crate::DefinitionError),
     #[error("model: LLM module is not registered")]
     ModelLLMModuleIsNotRegistered,
     #[error("model: provider stream ended without completion")]

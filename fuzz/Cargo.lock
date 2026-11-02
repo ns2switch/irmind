@@ -1201,6 +1201,7 @@ dependencies = [
  "irmind-domain",
  "irmind-infra",
  "irmind-mod-parser-chainsaw",
+ "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-hayabusa",
@@ -1249,6 +1250,20 @@ dependencies = [
  "irmind-domain",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-declarative"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "csv",
+ "irmind-app",
+ "irmind-domain",
+ "regex",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

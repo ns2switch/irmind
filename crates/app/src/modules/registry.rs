@@ -1,184 +1,20 @@
 use super::config::{Module, ModuleConfig, ModuleManifest, ModulePort};
+use super::parsers::{ParserCatalog, ParserChoice};
 use crate::{
-    AppError, CancellationToken, CloudAuditPort, EdrPort, Engine, EventParser, GraphRecord,
-    InternalIntelPort, LlmPort, LogParser, ObjectSource, ParserConfidence, SiemPort, SignedEntry,
-    StreamingEventParser, Tainted, ThreatIntelPort, hex, sha256,
+    AppError, CloudAuditPort, EdrPort, Engine, EventParser, InternalIntelPort, LlmPort, LogParser,
+    ObjectSource, SiemPort, ThreatIntelPort, hex, sha256,
 };
-use irmind_domain::{AuditEventKind, SourceManifestV1, SourceManifestV2, Tool};
+use irmind_domain::Tool;
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::Read;
 use std::sync::Arc;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DetectedParser {
-    pub id: &'static str,
-    pub confidence: ParserConfidence,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ParserChoice {
-    Auto(DetectedParser),
-    NeedsAnalyst(Vec<DetectedParser>),
-    Unsupported,
-}
-
-#[derive(Clone, Default)]
-pub struct ParserCatalog {
-    parsers: BTreeMap<&'static str, Arc<dyn LogParser>>,
-}
-
-impl ParserCatalog {
-    #[must_use]
-    pub fn detect(&self, source_name: &str, sample: &[u8]) -> ParserChoice {
-        let sample = &sample[..sample.len().min(64 * 1024)];
-        let candidates = self
-            .parsers
-            .iter()
-            .filter_map(|(id, parser)| {
-                parser
-                    .detect(source_name, sample)
-                    .map(|confidence| DetectedParser { id, confidence })
-            })
-            .collect::<Vec<_>>();
-        choose_parser(candidates)
-    }
-
-    pub fn get(&self, id: &str) -> Result<Arc<dyn LogParser>, AppError> {
-        self.parsers.get(id).cloned().ok_or(AppError::Fixed(
-            crate::FixedAppError::PolicyEventParserIsNotRegistered,
-        ))
-    }
-
-    #[must_use]
-    pub fn available(&self) -> Vec<(&'static str, &'static str)> {
-        self.parsers
-            .iter()
-            .map(|(id, parser)| (*id, parser.version()))
-            .collect()
-    }
-
-    /// Rebuild a case with exactly the parser and version recorded for each
-    /// source. Old V1 manifests used the JSON parser exclusively.
-    pub fn rebuild_router(&self, entries: &[SignedEntry]) -> Result<RebuildParser, AppError> {
-        let mut sources = BTreeMap::new();
-        for entry in entries {
-            let (source, id, version) = match entry.kind {
-                AuditEventKind::SourceManifestV1 => {
-                    let manifest = SourceManifestV1::decode(&entry.payload)
-                        .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                    (manifest.source, "parser-json", "json-stream-v2")
-                }
-                AuditEventKind::SourceManifestV2 => {
-                    let manifest = SourceManifestV2::decode(&entry.payload)
-                        .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                    let parser = self.get(&manifest.parser_id)?;
-                    if parser.streaming_version() != manifest.parser_version {
-                        return Err(AppError::Policy(
-                            "signed parser version is unavailable".into(),
-                        ));
-                    }
-                    let id = parser.parser_name();
-                    let version = parser.streaming_version();
-                    (manifest.source.source, id, version)
-                }
-                _ => continue,
-            };
-            let parser = self.get(id)?;
-            if parser.streaming_version() != version || sources.insert(source, parser).is_some() {
-                return Err(AppError::InvalidChain(entry.seq));
-            }
-        }
-        Ok(RebuildParser { sources })
-    }
-}
-
-pub struct RebuildParser {
-    sources: BTreeMap<String, Arc<dyn LogParser>>,
-}
-
-impl StreamingEventParser for RebuildParser {
-    fn streaming_version(&self) -> &'static str {
-        "signed-parser-router-v1"
-    }
-    fn parser_name(&self) -> &'static str {
-        "signed-parser-router"
-    }
-
-    fn prefers_local_file(&self, source: &str, sample: &[u8]) -> bool {
-        self.sources
-            .get(source)
-            .is_some_and(|parser| parser.prefers_local_file(source, sample))
-    }
-
-    fn version_for_source(&self, source: &str) -> Result<&'static str, AppError> {
-        self.sources
-            .get(source)
-            .map(|parser| parser.streaming_version())
-            .ok_or(AppError::Policy(
-                "source has no signed parser selection".into(),
-            ))
-    }
-
-    fn parse_reader(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        self.sources
-            .get(source)
-            .ok_or(AppError::Policy(
-                "source has no signed parser selection".into(),
-            ))?
-            .parse_reader(source, reader, evidence_hash, cancel, emit)
-    }
-
-    fn parse_local_file_report(
-        &self,
-        source: &str,
-        file: &mut std::fs::File,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<crate::ParseReport, AppError> {
-        self.sources
-            .get(source)
-            .ok_or(AppError::Policy(
-                "source has no signed parser selection".into(),
-            ))?
-            .parse_local_file_report(source, file, evidence_hash, cancel, emit)
-    }
-}
-
-fn choose_parser(mut candidates: Vec<DetectedParser>) -> ParserChoice {
-    candidates.sort_by(|left, right| {
-        right
-            .confidence
-            .cmp(&left.confidence)
-            .then_with(|| left.id.cmp(right.id))
-    });
-    let Some(first) = candidates.first() else {
-        return ParserChoice::Unsupported;
-    };
-    if first.confidence.is_high()
-        && candidates
-            .get(1)
-            .is_none_or(|next| next.confidence < first.confidence)
-    {
-        ParserChoice::Auto(first.clone())
-    } else {
-        ParserChoice::NeedsAnalyst(candidates)
-    }
-}
 
 #[derive(Default)]
 pub struct ModuleRegistry {
     manifests: BTreeMap<&'static str, &'static ModuleManifest>,
     llms: BTreeMap<&'static str, Box<dyn LlmPort>>,
     parser: Option<Arc<dyn LogParser>>,
-    parsers: BTreeMap<&'static str, Arc<dyn LogParser>>,
+    parsers: BTreeMap<String, Arc<dyn LogParser>>,
+    parser_variants: Vec<Arc<dyn LogParser>>,
     siems: Vec<Box<dyn SiemPort>>,
     edrs: Vec<Box<dyn EdrPort>>,
     cloud_audits: Vec<Box<dyn CloudAuditPort>>,
@@ -222,7 +58,10 @@ impl ModuleRegistry {
             if self.parser.is_none() {
                 self.parser = Some(Arc::clone(&port));
             }
-            self.parsers.insert(manifest.id, port);
+            self.parsers.insert(manifest.id.to_owned(), port);
+        }
+        for port in staged.parser_variants {
+            self.parsers.insert(port.identity().name.to_owned(), port);
         }
         self.manifests.insert(manifest.id, manifest);
         Ok(())
@@ -250,6 +89,13 @@ impl ModuleRegistry {
         if manifest.ports.contains(&ModulePort::Llm) && !staged.llms.contains_key(manifest.id) {
             return Err(AppError::Fixed(
                 crate::FixedAppError::PolicyLLMRegisteredUnderADifferentModuleID,
+            ));
+        }
+        if staged.parser_variants.iter().any(|parser| {
+            parser.parser_name() != manifest.id || self.parsers.contains_key(parser.identity().name)
+        }) {
+            return Err(AppError::Policy(
+                "parser variant belongs to another module or duplicates an active parser".into(),
             ));
         }
         if staged
@@ -325,6 +171,32 @@ impl ModuleRegistry {
         Ok(())
     }
 
+    pub fn add_parser_variant(&mut self, port: Arc<dyn LogParser>) -> Result<(), AppError> {
+        let identity = port.identity();
+        let valid_name = !identity.name.is_empty()
+            && identity.name.len() <= 64
+            && identity
+                .name
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-');
+        if !valid_name
+            || identity.version.is_empty()
+            || identity.version.len() > 128
+            || self.parser_variants.len() >= 64
+            || self
+                .parser_variants
+                .iter()
+                .any(|previous| previous.identity().name == identity.name)
+            || identity.name == port.parser_name()
+        {
+            return Err(AppError::Policy(
+                "invalid or duplicate configured parser identity".into(),
+            ));
+        }
+        self.parser_variants.push(port);
+        Ok(())
+    }
+
     pub fn parser(&self) -> Result<Arc<dyn EventParser>, AppError> {
         self.parser
             .clone()
@@ -347,6 +219,7 @@ impl ModuleRegistry {
     pub fn parser_catalog(&self) -> ParserCatalog {
         ParserCatalog {
             parsers: self.parsers.clone(),
+            resolver: None,
         }
     }
 
@@ -499,7 +372,10 @@ impl ModuleRegistry {
                 ModulePort::ThreatIntel,
                 usize::from(self.threat_intel.is_some()),
             ),
-            (ModulePort::EventParser, usize::from(self.parser.is_some())),
+            (
+                ModulePort::EventParser,
+                usize::from(self.parser.is_some() || !self.parser_variants.is_empty()),
+            ),
             (ModulePort::ObjectSource, self.object_sources.len()),
         ])
     }
@@ -553,149 +429,4 @@ fn validate_manifest(manifest: &ModuleManifest) -> Result<(), AppError> {
         ));
     }
     Ok(())
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod parser_choice_tests {
-    use super::{DetectedParser, ParserChoice, ParserConfidence, choose_parser};
-
-    fn candidate(id: &'static str, confidence: u8) -> DetectedParser {
-        DetectedParser {
-            id,
-            confidence: ParserConfidence::new(confidence).unwrap(),
-        }
-    }
-
-    #[test]
-    fn high_unique_candidate_is_automatic() {
-        assert_eq!(
-            choose_parser(vec![candidate("json", 90)]),
-            ParserChoice::Auto(candidate("json", 90))
-        );
-    }
-
-    #[test]
-    fn ties_and_low_confidence_need_analyst() {
-        assert!(matches!(
-            choose_parser(vec![candidate("json", 90), candidate("ecs", 90)]),
-            ParserChoice::NeedsAnalyst(_)
-        ));
-        assert!(matches!(
-            choose_parser(vec![candidate("json", 45)]),
-            ParserChoice::NeedsAnalyst(_)
-        ));
-    }
-
-    #[test]
-    fn no_match_is_unsupported() {
-        assert_eq!(choose_parser(Vec::new()), ParserChoice::Unsupported);
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod parser_router_tests {
-    use super::*;
-    use irmind_domain::{EvidenceHash, ParserSelectionMode};
-
-    struct FakeParser(&'static str, &'static str);
-
-    impl EventParser for FakeParser {
-        fn version(&self) -> &'static str {
-            self.1
-        }
-        fn parse_each(
-            &self,
-            _: &str,
-            _: &[u8],
-            _: &CancellationToken,
-            _: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-        ) -> Result<usize, AppError> {
-            Ok(0)
-        }
-    }
-    impl StreamingEventParser for FakeParser {
-        fn streaming_version(&self) -> &'static str {
-            self.1
-        }
-        fn parser_name(&self) -> &'static str {
-            self.0
-        }
-        fn parse_reader(
-            &self,
-            _: &str,
-            _: &mut dyn Read,
-            _: [u8; 32],
-            _: &CancellationToken,
-            _: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-        ) -> Result<usize, AppError> {
-            Ok(0)
-        }
-    }
-    impl LogParser for FakeParser {
-        fn detect(&self, _: &str, _: &[u8]) -> Option<ParserConfidence> {
-            None
-        }
-    }
-
-    fn entry(kind: AuditEventKind, payload: String) -> SignedEntry {
-        SignedEntry {
-            seq: 1,
-            case_id: "00000000-0000-0000-0000-000000000001".into(),
-            at: 0,
-            actor: irmind_domain::Actor::Analyst,
-            origin: "system".into(),
-            kind,
-            payload,
-            evidence: None,
-            prev: [0; 32],
-            hash: [0; 32],
-            sig: Vec::new(),
-            public_key: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn rebuild_routes_each_source_to_its_signed_parser_version() {
-        let mut catalog = ParserCatalog::default();
-        catalog.parsers.insert(
-            "parser-json",
-            Arc::new(FakeParser("parser-json", "json-stream-v2")),
-        );
-        catalog.parsers.insert(
-            "parser-syslog",
-            Arc::new(FakeParser("parser-syslog", "syslog-v1")),
-        );
-        let source = SourceManifestV1 {
-            source: "system.log".into(),
-            size: 1,
-            modified_unix_seconds: None,
-            version: None,
-            provider_checksum: None,
-            sha256: EvidenceHash::parse(&"a".repeat(64)).unwrap(),
-            copied: false,
-        };
-        let selection = SourceManifestV2 {
-            source,
-            parser_id: "parser-syslog".into(),
-            parser_version: "syslog-v1".into(),
-            confidence: 95,
-            selection: ParserSelectionMode::Automatic,
-            timestamp_context: None,
-            rejected_records: 0,
-            rejected_sample: Vec::new(),
-        };
-        let router = catalog
-            .rebuild_router(&[entry(
-                AuditEventKind::SourceManifestV2,
-                selection.encode().unwrap(),
-            )])
-            .unwrap();
-        assert_eq!(
-            router.version_for_source("system.log").unwrap(),
-            "syslog-v1"
-        );
-        assert!(router.version_for_source("other.log").is_err());
-    }
 }

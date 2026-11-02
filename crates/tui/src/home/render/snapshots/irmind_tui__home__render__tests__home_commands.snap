@@ -1,6 +1,5 @@
 ---
 source: crates/tui/src/home/render/tests.rs
-assertion_line: 161
 expression: menu
 ---
 IRMind v0.1.0
@@ -19,9 +18,9 @@ Recent cases · all
 │  /help — Show commands; /help <command> explains one command                 │
 │  /new — Create a case                                                        │
 │  /open — Open a case by title or ID                                          │
+│  /parsers — Manage or preview signed declarative parsers                     │
 │  /quit — Return to case list                                                 │
 │  /restart — Restart the session after a change                               │
-│  /settings — Configure model, connectors, keystore and preferences           │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │/                                                                             │

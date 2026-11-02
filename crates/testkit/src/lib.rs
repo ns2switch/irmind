@@ -31,7 +31,9 @@ mod fakes;
 mod keystore_contract;
 mod mock_http;
 mod object_contract;
+mod parser_contract;
 mod product_contracts;
+pub use parser_contract::run_log_parser_contract;
 
 pub use edr_contract::{EdrFixture, EdrScenario, run_edr_contract};
 pub use fakes::{FROM, FakeEdr, FixedClock, HOST, OUTSIDE, TO};

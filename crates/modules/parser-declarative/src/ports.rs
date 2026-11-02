@@ -1,0 +1,85 @@
+use crate::{AppError, DeclarativeParser, error};
+use irmind_app::{
+    CancellationToken, EventParser, GraphRecord, LogParser, ParseReport, ParserConfidence,
+    ParserIdentity, StreamingEventParser,
+};
+use irmind_domain::Tainted;
+use std::io::{Cursor, Read};
+
+impl EventParser for DeclarativeParser {
+    fn version(&self) -> &'static str {
+        "declarative-v1"
+    }
+    fn parse_each(
+        &self,
+        source: &str,
+        bytes: &[u8],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<usize, AppError> {
+        if bytes.len() > 50 * 1024 * 1024 {
+            return Err(error("declarative buffered input exceeds 50 MiB"));
+        }
+        Ok(self
+            .parse_source(
+                source,
+                &mut Cursor::new(bytes),
+                irmind_app::sha256(bytes),
+                cancel,
+                emit,
+            )?
+            .accepted)
+    }
+}
+
+impl StreamingEventParser for DeclarativeParser {
+    fn parser_name(&self) -> &'static str {
+        "parser-declarative"
+    }
+    fn streaming_version(&self) -> &'static str {
+        "declarative-v1"
+    }
+    fn identity(&self) -> ParserIdentity<'_> {
+        ParserIdentity {
+            name: self.id(),
+            version: self.definition_version(),
+        }
+    }
+    fn identity_for_source(&self, _: &str) -> Result<ParserIdentity<'_>, AppError> {
+        Ok(self.identity())
+    }
+    fn timestamp_context(&self) -> Option<&str> {
+        Some(&self.timestamp_context)
+    }
+    fn parse_reader(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<usize, AppError> {
+        Ok(self
+            .parse_source(source, reader, hash, cancel, emit)?
+            .accepted)
+    }
+    fn parse_reader_report(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        self.parse_source(source, reader, hash, cancel, emit)
+    }
+}
+
+impl LogParser for DeclarativeParser {
+    fn description(&self) -> &str {
+        self.description()
+    }
+    fn detect(&self, _: &str, sample: &[u8]) -> Option<ParserConfidence> {
+        self.detect_sample(sample)
+    }
+}

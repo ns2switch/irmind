@@ -11,7 +11,7 @@ fuzz_target!(|bytes: &[u8]| {
         let _ = JsonParser.parse("fuzz.json", bytes);
         let _ = JsonParser.parse_reader_report(
             "fuzz.jsonl",
-            &mut bytes.as_ref(),
+            &mut std::io::Cursor::new(bytes),
             sha256(bytes),
             &CancellationToken::new(),
             &mut |_| Ok(()),

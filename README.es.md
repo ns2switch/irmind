@@ -1,4 +1,4 @@
-Traducción de README.md en el commit a59d6745083d597b3154325685f7c9c8a67a8bbc; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit fda2702d91de43a20df21ce9b936b87c240b4355; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -102,6 +102,7 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Parser de Hayabusa | parser local | `parser-hayabusa` (por defecto) | experimental | [Hayabusa](docs/es/modules.md#parser-de-hayabusa) |
 | Parser de Chainsaw | parser local | `parser-chainsaw` (por defecto) | experimental | [Chainsaw](docs/es/modules.md#parser-de-chainsaw) |
 | Parser de plaso | parser local | `parser-plaso` (por defecto) | experimental | [plaso](docs/es/modules.md#parser-de-plaso) |
+| Parser declarativo | parser local | `parser-declarative` (por defecto) | experimental | [Formatos propios](docs/es/parsers.md) |
 | Parser de EZTools | parser local | `parser-eztools` (por defecto) | experimental | [EZTools](docs/es/modules.md#parser-de-eztools) |
 | Llavero del sistema | firma y secretos | `keystore-os` (por defecto) | experimental | [Módulos](docs/es/modules.md#llavero-del-sistema) |
 | Archivo cifrado | firma y secretos | `keystore-file` (por defecto) | experimental | [Módulos](docs/es/modules.md#archivo-cifrado) |

@@ -77,6 +77,13 @@ mod matrix {
         registry.register(Box::new(PlasoParser), &ModuleConfig::new())?;
         registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
 
+        #[cfg(feature = "parser-declarative")]
+        registry.register(
+            Box::new(irmind_mod_parser_declarative::DeclarativeModule::new(
+                custom_parsers()?,
+            )?),
+            &ModuleConfig::new(),
+        )?;
         for (name, sample, expected) in [
             ("cloud.json", JSON, "parser-json"),
             ("ecs.ndjson", ECS, "parser-ecs"),
@@ -93,47 +100,150 @@ mod matrix {
                     "parser detection is ambiguous".into(),
                 ));
             };
+            #[cfg(feature = "parser-declarative")]
+            for (id, _) in registry
+                .parser_catalog()
+                .available()
+                .into_iter()
+                .filter(|(id, _)| id.starts_with("parser-declarative-"))
+            {
+                assert!(registry.parser_by_id(&id)?.detect(name, sample).is_none());
+            }
             assert_eq!(found.id, expected);
             assert!(found.confidence.is_high());
-            let observed = [
-                ("parser-json", JsonParser.detect(name, sample)),
-                ("parser-ecs", EcsParser.detect(name, sample)),
-                ("parser-ocsf", OcsfParser.detect(name, sample)),
-                (
-                    "parser-velociraptor",
-                    VelociraptorParser.detect(name, sample),
-                ),
-                ("parser-hayabusa", HayabusaParser.detect(name, sample)),
-                ("parser-chainsaw", ChainsawParser.detect(name, sample)),
-                ("parser-plaso", PlasoParser.detect(name, sample)),
-                ("parser-eztools", EztoolsParser.detect(name, sample)),
-            ];
-            let expected_scores: [Option<u8>; 8] = match expected {
-                "parser-json" => [Some(90), None, None, None, None, None, None, None],
-                "parser-ecs" => [Some(45), Some(95), None, None, None, None, None, None],
-                "parser-ocsf" => [Some(45), None, Some(95), None, None, None, None, None],
-                "parser-velociraptor" => [Some(45), None, None, Some(95), None, None, None, None],
-                "parser-hayabusa" => [Some(45), None, None, None, Some(95), None, None, None],
-                "parser-chainsaw" => [Some(45), None, None, None, None, Some(95), None, None],
-                "parser-plaso" => [Some(45), None, None, None, None, None, Some(95), None],
-                "parser-eztools" => [None, None, None, None, None, None, None, Some(95)],
-                _ => {
-                    return Err(irmind_app::AppError::Policy(
-                        "unknown parser fixture".into(),
-                    ));
-                }
-            };
-            for ((id, confidence), score) in observed.into_iter().zip(expected_scores) {
-                assert_eq!(confidence.map(irmind_app::ParserConfidence::value), score);
-                if id != expected {
-                    assert!(!confidence.is_some_and(irmind_app::ParserConfidence::is_high));
-                }
-            }
+            assert_scores(name, sample, expected)?;
         }
+        #[cfg(feature = "parser-declarative")]
+        assert_custom_matrix(&registry)?;
         assert!(matches!(
             registry.detect_parser("security-lake.parquet", b"PAR1synthetic-header"),
             ParserChoice::NeedsAnalyst(_)
         ));
+        Ok(())
+    }
+    fn assert_scores(
+        name: &str,
+        sample: &[u8],
+        expected: &str,
+    ) -> Result<(), irmind_app::AppError> {
+        let observed = [
+            ("parser-json", JsonParser.detect(name, sample)),
+            ("parser-ecs", EcsParser.detect(name, sample)),
+            ("parser-ocsf", OcsfParser.detect(name, sample)),
+            (
+                "parser-velociraptor",
+                VelociraptorParser.detect(name, sample),
+            ),
+            ("parser-hayabusa", HayabusaParser.detect(name, sample)),
+            ("parser-chainsaw", ChainsawParser.detect(name, sample)),
+            ("parser-plaso", PlasoParser.detect(name, sample)),
+            ("parser-eztools", EztoolsParser.detect(name, sample)),
+        ];
+        let expected_scores: [Option<u8>; 8] = match expected {
+            "parser-json" => [Some(90), None, None, None, None, None, None, None],
+            "parser-ecs" => [Some(45), Some(95), None, None, None, None, None, None],
+            "parser-ocsf" => [Some(45), None, Some(95), None, None, None, None, None],
+            "parser-velociraptor" => [Some(45), None, None, Some(95), None, None, None, None],
+            "parser-hayabusa" => [Some(45), None, None, None, Some(95), None, None, None],
+            "parser-chainsaw" => [Some(45), None, None, None, None, Some(95), None, None],
+            "parser-plaso" => [Some(45), None, None, None, None, None, Some(95), None],
+            "parser-eztools" => [None, None, None, None, None, None, None, Some(95)],
+            _ => {
+                return Err(irmind_app::AppError::Policy(
+                    "unknown parser fixture".into(),
+                ));
+            }
+        };
+        for ((id, confidence), score) in observed.into_iter().zip(expected_scores) {
+            assert_eq!(confidence.map(irmind_app::ParserConfidence::value), score);
+            if id != expected {
+                assert!(!confidence.is_some_and(irmind_app::ParserConfidence::is_high));
+            }
+        }
+        Ok(())
+    }
+    #[cfg(feature = "parser-declarative")]
+    fn custom_parsers() -> Result<Vec<std::sync::Arc<dyn LogParser>>, irmind_app::AppError> {
+        [
+            include_str!("../../../docs/examples/parsers/access-csv.toml"),
+            include_str!("../../../docs/examples/parsers/nested-ndjson.toml"),
+            include_str!("../../../docs/examples/parsers/auth-regex.toml"),
+        ]
+        .into_iter()
+        .map(|text| {
+            Ok(
+                std::sync::Arc::new(irmind_mod_parser_declarative::DeclarativeParser::from_toml(
+                    text,
+                )?) as std::sync::Arc<dyn LogParser>,
+            )
+        })
+        .collect()
+    }
+
+    #[cfg(feature = "parser-declarative")]
+    fn assert_custom_matrix(registry: &ModuleRegistry) -> Result<(), irmind_app::AppError> {
+        let custom = custom_parsers()?;
+        for (index, (name, sample)) in [
+            (
+                "custom.csv",
+                include_bytes!("../../testkit/fixtures/parser-declarative/source/access.csv")
+                    .as_slice(),
+            ),
+            (
+                "custom.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-declarative/source/events.ndjson")
+                    .as_slice(),
+            ),
+            (
+                "custom.log",
+                include_bytes!("../../testkit/fixtures/parser-declarative/source/auth.log")
+                    .as_slice(),
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let ParserChoice::NeedsAnalyst(candidates) = registry.detect_parser(name, sample)
+            else {
+                return Err(irmind_app::AppError::Policy(
+                    "custom format must request analyst choice".into(),
+                ));
+            };
+            assert!(
+                candidates
+                    .iter()
+                    .all(|candidate| !candidate.confidence.is_high())
+            );
+            for (parser_index, parser) in custom.iter().enumerate() {
+                assert_eq!(
+                    parser
+                        .detect(name, sample)
+                        .map(irmind_app::ParserConfidence::value),
+                    if parser_index == index {
+                        Some(70)
+                    } else {
+                        None
+                    }
+                );
+            }
+            assert_eq!(
+                JsonParser
+                    .detect(name, sample)
+                    .map(irmind_app::ParserConfidence::value),
+                if index == 1 { Some(45) } else { None }
+            );
+            for native in [
+                &EcsParser as &dyn LogParser,
+                &OcsfParser,
+                &VelociraptorParser,
+                &HayabusaParser,
+                &ChainsawParser,
+                &PlasoParser,
+                &EztoolsParser,
+            ] {
+                assert!(native.detect(name, sample).is_none());
+            }
+        }
         Ok(())
     }
 }

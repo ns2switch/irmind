@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit e1a4ceee964092a878e9a2ef2a327cd4bb562393; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit fda2702d91de43a20df21ce9b936b87c240b4355; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -195,6 +195,16 @@ Lee `json_line` de psort y conserva parser y `data_type` como procedencia. Requi
 ## Parser de eztools
 
 Lee CSV de PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch, SrumECmd y EvtxECmd mediante nombres exactos de columnas. Requiere acceso de lectura al archivo. Compilado por defecto con `parser-eztools`. Experimental; los encabezados desconocidos no se adivinan por el nombre del archivo. Las fechas sin zona se interpretan como UTC y el contexto queda en el manifiesto firmado. [Referencia](https://github.com/EricZimmerman/TLEFilePlugins/blob/master/TLEFileEZTools/EZTools.cs).
+
+## Parser declarativo
+
+**Uso:** Mapear CSV, JSON, NDJSON o texto con regex acotada al esquema común sin escribir Rust. Experimental; validado solo con datos sintéticos.
+
+**Permisos:** Lectura de fuentes locales y del almacén privado de definiciones. Sin red, credenciales ni plantillas ejecutables.
+
+**Configuración:** Compilado por defecto con `parser-declarative`. `/parsers` permite probar, instalar, desactivar o restaurar definiciones mediante operaciones globales firmadas. La confianza máxima es 70 %, por lo que la ingesta requiere elegirlo. Consulta la [guía de parsers](parsers.md) y sus tres ejemplos.
+
+**Límites:** Archivo, registro, campos, profundidad y regex tienen máximos que la definición no puede ampliar. Las ediciones inválidas o sin firma quedan desactivadas; las versiones firmadas antiguas siguen disponibles para reconstruir. Solo se admiten UTC y desplazamientos fijos, no zonas con nombre. No se ha validado ningún formato real con este módulo.
 
 ## Llavero del sistema
 

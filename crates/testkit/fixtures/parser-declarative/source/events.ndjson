@@ -1,0 +1,2 @@
+{"custom_event":{"time":"2026-10-23T10:00:00.000001Z","host":"synthetic-linux-01","identity":{"user":"alice"},"network":{"source_ip":"203.0.113.77"},"action":"ssh_login","result":"success"},"synthetic_event_id":"custom-001"}
+{"custom_event":{"time":"2026-10-23T10:00:01.000002Z","host":"synthetic-linux-01","identity":{"user":"alice"},"network":{"source_ip":"203.0.113.77"},"action":"sudo","result":"success"},"synthetic_event_id":"custom-002"}

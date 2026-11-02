@@ -37,6 +37,9 @@ impl HomeRuntime<'_, '_, '_> {
             if self.shutdown.is_cancelled() {
                 break;
             }
+            if let Some(outcome) = self.state.parser_outcome {
+                return Ok(outcome);
+            }
             self.poll_tasks()?;
             while let Ok((id, status)) = self.statuses.try_recv() {
                 if let Some(row) = self.state.rows.iter_mut().find(|row| row.id == id) {
@@ -206,6 +209,7 @@ impl HomeRuntime<'_, '_, '_> {
 
     fn apply_action(&mut self, action: HomeAction) -> Result<bool> {
         match action {
+            HomeAction::Parsers(command) => return Ok(self.manage_parsers(&command)),
             HomeAction::None => {}
             HomeAction::Quit => return Ok(true),
             HomeAction::Restart => {
@@ -274,6 +278,31 @@ impl HomeRuntime<'_, '_, '_> {
             HomeAction::SaveModel(draft) => return Ok(self.save_model(&draft)),
         }
         Ok(false)
+    }
+
+    fn manage_parsers(&mut self, command: &str) -> bool {
+        match crate::parsers::run(
+            self.terminal,
+            self.engine,
+            self.io_ops,
+            self.shutdown,
+            command,
+        ) {
+            Ok(crate::parsers::ManagerExit::Restart) => {
+                self.outcome = crate::WorkspaceOutcome::Restart;
+                return true;
+            }
+            Ok(crate::parsers::ManagerExit::Quit) => return true,
+            Ok(crate::parsers::ManagerExit::Back) => {}
+            Ok(crate::parsers::ManagerExit::Palette) => {
+                self.state.mode = Mode::List;
+                self.state.input = "/".into();
+            }
+            Err(error) => {
+                self.state.notice = format!("Parser manager: {error}. Use /parsers to retry.");
+            }
+        }
+        false
     }
 
     fn save_model(&mut self, draft: &super::model::ModelDraft) -> bool {
