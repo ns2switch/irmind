@@ -17,6 +17,25 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | DFIR tools | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Format markers or exact CSV headers | Time, host, user, process, action and available entities | experimental |
 | Declarative | CSV, JSON, NDJSON or bounded regex | Exact header, required JSON pointers or sample regex; at most 70% | Explicit mapping described below | experimental |
 
+## Windows coverage
+
+Use processed exports to investigate these artifacts today. All listed modules are experimental and tested with synthetic data. IRMind ingests the exports; it does not run KAPE, EZTools, Velociraptor or plaso, or open their raw binary artifacts itself.
+
+| Artifact | What it helps answer | Current ingestion route |
+| --- | --- | --- |
+| Windows event logs, including Sysmon | Which logons, process or service events were recorded, and how do they correlate? | Hayabusa CSV/JSONL → `parser-hayabusa`; EvtxECmd CSV → `parser-eztools`. Direct EVTX ingestion awaits the isolated helper. |
+| Registry hives and related transaction logs | Which account, configuration or persistence-related keys and values were reported? | Process externally with RECmd batch; ingest its CSV with `parser-eztools`. |
+| Prefetch (`.pf`) | Which executables, run counts and reported run times appear? | PECmd CSV → `parser-eztools`. |
+| Amcache | Which application paths, hashes and inventory timestamps were recorded? | AmcacheParser CSV → `parser-eztools`. |
+| AppCompatCache / ShimCache | Which paths and cache metadata were recorded? | AppCompatCacheParser CSV → `parser-eztools`. Cache presence alone is not an execution verdict. |
+| `$MFT` | Which file paths and filesystem timestamps were reported? | MFTECmd CSV → `parser-eztools`. |
+| LNK shortcuts | Which targets, working directories and shortcut timestamps were reported? | LECmd CSV → `parser-eztools`. |
+| SRUM (`SRUDB.dat`) | Which applications and users have recorded resource or network-usage data? | SrumECmd CSV → `parser-eztools`. Usage totals alone do not establish exfiltration. |
+
+For these artifacts, another supported route is a timestamped Velociraptor JSONL artifact result through `parser-velociraptor`, or a plaso `psort` `json_line` export through `parser-plaso`. Export schemas must match the [module contracts](modules.md#velociraptor-parser): arbitrary collector output is not automatically supported. EZTools detection requires the exact recognized column names and a usable timestamp; unmapped fields remain in the record. Start with event timelines, then correlate execution, persistence, lateral movement and possible exfiltration rather than treating one artifact as proof.
+
+[KAPE targets and modules](https://github.com/EricZimmerman/KapeFiles), [EZTools](https://ericzimmerman.github.io/) and [Velociraptor artifacts](https://docs.velociraptor.app/docs/artifacts/) describe collection and external processing. Keep originals and select the processed export files for ingestion. Native registry and `$MFT` parsing remain demand-driven future work under the isolated-helper model used in the [roadmap](development/roadmap.md#v02-parsers-and-connectors). [A Volatility 3 JSON parser](https://github.com/ns2switch/irmind/issues/158) is planned; direct memory-image parsing is not available.
+
 ## A custom format without Rust
 
 Open `/parsers`. Choose **Test definition** and enter a TOML file and a small sample file. The preview shows detection confidence and at most ten guarded rows. It does not ingest evidence, create a case or contact a model. `/parsers test <definition> <file>` opens the same form with paths filled in; use the form for paths containing spaces.

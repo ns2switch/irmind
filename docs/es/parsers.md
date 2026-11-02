@@ -1,4 +1,4 @@
-Traducción de docs/parsers.md en el commit c6087e07320d77640e88c70461010cd57f1a43c1; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/parsers.md en el commit 99c035c39c9d54d11dbe9c5bdd820136d1c21502; si hay diferencias, prevalece la versión en inglés.
 
 # Parsers de logs
 
@@ -18,6 +18,25 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | Herramientas DFIR | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Marcadores o cabecera CSV exacta | Instante, host, usuario, proceso, acción y entidades disponibles | experimental |
 | Syslog | RFC 5424/RFC 3164, texto o gzip acotado | PRI y forma de cabecera/instante, no extensión | Host, aplicación, PID, facility, severity, mensaje y tiempo completo | experimental |
 | Declarativo | CSV, JSON, NDJSON o regex acotada | Cabecera exacta, campos JSON o regex; máximo 70 % | Mapeo explícito descrito abajo | experimental |
+
+## Cobertura de Windows
+
+Hoy se investigan estos artefactos mediante exportaciones procesadas. Todos los módulos de la tabla son experimentales y están probados con datos sintéticos. IRMind ingiere las salidas; no ejecuta KAPE, EZTools, Velociraptor ni plaso, ni abre por sí mismo sus artefactos binarios originales.
+
+| Artefacto | Qué ayuda a responder | Cómo se ingiere hoy |
+| --- | --- | --- |
+| Logs de eventos de Windows, incluido Sysmon | ¿Qué inicios de sesión, procesos o servicios quedaron registrados y cómo se relacionan? | CSV/JSONL de Hayabusa → `parser-hayabusa`; CSV de EvtxECmd → `parser-eztools`. EVTX directo queda pendiente del auxiliar aislado. |
+| Registro y sus logs de transacciones | ¿Qué claves y valores de cuentas, configuración o persistencia se registraron? | Procesar externamente con RECmd batch e ingerir su CSV mediante `parser-eztools`. |
+| Prefetch (`.pf`) | ¿Qué ejecutables, recuentos e instantes de ejecución aparecen? | CSV de PECmd → `parser-eztools`. |
+| Amcache | ¿Qué rutas, hashes y fechas del inventario de aplicaciones se registraron? | CSV de AmcacheParser → `parser-eztools`. |
+| AppCompatCache / ShimCache | ¿Qué rutas y metadatos de caché se registraron? | CSV de AppCompatCacheParser → `parser-eztools`. La presencia en caché no demuestra por sí sola ejecución. |
+| `$MFT` | ¿Qué rutas y fechas del sistema de archivos se registraron? | CSV de MFTECmd → `parser-eztools`. |
+| Accesos directos LNK | ¿Qué destinos, directorios de trabajo y fechas del acceso directo se registraron? | CSV de LECmd → `parser-eztools`. |
+| SRUM (`SRUDB.dat`) | ¿Qué aplicaciones y usuarios tienen datos de uso de recursos o red? | CSV de SrumECmd → `parser-eztools`. Los totales de uso no demuestran por sí solos exfiltración. |
+
+Otra vía admitida para estos artefactos es exportar resultados JSONL de Velociraptor con timestamp y metadatos de artefacto, para `parser-velociraptor`, o `json_line` de `psort` de plaso para `parser-plaso`. El esquema debe coincidir con [los contratos de los módulos](modules.md#parser-de-velociraptor): no se admite automáticamente cualquier salida de un colector. EZTools requiere los nombres de columna reconocidos y un timestamp utilizable; los campos no mapeados permanecen en el registro. Empieza por los eventos y correlaciona ejecución, persistencia, movimiento lateral y posible exfiltración, sin tratar un único artefacto como prueba concluyente.
+
+Los [targets y módulos de KAPE](https://github.com/EricZimmerman/KapeFiles), [EZTools](https://ericzimmerman.github.io/) y [los artefactos de Velociraptor](https://docs.velociraptor.app/docs/artifacts/) describen la recogida y el procesamiento externo. Conserva los originales y selecciona las exportaciones procesadas para ingerirlas. Los parsers nativos de registro y `$MFT` quedan como trabajo futuro según demanda, con el auxiliar aislado descrito en [la hoja de ruta](roadmap.md#v02-parsers-y-conectores). Está previsto [un parser de JSON de Volatility 3](https://github.com/ns2switch/irmind/issues/158); no se ingieren directamente imágenes de memoria.
 
 ## Un formato propio sin Rust
 

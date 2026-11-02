@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit a59d6745083d597b3154325685f7c9c8a67a8bbc; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 99c035c39c9d54d11dbe9c5bdd820136d1c21502; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -26,10 +26,14 @@ Las versiones preliminares incluyen la TUI para casos, conectores sujetos a pol�
 - Añadir conectores experimentales `siem-elastic` y `siem-chronicle`, con consultas estructuradas, permisos mínimos de lectura, contratos sintéticos y evidencia firmada.
 - Mantener los formatos restantes como [issues de entrada](https://github.com/ns2switch/irmind/issues?q=is%3Aissue+label%3A%22good+first+issue%22).
 
+Los artefactos binarios de Windows (registro, `$MFT`, Prefetch, LNK, SRUM y Amcache) se cubren mediante las exportaciones procesadas de EZTools, Velociraptor y plaso. Consulta [la cobertura actual de Windows](parsers.md#cobertura-de-windows) para los formatos admitidos. Los [futuros parsers nativos de registro y `$MFT`](https://github.com/ns2switch/irmind/issues/159) dependerán de la demanda y deberán seguir el mismo modelo de proceso auxiliar aislado aprobado para EVTX, sin incorporar decodificadores binarios al proceso principal.
+
 ## v0.3: skills forenses
 
 - Aprobar `docs/development/skills-design.md` antes de implementar: formato, carga progresiva, instalación firmada, confianza y relación con la política.
-- Una skill es una carpeta con `SKILL.md` que describe una metodología, más plantillas de consulta, reglas Sigma o mapeos opcionales. Las primeras cubrirán ransomware en Windows, compromiso de credenciales AWS, persistencia en Linux y BEC en M365.
+- Una skill es una carpeta con `SKILL.md` que describe una metodología, más plantillas de consulta, reglas Sigma o mapeos opcionales. Los métodos iniciales también cubren ransomware en Windows, persistencia en Linux y BEC en M365.
+- Incluir [**Windows triage**](https://github.com/ns2switch/irmind/issues/157): guiar una colección sintética y acotada con KAPE o Velociraptor de logs de eventos, registro y sus logs de transacciones, `$MFT`, Prefetch, LNK, SRUM y Amcache. Ingerir primero timelines de Hayabusa derivados de EVTX o CSV de EvtxECmd (EVTX directo cuando exista el auxiliar aislado), y después las exportaciones de PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch y SrumECmd. Investigar en orden: inicio de sesión → ejecución → persistencia → movimiento lateral → exfiltración. Correlacionar fuentes independientes y confirmar hallazgos con evidencia. El analista ejecuta las herramientas externas; una skill no concede permisos de ejecución.
+- Incluir **Linux triage** para autenticación, ejecución y persistencia, y **AWS credential compromise** para CloudTrail, actividad de roles y sesiones, y cambios en IAM.
 - El modelo recibe primero nombre y descripción y carga el contenido completo solo cuando lo necesita. Las skills pueden venir incluidas, de una organización o instaladas por un analista.
 - La instalación se firma y el caso registra el hash de la versión usada. Una skill declara herramientas necesarias, pero no amplía permisos. El contenido de terceros sigue sin ser de confianza hasta que lo firma el analista.
 - `/skills` permite listar, instalar, inspeccionar y deshabilitar. Las skills invocables aparecen como comandos. El catálogo comunitario vive en otro repositorio.

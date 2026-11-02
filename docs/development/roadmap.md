@@ -30,12 +30,16 @@ Add detected log parsers and read-only structured-query connectors.
 - Add experimental `siem-elastic` and `siem-chronicle` connectors with structured queries, minimum read permissions, synthetic contracts, and signed evidence. Community connector requests include Microsoft Sentinel and Wazuh.
 - Track remaining log formats as [good first issues](https://github.com/ns2switch/irmind/issues?q=is%3Aissue+label%3A%22good+first+issue%22).
 
+Windows binary artifacts (registry hives, `$MFT`, Prefetch, LNK, SRUM and Amcache) are covered through processed EZTools, Velociraptor and plaso exports. See [current Windows coverage](../parsers.md#windows-coverage) for the supported input shapes. Demand will guide [future native registry and `$MFT` parsers](https://github.com/ns2switch/irmind/issues/159); both require the same isolated-helper model approved for EVTX, rather than binary decoders inside the main process.
+
 ## v0.3: Forensic skills
 
 Add signed, progressively loaded forensic skills that never extend policy permissions.
 
 - Approve `docs/development/skills-design.md` before implementation. It will define format, progressive loading, signed installation, trust, and policy interaction.
-- A skill is a folder with `SKILL.md` for methodology and instructions, plus optional query templates, Sigma rules, or mappings. Initial examples cover Windows ransomware triage, AWS credential compromise, Linux persistence, and M365 business email compromise.
+- A skill is a folder with `SKILL.md` for methodology and instructions, plus optional query templates, Sigma rules, or mappings. Initial methods also cover Windows ransomware, Linux persistence, and M365 business email compromise.
+- Bundle [**Windows triage**](https://github.com/ns2switch/irmind/issues/157): guide a scoped, synthetic KAPE or Velociraptor collection of event logs, registry hives and related transaction logs, `$MFT`, Prefetch, LNK, SRUM and Amcache. Ingest EVTX-derived Hayabusa timelines or EvtxECmd CSV first (direct EVTX once its isolated helper is available), then EZTools exports from PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch and SrumECmd. Investigate logons → execution → persistence → lateral movement → exfiltration, correlate independent sources and confirm findings with evidence. Collection and external tools remain analyst-run; a skill grants no execution rights.
+- Bundle **Linux triage** for authentication, execution and persistence, and **AWS credential compromise** for CloudTrail, role/session activity and IAM changes.
 - The model initially sees only a skill's name and description; it loads full content when needed. Skills may be bundled, supplied by an organization, or installed by an analyst.
 - Installation is signed, and the case log records the hash of the version used. A skill can declare needed tools but cannot extend permissions: policy and the organization ceiling decide. Third-party content stays untrusted until the analyst signs it.
 - Add `/skills` to list, install, inspect, and disable skills. User-invocable skills appear as slash commands. Maintain a separate community skills repository.
