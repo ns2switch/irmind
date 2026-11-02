@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+mod parsers;
+
 mod case;
 mod demo_choice;
 mod home;
@@ -160,6 +162,15 @@ pub trait WorkspaceIo: Send + Sync {
         Ok(())
     }
     fn input_files(&self, root: &Path) -> Result<Vec<PathBuf>>;
+    fn definition_store(&self) -> Option<&dyn irmind_app::ParserDefinitionStore> {
+        None
+    }
+    fn definition_compiler(&self) -> Option<&dyn irmind_app::DefinitionCompiler> {
+        None
+    }
+    fn read_parser_input(&self, _path: &Path, _limit: usize) -> Result<Vec<u8>> {
+        anyhow::bail!("declarative parser input is unavailable")
+    }
     fn parser_catalog(&self) -> Option<&irmind_app::modules::ParserCatalog> {
         None
     }

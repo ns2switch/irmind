@@ -101,6 +101,7 @@ The normal build includes every current product module and both keystores. None 
 | Hayabusa parser | local parser | `parser-hayabusa` (default) | experimental | [Hayabusa](docs/modules.md#hayabusa-parser) |
 | Chainsaw parser | local parser | `parser-chainsaw` (default) | experimental | [Chainsaw](docs/modules.md#chainsaw-parser) |
 | plaso parser | local parser | `parser-plaso` (default) | experimental | [plaso](docs/modules.md#plaso-parser) |
+| Declarative parser | local parser | `parser-declarative` (default) | experimental | [Custom formats](docs/parsers.md) |
 | EZTools parser | local parser | `parser-eztools` (default) | experimental | [EZTools](docs/modules.md#eztools-parser) |
 | OS keystore | signing and secrets | `keystore-os` (default) | experimental | [OS keystore](docs/modules.md#os-keystore) |
 | Encrypted-file keystore | signing and secrets | `keystore-file` (default) | experimental | [File keystore](docs/modules.md#file-keystore) |

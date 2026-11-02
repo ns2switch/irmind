@@ -68,15 +68,7 @@ impl LargeCaseStore for ParquetStore {
             profile: self.profile.as_deref(),
             legacy_entities: self.legacy_entities,
         })?;
-        let after = source.metadata().map_err(|error| {
-            storage_phase(
-                storage(error),
-                irmind_app::AdapterStorageError::CannotOpenParquetSource,
-            )
-        })?;
-        if after.len() != metadata.len() || after.modified().ok() != metadata.modified().ok() {
-            return Err(AppError::EvidenceMismatch(hash_value.as_str().into()));
-        }
+        verify_source_unchanged(&source, &metadata, &hash_value)?;
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
@@ -84,8 +76,12 @@ impl LargeCaseStore for ParquetStore {
         if copy_original {
             self.copy_source(case_id, &mut source, &hash_value, cancel)?;
         }
-        let staged = finish_parquet(open, &hash_value, parser.version_for_source(relative_path)?)
-            .map_err(|error| {
+        let staged = finish_parquet(
+            open,
+            &hash_value,
+            parser.identity_for_source(relative_path)?.version,
+        )
+        .map_err(|error| {
             storage_phase(
                 error,
                 irmind_app::AdapterStorageError::CannotPrepareParquetOutput,
@@ -268,7 +264,7 @@ impl LargeCaseStore for ParquetStore {
             }
             let mut actual = prepared.artifacts;
             actual.sort_by(|a, b| a.path.cmp(&b.path));
-            let parser_version = parser.version_for_source(&source.source)?;
+            let parser_version = parser.identity_for_source(&source.source)?.version;
             let mut signed = artifacts
                 .iter()
                 .filter(|artifact| {
@@ -317,4 +313,21 @@ impl LargeCaseStore for ParquetStore {
         }
         Ok(checked)
     }
+}
+
+fn verify_source_unchanged(
+    source: &std::fs::File,
+    metadata: &std::fs::Metadata,
+    hash: &EvidenceHash,
+) -> Result<(), AppError> {
+    let after = source.metadata().map_err(|error| {
+        storage_phase(
+            storage(error),
+            irmind_app::AdapterStorageError::CannotOpenParquetSource,
+        )
+    })?;
+    if after.len() != metadata.len() || after.modified().ok() != metadata.modified().ok() {
+        return Err(AppError::EvidenceMismatch(hash.as_str().into()));
+    }
+    Ok(())
 }

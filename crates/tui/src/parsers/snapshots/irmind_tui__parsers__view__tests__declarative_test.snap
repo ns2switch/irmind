@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/parsers/view.rs
+expression: text
+---
+Declarative parsers · experimental
+
+┌Definition TOML path──────────────────────────────────────────────────────────┐
+│definition.toml                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+┌Sample path (at most 1 MiB)───────────────────────────────────────────────────┐
+│sample.csv                                                                    │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+
+
+
+Only signed definitions are active.
+
+
+↑/↓ select · Tab action/field · Enter continue · PgUp/PgDn scroll · Esc back

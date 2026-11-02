@@ -279,10 +279,10 @@ impl CaseWorkflow<'_, '_> {
                 source,
                 ParserSelection {
                     parser_id,
-                    parser_version: parser.streaming_version().into(),
+                    parser_version: parser.identity().version.into(),
                     confidence,
                     mode,
-                    timestamp_context: None,
+                    timestamp_context: parser.timestamp_context().map(str::to_owned),
                     format_sample_sha256: irmind_app::sha256(&sample),
                 },
             ));
@@ -321,7 +321,7 @@ fn resolve_parser_choice(
     }
     match choice {
         ParserChoice::Auto(candidate) => Ok((
-            candidate.id.into(),
+            candidate.id,
             candidate.confidence.value(),
             ParserSelectionMode::Automatic,
         )),
@@ -329,7 +329,7 @@ fn resolve_parser_choice(
             source_name: source.into(),
             candidates: candidates
                 .into_iter()
-                .map(|candidate| (candidate.id.into(), candidate.confidence.value()))
+                .map(|candidate| (candidate.id, candidate.confidence.value()))
                 .collect(),
         }),
         ParserChoice::Unsupported => Err(AppError::ParserSelection {
@@ -337,7 +337,7 @@ fn resolve_parser_choice(
             candidates: catalog
                 .available()
                 .into_iter()
-                .map(|(id, _)| (id.into(), 0))
+                .map(|(id, _)| (id, 0))
                 .collect(),
         }),
     }

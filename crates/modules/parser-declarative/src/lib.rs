@@ -8,6 +8,9 @@ mod detection;
 mod input;
 mod json_fields;
 mod mapping;
+mod module;
+mod ports;
+pub use module::{DeclarativeCompiler, DeclarativeModule, MANIFEST};
 mod parse;
 
 /// A validated definition and bounded, precompiled linear-time expressions.
@@ -16,6 +19,7 @@ pub struct DeclarativeParser {
     definition: config::Definition,
     id: String,
     version: String,
+    timestamp_context: String,
     input_regex: Option<Regex>,
     detection_regex: Option<Regex>,
 }
@@ -59,10 +63,15 @@ impl DeclarativeParser {
             "declarative-v1:sha256={}",
             irmind_app::hex(&irmind_app::sha256(text.as_bytes()))
         );
+        let timestamp_context = format!(
+            "declared-default-zone={};normalized-utc;source-precision-retained",
+            definition.timestamp.default_timezone
+        );
         Ok(Self {
             definition,
             id,
             version,
+            timestamp_context,
             input_regex,
             detection_regex,
         })
@@ -81,7 +90,9 @@ impl DeclarativeParser {
 }
 
 fn error(message: &'static str) -> AppError {
-    AppError::Policy(message.into())
+    AppError::Fixed(irmind_app::FixedAppError::Definition(
+        irmind_app::DefinitionError::InvalidFormat(message),
+    ))
 }
 
 #[cfg(test)]

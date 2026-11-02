@@ -160,8 +160,15 @@ impl Engine<'_> {
     }
 
     pub fn verify_global_operations(&self) -> Result<(), AppError> {
+        self.verify_global_operation_entries(&self.audit_log.global_operations()?)
+    }
+
+    pub(crate) fn verify_global_operation_entries(
+        &self,
+        entries: &[SignedOperation],
+    ) -> Result<(), AppError> {
         let mut previous = [0u8; 32];
-        for (index, entry) in self.audit_log.global_operations()?.iter().enumerate() {
+        for (index, entry) in entries.iter().enumerate() {
             if entry.case_id != GLOBAL_OPERATION_SCOPE
                 || entry.actor != Actor::Analyst
                 || entry.seq != index as u64 + 1

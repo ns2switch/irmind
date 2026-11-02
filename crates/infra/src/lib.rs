@@ -2,6 +2,8 @@
 
 mod clock;
 mod config_toml;
+mod definition_fs;
+pub use definition_fs::FileDefinitionStore;
 mod evidence_fs;
 mod graph_port;
 mod parquet_store;

@@ -1,0 +1,9 @@
+{
+  "episode_id": "synthetic-custom-ssh-sudo",
+  "malicious_event_ids": ["custom-001", "custom-002"],
+  "malicious_entities": ["alice", "203.0.113.77", "synthetic-linux-01"],
+  "attack_path": ["203.0.113.77", "alice", "synthetic-linux-01"],
+  "techniques": ["T1078", "T1548.003"],
+  "acceptable_conclusions": ["Synthetic SSH access followed by sudo on the same host"],
+  "evaluator_only_marker": "PRIVATE-DECLARATIVE-EVALUATOR-ANSWER"
+}

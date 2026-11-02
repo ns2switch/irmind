@@ -6,6 +6,7 @@ use super::{CaseWorkflow, FindingKind, PathBuf, PathPicker, Result, parse_approv
 use irmind_app::CaseScope;
 
 mod export;
+mod parsers;
 
 impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     pub(super) fn submit(&mut self, prompt: String) -> Result<bool> {
@@ -72,6 +73,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             };
             self.state.messages.push(message.into());
             return Ok(false);
+        }
+        if self.parser_command(&prompt) {
+            return Ok(self.parser_exit_requested());
         }
         if !(self.long_command(&prompt)?
             || self.case_command(&prompt)?

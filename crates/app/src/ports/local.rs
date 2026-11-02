@@ -187,11 +187,34 @@ pub trait EventParser: Send + Sync {
     }
 }
 
+/// Borrowed identity; catalogs own their keys while native parsers keep static names.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ParserIdentity<'a> {
+    pub name: &'a str,
+    pub version: &'a str,
+}
+
 /// Parser for large, pre-hashed sources. The caller verifies the same reader
 /// again while parsing before it commits any signed manifest entry.
 pub trait StreamingEventParser: Send + Sync {
     fn streaming_version(&self) -> &'static str;
     fn parser_name(&self) -> &'static str;
+    fn identity(&self) -> ParserIdentity<'_> {
+        ParserIdentity {
+            name: self.parser_name(),
+            version: self.streaming_version(),
+        }
+    }
+    fn identity_for_source(&self, source: &str) -> Result<ParserIdentity<'_>, AppError> {
+        Ok(ParserIdentity {
+            name: self.identity().name,
+            version: self.version_for_source(source)?,
+        })
+    }
+    fn timestamp_context(&self) -> Option<&str> {
+        None
+    }
+
     /// A parser may request random access only when the bounded source sample
     /// identifies a format that needs it. Other parsers stay streaming.
     fn prefers_local_file(&self, _source: &str, _sample: &[u8]) -> bool {
@@ -272,6 +295,9 @@ impl ParserConfidence {
 /// Format-specific, bounded evidence decoder. `detect` receives at most 64 KiB
 /// from the caller and must remain pure and cheap.
 pub trait LogParser: EventParser + StreamingEventParser {
+    fn description(&self) -> &str {
+        self.parser_name()
+    }
     fn detect(&self, source_name: &str, sample: &[u8]) -> Option<ParserConfidence>;
 }
 

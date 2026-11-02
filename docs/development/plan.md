@@ -90,3 +90,7 @@ The v0.1.0 pre-release has unsigned binaries and `SHA256SUMS`. From v0.1.1, rele
 ## Documentation
 
 English is authoritative. Public guides live under `docs/`; Spanish user guides identify the English source commit. Do not translate or alter signed event identifiers, canonical formats, or the bilingual attack corpus merely to localize documentation.
+
+## Declarative parser block
+
+Prepare the experimental `parser-declarative` module behind a default Cargo feature. Definitions are strict, bounded TOML, compiled only from approved bytes, with low-confidence detection requiring analyst selection. New additive parser identity methods borrow dynamic names/versions; catalog keys own their strings. Native parser methods keep their defaults. Signed `SourceManifestV2` and `ParquetArtifactV1` tags and encodings remain unchanged: the existing parser-version field contains the definition SHA-256. Install/change/deactivate/restore use the current signed global operational envelope and private atomic storage. Historical resolution uses verified signed snapshots. Merge waits for approval of the additive port changes; the artifact-v2 proposal in #143 remains design-only and requires separate approval before implementation.

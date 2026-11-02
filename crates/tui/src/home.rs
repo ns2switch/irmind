@@ -163,6 +163,7 @@ pub(crate) struct HomeState {
     confirm_credential_delete: bool,
     pending_migration: Option<&'static str>,
     restart_required: bool,
+    parser_outcome: Option<crate::WorkspaceOutcome>,
     overrides_active: bool,
     modules: Vec<ModuleStatus>,
     parsers: Vec<(String, String)>,
@@ -235,6 +236,7 @@ impl HomeState {
             confirm_credential_delete: false,
             pending_migration: None,
             restart_required: false,
+            parser_outcome: None,
             overrides_active: false,
             modules: Vec::new(),
             parsers: Vec::new(),
@@ -445,11 +447,7 @@ fn prepare_home_state(
     );
     state.set_modules(modules);
     if let Some(catalog) = io_ops.parser_catalog() {
-        state.parsers = catalog
-            .available()
-            .into_iter()
-            .map(|(name, version)| (name.into(), version.into()))
-            .collect();
+        state.parsers = catalog.available();
     }
     state.resume_last_case = launch.resume_last_case;
     state.show_hints = io_ops.show_hints().into();
@@ -535,7 +533,10 @@ impl StartupCaseView<'_, '_> {
 
 pub(super) fn apply_case_exit(state: &mut HomeState, exit: &case::CaseExit) {
     state.mode = match exit {
-        case::CaseExit::Home | case::CaseExit::Open(_) | case::CaseExit::Quit => Mode::List,
+        case::CaseExit::Home
+        | case::CaseExit::Open(_)
+        | case::CaseExit::Quit
+        | case::CaseExit::Restart => Mode::List,
         case::CaseExit::New => Mode::New,
         case::CaseExit::Settings(section, legacy) => {
             if *legacy {
@@ -548,6 +549,8 @@ pub(super) fn apply_case_exit(state: &mut HomeState, exit: &case::CaseExit) {
                 .map_or(Mode::Settings, SettingsSection::mode)
         }
     };
+    state.parser_outcome =
+        matches!(exit, case::CaseExit::Restart).then_some(crate::WorkspaceOutcome::Restart);
     if state.mode == Mode::Model {
         state.model_setup = model::ModelSetup::new();
     }

@@ -68,3 +68,38 @@ fn backtracking_syntax_and_missing_regex_captures_are_rejected() {
         assert!(DeclarativeParser::from_toml(&definition).is_err());
     }
 }
+
+#[test]
+fn declarative_formats_pass_the_common_streaming_contract() {
+    for (definition, source, fixture, expected) in [
+        (
+            include_str!("../../../../../docs/examples/parsers/access-csv.toml"),
+            "access.csv",
+            include_bytes!("../../../../testkit/fixtures/parser-declarative/source/access.csv")
+                .as_slice(),
+            1,
+        ),
+        (
+            include_str!("../../../../../docs/examples/parsers/nested-ndjson.toml"),
+            "events.ndjson",
+            include_bytes!("../../../../testkit/fixtures/parser-declarative/source/events.ndjson")
+                .as_slice(),
+            2,
+        ),
+        (
+            include_str!("../../../../../docs/examples/parsers/auth-regex.toml"),
+            "auth.log",
+            include_bytes!("../../../../testkit/fixtures/parser-declarative/source/auth.log")
+                .as_slice(),
+            1,
+        ),
+    ] {
+        irmind_testkit::run_log_parser_contract(
+            &DeclarativeParser::from_toml(definition).unwrap(),
+            source,
+            fixture,
+            expected,
+        )
+        .unwrap();
+    }
+}

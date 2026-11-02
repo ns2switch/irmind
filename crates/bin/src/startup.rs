@@ -33,6 +33,8 @@ mod preflight;
 use preflight::{decide_overrides, reconcile_configuration};
 
 struct PreparedStartup {
+    #[cfg(feature = "parser-declarative")]
+    definitions: irmind_app::ApprovedDefinitions,
     cli: Cli,
     interactive: bool,
     home: PathBuf,
@@ -94,6 +96,9 @@ impl PreparedStartup {
             ExecutionMode::Attended,
             Arc::new(SystemClock),
         )?;
+        super::parser_definitions::clean_temporaries(&preflight, &home);
+        #[cfg(feature = "parser-declarative")]
+        let definitions = preflight.approved_definitions()?;
         let Some(saved) = load_approved_config(
             &preflight,
             config_store.as_ref(),
@@ -133,6 +138,8 @@ impl PreparedStartup {
         };
         configuration::resolve_cli(&mut cli, &saved, allow_environment)?;
         Ok(Some(Self {
+            #[cfg(feature = "parser-declarative")]
+            definitions,
             cli,
             interactive,
             home,
@@ -157,7 +164,16 @@ impl PreparedStartup {
             self.allow_environment,
             self.interactive,
         )?;
-        let engine = self.compose_engine(&registry)?;
+        #[cfg(feature = "parser-declarative")]
+        let registry =
+            super::parser_definitions::register(registry, &self.definitions, &self.home)?;
+        let catalog = registry.parser_catalog();
+        #[cfg(feature = "parser-declarative")]
+        let catalog = catalog.with_resolver(
+            self.definitions
+                .resolver(Arc::new(irmind_mod_parser_declarative::DeclarativeCompiler)),
+        );
+        let engine = self.compose_engine(&registry, catalog.clone())?;
         let Self {
             cli,
             interactive,
@@ -172,12 +188,15 @@ impl PreparedStartup {
             overrides_active,
             verifier: _,
             guard,
+            #[cfg(feature = "parser-declarative")]
+                definitions: _,
         } = self;
         let secrets = active.secret_backend;
         let signer_backend = active.signer_backend;
         let new_analyst_key = interactive && active.new_analyst_key;
         let workspace_io = RootWorkspaceIo {
-            parser_catalog: registry.parser_catalog(),
+            parser_catalog: catalog,
+            definition_store: irmind_infra::FileDefinitionStore::new(&home),
             home: home.clone(),
             credential_fields: compiled_credential_fields(),
             store: store.clone(),
@@ -218,7 +237,11 @@ impl PreparedStartup {
         )
     }
 
-    fn compose_engine<'a>(&self, registry: &'a ModuleRegistry) -> Result<Engine<'a>> {
+    fn compose_engine<'a>(
+        &self,
+        registry: &'a ModuleRegistry,
+        catalog: irmind_app::modules::ParserCatalog,
+    ) -> Result<Engine<'a>> {
         let engine = registry.bind(
             Engine::new(
                 EnginePorts::new(
@@ -234,7 +257,7 @@ impl PreparedStartup {
                 Arc::new(SystemClock),
             )?
             .with_large_case_pipeline(self.store.clone(), Arc::new(JsonParser))
-            .with_parser_catalog(registry.parser_catalog()),
+            .with_parser_catalog(catalog),
         )?;
         apply_session_policy(
             engine,

@@ -335,7 +335,7 @@ fn select_object_parser(
                 source_name: source.into(),
                 candidates: candidates
                     .into_iter()
-                    .map(|candidate| (candidate.id.into(), candidate.confidence.value()))
+                    .map(|candidate| (candidate.id, candidate.confidence.value()))
                     .collect(),
             });
         }
@@ -345,13 +345,13 @@ fn select_object_parser(
             ));
         }
     };
-    let parser = catalog.get(selected.id)?;
+    let parser = catalog.get(&selected.id)?;
     let selection = ParserSelection {
-        parser_id: selected.id.into(),
-        parser_version: parser.streaming_version().into(),
+        parser_id: selected.id,
+        parser_version: parser.identity().version.into(),
         confidence: selected.confidence.value(),
         mode: ParserSelectionMode::Automatic,
-        timestamp_context: None,
+        timestamp_context: parser.timestamp_context().map(str::to_owned),
         format_sample_sha256: crate::sha256(&sample),
     };
     Ok((parser, selection))

@@ -32,3 +32,7 @@ cargo test -p irmind-module-template --locked
 The template demonstrates the manifest, `SiemPort`, cancellation, source checks, and the shared contract suite without a network call. Replace its synthetic response only after the adapter has bounded HTTP and recorded-response tests. A production connector also needs the HTTP safety contract.
 
 Before opening a pull request, run `cargo fmt --all -- --check`, Clippy with `-D warnings`, the changed crates' tests, and `cargo deny check`. Use `git commit -s` for every commit.
+
+## Declarative formats
+
+For CSV, JSON/NDJSON and simple text logs, try a [bounded TOML definition](../parsers.md) before adding Rust. The `parser-declarative` crate implements the same streaming and detection ports. The root compiles approved definitions, registers owned catalog identities and supplies a resolver for exact signed versions. Native parser implementations need no changes. Use the signed installation flow; never load arbitrary files into the active catalog or promote parser text into a system message.

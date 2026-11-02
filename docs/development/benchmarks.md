@@ -135,3 +135,35 @@ The same local, single-worker harness measured the five DFIR parsers on one synt
 The benchmark uses repeated small records and a complete local ingest, so the numbers include costs outside the parser itself. The low CSV and JSONL throughput needs profiling before setting a release target.
 
 With default features and the same `cargo build -p irmind --release --locked` profile, the main-branch binary measured 47,733,368 B and the binary with these five parsers measured 48,314,232 B (+580,864 B, 1.22%). The workspace lockfile rose from 539 to 546 packages: five local parser crates plus `csv` and `csv-core`.
+
+## Declarative parser
+
+The local default-feature release build ingested 1,073,742,492 bytes of synthetic NDJSON in **15.478 seconds (66.16 MiB/s)**. The corpus repeats one nested custom authentication event with 800 padding bytes; source generation is excluded. The timed operation includes source hash, streaming mapping, entity/co-observation Parquet and signed custody. Subsequent case verification passed. This single-file repeated-data result is not comparable to the earlier heterogeneous DFIR benchmark or a standard GitHub runner. It does not close the shared throughput investigation in issue #61.
+
+Reproduce with the ignored `benchmark_declarative_one_gib` integration test in `crates/bin/tests/declarative.rs`, using a release build and one local build job if memory is limited. The test owns a temporary directory, checks the signed case and removes source and artifacts on completion. It is not run in ordinary PRs.
+
+| Same local default-feature Linux release build | Before (main `52bb023`) | Declarative draft |
+| --- | ---: | ---: |
+| Binary bytes | 48,391,864 | 49,145,152 |
+| Change | — | +753,288 (+1.56%) |
+
+Both binaries reported `irmind 0.1.3` and used the same Rust toolchain, release profile and existing dependency cache. Build times were warm/incremental and are not a cold-build comparison. The new lockfile resolves the same third-party packages; it adds only the IRMind parser crate.
+
+### Declarative detection matrix
+
+Native fixture scores remain unchanged. Every declarative candidate is below the automatic-selection threshold (80%). Here `—` means no match; the native DFIR diagonal is 95%. The three example definitions do not match any native fixture.
+
+| Fixture | JSON | Its native ECS/OCSF/DFIR parser | custom-access | custom-nested | custom-auth | Decision |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| JSON/cloud | 90 | — | — | — | — | JSON automatically |
+| ECS | 45 | 95 | — | — | — | ECS automatically |
+| OCSF JSON | 45 | 95 | — | — | — | OCSF automatically |
+| Velociraptor / Hayabusa / Chainsaw / plaso | 45 | 95 | — | — | — | Corresponding native parser automatically |
+| EZTools CSV | — | 95 | — | — | — | EZTools automatically |
+| Custom CSV | — | — | 70 | — | — | Analyst choice |
+| Custom nested NDJSON | 45 | — | — | 70 | — | Analyst choice |
+| Custom authentication text | — | — | — | — | 70 | Analyst choice |
+
+The versioned matrix test checks every native fixture against the three declarations and every custom fixture against all native parsers and declarations. Shared streaming contracts cover all three declarative formats. Low confidence deliberately requires selection even with one candidate; no false high-confidence declarative match was observed.
+
+Nightly AddressSanitizer fuzzing of detection and parsing ran **600 seconds**, exercising **1,042,080 inputs**, with no crashes and peak RSS 385 MiB under a 512 MiB limit. Disposable corpora and artifacts were removed. The target also runs in weekly fuzzing.

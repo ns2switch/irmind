@@ -224,6 +224,16 @@ The five DFIR parsers below index times at UTC-second precision. Their local rec
 
 **Limits:** Experimental. Rows without a usable timestamp are rejected. Timestamps without an offset are interpreted as UTC; the normalization context is recorded in the signed source manifest. [EZTools CSV header reference](https://github.com/EricZimmerman/TLEFilePlugins/blob/master/TLEFileEZTools/EZTools.cs).
 
+## Declarative parser
+
+**Use:** Map a custom CSV, JSON, NDJSON or bounded-regex log to the common event schema without writing Rust. Experimental; synthetic validation only.
+
+**Permission:** Read the selected local sources and the private definition store. No network, credentials or executable templates.
+
+**Configure:** Compiled by default with `parser-declarative`. Use `/parsers` to preview, install, deactivate or restore a definition with a signed global operation. Dynamic definitions have confidence at most 70%, so ingestion asks the analyst to choose them. See the [parser guide](parsers.md) and its three examples.
+
+**Limits:** Strict record, file, field, depth and regex limits apply. Definitions cannot raise them. Invalid or unsigned edits remain disabled, while old signed versions remain available for reconstruction. Fixed UTC offsets are supported; named time zones are not. No live log format has been validated by this module.
+
 ## OS keystore
 
 **Does:** Signs as Analyst or Agent and stores module credentials in Keychain, Credential Manager, or Secret Service.

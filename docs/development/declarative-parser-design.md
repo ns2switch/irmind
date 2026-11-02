@@ -56,11 +56,11 @@ The root owns a private `parsers/` directory beneath the data directory. Archive
 
 Add, replace and remove are explicit analyst operations. Validate first, show the definition identity and hash, sign a bounded global operational snapshot, then write the accepted bytes atomically with private permissions. Removal signs deactivation; it does not erase a definition still needed by signed cases. Keep the existing operational envelope and signature domain, with a versioned payload for definition management.
 
-On startup verify the global operation chain. Enable only a valid definition matching its last accepted snapshot. An invalid, unknown or unsigned edited definition is disabled with a safe warning; it does not prevent IRMind from starting. Never silently sign or accept it. Offer explicit review/restore using the signed archived contents. Missing historic definitions make reconstruction unavailable with a clear reason, without weakening case-chain verification.
+On startup verify the global operation chain. Enable only a valid definition matching its last accepted snapshot. An invalid, unknown or unsigned edited definition is disabled with a safe warning; it does not prevent IRMind from starting. Never silently sign or accept it. Offer explicit review/restore using the signed archived contents. Historical reconstruction resolves the exact definition from verified signed operational snapshots, including deactivated versions. Another machine needs the matching approved definition for reconstruction; case-chain and export verification do not execute definitions.
 
 ## User interaction
 
-`/parsers` lists native and declarative parsers, versions, definition hashes and experimental status. `/parsers test <definition> <file>` runs bounded detection and mapping without ingestion, signing evidence or invoking an LLM. It displays the confidence and first ten guarded rows, with rejected counts and safe errors. Destructive or installing actions require explicit confirmation and an unlocked analyst signer.
+`/parsers` manages declarative parsers, pinned versions and experimental status; Preferences lists all compiled parsers. `/parsers test <definition> <file>` runs bounded detection and mapping without ingestion, signing evidence or invoking an LLM. It displays the confidence and first ten guarded rows, with rejected counts and safe errors. Destructive or installing actions require explicit confirmation and an unlocked analyst signer.
 
 Preferences lists compiled parsers as today, including this module and its active definitions. Existing parser choices and the TUI ingestion command's explicit parser override remain the only ingestion dispatch path.
 
@@ -74,7 +74,7 @@ Preferences lists compiled parsers as today, including this module and its activ
 - Feature-minimal and default builds, dependency direction and shared parser contracts pass. Production dependencies reuse the existing `csv`, `serde_json`, `regex`, `toml`, `serde` and `chrono` packages; no new lockfile package is needed.
 - Fuzz detection and parsing for at least ten minutes locally and include the target in the weekly workflow. Measure a synthetic 1 GiB input and binary size before/after, with no unmeasured throughput claim.
 
-The three proposed definitions in [docs/examples/parsers](../examples/parsers/README.md) illustrate the intended syntax. They are specifications until the parser implementation is complete and tested.
+The three proposed definitions in [docs/examples/parsers](../examples/parsers/README.md) illustrate the intended syntax. They compile in the parser contract tests and can be previewed before signed installation.
 
 ## Draft implementation evidence
 
@@ -82,11 +82,13 @@ The core library now validates the three example definitions and decodes bounded
 
 | Local check | Observed result |
 | --- | --- |
-| Core unit tests | 9 passed, including cancellation, malformed neighboring records, depth/field limits, duplicate keys, quoted CSV newlines and exact fractional epoch time |
+| Core unit tests | 10 passed, including cancellation, malformed neighboring records, depth/field limits, duplicate keys, quoted CSV newlines and exact fractional epoch time |
 | Workspace fmt and clippy with warnings denied | Passed |
 | Nightly AddressSanitizer fuzzing | 10 minutes, 1,042,080 inputs, no failures; peak RSS 385 MiB under a 512 MiB limit |
 | Default-feature fuzz targets | All built successfully after the explicit-reader correction |
 | Fuzz corpus and artifacts | Disposable local corpus removed after the run; versioned synthetic seeds retained |
 | Production dependency resolution | Existing third-party package versions reused; the lockfile adds only the new IRMind parser crate |
 
-The application does not register this core yet. Remaining work is the reviewed identity/catalog extension, the module's common-port implementation and default feature, signed definition storage/recovery, parser preview and preference views, shared contracts/detection matrix, synthetic episode, user documentation in both languages, and the 1 GiB ingestion/binary-size measurements. No throughput or full-ingestion claim is made by these core-only tests.
+The draft now wires the module into the default binary feature, approved-definition registration and an exact historical resolver. The TUI manages installation, preview, deactivation and restoration through synchronous application use cases on background workers. Tests cover a post-signing write interruption, manual and unsigned edits, explicit restoration, pinned Parquet reconstruction after replacement/deactivation, and the common detection matrix. The additive identity, catalog and local-definition ports remain subject to analyst approval before merge. No new third-party lockfile packages or signed wire tags are introduced.
+
+The local release-profile 1 GiB NDJSON ingestion completed in 15.478 seconds (66.16 MiB/s), including hash, conversion, Parquet and signed custody. This is a repeated synthetic custom event with 800 padding bytes, on one local machine, not a standard-runner or diverse-log performance claim. The temporary corpus and derived files were removed. See [benchmarks](benchmarks.md#declarative-parser) for binary-size evidence.

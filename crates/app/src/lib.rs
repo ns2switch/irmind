@@ -26,6 +26,11 @@ mod adapter_storage_errors;
 mod approvals;
 mod audit_origin;
 mod configuration;
+mod definitions;
+pub use definitions::{
+    ApprovedDefinitions, DefinitionCompiler, DefinitionError, DefinitionStatus,
+    MAX_DEFINITION_BYTES, ParserDefinitionStore,
+};
 mod custody;
 mod diagnostics;
 mod dispatch;

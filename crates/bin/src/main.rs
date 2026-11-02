@@ -19,6 +19,7 @@ mod demo {
 mod diagnostics;
 mod keystore;
 mod model_probe;
+mod parser_definitions;
 mod policy_config;
 mod recent_case;
 use cli::{
@@ -100,6 +101,7 @@ macro_rules! register_configured {
 
 struct RootWorkspaceIo {
     parser_catalog: irmind_app::modules::ParserCatalog,
+    definition_store: irmind_infra::FileDefinitionStore,
     home: PathBuf,
     credential_fields: Vec<&'static str>,
     store: Arc<LocalStore>,
@@ -159,6 +161,23 @@ fn compiled_credential_fields() -> Vec<&'static str> {
 }
 
 impl WorkspaceIo for RootWorkspaceIo {
+    fn definition_store(&self) -> Option<&dyn irmind_app::ParserDefinitionStore> {
+        Some(&self.definition_store)
+    }
+    fn definition_compiler(&self) -> Option<&dyn irmind_app::DefinitionCompiler> {
+        #[cfg(feature = "parser-declarative")]
+        {
+            Some(&irmind_mod_parser_declarative::DeclarativeCompiler)
+        }
+        #[cfg(not(feature = "parser-declarative"))]
+        {
+            None
+        }
+    }
+    fn read_parser_input(&self, path: &Path, limit: usize) -> Result<Vec<u8>> {
+        parser_definitions::read(path, limit)
+    }
+
     fn show_hints(&self) -> bool {
         self.config_store
             .load()

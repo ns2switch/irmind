@@ -300,8 +300,8 @@ impl LargeCaseUseCases<'_, '_> {
         }
         let source_event = match selection {
             Some(selection) => {
-                if selection.parser_version != self.parser.streaming_version()
-                    || selection.parser_id != self.parser.parser_name()
+                if selection.parser_version != self.parser.identity().version
+                    || selection.parser_id != self.parser.identity().name
                     || selection.format_sample_sha256 != prepared.format_sample_sha256
                 {
                     return Err(invalid_manifest());
