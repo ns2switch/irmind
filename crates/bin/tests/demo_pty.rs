@@ -316,10 +316,12 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
     eprintln!("finding confirmed");
     eprintln!("guide step 8 visible");
     session.send("/demo check\r").unwrap();
-    session.expect("comparison").unwrap();
-    eprintln!("check complete");
     session.send("/demo next\r").unwrap();
+    // Reaching step 9 proves that /demo check ran: next cannot advance until
+    // the guide records the comparison. Text within the result card can be
+    // repainted before the guide counter on Windows ConPTY.
     session.expect("9/10").unwrap();
+    eprintln!("check complete");
     eprintln!("guide step 9 visible");
     complete_demo_custody(&mut session);
     session.send("/demo exit\r\r").unwrap();
