@@ -203,22 +203,6 @@ fn no_case_evidence(
         })
 }
 
-#[cfg(test)]
-mod hint_tests {
-    use super::{AuditEventKind, no_case_evidence};
-
-    #[test]
-    fn signed_source_manifests_count_as_evidence_without_a_local_copy() {
-        assert!(no_case_evidence(true, std::iter::empty()));
-        for kind in [
-            AuditEventKind::SourceManifestV1,
-            AuditEventKind::SourceManifestV2,
-        ] {
-            assert!(!no_case_evidence(true, std::iter::once(kind)));
-        }
-    }
-}
-
 fn add_context_hints(conversation: &mut Conversation, enabled: bool, context: HintContext) {
     if !enabled {
         return;
@@ -500,4 +484,20 @@ fn load_approval_sources(
         .iter()
         .map(|request| Ok((request.id.clone(), engine.approval_source(id, request)?)))
         .collect()
+}
+
+#[cfg(test)]
+mod hint_tests {
+    use super::{AuditEventKind, no_case_evidence};
+
+    #[test]
+    fn signed_source_manifests_count_as_evidence_without_a_local_copy() {
+        assert!(no_case_evidence(true, std::iter::empty()));
+        for kind in [
+            AuditEventKind::SourceManifestV1,
+            AuditEventKind::SourceManifestV2,
+        ] {
+            assert!(!no_case_evidence(true, std::iter::once(kind)));
+        }
+    }
 }
