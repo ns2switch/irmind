@@ -364,12 +364,12 @@ fn complete_demo_custody(session: &mut DemoSession) {
     session.send("/verify\r").unwrap();
     session.expect("Verified").unwrap();
     session.send("/seal\r").unwrap();
-    session.expect("Confirm").unwrap();
+    expect_custody_confirmation(session);
     session.send("2\r").unwrap();
     session.expect("Seal:").unwrap();
     eprintln!("case sealed");
     session.send("/export\r").unwrap();
-    session.expect("Confirm").unwrap();
+    expect_custody_confirmation(session);
     session.send("2\r").unwrap();
     session.expect("Exported").unwrap();
     eprintln!("case exported");
@@ -380,6 +380,13 @@ fn complete_demo_custody(session: &mut DemoSession) {
     session.send("/demo next\r").unwrap();
     session.expect("10/10").unwrap();
     eprintln!("guide step 10 visible");
+}
+
+fn expect_custody_confirmation(session: &mut DemoSession) {
+    #[cfg(windows)]
+    session.expect("1. Cancel  2. Confirm").unwrap();
+    #[cfg(unix)]
+    session.expect("Confirm").unwrap();
 }
 
 #[test]

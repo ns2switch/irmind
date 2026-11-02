@@ -119,6 +119,6 @@ The prompt-injection corpus intentionally contains English and Spanish attack sa
 
 **Context:** Windows CI exposed a tutorial PTY timeout while waiting for the next graph instruction. The test searched raw ConPTY bytes, which can repaint only part of a word; the captured console also decoded UTF-8 UI glyphs with its legacy code page. Linux and macOS use a different PTY implementation.
 
-**Decision:** Set UTF-8 only in the test console and reconstruct a bounded current screen for Windows assertions. Wait for the guide's `Do:` instruction, rather than loose command-name fragments. Unit tests cover cursor repaints, chunked UTF-8, titles, clearing and stale frames.
+**Decision:** Set UTF-8 only in the test console and reconstruct a bounded current screen for Windows assertions. Wait for the guide's `Do:` instruction, rather than loose command-name fragments. Unit tests cover cursor repaints, chunked UTF-8, titles, erase-character/display commands and stale frames. Custody tests wait for the exact numbered confirmation choices; a previous confirmed finding must not satisfy that wait.
 
 **Consequences:** Tutorial actions, deadlines, cancellation and cleanup assertions remain intact. No production behavior, dependencies, ports, signed formats or security controls change. The test screen handles the English single-cell UI, not arbitrary wide/combining terminal input.

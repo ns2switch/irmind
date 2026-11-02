@@ -132,11 +132,40 @@ impl TerminalScreen {
             b'D' => self.col = self.col.saturating_sub(count),
             b'G' => self.col = first.saturating_sub(1),
             b'd' => self.row = first.saturating_sub(1).min(self.cells.len() - 1),
-            b'J' if first == 2 || first == 3 => self.clear(),
+            b'J' => self.erase_display(first),
+            b'X' => {
+                let start = self.col.min(self.cells[0].len() - 1);
+                let end = start.saturating_add(count).min(self.cells[0].len());
+                self.cells[self.row][start..end].fill(' ');
+            }
             b'K' => self.erase_line(first),
             _ => {}
         }
         self.col = self.col.min(self.cells[0].len() - 1);
+    }
+
+    fn erase_display(&mut self, mode: usize) {
+        let col = self.col.min(self.cells[0].len() - 1);
+        match mode {
+            0 => {
+                self.cells[self.row][col..].fill(' ');
+                for line in &mut self.cells[self.row + 1..] {
+                    line.fill(' ');
+                }
+            }
+            1 => {
+                self.cells[self.row][..=col].fill(' ');
+                for line in &mut self.cells[..self.row] {
+                    line.fill(' ');
+                }
+            }
+            2 | 3 => {
+                for line in &mut self.cells {
+                    line.fill(' ');
+                }
+            }
+            _ => {}
+        }
     }
 
     fn erase_line(&mut self, mode: usize) {
@@ -183,5 +212,17 @@ mod tests {
         screen.feed(b"\x1b[?1049hDo: /search");
         assert!(!screen.text().contains("timeline"));
         assert!(screen.text().contains("Do: /search"));
+    }
+
+    #[test]
+    fn erase_sequences_remove_old_confirmation_text_without_moving_the_cursor() {
+        let mut screen = TerminalScreen::new(4, 40);
+        screen.feed(b"Confirmed finding\x1b[1;1H\x1b[9X");
+        assert!(!screen.text().contains("Confirm"));
+        screen.feed(b"New\x1b[0J");
+        assert!(screen.text().starts_with("New "));
+        assert!(!screen.text().contains("finding"));
+        screen.feed(b"\x1b[3;5HOld\x1b[2JNow");
+        assert_eq!(screen.text().lines().nth(2).unwrap().find("Now"), Some(7));
     }
 }
