@@ -83,10 +83,10 @@ This page is for maintainers reviewing tradeoffs that shape the current build. E
 
 The prompt-injection corpus intentionally contains English and Spanish attack samples. Its rule-set fingerprint can be recorded in signed audit data, so this documentation change does not rewrite those strings. Existing signed event identifiers and serialized formats also remain unchanged.
 
-## Declarative parser definitions (proposed for merge)
+## Declarative parser definitions (approved)
 
 **Context:** Each analyst-defined format needs a stable identity and exact historical reconstruction without static string leaks or mutable global state.
 
 **Decision:** Add default-compatible borrowed identity methods to the streaming parser port and owned catalog keys. Keep legacy native methods. Sign the full bounded definition in the existing global operation envelope, retain the SHA-256 in the existing source parser-version string, and resolve historical versions from verified signed snapshots. New local compiler/store ports keep parsing pure and storage at the composition boundary. No external package version or signed wire tag changes.
 
-**Consequences:** A declaration cannot outrank a native high-confidence match. Changed or unsigned files stay disabled, and restoration is explicit. A post-signing write failure is recoverable without weakening approval or custody. The reviewed artifact-v2 design remains unimplemented. The additive parser-port changes await analyst approval before merge.
+**Consequences:** A declaration cannot outrank a native high-confidence match. Changed or unsigned files stay disabled, and restoration is explicit. A post-signing write failure is recoverable without weakening approval or custody. The reviewed artifact-v2 design remains unimplemented. The analyst approved the additive parser-port changes; they are integrated in [PR #151](https://github.com/ns2switch/irmind/pull/151).

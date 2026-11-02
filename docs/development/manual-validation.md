@@ -34,7 +34,10 @@ Use a disposable bucket and a dedicated identity with only `s3:ListBucket` on on
 
 | Check | Record |
 | --- | --- |
-| Date, exact model ID, OS, IRMind commit | Pending analyst record; not supplied. |
+| Test date | 2026-11-01, supplied by the analyst. |
+| Model | `deepseek v4.1 flash`, supplied by the analyst. |
+| Operating system | Debian Linux 12, supplied by the analyst. |
+| IRMind version / commit | Version 0.1.2; an exact commit was not supplied. |
 | Operator and provider | Analyst; real DeepSeek service. |
 | H5 connection probe | Pending analyst record. |
 | H5 greeting | Observed by the analyst: `hola` is recognized as a greeting and answered naturally, without unnecessary tool calls. |
