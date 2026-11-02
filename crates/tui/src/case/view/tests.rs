@@ -62,7 +62,10 @@ fn narrow_terminal_keeps_prompt_and_new_content_indicator() {
 #[test]
 fn guided_demo_panel_stays_visible_above_the_conversation() {
     let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
-    let lines = [Line::from("⏺ Synthetic result")];
+    let lines = [
+        Line::from(concat!("IRMind v", env!("CARGO_PKG_VERSION"))),
+        Line::from("Evidence ready: 1 synthetic file · parser-json · 90% confidence"),
+    ];
     let view = CaseFrame {
         title: "Synthetic",
         guide: Some("Demo 3/10 · Evidence\nDo: /demo next\nWhy: The original stays in place."),
@@ -89,7 +92,11 @@ fn guided_demo_panel_stays_visible_above_the_conversation() {
     let shown = screen(&terminal);
     assert!(shown.contains("Demo 3/10"));
     assert!(shown.contains("/demo next"));
-    assert!(shown.contains("Synthetic result"));
+    assert!(shown.contains("Evidence ready: 1 synthetic file"));
+    assert!(!shown.contains("Try /timeline"));
+    insta::assert_snapshot!("guided_demo_evidence_ready", shown);
+    assert!(!shown.contains("/help for help"));
+    assert!(shown.contains("Follow the current guide step"));
 }
 
 #[test]

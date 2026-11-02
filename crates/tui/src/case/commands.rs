@@ -60,9 +60,17 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return Ok(false);
         }
         if self.active.is_some() {
-            self.state
-                .messages
-                .push("Investigation running; use /pause before another command.".into());
+            let message = if self
+                .state
+                .demo_guide
+                .as_ref()
+                .is_some_and(|guide| !guide.hidden())
+            {
+                "Investigation running."
+            } else {
+                "Investigation running; use /pause before another command."
+            };
+            self.state.messages.push(message.into());
             return Ok(false);
         }
         if !(self.long_command(&prompt)?
@@ -163,7 +171,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 .messages
                 .push(if let Some(guide) = self.state.demo_guide.as_mut() {
                     guide.show();
-                    "The demo guide is visible. Use /demo hint for this step.".into()
+                    "The demo guide is visible.".into()
                 } else {
                     "Return to /home before starting /demo.".into()
                 });
@@ -191,20 +199,20 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             if self.active.is_some() {
                 self.state
                     .messages
-                    .push("Wait for the current task or use /pause.".into());
+                    .push("Waiting for the current task.".into());
                 return Ok(true);
             }
             let Some((path, _)) = self.io_ops.demo_export_identity() else {
                 self.state
                     .messages
-                    .push("Demo export is unavailable. Use /help demo.".into());
+                    .push("Demo export is unavailable.".into());
                 return Ok(true);
             };
             let command = format!("/export {}", path.display());
             if prompt != "/export" && prompt != command {
-                self.state.messages.push(
-                    "The demo exports only inside its temporary directory. Use /export.".into(),
-                );
+                self.state
+                    .messages
+                    .push("The demo exports only inside its temporary directory.".into());
                 return Ok(true);
             }
             self.seal_or_export_command(&command)?;
@@ -220,7 +228,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         let Some(root) = self.io_ops.demo_source_root() else {
             self.state
                 .messages
-                .push("Demo source is unavailable. Retry /demo.".into());
+                .push("Demo source is unavailable.".into());
             return true;
         };
         let workflow = self.workflow();
@@ -236,13 +244,13 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             if self.active.is_some() {
                 self.state
                     .messages
-                    .push("Wait for the current task or use /pause.".into());
+                    .push("Waiting for the current task.".into());
                 return true;
             }
             let Some((path, fingerprint)) = self.io_ops.demo_export_identity() else {
                 self.state
                     .messages
-                    .push("Demo export is unavailable. Use /help demo.".into());
+                    .push("Demo export is unavailable.".into());
                 return true;
             };
             let io_ops = self.io_ops;

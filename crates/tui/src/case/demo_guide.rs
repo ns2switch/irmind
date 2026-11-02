@@ -40,7 +40,6 @@ impl DemoGuide {
         self.step
     }
 
-    #[cfg(test)]
     pub(super) fn hidden(&self) -> bool {
         self.hidden
     }
@@ -48,7 +47,7 @@ impl DemoGuide {
     pub(super) fn record(&mut self, event: DemoEvent) {
         self.seen.insert(event);
         if self.completed() && self.step < 9 {
-            self.note = "Step complete. Use /demo next when ready.".into();
+            self.note = "Step complete.".into();
         }
     }
 
@@ -59,13 +58,13 @@ impl DemoGuide {
 
     pub(super) fn next(&mut self) {
         if self.step == 9 {
-            self.note = "The tutorial is complete. Use /demo exit to leave.".into();
+            self.note = "The tutorial is complete.".into();
         } else if self.completed() {
             self.step += 1;
             self.hidden = false;
             self.note.clear();
         } else {
-            self.note = "Complete this step, or use /demo skip to move on.".into();
+            self.note = "This step is not complete. Follow the instruction above.".into();
         }
     }
 
@@ -80,7 +79,7 @@ impl DemoGuide {
             self.step += 1;
         }
         self.hidden = false;
-        self.note = "Step skipped. You can return with /demo back.".into();
+        self.note = "Step skipped.".into();
     }
 
     pub(super) fn hide(&mut self) {
@@ -94,15 +93,15 @@ impl DemoGuide {
     pub(super) fn hint(&mut self) {
         self.note = match self.step {
             0 => "No setup is needed. This session uses only bundled synthetic data.",
-            1 => "The signed case scope is visible with /scope.",
+            1 => "The scope defines which sources this case may query.",
             2 => "Wait for the ingest result; it names the parser and confidence.",
             3 => "Run the commands shown in the guide, one at a time.",
             4 => "Ask about the synthetic IAM events in your own words.",
-            5 => "Open /approvals to inspect the exact arguments before deciding.",
-            6 => "Use /findings to see the proposed hypothesis and its evidence.",
+            5 => "Inspect the exact arguments before deciding.",
+            6 => "Inspect the proposed hypothesis and its evidence.",
             7 => "Only confirmed findings count toward the local check.",
             8 => "Verify before sealing, then export and check the package with the analyst key.",
-            _ => "Use /new and /settings outside this temporary demo.",
+            _ => "Start a real case and configure a model after leaving the demo.",
         }
         .into();
         self.hidden = false;
@@ -133,6 +132,9 @@ impl DemoGuide {
     }
 
     fn instruction(&self, approval: Option<&str>, finding: Option<&str>) -> String {
+        if self.completed() && (1..9).contains(&self.step) {
+            return "/demo next — continue when ready".into();
+        }
         match self.step {
             0 => "/demo next — begin the guided tour".into(),
             1 => "/scope — inspect the signed case boundary".into(),
@@ -223,6 +225,18 @@ impl DemoGuide {
 #[cfg(test)]
 mod tests {
     use super::{DemoEvent, DemoGuide};
+
+    #[test]
+    fn completed_step_has_one_current_instruction() {
+        let mut guide = DemoGuide::new();
+        guide.next();
+        guide.record(DemoEvent::ScopeViewed);
+        assert!(guide.panel(None, None).is_some_and(|panel| {
+            panel.contains("Do: /demo next")
+                && !panel.contains("/scope")
+                && panel.matches('/').count() == 2 // Step counter and one command.
+        }));
+    }
 
     #[test]
     fn unrelated_actions_never_advance_the_guide() {

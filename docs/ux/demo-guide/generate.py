@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[3]
 HERE = Path(__file__).resolve().parent
@@ -23,18 +24,24 @@ IMAGES = ("welcome.png", "evidence.png", "explore.png", "approval.png", "custody
 def main() -> None:
     if not (TARGET / "debug" / "irmind").is_file():
         raise SystemExit("Build the local binary first: cargo build -p irmind --locked")
+    version = tomllib.loads((ROOT / "crates/bin/Cargo.toml").read_text())["package"]["version"]
+    actual = subprocess.check_output([TARGET / "debug" / "irmind", "--version"], text=True).strip()
+    if actual != f"irmind {version}":
+        raise SystemExit(f"Rebuild the binary: expected irmind {version}, got {actual}")
     with tempfile.TemporaryDirectory(prefix="irmind-demo-guide-") as disposable:
         output = Path(disposable)
         command = [
             "docker", "run", "--rm", "--network", "none", "--pull=never",
             "--user", f"{os.getuid()}:{os.getgid()}",
             "--mount", f"type=bind,src={ROOT},dst=/vhs,readonly",
-            "--mount", f"type=bind,src={TARGET},dst=/vhs/target,readonly",
+            "--mount", f"type=bind,src={TARGET},dst=/build,readonly",
             "--mount", f"type=bind,src={output},dst=/out",
             "--workdir", "/vhs", IMAGE, "docs/ux/demo-guide/capture.tape",
         ]
         subprocess.run(command, check=True)
         transcript = (output / "preview.ascii").read_text(errors="replace")
+        if f"v{version}" not in transcript:
+            raise ValueError("the capture does not show the binary version")
         for private in (str(Path.home()), getpass.getuser(), os.uname().nodename):
             if private and private in transcript:
                 raise ValueError("a screenshot transcript contains a personal identifier")

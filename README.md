@@ -11,7 +11,7 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 *The demo uses synthetic evidence and an ephemeral key. Its scripted model needs no network or account.*
 
 > [!WARNING]
-> IRMind 0.1.2 is a preliminary release for evaluation with synthetic data. It has not passed manual validation with a real model or connector. Do not use it for real incidents or sensitive data.
+> IRMind 0.1.3 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
 
 ## What you can do
 

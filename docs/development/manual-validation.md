@@ -30,17 +30,24 @@ Use a disposable bucket and a dedicated identity with only `s3:ListBucket` on on
 
 ## Result record
 
+[Spanish result record](../es/manual-validation.md#registro-de-resultados).
+
 | Check | Record |
 | --- | --- |
-| Date, operator, OS, IRMind commit | |
-| H5 provider and model; connection probe | |
-| H5 greeting, investigation, follow-up, streaming | |
-| H5 tool policy, citations, verification | |
-| Splunk image digest/version, test index, TLS setup | |
-| Structured search: expected / observed count and evidence hash | |
-| Alert approval: exact scope, decision, expected / observed result | |
-| Custody verification and any failure | |
-| Verdict: H5 pass/fail; connector pass/fail; follow-up issue | |
+| Date, exact model ID, OS, IRMind commit | Pending analyst record; not supplied. |
+| Operator and provider | Analyst; real DeepSeek service. |
+| H5 connection probe | Pending analyst record. |
+| H5 greeting | Observed by the analyst: `hola` is recognized as a greeting and answered naturally, without unnecessary tool calls. |
+| H5 investigation question with evidence-hash citation | Pending analyst record; not reported as observed. |
+| H5 follow-up and streaming | Pending analyst record; not reported as observed. |
+| H5 tool policy, redaction or injection warnings | Pending analyst record beyond the observed absence of unnecessary tools for the greeting. |
+| H5 `/verify` | Pending analyst record; not reported as observed. |
+| H5 verdict | **Done by analyst decision.** The analyst accepts H5 based on the observed real-DeepSeek greeting. Unreported procedure steps remain pending records, not claimed passes. |
+| Real connector verdict | **Pending analyst validation.** No live connector result has been supplied. |
+| Splunk image digest/version, test index, TLS setup | Pending analyst record. |
+| Structured search: expected / observed count and evidence hash | Pending analyst record. |
+| Alert approval: exact scope, decision, expected / observed result | Pending analyst record. |
+| Connector custody verification and follow-up issue | Pending analyst record. |
 
 Keep secrets, complete provider output, personal paths, and real incident data out of the record.
 

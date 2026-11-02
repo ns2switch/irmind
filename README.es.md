@@ -1,4 +1,4 @@
-Traducción de README.md en el commit eb6637f06b3af70cbc6c7bb8242883b612d13894; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit a59d6745083d597b3154325685f7c9c8a67a8bbc; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -11,7 +11,7 @@ IRMind es un asistente agéntico de terminal para respuesta a incidentes y anál
 *La demostración usa evidencia sintética y una clave efímera. El modelo guionizado no necesita red ni cuenta.*
 
 > [!WARNING]
-> IRMind 0.1.2 es una versión preliminar para evaluar con datos sintéticos. No ha superado la validación manual con un modelo ni con conectores reales. No la uses para incidentes reales ni datos sensibles.
+> IRMind 0.1.3 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
 
 ## Qué puedes hacer
 

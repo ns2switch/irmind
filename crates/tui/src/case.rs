@@ -169,7 +169,7 @@ fn welcome_conversation(
     resumed: bool,
 ) -> Result<Conversation> {
     let backend = io_ops.keystore_status()?.signer_backend;
-    let mut case_summary = welcome_summary(case, model, &backend, resumed);
+    let mut case_summary = welcome_summary(case, model, &backend, resumed, !io_ops.demo_mode());
     if io_ops.demo_mode() {
         case_summary.insert_str(0, "Demo · synthetic data · deleted on exit\n");
     }
@@ -253,13 +253,19 @@ fn welcome_summary(
     model: Option<&dyn LlmPort>,
     backend: &str,
     resumed: bool,
+    hints: bool,
 ) -> String {
     format!(
-        "{} · {}\nModel: {} · Keystore: {}\n/ingest adds evidence · /help opens help{}",
+        "{} · {}\nModel: {} · Keystore: {}{}{}",
         case.title,
         case.severity.as_str(),
         model.map_or_else(|| "no model".into(), LlmPort::descriptor),
         backend,
+        if hints {
+            "\n/ingest adds evidence · /help opens help"
+        } else {
+            ""
+        },
         if resumed {
             "\nResumed · /home to view all cases"
         } else {
@@ -281,7 +287,7 @@ fn demo_ingest_result(engine: &Engine<'_>, id: &CaseId, count: usize) -> Result<
     let manifest =
         SourceManifestV2::decode(&entry.payload).map_err(|_| AppError::InvalidChain(entry.seq))?;
     Ok(format!(
-        "Ingested {count} synthetic file · {} ({}% confidence). Try /timeline.",
+        "Evidence ready: {count} synthetic file · {} · {}% confidence",
         manifest.parser_id, manifest.confidence
     ))
 }

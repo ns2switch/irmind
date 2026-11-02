@@ -46,7 +46,7 @@ The 0.1.0 scope included GCP and Azure only as object-storage read sources and e
 
 For uncopied originals, the signed manifest proves what IRMind observed when it hashed each source, while later full verification requires access to that same source. Sampling verifies only selected originals. Neither mode claims that an unavailable source remains intact. Export without originals is verifiable as a signed manifest and case chain, not as a complete portable evidence package.
 
-The original MVP exit criteria remain: H0–H8 meet their stated acceptance criteria, the H5 manual test is documented, at least one connector has been tested against a real test environment, and the release has a changelog and downloadable binaries. Synthetic recordings alone do not satisfy the connector test. The analyst approved an explicit exception for `v0.1.0`: publish it as a pre-release before the two manual validations. They remain open and must be recorded in [manual validation](manual-validation.md); defects found later will be addressed in 0.1.x. Do not mark H5 or the live-connector gate complete merely because the tag exists.
+The original MVP exit criteria remain: H0–H8 meet their stated acceptance criteria, the H5 manual test is documented, at least one connector has been tested against a real test environment, and the release has a changelog and downloadable binaries. Synthetic recordings alone do not satisfy the connector test. The analyst approved an explicit exception for `v0.1.0`: publish it as a pre-release before the two manual validations. H5 has since been closed by analyst decision after a real DeepSeek greeting test, as recorded in [manual validation](manual-validation.md#result-record). The live-connector gate remains open. Unreported H5 procedure steps remain pending analyst records; the tag itself does not satisfy any validation gate.
 
 | MVP exit criterion | Status | Evidence or next action |
 | --- | --- | --- |
@@ -54,11 +54,11 @@ The original MVP exit criteria remain: H0–H8 meet their stated acceptance crit
 | H7 local Parquet and benchmark acceptance | Done | [15 GB runner benchmark](https://github.com/ns2switch/irmind/actions/runs/40776509647) and migration tests. |
 | H8 existing connector and object-source contracts | Done | Recorded synthetic contract suites and setup guides. |
 | H5 recorded-response tests | Done | CI contract and application tests. |
-| H5 conversation-loop correction | Done | PR #31 integrated with the trusted-system-role security correction; no manual DeepSeek test was run before merge. H5 as a whole remains open. |
-| H5 manual test with real DeepSeek | Pending analyst | Run the first procedure in [manual validation](manual-validation.md) and record the result. |
+| H5 conversation-loop correction | Done | PR #31 integrated with the trusted-system-role security correction; no manual DeepSeek test was run before merge. The later analyst acceptance is recorded below. |
+| H5 manual test with real DeepSeek | Done by analyst decision | The analyst observed a natural reply to `hola` without unnecessary tool calls. See the [result record](manual-validation.md#result-record); exact model, date, commit, OS and unreported procedure steps remain pending analyst records. |
 | One connector against a real test environment | Pending analyst | Run the Splunk lab procedure in [manual validation](manual-validation.md) and record the result. |
 | Release dry run without a tag | Done | [Manual CI run 41117075395](https://github.com/ns2switch/irmind/actions/runs/41117075395) passed on Linux, macOS and Windows before the first tag. |
-| `v0.1.0` and `v0.1.1` tags, changelog and downloadable binaries | Done with explicit validation exception | Both pre-releases were published from green `main`; v0.1.1 adds signed and attested assets. Manual H5 and live-connector gates remain pending. |
+| `v0.1.0` and `v0.1.1` tags, changelog and downloadable binaries | Done with explicit validation exception | Both pre-releases were published from green `main`; v0.1.1 adds signed and attested assets. These releases preceded H5 acceptance; the live-connector gate remains pending. |
 
 ## Historical 0.1.0 release process
 

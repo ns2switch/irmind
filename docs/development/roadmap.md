@@ -8,13 +8,13 @@ This page is for contributors and evaluators. It describes intentions, not relea
 
 ## Delivered in 0.1.0 and 0.1.1
 
-The pre-releases provide the terminal case workflow, policy-gated connectors, signed custody, guarded model conversations, bounded Parquet queries, a synthetic demo, a parser detection registry, verified installers, and Sigstore-signed and attested assets. See the [changelog](../../CHANGELOG.md) for what shipped and its limitations. Manual model and live connector validation remain open.
+The pre-releases provide the terminal case workflow, policy-gated connectors, signed custody, guarded model conversations, bounded Parquet queries, a synthetic demo, a parser detection registry, verified installers, and Sigstore-signed and attested assets. See the [changelog](../../CHANGELOG.md) for what shipped and its limitations. H5 is complete by analyst decision; unreported procedure details and validation of a real connector remain pending.
 
 ## v0.1.x: Stabilize the pre-release
 
 Stabilize the pre-release with manual validation, verifiable installation, and signed assets.
 
-- Validate H5 manually with DeepSeek and test one connector against a real test environment.
+- H5 is complete by analyst decision after a real DeepSeek greeting test. Record the remaining procedure details and test one connector against a real test environment. See the [validation record](manual-validation.md#result-record).
 - Maintain Sigstore keyless signatures, GitHub artifact attestations, and an SBOM for release assets, delivered in v0.1.1.
 - Sign macOS binaries with Developer ID, hardened runtime, and `notarytool` notarization in a protected release environment that runs only on tags. The maintainer must provision the certificate and App Store Connect API key before implementation; secrets are never configured through a roadmap issue.
 - Apply to the SignPath Foundation open-source program for Windows Authenticode signing. Publish `CODE_SIGNING.md` to describe signed assets, release approval, and build provenance. The application is a maintainer task.

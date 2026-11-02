@@ -191,9 +191,11 @@ fn draw_prompt(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
         .collect::<Vec<_>>();
     let input_visible = input_visible.into_iter().rev().collect::<Vec<_>>();
     let shown = if view.input.is_empty() {
-        vec![Line::from(
-            "Ask about the case… · / for commands · /help for help",
-        )]
+        vec![Line::from(if view.guide.is_some() {
+            "Follow the current guide step…"
+        } else {
+            "Ask about the case… · / for commands · /help for help"
+        })]
     } else {
         input_visible.clone()
     };

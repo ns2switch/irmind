@@ -74,7 +74,7 @@ impl LlmPort for ScriptedModel {
                 ]) },
                 ProposedCall { tool: Tool::ThreatIntelExternal, args: BTreeMap::from([("ioc".into(), "203.0.113.77".into())]) },
             ]),
-            _ => ("The evidence points to an administrative policy attachment, a cross-account role assumption, and an access-key creation. Confirm the proposed finding if supported, then use /demo check. All data in this session is synthetic.", Vec::new()),
+            _ => ("The evidence points to an administrative policy attachment, a cross-account role assumption, and an access-key creation. A proposed finding is available for review. All data in this session is synthetic.", Vec::new()),
         };
         let calls = proposals
             .into_iter()
