@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit c6087e07320d77640e88c70461010cd57f1a43c1; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit 5d7a59b246db1e06bd67b6833a873b72a00e9ff2; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -202,7 +202,7 @@ Lee CSV de PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd bat
 
 **Permisos:** Lectura de fuentes locales y del almacén privado de definiciones. Sin red, credenciales ni plantillas ejecutables.
 
-**Configuración:** Compilado por defecto con `parser-declarative`. `/parsers` permite probar, instalar, desactivar o restaurar definiciones mediante operaciones globales firmadas. La confianza máxima es 70 %, por lo que la ingesta requiere elegirlo. Consulta la [guía de parsers](parsers.md) y sus tres ejemplos.
+**Configuración:** Compilado por defecto con `parser-declarative`. `/parsers` permite probar, instalar, desactivar o restaurar definiciones mediante operaciones globales firmadas. La confianza máxima es 70 %, por lo que la ingesta requiere elegirlo. Consulta la [guía de parsers](parsers.md) y sus ejemplos.
 
 **Límites:** Archivo, registro, campos, profundidad y regex tienen máximos que la definición no puede ampliar. Las ediciones inválidas o sin firma quedan desactivadas; las versiones firmadas antiguas siguen disponibles para reconstruir. Solo se admiten UTC y desplazamientos fijos, no zonas con nombre. No se ha validado ningún formato real con este módulo.
 
@@ -233,3 +233,7 @@ Para añadir un módulo, consulta la [guía de arquitectura](../development/arch
 ## Parser Syslog
 
 Para ingerir logs RFC 5424 o RFC 3164, `parser-syslog` es un módulo local experimental compilado por defecto. También admite gzip con límites de entrada y salida. No necesita credenciales ni red. RFC 3164 exige año y desplazamiento UTC explícitos: ambos quedan firmados como contexto inferido. Consulta [el contrato y la configuración](../development/syslog-parser.md) y [la selección de parsers](parsers.md). Se conserva la precisión del original; el índice derivado actual aún usa segundos.
+
+## Logs de Linux
+
+Para ingerir auth.log/secure, auditd, journald JSON o exportaciones nginx/Apache common y combined, `parser-linux` es un módulo local experimental compilado por defecto. Necesita acceso de lectura a esos archivos y ninguna credencial. El tiempo de la autenticación clásica se confirma en cada ingesta con el mismo formulario de syslog. La agrupación de auditd está acotada y los eventos incompletos quedan marcados como parciales. Se conservan las fracciones del instante original; el índice actual usa segundos. Los formatos propios usan una definición declarativa firmada. Consulta [la selección de parsers](parsers.md) y [el contrato y los límites de Linux](../development/linux-parser.md).
