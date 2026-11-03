@@ -9,9 +9,9 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "expand",
-        description: "Expand or fold the selected card",
+        description: "Expand or fold the selected or last expandable card",
         shortcut: "Ctrl+O",
-        slash: false,
+        slash: true,
     },
     Command {
         name: "help",

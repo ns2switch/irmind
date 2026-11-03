@@ -262,6 +262,30 @@ fn demo_ingest_completion_is_visible_and_followup_command_responds() {
 }
 
 #[test]
+fn card_expands_from_the_text_box_with_control_o_and_slash_command() {
+    let real_home = tempfile::tempdir().unwrap();
+    let demo_parent = tempfile::tempdir().unwrap();
+    let mut session =
+        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+    session.set_expect_timeout(Some(Duration::from_secs(20)));
+    #[cfg(unix)]
+    session.set_expect_lazy(false);
+    session.expect("ready:").unwrap();
+    session.send("/demo hide\r/graph\r").unwrap();
+    session.expect("Ctrl+O").unwrap();
+    session.send("\x0f").unwrap();
+    session.expect("records=").unwrap();
+    session.send("\x0f").unwrap();
+    session.expect("Ctrl+O").unwrap();
+    session.send("/expand\r").unwrap();
+    session.expect("records=").unwrap();
+    session.send("/demo exit\r\r").unwrap();
+    session.expect("Demo data deleted").unwrap();
+    assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 0);
+    assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
+}
+
+#[test]
 fn demo_is_isolated_and_removed_after_exit() {
     run_demo("/quit\r\r");
 }

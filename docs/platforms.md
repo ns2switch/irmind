@@ -83,3 +83,9 @@ Use Windows Terminal and the x64 MSVC build. The `os` backend uses Credential Ma
 Without `--home`, data goes to the platform's standard local application-data directory: XDG on Linux, Application Support on macOS, and LocalAppData on Windows. Evidence names are lower-case hashes; paths stored in the audit and export use relative `/` separators. SQLite holds the audit and case state; signed Parquet artifacts provide derived graph queries.
 
 The TUI uses the alternate screen and sanitizes external text before display. Automated tests cover control sequences and bidirectional controls on all three systems. Visual interaction still needs manual review in each terminal before production use. Over SSH, request a terminal (`ssh -t`), select `file` during setup, and enter the passphrase in the masked TUI field. Backend changes are explicit; IRMind never falls back silently. `verify-export` can run without unlocking a keystore.
+
+## Card expansion and terminal keymaps
+
+Ctrl+O expands or folds the selected expandable card from the input box, conversation or sidebar. Without a suitable selection, it uses the last expandable card. `/expand` performs the same action and remains available if a terminal, SSH client or custom tmux keymap intercepts the key. No focus change or draft clearing is needed.
+
+The byte `0x0f` is covered by the real-binary PTY regression on the CI operating systems. This does not certify individual GUI terminal keymaps. Interactive confirmation in macOS Terminal.app, iTerm2, GNOME Terminal/Konsole, Windows Terminal, SSH and tmux remains a maintainer check. No terminal-specific interception has been confirmed by this automated test; use `/expand` rather than disabling terminal safety settings.

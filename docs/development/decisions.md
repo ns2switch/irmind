@@ -138,3 +138,9 @@ Context: Linux authentication exports and syslog share the approved RFC 3164 inf
 Decision: keep the immutable validated time context and pure candidate calendar in the application. Each module validates its own complete row before committing its local candidate. Detection stays module-owned, bounded and independent of filenames. PRI-prefixed records retain syslog selection. Linux is a default-compiled experimental feature with no new external package, credential or signed wire encoding.
 
 Consequences: historical syslog interpretations and golden bytes stay identical. Linux audit groups retain component offsets and exact argument boundaries; an unproven group stays partial. Journald/audit fractions remain in original/normalized text while artifact V1 indexes seconds. Native host partitioning and indexed subsecond precision follow the approved artifact-V2 design.
+
+## Global card expansion and terminal fallback
+
+Context: Ctrl+O was gated on conversation focus even though the normal focus is the composer. Long notices also rendered only their first line after toggling.
+Decision: handle expansion as a global case-screen presentation action before form/menu handlers, use the same operation for `/expand`, and fall back to the last expandable card. Preserve draft, focus, approvals and form state. Show the slash alternative in folded-card hints.
+Consequences: no application port, policy, signed format or dependency changes. PTY and TestBackend tests cover the raw key path; GUI terminal, SSH and tmux manual coverage must be reported separately.

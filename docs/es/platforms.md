@@ -1,4 +1,4 @@
-Traducción de docs/platforms.md en el commit e31fd5cc947308542888df4a52164d8892c56b93; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit c4fa5c304750e84fd3b1f102154be646f3fd0a00; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
@@ -85,3 +85,9 @@ Usa Windows Terminal y el binario x64 MSVC. `os` utiliza Credential Manager; `fi
 Sin `--home`, los datos se guardan en el directorio estándar de datos locales de cada plataforma: XDG en Linux, Application Support en macOS y LocalAppData en Windows. Los nombres de evidencia son hashes en minúsculas; las rutas de auditoría y exportación son relativas y usan `/`. SQLite guarda la auditoría y el estado del caso; los artefactos Parquet firmados proporcionan las consultas derivadas del grafo.
 
 La TUI usa la pantalla alternativa y sanea el texto externo antes de mostrarlo. Los tests automáticos comprueban secuencias de control y controles bidireccionales en los tres sistemas. La interacción visual aún requiere revisión manual en cada terminal antes de usarse en producción. Por SSH, solicita un terminal con `ssh -t`, elige `file` y escribe la passphrase en el campo enmascarado de la TUI. IRMind no cambia de backend en silencio. `verify-export` funciona sin desbloquear un llavero.
+
+## Desplegar tarjetas y mapas de teclas del terminal
+
+Ctrl+O despliega o pliega la tarjeta plegable seleccionada desde la caja de texto, la conversación o el panel lateral. Si no hay una selección adecuada, usa la última tarjeta plegable. `/expand` hace lo mismo si el terminal, el cliente SSH o una configuración propia de tmux intercepta la tecla. No hace falta cambiar el foco ni borrar el borrador.
+
+La prueba PTY del binario real en los sistemas de CI cubre el byte `0x0f`. Esto no certifica los mapas de teclas de cada aplicación gráfica. Sigue pendiente la comprobación interactiva en Terminal.app de macOS, iTerm2, GNOME Terminal/Konsole, Windows Terminal, SSH y tmux. Esta prueba automática no ha confirmado ninguna interceptación específica; usa `/expand` en vez de desactivar ajustes de seguridad del terminal.

@@ -92,6 +92,10 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     }
 
     fn session_command(&mut self, prompt: &str) -> bool {
+        if prompt == "/expand" {
+            self.state.conversation.toggle_selected();
+            return true;
+        }
         if prompt == "/sidebar" {
             self.state.sidebar_visible = !self.state.sidebar_visible;
             self.state.focus = if self.state.sidebar_visible {

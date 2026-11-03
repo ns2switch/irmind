@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 7933256136e1501041869f043d1b64949e79c0be; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit c4fa5c304750e84fd3b1f102154be646f3fd0a00; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -102,3 +102,5 @@ Una consulta externa espera la aprobación firmada del analista. La tarjeta mues
 ## Siguientes pasos
 
 Consulta [configuración](configuration.md) para el alcance, la política, los backends y los nombres de credenciales. Consulta [módulos](modules.md) para los permisos y límites de los conectores y [plataformas](platforms.md) para el uso por SSH. La TUI es el flujo principal; los subcomandos sirven para automatizar tareas.
+
+Usa **Ctrl+O** o `/expand` para plegar o desplegar la tarjeta seleccionada mientras escribes. Si no hay una tarjeta plegable seleccionada, IRMind usa la última. Conserva tu borrador y funciona desde la caja de texto y el panel lateral. Consulta [las teclas del terminal](platforms.md#desplegar-tarjetas-y-mapas-de-teclas-del-terminal).
