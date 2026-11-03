@@ -1,8 +1,8 @@
 use super::CaseWorkflow;
 use irmind_app::{
-    AppError, CancellationToken, CaseId, LargeCaseUseCases, ParserSelection, ParserSelectionMode,
+    AppError, CancellationToken, CaseId, LargeCaseUseCases, ParserTimeContext,
     StreamingEventParser,
-    modules::{ParserCatalog, ParserChoice},
+    modules::{ParserCatalog, ParserSelectionRequest, ResolvedParserSelection},
 };
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -15,6 +15,8 @@ pub(crate) struct IngestRequest<'a> {
     pub forced_parser: Option<&'a str>,
     pub analyst_choices: &'a BTreeMap<String, String>,
     pub cancel: &'a CancellationToken,
+    pub time_contexts: &'a BTreeMap<String, ParserTimeContext>,
+    pub default_time_context: Option<ParserTimeContext>,
 }
 
 impl CaseWorkflow<'_, '_> {
@@ -55,6 +57,8 @@ impl CaseWorkflow<'_, '_> {
                 copy_original,
                 forced_parser,
                 analyst_choices: &BTreeMap::new(),
+                time_contexts: &BTreeMap::new(),
+                default_time_context: None,
                 cancel,
             },
             &mut progress,
@@ -73,6 +77,7 @@ impl CaseWorkflow<'_, '_> {
             forced_parser,
             analyst_choices: _,
             cancel,
+            ..
         } = request;
         let files = self.io_ops.input_files(path).map_err(|_| {
             AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
@@ -82,7 +87,10 @@ impl CaseWorkflow<'_, '_> {
         if let Some(catalog) = self.io_ops.parser_catalog() {
             return self.ingest_detected(request, &files, catalog, &mut progress);
         }
-        if forced_parser.is_some() {
+        if forced_parser.is_some()
+            || request.default_time_context.is_some()
+            || !request.time_contexts.is_empty()
+        {
             return Err(AppError::Policy("parser override is unavailable".into()));
         }
         let total = files.len();
@@ -163,14 +171,18 @@ impl CaseWorkflow<'_, '_> {
         let mut cursor = 0;
         let mut last_parser = None;
         while cursor < selected.len() {
-            let parser_id = &selected[cursor].1.parser_id;
+            let first = &selected[cursor].1.selection;
+            let parser_id = &first.parser_id;
             let end = selected[cursor..]
                 .iter()
                 .take(4)
-                .take_while(|(_, metadata)| metadata.parser_id == *parser_id)
+                .take_while(|(_, resolved)| {
+                    resolved.selection.parser_id == *parser_id
+                        && resolved.selection.parser_version == first.parser_version
+                })
                 .count()
                 + cursor;
-            let parser = catalog.get(parser_id)?;
+            let parser = selected[cursor].1.parser.clone();
             let use_cases = LargeCaseUseCases {
                 engine: self.engine,
                 store,
@@ -181,15 +193,24 @@ impl CaseWorkflow<'_, '_> {
                 .iter()
                 .map(|(source, _)| source.clone())
                 .collect::<Vec<_>>();
-            let selections = group.iter().cloned().collect::<BTreeMap<_, _>>();
-            for (source, _) in use_cases.ingest_local_batch_selected(
-                id,
-                source_root,
-                &sources,
-                copy_original,
-                &selections,
-                cancel,
-            )? {
+            let selections = group
+                .iter()
+                .map(|(source, resolved)| (source.clone(), resolved.selection.clone()))
+                .collect::<BTreeMap<_, _>>();
+            for (source, _) in use_cases
+                .ingest_local_batch_selected(
+                    id,
+                    source_root,
+                    &sources,
+                    copy_original,
+                    &selections,
+                    cancel,
+                )
+                .map_err(|error| {
+                    self.engine
+                        .annotate_parser_time_error(id, error, catalog, cancel, true)
+                })?
+            {
                 done += 1;
                 let safe = self.engine.guard.screen(&source)?.text;
                 progress(done, files.len(), &safe);
@@ -197,22 +218,36 @@ impl CaseWorkflow<'_, '_> {
             last_parser = Some(parser);
             cursor = end;
         }
-        if let Some(parser) = last_parser {
-            let use_cases = LargeCaseUseCases {
-                engine: self.engine,
-                store,
-                parser: parser.as_ref() as &dyn StreamingEventParser,
-            };
-            let bundles = use_cases.compact_case(id, cancel)?;
-            if bundles > 0 {
-                progress(
-                    files.len(),
-                    files.len(),
-                    &format!("Created {bundles} signed Parquet bundles"),
-                );
-            }
-        }
+        self.compact_detected(request, last_parser, files.len(), progress)?;
         Ok(files.len())
+    }
+
+    fn compact_detected(
+        &self,
+        request: IngestRequest<'_>,
+        parser: Option<std::sync::Arc<dyn irmind_app::LogParser>>,
+        count: usize,
+        progress: &mut impl FnMut(usize, usize, &str),
+    ) -> Result<(), AppError> {
+        let Some(parser) = parser else {
+            return Ok(());
+        };
+        let use_cases = LargeCaseUseCases {
+            engine: self.engine,
+            store: self.io_ops.large_case_store().ok_or(AppError::Policy(
+                "signed Parquet ingestion is unavailable".into(),
+            ))?,
+            parser: parser.as_ref() as &dyn StreamingEventParser,
+        };
+        let bundles = use_cases.compact_case(request.id, request.cancel)?;
+        if bundles > 0 {
+            progress(
+                count,
+                count,
+                &format!("Created {bundles} signed Parquet bundles"),
+            );
+        }
+        Ok(())
     }
 
     fn detect_sources(
@@ -220,7 +255,7 @@ impl CaseWorkflow<'_, '_> {
         request: IngestRequest<'_>,
         files: &[std::path::PathBuf],
         catalog: &ParserCatalog,
-    ) -> Result<Vec<(String, ParserSelection)>, AppError> {
+    ) -> Result<Vec<(String, ResolvedParserSelection)>, AppError> {
         let IngestRequest {
             id,
             path,
@@ -266,79 +301,26 @@ impl CaseWorkflow<'_, '_> {
                 .io_ops
                 .read_format_sample(file)
                 .map_err(|_| AppError::Policy("cannot read bounded format sample".into()))?;
-            let choice = catalog.detect(&source, &sample);
-            let (parser_id, confidence, mode) = resolve_parser_choice(
-                &source,
-                choice,
-                forced_parser.or_else(|| analyst_choices.get(&source).map(String::as_str)),
-                forced_parser.is_some(),
-                catalog,
-            )?;
-            let parser = catalog.get(&parser_id)?;
-            selected.push((
-                source,
-                ParserSelection {
-                    parser_id,
-                    parser_version: parser.identity().version.into(),
-                    confidence,
-                    mode,
-                    timestamp_context: parser.timestamp_context().map(str::to_owned),
-                    format_sample_sha256: irmind_app::sha256(&sample),
-                },
-            ));
+            let context = request
+                .time_contexts
+                .get(&source)
+                .copied()
+                .or(request.default_time_context);
+            let resolved = catalog.select_source(ParserSelectionRequest {
+                source: &source,
+                sample: &sample,
+                parser_override: forced_parser
+                    .or_else(|| analyst_choices.get(&source).map(String::as_str)),
+                forced: forced_parser.is_some(),
+                time_context: context,
+            });
+            let resolved = resolved.map_err(|error| {
+                self.engine
+                    .annotate_parser_time_error(id, error, catalog, cancel, true)
+            })?;
+            selected.push((source, resolved));
         }
         selected.sort_by(|left, right| left.0.cmp(&right.0));
         Ok(selected)
-    }
-}
-
-fn resolve_parser_choice(
-    source: &str,
-    choice: ParserChoice,
-    selected: Option<&str>,
-    forced: bool,
-    catalog: &ParserCatalog,
-) -> Result<(String, u8, ParserSelectionMode), AppError> {
-    if let Some(id) = selected {
-        catalog.get(id)?;
-        let confidence = match &choice {
-            ParserChoice::Auto(candidate) if candidate.id == id => candidate.confidence.value(),
-            ParserChoice::NeedsAnalyst(candidates) => candidates
-                .iter()
-                .find(|candidate| candidate.id == id)
-                .map_or(0, |candidate| candidate.confidence.value()),
-            _ => 0,
-        };
-        return Ok((
-            id.into(),
-            confidence,
-            if forced {
-                ParserSelectionMode::Forced
-            } else {
-                ParserSelectionMode::Analyst
-            },
-        ));
-    }
-    match choice {
-        ParserChoice::Auto(candidate) => Ok((
-            candidate.id,
-            candidate.confidence.value(),
-            ParserSelectionMode::Automatic,
-        )),
-        ParserChoice::NeedsAnalyst(candidates) => Err(AppError::ParserSelection {
-            source_name: source.into(),
-            candidates: candidates
-                .into_iter()
-                .map(|candidate| (candidate.id, candidate.confidence.value()))
-                .collect(),
-        }),
-        ParserChoice::Unsupported => Err(AppError::ParserSelection {
-            source_name: source.into(),
-            candidates: catalog
-                .available()
-                .into_iter()
-                .map(|(id, _)| (id, 0))
-                .collect(),
-        }),
     }
 }

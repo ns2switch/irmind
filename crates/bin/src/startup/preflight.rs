@@ -18,6 +18,25 @@ pub(super) fn reconcile_configuration(
     interactive: bool,
     guard: &dyn ContentGuard,
 ) -> Result<bool> {
+    let historical = super::retired_syslog::review_manifests(manifests);
+    if !reconcile_review(engine, store, &historical, home, interactive, guard)? {
+        return Ok(false);
+    }
+    if !super::retired_syslog::remove_after_confirmation(engine, store, &historical, interactive)? {
+        return Ok(false);
+    }
+    engine.verify_configuration(store, manifests)?;
+    Ok(true)
+}
+
+fn reconcile_review(
+    engine: &Engine<'_>,
+    store: &dyn ConfigurationStore,
+    manifests: &[&ModuleManifest],
+    home: &Path,
+    interactive: bool,
+    guard: &dyn ContentGuard,
+) -> Result<bool> {
     let present = configuration_file_present(home)?;
     let inspection = engine.inspect_configuration(store, manifests, present)?;
     let irmind_app::ConfigurationInspection::Review(review) = inspection else {

@@ -67,6 +67,27 @@ impl StreamingEventParser for JsonParser {
 }
 
 impl LogParser for JsonParser {
+    fn time_context_requirement(
+        &self,
+        source: &str,
+        sample: &[u8],
+    ) -> Result<Option<irmind_app::ParserTimeRequirement>, AppError> {
+        irmind_app::json_time_requirement(
+            source,
+            sample,
+            &irmind_app::ParserTimeFields {
+                parser_id: "parser-json",
+                hosts: &["/host", "/hostname", "/hostName"],
+                timestamps: &[
+                    "/eventTime",
+                    "/timestamp",
+                    "/event_time",
+                    "/time",
+                    "/@timestamp",
+                ],
+            },
+        )
+    }
     fn detect(&self, _source_name: &str, sample: &[u8]) -> Option<ParserConfidence> {
         let first = sample
             .iter()

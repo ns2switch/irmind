@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/case/time_prompt/tests.rs
+expression: render(&prompt)
+---
+┌──────────────────────────────────────────────────────────────────────────────┐
+│Confirm source time · source.log                                              │
+│No machine clock or file mtime is used. Confirm before ingestion.             │
+│  ╭─ First record year ─────────╮                                             │
+│  │ YYYY                                                                      │
+│  ╰──────────────────────╯                                                    │
+│  ╭─ Fixed UTC offset ─────────╮                                              │
+│  │ +01:00                                                                    │
+│  ╰──────────────────────╯                                                    │
+│  December → January rollover: enabled (inferred and signed)                  │
+│  Apply confirmed context: all files in this ingestion                        │
+│> Suggested 2026 +01:00 · signed aaaaaaaa#2 · Enter copies, never auto-applies│
+│  Confirm and ingest · basis: analyst                                         │
+│Tab/Shift+Tab fields · ↑/↓ choose · Enter select · Esc cancel                 │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘

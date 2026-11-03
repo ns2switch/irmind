@@ -270,3 +270,6 @@ fn corrupt_gzip_never_commits_a_partial_custody_batch() {
     );
     engine.verify(&case.id).unwrap();
 }
+
+#[path = "syslog_ingest/time_context.rs"]
+mod time_context;

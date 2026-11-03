@@ -6,6 +6,10 @@ use crossterm::event::{MouseEvent, MouseEventKind};
 
 impl CaseRuntime<'_, '_, '_> {
     pub(super) fn handle_paste(&mut self, value: &str) {
+        if let Some(prompt) = self.state.time_prompt.as_mut() {
+            prompt.paste(value);
+            return;
+        }
         if self.state.picker.is_some()
             || self.state.confirmation.is_some()
             || self.state.parser_prompt.is_some()
@@ -265,6 +269,7 @@ impl CaseRuntime<'_, '_, '_> {
         if self.state.picker.is_some()
             || self.state.confirmation.is_some()
             || self.state.palette.is_some()
+            || self.state.time_prompt.is_some()
         {
             self.state.overlay_scroll = self.state.overlay_scroll.saturating_add_signed(delta);
         } else if self.state.sidebar_visible && self.state.focus == Focus::Sidebar {
@@ -308,6 +313,10 @@ impl CaseRuntime<'_, '_, '_> {
             self.state.menu_open = false;
             return Ok(false);
         }
+        if self.state.time_prompt.is_some() {
+            self.handle_time_prompt_key(code, modifiers)?;
+            return Ok(false);
+        }
         if self.state.parser_prompt.is_some() {
             self.handle_parser_prompt_key(code)?;
             return Ok(false);
@@ -342,6 +351,43 @@ impl CaseRuntime<'_, '_, '_> {
             CaseMessage::Key(code, modifiers, self.active.is_some()),
         );
         self.apply_action(action)
+    }
+
+    fn handle_time_prompt_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<()> {
+        if matches!(code, KeyCode::PageUp | KeyCode::PageDown) {
+            self.state.overlay_scroll = self
+                .state
+                .overlay_scroll
+                .saturating_add_signed(if code == KeyCode::PageUp { -10 } else { 10 });
+            return Ok(());
+        }
+        let Some(mut prompt) = self.state.time_prompt.take() else {
+            return Ok(());
+        };
+        match prompt.update(code, modifiers) {
+            crate::case::time_prompt::TimePromptAction::Cancel => {
+                self.state.pending_ingest = None;
+                self.engine
+                    .record_cancellation(self.id, irmind_app::CancelledOperation::Ingest)?;
+                self.state.messages.push(
+                    "Temporal context cancelled; unfinished sources were not ingested.".into(),
+                );
+            }
+            crate::case::time_prompt::TimePromptAction::Confirm { context, all_files } => {
+                if let Some(pending) = self.state.pending_ingest.as_mut() {
+                    if all_files {
+                        pending.default_time_context = Some(context);
+                    } else {
+                        pending.time_contexts.insert(prompt.source, context);
+                    }
+                    self.start_pending_ingest();
+                }
+            }
+            crate::case::time_prompt::TimePromptAction::Keep => {
+                self.state.time_prompt = Some(prompt);
+            }
+        }
+        Ok(())
     }
 
     fn handle_parser_prompt_key(&mut self, code: KeyCode) -> Result<()> {

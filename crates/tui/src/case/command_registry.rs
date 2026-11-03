@@ -32,7 +32,7 @@ impl Command {
             "open" => " <case title or ID>",
             "demo" => " [next|back|hint|skip|hide|show|check|exit]",
             "evidence" | "raw" => " <hash>",
-            "ingest" => " [--parser <name>] <path>",
+            "ingest" => " [--parser <name>] [--year YYYY --utc-offset ±HH:MM] <path>",
             "objects" => " <source> <scheme> <container> <prefix> <from> <to>",
             "object-read" => " <number> [--copy-original]",
             "search" => " <words>",

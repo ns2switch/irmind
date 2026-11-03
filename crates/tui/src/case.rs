@@ -27,6 +27,7 @@ mod render;
 pub(crate) use render::{approval_panel, entity_panel};
 mod runtime;
 mod state;
+mod time_prompt;
 mod view;
 pub(crate) use confirmation::escape_display;
 use confirmation::{Confirmation, confirmation_summary, seal_confirmation};
@@ -150,6 +151,7 @@ fn initial_state(
         picker: None,
         pending_ingest: None,
         parser_prompt: None,
+        time_prompt: None,
         confirmation: None,
         confirmed_action: None,
         hashes,
@@ -345,6 +347,8 @@ pub(crate) fn run_case(
                 copy_original: false,
                 forced_parser: None,
                 analyst_choices: std::collections::BTreeMap::new(),
+                time_contexts: std::collections::BTreeMap::new(),
+                default_time_context: None,
             });
             let workflow = CaseWorkflow {
                 engine,

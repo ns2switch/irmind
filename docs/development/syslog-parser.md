@@ -8,17 +8,13 @@ This page is for parser maintainers and analysts validating synthetic syslog inp
 
 RFC 5424 retains its original offset and fractional timestamp in the raw record and a full UTC timestamp in normalized text. The existing V1 derived index remains second precision until the approved artifact-V2 work. A NIL timestamp remains unknown; no clock supplies a replacement.
 
-RFC 3164 requires an explicit year and fixed UTC offset. Set both non-secret values together in `config.toml` and approve the changed configuration in the TUI before opening cases:
+RFC 3164 requires an explicit year for the first record and a fixed UTC offset **for each ingestion**. When detection selects this format, the TUI opens a form before ingesting. Confirm the year, offset, December-to-January rollover and whether the choice applies to this file or all files in the ingestion. Fields start empty; verified sources from the same logged host may supply suggestions, never automatic defaults. Neither the machine clock nor file mtime supplies a year or zone.
 
-```toml
-[modules.parser-syslog]
-enabled = false # Parsers activate through detection, not remote connector enablement.
-[modules.parser-syslog.values]
-LEGACY_YEAR = "2026"
-LEGACY_UTC_OFFSET_MINUTES = "60"
-```
+For automation, pass both `--year` and `--utc-offset` to ingestion. The TUI command accepts the same options; the command context has basis `Command`. Use `--no-year-rollover` to disable the default boundary inference. See the [CLI reference](cli.md). Without context, unattended ingestion refuses the source and records the reason.
 
-The module does not read environment variables or secrets. The composition root injects its configuration. Missing context rejects RFC 3164 records rather than assigning a year or zone. Each accepted legacy row has `timestamp_inferred=true`. The signed SourceManifestV2 records year, offset and analyst basis; the parser version also binds them. Historical resolution reconstructs that exact version after settings change. No automatic DST or new-year rollover is inferred. Use separate, explicitly configured ingestions for different years/offsets.
+Only December → January advances the inferred year. Other backward month transitions are rejected as invalid records. The calendar cursor is separate for every file and advances only after a valid record. Each accepted classic row retains `timestamp_inferred=true`. The existing SourceManifestV2 context records the initial year, fixed offset, rollover choice and basis (`analyst`, `command` or `confirmed-suggestion`). The canonical `syslog-v2` parser version binds the same interpretation. No source-manifest or artifact encoding changes.
+
+`LEGACY_YEAR` and `LEGACY_UTC_OFFSET_MINUTES` are retired from config.toml. Startup offers an explicit signed removal of previously approved fields; automation fails closed until that review. Historical `syslog-v1` sources still rebuild from their signed version and fixed-year context, not the current configuration. All old byte/hash goldens remain unchanged. IANA zones and DST require separate design work in [issue #161](https://github.com/ns2switch/irmind/issues/161).
 
 ## Mapping and bounds
 

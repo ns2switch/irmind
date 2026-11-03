@@ -63,4 +63,4 @@ All mapped records retain taint and source/parser/offset provenance. The guard s
 
 ### Legacy syslog time
 
-RFC 3164 needs a year and UTC offset supplied by the analyst. IRMind records the inference and never fills these from the machine clock. See the [syslog configuration and limits](development/syslog-parser.md).
+RFC 3164 opens a time-context form before ingestion. Confirm the first record’s year and fixed UTC offset, whether December → January advances the year, and whether to apply the choice to one file or the whole ingestion. Fields start empty. Verified sources from the same host may suggest a year and offset; you must confirm them. IRMind never uses the machine clock or file modification time. Other backward month transitions count as invalid records. The choice is signed with the source. See the [syslog contract and limits](development/syslog-parser.md).

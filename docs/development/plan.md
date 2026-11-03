@@ -109,3 +109,7 @@ The experimental `parser-declarative` module is integrated through [PR #151](htt
 ## Native syslog parser
 
 The experimental feature-gated `parser-syslog` uses the shared detection registry and existing SourceManifestV2. RFC 5424 retains source precision; RFC 3164 binds explicit year and fixed offset into the signed inference context and parser version. Bounded gzip uses the reviewed, analyst-approved `flate2` dependency. Synthetic contracts, signed ingestion/reconstruction, unchanged-format goldens, fuzzing and local throughput measurements are documented in [the parser contract](syslog-parser.md) and [benchmarks](benchmarks.md). Linux remains the next module; artifact-V2 implementation has not started.
+
+### Per-ingestion RFC 3164 time correction
+
+[PR #162](https://github.com/ns2switch/irmind/pull/162) implements the approved optional LogParser time-context capabilities. New syslog sources bind a typed first year, fixed UTC offset, visible December/January rollover and confirmed basis in existing SourceManifestV2 fields and parser version. New ingestion never reads a global year or machine time. Historical v1 sources retain exact reconstruction. Linux authentication parsing reuses this flow in its own follow-up PR. EVTX remains an isolated helper after artifact V2; the superseded in-process proposal #153 is closed.

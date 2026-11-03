@@ -336,22 +336,14 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return Ok(true);
         }
         if let Some(path) = prompt.strip_prefix("/ingest ") {
-            let (forced_parser, path) = if let Some(rest) = path.strip_prefix("--parser ") {
-                let (parser, path) = rest
-                    .split_once(' ')
-                    .ok_or_else(|| anyhow::anyhow!("use /ingest --parser <name> <path>"))?;
-                (Some(parser.to_owned()), path)
-            } else {
-                (None, path)
-            };
-            let (copy_original, path) = path
-                .strip_prefix("--copy-original ")
-                .map_or((false, path), |selected| (true, selected));
+            let options = irmind_app::IngestOptions::parse(path)?;
             self.state.pending_ingest = Some(super::state::PendingIngest {
-                path: PathBuf::from(path),
-                copy_original,
-                forced_parser,
+                path: PathBuf::from(options.path),
+                copy_original: options.copy_original,
+                forced_parser: options.parser,
                 analyst_choices: std::collections::BTreeMap::new(),
+                time_contexts: std::collections::BTreeMap::new(),
+                default_time_context: options.time_context,
             });
             self.start_pending_ingest();
             return Ok(true);
@@ -398,6 +390,8 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                         copy_original: pending.copy_original,
                         forced_parser: pending.forced_parser.as_deref(),
                         analyst_choices: &pending.analyst_choices,
+                        time_contexts: &pending.time_contexts,
+                        default_time_context: pending.default_time_context,
                         cancel: &cancel,
                     },
                     |done, count, source| {

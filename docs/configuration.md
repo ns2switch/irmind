@@ -139,3 +139,7 @@ No provider is selected by default. In the TUI, type `/settings model` to choose
 The local presets are Ollama (`127.0.0.1:11434`), LM Studio (`127.0.0.1:1234`), and vLLM (`127.0.0.1:8000`). Remote presets are OpenAI, Anthropic, DeepSeek, OpenRouter, Mistral, Groq, Google Gemini's OpenAI-compatible endpoint, xAI, and Together. The latter five use the existing OpenAI-compatible module; no extra product module is needed. Model listing may be unavailable on a compatible service; the form still accepts a model ID. Tool support depends on the chosen model, and the connection test checks only basic access. Azure OpenAI endpoints requiring an `api-version` query parameter are not supported by this URL field.
 
 A keyless local service may use HTTP only on loopback; HTTPS works there too. Remote endpoints require HTTPS and a destination-specific key. A different custom URL never inherits `OPENAI_API_KEY`. Select other compiled providers with their module IDs and settings in [modules](modules.md). Confirm retention, processing region, and data classification before any external connection.
+
+## Source time for classic syslog
+
+RFC 3164 time settings belong to an ingestion, not config.toml. Confirm the year, fixed UTC offset and rollover choice in the ingestion form. You may apply one confirmed choice to all files or choose separately. Retired global time fields require explicit signed removal at startup. Previously signed sources keep their recorded interpretation. See [parsers](parsers.md#legacy-syslog-time) and the [automation reference](development/cli.md).

@@ -3,8 +3,8 @@ use super::{
     RootWorkspaceIo, anyhow, audit_source_name, input_files_large, parse_id, terminal_safe_path,
 };
 use irmind_app::{
-    AuditLog, LargeCaseStore, ParserSelection, ParserSelectionMode, StreamingEventParser,
-    modules::{ParserCatalog, ParserChoice},
+    AuditLog, LargeCaseStore, ParserTimeContext, StreamingEventParser,
+    modules::{ParserCatalog, ParserSelectionRequest, ResolvedParserSelection},
 };
 use irmind_tui::WorkspaceIo;
 use std::{
@@ -16,12 +16,12 @@ use std::{
 struct PlanExecution<'a> {
     id: &'a CaseId,
     source_root: &'a Path,
-    plan: &'a [(String, ParserSelection)],
+    plan: &'a [(String, ResolvedParserSelection)],
     copy_original: bool,
     engine: &'a Engine<'a>,
     store: &'a dyn LargeCaseStore,
-    catalog: &'a ParserCatalog,
     cancel: &'a irmind_app::CancellationToken,
+    catalog: &'a ParserCatalog,
 }
 
 impl AutomationContext<'_, '_> {
@@ -39,31 +39,23 @@ impl AutomationContext<'_, '_> {
                 case_id,
                 path,
                 copy_original,
+                parser,
+                year,
+                utc_offset,
+                no_year_rollover,
             } => {
                 let id = parse_id(&case_id)?;
+                let time_context = irmind_app::command_time_context(
+                    year.as_deref(),
+                    utc_offset.as_deref(),
+                    !no_year_rollover,
+                )?;
                 engine.verify_cancelable(&id, cancel)?;
                 if store.get_case(&id)?.sealed {
                     return Err(anyhow!("case is sealed"));
                 }
                 let files = input_files_large(&path)?;
-                let indexed: std::collections::BTreeMap<String, irmind_domain::SourceManifestV1> =
-                    store
-                        .entries(&id)?
-                        .into_iter()
-                        .filter_map(|entry| {
-                            match irmind_domain::SourceManifestV1::decode_signed(
-                                entry.kind,
-                                &entry.payload,
-                            ) {
-                                Ok(Some(source)) => Some(Ok((source.source.clone(), source))),
-                                Ok(None) => None,
-                                Err(_) => Some(Err(anyhow!(
-                                    "invalid signed source manifest at entry {}",
-                                    entry.seq
-                                ))),
-                            }
-                        })
-                        .collect::<Result<_, _>>()?;
+                let indexed = indexed_sources(store.as_ref(), &id)?;
                 let source_root = if path.is_dir() {
                     path.as_path()
                 } else {
@@ -80,8 +72,17 @@ impl AutomationContext<'_, '_> {
                         println!("skipped {}", terminal_safe_path(file));
                     }
                 }
-                let plan =
-                    plan_ingest(&files, &path, &indexed, workspace_io, &catalog, engine, &id)?;
+                let plan = plan_ingest(IngestPlanInput {
+                    files: &files,
+                    path: &path,
+                    indexed: &indexed,
+                    io: workspace_io,
+                    catalog: &catalog,
+                    engine,
+                    id: &id,
+                    parser: parser.as_deref(),
+                    time_context,
+                })?;
                 perform_ingest_plan(PlanExecution {
                     id: &id,
                     source_root,
@@ -89,8 +90,8 @@ impl AutomationContext<'_, '_> {
                     copy_original,
                     engine,
                     store: store.as_ref(),
-                    catalog: &catalog,
                     cancel,
+                    catalog: &catalog,
                 })?;
             }
             _ => return Err(anyhow!("invalid command dispatch")),
@@ -107,20 +108,24 @@ fn perform_ingest_plan(args: PlanExecution<'_>) -> Result<()> {
         copy_original,
         engine,
         store,
-        catalog,
         cancel,
+        catalog,
     } = args;
     let mut cursor = 0;
     let mut last_parser = None;
     while cursor < plan.len() {
-        let parser_id = &plan[cursor].1.parser_id;
+        let first = &plan[cursor].1.selection;
+        let parser_id = &first.parser_id;
         let end = plan[cursor..]
             .iter()
             .take(4)
-            .take_while(|(_, choice)| choice.parser_id == *parser_id)
+            .take_while(|(_, choice)| {
+                choice.selection.parser_id == *parser_id
+                    && choice.selection.parser_version == first.parser_version
+            })
             .count()
             + cursor;
-        let parser = catalog.get(parser_id)?;
+        let parser = plan[cursor].1.parser.clone();
         let large = LargeCaseUseCases {
             engine,
             store,
@@ -132,16 +137,12 @@ fn perform_ingest_plan(args: PlanExecution<'_>) -> Result<()> {
             .collect::<Vec<_>>();
         let choices = plan[cursor..end]
             .iter()
-            .cloned()
+            .map(|(source, choice)| (source.clone(), choice.selection.clone()))
             .collect::<BTreeMap<_, _>>();
-        for (source, hash) in large.ingest_local_batch_selected(
-            id,
-            source_root,
-            &sources,
-            copy_original,
-            &choices,
-            cancel,
-        )? {
+        for (source, hash) in large
+            .ingest_local_batch_selected(id, source_root, &sources, copy_original, &choices, cancel)
+            .map_err(|error| engine.annotate_parser_time_error(id, error, catalog, cancel, false))?
+        {
             println!(
                 "{} {}",
                 hash.as_str(),
@@ -163,55 +164,123 @@ fn perform_ingest_plan(args: PlanExecution<'_>) -> Result<()> {
     Ok(())
 }
 
-fn plan_ingest(
-    files: &[PathBuf],
-    path: &Path,
-    indexed: &BTreeMap<String, irmind_domain::SourceManifestV1>,
-    io: &RootWorkspaceIo,
-    catalog: &ParserCatalog,
-    engine: &Engine<'_>,
-    id: &CaseId,
-) -> Result<Vec<(String, ParserSelection)>> {
+#[derive(Clone, Copy)]
+struct IngestPlanInput<'a> {
+    files: &'a [PathBuf],
+    path: &'a Path,
+    indexed: &'a BTreeMap<String, irmind_domain::SourceManifestV1>,
+    io: &'a RootWorkspaceIo,
+    catalog: &'a ParserCatalog,
+    engine: &'a Engine<'a>,
+    id: &'a CaseId,
+    parser: Option<&'a str>,
+    time_context: Option<ParserTimeContext>,
+}
+
+fn plan_ingest(input: IngestPlanInput<'_>) -> Result<Vec<(String, ResolvedParserSelection)>> {
     let mut plan = Vec::new();
-    for file in files {
-        let source = audit_source_name(path, file)?;
-        if indexed.contains_key(&source) {
+    for file in input.files {
+        let source = audit_source_name(input.path, file)?;
+        if input.indexed.contains_key(&source) {
             continue;
         }
-        let sample = io.read_format_sample(file)?;
-        match catalog.detect(&source, &sample) {
-            ParserChoice::Auto(candidate) => {
-                let parser = catalog.get(&candidate.id)?;
-                plan.push((
-                    source,
-                    ParserSelection {
-                        parser_id: candidate.id,
-                        parser_version: parser.identity().version.into(),
-                        confidence: candidate.confidence.value(),
-                        mode: ParserSelectionMode::Automatic,
-                        timestamp_context: parser.timestamp_context().map(str::to_owned),
-                        format_sample_sha256: irmind_app::sha256(&sample),
-                    },
-                ));
+        let sample = input.io.read_format_sample(file)?;
+        let selected = input.catalog.select_source(ParserSelectionRequest {
+            source: &source,
+            sample: &sample,
+            parser_override: input.parser,
+            forced: input.parser.is_some(),
+            time_context: input.time_context,
+        });
+        match selected {
+            Ok(selection) => plan.push((source, selection)),
+            Err(error @ irmind_app::AppError::ParserTimeContextRequired { .. }) => {
+                input
+                    .engine
+                    .record_parser_selection_required(input.id, "missing-time-context")?;
+                return Err(error.into());
             }
-            ParserChoice::NeedsAnalyst(candidates) => {
-                let reason = if candidates
-                    .first()
-                    .is_some_and(|first| first.confidence.is_high())
-                {
-                    "ambiguous"
+            Err(error @ irmind_app::AppError::ParserSelection { .. }) => {
+                let reason = if matches!(
+                    input.catalog.detect(&source, &sample),
+                    irmind_app::modules::ParserChoice::Unsupported
+                ) {
+                    "unsupported"
                 } else {
-                    "low-confidence"
+                    "ambiguous"
                 };
-                engine.record_parser_selection_required(id, reason)?;
-                return Err(anyhow!("parser selection requires an analyst in the TUI"));
+                input
+                    .engine
+                    .record_parser_selection_required(input.id, reason)?;
+                return Err(error.into());
             }
-            ParserChoice::Unsupported => {
-                engine.record_parser_selection_required(id, "unsupported")?;
-                return Err(anyhow!("no compiled parser recognizes this source"));
-            }
+            Err(error) => return Err(error.into()),
         }
     }
     plan.sort_by(|left, right| left.0.cmp(&right.0));
     Ok(plan)
+}
+
+fn indexed_sources(
+    store: &dyn AuditLog,
+    id: &CaseId,
+) -> Result<BTreeMap<String, irmind_domain::SourceManifestV1>> {
+    store
+        .entries(id)?
+        .into_iter()
+        .filter_map(|entry| {
+            match irmind_domain::SourceManifestV1::decode_signed(entry.kind, &entry.payload) {
+                Ok(Some(source)) => Some(Ok((source.source.clone(), source))),
+                Ok(None) => None,
+                Err(_) => Some(Err(anyhow!(
+                    "invalid signed source manifest at entry {}",
+                    entry.seq
+                ))),
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use clap::Parser as _;
+    #[test]
+    fn automation_and_tui_commands_share_the_same_typed_negative_offset() {
+        let cli = crate::cli::Cli::try_parse_from([
+            "irmind",
+            "ingest",
+            "00000000-0000-0000-0000-000000000001",
+            "synthetic.log",
+            "--year",
+            "2026",
+            "--utc-offset",
+            "-03:30",
+            "--no-year-rollover",
+        ])
+        .unwrap();
+        let args = match cli.command {
+            Some(Command::Ingest {
+                year,
+                utc_offset,
+                no_year_rollover,
+                ..
+            }) => Some((year, utc_offset, no_year_rollover)),
+            _ => None,
+        }
+        .unwrap();
+        let (year, utc_offset, no_year_rollover) = args;
+        let parsed = irmind_app::command_time_context(
+            year.as_deref(),
+            utc_offset.as_deref(),
+            !no_year_rollover,
+        )
+        .unwrap();
+        let tui = irmind_app::IngestOptions::parse(
+            "--year 2026 --utc-offset -03:30 --no-year-rollover synthetic.log",
+        )
+        .unwrap();
+        assert_eq!(parsed, tui.time_context);
+    }
 }

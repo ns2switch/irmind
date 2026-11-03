@@ -11,7 +11,10 @@ impl Engine<'_> {
         id: &CaseId,
         reason: &'static str,
     ) -> Result<(), AppError> {
-        if !matches!(reason, "ambiguous" | "low-confidence" | "unsupported") {
+        if !matches!(
+            reason,
+            "ambiguous" | "low-confidence" | "unsupported" | "missing-time-context"
+        ) {
             return Err(AppError::Policy("invalid parser refusal reason".into()));
         }
         self.audit(

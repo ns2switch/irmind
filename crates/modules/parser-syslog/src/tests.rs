@@ -44,7 +44,7 @@ fn shares_contract_and_preserves_full_original_time() {
 
 #[test]
 fn classic_requires_context_and_records_its_basis() {
-    let (report, _) = rows(&SyslogParser::default(), CLASSIC);
+    let (report, _) = rows(&SyslogParser::from_version("syslog-v1").unwrap(), CLASSIC);
     assert_eq!(report.rejected, 1);
     let parser = SyslogParser::new(Some(LegacyTimestamp::new(2026, 60).unwrap()));
     let (_, rows) = rows(&parser, CLASSIC);
@@ -156,4 +156,76 @@ fn gzip_detects_by_content_checks_crc_and_accepts_multiple_members() {
             )
             .is_err()
     );
+}
+
+#[test]
+fn per_ingest_context_is_typed_signed_versioned_and_rolls_over() {
+    use irmind_app::{ParserTimeBasis, ParserTimeContext};
+    let context =
+        ParserTimeContext::from_fields("2026", "+01:00", true, ParserTimeBasis::Command).unwrap();
+    let parser = SyslogParser::configured(context).unwrap();
+    let input = b"<34>Dec 31 23:59:59 host sshd[1]: last\n<34>Jan  1 00:00:01 host sshd[1]: next\n<34>Dec 31 23:59:59 host sshd[1]: later\n<34>Nov 30 23:59:59 host sshd[1]: backward\n<34>Jan  1 00:00:01 host sshd[1]: next year\n";
+    let (report, values) = rows(&parser, input);
+    assert_eq!((report.accepted, report.rejected), (4, 1));
+    assert_eq!(values[0].at, "2026-12-31T22:59:59Z");
+    assert_eq!(values[1].at, "2026-12-31T23:00:01Z");
+    assert_eq!(values[3].at, "2027-12-31T23:00:01Z");
+    assert!(
+        parser
+            .timestamp_context()
+            .unwrap()
+            .contains("basis=command")
+    );
+    let restored = SyslogParser::from_version(parser.identity().version).unwrap();
+    assert_eq!(rows(&restored, input).1, values);
+    assert!(
+        SyslogParser::default()
+            .parse_reader(
+                "source.log",
+                &mut Cursor::new(CLASSIC),
+                [0; 32],
+                &CancellationToken::new(),
+                &mut |_| Ok(())
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn malformed_dates_do_not_advance_the_rollover_state() {
+    use irmind_app::{ParserTimeBasis, ParserTimeContext};
+    let parser = SyslogParser::configured(
+        ParserTimeContext::new(2026, 0, true, ParserTimeBasis::Analyst).unwrap(),
+    )
+    .unwrap();
+    let input = b"<34>Dec 31 23:59:59 host sshd[1]: last\n<34>Jan 99 00:00:01 host sshd[1]: invalid\n<34>Jan  1 00:00:01 host sshd[1]: next\n";
+    let (report, values) = rows(&parser, input);
+    assert_eq!(report.rejected, 1);
+    assert_eq!(values[1].at, "2027-01-01T00:00:01Z");
+}
+
+#[test]
+fn versions_are_canonical_and_source_time_context_requires_no_global_settings() {
+    use irmind_app::{ParserTimeBasis, ParserTimeContext};
+    assert!(MANIFEST.config.is_empty());
+    for basis in [
+        ParserTimeBasis::Analyst,
+        ParserTimeBasis::Command,
+        ParserTimeBasis::ConfirmedSuggestion,
+    ] {
+        let configured =
+            SyslogParser::configured(ParserTimeContext::new(2026, -210, false, basis).unwrap())
+                .unwrap();
+        let restored = SyslogParser::from_version(configured.identity().version).unwrap();
+        assert_eq!(restored.timestamp_context(), configured.timestamp_context());
+        assert_eq!(rows(&restored, CLASSIC).1, rows(&configured, CLASSIC).1);
+    }
+    for version in [
+        "syslog-v2:year=02026;offset=0;rollover=1;basis=analyst",
+        "syslog-v2:year=2026;offset=0;rollover=true;basis=analyst",
+        "syslog-v2:year=2026;offset=0;rollover=1;basis=untrusted",
+        "syslog-v2:year=2026;offset=0;rollover=1;basis=analyst;extra=1",
+    ] {
+        assert!(SyslogParser::from_version(version).is_err());
+    }
 }

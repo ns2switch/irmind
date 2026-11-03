@@ -9,3 +9,6 @@ pub use registry::ModuleRegistry;
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::wildcard_imports)]
 mod tests;
+
+mod parser_selection;
+pub use parser_selection::{ParserSelectionRequest, ResolvedParserSelection};

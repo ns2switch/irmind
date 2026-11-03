@@ -56,6 +56,14 @@ pub(super) enum Command {
         path: PathBuf,
         #[arg(long)]
         copy_original: bool,
+        #[arg(long)]
+        parser: Option<String>,
+        #[arg(long)]
+        year: Option<String>,
+        #[arg(long, allow_hyphen_values = true)]
+        utc_offset: Option<String>,
+        #[arg(long)]
+        no_year_rollover: bool,
     },
     Migrate {
         case_id: String,

@@ -75,3 +75,14 @@ The timeline, entity, neighbors, entity-timeline, graph-path, and text-search co
 Use `irmind <COMMAND> --help` to check positional arguments for the installed binary. Keep the expected key fingerprint outside the exported package and obtain it through a trusted channel.
 
 An export without large-case originals proves the signed manifest and seal, but cannot prove the source bytes are still available. `verify-export` reports that limit. Keep the source root available for a full `verify`. A sampled verification states how many sources remain unchecked.
+
+## Per-ingestion source time
+
+For RFC 3164, supply the year of the first record and a fixed UTC offset together:
+
+```console
+irmind ingest <case-id> <path> --year 2026 --utc-offset +01:00
+irmind ingest <case-id> <path> --parser parser-syslog --year 2026 --utc-offset -03:30 --no-year-rollover
+```
+
+The TUI accepts `/ingest --year 2026 --utc-offset +01:00 <path>` with the same validation and signed context. Without flags, attended ingestion asks for confirmation in a form. Automation refuses missing context. The default rollover only advances a year from December to January; other backward months are rejected. Explicit command selection and its temporal basis are recorded in existing SourceManifestV2 fields. The old global year/offset fields no longer configure new sources.

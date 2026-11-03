@@ -20,6 +20,8 @@ pub(super) struct PendingIngest {
     pub copy_original: bool,
     pub forced_parser: Option<String>,
     pub analyst_choices: BTreeMap<String, String>,
+    pub time_contexts: BTreeMap<String, irmind_app::ParserTimeContext>,
+    pub default_time_context: Option<irmind_app::ParserTimeContext>,
 }
 
 pub(super) struct ParserPrompt {
@@ -114,6 +116,7 @@ pub(super) struct CaseState {
     pub picker: Option<PathPicker>,
     pub pending_ingest: Option<PendingIngest>,
     pub parser_prompt: Option<ParserPrompt>,
+    pub time_prompt: Option<super::time_prompt::TimePrompt>,
     pub confirmation: Option<Confirmation>,
     pub confirmed_action: Option<Confirmation>,
     pub hashes: Vec<String>,
@@ -390,6 +393,7 @@ mod tests {
             picker: None,
             pending_ingest: None,
             parser_prompt: None,
+            time_prompt: None,
             confirmation: None,
             confirmed_action: None,
             hashes: Vec::new(),
