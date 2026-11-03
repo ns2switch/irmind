@@ -13,7 +13,7 @@ expression: screen(&terminal)
 ⏺ Streaming answer with bold text.
 
 ⏺ Splunk search(user=alice, 24h)
-⎿ approved · 12 results  (ctrl+o to expand)
+⎿ approved · 12 results  (Ctrl+O or /expand for detail)
 
 
 

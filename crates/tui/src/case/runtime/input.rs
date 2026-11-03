@@ -36,10 +36,6 @@ impl CaseRuntime<'_, '_, '_> {
         let page = self.state.conversation.viewport().saturating_sub(2).max(1);
         let page = isize::try_from(page).unwrap_or(isize::MAX);
         let shortcut = command_registry::shortcut_name(code, modifiers);
-        if shortcut == Some("expand") && self.state.focus == Focus::Conversation {
-            self.state.conversation.toggle_selected();
-            return true;
-        }
         let delta = match shortcut {
             Some("scroll-up") => Some(-page),
             Some("scroll-down") => Some(page),
@@ -311,6 +307,13 @@ impl CaseRuntime<'_, '_, '_> {
         {
             cancel.cancel();
             self.state.menu_open = false;
+            return Ok(false);
+        }
+        if shortcut == Some("expand") {
+            update(
+                &mut self.state,
+                CaseMessage::Key(code, modifiers, self.active.is_some()),
+            );
             return Ok(false);
         }
         if self.state.time_prompt.is_some() {

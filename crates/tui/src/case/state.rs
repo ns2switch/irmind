@@ -194,6 +194,10 @@ fn update_key(
     modifiers: KeyModifiers,
     busy: bool,
 ) -> CaseAction {
+    if super::command_registry::shortcut_name(code, modifiers) == Some("expand") {
+        state.conversation.toggle_selected();
+        return CaseAction::None;
+    }
     if matches!(code, KeyCode::Tab | KeyCode::BackTab)
         && !state.input.starts_with('/')
         && state.focus != Focus::Sidebar
@@ -316,35 +320,8 @@ mod tests {
     use super::*;
     use irmind_app::CaseId;
 
-    #[test]
-    fn parser_prompt_uses_arrows_or_number_then_enter_and_escape_cancels() {
-        let mut prompt = ParserPrompt {
-            source: "events.json".into(),
-            candidates: vec![("parser-json".into(), 45), ("parser-ecs".into(), 45)],
-            selected: 0,
-            typed_option: String::new(),
-        };
-        assert!(matches!(
-            prompt.update(KeyCode::Down),
-            ParserPromptAction::Keep
-        ));
-        assert!(
-            matches!(prompt.update(KeyCode::Enter), ParserPromptAction::Select(name) if name == "parser-ecs")
-        );
-        prompt.update(KeyCode::Char('1'));
-        assert!(
-            matches!(prompt.update(KeyCode::Enter), ParserPromptAction::Select(name) if name == "parser-json")
-        );
-        assert!(matches!(
-            prompt.update(KeyCode::Esc),
-            ParserPromptAction::Cancel
-        ));
-    }
-
-    #[test]
-    #[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
-    fn input_update_is_pure_and_submits_exact_text() {
-        let mut state = CaseState {
+    fn synthetic_state() -> CaseState {
+        CaseState {
             case: irmind_app::Case {
                 id: CaseId::parse("00000000-0000-0000-0000-000000000000").unwrap(),
                 title: "Synthetic".into(),
@@ -403,7 +380,38 @@ mod tests {
             needs_refresh: false,
             running_since: None,
             progress_status: None,
+        }
+    }
+
+    #[test]
+    fn parser_prompt_uses_arrows_or_number_then_enter_and_escape_cancels() {
+        let mut prompt = ParserPrompt {
+            source: "events.json".into(),
+            candidates: vec![("parser-json".into(), 45), ("parser-ecs".into(), 45)],
+            selected: 0,
+            typed_option: String::new(),
         };
+        assert!(matches!(
+            prompt.update(KeyCode::Down),
+            ParserPromptAction::Keep
+        ));
+        assert!(
+            matches!(prompt.update(KeyCode::Enter), ParserPromptAction::Select(name) if name == "parser-ecs")
+        );
+        prompt.update(KeyCode::Char('1'));
+        assert!(
+            matches!(prompt.update(KeyCode::Enter), ParserPromptAction::Select(name) if name == "parser-json")
+        );
+        assert!(matches!(
+            prompt.update(KeyCode::Esc),
+            ParserPromptAction::Cancel
+        ));
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
+    fn input_update_is_pure_and_submits_exact_text() {
+        let mut state = synthetic_state();
         update(
             &mut state,
             CaseMessage::Key(KeyCode::Char('x'), KeyModifiers::NONE, false),
@@ -507,5 +515,80 @@ mod tests {
         );
         assert!(state.menu_open);
         assert!(crate::case::command_registry::matches(&state.input).len() > 5);
+    }
+
+    #[test]
+    fn control_o_expands_from_composer_and_preserves_typed_text() {
+        use super::super::conversation::{Card, CardKind};
+        let mut state = synthetic_state();
+        state.input = "keep this draft".into();
+        state.conversation.set_viewport(80, 18);
+        state.conversation.push(Card::new(
+            CardKind::ToolResult,
+            "Synthetic tool",
+            "Expanded synthetic result detail",
+            false,
+        ));
+        state
+            .conversation
+            .push(Card::new(CardKind::Notice, "", "Task finished", false));
+        for focus in [Focus::Composer, Focus::Sidebar, Focus::Conversation] {
+            state.focus = focus;
+            let folded = render_expansion_state(&state);
+            assert!(!folded.contains("Expanded synthetic result detail"));
+            assert!(matches!(
+                update(
+                    &mut state,
+                    CaseMessage::Key(KeyCode::Char('o'), KeyModifiers::CONTROL, false,)
+                ),
+                CaseAction::None
+            ));
+            assert!(render_expansion_state(&state).contains("Expanded synthetic result detail"));
+            assert_eq!(state.focus, focus);
+            assert_eq!(state.input, "keep this draft");
+            update(
+                &mut state,
+                CaseMessage::Key(KeyCode::Char('o'), KeyModifiers::CONTROL, false),
+            );
+        }
+    }
+
+    fn render_expansion_state(state: &CaseState) -> String {
+        use ratatui::{Terminal, backend::TestBackend};
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        let lines = state.conversation.visible_lines();
+        super::super::draw_case(
+            &mut terminal,
+            &super::super::CaseFrame {
+                title: "Synthetic",
+                guide: None,
+                messages: "",
+                visible_lines: Some(&lines),
+                input: &state.input,
+                input_focused: state.focus == Focus::Composer,
+                panel: "",
+                overlay: None,
+                menu: None,
+                tab: 0,
+                sidebar_visible: false,
+                sidebar_scroll: 0,
+                overlay_scroll: 0,
+                new_content: false,
+                model: "no model",
+                tokens: 0,
+                cost: "",
+                pending: 0,
+                detections: 0,
+                status: "idle",
+            },
+        )
+        .unwrap();
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(ratatui::buffer::Cell::symbol)
+            .collect()
     }
 }

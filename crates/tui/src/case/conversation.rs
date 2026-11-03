@@ -38,8 +38,7 @@ impl Card {
     ) -> Self {
         let body = body.into();
         let collapsed = matches!(kind, CardKind::Proposal | CardKind::ToolResult)
-            || matches!(kind, CardKind::Notice)
-                && (body.len() > 1_200 || body.lines().count() > 10);
+            || matches!(kind, CardKind::Notice) && (body.len() > 1_200 || body.lines().count() > 1);
         Self {
             kind,
             title: title.into(),
@@ -62,7 +61,7 @@ impl Card {
             return self.body.clone();
         }
         let summary = self.summary.as_deref().unwrap_or("Detail available");
-        format!("⎿ {summary}  (ctrl+o to expand)")
+        format!("⎿ {summary}  (Ctrl+O or /expand for detail)")
     }
 
     fn layout(&mut self, width: usize, color: bool) {
@@ -98,7 +97,7 @@ impl Card {
         };
         self.lines = vec![Line::from(Span::styled(heading, style))];
         if matches!(self.kind, CardKind::Notice) {
-            self.lines.push(Line::default());
+            self.layout_notice(width, theme);
             return;
         }
         if matches!(self.kind, CardKind::Proposal | CardKind::ToolResult) {
@@ -122,6 +121,26 @@ impl Card {
             width,
             self.markdown && !self.collapsed,
         ));
+        self.lines.push(Line::default());
+    }
+
+    fn layout_notice(&mut self, width: usize, theme: Theme) {
+        if !self.foldable() {
+            self.lines.push(Line::default());
+            return;
+        }
+        let text = if self.collapsed {
+            format!(
+                "{}  (Ctrl+O or /expand for detail)",
+                self.body.lines().next().unwrap_or("")
+            )
+        } else {
+            self.body.clone()
+        };
+        self.lines = markdown::render(&text, width, false)
+            .into_iter()
+            .map(|line| line.style(theme.muted()))
+            .collect();
         self.lines.push(Line::default());
     }
 
@@ -210,6 +229,12 @@ impl Card {
             theme.accent(),
         )));
         self.lines.push(Line::default());
+    }
+
+    fn foldable(&self) -> bool {
+        matches!(self.kind, CardKind::Proposal | CardKind::ToolResult)
+            || matches!(self.kind, CardKind::Notice)
+                && (self.body.len() > 1_200 || self.body.lines().count() > 1)
     }
 
     fn toggle(&mut self, width: usize, color: bool) {
@@ -408,13 +433,20 @@ impl Conversation {
     }
 
     pub(super) fn toggle_selected(&mut self) {
-        let Some(index) = self.selected else { return };
+        let index = self
+            .selected
+            .filter(|index| self.cards.get(*index).is_some_and(Card::foldable))
+            .or_else(|| self.cards.iter().rposition(Card::foldable));
+        let Some(index) = index else { return };
         self.selection_state = SelectionState::Navigating;
-        if let Some(card) = self.cards.get_mut(index) {
-            card.toggle(self.width, self.color);
-            self.recalculate_from(index);
-            self.scroll = self.scroll.min(self.max_scroll());
+        self.selected = Some(index);
+        self.cards[index].toggle(self.width, self.color);
+        self.recalculate_from(index);
+        self.scroll = self.scroll.min(self.max_scroll());
+        if self.offsets[index] < self.scroll || self.offsets[index] >= self.scroll + self.viewport {
+            self.scroll = self.offsets[index].min(self.max_scroll());
         }
+        self.follow_tail = self.scroll == self.max_scroll();
     }
 
     pub(super) fn selected_approval(&self) -> Option<&str> {
@@ -495,6 +527,40 @@ impl Conversation {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_or_nonfoldable_selection_uses_last_expandable_card() {
+        let mut chat = Conversation::new(false);
+        chat.set_viewport(80, 20);
+        chat.push(Card::new(
+            CardKind::ToolResult,
+            "Old tool",
+            "Old detail",
+            false,
+        ));
+        chat.push(Card::new(
+            CardKind::Notice,
+            "",
+            "Graph summary\nFull graph detail",
+            false,
+        ));
+        chat.push(Card::new(CardKind::Model, "", "Latest response", true));
+        chat.selected = None;
+        chat.toggle_selected();
+        assert_eq!(chat.selected, Some(1));
+        assert!(!chat.cards[1].collapsed);
+        assert!(
+            chat.visible_lines()
+                .iter()
+                .any(|line| line.to_string().contains("Full graph detail"))
+        );
+        chat.toggle_selected();
+        assert!(chat.cards[1].collapsed);
+        chat.selected = Some(0);
+        chat.toggle_selected();
+        assert!(!chat.cards[0].collapsed);
+        assert!(chat.cards[1].collapsed);
+    }
 
     #[test]
     fn streaming_follows_tail_only_while_reader_is_at_tail() {

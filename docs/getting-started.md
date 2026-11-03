@@ -79,9 +79,9 @@ The export can be checked on a second computer with `irmind verify-export <PACKA
 
 ## Navigate the case
 
-The conversation fills the case workspace. The opening card shows the case, model, and signing backend. Tool proposals, approvals, results, and findings appear in order. Long results start folded with a one-line summary. `/sidebar` shows or hides case panels. Tab moves from the prompt to the conversation and through visible panels; Esc returns. Use `Ctrl+O` to expand a selected result. On a selected approval, use Up/Down and Enter, or type 1/2/3 followed by Enter to approve, deny with a reason, or edit arguments.
+The conversation fills the case workspace. The opening card shows the case, model, and signing backend. Tool proposals, approvals, results, and findings appear in order. Long results start folded with a one-line summary. If no expandable card is selected, Ctrl+O or `/expand` uses the last one and preserves your draft. See [terminal keymaps](platforms.md#card-expansion-and-terminal-keymaps). `/sidebar` shows or hides case panels. Tab moves from the prompt to the conversation and through visible panels; Esc returns. Use `Ctrl+O` or `/expand` to expand a selected result from any focus. On a selected approval, use Up/Down and Enter, or type 1/2/3 followed by Enter to approve, deny with a reason, or edit arguments.
 
-Graph queries and local searches also appear as result cards. Select a card and press Enter or `Ctrl+O` to expand it, then scroll within the conversation.
+Graph queries and local searches also appear as result cards. Select a card and press Enter, or use `Ctrl+O` or `/expand` from the input box to expand it, then scroll within the conversation.
 
 For large Parquet cases, add `--from=<UTC> --to=<UTC>`, `--account=<ID>` or `--project=<ID>`, and `--region=<NAME>` to `/search`, `/entity`, `/neighbors`, `/entity-timeline`, or `/path`. For example, `/search AssumeRole --from=2026-10-28T12:00:00Z --to=2026-10-28T13:00:00Z --account=123456789012 --region=eu-west-1` reads only matching partitions and timestamps. Both UTC bounds are required together, and the filter must remain inside the case scope. A neighbor card explicitly says when its 4,096-record sample is partial.
 

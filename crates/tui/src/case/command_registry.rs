@@ -267,6 +267,7 @@ mod tests {
         );
         assert_eq!(matches("/side")[0].name, "sidebar");
         assert!(help().contains("Ctrl+K"));
+        assert_eq!(matches("/expand")[0].shortcut, "Ctrl+O");
         let all = matches("/");
         assert!(all.windows(2).all(|pair| {
             (category_rank(pair[0].category()), pair[0].name)
