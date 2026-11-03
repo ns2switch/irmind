@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 211c41b7a1fb1fc395c2d152f5abe965a7c6c9e6; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit f201acd5d6f465541054580e514ed555a182fe91; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -24,7 +24,7 @@ Ejecuta primero `irmind demo` o escribe `/demo` en el inicio. No necesitas confi
 
 La presentación teclea y ejecuta los comandos reales. Un panel grande, a todo el ancho, explica cada resultado y destaca la investigación que ocurre encima. Diez escenas cubren la alerta de AWS, el caso firmado, la confianza del parser, timeline/búsqueda/vecinos locales, una investigación en streaming, la aprobación por política, hallazgos confirmados, `/demo check`, y verificación, sellado y exportación. Las respuestas esperadas solo se cargan para la comparación local; nunca son evidencia ni contexto del modelo.
 
-La reproducción empieza automáticamente. El tiempo de lectura depende de la narración, con un mínimo de seis segundos por escena a velocidad normal. **Enter** avanza, **Retroceso** revisa una escena sin repetir acciones firmadas ya completadas, **Espacio** pausa o reanuda y **Esc** sale. Ctrl+C también cancela y sale de la demo. Si aparece el aviso de tamaño, amplía el terminal a **100 × 40 celdas** como mínimo. Si falla una tarea, se pausa con una explicación; Enter reintenta. Los casos normales conservan sus teclas y el soporte de terminales más pequeños.
+La reproducción empieza automáticamente. El tiempo de lectura depende de la narración, con un mínimo de seis segundos por escena a velocidad normal. **Enter** avanza, **Retroceso** revisa una escena sin repetir acciones firmadas ya completadas, **Espacio** pausa o reanuda y **Esc** sale. Ctrl+C también cancela y sale de la demo. La demo admite **80 × 24 celdas**; se recomiendan **100 × 40**. Las ventanas más pequeñas muestran un aviso. En tamaños compactos se ocultan los paneles secundarios; **PgUp/PgDn** desplaza la narración y pausa la reproducción, manteniendo visibles los controles. Si falla una tarea, se pausa con una explicación; Enter reintenta. Los casos normales conservan sus teclas y el soporte de terminales más pequeños.
 
 Solo esta demo firma automáticamente la consulta externa simulada y las confirmaciones de custodia con su clave temporal. En un caso real, el analista revisa y firma esas acciones. Al terminar puedes explorar el caso sellado en la interfaz normal, ver cómo crear uno real o salir. La salida borra los datos temporales y restaura el terminal. Empieza una sesión real con `irmind`, después `/new`, `/ingest` y `/settings`.
 
