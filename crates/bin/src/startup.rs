@@ -53,8 +53,12 @@ struct PreparedStartup {
 
 pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
     let cli = Cli::parse();
-    if let Some(Command::Demo { scripted }) = cli.command.as_ref() {
-        super::demo::run(cancel, *scripted)?;
+    if let Some(Command::Demo {
+        scripted,
+        presentation_speed,
+    }) = cli.command.as_ref()
+    {
+        super::demo::run(cancel, *scripted, *presentation_speed)?;
         return Ok(false);
     }
     let interactive = matches!(&cli.command, None | Some(Command::Tui { .. }));
@@ -403,7 +407,7 @@ fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) ->
                 irmind_tui::WorkspaceOutcome::Exit => Ok(false),
                 irmind_tui::WorkspaceOutcome::Restart => Ok(true),
                 irmind_tui::WorkspaceOutcome::Demo => {
-                    super::demo::run(context.cancel, false)?;
+                    super::demo::run(context.cancel, false, 1)?;
                     Ok(false)
                 }
             }

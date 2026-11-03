@@ -6,160 +6,9 @@ use std::{process::Command, time::Duration};
 #[path = "support/terminal_screen.rs"]
 mod terminal_screen;
 
-#[cfg(unix)]
-use expectrl::{Expect as _, session::OsSession as DemoSession};
-
-#[cfg(windows)]
-mod windows_pty {
-    use super::{Command, Duration, terminal_screen::TerminalScreen};
-    use portable_pty::{CommandBuilder, PtySize, native_pty_system};
-    use std::{
-        io::{Read as _, Write as _},
-        sync::mpsc::{self, Receiver, RecvTimeoutError},
-        time::Instant,
-    };
-
-    pub(super) struct DemoSession {
-        child: Box<dyn portable_pty::Child + Send + Sync>,
-        _master: Box<dyn portable_pty::MasterPty + Send>,
-        input: Box<dyn std::io::Write + Send>,
-        output: Receiver<Result<Vec<u8>, String>>,
-        seen: Vec<u8>,
-        screen: TerminalScreen,
-        answered_cursor_queries: usize,
-        timeout: Duration,
-    }
-
-    impl DemoSession {
-        pub(super) fn spawn(command: Command) -> Result<Self, String> {
-            let mut builder = CommandBuilder::new(command.get_program());
-            builder.args(command.get_args());
-            if let Some(directory) = command.get_current_dir() {
-                builder.cwd(directory);
-            }
-            for (name, value) in command.get_envs() {
-                if let Some(value) = value {
-                    builder.env(name, value);
-                } else {
-                    builder.env_remove(name);
-                }
-            }
-            let pair = native_pty_system()
-                .openpty(PtySize {
-                    rows: 32,
-                    cols: 100,
-                    pixel_width: 0,
-                    pixel_height: 0,
-                })
-                .map_err(|error| error.to_string())?;
-            let child = pair
-                .slave
-                .spawn_command(builder)
-                .map_err(|error| error.to_string())?;
-            let master = pair.master;
-            let input = master.take_writer().map_err(|error| error.to_string())?;
-            let mut reader = master
-                .try_clone_reader()
-                .map_err(|error| error.to_string())?;
-            let (sender, output) = mpsc::channel();
-            std::thread::spawn(move || {
-                let mut buffer = [0u8; 4096];
-                loop {
-                    let read = match reader.read(&mut buffer) {
-                        Ok(0) => break,
-                        Ok(read) => read,
-                        Err(error) => {
-                            let _ = sender.send(Err(error.to_string()));
-                            break;
-                        }
-                    };
-                    if sender.send(Ok(buffer[..read].to_vec())).is_err() {
-                        break;
-                    }
-                }
-            });
-            Ok(Self {
-                child,
-                _master: master,
-                input,
-                output,
-                seen: Vec::new(),
-                screen: TerminalScreen::new(32, 100),
-                answered_cursor_queries: 0,
-                timeout: Duration::from_secs(10),
-            })
-        }
-
-        pub(super) fn set_expect_timeout(&mut self, timeout: Option<Duration>) {
-            self.timeout = timeout.unwrap_or(Duration::from_secs(60));
-        }
-
-        pub(super) fn expect(&mut self, needle: impl AsRef<str>) -> Result<Vec<u8>, String> {
-            let needle = needle.as_ref();
-            let started = Instant::now();
-            loop {
-                if self.screen.text().contains(needle) {
-                    return Ok(self.seen.clone());
-                }
-                if started.elapsed() >= self.timeout {
-                    return Err(format!(
-                        "timed out after {}s waiting for {needle}; read {} PTY bytes; screen: {:?}",
-                        self.timeout.as_secs(),
-                        self.seen.len(),
-                        self.screen.text()
-                    ));
-                }
-                match self.output.recv_timeout(Duration::from_millis(25)) {
-                    Ok(Ok(chunk)) => {
-                        self.screen.feed(&chunk);
-                        self.seen.extend_from_slice(&chunk);
-                        self.answer_cursor_queries()?;
-                    }
-                    Ok(Err(error)) => return Err(error),
-                    Err(RecvTimeoutError::Disconnected) => {
-                        return Err(format!(
-                            "PTY ended while waiting for {needle}; child: {:?}; output: {:?}",
-                            self.child.try_wait(),
-                            String::from_utf8_lossy(&self.seen[..self.seen.len().min(512)])
-                        ));
-                    }
-                    Err(RecvTimeoutError::Timeout) => {}
-                }
-            }
-        }
-
-        pub(super) fn send(&mut self, value: impl AsRef<str>) -> Result<(), String> {
-            self.input
-                .write_all(value.as_ref().as_bytes())
-                .map_err(|error| error.to_string())
-        }
-
-        fn answer_cursor_queries(&mut self) -> Result<(), String> {
-            let count = self
-                .seen
-                .windows(4)
-                .filter(|bytes| *bytes == b"\x1b[6n")
-                .count();
-            for _ in self.answered_cursor_queries..count {
-                self.input
-                    .write_all(b"\x1b[1;1R")
-                    .map_err(|error| error.to_string())?;
-            }
-            self.answered_cursor_queries = count;
-            Ok(())
-        }
-    }
-
-    impl Drop for DemoSession {
-        fn drop(&mut self) {
-            let _ = self.child.kill();
-            let _ = self.child.wait();
-        }
-    }
-}
-
-#[cfg(windows)]
-use windows_pty::DemoSession;
+#[path = "support/demo_session.rs"]
+mod demo_session;
+use demo_session::DemoSession;
 
 fn demo_command(real_home: &std::path::Path, demo_parent: &std::path::Path) -> Command {
     #[cfg(unix)]
@@ -167,7 +16,7 @@ fn demo_command(real_home: &std::path::Path, demo_parent: &std::path::Path) -> C
         let mut command = Command::new("sh");
         command
             .arg("-c")
-            .arg("stty cols 100 rows 32; exec \"$0\" --home \"$1\" demo --scripted")
+            .arg("stty cols 120 rows 40; exec \"$0\" --home \"$1\" demo --scripted --presentation-speed 50")
             .arg(env!("CARGO_BIN_EXE_irmind"))
             .arg(real_home);
         command
@@ -190,6 +39,8 @@ fn demo_command(real_home: &std::path::Path, demo_parent: &std::path::Path) -> C
             .arg(real_home)
             .arg("demo")
             .arg("--scripted")
+            .arg("--presentation-speed")
+            .arg("50")
             .arg("<CONIN$")
             .arg(">CONOUT$")
             .arg("2>&1");
@@ -206,6 +57,23 @@ fn demo_command(real_home: &std::path::Path, demo_parent: &std::path::Path) -> C
     command
 }
 
+#[test]
+fn automatic_presentation_reaches_signed_evidence_and_exits_cleanly() {
+    let real_home = tempfile::tempdir().unwrap();
+    let demo_parent = tempfile::tempdir().unwrap();
+    let mut session =
+        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+    session.expect("Step 1 of 10").unwrap();
+    session.expect("Step 2 of 10").unwrap();
+    session.expect("Step 3 of 10").unwrap();
+    session.expect("Evidence ready:").unwrap();
+    session.expect("90% confidence").unwrap();
+    session.send("\x1b").unwrap();
+    session.expect("Demo data deleted").unwrap();
+    assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 0);
+    assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
+}
+
 fn run_demo(exit_keys: &str) {
     let real_home = tempfile::tempdir().unwrap();
     let demo_parent = tempfile::tempdir().unwrap();
@@ -214,8 +82,6 @@ fn run_demo(exit_keys: &str) {
     let mut session =
         DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
     session.set_expect_timeout(Some(Duration::from_mins(1)));
-    #[cfg(unix)]
-    session.set_expect_lazy(false);
     session.expect("ready:").unwrap();
     session.send(exit_keys).unwrap();
     session.expect("Demo data deleted").unwrap();
@@ -234,8 +100,6 @@ fn demo_ingest_completion_is_visible_and_followup_command_responds() {
     let mut session =
         DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
     session.set_expect_timeout(Some(Duration::from_secs(20)));
-    #[cfg(unix)]
-    session.set_expect_lazy(false);
     let completed = session.expect("ready:");
     if completed.is_err() {
         let _ = session.send("/quit\r\r");
@@ -244,9 +108,6 @@ fn demo_ingest_completion_is_visible_and_followup_command_responds() {
         completed.is_ok(),
         "demo did not report ingest completion within 20 seconds: {completed:?}"
     );
-    #[cfg(unix)]
-    let initial = completed.unwrap().as_bytes().to_vec();
-    #[cfg(windows)]
     let initial = completed.unwrap();
     let initial = String::from_utf8_lossy(&initial);
     assert!(!initial.contains("Try"));
@@ -268,8 +129,6 @@ fn card_expands_from_the_text_box_with_control_o_and_slash_command() {
     let mut session =
         DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
     session.set_expect_timeout(Some(Duration::from_secs(20)));
-    #[cfg(unix)]
-    session.set_expect_lazy(false);
     session.expect("ready:").unwrap();
     session.send("/demo hide\r/graph\r").unwrap();
     session.expect("Ctrl+O").unwrap();
@@ -302,8 +161,6 @@ fn guided_demo_walks_ten_steps_in_a_terminal() {
     let mut session =
         DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
     session.set_expect_timeout(Some(Duration::from_secs(12)));
-    #[cfg(unix)]
-    session.set_expect_lazy(false);
     session.expect("1/10").unwrap();
     eprintln!("guide step 1 visible");
     session.expect("ready:").unwrap();
@@ -421,8 +278,6 @@ fn control_c_cleans_the_demo_from_every_guide_step() {
         let mut session =
             DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
         session.set_expect_timeout(Some(Duration::from_secs(20)));
-        #[cfg(unix)]
-        session.set_expect_lazy(false);
         session.expect("ready:").unwrap();
         for next in 2..=step {
             session.send("/demo skip\r").unwrap();
@@ -436,7 +291,7 @@ fn control_c_cleans_the_demo_from_every_guide_step() {
         #[cfg(unix)]
         assert!(
             completion
-                .as_bytes()
+                .as_slice()
                 .windows(8)
                 .any(|bytes| bytes == b"\x1b[?1049l"),
             "leaving the demo must restore the terminal's main screen"

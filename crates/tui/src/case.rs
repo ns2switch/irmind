@@ -73,6 +73,14 @@ pub(crate) struct CasePresentation<'a> {
     pub overrides_active: bool,
     pub mouse_capture: bool,
     pub resumed: bool,
+    pub demo_speed: u8,
+}
+
+fn initial_demo_guide(io_ops: &dyn WorkspaceIo) -> Result<Option<demo_guide::DemoGuide>> {
+    io_ops
+        .demo_mode()
+        .then(demo_guide::DemoGuide::new)
+        .transpose()
 }
 
 fn initial_state(
@@ -121,7 +129,7 @@ fn initial_state(
         object_listing_window: None,
         object_listing_after_seq: 0,
         conversation,
-        demo_guide: io_ops.demo_mode().then(demo_guide::DemoGuide::new),
+        demo_guide: initial_demo_guide(io_ops)?,
         demo_pending_event: None,
         audit_cursor: 0,
         live_reply_cutoff_seq: None,
@@ -308,6 +316,9 @@ pub(crate) fn run_case(
         return run_signed_history_only(terminal, engine, id, shutdown, &reason);
     }
     let mut state = initial_state(engine, id, model, io_ops, presentation.resumed)?;
+    if io_ops.demo_mode() {
+        state.demo_guide = Some(demo_guide::DemoGuide::with_speed(presentation.demo_speed)?);
+    }
     if io_ops.remember_last_case(id).is_err() {
         state.conversation.push(Card::new(
             CardKind::Notice,
@@ -341,28 +352,6 @@ pub(crate) fn run_case(
             exit_to: CaseExit::Home,
         };
         let _mouse = MouseCapture::start(presentation.mouse_capture)?;
-        if let Some(path) = io_ops.demo_initial_ingest() {
-            runtime.state.pending_ingest = Some(state::PendingIngest {
-                path: path.clone(),
-                copy_original: false,
-                forced_parser: None,
-                analyst_choices: std::collections::BTreeMap::new(),
-                time_contexts: std::collections::BTreeMap::new(),
-                default_time_context: None,
-            });
-            let workflow = CaseWorkflow {
-                engine,
-                model,
-                io_ops,
-            };
-            let progress = runtime.progress_tx.clone();
-            runtime.start_task("Ingest", move |cancel| {
-                let count = workflow.ingest_path(id, &path, &cancel, |done, count, source| {
-                    let _ = progress.send(format!("Demo evidence {done}/{count}: {source}"));
-                })?;
-                demo_ingest_result(engine, id, count)
-            });
-        }
         runtime.run()
     })
 }

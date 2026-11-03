@@ -23,7 +23,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         Arc,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
@@ -127,13 +127,16 @@ struct DemoIo {
     store: Arc<LocalStore>,
     source: PathBuf,
     fingerprint: String,
-    ingest_pending: AtomicBool,
     parser_catalog: ParserCatalog,
 }
 
 impl DemoIo {
     fn checked_source(&self, path: &Path) -> Result<()> {
-        if path != self.source || std::fs::symlink_metadata(path)?.file_type().is_symlink() {
+        if path != self.source
+            || std::fs::symlink_metadata(&self.source)?
+                .file_type()
+                .is_symlink()
+        {
             bail!("demo accepts only the bundled synthetic episode");
         }
         Ok(())
@@ -143,11 +146,6 @@ impl DemoIo {
 impl WorkspaceIo for DemoIo {
     fn demo_mode(&self) -> bool {
         true
-    }
-    fn demo_initial_ingest(&self) -> Option<PathBuf> {
-        self.ingest_pending
-            .swap(false, Ordering::SeqCst)
-            .then(|| self.source.clone())
     }
     fn demo_check(&self, engine: &Engine<'_>, id: &CaseId) -> Result<Option<String>> {
         let expected: serde_json::Value = serde_json::from_str(include_str!("demo/expected.json"))?;
@@ -187,7 +185,7 @@ impl WorkspaceIo for DemoIo {
     }
     fn input_files(&self, root: &Path) -> Result<Vec<PathBuf>> {
         self.checked_source(root)?;
-        Ok(vec![root.to_path_buf()])
+        Ok(vec![self.source.clone()])
     }
     fn parser_catalog(&self) -> Option<&ParserCatalog> {
         Some(&self.parser_catalog)
@@ -195,6 +193,7 @@ impl WorkspaceIo for DemoIo {
     fn read_format_sample(&self, path: &Path) -> Result<Vec<u8>> {
         use std::io::Read as _;
         self.checked_source(path)?;
+        let path = &self.source;
         let parent = path
             .parent()
             .ok_or_else(|| anyhow!("selected source has no parent"))?;
@@ -208,7 +207,7 @@ impl WorkspaceIo for DemoIo {
     }
     fn read_evidence(&self, path: &Path) -> Result<Vec<u8>> {
         self.checked_source(path)?;
-        Ok(std::fs::read(path)?)
+        Ok(std::fs::read(&self.source)?)
     }
     fn audit_source_name(&self, root: &Path, file: &Path) -> Result<String> {
         self.checked_source(root)?;
@@ -282,35 +281,22 @@ impl WorkspaceIo for DemoIo {
     }
 }
 
-pub(super) fn run(shutdown: &CancellationToken, scripted: bool) -> Result<()> {
-    let available = if scripted {
-        Vec::new()
-    } else {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()?
-            .block_on(
-                irmind_mod_llm_openai_compatible::OpenAiCompatible::list_ollama_tool_models(
-                    "http://127.0.0.1:11434/v1/",
-                ),
-            )
-            .unwrap_or_default()
-    };
-    let selected = irmind_tui::choose_demo_model(&available, shutdown)?;
-    if shutdown.is_cancelled() {
-        return Ok(());
-    }
-    let model: Box<dyn LlmPort> = if let Some(name) = &selected {
-        Box::new(irmind_mod_llm_openai_compatible::OpenAiCompatible::new(
-            "http://127.0.0.1:11434/v1/",
-            name,
-            None,
-        )?)
-    } else {
-        Box::new(ScriptedModel::new())
-    };
+pub(super) fn run(
+    shutdown: &CancellationToken,
+    _scripted: bool,
+    presentation_speed: u8,
+) -> Result<()> {
+    // Presentations never probe or select a network provider, including loopback.
+    let selected: Option<String> = None;
+    let model: Box<dyn LlmPort> = Box::new(ScriptedModel::new());
     let data = tempfile::tempdir()?;
-    let outcome = run_in_directory(data.path(), model.as_ref(), selected.as_deref(), shutdown);
+    let outcome = run_in_directory(
+        data.path(),
+        model.as_ref(),
+        selected.as_deref(),
+        shutdown,
+        presentation_speed,
+    );
     data.close()?;
     outcome?;
     println!("Demo data deleted. To start a real case, run irmind and use /new and /settings.");
@@ -322,6 +308,7 @@ fn run_in_directory(
     model: &dyn LlmPort,
     selected: Option<&str>,
     shutdown: &CancellationToken,
+    presentation_speed: u8,
 ) -> Result<()> {
     let source = root.join("events.json");
     std::fs::write(&source, EVENTS)?;
@@ -358,7 +345,6 @@ fn run_in_directory(
         store,
         source,
         fingerprint,
-        ingest_pending: AtomicBool::new(true),
         parser_catalog,
     };
     let modules = [ModuleStatus {
@@ -375,7 +361,7 @@ fn run_in_directory(
         credentials: Vec::new(),
         missing: Vec::new(),
     }];
-    let _ = irmind_tui::run_workspace(
+    let _ = irmind_tui::run_demo_presentation(
         &engine,
         Some(model),
         &io,
@@ -389,6 +375,7 @@ fn run_in_directory(
             mouse_capture: false,
             theme: None,
         },
+        presentation_speed,
     )?;
     Ok(())
 }
@@ -426,7 +413,6 @@ mod tests {
             store,
             source: temp.path().join("events.json"),
             fingerprint: String::new(),
-            ingest_pending: AtomicBool::new(false),
             parser_catalog: demo_parser_catalog().unwrap(),
         };
         let result = io.demo_check(&engine, &case.id).unwrap().unwrap();
@@ -488,7 +474,6 @@ mod tests {
             store,
             source: temp.path().join("events.json"),
             fingerprint: String::new(),
-            ingest_pending: AtomicBool::new(false),
             parser_catalog: demo_parser_catalog().unwrap(),
         };
         let result = io.demo_check(&engine, &case.id).unwrap().unwrap();

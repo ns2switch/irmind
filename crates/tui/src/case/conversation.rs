@@ -449,6 +449,16 @@ impl Conversation {
         self.follow_tail = self.scroll == self.max_scroll();
     }
 
+    pub(super) fn reveal_latest(&mut self) {
+        let Some(index) = self.cards.len().checked_sub(1) else {
+            return;
+        };
+        self.selected = Some(index);
+        self.selection_state = SelectionState::Navigating;
+        self.scroll = self.offsets[index].min(self.max_scroll());
+        self.follow_tail = self.scroll == self.max_scroll();
+    }
+
     pub(super) fn selected_approval(&self) -> Option<&str> {
         match &self.selected.and_then(|index| self.cards.get(index))?.kind {
             CardKind::Approval(id) => Some(id),

@@ -50,17 +50,17 @@ pub(crate) fn conversation_area(
     guide_visible: bool,
 ) -> Rect {
     let sections = Layout::vertical([
-        Constraint::Length(if guide_visible { 6 } else { 0 }),
         Constraint::Min(3),
         Constraint::Length(composer_height(input, area.width)),
         Constraint::Length(1),
+        Constraint::Length(if guide_visible { 14 } else { 0 }),
     ])
     .split(area);
     if sidebar_visible && area.width >= 110 {
         Layout::horizontal([Constraint::Percentage(68), Constraint::Percentage(32)])
-            .split(sections[1])[0]
+            .split(sections[0])[0]
     } else {
-        sections[1]
+        sections[0]
     }
 }
 
@@ -74,21 +74,27 @@ where
     terminal.draw(|frame| {
         let area = frame.area();
         let theme = Theme::detect();
+        if view.guide.is_some() && (area.width < 100 || area.height < 40) {
+            frame.render_widget(Paragraph::new(format!(
+                "Demo presentation needs at least 100 × 40 cells.\nCurrent: {} × {}. Resize the terminal; Esc exits.", area.width, area.height
+            )).style(Style::default().fg(theme.text)), area);
+            return;
+        }
         let sections = Layout::vertical([
-            Constraint::Length(if view.guide.is_some() { 6 } else { 0 }),
             Constraint::Min(3),
             Constraint::Length(composer_height(view.input, area.width)),
             Constraint::Length(1),
+            Constraint::Length(if view.guide.is_some() { 14 } else { 0 }),
         ])
         .split(area);
         if let Some(guide) = view.guide {
-            draw_guide(frame, guide, sections[0], theme);
+            draw_guide(frame, guide, sections[3], theme);
         }
-        draw_thread(frame, view, area, sections[1], theme);
-        draw_prompt(frame, view, sections[2], theme);
-        draw_footer(frame, view, sections[3], theme);
-        draw_menu(frame, view, area, sections[2], theme);
-        draw_overlay(frame, view, area, theme);
+        draw_thread(frame, view, area, sections[0], theme);
+        draw_prompt(frame, view, sections[1], theme);
+        draw_footer(frame, view, sections[2], theme);
+        draw_menu(frame, view, area, sections[1], theme);
+        draw_overlay(frame, view, if view.guide.is_some() { sections[0] } else { area }, theme);
     })?;
     Ok(())
 }
@@ -135,7 +141,16 @@ fn draw_thread(
             <[Line<'static>]>::to_vec,
         );
         frame.render_widget(
-            Paragraph::new(lines).style(Style::default().fg(theme.text)),
+            Paragraph::new(lines)
+                .style(Style::default().fg(theme.text))
+                .block(if view.guide.is_some() {
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" Live investigation ")
+                        .border_style(theme.accent())
+                } else {
+                    Block::default()
+                }),
             chat_area,
         );
         if view.new_content {
@@ -192,7 +207,7 @@ fn draw_prompt(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
     let input_visible = input_visible.into_iter().rev().collect::<Vec<_>>();
     let shown = if view.input.is_empty() {
         vec![Line::from(if view.guide.is_some() {
-            "Follow the current guide step…"
+            "Presentation types and runs each command here…"
         } else {
             "Ask about the case… · / for commands · /help for help"
         })]

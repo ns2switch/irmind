@@ -1,4 +1,5 @@
 mod input;
+mod presentation;
 use super::CaseExit;
 use super::demo_guide::DemoEvent;
 use super::state::{CaseMessage, CaseState, update};
@@ -86,6 +87,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             }
             self.finish_task()?;
             self.refresh()?;
+            self.presentation_tick()?;
             self.render()?;
             if event::poll(Duration::from_millis(100))? {
                 match event::read()? {
@@ -202,6 +204,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             self.state.conversation.discard_preview();
         }
         let message = self.task_failure(label, &error.to_string());
+        self.presentation_failed(&message);
         update(&mut self.state, CaseMessage::TaskFinished(message));
         false
     }
@@ -231,6 +234,11 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
     }
 
     fn finish_success(&mut self, label: &'static str, text: String) -> Result<()> {
+        let text = if label == "Ingest" && self.io_ops.demo_mode() {
+            super::demo_ingest_result(self.engine, self.id, 1)?
+        } else {
+            text
+        };
         if label == "Ingest" {
             self.state.pending_ingest = None;
         }

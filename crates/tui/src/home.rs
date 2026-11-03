@@ -364,11 +364,13 @@ pub(crate) fn run_home(
     io_ops: &dyn WorkspaceIo,
     modules: &[ModuleStatus],
     shutdown: &CancellationToken,
-    launch: WorkspaceLaunch<'_>,
+    options: crate::WorkspacePresentation<'_>,
 ) -> Result<crate::WorkspaceOutcome> {
+    let launch = options.launch;
     let mut state = prepare_home_state(engine, io_ops, modules, launch)?;
     {
         let mut startup = StartupCaseView {
+            demo_speed: options.demo_speed,
             terminal,
             engine,
             model,
@@ -407,6 +409,7 @@ pub(crate) fn run_home(
             Ok(())
         });
         let mut runtime = HomeRuntime {
+            demo_speed: options.demo_speed,
             terminal,
             engine,
             model,
@@ -459,6 +462,7 @@ fn prepare_home_state(
 }
 
 struct StartupCaseView<'a, 'ports> {
+    demo_speed: u8,
     terminal: &'a mut Terminal<CrosstermBackend<io::Stdout>>,
     engine: &'a Engine<'ports>,
     model: Option<&'a dyn LlmPort>,
@@ -522,6 +526,7 @@ impl StartupCaseView<'_, '_> {
             id,
             self.shutdown,
             case::CasePresentation {
+                demo_speed: self.demo_speed,
                 overrides_active: launch.overrides_active,
                 modules: self.modules,
                 mouse_capture: launch.mouse_capture,

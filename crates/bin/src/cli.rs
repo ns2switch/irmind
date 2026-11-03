@@ -46,6 +46,9 @@ pub(super) enum Command {
         /// Use the offline scripted model without checking local Ollama.
         #[arg(long)]
         scripted: bool,
+        /// Accelerate the synthetic presentation for development and PTY tests.
+        #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u8).range(1..=50))]
+        presentation_speed: u8,
     },
     Case {
         #[command(subcommand)]

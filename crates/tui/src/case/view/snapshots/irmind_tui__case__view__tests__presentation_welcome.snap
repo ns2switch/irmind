@@ -1,0 +1,44 @@
+---
+source: crates/tui/src/case/view/tests.rs
+expression: shown
+---
+┌ Live investigation ──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│IRMind v0.1.5                                                                                                         │
+│Evidence ready: 1 synthetic file · parser-json · 90% confidence                                                       │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│Presentation types and runs each command here…                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Synthetic · scripted demo model · 0 tok
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│Step 1 of 10 · Meet IRMind                                                                                            │
+│                                                                                                                      │
+│IRMind is a terminal assistant for investigating security incidents. The model proposes actions, policy decides what  │
+│can run, and the case records signed evidence.                                                                        │
+│                                                                                                                      │
+│This presentation operates the product for you with synthetic data and a scripted model. Nothing leaves this computer,│
+│and the temporary session is deleted when you exit.                                                                   │
+│Auto playing · Enter next · Backspace previous · Space pause/play · Esc exit                                          │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

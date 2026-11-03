@@ -268,6 +268,61 @@ pub fn run_workspace(
     shutdown: &CancellationToken,
     launch: WorkspaceLaunch<'_>,
 ) -> Result<WorkspaceOutcome> {
+    run_workspace_options(
+        engine,
+        model,
+        io_ops,
+        modules,
+        shutdown,
+        WorkspacePresentation {
+            launch,
+            demo_speed: 1,
+        },
+    )
+}
+
+/// Present only the isolated demo; the application ports and normal workspace API are unchanged.
+pub fn run_demo_presentation(
+    engine: &Engine<'_>,
+    model: Option<&dyn LlmPort>,
+    io_ops: &dyn WorkspaceIo,
+    modules: &[ModuleStatus],
+    shutdown: &CancellationToken,
+    launch: WorkspaceLaunch<'_>,
+    speed: u8,
+) -> Result<WorkspaceOutcome> {
+    anyhow::ensure!(
+        io_ops.demo_mode(),
+        "presentation requires an isolated demo workspace"
+    );
+    run_workspace_options(
+        engine,
+        model,
+        io_ops,
+        modules,
+        shutdown,
+        WorkspacePresentation {
+            launch,
+            demo_speed: speed.clamp(1, 50),
+        },
+    )
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct WorkspacePresentation<'a> {
+    launch: WorkspaceLaunch<'a>,
+    demo_speed: u8,
+}
+
+fn run_workspace_options(
+    engine: &Engine<'_>,
+    model: Option<&dyn LlmPort>,
+    io_ops: &dyn WorkspaceIo,
+    modules: &[ModuleStatus],
+    shutdown: &CancellationToken,
+    options: WorkspacePresentation<'_>,
+) -> Result<WorkspaceOutcome> {
+    let launch = options.launch;
     let _theme = theme::Theme::configure(launch.theme);
     let _session = TerminalSession::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -278,7 +333,7 @@ pub fn run_workspace(
         io_ops,
         modules,
         shutdown,
-        launch,
+        options,
     )
 }
 
