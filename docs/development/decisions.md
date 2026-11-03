@@ -144,3 +144,9 @@ Consequences: historical syslog interpretations and golden bytes stay identical.
 Context: Ctrl+O was gated on conversation focus even though the normal focus is the composer. Long notices also rendered only their first line after toggling.
 Decision: handle expansion as a global case-screen presentation action before form/menu handlers, use the same operation for `/expand`, and fall back to the last expandable card. Preserve draft, focus, approvals and form state. Show the slash alternative in folded-card hints.
 Consequences: no application port, policy, signed format or dependency changes. PTY and TestBackend tests cover the raw key path; GUI terminal, SSH and tmux manual coverage must be reported separately.
+
+## Offline demo as a live presentation
+
+Context: the event-driven tutorial required too many commands and its corner guide hid the next action.
+Decision: keep ten bounded scenes in versioned data and execute their commands through the ordinary TUI dispatcher. Use only the isolated demo composition, temporary keys and scripted model. No network probe or real workspace is permitted. Narration remains separate from model context. Actual completion events gate advancement; errors pause visibly. Only demo enrichment and custody previews are confirmed automatically, through their existing signed paths.
+Consequences: the large bottom panel reserves a 100 × 40 minimum while visible. Enter/Backspace/Space/Esc navigate presentation state; normal case keys stay unchanged. Revisiting a scene never repeats completed ingestion, approvals or sealing. Expected answers load only for the local check. Existing VHS generates the complete recording without a new dependency.

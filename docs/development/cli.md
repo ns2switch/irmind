@@ -21,7 +21,7 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 
 | Command | Purpose |
 | --- | --- |
-| `irmind demo` | Open an isolated, temporary synthetic investigation without real configuration or credentials. |
+| `irmind demo` | Play the isolated, offline ten-scene presentation without real configuration or credentials. |
 | `irmind case new <TITLE> --scope <SCOPE> [--severity <LEVEL>]` | Create a signed case. |
 | `irmind case list` | List cases. |
 | `irmind case show <CASE_ID>` | Show case details. |
@@ -86,3 +86,7 @@ irmind ingest <case-id> <path> --parser parser-syslog --year 2026 --utc-offset -
 ```
 
 The TUI accepts `/ingest --year 2026 --utc-offset +01:00 <path>` with the same validation and signed context. Without flags, attended ingestion asks for confirmation in a form. Automation refuses missing context. The default rollover only advances a year from December to January; other backward months are rejected. Explicit command selection and its temporal basis are recorded in existing SourceManifestV2 fields. The old global year/offset fields no longer configure new sources.
+
+### Presentation timing
+
+`irmind demo --presentation-speed 50` accelerates presentation timing for development and cross-platform PTY tests. Normal playback defaults to 1 and gives each narration at least six seconds. Acceleration does not skip commands, signed decisions, verification or completion events. The compatibility flag `--scripted` remains accepted; all presentations now use the offline scripted model.

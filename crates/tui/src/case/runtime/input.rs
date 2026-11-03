@@ -6,6 +6,14 @@ use crossterm::event::{MouseEvent, MouseEventKind};
 
 impl CaseRuntime<'_, '_, '_> {
     pub(super) fn handle_paste(&mut self, value: &str) {
+        if self
+            .state
+            .demo_guide
+            .as_ref()
+            .is_some_and(super::super::demo_guide::DemoGuide::active)
+        {
+            return;
+        }
         if let Some(prompt) = self.state.time_prompt.as_mut() {
             prompt.paste(value);
             return;
@@ -276,24 +284,16 @@ impl CaseRuntime<'_, '_, '_> {
     }
 
     pub(super) fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<bool> {
-        if self.state.confirm_exit == crate::ExitConfirmation::Pending {
-            return match code {
-                KeyCode::Enter => {
-                    if let Some((cancel, _, _)) = &self.active {
-                        cancel.cancel();
-                    }
-                    if self.io_ops.demo_mode() {
-                        self.shutdown.cancel();
-                    }
-                    Ok(true)
-                }
-                KeyCode::Esc => {
-                    self.state.confirm_exit = crate::ExitConfirmation::Inactive;
-                    Ok(false)
-                }
-                _ => Ok(false),
-            };
+        if self.io_ops.demo_mode()
+            && command_registry::shortcut_name(code, modifiers) != Some("expand")
+            && let Some(exit) = self.presentation_key(code, modifiers)
+        {
+            return Ok(exit);
         }
+        if self.state.confirm_exit == crate::ExitConfirmation::Pending {
+            return Ok(self.exit_confirmation_key(code));
+        }
+
         let shortcut = command_registry::shortcut_name(code, modifiers);
         if shortcut == Some("exit") {
             self.state.confirm_exit = crate::ExitConfirmation::Pending;
@@ -354,6 +354,25 @@ impl CaseRuntime<'_, '_, '_> {
             CaseMessage::Key(code, modifiers, self.active.is_some()),
         );
         self.apply_action(action)
+    }
+
+    fn exit_confirmation_key(&mut self, code: KeyCode) -> bool {
+        match code {
+            KeyCode::Enter => {
+                if let Some((cancel, _, _)) = &self.active {
+                    cancel.cancel();
+                }
+                if self.io_ops.demo_mode() {
+                    self.shutdown.cancel();
+                }
+                true
+            }
+            KeyCode::Esc => {
+                self.state.confirm_exit = crate::ExitConfirmation::Inactive;
+                false
+            }
+            _ => false,
+        }
     }
 
     fn handle_time_prompt_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<()> {
@@ -417,7 +436,7 @@ impl CaseRuntime<'_, '_, '_> {
         Ok(())
     }
 
-    fn apply_action(&mut self, action: CaseAction) -> Result<bool> {
+    pub(super) fn apply_action(&mut self, action: CaseAction) -> Result<bool> {
         match action {
             CaseAction::None => {
                 self.state.menu_open = self.state.input.starts_with('/');
@@ -433,7 +452,7 @@ impl CaseRuntime<'_, '_, '_> {
         }
     }
 
-    fn handle_overlay_key(&mut self, code: KeyCode) -> Result<Option<KeyCode>> {
+    pub(super) fn handle_overlay_key(&mut self, code: KeyCode) -> Result<Option<KeyCode>> {
         if let Some(mut query) = self.state.palette.take() {
             match code {
                 KeyCode::Esc => return Ok(None),

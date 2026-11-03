@@ -6,12 +6,12 @@ A terminal AI client for security investigations with policy-enforced tool calls
 
 IRMind is an agentic terminal assistant for incident response and digital forensics: the analyst converses with an agent that investigates local and remote evidence, loads forensic skills when needed, and delegates bounded work to parallel subagents. The model proposes, policy decides, and every action is signed.
 
-![Synthetic IRMind TUI walkthrough showing a resumed case, slash commands, local evidence ingestion, streaming model text, and a numbered approval](docs/assets/demo.gif)
+![Automatic IRMind presentation with a full-width narration panel, synthetic evidence, streaming responses, signed approval, and custody verification](docs/assets/demo.gif)
 
-*The demo uses synthetic evidence and an ephemeral key. Its scripted model needs no network or account.*
+*The complete presentation runs the real product with synthetic evidence, ephemeral keys and an offline scripted model. Enter advances; Space pauses; Esc exits.*
 
 > [!WARNING]
-> IRMind 0.1.3 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
+> IRMind 0.1.5 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
 
 ## What you can do
 
@@ -44,11 +44,11 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-The [v0.1.4 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.1.4) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
+The [v0.1.5 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.1.5) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
 
 ```sh
 # After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:
-tag=v0.1.4; binary=irmind-linux-x86_64
+tag=v0.1.5; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -58,9 +58,9 @@ gh attestation verify "$binary" -R ns2switch/irmind
 
 ## Try it in five minutes
 
-Run `irmind demo` from a verified build, or type `/demo` on the home screen. IRMind opens a temporary, signed case with a bundled synthetic HuntEval episode. It creates a random encrypted file keystore without asking for a passphrase and deletes the whole demo when you exit. If a local Ollama model advertises tool support, you may select it with the arrow keys; otherwise the clearly labeled scripted model runs offline. No remote model is used.
+Run `irmind demo`, or type `/demo` on the home screen. The product types commands and runs a ten-step investigation for you. A large narration panel explains the evidence, local queries, streaming response, signed approval and custody checks. No API key, passphrase, account or network is needed. The isolated temporary case and keys are deleted when you exit.
 
-Ask “What happened in this synthetic episode?” to see a local graph lookup, a proposed finding, and an external enrichment proposal that still needs signed approval. The external result is simulated and makes no network call. Confirm a finding, then type `/demo check` to compare it locally with the bundled answers. The answers never enter the model context. On exit, use `/new` and `/settings` to start a real case.
+Use **Enter** to advance, **Backspace** to revisit a step, **Space** to pause or resume, and **Esc** to exit. Allow at least **100 × 40 terminal cells**. The simulated external lookup still passes policy and is approved with the temporary analyst key; no request leaves the computer. At the end, choose to explore the sealed demo case, learn how to start your own, or exit. [The getting-started guide](docs/getting-started.md#try-it-in-five-minutes) shows the ten scenes.
 
 ## First case in the TUI
 

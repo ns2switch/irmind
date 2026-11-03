@@ -117,3 +117,7 @@ The experimental feature-gated `parser-syslog` uses the shared detection registr
 ### Linux exports before artifact V2
 
 The independent parser-linux crate extends the detection registry without external dependencies. It reuses the approved per-ingestion context and shared pure calendar with syslog; neither parser depends on the other. Auth/secure, bounded audit correlation, journald microsecond originals and common/combined HTTP exports are experimental and tested with synthetic episodes only. Artifact V1 remains second precision until the approved V2 implementation. Existing signed encodings and parser versions outside syslog/Linux remain unchanged.
+
+### Automatic community presentation
+
+Priority before artifact V2: deliver global card expansion and its `/expand` fallback in v0.1.4, then the isolated ten-scene live presentation in v0.1.5. Its versioned script drives the same parser registry, signed ingestion, approvals and custody as ordinary commands. No new application port, signed format, dependency or remote provider is introduced. PTYs cover automatic/manual playback and cleanup on Linux, macOS and Windows; native GUI/SSH/tmux keymaps remain separately reported manual checks.

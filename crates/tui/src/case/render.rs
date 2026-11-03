@@ -156,6 +156,29 @@ impl CaseRuntime<'_, '_, '_> {
         Ok(())
     }
 
+    fn resize_conversation(&mut self, shown_input: &str, guide_visible: bool) -> Result<()> {
+        let size = self.terminal.size()?;
+        let chat_area = super::view::conversation_area(
+            size.into(),
+            shown_input,
+            self.state.sidebar_visible,
+            guide_visible,
+        );
+        self.state.conversation.set_viewport(
+            usize::from(
+                chat_area
+                    .width
+                    .saturating_sub(if guide_visible { 2 } else { 0 }),
+            ),
+            usize::from(
+                chat_area
+                    .height
+                    .saturating_sub(if guide_visible { 2 } else { 0 }),
+            ),
+        );
+        Ok(())
+    }
+
     pub(super) fn render(&mut self) -> Result<()> {
         self.sync_conversation()?;
         self.refresh_usage()?;
@@ -181,16 +204,7 @@ impl CaseRuntime<'_, '_, '_> {
             })
             .transpose()?;
         let guide = self.demo_guide_text()?;
-        let size = self.terminal.size()?;
-        let chat_area = super::view::conversation_area(
-            size.into(),
-            &shown_input,
-            self.state.sidebar_visible,
-            guide.is_some(),
-        );
-        self.state
-            .conversation
-            .set_viewport(usize::from(chat_area.width), usize::from(chat_area.height));
+        self.resize_conversation(&shown_input, guide.is_some())?;
         self.state
             .conversation
             .set_approval_option(self.state.approval_option);

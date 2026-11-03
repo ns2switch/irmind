@@ -14,7 +14,7 @@ Recent cases · all
 ╭ Commands ────────────────────────────────────────────────────────────────────╮
 │> /home — Return to case list                                                 │
 │  /cases — List cases; optional all|open|sealed|inconsistent                  │
-│  /demo — Guide a synthetic investigation; next, back, hint, skip, check or…  │
+│  /demo — Play an offline synthetic presentation; Enter, Backspace, Space, Esc│
 │  /help — Show commands; /help <command> explains one command                 │
 │  /new — Create a case                                                        │
 │  /open — Open a case by title or ID                                          │

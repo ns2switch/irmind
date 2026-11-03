@@ -1,4 +1,4 @@
-Traducción de README.md en el commit c4fa5c304750e84fd3b1f102154be646f3fd0a00; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 211c41b7a1fb1fc395c2d152f5abe965a7c6c9e6; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -6,12 +6,12 @@ Cliente de IA en terminal para investigaciones de seguridad, con llamadas a herr
 
 IRMind es un asistente agéntico de terminal para respuesta a incidentes y análisis forense: el analista conversa con un agente que investiga evidencia local y remota, carga skills forenses cuando hacen falta y delega trabajo acotado en subagentes paralelos. El modelo propone, la política decide y todo queda firmado.
 
-![Demostración sintética de IRMind: caso reanudado, comandos, ingesta, respuesta en streaming y aprobación numerada](docs/assets/demo.gif)
+![Presentación automática de IRMind con narración a todo el ancho, evidencia sintética, respuesta en streaming, aprobación firmada y verificación de custodia](docs/assets/demo.gif)
 
-*La demostración usa evidencia sintética y una clave efímera. El modelo guionizado no necesita red ni cuenta.*
+*La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
 
 > [!WARNING]
-> IRMind 0.1.3 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
+> IRMind 0.1.5 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
 
 ## Qué puedes hacer
 
@@ -44,11 +44,11 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-La [versión preliminar v0.1.4](https://github.com/ns2switch/irmind/releases/tag/v0.1.4) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.1.5](https://github.com/ns2switch/irmind/releases/tag/v0.1.5) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.1.4; binary=irmind-linux-x86_64
+tag=v0.1.5; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -58,9 +58,9 @@ gh attestation verify "$binary" -R ns2switch/irmind
 
 ## Pruébalo en cinco minutos
 
-Ejecuta `irmind demo` desde una compilación verificada o escribe `/demo` en el inicio. IRMind abre un caso temporal y firmado con un episodio sintético de HuntEval. Crea un llavero cifrado con una passphrase aleatoria, sin pedírtela, y borra toda la demo al salir. Si un modelo de Ollama local declara soporte de herramientas, puedes elegirlo con las flechas; en caso contrario, usa el modelo guionizado, claramente identificado y sin conexión. Nunca se utiliza un proveedor remoto.
+Ejecuta `irmind demo` o escribe `/demo` en el inicio. El producto teclea comandos y realiza una investigación de diez pasos por ti. Un panel de narración grande explica la evidencia, las consultas locales, la respuesta en streaming, la aprobación firmada y las comprobaciones de custodia. No necesitas clave de API, passphrase, cuenta ni red. El caso temporal aislado y las claves se borran al salir.
 
-Pregunta «¿Qué ocurrió en este episodio sintético?» para ver una búsqueda local, un hallazgo propuesto y una consulta de enriquecimiento que sigue requiriendo aprobación firmada. El resultado externo es simulado y no hace llamadas de red. Confirma un hallazgo y escribe `/demo check` para compararlo localmente con las respuestas incluidas. Estas nunca entran en el contexto del modelo. Al salir, usa `/new` y `/settings` para empezar un caso real.
+Usa **Enter** para avanzar, **Retroceso** para revisar un paso, **Espacio** para pausar o reanudar y **Esc** para salir. Necesitas al menos **100 × 40 celdas de terminal**. La consulta externa simulada pasa por la política y se aprueba con la clave temporal del analista; no sale ninguna petición del equipo. Al terminar puedes explorar el caso sellado, aprender a crear uno propio o salir. La [guía de primeros pasos](docs/es/getting-started.md#pruébalo-en-cinco-minutos) muestra las diez escenas.
 
 ## Primer caso en la TUI
 

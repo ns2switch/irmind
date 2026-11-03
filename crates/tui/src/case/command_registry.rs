@@ -30,7 +30,7 @@ impl Command {
             "parsers" => " [test <definition> <file>]",
             "settings" => " [model|connectors|keystore|preferences]",
             "open" => " <case title or ID>",
-            "demo" => " [next|back|hint|skip|hide|show|check|exit]",
+            "demo" => " [check|exit]",
             "evidence" | "raw" => " <hash>",
             "ingest" => " [--parser <name>] [--year YYYY --utc-offset ±HH:MM] <path>",
             "objects" => " <source> <scheme> <container> <prefix> <from> <to>",
@@ -109,7 +109,7 @@ pub(crate) fn help_for(name: &str) -> String {
         return format!("Unknown command /{name}. Use /help to list commands.");
     };
     let example = match name {
-        "demo" => "/demo next",
+        "demo" => "/demo",
         "ingest" => "/ingest examples/cloudtrail-alert.json",
         "search" => "/search 203.0.113.77",
         "neighbors" => "/neighbors ip 203.0.113.77",
@@ -198,12 +198,10 @@ pub(super) fn argument_candidates(
         return super::picker::safe_completions(prefix);
     }
     let values: Vec<String> = match command {
-        "/demo" => [
-            "next", "back", "hint", "skip", "hide", "show", "check", "exit",
-        ]
-        .iter()
-        .map(|value| (*value).into())
-        .collect(),
+        "/demo" => ["check", "exit"]
+            .iter()
+            .map(|value| (*value).into())
+            .collect(),
         "/approve" | "/deny" | "/edit" => approvals.to_vec(),
         "/confirm" | "/dismiss" => findings.to_vec(),
         "/evidence" | "/evidence-save" | "/raw" => hashes.to_vec(),
@@ -323,12 +321,12 @@ mod tests {
     #[test]
     fn command_help_includes_example_and_related_actions() {
         let guide = help_for("demo");
-        assert!(guide.contains("Example: /demo next"));
+        assert!(guide.contains("Example: /demo"));
         assert!(guide.contains("Related:"));
         assert!(help_for("unknown").contains("Unknown command"));
         assert_eq!(
-            argument_candidates("/demo ne", &[], &[], &[], &[]),
-            vec!["next"]
+            argument_candidates("/demo ch", &[], &[], &[], &[]),
+            vec!["check"]
         );
     }
 }

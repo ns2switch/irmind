@@ -18,21 +18,23 @@ On Windows, run `.\target\release\irmind.exe` in Windows Terminal. For a release
 
 ## Try it in five minutes
 
-Run `irmind demo` first. You can also type `/demo` from the home screen. It opens an isolated temporary case with a synthetic HuntEval episode, ephemeral signing keys, and a scripted model. No API key, passphrase, account, or network is needed. If a local Ollama model supports tools, you may choose it instead; it stays local.
+Run `irmind demo` first, or type `/demo` on the home screen. You need no configuration, API key, passphrase, account or network. IRMind creates an isolated temporary case, ephemeral signing keys and the bundled synthetic HuntEval episode. It always uses an offline scripted model, without probing local or remote providers.
 
-A fixed guide shows the current step, the exact command, and why it matters. Wait for the initial ingest result before moving on. The ten steps cover the signed case, parser and evidence, local graph queries, a question to the agent, a signed approval, a confirmed finding, `/demo check`, and custody verification, sealing, export, and package verification. The expected HuntEval answers are loaded only when you run `/demo check`; they never enter the model context.
+The presentation types and executes the actual commands. A large, full-width narration panel explains each result and highlights the live investigation above it. Ten scenes cover the AWS alert, signed case, parser confidence, local timeline/search/neighbors, a streamed investigation, policy approval, confirmed findings, `/demo check`, and verification, sealing and export. The expected answers load only for the local check; they never become evidence or model context.
 
-Use `/demo next` after completing a step. `/demo back`, `/demo hint`, `/demo skip`, and `/demo hide` help you navigate; `/demo` shows the guide again. Other commands still work without advancing the current step. `/demo exit` deletes the temporary case, keys, and evidence and points you to `/new` and `/settings`. Use `/help demo` for examples and related commands.
+Playback starts automatically. Reading time follows the narration length, with at least six seconds per scene at normal speed. **Enter** advances, **Backspace** revisits a scene without repeating completed signed actions, **Space** pauses or resumes, and **Esc** exits. Ctrl+C also cancels and exits the demo. Resize to at least **100 × 40 cells** if a size notice appears. Failed work pauses with an explanation; Enter retries. Normal investigations keep their usual keys and smaller-terminal support.
 
-![The fixed demo guide explains the synthetic case and the first action](ux/demo-guide/welcome.png)
+Only this demo automatically signs the simulated external lookup and custody confirmations, using its temporary key. In a real case, the analyst reviews and signs those actions. The final screen offers normal exploration of the sealed case, instructions for a real case, or exit. Exiting deletes the temporary data and restores the terminal. Start a real session with `irmind`, then `/new`, `/ingest` and `/settings`.
 
-![The demo shows the selected parser and detection confidence after ingestion](ux/demo-guide/evidence.png)
+![Introduction with the full-width narration panel below the live synthetic case.](ux/demo-guide/welcome.png)
 
-![The demo guide suggests local timeline, search, and neighbor queries](ux/demo-guide/explore.png)
+![Real ingestion shows parser-json and 90 percent detection confidence.](ux/demo-guide/evidence.png)
 
-![The guide explains why an external lookup waits for signed approval](ux/demo-guide/approval.png)
+![Local evidence queries run without a model or network request.](ux/demo-guide/explore.png)
 
-![The final custody step asks the analyst to verify, seal, export, and verify the package](ux/demo-guide/custody.png)
+![The narration explains the stopped enrichment and its temporary signed approval.](ux/demo-guide/approval.png)
+
+![Custody verification and the exact seal confirmation in the offline presentation.](ux/demo-guide/custody.png)
 
 ## First launch
 

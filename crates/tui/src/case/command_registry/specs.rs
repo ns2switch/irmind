@@ -255,7 +255,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "demo",
-        description: "Guide a synthetic investigation; next, back, hint, skip, check or exit",
+        description: "Play an offline synthetic presentation; Enter, Backspace, Space, Esc",
         shortcut: "",
         slash: true,
     },

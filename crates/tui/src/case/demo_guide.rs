@@ -1,4 +1,21 @@
-use std::collections::BTreeSet;
+use anyhow::Result;
+use std::fmt::Write as _;
+use std::{
+    collections::BTreeSet,
+    time::{Duration, Instant},
+};
+mod playback;
+mod script;
+pub(super) enum Effect {
+    None,
+    Bind(String),
+    Type(String),
+    Submit(String),
+    Finished,
+    Next,
+    Error(&'static str),
+}
+use script::Step;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) enum DemoEvent {
@@ -23,264 +40,231 @@ pub(super) struct DemoGuide {
     seen: BTreeSet<DemoEvent>,
     parser: Option<(String, u8)>,
     note: String,
+    steps: Vec<Step>,
+    playback: playback::Playback,
+    progress: [usize; 10],
+    confirmation_started: Option<Instant>,
+    back_pending: bool,
+    pub final_option: usize,
+    pub show_real_case_help: bool,
 }
 
 impl DemoGuide {
-    pub(super) fn new() -> Self {
-        Self {
+    pub(super) fn new() -> Result<Self> {
+        Self::with_speed(1)
+    }
+    pub(super) fn with_speed(speed: u8) -> Result<Self> {
+        Ok(Self {
             step: 0,
             hidden: false,
             seen: BTreeSet::new(),
             parser: None,
             note: String::new(),
-        }
+            steps: script::load()?,
+            playback: playback::Playback::new(speed),
+            progress: [0; 10],
+            confirmation_started: None,
+            back_pending: false,
+            final_option: 0,
+            show_real_case_help: false,
+        })
     }
-
     pub(super) fn step(&self) -> usize {
         self.step
     }
-
     pub(super) fn hidden(&self) -> bool {
         self.hidden
     }
-
+    pub(super) fn active(&self) -> bool {
+        !self.hidden
+    }
     pub(super) fn record(&mut self, event: DemoEvent) {
         self.seen.insert(event);
-        if self.completed() && self.step < 9 {
-            self.note = "Step complete.".into();
-        }
     }
-
     pub(super) fn record_ingest(&mut self, parser: &str, confidence: u8) {
-        self.parser = Some((parser.to_owned(), confidence));
+        self.parser = Some((parser.into(), confidence));
         self.record(DemoEvent::EvidenceIngested);
     }
-
+    pub(super) fn completed(&self) -> bool {
+        self.progress[self.step] >= self.steps[self.step].actions.len()
+            && self.steps[self.step]
+                .requires
+                .iter()
+                .all(|event| self.seen.contains(event))
+    }
     pub(super) fn next(&mut self) {
-        if self.step == 9 {
-            self.note = "The tutorial is complete.".into();
-        } else if self.completed() {
+        if self.completed() && self.step < 9 {
             self.step += 1;
-            self.hidden = false;
+            self.playback.reset();
             self.note.clear();
-        } else {
-            self.note = "This step is not complete. Follow the instruction above.".into();
+        } else if !self.completed() {
+            self.playback.request_advance();
         }
     }
-
     pub(super) fn back(&mut self) {
+        if self.playback.awaiting_result() {
+            self.back_pending = true;
+            self.playback.pause();
+            self.note = "Finishing the current action before going back.".into();
+            return;
+        }
         self.step = self.step.saturating_sub(1);
-        self.hidden = false;
+        self.playback.reset();
+        self.playback.pause();
         self.note.clear();
     }
-
     pub(super) fn skip(&mut self) {
-        if self.step < 9 {
-            self.step += 1;
-        }
-        self.hidden = false;
-        self.note = "Step skipped.".into();
+        self.next();
     }
-
     pub(super) fn hide(&mut self) {
         self.hidden = true;
+        self.playback.pause();
     }
-
     pub(super) fn show(&mut self) {
         self.hidden = false;
+        self.playback.reset();
     }
-
     pub(super) fn hint(&mut self) {
-        self.note = match self.step {
-            0 => "No setup is needed. This session uses only bundled synthetic data.",
-            1 => "The scope defines which sources this case may query.",
-            2 => "Wait for the ingest result; it names the parser and confidence.",
-            3 => "Run the commands shown in the guide, one at a time.",
-            4 => "Ask about the synthetic IAM events in your own words.",
-            5 => "Inspect the exact arguments before deciding.",
-            6 => "Inspect the proposed hypothesis and its evidence.",
-            7 => "Only confirmed findings count toward the local check.",
-            8 => "Verify before sealing, then export and check the package with the analyst key.",
-            _ => "Start a real case and configure a model after leaving the demo.",
-        }
-        .into();
-        self.hidden = false;
+        self.show();
     }
-
-    fn completed(&self) -> bool {
-        let has = |event| self.seen.contains(&event);
-        match self.step {
-            1 => has(DemoEvent::ScopeViewed),
-            2 => has(DemoEvent::EvidenceIngested),
-            3 => {
-                has(DemoEvent::TimelineViewed)
-                    && has(DemoEvent::TermSearched)
-                    && has(DemoEvent::NeighborsViewed)
-            }
-            4 => has(DemoEvent::QuestionAnswered),
-            5 => has(DemoEvent::ApprovalResolved),
-            6 => has(DemoEvent::FindingResolved),
-            7 => has(DemoEvent::Checked),
-            8 => {
-                has(DemoEvent::CustodyVerified)
-                    && has(DemoEvent::Sealed)
-                    && has(DemoEvent::Exported)
-                    && has(DemoEvent::ExportVerified)
-            }
-            _ => true,
+    pub(super) fn pause_or_resume(&mut self) {
+        self.playback.toggle();
+    }
+    pub(super) fn fail(&mut self, text: &str) {
+        if !self.playback.in_flight() && !self.completed() {
+            self.progress[self.step] = self.progress[self.step].saturating_sub(1);
+        }
+        self.note = format!("Presentation stopped: {text}. Enter retries; Esc exits.");
+        self.playback.fail();
+    }
+    pub(super) fn enter(&mut self) {
+        self.note.clear();
+        if self.playback.failed() {
+            self.playback.retry();
+        } else {
+            self.next();
         }
     }
-
-    fn instruction(&self, approval: Option<&str>, finding: Option<&str>) -> String {
-        if self.completed() && (1..9).contains(&self.step) {
-            return "/demo next — continue when ready".into();
+    pub(super) fn tick(&mut self, now: Instant, busy: bool, visible: bool) -> Effect {
+        if self.hidden {
+            return Effect::None;
         }
-        match self.step {
-            0 => "/demo next — begin the guided tour".into(),
-            1 => "/scope — inspect the signed case boundary".into(),
-            2 => self.parser.as_ref().map_or_else(
-                || "Wait for ingest, then /demo next".into(),
-                |(parser, confidence)| format!("{parser} · {confidence}% confidence · /demo next"),
-            ),
-            3 if !self.seen.contains(&DemoEvent::TimelineViewed) => "/timeline".into(),
-            3 if !self.seen.contains(&DemoEvent::TermSearched) => "/search 203.0.113.77".into(),
-            3 => "/neighbors ip 203.0.113.77".into(),
-            4 => "What happened in this synthetic AWS IAM episode?".into(),
-            5 => approval.map_or_else(
-                || "/approvals — inspect the pending request".into(),
-                |id| format!("/approve {id} — or /deny <id> <reason>"),
-            ),
-            6 => finding.map_or_else(
-                || "/findings — inspect the proposed hypothesis".into(),
-                |id| format!("/confirm {id} or /dismiss {id} <reason>"),
-            ),
-            7 => "/demo check".into(),
-            8 if !self.seen.contains(&DemoEvent::CustodyVerified) => "/verify".into(),
-            8 if !self.seen.contains(&DemoEvent::Sealed) => "/seal".into(),
-            8 if !self.seen.contains(&DemoEvent::Exported) => "/export".into(),
-            8 => "/verify-export — check the package with the expected key".into(),
-            _ => "/demo exit — then try /new and /settings".into(),
+        let completed = self.completed();
+        self.playback.tick(playback::Tick {
+            now,
+            visibility: if !visible {
+                playback::Visibility::Hidden
+            } else if busy {
+                playback::Visibility::Busy
+            } else {
+                playback::Visibility::Ready
+            },
+            completion: if self.step == 9 {
+                playback::Completion::Final
+            } else if completed {
+                playback::Completion::Complete
+            } else {
+                playback::Completion::Pending
+            },
+            action: self.steps[self.step]
+                .actions
+                .get(self.progress[self.step])
+                .cloned(),
+            reading_time: self.reading_time(),
+        })
+    }
+    pub(super) fn start_typing(&mut self, command: String) {
+        self.playback.start_typing(command);
+    }
+    pub(super) fn command_sent(&mut self) {
+        self.playback.command_sent();
+    }
+    pub(super) fn action_finished(&mut self) {
+        self.progress[self.step] += 1;
+        self.playback.action_finished();
+        if self.back_pending {
+            self.back_pending = false;
+            self.back();
         }
     }
-
-    pub(super) fn panel(&self, approval: Option<&str>, finding: Option<&str>) -> Option<String> {
+    pub(super) fn confirmation_due(&mut self, now: Instant) -> bool {
+        if !self.playback.permits_actions() && !self.back_pending {
+            return false;
+        }
+        let started = *self.confirmation_started.get_or_insert(now);
+        now.saturating_duration_since(started) >= self.scaled(6_000)
+    }
+    pub(super) fn clear_confirmation_wait(&mut self) {
+        self.confirmation_started = None;
+    }
+    pub(super) fn scaled(&self, millis: u64) -> Duration {
+        self.playback.scaled(millis)
+    }
+    fn reading_time(&self) -> Duration {
+        let words = self.steps[self.step].narration.split_whitespace().count() as u64;
+        self.scaled((words * 1_000 / 3).max(6_000))
+    }
+    pub(super) fn panel(&self, _approval: Option<&str>, _finding: Option<&str>) -> Option<String> {
         if self.hidden {
             return None;
         }
-        let (title, reason) = match self.step {
-            0 => (
-                "Welcome",
-                "IRMind signs each action. This demo stays local and is deleted on exit.",
-            ),
-            1 => (
-                "The case",
-                "The case is a signed record with a fixed scope.",
-            ),
-            2 => (
-                "Evidence",
-                "The signed manifest links the original to a parser; it is not copied by default.",
-            ),
-            3 => (
-                "Explore",
-                "Local graph queries help you inspect evidence without a model.",
-            ),
-            4 => (
-                "Ask the agent",
-                "The model may propose tools, but policy decides what runs.",
-            ),
-            5 => (
-                "Approval",
-                "External enrichment waits for your signed decision.",
-            ),
-            6 => (
-                "Findings",
-                "Reports count only findings you confirm with evidence.",
-            ),
-            7 => (
-                "Demo check",
-                "Expected answers are read locally only for this comparison.",
-            ),
-            8 => (
-                "Custody",
-                "Verify the chain, seal the case, export it, then verify the package.",
-            ),
-            _ => (
-                "Next steps",
-                "Create a case and configure a model when you are ready.",
-            ),
-        };
+        let current = &self.steps[self.step];
         let mut text = format!(
-            "Demo {}/10 · {title}\nDo: {}\nWhy: {reason}",
+            "Step {} of 10 · {}\n\n{}",
             self.step + 1,
-            self.instruction(approval, finding),
+            current.title,
+            current.narration
         );
+        if self.step == 2
+            && let Some((parser, confidence)) = &self.parser
+        {
+            let _ = write!(
+                text,
+                "\nEvidence ready: {parser} · {confidence}% confidence"
+            );
+        }
+        if self.step == 9 {
+            if self.show_real_case_help {
+                text.push_str(
+                    "\nExit demo, run irmind, then /new, /ingest and /settings. Enter returns.",
+                );
+            } else {
+                for (index, choice) in [
+                    "Explore this demo case (sealed, read-only)",
+                    "Start your own case",
+                    "Exit",
+                ]
+                .iter()
+                .enumerate()
+                {
+                    let _ = write!(
+                        text,
+                        "\n{} {}. {choice}",
+                        if index == self.final_option {
+                            "›"
+                        } else {
+                            " "
+                        },
+                        index + 1
+                    );
+                }
+            }
+        }
         if !self.note.is_empty() {
             text.push('\n');
             text.push_str(&self.note);
         }
+        text.push_str(if self.step == 9 {
+            "\nPresentation complete · ↑/↓ choose · Enter select"
+        } else if self.playback.automatic() {
+            "\nAuto playing"
+        } else {
+            "\nPaused"
+        });
+        text.push_str(" · Enter next · Backspace previous · Space pause/play · Esc exit");
         Some(text)
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{DemoEvent, DemoGuide};
-
-    #[test]
-    fn completed_step_has_one_current_instruction() {
-        let mut guide = DemoGuide::new();
-        guide.next();
-        guide.record(DemoEvent::ScopeViewed);
-        assert!(guide.panel(None, None).is_some_and(|panel| {
-            panel.contains("Do: /demo next")
-                && !panel.contains("/scope")
-                && panel.matches('/').count() == 2 // Step counter and one command.
-        }));
-    }
-
-    #[test]
-    fn unrelated_actions_never_advance_the_guide() {
-        let mut guide = DemoGuide::new();
-        guide.record(DemoEvent::QuestionAnswered);
-        assert_eq!(guide.step(), 0);
-        guide.next();
-        assert_eq!(guide.step(), 1);
-        guide.next();
-        assert_eq!(guide.step(), 1);
-        guide.record(DemoEvent::ScopeViewed);
-        guide.next();
-        assert_eq!(guide.step(), 2);
-    }
-
-    #[test]
-    fn exploring_requires_all_three_local_queries() {
-        let mut guide = DemoGuide::new();
-        guide.skip();
-        guide.skip();
-        guide.skip();
-        guide.record(DemoEvent::TimelineViewed);
-        guide.record(DemoEvent::TermSearched);
-        guide.next();
-        assert_eq!(guide.step(), 3);
-        guide.record(DemoEvent::NeighborsViewed);
-        guide.next();
-        assert_eq!(guide.step(), 4);
-    }
-
-    #[test]
-    fn hint_and_visibility_preserve_progress() {
-        let mut guide = DemoGuide::new();
-        guide.hide();
-        assert!(guide.panel(None, None).is_none());
-        guide.hint();
-        assert!(!guide.hidden());
-        assert!(
-            guide
-                .panel(None, None)
-                .is_some_and(|panel| panel.contains("Demo 1/10"))
-        );
-        guide.next();
-        guide.back();
-        assert_eq!(guide.step(), 0);
-    }
-}
+mod tests;

@@ -192,6 +192,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return Ok(true);
         }
         if self.io_ops.demo_mode()
+            && prompt != "/ingest events.json"
             && ["/ingest", "/settings", "/objects", "/object-read"]
                 .iter()
                 .any(|command| prompt == *command || prompt.starts_with(&format!("{command} ")))
@@ -341,8 +342,20 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         }
         if let Some(path) = prompt.strip_prefix("/ingest ") {
             let options = irmind_app::IngestOptions::parse(path)?;
+            let path = if self.io_ops.demo_mode() {
+                anyhow::ensure!(
+                    options.path == "events.json",
+                    "demo accepts only its bundled source"
+                );
+                self.io_ops
+                    .demo_source_root()
+                    .ok_or_else(|| anyhow::anyhow!("demo source unavailable"))?
+                    .join("events.json")
+            } else {
+                PathBuf::from(options.path)
+            };
             self.state.pending_ingest = Some(super::state::PendingIngest {
-                path: PathBuf::from(options.path),
+                path,
                 copy_original: options.copy_original,
                 forced_parser: options.parser,
                 analyst_choices: std::collections::BTreeMap::new(),

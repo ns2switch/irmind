@@ -60,15 +60,19 @@ fn narrow_terminal_keeps_prompt_and_new_content_indicator() {
 }
 
 #[test]
-fn guided_demo_panel_stays_visible_above_the_conversation() {
-    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+fn presentation_panel_is_large_below_the_thread_and_small_terminals_are_explicit() {
+    let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     let lines = [
         Line::from(concat!("IRMind v", env!("CARGO_PKG_VERSION"))),
         Line::from("Evidence ready: 1 synthetic file · parser-json · 90% confidence"),
     ];
+    let guide = crate::case::demo_guide::DemoGuide::new()
+        .unwrap()
+        .panel(None, None)
+        .unwrap();
     let view = CaseFrame {
         title: "Synthetic",
-        guide: Some("Demo 3/10 · Evidence\nDo: /demo next\nWhy: The original stays in place."),
+        guide: Some(&guide),
         messages: "",
         visible_lines: Some(&lines),
         input: "",
@@ -90,13 +94,16 @@ fn guided_demo_panel_stays_visible_above_the_conversation() {
     };
     draw_case(&mut terminal, &view).unwrap();
     let shown = screen(&terminal);
-    assert!(shown.contains("Demo 3/10"));
-    assert!(shown.contains("/demo next"));
+    assert!(shown.contains("Step 1 of 10"));
+    assert!(shown.contains("Space pause/play"));
     assert!(shown.contains("Evidence ready: 1 synthetic file"));
-    assert!(!shown.contains("Try /timeline"));
-    insta::assert_snapshot!("guided_demo_evidence_ready", shown);
-    assert!(!shown.contains("/help for help"));
-    assert!(shown.contains("Follow the current guide step"));
+    assert!(shown.find("Step 1 of 10").unwrap() > shown.find("Presentation types").unwrap());
+    assert!(!shown.contains("/demo next"));
+    insta::assert_snapshot!("presentation_welcome", shown);
+    let mut small = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    draw_case(&mut small, &view).unwrap();
+    assert!(screen(&small).contains("100 × 40"));
+    insta::assert_snapshot!("presentation_small_terminal", screen(&small));
 }
 
 #[test]

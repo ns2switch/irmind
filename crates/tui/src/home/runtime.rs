@@ -20,6 +20,7 @@ pub(super) struct HomeRuntime<'scope, 'env, 'ports> {
     pub state: HomeState,
     pub statuses: mpsc::Receiver<(CaseId, CaseStatus)>,
     pub new_analyst_key: bool,
+    pub demo_speed: u8,
     pub mouse_capture: bool,
     pub(super) verify_task: Option<Worker<'scope>>,
     pub(super) verify_started: Option<Instant>,
@@ -412,6 +413,7 @@ impl HomeRuntime<'_, '_, '_> {
             id,
             self.shutdown,
             case::CasePresentation {
+                demo_speed: self.demo_speed,
                 overrides_active: self.state.overrides_active,
                 modules: self.modules,
                 mouse_capture: self.mouse_capture,
@@ -485,6 +487,7 @@ impl HomeRuntime<'_, '_, '_> {
                     &case_id,
                     self.shutdown,
                     case::CasePresentation {
+                        demo_speed: self.demo_speed,
                         overrides_active: self.state.overrides_active,
                         modules: self.modules,
                         mouse_capture: self.mouse_capture,

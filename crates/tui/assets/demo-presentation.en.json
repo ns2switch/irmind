@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "welcome",
+      "title": "Meet IRMind",
+      "narration": [
+        "IRMind is a terminal assistant for investigating security incidents. The model proposes actions, policy decides what can run, and the case records signed evidence.",
+        "This presentation operates the product for you with synthetic data and a scripted model. Nothing leaves this computer, and the temporary session is deleted when you exit."
+      ],
+      "actions": [],
+      "requires": []
+    },
+    {
+      "id": "case",
+      "title": "An AWS privilege alert",
+      "narration": [
+        "The synthetic alert concerns an AWS user who obtained administrator privileges. IRMind has created a temporary case to keep the investigation and its evidence together.",
+        "The highlighted case and scope are the boundary for every action. A signed case records what was observed and who acted; it does not make an assumption true."
+      ],
+      "actions": [
+        "/scope"
+      ],
+      "requires": [
+        "scope"
+      ]
+    },
+    {
+      "id": "evidence",
+      "title": "Follow the evidence",
+      "narration": [
+        "IRMind now ingests the bundled AWS log through the same detection registry as a real case. Look for the parser name and its detection confidence in the result.",
+        "The original stays in place: its hash and the interpretation are signed in a manifest. Derived Parquet supports local queries; keep originals available to reverify their signed hashes later."
+      ],
+      "actions": [
+        "/ingest events.json"
+      ],
+      "requires": [
+        "ingest"
+      ]
+    },
+    {
+      "id": "explore",
+      "title": "Explore without AI",
+      "narration": [
+        "The timeline places events in order, then search finds the synthetic IP 203.0.113.77. Neighbors connects values observed together in the evidence.",
+        "These are local evidence queries, not model guesses. The expanded cards show the actual results without sending data to an AI provider."
+      ],
+      "actions": [
+        "/timeline",
+        "/expand",
+        "/search 203.0.113.77",
+        "/expand",
+        "/neighbors ip 203.0.113.77",
+        "/expand"
+      ],
+      "requires": [
+        "timeline",
+        "search",
+        "neighbors"
+      ]
+    },
+    {
+      "id": "agent",
+      "title": "Ask the investigator",
+      "narration": [
+        "IRMind types a concrete investigation question and shows the scripted response as it streams. Look for the source hash that links the explanation to evidence.",
+        "The assistant can propose tools and findings, but its words are not proof. In your own case, you select a model explicitly and review its evidence-backed claims."
+      ],
+      "actions": [
+        "What happened in this synthetic AWS IAM episode?"
+      ],
+      "requires": [
+        "question"
+      ]
+    },
+    {
+      "id": "approval",
+      "title": "Policy stops an external lookup",
+      "narration": [
+        "The agent proposes sending an IP address to external threat intelligence. Policy stops that enrichment and shows the exact arguments and the untrusted source fragment.",
+        "Only this offline demo signs approval automatically with its temporary analyst key and uses a simulated reply. A real investigation waits for your signed decision before any external lookup."
+      ],
+      "actions": [
+        "/approvals",
+        {
+          "wait_ms": 6000
+        },
+        "$approve",
+        "/sidebar"
+      ],
+      "requires": [
+        "approval"
+      ]
+    },
+    {
+      "id": "findings",
+      "title": "Confirm what the evidence supports",
+      "narration": [
+        "The proposed hypothesis connects the privilege change with the observed events and ATT&CK techniques T1078 and T1098. The demo now confirms that evidence-backed finding.",
+        "Only findings confirmed by the analyst enter the report. An observed command or an AI explanation alone does not prove every claimed consequence."
+      ],
+      "actions": [
+        "/findings",
+        {
+          "wait_ms": 2000
+        },
+        "$confirm",
+        "/sidebar"
+      ],
+      "requires": [
+        "finding"
+      ]
+    },
+    {
+      "id": "check",
+      "title": "Check the investigation locally",
+      "narration": [
+        "The demo compares the confirmed findings with the bundled HuntEval answers. Those answers are loaded only for this comparison, never ingested as evidence or sent to the model.",
+        "The result is a local score for this synthetic episode. It helps expose missed events or unsupported conclusions; it is not a validation against real incidents."
+      ],
+      "actions": [
+        "/demo check",
+        "/expand"
+      ],
+      "requires": [
+        "check"
+      ]
+    },
+    {
+      "id": "custody",
+      "title": "Verify, seal and hand over",
+      "narration": [
+        "IRMind verifies the chain and originals, seals the case, exports it, then verifies the package against the expected analyst key. The demo shows exactly what is signed or exported and confirms it automatically with its temporary key.",
+        "The signed chain makes later changes detectable and supports review by another investigator or a court. It does not prove the logs were truthful, establish legal admissibility, or prevent the key owner from rewriting an entire chain."
+      ],
+      "actions": [
+        "/verify",
+        "/seal",
+        "/export",
+        "/verify-export"
+      ],
+      "requires": [
+        "verify",
+        "seal",
+        "export",
+        "verify-export"
+      ]
+    },
+    {
+      "id": "next",
+      "title": "Your turn",
+      "narration": [
+        "You have seen evidence ingestion, local queries, a tool-using investigation, signed approval and custody verification. The temporary demo case is now sealed.",
+        "Explore its evidence in the normal interface, learn how to start your own case, or exit. A real investigation begins with /new, /ingest and /settings to choose a model explicitly."
+      ],
+      "actions": [],
+      "requires": []
+    }
+  ]
+}
