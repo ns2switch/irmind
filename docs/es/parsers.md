@@ -1,4 +1,4 @@
-Traducción de docs/parsers.md en el commit 99c035c39c9d54d11dbe9c5bdd820136d1c21502; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/parsers.md en el commit 92d6c095219e474b28ef2405984e5c19caf5ef3f; si hay diferencias, prevalece la versión en inglés.
 
 # Parsers de logs
 
@@ -65,4 +65,4 @@ Los registros conservan taint y procedencia de fuente, parser y offset. El guard
 
 ### Tiempo de syslog clásico
 
-RFC 3164 necesita un año y un desplazamiento UTC proporcionados por el analista. IRMind registra la inferencia y nunca los toma del reloj del sistema. Consulta [la configuración y los límites de syslog](../development/syslog-parser.md).
+RFC 3164 abre un formulario temporal antes de ingerir. Confirma el año del primer registro, el desplazamiento UTC fijo, si diciembre → enero incrementa el año y si la elección se aplica a un fichero o a toda la ingesta. Los campos empiezan vacíos. Otras fuentes verificadas del mismo host pueden sugerir el año y la zona; debes confirmarlos. IRMind nunca usa el reloj del equipo ni la fecha de modificación. Otros retrocesos de mes cuentan como registros inválidos. La elección queda firmada con la fuente. Consulta [el contrato y los límites de syslog](../development/syslog-parser.md).
