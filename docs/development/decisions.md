@@ -150,3 +150,9 @@ Consequences: no application port, policy, signed format or dependency changes. 
 Context: the event-driven tutorial required too many commands and its corner guide hid the next action.
 Decision: keep ten bounded scenes in versioned data and execute their commands through the ordinary TUI dispatcher. Use only the isolated demo composition, temporary keys and scripted model. No network probe or real workspace is permitted. Narration remains separate from model context. Actual completion events gate advancement; errors pause visibly. Only demo enrichment and custody previews are confirmed automatically, through their existing signed paths.
 Consequences: the large bottom panel reserves a 100 × 40 minimum while visible. Enter/Backspace/Space/Esc navigate presentation state; normal case keys stay unchanged. Revisiting a scene never repeats completed ingestion, approvals or sealing. Expected answers load only for the local check. Existing VHS generates the complete recording without a new dependency.
+
+## Compact presentation at the standard terminal size
+
+Context: a 100 × 40 minimum blocked the demo in standard 80 × 24 terminals.
+Decision: support 80 × 24 with a compact lower narration pane, pinned controls and final choices, independent narration scrolling and hidden secondary panels. PgUp/PgDn pauses playback for reading. Confirmation previews use the space above narration. Keep 100 × 40 as a recommendation, with a blocking notice only below 80 × 24.
+Consequences: use the same ingestion, policy, signing and custody paths at both sizes. Cross-platform PTYs run the whole presentation at 80 × 24. No point release is required for this layout adjustment.

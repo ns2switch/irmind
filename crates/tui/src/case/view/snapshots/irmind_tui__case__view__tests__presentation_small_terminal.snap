@@ -2,5 +2,5 @@
 source: crates/tui/src/case/view/tests.rs
 expression: screen(&small)
 ---
-Demo presentation needs at least 100 × 40 cells.
-Current: 80 × 24. Resize the terminal; Esc exits.
+Demo presentation needs at least 80 × 24 cells. Recommended: 100 × 40.
+Current: 79 × 23. Resize the terminal; Esc exits.

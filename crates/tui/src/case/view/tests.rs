@@ -25,6 +25,7 @@ fn narrow_terminal_keeps_prompt_and_new_content_indicator() {
     let view = CaseFrame {
         title: "Synthetic",
         guide: None,
+        guide_scroll: 0,
         messages: "",
         visible_lines: Some(&lines),
         input: "first line\nsecond line",
@@ -73,6 +74,7 @@ fn presentation_panel_is_large_below_the_thread_and_small_terminals_are_explicit
     let view = CaseFrame {
         title: "Synthetic",
         guide: Some(&guide),
+        guide_scroll: 0,
         messages: "",
         visible_lines: Some(&lines),
         input: "",
@@ -100,9 +102,9 @@ fn presentation_panel_is_large_below_the_thread_and_small_terminals_are_explicit
     assert!(shown.find("Step 1 of 10").unwrap() > shown.find("Presentation types").unwrap());
     assert!(!shown.contains("/demo next"));
     insta::assert_snapshot!("presentation_welcome", shown);
-    let mut small = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let mut small = Terminal::new(TestBackend::new(79, 23)).unwrap();
     draw_case(&mut small, &view).unwrap();
-    assert!(screen(&small).contains("100 × 40"));
+    assert!(screen(&small).contains("80 × 24"));
     insta::assert_snapshot!("presentation_small_terminal", screen(&small));
 }
 
@@ -122,6 +124,7 @@ fn expanded_card_and_scrolled_sidebar_are_visible_in_test_backend() {
     let mut view = CaseFrame {
         title: "Synthetic",
         guide: None,
+        guide_scroll: 0,
         messages: "",
         visible_lines: Some(&lines),
         input: "",
@@ -170,6 +173,7 @@ fn cloud_listing_and_transfer_confirmation_fit_in_a_narrow_terminal() {
     let view = CaseFrame {
         title: "Synthetic cloud case",
         guide: None,
+        guide_scroll: 0,
         messages: "",
         visible_lines: Some(&lines),
         input: "",
@@ -198,19 +202,13 @@ fn cloud_listing_and_transfer_confirmation_fit_in_a_narrow_terminal() {
     assert!(shown.contains("256/512 bytes"));
 }
 
-#[test]
-fn visual_states_have_versioned_terminal_snapshots() {
-    use crate::case::conversation::{Card, CardKind, Conversation};
-    let mut chat = Conversation::new(false);
-    chat.set_viewport(80, 18);
-    chat.push(Card::new(CardKind::Welcome, "IRMind v0.1.0", "Synthetic case · high\nModel: no model · Keystore: file\n/ingest adds evidence · /help opens help", false));
-    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
-    let lines0 = chat.visible_lines();
-    let mut view = CaseFrame {
+fn visual_frame<'a>(lines: &'a [Line<'static>]) -> CaseFrame<'a> {
+    CaseFrame {
         title: "Synthetic case",
         guide: None,
+        guide_scroll: 0,
         messages: "",
-        visible_lines: Some(&lines0),
+        visible_lines: Some(lines),
         input: "",
         input_focused: true,
         panel: "",
@@ -227,7 +225,18 @@ fn visual_states_have_versioned_terminal_snapshots() {
         pending: 0,
         detections: 0,
         status: "idle",
-    };
+    }
+}
+
+#[test]
+fn visual_states_have_versioned_terminal_snapshots() {
+    use crate::case::conversation::{Card, CardKind, Conversation};
+    let mut chat = Conversation::new(false);
+    chat.set_viewport(80, 18);
+    chat.push(Card::new(CardKind::Welcome, "IRMind v0.1.0", "Synthetic case · high\nModel: no model · Keystore: file\n/ingest adds evidence · /help opens help", false));
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let lines0 = chat.visible_lines();
+    let mut view = visual_frame(&lines0);
     draw_case(&mut terminal, &view).unwrap();
     insta::assert_snapshot!("welcome", screen(&terminal));
 
@@ -310,6 +319,7 @@ fn consecutive_model_rounds_have_separate_messages() {
         &CaseFrame {
             title: "Synthetic case",
             guide: None,
+            guide_scroll: 0,
             messages: "",
             visible_lines: Some(&lines),
             input: "",

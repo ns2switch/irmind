@@ -11,14 +11,25 @@ mod demo_session;
 use demo_session::DemoSession;
 
 fn demo_command(real_home: &std::path::Path, demo_parent: &std::path::Path) -> Command {
+    sized_demo_command(real_home, demo_parent, 120, 40)
+}
+
+fn sized_demo_command(
+    real_home: &std::path::Path,
+    demo_parent: &std::path::Path,
+    columns: u16,
+    rows: u16,
+) -> Command {
     #[cfg(unix)]
     let mut command = {
         let mut command = Command::new("sh");
         command
             .arg("-c")
-            .arg("stty cols 120 rows 40; exec \"$0\" --home \"$1\" demo --scripted --presentation-speed 50")
+            .arg("stty cols \"$2\" rows \"$3\"; exec \"$0\" --home \"$1\" demo --scripted --presentation-speed 50")
             .arg(env!("CARGO_BIN_EXE_irmind"))
-            .arg(real_home);
+            .arg(real_home)
+            .arg(columns.to_string())
+            .arg(rows.to_string());
         command
     };
     #[cfg(windows)]
@@ -46,6 +57,7 @@ fn demo_command(real_home: &std::path::Path, demo_parent: &std::path::Path) -> C
             .arg("2>&1");
         command
     };
+    let _ = (columns, rows);
     command
         .env("TERM", "xterm-256color")
         .env("NO_COLOR", "1")
@@ -219,4 +231,18 @@ fn control_c_cleans_and_restores_the_terminal_from_every_presentation_step() {
 #[test]
 fn escape_cleans_and_restores_the_terminal_from_every_presentation_step() {
     cancel_at_every_step("\x1b");
+}
+
+#[test]
+fn eighty_by_twenty_four_completes_the_automatic_presentation() {
+    let real_home = tempfile::tempdir().unwrap();
+    let demo_parent = tempfile::tempdir().unwrap();
+    let command = sized_demo_command(real_home.path(), demo_parent.path(), 80, 24);
+    let mut session = DemoSession::spawn_sized(command, 80, 24).unwrap();
+    reach_final(&mut session);
+    session.expect("1. Explore this demo case").unwrap();
+    session.expect("3. Exit").unwrap();
+    session.send("\x1b").unwrap();
+    session.expect("Demo data deleted").unwrap();
+    assert_deleted(real_home.path(), demo_parent.path());
 }

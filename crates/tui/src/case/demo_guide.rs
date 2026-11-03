@@ -37,6 +37,7 @@ pub(super) enum DemoEvent {
 pub(super) struct DemoGuide {
     step: usize,
     hidden: bool,
+    scroll: u16,
     seen: BTreeSet<DemoEvent>,
     parser: Option<(String, u8)>,
     note: String,
@@ -57,6 +58,7 @@ impl DemoGuide {
         Ok(Self {
             step: 0,
             hidden: false,
+            scroll: 0,
             seen: BTreeSet::new(),
             parser: None,
             note: String::new(),
@@ -68,6 +70,13 @@ impl DemoGuide {
             final_option: 0,
             show_real_case_help: false,
         })
+    }
+    pub(super) fn scroll(&self) -> u16 {
+        self.scroll
+    }
+    pub(super) fn scroll_by(&mut self, rows: i16) {
+        self.scroll = self.scroll.saturating_add_signed(rows).min(1_024);
+        self.playback.pause();
     }
     pub(super) fn step(&self) -> usize {
         self.step
@@ -95,6 +104,7 @@ impl DemoGuide {
     pub(super) fn next(&mut self) {
         if self.completed() && self.step < 9 {
             self.step += 1;
+            self.scroll = 0;
             self.playback.reset();
             self.note.clear();
         } else if !self.completed() {
@@ -109,6 +119,7 @@ impl DemoGuide {
             return;
         }
         self.step = self.step.saturating_sub(1);
+        self.scroll = 0;
         self.playback.reset();
         self.playback.pause();
         self.note.clear();

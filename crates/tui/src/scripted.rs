@@ -188,6 +188,7 @@ where
             &case::CaseFrame {
                 title: &title,
                 guide: None,
+                guide_scroll: 0,
                 messages: &message,
                 visible_lines: None,
                 input: "",
@@ -254,6 +255,7 @@ where
             &case::CaseFrame {
                 title: &title,
                 guide: None,
+                guide_scroll: 0,
                 messages: "",
                 visible_lines: None,
                 input: "",

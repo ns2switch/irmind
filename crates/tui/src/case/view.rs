@@ -1,7 +1,9 @@
+mod narration;
 use super::markdown;
 use crate::menu_layout;
 use crate::theme::Theme;
 use anyhow::Result;
+pub(super) use narration::{compact as presentation_compact, supported as presentation_supported};
 use ratatui::{
     Terminal,
     layout::{Constraint, Layout, Rect},
@@ -14,6 +16,7 @@ use unicode_width::UnicodeWidthStr;
 pub(crate) struct CaseFrame<'a> {
     pub title: &'a str,
     pub guide: Option<&'a str>,
+    pub guide_scroll: u16,
     pub messages: &'a str,
     pub visible_lines: Option<&'a [Line<'static>]>,
     pub input: &'a str,
@@ -53,9 +56,10 @@ pub(crate) fn conversation_area(
         Constraint::Min(3),
         Constraint::Length(composer_height(input, area.width)),
         Constraint::Length(1),
-        Constraint::Length(if guide_visible { 14 } else { 0 }),
+        Constraint::Length(narration::height(area, guide_visible)),
     ])
     .split(area);
+    let sidebar_visible = sidebar_visible && !(guide_visible && presentation_compact(area));
     if sidebar_visible && area.width >= 110 {
         Layout::horizontal([Constraint::Percentage(68), Constraint::Percentage(32)])
             .split(sections[0])[0]
@@ -74,9 +78,9 @@ where
     terminal.draw(|frame| {
         let area = frame.area();
         let theme = Theme::detect();
-        if view.guide.is_some() && (area.width < 100 || area.height < 40) {
+        if view.guide.is_some() && !presentation_supported(area) {
             frame.render_widget(Paragraph::new(format!(
-                "Demo presentation needs at least 100 × 40 cells.\nCurrent: {} × {}. Resize the terminal; Esc exits.", area.width, area.height
+                "Demo presentation needs at least 80 × 24 cells. Recommended: 100 × 40.\nCurrent: {} × {}. Resize the terminal; Esc exits.", area.width, area.height
             )).style(Style::default().fg(theme.text)), area);
             return;
         }
@@ -84,17 +88,24 @@ where
             Constraint::Min(3),
             Constraint::Length(composer_height(view.input, area.width)),
             Constraint::Length(1),
-            Constraint::Length(if view.guide.is_some() { 14 } else { 0 }),
+            Constraint::Length(narration::height(area, view.guide.is_some())),
         ])
         .split(area);
         if let Some(guide) = view.guide {
-            draw_guide(frame, guide, sections[3], theme);
+            if presentation_compact(area) {
+                narration::draw_compact(frame, guide, sections[3], view.guide_scroll, theme);
+            } else {
+                draw_guide(frame, guide, sections[3], theme);
+            }
         }
         draw_thread(frame, view, area, sections[0], theme);
         draw_prompt(frame, view, sections[1], theme);
         draw_footer(frame, view, sections[2], theme);
         draw_menu(frame, view, area, sections[1], theme);
-        draw_overlay(frame, view, if view.guide.is_some() { sections[0] } else { area }, theme);
+        let overlay_area = if view.guide.is_some() && presentation_compact(area) {
+            Rect::new(area.x, area.y, area.width, sections[3].y.saturating_sub(area.y))
+        } else if view.guide.is_some() { sections[0] } else { area };
+        draw_overlay(frame, view, overlay_area, theme);
     })?;
     Ok(())
 }
@@ -121,7 +132,9 @@ fn draw_thread(
     section: Rect,
     theme: Theme,
 ) {
-    let columns = if view.sidebar_visible && area.width >= 110 {
+    let sidebar_visible =
+        view.sidebar_visible && !(view.guide.is_some() && presentation_compact(area));
+    let columns = if sidebar_visible && area.width >= 110 {
         Some(
             Layout::horizontal([Constraint::Percentage(68), Constraint::Percentage(32)])
                 .split(section),
@@ -130,7 +143,7 @@ fn draw_thread(
         None
     };
     let chat_area = columns.as_ref().map_or(section, |columns| columns[0]);
-    if !view.sidebar_visible || area.width >= 110 {
+    if !sidebar_visible || area.width >= 110 {
         let lines = view.visible_lines.map_or_else(
             || {
                 view.messages
@@ -165,7 +178,7 @@ fn draw_thread(
             );
         }
     }
-    if view.sidebar_visible {
+    if sidebar_visible {
         let side_area = columns.as_ref().map_or(section, |columns| columns[1]);
         let titles = [
             "Timeline",
@@ -336,8 +349,13 @@ fn draw_menu(
 
 fn draw_overlay(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect, theme: Theme) {
     if let Some(overlay) = view.overlay {
-        let width = area.width.saturating_sub(4).clamp(1, 90);
-        let height = area.height.saturating_sub(4).clamp(1, 20);
+        let margin = if view.guide.is_some() && presentation_compact(frame.area()) {
+            0
+        } else {
+            4
+        };
+        let width = area.width.saturating_sub(margin).clamp(1, 90);
+        let height = area.height.saturating_sub(margin).clamp(1, 20);
         let box_area = Rect::new(
             area.x + (area.width - width) / 2,
             area.y + (area.height - height) / 2,
@@ -363,3 +381,7 @@ fn draw_overlay(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod compact_tests;

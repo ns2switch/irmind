@@ -224,6 +224,11 @@ impl CaseRuntime<'_, '_, '_> {
             &CaseFrame {
                 title: &title,
                 guide: guide.as_deref(),
+                guide_scroll: self
+                    .state
+                    .demo_guide
+                    .as_ref()
+                    .map_or(0, super::demo_guide::DemoGuide::scroll),
                 messages: "",
                 visible_lines: Some(&visible_lines),
                 input: &shown_input,

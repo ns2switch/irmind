@@ -562,6 +562,7 @@ mod tests {
             &super::super::CaseFrame {
                 title: "Synthetic",
                 guide: None,
+                guide_scroll: 0,
                 messages: "",
                 visible_lines: Some(&lines),
                 input: &state.input,
