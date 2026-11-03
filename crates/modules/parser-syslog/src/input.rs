@@ -22,12 +22,7 @@ pub(super) fn parse(
     };
     let mut offset = 0;
     let mut index = 0;
-    let mut sequence = parser
-        .time_context
-        .map(|context| {
-            super::year_rollover::YearSequence::new(i32::from(context.year()), context.rollover())
-        })
-        .transpose()?;
+    let mut sequence = parser.time_context.map(irmind_app::ParserCalendar::new);
     loop {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
@@ -91,7 +86,7 @@ fn parse_row(
     source: &str,
     line: &str,
     index: usize,
-    sequence: &mut Option<super::year_rollover::YearSequence>,
+    sequence: &mut Option<irmind_app::ParserCalendar>,
 ) -> Result<GraphRecord, AppError> {
     if parser.per_ingest && super::record::detect(line) == Some(90) {
         let Some(current) = sequence else {
@@ -111,7 +106,10 @@ fn parse_row(
             .offset_minutes();
         let row = super::record::parse(
             line,
-            Some(super::LegacyTimestamp::new(next.year(), i32::from(offset))?),
+            Some(super::LegacyTimestamp::new(
+                i32::from(next.year()),
+                i32::from(offset),
+            )?),
             index,
         )?;
         *current = next;

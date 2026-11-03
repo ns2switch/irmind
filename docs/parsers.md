@@ -10,6 +10,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 
 | Parser | Input | Detection | Mapped fields | Status |
 | --- | --- | --- | --- | --- |
+| Linux | auth.log/secure, auditd, journald JSON, HTTP common/combined | Authentication tags, audit headers, journal fields or HTTP header; 95 | UTC time, host, user, process, command, IP/port, action/result; bounded audit correlation | experimental |
 | Syslog | RFC 5424 / RFC 3164, plain or gzip | PRI and timestamp/header shape; 95 / 90 | UTC time, host, application, PID, facility, severity, message and raw data | experimental |
 | JSON and exported cloud logs | JSON/NDJSON; AWS, GCP, Azure and HuntEval | Recognized record fields | Time, identities, accounts, resources and IPs | experimental |
 | ECS | NDJSON | ECS version and timestamp/characteristic fields | Event, host, user, source, destination, process, file, URL | experimental |
@@ -40,7 +41,7 @@ For these artifacts, another supported route is a timestamped Velociraptor JSONL
 
 Open `/parsers`. Choose **Test definition** and enter a TOML file and a small sample file. The preview shows detection confidence and at most ten guarded rows. It does not ingest evidence, create a case or contact a model. `/parsers test <definition> <file>` opens the same form with paths filled in; use the form for paths containing spaces.
 
-Start from one of the [three examples](examples/parsers/README.md). A definition contains:
+Start from one of the [examples](examples/parsers/README.md). A definition contains:
 
 - `version = 1`, a lowercase name and a short description.
 - `input.format`: `csv`, `json`, `ndjson` or `regex`. CSV declares its delimiter and header. Regex uses named captures and the linear-time Rust regex engine.
@@ -64,3 +65,7 @@ All mapped records retain taint and source/parser/offset provenance. The guard s
 ### Legacy syslog time
 
 RFC 3164 opens a time-context form before ingestion. Confirm the first record’s year and fixed UTC offset, whether December → January advances the year, and whether to apply the choice to one file or the whole ingestion. Fields start empty. Verified sources from the same host may suggest a year and offset; you must confirm them. IRMind never uses the machine clock or file modification time. Other backward month transitions count as invalid records. The choice is signed with the source. See the [syslog contract and limits](development/syslog-parser.md).
+
+### Linux exports
+
+Classic auth.log/secure uses the same per-ingestion time form as syslog. Journald keeps the original microsecond timestamp. Auditd groups bounded records with the same node, timestamp and serial; unfinished groups stay marked partial. Standard HTTP access formats provide no server-host field, so IRMind leaves it unknown. For custom log formats, adapt the [declarative HTTP export example](examples/parsers/nginx-apache-custom.toml). The [Linux contract](development/linux-parser.md) lists limits and mapping details.

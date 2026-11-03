@@ -1,0 +1,5 @@
+Nov  1 01:00:00 synthetic-linux sshd[101]: Failed password for synthetic-user from 203.0.113.77 port 4242 ssh2
+Nov  1 01:00:01 synthetic-linux sshd[101]: Failed password for synthetic-user from 203.0.113.77 port 4242 ssh2
+Nov  1 01:00:02 synthetic-linux sshd[101]: Accepted password for synthetic-user from 203.0.113.77 port 4242 ssh2
+Nov  1 01:01:00 synthetic-linux sudo[102]: synthetic-user : TTY=pts/0 ; PWD=/srv/synthetic ; USER=root ; COMMAND=/usr/bin/id
+Nov  1 01:02:00 synthetic-linux CRON[103]: (root) CMD (/srv/synthetic/maintenance.sh)

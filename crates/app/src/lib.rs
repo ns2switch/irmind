@@ -50,6 +50,8 @@ mod ingest_options;
 pub use ingest_options::{IngestOptions, command_time_context};
 mod keystore;
 mod large_case;
+mod parser_calendar;
+pub use parser_calendar::ParserCalendar;
 mod parser_time;
 mod parser_time_json;
 mod parser_time_suggestions;

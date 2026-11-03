@@ -1,0 +1,39 @@
+{
+  "episode_id": "synthetic-linux-auth-001",
+  "provider": "linux",
+  "malicious_events": [
+    "ssh_login",
+    "sudo_command",
+    "cron_command"
+  ],
+  "malicious_entities": [
+    "synthetic-linux",
+    "synthetic-user",
+    "203.0.113.77",
+    "root"
+  ],
+  "attack_path": [
+    {
+      "type": "ip",
+      "value": "203.0.113.77"
+    },
+    {
+      "type": "host",
+      "value": "synthetic-linux"
+    },
+    {
+      "type": "user",
+      "value": "root"
+    }
+  ],
+  "mitre_attack": [
+    "T1110",
+    "T1078",
+    "T1548.003",
+    "T1053.003"
+  ],
+  "acceptable_conclusions": [
+    "Synthetic failed SSH attempts followed by an accepted login, a sudo command record and a cron command record. These logs alone do not prove successful execution or exfiltration."
+  ],
+  "private_marker": "IRMind-Linux-synthetic-evaluator-only"
+}

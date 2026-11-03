@@ -1231,6 +1231,7 @@ dependencies = [
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-hayabusa",
  "irmind-mod-parser-json",
+ "irmind-mod-parser-linux",
  "irmind-mod-parser-ocsf",
  "irmind-mod-parser-plaso",
  "irmind-mod-parser-syslog",
@@ -1330,6 +1331,17 @@ dependencies = [
 name = "irmind-mod-parser-json"
 version = "0.1.0"
 dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-linux"
+version = "0.1.0"
+dependencies = [
+ "chrono",
  "irmind-app",
  "irmind-domain",
  "serde",

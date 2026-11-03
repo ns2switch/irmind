@@ -1,0 +1,22 @@
+version = 1
+name = "custom-http-export"
+description = "Synthetic custom HTTP access NDJSON export with explicit host"
+
+[input]
+format = "ndjson"
+
+[detect]
+required_fields = ["/custom_http/time", "/custom_http/host", "/custom_http/client", "/custom_http/method"]
+confidence = 70
+
+[mapping]
+time = "/custom_http/time"
+host = "/custom_http/host"
+user = "/custom_http/user"
+source_ip = "/custom_http/client"
+action = "/custom_http/method"
+outcome = "/custom_http/status"
+
+[timestamp]
+format = "rfc3339"
+default_timezone = "UTC"

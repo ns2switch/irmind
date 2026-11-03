@@ -49,6 +49,7 @@ pub(super) fn label(id: &str) -> &'static str {
         "keystore-os" => "System keychain",
         "keystore-file" => "Encrypted file",
         "parser-json" => "JSON parser",
+        "parser-linux" => "Linux logs",
         _ => "Other module",
     }
 }

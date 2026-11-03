@@ -1,0 +1,2 @@
+{"__REALTIME_TIMESTAMP":"1793494800123456","_HOSTNAME":"synthetic-linux","_UID":"1000","_AUDIT_LOGINUID":"1000","_PID":"42","_EXE":"/usr/bin/sh","_CMDLINE":"sh -c \"synthetic\"","MESSAGE":"Synthetic journal entry","UNMAPPED":"retained"}
+{"__REALTIME_TIMESTAMP":"1793494800654321","_HOSTNAME":"synthetic-linux","_UID":"0","_PID":"43","_EXE":"/usr/bin/id","MESSAGE":"Synthetic follow-up"}

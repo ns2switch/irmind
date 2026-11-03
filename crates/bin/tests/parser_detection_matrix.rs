@@ -66,6 +66,7 @@ mod matrix {
         include_bytes!("../../testkit/fixtures/parser-eztools/source/events.csv");
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
         registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
@@ -76,6 +77,11 @@ mod matrix {
         registry.register(Box::new(ChainsawParser), &ModuleConfig::new())?;
         registry.register(Box::new(PlasoParser), &ModuleConfig::new())?;
         registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
+        #[cfg(feature = "parser-linux")]
+        registry.register(
+            Box::new(irmind_mod_parser_linux::LinuxParser::default()),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-syslog")]
         registry.register(
             Box::new(irmind_mod_parser_syslog::SyslogParser::default()),
@@ -95,6 +101,31 @@ mod matrix {
                 "synthetic.log",
                 include_bytes!("../../testkit/fixtures/parser-syslog/source/events.log").as_slice(),
                 "parser-syslog",
+            ),
+            #[cfg(feature = "parser-linux")]
+            (
+                "auth.log",
+                include_bytes!("../../testkit/fixtures/parser-linux/source/auth.log").as_slice(),
+                "parser-linux",
+            ),
+            #[cfg(feature = "parser-linux")]
+            (
+                "audit.log",
+                include_bytes!("../../testkit/fixtures/parser-linux/source/audit.log").as_slice(),
+                "parser-linux",
+            ),
+            #[cfg(feature = "parser-linux")]
+            (
+                "journal.jsonl",
+                include_bytes!("../../testkit/fixtures/parser-linux/source/journal.jsonl")
+                    .as_slice(),
+                "parser-linux",
+            ),
+            #[cfg(feature = "parser-linux")]
+            (
+                "access.log",
+                include_bytes!("../../testkit/fixtures/parser-linux/source/access.log").as_slice(),
+                "parser-linux",
             ),
             ("cloud.json", JSON, "parser-json"),
             ("ecs.ndjson", ECS, "parser-ecs"),
@@ -161,8 +192,33 @@ mod matrix {
                 None
             }
         );
+        #[cfg(feature = "parser-linux")]
+        assert_eq!(
+            irmind_mod_parser_linux::LinuxParser::default()
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            if expected == "parser-linux" {
+                Some(95)
+            } else {
+                None
+            }
+        );
         let expected_scores: [Option<u8>; 8] = match expected {
             "parser-syslog" => [None; 8],
+            "parser-linux" => [
+                if sample.first() == Some(&b'{') {
+                    Some(45)
+                } else {
+                    None
+                },
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ],
             "parser-json" => [Some(90), None, None, None, None, None, None, None],
             "parser-ecs" => [Some(45), Some(95), None, None, None, None, None, None],
             "parser-ocsf" => [Some(45), None, Some(95), None, None, None, None, None],

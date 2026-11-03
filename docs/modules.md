@@ -230,7 +230,7 @@ The five DFIR parsers below index times at UTC-second precision. Their local rec
 
 **Permission:** Read the selected local sources and the private definition store. No network, credentials or executable templates.
 
-**Configure:** Compiled by default with `parser-declarative`. Use `/parsers` to preview, install, deactivate or restore a definition with a signed global operation. Dynamic definitions have confidence at most 70%, so ingestion asks the analyst to choose them. See the [parser guide](parsers.md) and its three examples.
+**Configure:** Compiled by default with `parser-declarative`. Use `/parsers` to preview, install, deactivate or restore a definition with a signed global operation. Dynamic definitions have confidence at most 70%, so ingestion asks the analyst to choose them. See the [parser guide](parsers.md) and its examples.
 
 **Limits:** Strict record, file, field, depth and regex limits apply. Definitions cannot raise them. Invalid or unsigned edits remain disabled, while old signed versions remain available for reconstruction. Fixed UTC offsets are supported; named time zones are not. No live log format has been validated by this module.
 
@@ -261,3 +261,7 @@ Contributors adding a module should use [the architecture guide](development/arc
 ## Syslog parser
 
 For analysts importing line-oriented RFC 5424 or RFC 3164 logs, `parser-syslog` is an experimental local module compiled by default. It also supports bounded gzip streams. No credentials or network permissions are required. RFC 3164 requires an explicit year and UTC offset; both are signed as inferred context. See the [parser contract and configuration](development/syslog-parser.md) and [parser selection](parsers.md). Full source precision is retained while the current derived index remains second precision.
+
+## Linux logs
+
+For analysts importing auth.log/secure, auditd, journald JSON or nginx/Apache common and combined exports, `parser-linux` is an experimental local module compiled by default. It needs read access to those files and no credentials. Classic authentication time is confirmed per ingestion using the same form as syslog. Audit grouping is bounded and unfinished events are marked partial. Original fractional timestamps remain available while the current index uses seconds. Custom log formats use a signed declarative definition. See [parser selection](parsers.md) and the [Linux contract and limits](development/linux-parser.md).

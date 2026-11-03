@@ -130,3 +130,11 @@ Context: a global RFC 3164 year cannot interpret unrelated files or a year bound
 Decision: use bounded ParserTimeContext values with a closed Analyst/Command/ConfirmedSuggestion basis. TUI and command ingestion share parser selection and immutable context-specific instances. Only syslog and Linux change parser versions. Suggestions require verified signed same-host records and explicit analyst confirmation. December → January rollover is visible, enabled by default, and per file. Other backward months are rejected. Existing SourceManifestV2 context and parser-version fields bind the inference; signed wire encodings and historical byte/hash goldens do not change.
 
 Consequences: retired global syslog settings need an explicit signed cleanup before cases open. The composition root retains their exact former schema for review only; modules never receive them. Historical v1 source reconstruction retains fixed-year semantics. IANA/DST support remains [issue #161](https://github.com/ns2switch/irmind/issues/161), with no new dependency in this correction. See [design and compatibility flow](syslog-ingest-time-design.md).
+
+## Shared source calendar for Linux and syslog
+
+Context: Linux authentication exports and syslog share the approved RFC 3164 inference rule, while adapters must not depend on one another.
+
+Decision: keep the immutable validated time context and pure candidate calendar in the application. Each module validates its own complete row before committing its local candidate. Detection stays module-owned, bounded and independent of filenames. PRI-prefixed records retain syslog selection. Linux is a default-compiled experimental feature with no new external package, credential or signed wire encoding.
+
+Consequences: historical syslog interpretations and golden bytes stay identical. Linux audit groups retain component offsets and exact argument boundaries; an unproven group stays partial. Journald/audit fractions remain in original/normalized text while artifact V1 indexes seconds. Native host partitioning and indexed subsecond precision follow the approved artifact-V2 design.

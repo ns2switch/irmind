@@ -202,3 +202,46 @@ Values are confidence percentages for the versioned public fixtures; `—` means
 | Syslog RFC 5424 | — | — | — | — | — | — | — | — | 95 |
 
 No high-confidence false positive or tie was observed in this matrix. Unit contracts separately check RFC 3164 (90%) and content-detected gzip. New frozen fixtures add 18 byte/hash pairs covering syslog normalization, source manifests and actual Parquet artifact envelopes; the original 67 pairs remain unchanged under both JSON map implementations.
+
+## Experimental Linux parser
+
+Each synthetic input below is generated before timing on the same local Linux x86_64 machine as the syslog correction, using the pinned toolchain, all features and an **optimized release build**. One test/build worker is used; freshly generated files have a warm OS cache. The timed selected-parser pipeline includes sampling/detection, hashing and source checks, typed parsing, extraction, Parquet/co-observation writing and signed custody. Generation and the subsequent successful case verification are excluded. No real data, network or model is used. These are local measurements, not a standard-runner claim or a stage-level profile.
+
+| Linux input | Bytes | Ingestion | Throughput | Case verification |
+| --- | ---: | ---: | ---: | --- |
+| auth.log / secure | 1,073,741,824 | 15.274 s | 67.043 MiB/s | passed |
+| journald JSON | 1,073,742,725 | 15.832 s | 64.680 MiB/s | passed |
+| HTTP combined | 1,073,742,485 | 13.388 s | 76.485 MiB/s | passed |
+| correlated auditd | 1,073,742,975 | 13.234 s | 77.377 MiB/s | passed |
+
+Rows are approximately 1 KiB. Audit records have unique event serials and a complete syscall/execve/end-marker group, so repeated serial collisions or rejected records do not inflate the result. The other inputs retain their format-specific metadata. Do not compare these numbers as identical schemas or as an improvement over earlier unoptimized results. The release-only ignored test `linux_one_gib_release_throughput` in `crates/bin/tests/linux_ingest/benchmark.rs` recreates all four files and refuses debug-assertion builds. Each temporary source/case is deleted before the next format.
+
+A second release run added an explicit zero-rejected-record assertion for every source. It passed, as did case verification. With ASAN fuzzing competing for CPU, timings were auth 19.954 s (51.319 MiB/s), journald 17.512 s (58.475 MiB/s), HTTP 24.234 s (42.255 MiB/s) and auditd 12.976 s (78.916 MiB/s). Keep the workload difference visible; neither run is a controlled comparison with the other.
+
+The detection matrix adds the four Linux public fixtures at 95%, with no other native high-confidence match. Journald JSON also receives the existing generic JSON score of 45%, so the unique native match wins. PRI-prefixed syslog retains its existing detector; Linux does not compete for it. Declarative confidence remains at most 70%, with explicit analyst choice. The existing nine native fixtures keep their scores.
+
+Linux adds 24 new frozen byte/hash pairs for normalized output, manifests and actual Parquet artifact envelopes. All 85 historical pairs remain unchanged. The extra Linux test is part of the existing `format_goldens` target, so the preserve_order CI job compares it too. A dedicated detect/parse fuzz target and synthetic seeds are included in the weekly job; the local run is reported with the delivery PR.
+
+### Linux detection matrix
+
+The versioned detection test asserts every score below; `—` means no match. The three existing declarative examples match none of these native fixtures. Their own fixtures each select the corresponding definition at 70% and require analyst confirmation.
+
+| Fixture | JSON | ECS | OCSF | Velociraptor | Hayabusa | Chainsaw | plaso | EZTools | Syslog | Linux |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| JSON/cloud | 90 | — | — | — | — | — | — | — | — | — |
+| ECS | 45 | 95 | — | — | — | — | — | — | — | — |
+| OCSF JSON | 45 | — | 95 | — | — | — | — | — | — | — |
+| Velociraptor | 45 | — | — | 95 | — | — | — | — | — | — |
+| Hayabusa | 45 | — | — | — | 95 | — | — | — | — | — |
+| Chainsaw | 45 | — | — | — | — | 95 | — | — | — | — |
+| plaso | 45 | — | — | — | — | — | 95 | — | — | — |
+| EZTools CSV | — | — | — | — | — | — | — | 95 | — | — |
+| Syslog RFC 5424 | — | — | — | — | — | — | — | — | 95 | — |
+| Linux auth.log | — | — | — | — | — | — | — | — | — | 95 |
+| Linux auditd | — | — | — | — | — | — | — | — | — | 95 |
+| Linux journald JSON | 45 | — | — | — | — | — | — | — | — | 95 |
+| HTTP common/combined | — | — | — | — | — | — | — | — | — | 95 |
+
+No high-confidence false positive or tie occurred in this fixture matrix. Authentication lines with PRI stay with syslog; native Linux handles unprefixed authentication exports. The current all-feature release binary is 49,889,720 bytes, versus 49,609,224 bytes on its syslog base (+280,496 bytes). Cargo.lock grows from 564 to 565 packages solely for the local Linux module; external packages and versions are unchanged.
+
+The local Linux detect/parse ASAN fuzz run completed a 600-second budget (601 seconds reported by libFuzzer): **2,519,363 executions, 28,248 new units, 516 MiB peak RSS, zero failures**. Build and execution took 653.860 seconds. Inputs are at most 64 KiB with a 1 GiB RSS bound and 30-second per-input timeout. The public seeds, mutated corpus, failure directory and log used for this run were held in a temporary directory and removed on exit. This is 0.167 hours for the new Linux parser; it is not a claim of exhaustive coverage.

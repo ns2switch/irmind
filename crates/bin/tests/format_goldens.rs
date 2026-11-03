@@ -405,3 +405,36 @@ fn syslog_signed_and_reconstructed_format_goldens_are_unchanged() {
         assert_eq!(actual.get(key), Some(value), "syslog format golden {key}");
     }
 }
+
+#[test]
+#[cfg(feature = "parser-linux")]
+fn linux_signed_and_reconstructed_format_goldens_are_unchanged() {
+    let mut actual = Goldens::new();
+    let parser = irmind_mod_parser_linux::LinuxParser::from_version(
+        "linux-v1:year=2026;offset=0;rollover=1;basis=analyst",
+    )
+    .unwrap();
+    for (name, bytes) in [
+        (
+            "linux-auth",
+            include_bytes!("../../testkit/fixtures/parser-linux/source/auth.log").as_slice(),
+        ),
+        (
+            "linux-audit",
+            include_bytes!("../../testkit/fixtures/parser-linux/source/audit.log").as_slice(),
+        ),
+        (
+            "linux-journal",
+            include_bytes!("../../testkit/fixtures/parser-linux/source/journal.jsonl").as_slice(),
+        ),
+        (
+            "linux-http",
+            include_bytes!("../../testkit/fixtures/parser-linux/source/access.log").as_slice(),
+        ),
+    ] {
+        one_parser_golden(&mut actual, name, &parser, bytes);
+    }
+    let expected: Goldens =
+        serde_json::from_str(include_str!("fixtures/formats-linux-v1.json")).unwrap();
+    assert_eq!(actual, expected);
+}
