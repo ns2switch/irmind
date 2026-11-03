@@ -165,6 +165,10 @@ impl PreparedStartup {
             self.definitions
                 .resolver(Arc::new(irmind_mod_parser_declarative::DeclarativeCompiler)),
         );
+        #[cfg(feature = "parser-linux")]
+        let resolver: Option<Arc<dyn irmind_app::modules::ParserResolver>> = Some(Arc::new(
+            irmind_mod_parser_linux::HistoricalResolver::new(resolver),
+        ));
         #[cfg(feature = "parser-syslog")]
         let resolver: Option<Arc<dyn irmind_app::modules::ParserResolver>> = Some(Arc::new(
             irmind_mod_parser_syslog::HistoricalResolver::new(resolver),

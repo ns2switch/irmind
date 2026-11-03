@@ -113,3 +113,7 @@ The experimental feature-gated `parser-syslog` uses the shared detection registr
 ### Per-ingestion RFC 3164 time correction
 
 [PR #162](https://github.com/ns2switch/irmind/pull/162) implements the approved optional LogParser time-context capabilities. New syslog sources bind a typed first year, fixed UTC offset, visible December/January rollover and confirmed basis in existing SourceManifestV2 fields and parser version. New ingestion never reads a global year or machine time. Historical v1 sources retain exact reconstruction. Linux authentication parsing reuses this flow in its own follow-up PR. EVTX remains an isolated helper after artifact V2; the superseded in-process proposal #153 is closed.
+
+### Linux exports before artifact V2
+
+The independent parser-linux crate extends the detection registry without external dependencies. It reuses the approved per-ingestion context and shared pure calendar with syslog; neither parser depends on the other. Auth/secure, bounded audit correlation, journald microsecond originals and common/combined HTTP exports are experimental and tested with synthetic episodes only. Artifact V1 remains second precision until the approved V2 implementation. Existing signed encodings and parser versions outside syslog/Linux remain unchanged.

@@ -1,0 +1,7 @@
+node=synthetic-linux type=SYSCALL msg=audit(1793494800.123456:1): arch=c000003e syscall=59 success=yes uid=1000 auid=1000 pid=42 exe="/usr/bin/sh"
+node=synthetic-linux type=EXECVE msg=audit(1793494800.123456:1): argc=2 a0="sh" a1="synthetic"
+node=synthetic-linux type=CWD msg=audit(1793494800.123456:1): cwd="/srv/synthetic"
+node=synthetic-linux type=PATH msg=audit(1793494800.123456:1): item=0 name="/usr/bin/sh"
+node=synthetic-linux type=SOCKADDR msg=audit(1793494800.123456:1): saddr=02000050CB00714D0000000000000000
+node=synthetic-linux type=EOE msg=audit(1793494800.123456:1):
+node=synthetic-linux type=SYSCALL msg=audit(1793494801.654321:2): arch=c000003e syscall=2 success=yes uid=1000 auid=1000 pid=43 exe="/usr/bin/cat"

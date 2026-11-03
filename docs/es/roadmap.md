@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 99c035c39c9d54d11dbe9c5bdd820136d1c21502; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 5d7a59b246db1e06bd67b6833a873b72a00e9ff2; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -20,6 +20,8 @@ Las versiones preliminares incluyen la TUI para casos, conectores sujetos a pol�
 - Reducir el espacio del artefacto de co-observación, mejorar `entity_lookup` y acotar el peor caso de `path` de tres saltos ([issue #37](https://github.com/ns2switch/irmind/issues/37)).
 
 ## v0.2: parsers y conectores
+
+Syslog y las exportaciones de Linux están disponibles como módulos experimentales. Linux cubre autenticación, correlación acotada de auditd, journald JSON y logs HTTP common/combined. [La cobertura y selección de parsers](parsers.md) describe sus límites actuales.
 
 - Ampliar el registro de detección: cada parser es un módulo Cargo que se activa cuando reconoce el log. Una coincidencia ambigua requiere que el analista elija; una elección forzada queda auditada.
 - Añadir parsers experimentales de EVTX; syslog; autenticación, auditd, journald, nginx y Apache en Linux; ECS; OCSF; Velociraptor; Hayabusa; Chainsaw; plaso; EZTools; Zeek; Suricata EVE; y un formato declarativo definido por el usuario.

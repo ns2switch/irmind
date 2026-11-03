@@ -14,7 +14,6 @@ mod record;
 mod time_context;
 mod timestamp;
 mod version;
-mod year_rollover;
 pub use timestamp::LegacyTimestamp;
 
 pub struct SyslogParser {

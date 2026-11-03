@@ -32,6 +32,7 @@ use super::{
     feature = "parser-plaso",
     feature = "parser-eztools",
     feature = "parser-syslog",
+    feature = "parser-linux",
 ))]
 use irmind_app::modules::ModuleConfig;
 #[cfg(feature = "parser-chainsaw")]
@@ -82,6 +83,11 @@ pub(super) fn configured_registry(
     #[cfg(feature = "parser-eztools")]
     registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
 
+    #[cfg(feature = "parser-linux")]
+    registry.register(
+        Box::new(irmind_mod_parser_linux::LinuxParser::default()),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-syslog")]
     registry.register(
         Box::new(irmind_mod_parser_syslog::SyslogParser::default()),

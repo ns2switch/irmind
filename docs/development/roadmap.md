@@ -23,6 +23,8 @@ Stabilize the pre-release with manual validation, verifiable installation, and s
 
 ## v0.2: Parsers and connectors
 
+Syslog and Linux exports are available as experimental modules. Linux covers authentication, bounded auditd correlation, journald JSON and common/combined HTTP logs. [Parser coverage and selection](../parsers.md) describes current limits.
+
 Add detected log parsers and read-only structured-query connectors.
 
 - Extend the detection registry delivered in v0.1.1. Each parser is a Cargo module activated only when its detector recognizes the log; ambiguous matches ask the analyst. A forced choice is audited.
