@@ -12,6 +12,7 @@ mod demo {
     pub(super) fn run(
         _shutdown: &irmind_app::CancellationToken,
         _scripted: bool,
+        _presentation_speed: u8,
     ) -> anyhow::Result<()> {
         anyhow::bail!("demo requires a binary built with keystore-file and parser-json")
     }

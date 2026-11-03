@@ -30,7 +30,7 @@ jobs:
         with:
           key: synthetic-demo
       - name: Build isolated public demo
-        run: cargo build -p irmind --no-default-features --features keystore-file --locked
+        run: cargo build -p irmind --locked
       - name: Pull the pinned VHS image with its rendering dependencies
         run: docker pull ghcr.io/charmbracelet/vhs@sha256:9d5fc3dc0c160b0fb1d2212baff07e6bdf3fa9438c504a3237484567302fcf93
       - name: Render and verify synthetic assets without network access
