@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit c4fa5c304750e84fd3b1f102154be646f3fd0a00; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 211c41b7a1fb1fc395c2d152f5abe965a7c6c9e6; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -20,21 +20,23 @@ En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Para u
 
 ## Pruébalo en cinco minutos
 
-Ejecuta primero `irmind demo`. También puedes escribir `/demo` en el inicio. Se abre un caso temporal aislado con un episodio sintético de HuntEval, claves efímeras y un modelo guionizado. No necesitas clave de API, passphrase, cuenta ni red. Si Ollama tiene un modelo local con soporte de herramientas, puedes elegirlo; permanece en el equipo.
+Ejecuta primero `irmind demo` o escribe `/demo` en el inicio. No necesitas configuración, clave de API, passphrase, cuenta ni red. IRMind crea un caso temporal aislado, claves de firma efímeras y el episodio sintético de HuntEval incluido. Siempre usa un modelo guionizado sin conexión, sin consultar proveedores locales ni remotos.
 
-Una guía fija muestra el paso actual, el comando exacto y por qué importa. Espera a que termine la ingesta inicial. Los diez pasos cubren el caso firmado, el parser y la evidencia, las consultas locales al grafo, una pregunta al agente, la aprobación firmada, un hallazgo confirmado, `/demo check`, y la verificación, el sellado, la exportación y la verificación del paquete. Las respuestas esperadas de HuntEval solo se cargan al ejecutar `/demo check` y nunca llegan al contexto del modelo.
+La presentación teclea y ejecuta los comandos reales. Un panel grande, a todo el ancho, explica cada resultado y destaca la investigación que ocurre encima. Diez escenas cubren la alerta de AWS, el caso firmado, la confianza del parser, timeline/búsqueda/vecinos locales, una investigación en streaming, la aprobación por política, hallazgos confirmados, `/demo check`, y verificación, sellado y exportación. Las respuestas esperadas solo se cargan para la comparación local; nunca son evidencia ni contexto del modelo.
 
-Usa `/demo next` después de completar cada paso. `/demo back`, `/demo hint`, `/demo skip` y `/demo hide` permiten navegar; `/demo` vuelve a mostrar la guía. Otros comandos siguen funcionando sin adelantar el paso. `/demo exit` borra el caso, las claves y la evidencia temporales y señala `/new` y `/settings`. `/help demo` muestra ejemplos y comandos relacionados.
+La reproducción empieza automáticamente. El tiempo de lectura depende de la narración, con un mínimo de seis segundos por escena a velocidad normal. **Enter** avanza, **Retroceso** revisa una escena sin repetir acciones firmadas ya completadas, **Espacio** pausa o reanuda y **Esc** sale. Ctrl+C también cancela y sale de la demo. Si aparece el aviso de tamaño, amplía el terminal a **100 × 40 celdas** como mínimo. Si falla una tarea, se pausa con una explicación; Enter reintenta. Los casos normales conservan sus teclas y el soporte de terminales más pequeños.
 
-![La guía fija presenta el caso sintético y la primera acción](../ux/demo-guide/welcome.png)
+Solo esta demo firma automáticamente la consulta externa simulada y las confirmaciones de custodia con su clave temporal. En un caso real, el analista revisa y firma esas acciones. Al terminar puedes explorar el caso sellado en la interfaz normal, ver cómo crear uno real o salir. La salida borra los datos temporales y restaura el terminal. Empieza una sesión real con `irmind`, después `/new`, `/ingest` y `/settings`.
 
-![La demo muestra el parser elegido y la confianza de detección tras la ingesta](../ux/demo-guide/evidence.png)
+![Introducción con el panel de narración a todo el ancho bajo el caso sintético real.](../ux/demo-guide/welcome.png)
 
-![La guía propone consultas locales de timeline, búsqueda y vecinos](../ux/demo-guide/explore.png)
+![La ingesta real muestra parser-json y una confianza de detección del 90 por ciento.](../ux/demo-guide/evidence.png)
 
-![La guía explica por qué una consulta externa espera aprobación firmada](../ux/demo-guide/approval.png)
+![Las consultas de evidencia se ejecutan en local, sin modelo ni red.](../ux/demo-guide/explore.png)
 
-![El paso de custodia pide verificar, sellar, exportar y verificar el paquete](../ux/demo-guide/custody.png)
+![La narración explica el enriquecimiento detenido y su aprobación firmada temporal.](../ux/demo-guide/approval.png)
+
+![La presentación muestra la verificación de custodia y la confirmación exacta del sello.](../ux/demo-guide/custody.png)
 
 ## Primer arranque
 
