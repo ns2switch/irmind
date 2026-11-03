@@ -233,3 +233,6 @@ impl irmind_app::modules::ParserResolver for HistoricalResolver {
             .resolve(id, version)
     }
 }
+
+#[cfg(test)]
+mod year_rollover;
