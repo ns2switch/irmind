@@ -109,7 +109,7 @@ pub(crate) fn help_for(name: &str) -> String {
         return format!("Unknown command /{name}. Use /help to list commands.");
     };
     let example = match name {
-        "demo" => "/demo next",
+        "demo" => "/demo",
         "ingest" => "/ingest examples/cloudtrail-alert.json",
         "search" => "/search 203.0.113.77",
         "neighbors" => "/neighbors ip 203.0.113.77",
@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn command_help_includes_example_and_related_actions() {
         let guide = help_for("demo");
-        assert!(guide.contains("Example: /demo next"));
+        assert!(guide.contains("Example: /demo"));
         assert!(guide.contains("Related:"));
         assert!(help_for("unknown").contains("Unknown command"));
         assert_eq!(

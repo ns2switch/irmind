@@ -21,9 +21,6 @@ impl DemoSession {
             sent: false,
         })
     }
-    pub(super) fn set_expect_timeout(&mut self, timeout: Option<Duration>) {
-        self.timeout = timeout.unwrap_or(Duration::from_mins(1));
-    }
     pub(super) fn expect(&mut self, needle: impl AsRef<str>) -> Result<Vec<u8>, String> {
         let needle = needle.as_ref();
         let started = Instant::now();

@@ -30,7 +30,7 @@
       "title": "Follow the evidence",
       "narration": [
         "IRMind now ingests the bundled AWS log through the same detection registry as a real case. Look for the parser name and its detection confidence in the result.",
-        "The original stays in place: its hash and the interpretation are signed in a manifest. The derived Parquet data supports local queries without changing the original."
+        "The original stays in place: its hash and the interpretation are signed in a manifest. Derived Parquet supports local queries; keep originals available to reverify their signed hashes later."
       ],
       "actions": [
         "/ingest events.json"
@@ -86,7 +86,8 @@
         {
           "wait_ms": 6000
         },
-        "$approve"
+        "$approve",
+        "/sidebar"
       ],
       "requires": [
         "approval"
@@ -104,7 +105,8 @@
         {
           "wait_ms": 2000
         },
-        "$confirm"
+        "$confirm",
+        "/sidebar"
       ],
       "requires": [
         "finding"
@@ -129,7 +131,7 @@
       "id": "custody",
       "title": "Verify, seal and hand over",
       "narration": [
-        "IRMind verifies the chain and originals, seals the case, exports it, then verifies the package against the expected analyst key. The confirmation shows exactly what is signed or exported.",
+        "IRMind verifies the chain and originals, seals the case, exports it, then verifies the package against the expected analyst key. The demo shows exactly what is signed or exported and confirms it automatically with its temporary key.",
         "The signed chain makes later changes detectable and supports review by another investigator or a court. It does not prove the logs were truthful, establish legal admissibility, or prevent the key owner from rewriting an entire chain."
       ],
       "actions": [

@@ -63,11 +63,17 @@ impl Playback {
     pub(super) fn request_advance(&mut self) {
         self.advance = true;
     }
+    pub(super) fn awaiting_result(&self) -> bool {
+        matches!(self.phase, Phase::Waiting)
+    }
     pub(super) fn in_flight(&self) -> bool {
         matches!(
             self.phase,
             Phase::Waiting | Phase::Typing { .. } | Phase::Typed(_)
         )
+    }
+    pub(super) fn permits_actions(&self) -> bool {
+        self.automatic || self.advance
     }
     pub(super) fn failed(&self) -> bool {
         matches!(self.phase, Phase::Failed)

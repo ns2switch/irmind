@@ -33,12 +33,12 @@ def main():
         if run.returncode:
             raise SystemExit('VHS preview failed: ' + run.stderr[-3000:] + run.stdout[-1000:])
         transcript = (scratch / 'preview.ascii').read_text(errors='replace')
-        for term in ['Step 1 of 10', 'Step 2 of 10', 'Step 3 of 10', 'Evidence ready:', '90% confidence', 'IRMind v0.1.5']:
-            if term not in transcript:
-                raise SystemExit('Preview is missing a real scene result: ' + term + '\n' + transcript[-3500:])
         for private in [str(Path.home()), getpass.getuser(), os.uname().nodename, '/home/', '/Users/', 'C:\\Users\\']:
             if private and private in transcript:
                 raise SystemExit('Preview contains environment-specific data')
+        for term in ['Step 1 of 10', 'Step 2 of 10', 'Step 3 of 10', 'Evidence ready:', '90% confidence', 'IRMind v0.1.5']:
+            if term not in transcript:
+                raise SystemExit('Preview is missing a real scene result: ' + term)
         output.mkdir(parents=True, exist_ok=True)
         for name in ['01-welcome.png', '02-case.png', '03-evidence.png']:
             shutil.copyfile(scratch / name, output / name)

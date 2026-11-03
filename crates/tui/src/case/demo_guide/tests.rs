@@ -68,3 +68,54 @@ fn missing_requirements_and_errors_cannot_advance() {
         Effect::Bind(_)
     ));
 }
+
+#[test]
+fn back_cancels_unsubmitted_typing_but_waits_for_real_work() {
+    let mut guide = DemoGuide::new().unwrap();
+    guide.next();
+    guide.start_typing("/scope".into());
+    guide.back();
+    assert_eq!(guide.step(), 0);
+    assert_eq!(guide.progress[1], 0);
+    guide.next();
+    guide.command_sent();
+    guide.back();
+    assert_eq!(guide.step(), 1);
+    guide.record(DemoEvent::ScopeViewed);
+    guide.action_finished();
+    assert_eq!(guide.step(), 0);
+    assert_eq!(guide.progress[1], 1);
+}
+
+#[test]
+fn hidden_and_small_screens_do_not_execute_commands() {
+    let mut guide = DemoGuide::new().unwrap();
+    guide.next();
+    assert!(matches!(
+        guide.tick(Instant::now(), false, false),
+        Effect::None
+    ));
+    guide.hide();
+    assert!(matches!(
+        guide.tick(Instant::now(), false, true),
+        Effect::None
+    ));
+}
+
+#[test]
+fn every_scene_keeps_narration_and_controls_in_the_versioned_snapshot() {
+    let mut guide = DemoGuide::new().unwrap();
+    let mut snapshots = String::new();
+    for index in 0..10 {
+        guide.step = index;
+        let panel = guide.panel(None, None).unwrap();
+        assert!(panel.contains(&guide.steps[index].narration));
+        assert!(panel.contains("Enter"));
+        assert!(panel.contains("Backspace previous"));
+        assert!(panel.contains("Space pause/play"));
+        assert!(panel.contains("Esc exit"));
+        snapshots.push_str(&panel);
+        snapshots.push_str("\n\n");
+    }
+    insta::assert_snapshot!("all_presentation_narrations", snapshots);
+}

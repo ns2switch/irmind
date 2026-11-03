@@ -1,7 +1,7 @@
 #![cfg(feature = "parser-json")]
 #![allow(clippy::unwrap_used)]
 
-use std::{process::Command, time::Duration};
+use std::process::Command;
 
 #[path = "support/terminal_screen.rs"]
 mod terminal_screen;
@@ -74,52 +74,79 @@ fn automatic_presentation_reaches_signed_evidence_and_exits_cleanly() {
     assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
 }
 
-fn run_demo(exit_keys: &str) {
-    let real_home = tempfile::tempdir().unwrap();
-    let demo_parent = tempfile::tempdir().unwrap();
-    let sentinel = real_home.path().join("config.toml");
-    std::fs::write(&sentinel, "a deliberately invalid real configuration").unwrap();
-    let mut session =
-        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
-    session.set_expect_timeout(Some(Duration::from_mins(1)));
-    session.expect("ready:").unwrap();
-    session.send(exit_keys).unwrap();
-    session.expect("Demo data deleted").unwrap();
-    assert_eq!(
-        std::fs::read_to_string(sentinel).unwrap(),
-        "a deliberately invalid real configuration"
-    );
-    assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 1);
-    assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
+fn assert_deleted(real_home: &std::path::Path, demo_parent: &std::path::Path) {
+    assert_eq!(std::fs::read_dir(real_home).unwrap().count(), 0);
+    assert_eq!(std::fs::read_dir(demo_parent).unwrap().count(), 0);
+}
+
+fn expect_step(session: &mut DemoSession, step: usize) {
+    let script: serde_json::Value =
+        serde_json::from_str(include_str!("../../tui/assets/demo-presentation.en.json")).unwrap();
+    let title = script["steps"][step - 1]["title"].as_str().unwrap();
+    session
+        .expect(format!("Step {step} of 10 · {title}"))
+        .unwrap();
+}
+
+fn reach_final(session: &mut DemoSession) {
+    for step in 1..=10 {
+        expect_step(session, step);
+        eprintln!("presentation step {step} visible");
+    }
 }
 
 #[test]
-fn demo_ingest_completion_is_visible_and_followup_command_responds() {
+fn automatic_presentation_completes_real_queries_approval_and_custody() {
     let real_home = tempfile::tempdir().unwrap();
     let demo_parent = tempfile::tempdir().unwrap();
     let mut session =
         DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
-    session.set_expect_timeout(Some(Duration::from_secs(20)));
-    let completed = session.expect("ready:");
-    if completed.is_err() {
-        let _ = session.send("/quit\r\r");
-    }
-    assert!(
-        completed.is_ok(),
-        "demo did not report ingest completion within 20 seconds: {completed:?}"
-    );
-    let initial = completed.unwrap();
-    let initial = String::from_utf8_lossy(&initial);
-    assert!(!initial.contains("Try"));
-    assert!(!initial.contains("adds evidence"));
-    session.expect("parser-json").unwrap();
-    session.expect("90%").unwrap();
-    session.send("/help\r").unwrap();
-    session.expect("Commands").unwrap();
-    session.send("\x1b/quit\r\r").unwrap();
+    reach_final(&mut session);
+    session
+        .expect("Explore this demo case (sealed, read-only)")
+        .unwrap();
+    session.send("\x1b").unwrap();
     session.expect("Demo data deleted").unwrap();
-    assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 0);
-    assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
+    assert_deleted(real_home.path(), demo_parent.path());
+}
+
+#[test]
+fn manual_presentation_visits_every_narration_and_can_go_back() {
+    let real_home = tempfile::tempdir().unwrap();
+    let demo_parent = tempfile::tempdir().unwrap();
+    let mut session =
+        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+    session.expect("Step 1 of 10").unwrap();
+    session.send(" ").unwrap();
+    session.expect("Paused").unwrap();
+    for step in 2..=10 {
+        session.send("\r").unwrap();
+        expect_step(&mut session, step);
+    }
+    session.send("\x7f").unwrap();
+    session.expect("Step 9 of 10").unwrap();
+    session.send("\r").unwrap();
+    session.expect("Step 10 of 10").unwrap();
+    session.send("\x1b").unwrap();
+    session.expect("Demo data deleted").unwrap();
+    assert_deleted(real_home.path(), demo_parent.path());
+}
+
+#[test]
+fn ingest_completion_is_visible_and_next_action_changes_the_screen() {
+    let real_home = tempfile::tempdir().unwrap();
+    let demo_parent = tempfile::tempdir().unwrap();
+    let mut session =
+        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+    session.expect("Evidence ready:").unwrap();
+    session.expect("parser-json").unwrap();
+    session.expect("90% confidence").unwrap();
+    session.expect("Step 4 of 10").unwrap();
+    session.expect("/timeline").unwrap();
+    session.expect("Step 5 of 10").unwrap();
+    session.send("\x1b").unwrap();
+    session.expect("Demo data deleted").unwrap();
+    assert_deleted(real_home.path(), demo_parent.path());
 }
 
 #[test]
@@ -128,9 +155,10 @@ fn card_expands_from_the_text_box_with_control_o_and_slash_command() {
     let demo_parent = tempfile::tempdir().unwrap();
     let mut session =
         DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
-    session.set_expect_timeout(Some(Duration::from_secs(20)));
-    session.expect("ready:").unwrap();
-    session.send("/demo hide\r/graph\r").unwrap();
+    reach_final(&mut session);
+    session.send("\r").unwrap();
+    session.expect("Demo exploration").unwrap();
+    session.send("/graph\r").unwrap();
     session.expect("Ctrl+O").unwrap();
     session.send("\x0f").unwrap();
     session.expect("records=").unwrap();
@@ -140,163 +168,55 @@ fn card_expands_from_the_text_box_with_control_o_and_slash_command() {
     session.expect("records=").unwrap();
     session.send("/demo exit\r\r").unwrap();
     session.expect("Demo data deleted").unwrap();
-    assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 0);
-    assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
+    assert_deleted(real_home.path(), demo_parent.path());
 }
 
 #[test]
-fn demo_is_isolated_and_removed_after_exit() {
-    run_demo("/quit\r\r");
-}
-
-#[test]
-fn demo_is_removed_after_control_c_confirmation() {
-    run_demo("\x03\r");
-}
-
-#[test]
-fn guided_demo_walks_ten_steps_in_a_terminal() {
-    let real_home = tempfile::tempdir().unwrap();
-    let demo_parent = tempfile::tempdir().unwrap();
-    let mut session =
-        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
-    session.set_expect_timeout(Some(Duration::from_secs(12)));
-    session.expect("1/10").unwrap();
-    eprintln!("guide step 1 visible");
-    session.expect("ready:").unwrap();
-    eprintln!("ingest complete");
-    session.send("/demo next\r").unwrap();
-    session.expect("2/10").unwrap();
-    eprintln!("guide step 2 visible");
-    session.send("/scope\r").unwrap();
-    #[cfg(windows)]
-    session.expect("Do: /demo next").unwrap();
-    session.send("/demo next\r").unwrap();
-    session.expect("3/10").unwrap();
-    eprintln!("guide step 3 visible");
-    session.send("/demo next\r").unwrap();
-    session.expect("4/10").unwrap();
-    eprintln!("guide step 4 visible");
-    // Command names also occur in the input and guide before a query finishes.
-    // Only its successful completion changes the guide's next instruction.
-    for (command, next_instruction) in [
-        ("/timeline", "search"),
-        ("/search 203.0.113.77", "neighbors"),
-        ("/neighbors ip 203.0.113.77", "complete."),
-    ] {
-        session.send(format!("{command}\r")).unwrap();
-        let instruction = if cfg!(windows) {
-            if next_instruction == "complete." {
-                "Step complete.".to_owned()
-            } else {
-                format!("Do: /{next_instruction}")
-            }
-        } else {
-            next_instruction.to_owned()
-        };
-        session.expect(instruction).unwrap();
-        eprintln!("graph completed: {command}");
+fn escape_and_control_c_leave_real_configuration_untouched() {
+    for exit in ["\x1b", "\x03"] {
+        let real_home = tempfile::tempdir().unwrap();
+        let demo_parent = tempfile::tempdir().unwrap();
+        let sentinel = real_home.path().join("config.toml");
+        std::fs::write(&sentinel, "a deliberately invalid real configuration").unwrap();
+        let mut session =
+            DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+        session.expect("Step 3 of 10").unwrap();
+        session.send(exit).unwrap();
+        session.expect("Demo data deleted").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(sentinel).unwrap(),
+            "a deliberately invalid real configuration"
+        );
+        assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 1);
+        assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
     }
-    session.send("/demo next\r").unwrap();
-    session.expect("5/10").unwrap();
-    eprintln!("guide step 5 visible");
-    session
-        .send("What happened in this synthetic AWS IAM episode?\r")
-        .unwrap();
-    session.expect("points").unwrap();
-    #[cfg(windows)]
-    session.expect("Do: /demo next").unwrap();
-    eprintln!("agent answered");
-    session.send("/demo next\r").unwrap();
-    session.expect("6/10").unwrap();
-    eprintln!("guide step 6 visible");
-    session.send("/approve \t\r").unwrap();
-    session.expect("Approval:").unwrap();
-    eprintln!("approval resolved");
-    session.send("/demo next\r").unwrap();
-    session.expect("7/10").unwrap();
-    std::thread::sleep(Duration::from_millis(250));
-    eprintln!("guide step 7 visible");
-    session.send("/confirm \t\r").unwrap();
-    #[cfg(windows)]
-    session.expect("Do: /demo next").unwrap();
-    session.send("/demo next\r").unwrap();
-    session.expect("8/10").unwrap();
-    eprintln!("finding confirmed");
-    eprintln!("guide step 8 visible");
-    session.send("/demo check\r").unwrap();
-    #[cfg(windows)]
-    session.expect("Do: /demo next").unwrap();
-    session.send("/demo next\r").unwrap();
-    // Reaching step 9 proves that /demo check ran: next cannot advance until
-    // the guide records the comparison. Text within the result card can be
-    // repainted before the guide counter on Windows ConPTY.
-    session.expect("9/10").unwrap();
-    eprintln!("check complete");
-    eprintln!("guide step 9 visible");
-    complete_demo_custody(&mut session);
-    session.send("/demo exit\r\r").unwrap();
-    session.expect("Demo data deleted").unwrap();
-    assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 0);
-    assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
 }
 
-fn complete_demo_custody(session: &mut DemoSession) {
-    session.send("/verify\r").unwrap();
-    session.expect("Verified").unwrap();
-    session.send("/seal\r").unwrap();
-    expect_custody_confirmation(session);
-    session.send("2\r").unwrap();
-    session.expect("Seal:").unwrap();
-    eprintln!("case sealed");
-    session.send("/export\r").unwrap();
-    expect_custody_confirmation(session);
-    session.send("2\r").unwrap();
-    session.expect("Exported").unwrap();
-    eprintln!("case exported");
-    session.send("/verify-export\r").unwrap();
-    session.expect("Verify export:").unwrap();
-    eprintln!("export verified");
-    std::thread::sleep(Duration::from_millis(250));
-    session.send("/demo next\r").unwrap();
-    session.expect("10/10").unwrap();
-    eprintln!("guide step 10 visible");
-}
-
-fn expect_custody_confirmation(session: &mut DemoSession) {
-    #[cfg(windows)]
-    session.expect("1. Cancel  2. Confirm").unwrap();
-    #[cfg(unix)]
-    session.expect("Confirm").unwrap();
-}
-
-#[test]
-fn control_c_cleans_the_demo_from_every_guide_step() {
-    for step in 1..=10 {
+fn cancel_at_every_step(exit_key: &str) {
+    for target in 1..=10 {
         let real_home = tempfile::tempdir().unwrap();
         let demo_parent = tempfile::tempdir().unwrap();
         let mut session =
             DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
-        session.set_expect_timeout(Some(Duration::from_secs(20)));
-        session.expect("ready:").unwrap();
-        for next in 2..=step {
-            session.send("/demo skip\r").unwrap();
-            session.expect(format!("{next}/10")).unwrap();
+        for step in 1..=target {
+            expect_step(&mut session, step);
         }
-        session.send("\x03\r").unwrap();
-        #[cfg(unix)]
-        let completion = session.expect("Demo data deleted").unwrap();
-        #[cfg(windows)]
-        session.expect("Demo data deleted").unwrap();
-        #[cfg(unix)]
+        session.send(exit_key).unwrap();
+        let output = session.expect("Demo data deleted").unwrap();
         assert!(
-            completion
-                .as_slice()
-                .windows(8)
-                .any(|bytes| bytes == b"\x1b[?1049l"),
-            "leaving the demo must restore the terminal's main screen"
+            output.windows(8).any(|bytes| bytes == b"\x1b[?1049l"),
+            "terminal main screen was not restored"
         );
-        assert_eq!(std::fs::read_dir(real_home.path()).unwrap().count(), 0);
-        assert_eq!(std::fs::read_dir(demo_parent.path()).unwrap().count(), 0);
+        assert_deleted(real_home.path(), demo_parent.path());
     }
+}
+
+#[test]
+fn control_c_cleans_and_restores_the_terminal_from_every_presentation_step() {
+    cancel_at_every_step("\x03");
+}
+
+#[test]
+fn escape_cleans_and_restores_the_terminal_from_every_presentation_step() {
+    cancel_at_every_step("\x1b");
 }

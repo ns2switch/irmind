@@ -10,6 +10,12 @@ impl CaseRuntime<'_, '_, '_> {
         }
         let size = self.terminal.size()?;
         let visible = size.width >= 100 && size.height >= 40;
+        if self.unexpected_presentation_prompt() {
+            return Ok(());
+        }
+        if visible && self.state.confirmation.is_some() {
+            return self.presentation_confirmation();
+        }
         let busy = self.active.is_some()
             || self.state.confirmation.is_some()
             || self.state.parser_prompt.is_some()
@@ -17,6 +23,7 @@ impl CaseRuntime<'_, '_, '_> {
         let Some(guide) = self.state.demo_guide.as_mut() else {
             return Ok(());
         };
+        guide.clear_confirmation_wait();
         let effect = guide.tick(Instant::now(), busy, visible);
         match effect {
             Effect::None => {}
@@ -55,6 +62,59 @@ impl CaseRuntime<'_, '_, '_> {
                 if let Some(guide) = self.state.demo_guide.as_mut() {
                     guide.next();
                 }
+            }
+        }
+        Ok(())
+    }
+
+    fn unexpected_presentation_prompt(&mut self) -> bool {
+        if !self
+            .state
+            .demo_guide
+            .as_ref()
+            .is_some_and(super::super::demo_guide::DemoGuide::active)
+            || (self.state.parser_prompt.is_none() && self.state.time_prompt.is_none())
+        {
+            return false;
+        }
+        self.state.parser_prompt = None;
+        self.state.time_prompt = None;
+        self.presentation_failed("The bundled source unexpectedly needs a parser or time choice");
+        true
+    }
+
+    fn presentation_confirmation(&mut self) -> Result<()> {
+        let Some(guide) = self
+            .state
+            .demo_guide
+            .as_mut()
+            .filter(|guide| guide.active())
+        else {
+            return Ok(());
+        };
+        if guide.step() != 8
+            || !matches!(
+                self.state.confirmation,
+                Some(crate::case::Confirmation::Seal(..) | crate::case::Confirmation::Export(..))
+            )
+        {
+            self.state.confirmation = None;
+            self.presentation_failed("the unexpected dialog was cancelled and needs review");
+            return Ok(());
+        }
+        if !guide.confirmation_due(Instant::now()) {
+            return Ok(());
+        }
+        if self.state.confirmation_option == 0 {
+            self.handle_overlay_key(KeyCode::Down)?;
+        }
+        if self.handle_overlay_key(KeyCode::Enter)? == Some(KeyCode::Enter) {
+            let action = update(
+                &mut self.state,
+                CaseMessage::Key(KeyCode::Enter, KeyModifiers::NONE, false),
+            );
+            if let Err(error) = self.apply_action(action) {
+                self.presentation_failed(&error.to_string());
             }
         }
         Ok(())
@@ -126,7 +186,10 @@ impl CaseRuntime<'_, '_, '_> {
         } else {
             match code {
                 KeyCode::Enter => guide.enter(),
-                KeyCode::Backspace => guide.back(),
+                KeyCode::Backspace => {
+                    guide.back();
+                    self.state.input.clear();
+                }
                 KeyCode::Char(' ') => guide.pause_or_resume(),
                 _ => {}
             }

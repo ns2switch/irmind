@@ -1,6 +1,6 @@
 # Automatic demo presentation
 
-This page is for maintainers reviewing the synthetic presentation. It records the early three-scene checkpoint; the complete custody tour and cross-platform playback tests are still being finished in this PR.
+This page is for maintainers reviewing the synthetic presentation. It describes the ten-scene live presentation and its isolation, navigation and test coverage.
 
 ## Script and playback
 
@@ -20,7 +20,7 @@ The presentation always uses the scripted model and does not even probe loopback
 
 The private temporary directory and ephemeral file keystore are deleted when the demo returns, including error and cancellation. Terminal restoration remains protected by the existing session guard. The SSH/GUI terminal matrix for Ctrl+O is documented separately in [platforms](../platforms.md#card-expansion-and-terminal-keymaps).
 
-## Three-scene review checkpoint
+## Early review checkpoint
 
 The real-binary PTY test reaches the ingestion result and checks parser confidence, exits with Esc, and checks both the existing real-data directory and temporary parent. The screenshots below use the reviewed, digest-pinned VHS image with network disabled, bounded container resources and fixed identity variables. They show the actual 0.1.5 development binary, not a mockup.
 
@@ -30,4 +30,27 @@ The real-binary PTY test reaches the ingestion result and checks parser confiden
 
 ![Completed synthetic evidence ingestion with parser-json and 90 percent confidence.](../ux/demo-guide/presentation-preview/03-evidence.png)
 
-Reproduce with the [preview generator](../demo/generate_presentation_preview.py), passing the current development binary through its binary option; see the script help. The generator removes its scratch directory after capture or error. This checkpoint is not release-ready; all ten scenes, updated legacy tutorial tests, full recording, documentation and three-platform CI must pass before merge and v0.1.5.
+Reproduce with the [preview generator](../demo/generate_presentation_preview.py), passing the current development binary through its binary option; see the script help. The generator removes its scratch directory after capture or error. The three-scene checkpoint was published in draft PR #165 before the remaining scenes were completed. The finished recording uses [community.tape](../demo/community.tape); all ten scene screenshots are generated beside these previews.
+
+## Complete presentation
+
+The step controller never substitutes a screenshot for work. Scope, registry ingestion, timeline/search/neighbors, investigation, approval, finding confirmation, comparison, verify, seal, export and expected-key export verification use the existing command paths. The scripted model yields whitespace-preserving word chunks with cancellation and cites the real source hash. The enrichment connector is an offline fake; approval still resolves policy with a signed analyst decision. Seal/export show the ordinary exact confirmation previews before the demo selects Confirm. That selection is gated on the isolated demo workspace and the custody scene; normal cases never auto-approve.
+
+The final screen offers read-only exploration of the sealed case, a short explanation of `/new`/`/ingest`/`/settings`, or exit. Space pauses action scheduling. Backspace cancels unsubmitted typing or waits for already-started work, then revisits narration without repeating committed actions. Presentation input cannot edit the real workspace or paste into an active command. Terminating at any scene cancels outstanding work, restores the terminal and removes the temporary tree.
+
+Tests read each scene title from the versioned script and wait for that actual rendered screen with a bounded deadline. Automatic and manual PTYs execute all ten scenes, then check isolation and cleanup; a separate loop sends Ctrl+C at each scene. The same tests compile and run on Linux, macOS and Windows. TestBackend/insta cover the bottom panel and undersized-screen notice, while controller snapshots retain every narration. Native terminal applications and remote keymaps remain separate manual checks.
+
+The full [README GIF](../assets/demo.gif) is generated from the current binary. The existing digest-pinned VHS image runs without network and receives only the binary and tape in a disposable directory. It checks the actual version, all ten scene/results, duration, size and fixed-identity privacy before publishing images. The manual regeneration workflow keeps its existing permissions and opens a PR with both the GIF and scene captures.
+
+### Scene gallery
+
+![Step one: introduction to the offline presentation.](../ux/demo-guide/welcome.png)
+![Step two: the signed synthetic AWS case and scope.](../ux/demo-guide/case.png)
+![Step three: real signed ingestion and parser confidence.](../ux/demo-guide/evidence.png)
+![Step four: local queries over synthetic evidence.](../ux/demo-guide/explore.png)
+![Step five: scripted investigator response streamed with a source hash.](../ux/demo-guide/agent.png)
+![Step six: stopped enrichment, exact arguments and synthetic signed approval.](../ux/demo-guide/approval.png)
+![Step seven: evidence-backed hypothesis and analyst confirmation.](../ux/demo-guide/findings.png)
+![Step eight: local HuntEval check of confirmed findings.](../ux/demo-guide/check.png)
+![Step nine: exact seal preview before synthetic confirmation.](../ux/demo-guide/custody.png)
+![Step ten: explore the sealed case, start a real case, or exit.](../ux/demo-guide/next.png)

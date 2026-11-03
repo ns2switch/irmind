@@ -6,6 +6,14 @@ use crossterm::event::{MouseEvent, MouseEventKind};
 
 impl CaseRuntime<'_, '_, '_> {
     pub(super) fn handle_paste(&mut self, value: &str) {
+        if self
+            .state
+            .demo_guide
+            .as_ref()
+            .is_some_and(super::super::demo_guide::DemoGuide::active)
+        {
+            return;
+        }
         if let Some(prompt) = self.state.time_prompt.as_mut() {
             prompt.paste(value);
             return;
@@ -444,7 +452,7 @@ impl CaseRuntime<'_, '_, '_> {
         }
     }
 
-    fn handle_overlay_key(&mut self, code: KeyCode) -> Result<Option<KeyCode>> {
+    pub(super) fn handle_overlay_key(&mut self, code: KeyCode) -> Result<Option<KeyCode>> {
         if let Some(mut query) = self.state.palette.take() {
             match code {
                 KeyCode::Esc => return Ok(None),

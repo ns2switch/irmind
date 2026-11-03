@@ -1,0 +1,76 @@
+---
+source: crates/tui/src/case/demo_guide/tests.rs
+expression: snapshots
+---
+Step 1 of 10 · Meet IRMind
+
+IRMind is a terminal assistant for investigating security incidents. The model proposes actions, policy decides what can run, and the case records signed evidence.
+
+This presentation operates the product for you with synthetic data and a scripted model. Nothing leaves this computer, and the temporary session is deleted when you exit.
+Auto playing · Enter next · Backspace previous · Space pause/play · Esc exit
+
+Step 2 of 10 · An AWS privilege alert
+
+The synthetic alert concerns an AWS user who obtained administrator privileges. IRMind has created a temporary case to keep the investigation and its evidence together.
+
+The highlighted case and scope are the boundary for every action. A signed case records what was observed and who acted; it does not make an assumption true.
+Auto playing · Enter next · Backspace previous · Space pause/play · Esc exit
+
+Step 3 of 10 · Follow the evidence
+
+IRMind now ingests the bundled AWS log through the same detection registry as a real case. Look for the parser name and its detection confidence in the result.
+
+The original stays in place: its hash and the interpretation are signed in a manifest. Derived Parquet supports local queries; keep originals available to reverify their signed hashes later.
+Auto playing · Enter next · Backspace previous · Space pause/play · Esc exit
+
+Step 4 of 10 · Explore without AI
+
+The timeline places events in order, then search finds the synthetic IP 203.0.113.77. Neighbors connects values observed together in the evidence.
+
+These are local evidence queries, not model guesses. The expanded cards show the actual results without sending data to an AI provider.
+Auto playing · Enter next · Backspace previous · Space pause/play · Esc exit
+
+Step 5 of 10 · Ask the investigator
+
+IRMind types a concrete investigation question and shows the scripted response as it streams. Look for the source hash that links the explanation to evidence.
+
+The assistant can propose tools and findings, but its words are not proof. In your own case, you select a model explicitly and review its evidence-backed claims.
+Auto playing · Enter next · Backspace previous · Space pause/play · Esc exit
+
+Step 6 of 10 · Policy stops an external lookup
+
+The agent proposes sending an IP address to external threat intelligence. Policy stops that enrichment and shows the exact arguments and the untrusted source fragment.
+
+Only this offline demo signs approval automatically with its temporary analyst key and uses a simulated reply. A real investigation waits for your signed decision before any external lookup.
+Auto playing · Enter next · Backspace previous · Space pause/play · Esc exit
+
+Step 7 of 10 · Confirm what the evidence supports
+
+The proposed hypothesis connects the privilege change with the observed events and ATT&CK techniques T1078 and T1098. The demo now confirms that evidence-backed finding.
+
+Only findings confirmed by the analyst enter the report. An observed command or an AI explanation alone does not prove every claimed consequence.
+Auto playing · Enter next · Backspace previous · Space pause/play · Esc exit
+
+Step 8 of 10 · Check the investigation locally
+
+The demo compares the confirmed findings with the bundled HuntEval answers. Those answers are loaded only for this comparison, never ingested as evidence or sent to the model.
+
+The result is a local score for this synthetic episode. It helps expose missed events or unsupported conclusions; it is not a validation against real incidents.
+Auto playing · Enter next · Backspace previous · Space pause/play · Esc exit
+
+Step 9 of 10 · Verify, seal and hand over
+
+IRMind verifies the chain and originals, seals the case, exports it, then verifies the package against the expected analyst key. The demo shows exactly what is signed or exported and confirms it automatically with its temporary key.
+
+The signed chain makes later changes detectable and supports review by another investigator or a court. It does not prove the logs were truthful, establish legal admissibility, or prevent the key owner from rewriting an entire chain.
+Auto playing · Enter next · Backspace previous · Space pause/play · Esc exit
+
+Step 10 of 10 · Your turn
+
+You have seen evidence ingestion, local queries, a tool-using investigation, signed approval and custody verification. The temporary demo case is now sealed.
+
+Explore its evidence in the normal interface, learn how to start your own case, or exit. A real investigation begins with /new, /ingest and /settings to choose a model explicitly.
+› 1. Explore this demo case (sealed, read-only)
+  2. Start your own case
+  3. Exit
+Presentation complete · ↑/↓ choose · Enter select · Enter next · Backspace previous · Space pause/play · Esc exit

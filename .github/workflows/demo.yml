@@ -39,7 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if git diff --quiet -- docs/assets; then
+          if git diff --quiet -- docs/assets docs/ux/demo-guide; then
             echo "The generated assets are unchanged."
             exit 0
           fi
@@ -47,7 +47,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$branch"
-          git add docs/assets/demo.gif
+          git add docs/assets/demo.gif docs/ux/demo-guide/*.png
           git commit -m 'docs: refresh synthetic demo' -m 'Signed-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
           git push origin "$branch"
-          gh pr create --base main --head "$branch" --title 'docs: refresh synthetic demo' --body 'VHS regenerated the isolated synthetic demo GIF. The tape, duration, size, flow, and privacy checks passed.'
+          gh pr create --base main --head "$branch" --title 'docs: refresh synthetic demo' --body 'VHS regenerated the complete offline presentation GIF and its ten scene captures. Real completion events, version, duration, size and privacy checks passed.'

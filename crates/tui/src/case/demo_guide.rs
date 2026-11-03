@@ -43,6 +43,8 @@ pub(super) struct DemoGuide {
     steps: Vec<Step>,
     playback: playback::Playback,
     progress: [usize; 10],
+    confirmation_started: Option<Instant>,
+    back_pending: bool,
     pub final_option: usize,
     pub show_real_case_help: bool,
 }
@@ -61,6 +63,8 @@ impl DemoGuide {
             steps: script::load()?,
             playback: playback::Playback::new(speed),
             progress: [0; 10],
+            confirmation_started: None,
+            back_pending: false,
             final_option: 0,
             show_real_case_help: false,
         })
@@ -98,12 +102,16 @@ impl DemoGuide {
         }
     }
     pub(super) fn back(&mut self) {
-        if !self.playback.in_flight() {
-            self.step = self.step.saturating_sub(1);
-            self.playback.reset();
+        if self.playback.awaiting_result() {
+            self.back_pending = true;
             self.playback.pause();
-            self.note.clear();
+            self.note = "Finishing the current action before going back.".into();
+            return;
         }
+        self.step = self.step.saturating_sub(1);
+        self.playback.reset();
+        self.playback.pause();
+        self.note.clear();
     }
     pub(super) fn skip(&mut self) {
         self.next();
@@ -174,6 +182,20 @@ impl DemoGuide {
     pub(super) fn action_finished(&mut self) {
         self.progress[self.step] += 1;
         self.playback.action_finished();
+        if self.back_pending {
+            self.back_pending = false;
+            self.back();
+        }
+    }
+    pub(super) fn confirmation_due(&mut self, now: Instant) -> bool {
+        if !self.playback.permits_actions() && !self.back_pending {
+            return false;
+        }
+        let started = *self.confirmation_started.get_or_insert(now);
+        now.saturating_duration_since(started) >= self.scaled(6_000)
+    }
+    pub(super) fn clear_confirmation_wait(&mut self) {
+        self.confirmation_started = None;
     }
     pub(super) fn scaled(&self, millis: u64) -> Duration {
         self.playback.scaled(millis)
@@ -232,7 +254,9 @@ impl DemoGuide {
             text.push('\n');
             text.push_str(&self.note);
         }
-        text.push_str(if self.playback.automatic() {
+        text.push_str(if self.step == 9 {
+            "\nPresentation complete · ↑/↓ choose · Enter select"
+        } else if self.playback.automatic() {
             "\nAuto playing"
         } else {
             "\nPaused"

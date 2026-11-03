@@ -43,7 +43,7 @@ pub(super) struct Cli {
 #[derive(Subcommand, Clone)]
 pub(super) enum Command {
     Demo {
-        /// Use the offline scripted model without checking local Ollama.
+        /// Retained for compatibility; the presentation always uses the offline scripted model.
         #[arg(long)]
         scripted: bool,
         /// Accelerate the synthetic presentation for development and PTY tests.

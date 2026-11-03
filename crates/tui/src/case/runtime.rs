@@ -137,6 +137,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     }
                     self.engine
                         .record_cancellation(self.id, cancelled_operation(label))?;
+                    self.presentation_failed("The current action was cancelled and audited");
                     update(
                         &mut self.state,
                         CaseMessage::TaskFinished(format!("{label} cancelled and audited")),
@@ -149,6 +150,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                 }
                 Err(_) => {
                     let message = self.task_failure(label, "unexpected task failure");
+                    self.presentation_failed(&message);
                     update(&mut self.state, CaseMessage::TaskFinished(message));
                 }
             }
