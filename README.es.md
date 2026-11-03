@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 5d7a59b246db1e06bd67b6833a873b72a00e9ff2; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit c4fa5c304750e84fd3b1f102154be646f3fd0a00; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -44,11 +44,11 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-La [versión preliminar v0.1.2](https://github.com/ns2switch/irmind/releases/tag/v0.1.2) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.1.4](https://github.com/ns2switch/irmind/releases/tag/v0.1.4) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.1.2; binary=irmind-linux-x86_64
+tag=v0.1.4; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -141,3 +141,5 @@ La [hoja de ruta pública](docs/es/roadmap.md) describe intenciones, sin comprom
 - [Contribuciones](CONTRIBUTING.es.md) · [Código de conducta](CODE_OF_CONDUCT.es.md) · [Reporte privado de vulnerabilidades](SECURITY.md) · [Licencias](LICENSE-MIT)
 
 Licencia dual **MIT OR Apache-2.0**; consulta [LICENSE-MIT](LICENSE-MIT) y [LICENSE-APACHE](LICENSE-APACHE).
+
+`Ctrl+O` o `/expand` despliega o pliega la tarjeta seleccionada desde la caja de texto o el panel lateral. Si no hay una tarjeta plegable seleccionada, usa la última. Tu borrador se conserva.
