@@ -62,13 +62,16 @@ def encode_gif(directory: Path) -> None:
               "-map", "[v]", "-c:v", "libx264", "-threads", "1", "-preset", "veryfast", "-crf", "20",
               "demo.mp4", entrypoint="ffmpeg")
     # Separate passes avoid buffering the whole presentation for a palette.
-    container(directory, "-v", "error", "-y", "-threads", "1", "-filter_threads", "1",
-              "-i", "demo.mp4", "-vf", "fps=6,palettegen=max_colors=128:stats_mode=diff",
-              "-frames:v", "1", "palette.png", entrypoint="ffmpeg")
-    container(directory, "-v", "error", "-y", "-threads", "1", "-filter_complex_threads", "1",
-              "-i", "demo.mp4", "-i", "palette.png", "-lavfi",
-              "[0:v]fps=6[v];[v][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
-              "-loop", "0", "demo.gif", entrypoint="ffmpeg")
+    for fps, width in ((4, 984), (3, 984), (2, 984), (2, 860)):
+        container(directory, "-v", "error", "-y", "-threads", "1", "-filter_threads", "1",
+                  "-i", "demo.mp4", "-vf", f"fps={fps},scale={width}:-2:flags=lanczos,palettegen=max_colors=128:stats_mode=diff",
+                  "-frames:v", "1", "palette.png", entrypoint="ffmpeg")
+        container(directory, "-v", "error", "-y", "-threads", "1", "-filter_complex_threads", "1",
+                  "-i", "demo.mp4", "-i", "palette.png", "-lavfi",
+                  f"[0:v]fps={fps},scale={width}:-2:flags=lanczos[v];[v][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
+                  "-loop", "0", "demo.gif", entrypoint="ffmpeg")
+        if 0 < (directory / "demo.gif").stat().st_size < 5_000_000:
+            return
 
 
 def validate(directory: Path, version: str) -> None:
@@ -90,6 +93,7 @@ def validate(directory: Path, version: str) -> None:
     duration = float(container(directory, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", "demo.gif", entrypoint="ffprobe").strip())
     if not 100 <= duration <= 600:
         raise ValueError(f"expected a complete 100–600 second presentation, got {duration:.2f}")
+    print(f"Verified all ten scenes: {duration:.2f} seconds, GIF {gif.stat().st_size:,} bytes; ten full-resolution PNGs.")
 
 
 def main() -> None:

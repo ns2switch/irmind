@@ -30,7 +30,7 @@ impl Command {
             "parsers" => " [test <definition> <file>]",
             "settings" => " [model|connectors|keystore|preferences]",
             "open" => " <case title or ID>",
-            "demo" => " [next|back|hint|skip|hide|show|check|exit]",
+            "demo" => " [check|exit]",
             "evidence" | "raw" => " <hash>",
             "ingest" => " [--parser <name>] [--year YYYY --utc-offset ±HH:MM] <path>",
             "objects" => " <source> <scheme> <container> <prefix> <from> <to>",
@@ -198,12 +198,10 @@ pub(super) fn argument_candidates(
         return super::picker::safe_completions(prefix);
     }
     let values: Vec<String> = match command {
-        "/demo" => [
-            "next", "back", "hint", "skip", "hide", "show", "check", "exit",
-        ]
-        .iter()
-        .map(|value| (*value).into())
-        .collect(),
+        "/demo" => ["check", "exit"]
+            .iter()
+            .map(|value| (*value).into())
+            .collect(),
         "/approve" | "/deny" | "/edit" => approvals.to_vec(),
         "/confirm" | "/dismiss" => findings.to_vec(),
         "/evidence" | "/evidence-save" | "/raw" => hashes.to_vec(),
@@ -327,8 +325,8 @@ mod tests {
         assert!(guide.contains("Related:"));
         assert!(help_for("unknown").contains("Unknown command"));
         assert_eq!(
-            argument_candidates("/demo ne", &[], &[], &[], &[]),
-            vec!["next"]
+            argument_candidates("/demo ch", &[], &[], &[], &[]),
+            vec!["check"]
         );
     }
 }
