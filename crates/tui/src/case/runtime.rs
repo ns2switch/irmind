@@ -141,36 +141,9 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     );
                 }
                 Ok(Err(error)) => {
-                    if label == "Ingest" {
-                        if let irmind_app::AppError::ParserSelection {
-                            source_name,
-                            candidates,
-                        } = error
-                        {
-                            self.state.parser_prompt = Some(super::state::ParserPrompt {
-                                source: source_name,
-                                candidates,
-                                selected: 0,
-                                typed_option: String::new(),
-                            });
-                            self.state.running_since = None;
-                            self.state.progress_status = None;
-                            self.state.demo_pending_event = None;
-                            update(
-                                &mut self.state,
-                                CaseMessage::TaskFinished(
-                                    "Choose a parser and press Enter, or Esc to cancel.".into(),
-                                ),
-                            );
-                            return Ok(());
-                        }
-                        self.state.pending_ingest = None;
+                    if self.finish_task_error(label, &error) {
+                        return Ok(());
                     }
-                    if label == "IRMind" {
-                        self.state.conversation.discard_preview();
-                    }
-                    let message = self.task_failure(label, &error.to_string());
-                    update(&mut self.state, CaseMessage::TaskFinished(message));
                 }
                 Err(_) => {
                     let message = self.task_failure(label, "unexpected task failure");
@@ -184,6 +157,53 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
         self.state.progress_status = None;
         self.state.demo_pending_event = None;
         Ok(())
+    }
+
+    fn finish_task_error(&mut self, label: &str, error: &irmind_app::AppError) -> bool {
+        if label == "Ingest" {
+            let message = match error {
+                irmind_app::AppError::ParserTimeContextRequired {
+                    source_name,
+                    requirement,
+                    suggestions,
+                } => {
+                    self.state.time_prompt = Some(super::time_prompt::TimePrompt::new(
+                        source_name.clone(),
+                        requirement.clone(),
+                        suggestions.clone(),
+                    ));
+                    Some("Confirm the source year and fixed UTC offset before ingestion.")
+                }
+                irmind_app::AppError::ParserSelection {
+                    source_name,
+                    candidates,
+                } => {
+                    self.state.parser_prompt = Some(super::state::ParserPrompt {
+                        source: source_name.clone(),
+                        candidates: candidates.clone(),
+                        selected: 0,
+                        typed_option: String::new(),
+                    });
+                    Some("Choose a parser and press Enter, or Esc to cancel.")
+                }
+                _ => None,
+            };
+            if let Some(message) = message {
+                self.state.overlay_scroll = 0;
+                self.state.running_since = None;
+                self.state.progress_status = None;
+                self.state.demo_pending_event = None;
+                update(&mut self.state, CaseMessage::TaskFinished(message.into()));
+                return true;
+            }
+            self.state.pending_ingest = None;
+        }
+        if label == "IRMind" {
+            self.state.conversation.discard_preview();
+        }
+        let message = self.task_failure(label, &error.to_string());
+        update(&mut self.state, CaseMessage::TaskFinished(message));
+        false
     }
 
     fn task_failure(&self, label: &str, reason: &str) -> String {

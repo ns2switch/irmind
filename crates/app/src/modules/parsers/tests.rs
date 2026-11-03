@@ -144,4 +144,35 @@ mod parser_router_tests {
         );
         assert!(router.version_for_source("other.log").is_err());
     }
+    #[test]
+    fn optional_time_context_does_not_change_existing_parser_defaults_or_identity() {
+        let parser = FakeParser("parser-json", "json-stream-v2");
+        assert!(
+            parser
+                .time_context_requirement("sample.json", b"{}")
+                .unwrap()
+                .is_none()
+        );
+        let context =
+            crate::ParserTimeContext::new(2026, 0, true, crate::ParserTimeBasis::Command).unwrap();
+        assert!(matches!(
+            parser.with_time_context(&context),
+            Err(AppError::ParserTimeUnsupported)
+        ));
+        let mut catalog = ParserCatalog::default();
+        catalog
+            .parsers
+            .insert("parser-json".into(), Arc::new(parser));
+        let selected = catalog
+            .select_source(crate::modules::ParserSelectionRequest {
+                source: "sample.json",
+                sample: b"{}",
+                parser_override: Some("parser-json"),
+                forced: true,
+                time_context: Some(context),
+            })
+            .unwrap();
+        assert_eq!(selected.selection.parser_version, "json-stream-v2");
+        assert_eq!(selected.selection.timestamp_context, None);
+    }
 }

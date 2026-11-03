@@ -22,6 +22,12 @@ pub(super) fn parse(
     };
     let mut offset = 0;
     let mut index = 0;
+    let mut sequence = parser
+        .time_context
+        .map(|context| {
+            super::year_rollover::YearSequence::new(i32::from(context.year()), context.rollover())
+        })
+        .transpose()?;
     loop {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
@@ -34,13 +40,26 @@ pub(super) fn parse(
             return Err(super::limit());
         }
         if consumed > MAX_LINE as u64 || !bytes.iter().all(u8::is_ascii_whitespace) {
-            let parsed = std::str::from_utf8(&bytes)
-                .ok()
-                .filter(|_| consumed <= MAX_LINE as u64)
-                .and_then(|line| {
-                    super::record::parse(line.trim_end_matches(['\r', '\n']), parser.legacy, index)
-                        .ok()
-                });
+            let parsed = if consumed <= MAX_LINE as u64 {
+                match std::str::from_utf8(&bytes) {
+                    Ok(line) => match parse_row(
+                        parser,
+                        source,
+                        line.trim_end_matches(['\r', '\n']),
+                        index,
+                        &mut sequence,
+                    ) {
+                        Ok(row) => Some(row),
+                        Err(error @ AppError::ParserTimeContextRequired { .. }) => {
+                            return Err(error);
+                        }
+                        Err(_) => None,
+                    },
+                    Err(_) => None,
+                }
+            } else {
+                None
+            };
             if let Some(row) = parsed {
                 let location = ParserLocation::new(source, "parser-syslog", offset)
                     .map_err(|_| super::limit())?;
@@ -65,6 +84,41 @@ pub(super) fn parse(
         offset += consumed;
     }
     Ok(report)
+}
+
+fn parse_row(
+    parser: &SyslogParser,
+    source: &str,
+    line: &str,
+    index: usize,
+    sequence: &mut Option<super::year_rollover::YearSequence>,
+) -> Result<GraphRecord, AppError> {
+    if parser.per_ingest && super::record::detect(line) == Some(90) {
+        let Some(current) = sequence else {
+            let requirement = super::time_context::requirement(parser, source, line.as_bytes())?
+                .ok_or_else(super::invalid)?;
+            return Err(AppError::ParserTimeContextRequired {
+                source_name: source.into(),
+                requirement,
+                suggestions: vec![],
+            });
+        };
+        let next =
+            current.candidate(super::time_context::month(line).ok_or_else(super::invalid)?)?;
+        let offset = parser
+            .time_context
+            .ok_or_else(super::invalid)?
+            .offset_minutes();
+        let row = super::record::parse(
+            line,
+            Some(super::LegacyTimestamp::new(next.year(), i32::from(offset))?),
+            index,
+        )?;
+        *current = next;
+        Ok(row)
+    } else {
+        super::record::parse(line, parser.legacy, index)
+    }
 }
 
 fn frame(

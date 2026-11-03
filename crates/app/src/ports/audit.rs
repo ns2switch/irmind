@@ -26,6 +26,14 @@ pub enum AppError {
         source_name: String,
         candidates: Vec<(String, u8)>,
     },
+    #[error("the source needs an analyst-confirmed year and fixed UTC offset")]
+    ParserTimeContextRequired {
+        source_name: String,
+        requirement: ParserTimeRequirement,
+        suggestions: Vec<ParserTimeSuggestion>,
+    },
+    #[error("this parser does not accept a temporal context")]
+    ParserTimeUnsupported,
     #[error("invalid case id")]
     InvalidCaseId,
     #[error("case is sealed")]

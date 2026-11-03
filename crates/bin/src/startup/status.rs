@@ -61,7 +61,7 @@ fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
         (
             "parser-syslog",
             cfg!(feature = "parser-syslog"),
-            "syslog-v1",
+            "syslog-v2",
         ),
         ("parser-ecs", cfg!(feature = "parser-ecs"), "ecs-ndjson-v1"),
         (

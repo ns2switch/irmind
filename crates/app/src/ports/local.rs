@@ -295,6 +295,19 @@ impl ParserConfidence {
 /// Format-specific, bounded evidence decoder. `detect` receives at most 64 KiB
 /// from the caller and must remain pure and cheap.
 pub trait LogParser: EventParser + StreamingEventParser {
+    fn time_context_requirement(
+        &self,
+        _source_name: &str,
+        _sample: &[u8],
+    ) -> Result<Option<crate::ParserTimeRequirement>, AppError> {
+        Ok(None)
+    }
+    fn with_time_context(
+        &self,
+        _context: &crate::ParserTimeContext,
+    ) -> Result<std::sync::Arc<dyn LogParser>, AppError> {
+        Err(AppError::ParserTimeUnsupported)
+    }
     fn description(&self) -> &str {
         self.parser_name()
     }

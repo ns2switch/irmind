@@ -122,3 +122,11 @@ The prompt-injection corpus intentionally contains English and Spanish attack sa
 **Decision:** Set UTF-8 only in the test console and reconstruct a bounded current screen for Windows assertions. Wait for the guide's `Do:` instruction, rather than loose command-name fragments. Unit tests cover cursor repaints, chunked UTF-8, titles, erase-character/display commands and stale frames. Custody tests wait for the exact numbered confirmation choices; a previous confirmed finding must not satisfy that wait.
 
 **Consequences:** Tutorial actions, deadlines, cancellation and cleanup assertions remain intact. No production behavior, dependencies, ports, signed formats or security controls change. The test screen handles the English single-cell UI, not arbitrary wide/combining terminal input.
+
+## Per-ingestion source time without a signed-format change
+
+Context: a global RFC 3164 year cannot interpret unrelated files or a year boundary safely. The analyst approved two additive optional LogParser capabilities.
+
+Decision: use bounded ParserTimeContext values with a closed Analyst/Command/ConfirmedSuggestion basis. TUI and command ingestion share parser selection and immutable context-specific instances. Only syslog and Linux change parser versions. Suggestions require verified signed same-host records and explicit analyst confirmation. December → January rollover is visible, enabled by default, and per file. Other backward months are rejected. Existing SourceManifestV2 context and parser-version fields bind the inference; signed wire encodings and historical byte/hash goldens do not change.
+
+Consequences: retired global syslog settings need an explicit signed cleanup before cases open. The composition root retains their exact former schema for review only; modules never receive them. Historical v1 source reconstruction retains fixed-year semantics. IANA/DST support remains [issue #161](https://github.com/ns2switch/irmind/issues/161), with no new dependency in this correction. See [design and compatibility flow](syslog-ingest-time-design.md).

@@ -36,6 +36,21 @@ impl Module for PlasoParser {
     }
 }
 impl LogParser for PlasoParser {
+    fn time_context_requirement(
+        &self,
+        source: &str,
+        sample: &[u8],
+    ) -> Result<Option<irmind_app::ParserTimeRequirement>, AppError> {
+        irmind_app::json_time_requirement(
+            source,
+            sample,
+            &irmind_app::ParserTimeFields {
+                parser_id: "parser-plaso",
+                hosts: &["/hostname"],
+                timestamps: &["/datetime"],
+            },
+        )
+    }
     fn detect(&self, _source_name: &str, sample: &[u8]) -> Option<ParserConfidence> {
         mapping::detect(&sample[..sample.len().min(64 * 1024)])
             .and_then(|value| ParserConfidence::new(value).ok())

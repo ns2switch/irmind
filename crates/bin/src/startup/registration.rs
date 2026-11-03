@@ -83,27 +83,10 @@ pub(super) fn configured_registry(
     registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
 
     #[cfg(feature = "parser-syslog")]
-    {
-        let manifest = &irmind_mod_parser_syslog::MANIFEST;
-        let result =
-            load_module_config(manifest, secrets, saved, allow_environment).and_then(|config| {
-                registry
-                    .register(
-                        Box::new(irmind_mod_parser_syslog::SyslogParser::default()),
-                        &config,
-                    )
-                    .map_err(Into::into)
-            });
-        if let Err(error) = result {
-            if !interactive {
-                return Err(error);
-            }
-            config_issues.insert(
-                manifest.id,
-                "Invalid RFC 3164 year/UTC offset configuration".into(),
-            );
-        }
-    }
+    registry.register(
+        Box::new(irmind_mod_parser_syslog::SyslogParser::default()),
+        &ModuleConfig::new(),
+    )?;
 
     register_llm(
         cli,

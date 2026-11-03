@@ -41,6 +41,21 @@ impl Module for EcsParser {
 }
 
 impl LogParser for EcsParser {
+    fn time_context_requirement(
+        &self,
+        source: &str,
+        sample: &[u8],
+    ) -> Result<Option<irmind_app::ParserTimeRequirement>, AppError> {
+        irmind_app::json_time_requirement(
+            source,
+            sample,
+            &irmind_app::ParserTimeFields {
+                parser_id: "parser-ecs",
+                hosts: &["/host/name", "/host.name"],
+                timestamps: &["/@timestamp"],
+            },
+        )
+    }
     fn detect(&self, _source_name: &str, sample: &[u8]) -> Option<ParserConfidence> {
         let first = sample.split(|byte| *byte == b'\n').next()?;
         let value: Value = serde_json::from_slice(&first[..first.len().min(64 * 1024)]).ok()?;

@@ -30,6 +30,7 @@ use irmind_app::ContentGuard as _;
 mod status;
 use status::module_statuses;
 mod preflight;
+mod retired_syslog;
 use preflight::{decide_overrides, reconcile_configuration};
 
 struct PreparedStartup {

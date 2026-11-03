@@ -149,8 +149,13 @@ fn signed_context_resolves_after_the_active_year_changes() {
 
 #[test]
 #[ignore = "manual 1 GiB end-to-end parser benchmark"]
-fn syslog_one_gib_ingestion_throughput() {
+fn syslog_one_gib_ingestion_throughput() -> Result<(), &'static str> {
     use std::io::{Read as _, Write as _};
+    if cfg!(debug_assertions) {
+        return Err(
+            "Run ingestion benchmarks with cargo test --release; unoptimized results are invalid",
+        );
+    }
     let root = tempfile::tempdir().unwrap();
     let sources = root.path().join("sources");
     fs::create_dir(&sources).unwrap();
@@ -204,6 +209,7 @@ fn syslog_one_gib_ingestion_throughput() {
         f64::from(u32::try_from(written).unwrap()) / 1_048_576.0 / elapsed
     );
     engine.verify(&case.id).unwrap();
+    Ok(())
 }
 
 fn selection(parser: &SyslogParser, sample: &[u8]) -> ParserSelection {
@@ -264,3 +270,6 @@ fn corrupt_gzip_never_commits_a_partial_custody_batch() {
     );
     engine.verify(&case.id).unwrap();
 }
+
+#[path = "syslog_ingest/time_context.rs"]
+mod time_context;

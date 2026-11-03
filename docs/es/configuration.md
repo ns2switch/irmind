@@ -1,8 +1,6 @@
-Traducción de docs/configuration.md en el commit 7933256136e1501041869f043d1b64949e79c0be; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 92d6c095219e474b28ef2405984e5c19caf5ef3f; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
-
-La captura del ratón se puede desactivar con `mouse_capture = false` en `config.toml` para permitir la selección de texto del terminal. La TUI pide revisar y aceptar el cambio manual antes de abrir casos.
 
 Esta página es para quienes preparan una evaluación controlada. Explica el alcance de los casos, la política, los ajustes no secretos y la selección del backend. Los permisos de los conectores están en [módulos](modules.md).
 
@@ -52,6 +50,7 @@ Para automatización, el orden es **flag de CLI > variable de entorno > config.t
 ```toml
 version = 1
 llm_module = "llm-openai-compatible"
+mouse_capture = false # opcional: permite seleccionar texto con el terminal
 resume_last_case = true
 show_hints = true
 theme = "auto"
@@ -142,3 +141,7 @@ No se selecciona ningún proveedor por defecto. En la TUI, escribe `/settings mo
 Los proveedores locales preconfigurados son Ollama (`127.0.0.1:11434`), LM Studio (`127.0.0.1:1234`) y vLLM (`127.0.0.1:8000`). Los remotos son OpenAI, Anthropic, DeepSeek, OpenRouter, Mistral, Groq, Google Gemini mediante su endpoint compatible, xAI y Together. Los últimos cinco usan el módulo compatible con OpenAI existente. Si un servicio no expone una lista compatible, escribe el ID del modelo. El soporte de herramientas depende del modelo elegido; la prueba de conexión solo comprueba el acceso básico. Azure OpenAI con el parámetro `api-version` en la URL no está soportado por este formulario.
 
 Un servicio local sin clave puede usar HTTP solo en loopback; también admite HTTPS. Los servicios remotos requieren HTTPS y una clave propia del destino. Una URL personalizada nunca hereda `OPENAI_API_KEY`. Consulta [módulos](modules.md) para elegir otros proveedores compilados. Comprueba la retención, la región de procesamiento y la clasificación de datos antes de cualquier conexión externa.
+
+## Tiempo de fuentes syslog clásicas
+
+El contexto temporal de RFC 3164 pertenece a cada ingesta, no a config.toml. Confirma el año, el desplazamiento UTC fijo y el cambio de año en el formulario de ingesta. Puedes aplicar la elección confirmada a todos los ficheros o elegir por separado. Los campos globales retirados necesitan una eliminación explícita y firmada al arrancar. Las fuentes ya firmadas mantienen su interpretación registrada. Consulta [parsers](parsers.md) y la [referencia para automatización](../development/cli.md).

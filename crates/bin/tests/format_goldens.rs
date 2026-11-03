@@ -374,7 +374,7 @@ fn signed_and_reconstructed_format_goldens_are_unchanged() {
 fn syslog_signed_and_reconstructed_format_goldens_are_unchanged() {
     use irmind_mod_parser_syslog::{LegacyTimestamp, SyslogParser};
     let mut actual = Goldens::new();
-    let modern = SyslogParser::default();
+    let modern = SyslogParser::from_version("syslog-v1").unwrap();
     let classic = SyslogParser::new(Some(LegacyTimestamp::new(2026, 60).unwrap()));
     for (name, parser, bytes) in [
         (

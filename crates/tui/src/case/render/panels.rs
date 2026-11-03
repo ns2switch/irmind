@@ -127,6 +127,12 @@ fn audit_panel(state: &CaseState) -> String {
 }
 
 pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Option<String>> {
+    if let Some(prompt) = &state.time_prompt {
+        return prompt
+            .screened_text(engine.guard.as_ref())
+            .map(Some)
+            .map_err(Into::into);
+    }
     if let Some(prompt) = &state.parser_prompt {
         return parser_prompt_text(prompt, engine).map(Some);
     }

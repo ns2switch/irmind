@@ -289,3 +289,6 @@ pub fn show_startup_error(message: &str) -> Result<bool> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     home::show_startup_error(&mut terminal, message)
 }
+
+mod retired_parser_time;
+pub use retired_parser_time::confirm_retired_parser_time_settings;

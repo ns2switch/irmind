@@ -3,7 +3,7 @@
 use irmind_app::{
     AppError, CancellationToken, EventParser, GraphRecord, LogParser, ParseReport,
     ParserConfidence, ParserIdentity, StreamingEventParser,
-    modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use irmind_domain::Tainted;
 use std::io::{Cursor, Read};
@@ -11,68 +11,18 @@ use std::io::{Cursor, Read};
 mod gzip;
 mod input;
 mod record;
+mod time_context;
 mod timestamp;
+mod version;
+mod year_rollover;
 pub use timestamp::LegacyTimestamp;
 
 pub struct SyslogParser {
     legacy: Option<LegacyTimestamp>,
     context: Option<String>,
     version: String,
-}
-
-impl SyslogParser {
-    #[must_use]
-    pub fn new(legacy: Option<LegacyTimestamp>) -> Self {
-        let context = legacy.map(|value| {
-            format!(
-                "rfc3164;year={};offset_minutes={};basis=analyst;inferred=true",
-                value.year(),
-                value.offset_minutes(),
-            )
-        });
-        let version = legacy.map_or_else(
-            || "syslog-v1".into(),
-            |value| {
-                format!(
-                    "syslog-v1:year={};offset={}",
-                    value.year(),
-                    value.offset_minutes()
-                )
-            },
-        );
-        Self {
-            legacy,
-            context,
-            version,
-        }
-    }
-
-    pub fn from_version(version: &str) -> Result<Self, AppError> {
-        if version.len() > 128 {
-            return Err(invalid());
-        }
-        if version == "syslog-v1" {
-            return Ok(Self::new(None));
-        }
-        let (year, offset) = version
-            .strip_prefix("syslog-v1:year=")
-            .and_then(|value| value.split_once(";offset="))
-            .ok_or_else(invalid)?;
-        let parser = Self::new(Some(LegacyTimestamp::new(
-            year.parse().map_err(|_| invalid())?,
-            offset.parse().map_err(|_| invalid())?,
-        )?));
-        if parser.version != version {
-            return Err(invalid());
-        }
-        Ok(parser)
-    }
-}
-
-impl Default for SyslogParser {
-    fn default() -> Self {
-        Self::new(None)
-    }
+    per_ingest: bool,
+    time_context: Option<irmind_app::ParserTimeContext>,
 }
 
 pub static MANIFEST: ModuleManifest = ModuleManifest {
@@ -80,18 +30,7 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
     version: "0.1.0",
     ports: &[ModulePort::EventParser],
     tools: &[],
-    config: &[
-        ConfigField {
-            name: "LEGACY_YEAR",
-            required: false,
-            secret: false,
-        },
-        ConfigField {
-            name: "LEGACY_UTC_OFFSET_MINUTES",
-            required: false,
-            secret: false,
-        },
-    ],
+    config: &[],
 };
 
 impl Module for SyslogParser {
@@ -103,22 +42,25 @@ impl Module for SyslogParser {
         registry: &mut ModuleRegistry,
         config: &ModuleConfig,
     ) -> Result<(), AppError> {
-        let context = match (
-            config.value("LEGACY_YEAR"),
-            config.value("LEGACY_UTC_OFFSET_MINUTES"),
-        ) {
-            (None, None) => self.legacy,
-            (Some(year), Some(offset)) => Some(LegacyTimestamp::new(
-                year.parse().map_err(|_| invalid())?,
-                offset.parse().map_err(|_| invalid())?,
-            )?),
-            _ => return Err(invalid()),
-        };
-        registry.add_parser(Box::new(Self::new(context)))
+        let _ = config;
+        registry.add_parser(self)
     }
 }
 
 impl LogParser for SyslogParser {
+    fn time_context_requirement(
+        &self,
+        source: &str,
+        sample: &[u8],
+    ) -> Result<Option<irmind_app::ParserTimeRequirement>, AppError> {
+        time_context::requirement(self, source, sample)
+    }
+    fn with_time_context(
+        &self,
+        context: &irmind_app::ParserTimeContext,
+    ) -> Result<std::sync::Arc<dyn LogParser>, AppError> {
+        Ok(std::sync::Arc::new(Self::configured(*context)?))
+    }
     fn detect(&self, _source_name: &str, sample: &[u8]) -> Option<ParserConfidence> {
         let sample = &sample[..sample.len().min(64 * 1024)];
         let expanded;
@@ -136,7 +78,11 @@ impl LogParser for SyslogParser {
 
 impl EventParser for SyslogParser {
     fn version(&self) -> &'static str {
-        "syslog-v1"
+        if self.per_ingest {
+            "syslog-v2"
+        } else {
+            "syslog-v1"
+        }
     }
     fn parse_each(
         &self,
@@ -163,7 +109,11 @@ impl StreamingEventParser for SyslogParser {
         "parser-syslog"
     }
     fn streaming_version(&self) -> &'static str {
-        "syslog-v1"
+        if self.per_ingest {
+            "syslog-v2"
+        } else {
+            "syslog-v1"
+        }
     }
     fn identity(&self) -> ParserIdentity<'_> {
         ParserIdentity {
