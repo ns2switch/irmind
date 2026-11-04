@@ -1,4 +1,4 @@
-# Proposal: deterministic partition preparation
+# Approved deterministic partition preparation
 
 This document is for the analyst reviewing the exact application boundary needed for artifact-V2 step (c). The [approved design](parquet-artifact-v2-design.md#generic-scope-partitions) already defines normalization, signed caps, overflow and safe paths. This proposal does not implement them or change a signed format. It follows the [mixed reader/writer](https://github.com/ns2switch/irmind/pull/168).
 
@@ -73,8 +73,14 @@ Add `unicode-normalization = "=0.1.26"` directly to `irmind-infra` for the appro
 
 An adapter cannot depend on `irmind-security` just to borrow its normalization implementation. Routing partition names through `ContentGuard` would also mix redaction/detection rules with deterministic bucket naming. An ASCII-only implementation without this dependency would not satisfy the approved NFKC requirement. The recommended option is the direct, already locked normalization package; no new parser or remote module is proposed.
 
-## Required evidence and approval
+## Approval and additional requirements
 
-Before implementation, review the additive batch method, closed parser profile and direct normalization dependency. No code or dependency is changed in this proposal.
+The analyst approved the batch method, closed profile, checked host selector and exact direct dependency in PR #169. The implementation is a separate PR; this document changes no signed bytes.
+
+Derive the normalization policy identifier from `unicode_normalization::UNICODE_VERSION`. A regression test pins the approved Unicode version and identifier. Updating the crate's Unicode tables must fail that test and require a reviewed new policy rather than silently changing historical allocation.
+
+Before staging any normalized batch, check available space in the private case directory against a bounded staging reservation plus a safety margin. At most four sources are staged. Exhaustion fails before copying with a clear error. Bound actual spool writes by the reservation, recover orphans, and measure peak temporary disk use in the 15 GB release benchmark.
+
+Treat model-supplied hosts as untrusted tool arguments. Reject paths, controls and strings impersonating typed overflow; never turn an invalid host into an absent filter. Exact row matching and both case and organization ceilings remain mandatory.
 
 Implementation must prove identical allocations under reordered workers, no slots consumed by rollback/cancellation, signed reconstruction of overflow and exact filters across missing/overflow/legacy buckets. Test normalization collisions, forbidden controls and path syntax, safe hash paths, 64/1,024/1,025 hosts, per-date tuple overflow and bounded writers/files. Keep the existing V1 and step-(b) physical goldens unchanged. The release benchmark selects the final host default; it does not relax a budget to make a measurement pass.
