@@ -222,10 +222,49 @@ impl QueryStore<'_> {
             },
         )?;
         complete(status)?;
-        Ok(format!(
+        let mut summary = format!(
             "Parquet records={count}; first={}; last={}",
             first.map_or_else(String::new, |t| t.display()),
             last.map_or_else(String::new, |t| t.display())
-        ))
+        );
+        if artifacts.iter().any(|a| matches!(a, ParquetArtifact::V2(v) if v.builder_version == crate::parquet_store::partitioning::BUILDER)) {
+            summary.push_str(&partition_coverage(artifacts));
+        }
+        Ok(summary)
     }
+}
+
+fn partition_coverage(artifacts: &[ParquetArtifact]) -> String {
+    use irmind_domain::{
+        ArtifactSchemaV2, PartitionOverflowReason as Reason, ScopePartitionValue as Value,
+    };
+    let (mut files, mut overflow, mut cardinality, mut tuples, mut invalid) =
+        (0usize, 0usize, 0usize, 0usize, 0usize);
+    for artifact in artifacts {
+        let ParquetArtifact::V2(v) = artifact else {
+            continue;
+        };
+        if v.builder_version != crate::parquet_store::partitioning::BUILDER
+            || v.schema != ArtifactSchemaV2::Events
+        {
+            continue;
+        }
+        files += 1;
+        let has = |reason| {
+            v.partition
+                .scopes
+                .iter()
+                .any(|s| s.value == Value::Overflow(reason))
+        };
+        let card = has(Reason::Cardinality);
+        let tuple = has(Reason::TupleBudget);
+        let bad = has(Reason::UnrepresentableValue);
+        overflow += usize::from(card || tuple || bad);
+        cardinality += usize::from(card);
+        tuples += usize::from(tuple);
+        invalid += usize::from(bad);
+    }
+    format!(
+        "; partitioned event files={files}; overflow files={overflow} (cardinality={cardinality}, tuple-budget={tuples}, unrepresentable-value={invalid})"
+    )
 }

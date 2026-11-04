@@ -56,6 +56,13 @@ fn exact_host_filters_include_overflow_and_legacy_without_merging_collisions() {
         .collect::<Vec<_>>();
     let names = source_names(&prepared);
     let queries = store.queries(&names);
+    let summary = queries
+        .summary_native(&id(), &artifacts, &CancellationToken::new())
+        .unwrap();
+    assert!(
+        summary.contains("overflow files=1 (cardinality=1"),
+        "{summary}"
+    );
     for (index, (_, host, ip)) in rows.into_iter().enumerate() {
         let filter =
             GraphQueryFilter::parse_with_host(None, None, None, None, None, Some(host)).unwrap();
