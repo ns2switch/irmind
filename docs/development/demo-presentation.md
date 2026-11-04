@@ -8,7 +8,7 @@ The versioned [English script](../../crates/tui/assets/demo-presentation.en.json
 
 The TUI types into its ordinary composer and dispatches the same registered commands as an analyst. It waits for actual work to complete and for the corresponding result event. Reading time scales with narration length, with a six-second minimum at normal speed. The development `--presentation-speed` option accelerates timing for PTY tests; it does not change policy or skip work.
 
-Enter advances, Backspace goes back, Space pauses or resumes playback, and Esc/Ctrl+C cancels work and exits. Completed actions are retained when navigating back. The full-width narration stays below the transcript; terminals smaller than 100 × 40 show a resize notice. Ordinary cases retain their existing smaller-terminal support.
+Enter advances, Backspace goes back, Space pauses or resumes playback, and Esc/Ctrl+C cancels work and exits. Completed actions are retained when navigating back. The full-width narration stays below the transcript; 80 × 24 terminals use compact, scrollable narration with fixed controls and hidden secondary panels. PgUp/PgDn pauses playback to read. Below 80 × 24, a resize notice appears. The recommended size remains 100 × 40. Ordinary cases retain their existing smaller-terminal support.
 
 The demo's composition root creates the signed temporary case before entering the presentation. Scene two explains that case and executes `/scope`; scene three visibly executes `/ingest events.json`. That exact alias is resolved to the bundled file inside the demo directory, then uses ordinary parser selection, ingestion and SourceManifestV2. Other paths remain rejected; no original is copied.
 

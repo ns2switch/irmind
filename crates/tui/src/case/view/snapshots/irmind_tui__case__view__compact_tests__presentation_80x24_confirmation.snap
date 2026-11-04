@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/case/view/compact_tests.rs
+expression: visible
+---
+┌ Detail · PgUp/PgDn scroll · Esc close ───────────────────────────────────────┐
+│Seal case synthetic                                                           │
+│Audit entries: 35                                                             │
+│Final hash: full-hash                                                         │
+│Analyst key fingerprint:                                                      │
+│expected-key                                                                  │
+│1. Cancel 2. Confirm                                                          │
+│                                                                              │
+│1. Cancel 2. Confirm                                                          │
+│Enter select                                                                  │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+╭Step 10 of 10 · Your turn─────────────────────────────────────────────────────╮
+│Long narration Long narration Long narration Long narration Long narration    │
+│Long narration Long narration Long narration Long narration Long narration    │
+│› 1. Explore this demo case                                                   │
+│  2. Start your own case                                                      │
+│  3. Exit                                                                     │
+│↑/↓ choose · Enter select · Backspace back · Esc exit                         │
+│PgUp/PgDn read · Space pause/play                                             │
+╰──────────────────────────────────────────────────────────────────────────────╯

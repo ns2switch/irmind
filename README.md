@@ -60,7 +60,7 @@ gh attestation verify "$binary" -R ns2switch/irmind
 
 Run `irmind demo`, or type `/demo` on the home screen. The product types commands and runs a ten-step investigation for you. A large narration panel explains the evidence, local queries, streaming response, signed approval and custody checks. No API key, passphrase, account or network is needed. The isolated temporary case and keys are deleted when you exit.
 
-Use **Enter** to advance, **Backspace** to revisit a step, **Space** to pause or resume, and **Esc** to exit. Allow at least **100 × 40 terminal cells**. The simulated external lookup still passes policy and is approved with the temporary analyst key; no request leaves the computer. At the end, choose to explore the sealed demo case, learn how to start your own, or exit. [The getting-started guide](docs/getting-started.md#try-it-in-five-minutes) shows the ten scenes.
+Use **Enter** to advance, **Backspace** to revisit a step, **Space** to pause or resume, and **Esc** to exit. The demo supports **80 × 24 cells**; **100 × 40** is recommended. PgUp/PgDn scroll compact narration and pause playback. The simulated external lookup still passes policy and is approved with the temporary analyst key; no request leaves the computer. At the end, choose to explore the sealed demo case, learn how to start your own, or exit. [The getting-started guide](docs/getting-started.md#try-it-in-five-minutes) shows the ten scenes.
 
 ## First case in the TUI
 

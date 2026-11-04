@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/case/view/compact_tests.rs
+expression: first
+---
+┌ Live investigation ──────────────────────────────────────────────────────────┐
+│Visible investigation                                                         │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+╭──────────────────────────────────────────────────────────────────────────────╮
+│Presentation types and runs each command here…                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Synthetic · scripted · 0 tok · 1 approval pending                               
+╭Step 1 of 10 · Meet IRMind────────────────────────────────────────────────────╮
+│IRMind is a terminal assistant for investigating security incidents. The      │
+│model proposes actions, policy decides what can run, and the case records     │
+│signed evidence.                                                              │
+│This presentation operates the product for you with synthetic data and a      │
+│scripted model. Nothing leaves this computer, and the temporary session is    │
+│Auto · Enter next · Backspace back · Space pause/play · Esc exit              │
+│PgUp/PgDn read                                                                │
+╰──────────────────────────────────────────────────────────────────────────────╯

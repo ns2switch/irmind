@@ -119,3 +119,18 @@ fn every_scene_keeps_narration_and_controls_in_the_versioned_snapshot() {
     }
     insta::assert_snapshot!("all_presentation_narrations", snapshots);
 }
+
+#[test]
+fn reading_compact_narration_pauses_and_next_scene_resets_scroll() {
+    let mut guide = DemoGuide::new().unwrap();
+    guide.scroll_by(3);
+    assert_eq!(guide.scroll(), 3);
+    assert!(guide.panel(None, None).unwrap().contains("Paused"));
+    assert!(matches!(
+        guide.tick(Instant::now() + Duration::from_mins(1), false, true),
+        Effect::None
+    ));
+    guide.enter();
+    assert_eq!(guide.step(), 1);
+    assert_eq!(guide.scroll(), 0);
+}

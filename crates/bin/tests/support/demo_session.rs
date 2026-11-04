@@ -13,9 +13,12 @@ pub(super) struct DemoSession {
 }
 impl DemoSession {
     pub(super) fn spawn(command: Command) -> Result<Self, String> {
+        Self::spawn_sized(command, 120, 40)
+    }
+    pub(super) fn spawn_sized(command: Command, columns: u16, rows: u16) -> Result<Self, String> {
         Ok(Self {
-            driver: Driver::spawn(command)?,
-            screen: TerminalScreen::new(40, 120),
+            driver: Driver::spawn(command, (columns, rows))?,
+            screen: TerminalScreen::new(usize::from(rows), usize::from(columns)),
             seen: vec![],
             timeout: Duration::from_secs(20),
             sent: false,
@@ -68,7 +71,8 @@ struct Driver {
 }
 #[cfg(unix)]
 impl Driver {
-    fn spawn(command: Command) -> Result<Self, String> {
+    fn spawn(command: Command, size: (u16, u16)) -> Result<Self, String> {
+        let _ = size;
         Ok(Self {
             session: expectrl::session::OsSession::spawn(command)
                 .map_err(|error| error.to_string())?,
@@ -98,7 +102,7 @@ struct Driver {
 }
 #[cfg(windows)]
 impl Driver {
-    fn spawn(command: Command) -> Result<Self, String> {
+    fn spawn(command: Command, size: (u16, u16)) -> Result<Self, String> {
         use std::io::Read as _;
         let mut builder = portable_pty::CommandBuilder::new(command.get_program());
         builder.args(command.get_args());
@@ -114,8 +118,8 @@ impl Driver {
         }
         let pair = portable_pty::native_pty_system()
             .openpty(portable_pty::PtySize {
-                rows: 40,
-                cols: 120,
+                rows: size.1,
+                cols: size.0,
                 pixel_width: 0,
                 pixel_height: 0,
             })

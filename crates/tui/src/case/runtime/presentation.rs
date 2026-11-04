@@ -9,7 +9,7 @@ impl CaseRuntime<'_, '_, '_> {
             return Ok(());
         }
         let size = self.terminal.size()?;
-        let visible = size.width >= 100 && size.height >= 40;
+        let visible = super::super::view::presentation_supported(size.into());
         if self.unexpected_presentation_prompt() {
             return Ok(());
         }
@@ -191,6 +191,8 @@ impl CaseRuntime<'_, '_, '_> {
                     self.state.input.clear();
                 }
                 KeyCode::Char(' ') => guide.pause_or_resume(),
+                KeyCode::PageUp => guide.scroll_by(-3),
+                KeyCode::PageDown => guide.scroll_by(3),
                 _ => {}
             }
         }

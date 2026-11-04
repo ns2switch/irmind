@@ -121,3 +121,9 @@ The independent parser-linux crate extends the detection registry without extern
 ### Automatic community presentation
 
 Priority before artifact V2: deliver global card expansion and its `/expand` fallback in v0.1.4, then the isolated ten-scene live presentation in v0.1.5. Its versioned script drives the same parser registry, signed ingestion, approvals and custody as ordinary commands. No new application port, signed format, dependency or remote provider is introduced. PTYs cover automatic/manual playback and cleanup on Linux, macOS and Windows; native GUI/SSH/tmux keymaps remain separately reported manual checks.
+
+### Standard-size demo and artifact-V2 implementation order
+
+The demo must support 80 × 24; 100 × 40 is recommended. Compact narration scrolls with fixed controls, and secondary panels hide at small sizes. Publish this adjustment before the artifact-V2 implementation, without a separate release.
+
+Implement the [approved artifact-V2 design](parquet-artifact-v2-design.md) in separate PRs: checked instant/precision types and signed envelope/goldens; V2 writes and mixed reads with one stable comparator; generic bounded partitions; explicit open-case migration and export V5; release-mode 15 GB cloud and endpoint/network cardinality benchmarks. Start the host cap at 64 and retain 1,024 as the hard ceiling. Stop before a merge if implementation would depart from the approved design. The isolated EVTX helper, Elastic and Chronicle follow this work.

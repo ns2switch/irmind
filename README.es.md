@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 211c41b7a1fb1fc395c2d152f5abe965a7c6c9e6; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit f201acd5d6f465541054580e514ed555a182fe91; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -60,7 +60,7 @@ gh attestation verify "$binary" -R ns2switch/irmind
 
 Ejecuta `irmind demo` o escribe `/demo` en el inicio. El producto teclea comandos y realiza una investigación de diez pasos por ti. Un panel de narración grande explica la evidencia, las consultas locales, la respuesta en streaming, la aprobación firmada y las comprobaciones de custodia. No necesitas clave de API, passphrase, cuenta ni red. El caso temporal aislado y las claves se borran al salir.
 
-Usa **Enter** para avanzar, **Retroceso** para revisar un paso, **Espacio** para pausar o reanudar y **Esc** para salir. Necesitas al menos **100 × 40 celdas de terminal**. La consulta externa simulada pasa por la política y se aprueba con la clave temporal del analista; no sale ninguna petición del equipo. Al terminar puedes explorar el caso sellado, aprender a crear uno propio o salir. La [guía de primeros pasos](docs/es/getting-started.md#pruébalo-en-cinco-minutos) muestra las diez escenas.
+Usa **Enter** para avanzar, **Retroceso** para revisar un paso, **Espacio** para pausar o reanudar y **Esc** para salir. La demo admite **80 × 24 celdas**; se recomiendan **100 × 40**. PgUp/PgDn desplaza la narración compacta y pausa la reproducción. La consulta externa simulada pasa por la política y se aprueba con la clave temporal del analista; no sale ninguna petición del equipo. Al terminar puedes explorar el caso sellado, aprender a crear uno propio o salir. La [guía de primeros pasos](docs/es/getting-started.md#pruébalo-en-cinco-minutos) muestra las diez escenas.
 
 ## Primer caso en la TUI
 
