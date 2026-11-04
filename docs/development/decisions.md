@@ -156,3 +156,7 @@ Consequences: the large bottom panel reserves a 100 × 40 minimum while visible.
 Context: a 100 × 40 minimum blocked the demo in standard 80 × 24 terminals.
 Decision: support 80 × 24 with a compact lower narration pane, pinned controls and final choices, independent narration scrolling and hidden secondary panels. PgUp/PgDn pauses playback for reading. Confirmation previews use the space above narration. Keep 100 × 40 as a recommendation, with a blocking notice only below 80 × 24.
 Consequences: use the same ingestion, policy, signing and custody paths at both sizes. Cross-platform PTYs run the whole presentation at 80 × 24. No point release is required for this layout adjustment.
+
+## Artifact V2 foundation follows the approved envelope
+
+Context: the approved precise-time design introduces new derived schemas and an additive signed envelope; historical V1 bytes must stay reproducible. Decision: define checked integer UTC time, explicit precision/inference, and `ParquetArtifactV2` with the approved seven field groups and strict bounded decoding. The [wire layout and independent golden](parquet-artifact-v2-wire.md) make the field-3 discriminators explicit. Consequences: V1 remains the only production writer until the separate mixed-reader/writer PR; a premature V2 chain fails closed. No production dependency or agreed port changes in this foundation. Host allocation still starts at 64 and awaits the release benchmark before its default is finalized.

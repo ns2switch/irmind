@@ -1,5 +1,8 @@
 use crate::{AuditEventKind, DomainError, EvidenceHash, canonical::put};
 
+mod artifact_v2;
+pub use artifact_v2::*;
+
 const SOURCE_TAG: &[u8] = b"irmind-source-manifest-v1\0";
 const SOURCE_V2_TAG: &[u8] = b"irmind-source-manifest-v2\0";
 const ARTIFACT_TAG: &[u8] = b"irmind-parquet-artifact-v1\0";

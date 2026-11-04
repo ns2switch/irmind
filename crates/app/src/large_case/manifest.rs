@@ -64,6 +64,8 @@ pub(crate) fn read_manifest_index(
                 }
                 artifacts.push(artifact);
             }
+            // This foundation release knows the envelope, but cannot yet verify V2 rows.
+            AuditEventKind::ParquetArtifactV2 => return Err(AppError::InvalidChain(entry.seq)),
             _ => {}
         }
     }
