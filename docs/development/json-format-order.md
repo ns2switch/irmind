@@ -33,3 +33,8 @@ cargo nextest run -p irmind -E 'binary(format_goldens)' --all-features --feature
 ```
 
 A changed historical golden is a custody compatibility decision, not a fixture refresh. Stop for analyst review rather than updating expected values to pass CI. New parsers must use typed/ordered serialization or explicit lexical object sorting from their first release.
+
+
+## Released JSON line compatibility
+
+The [release feature audit](json-line-order-compatibility.md#release-audit-and-approved-decision) checks every shipped target in v0.1.0–v0.1.5. None enabled `preserve_order`. `json-stream-v2` therefore retains lexical order on all paths without a version bump. Development builds that relied on the former insertion-ordered fast path are unsupported; hash mismatches remain verification errors. The alternate-feature job includes NDJSON/single-object regressions and dedicated historical byte checks for ECS, OCSF, DFIR, Linux journald and declarative JSON. Every release build separately rejects `preserve_order` in its normal/build dependency graph.
