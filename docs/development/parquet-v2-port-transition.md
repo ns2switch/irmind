@@ -1,6 +1,6 @@
 # Approved ports for mixed artifact ingestion
 
-This document records the analyst-approved application contracts for artifact-V2 step (b). The [approved design](parquet-artifact-v2-design.md#parser-transition) calls for additive typed parser metadata and review of the exact port changes before implementation. [Step (a)](https://github.com/ns2switch/irmind/pull/167) defines the checked time and envelope. The analyst approved the versioned storage boundary and both additive parser callbacks before their implementation in [PR #168](https://github.com/ns2switch/irmind/pull/168). The historical signed formats and dependencies stay unchanged.
+This document records the documented application contracts for artifact-V2 step (b). The [approved design](parquet-artifact-v2-design.md#parser-transition) calls for additive typed parser metadata and review of the exact port changes before implementation. [Step (a)](https://github.com/ns2switch/irmind/pull/167) defines the checked time and envelope. The versioned storage boundary and both additive parser callbacks are implemented in [PR #168](https://github.com/ns2switch/irmind/pull/168). The historical signed formats and dependencies stay unchanged.
 
 ## Why an application contract needs to change
 
@@ -60,7 +60,7 @@ The local-file method remains separate so OCSF Parquet retains random access wit
 - Compaction never drops precision or quietly merges incompatible parser/schema/partition policies. Cancellation and failure leave the old committed set active.
 - The mixed reader/writer does not silently export a V2 case as V4. Export V5 and explicit open-case migration remain their separate approved step (d).
 
-No production dependency, credential, policy ceiling, query budget or signed-source encoding is added or relaxed by this proposal. The storage API generalization and both additive parser methods have analyst approval.
+No production dependency, credential, policy ceiling, query budget or signed-source encoding is added or relaxed by this proposal. The existing callback defaults retain compatibility with native parser implementations.
 
 ## Step (b) implementation and rollout
 

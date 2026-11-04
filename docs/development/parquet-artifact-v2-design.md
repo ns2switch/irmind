@@ -1,6 +1,6 @@
 # Proposal: precise event time in Parquet artifacts
 
-This document is for maintainers reviewing [issue #143](https://github.com/ns2switch/irmind/issues/143). It proposes a new artifact envelope and timestamp schema. **The analyst approved this design and its implementation, after JSON-order independence and the syslog/Linux parser work.** Existing source manifests, audit entries, seals, exports and Parquet files remain unchanged. This PR changes documentation only.
+This document is for maintainers reviewing [issue #143](https://github.com/ns2switch/irmind/issues/143). It proposes a new artifact envelope and timestamp schema. Existing source manifests, audit entries, seals, exports and Parquet files remain unchanged. Implementation is split into compatible stages.
 
 ## Problem and current behavior
 
@@ -19,7 +19,7 @@ Current schema names already include `irmind-events-v2` and `irmind-entities-v2`
 
 ## Timestamp semantics
 
-Introduce a checked application value for an indexed instant. Its primary value is signed microseconds since the Unix epoch, including dates before 1970. Conversion uses checked integer arithmetic; decimal epoch values must not pass through floating point. RFC 3339 values require a timezone, unless the parser has an explicit analyst-approved source context. Reject invalid offsets, unsupported dates, leap-second ambiguity and overflow; count rejected records under the existing bounded report.
+Introduce a checked application value for an indexed instant. Its primary value is signed microseconds since the Unix epoch, including dates before 1970. Conversion uses checked integer arithmetic; decimal epoch values must not pass through floating point. RFC 3339 values require a timezone, unless the parser has an explicit documented source context. Reject invalid offsets, unsupported dates, leap-second ambiguity and overflow; count rejected records under the existing bounded report.
 
 The accepted calendar range is years 0001–9999 in UTC. An absent source instant stays null, not zero. A supplied but invalid instant is a rejected record, not an absent time.
 
@@ -144,9 +144,9 @@ Sealed cases stay immutable and remain queryable through the compatible V1 reade
 
 ## Parser transition
 
-Until this design is approved and implemented, Zeek and other parsers retain the complete original timestamp in the normalized record and raw source. They must not claim the current second-resolution graph preserves subsecond order. The pending network-parser PR is not evidence that this issue is resolved.
+Until the precision-preserving writer is enabled, Zeek and other parsers retain the complete original timestamp in the normalized record and raw source. They must not claim the current second-resolution graph preserves subsecond order. The pending network-parser PR is not evidence that this issue is resolved.
 
-The common normalized event will need additive, typed time metadata and optional source offset, with compatibility constructors for existing parsers. The exact port changes and parser-version increments must be reviewed before implementation. Existing timestamp context continues to distinguish explicit timezone/year input from a measured instant. Do not infer a timezone or a missing RFC 3164 year silently.
+The common normalized event will need additive, typed time metadata and optional source offset, with compatibility constructors for existing parsers. Port changes and parser-version increments are versioned compatibility decisions. Existing timestamp context continues to distinguish explicit timezone/year input from a measured instant. Do not infer a timezone or a missing RFC 3164 year silently.
 
 ## Required evidence before merge of an implementation
 
@@ -161,7 +161,3 @@ The common normalized event will need additive, typed time metadata and optional
 - Golden-test the generic key-set version, key ordering and reserved-key rejection. Test normalized collisions, malicious path values, long names, cross-platform directory encodings, and literal values resembling overflow labels.
 - At the cardinality boundary, 1,024 ordinary hosts remain ordinary and the next distinct host enters signed overflow. Reordering workers cannot alter assignments. Failed/cancelled batches consume no slots, and reconstruction reproduces overflow and row-level query results.
 - Host-filtered, unfiltered, missing-key, overflow and mixed V1/V2 queries remain semantically equivalent. Check tuple-budget overflow, file/writer bounds and actual values retained as entities. Run the 15 GB size/latency comparison above, including the many-host and tiny-file cases.
-
-## Approval requested
-
-Review this amended design, especially the generic scope-key version, 1,024-value cap, typed signed overflow, safe hash-derived paths and 15 GB estimate/measurement plan. The previously approved microseconds/residual, precision markers, stable ordering, mixed-version reads, explicit open-case migration, export V5 and original test criteria are retained. Stop here: implementation still needs the analyst’s approval of this revised document.

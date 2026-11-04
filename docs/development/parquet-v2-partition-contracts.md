@@ -73,9 +73,9 @@ Add `unicode-normalization = "=0.1.26"` directly to `irmind-infra` for the appro
 
 An adapter cannot depend on `irmind-security` just to borrow its normalization implementation. Routing partition names through `ContentGuard` would also mix redaction/detection rules with deterministic bucket naming. An ASCII-only implementation without this dependency would not satisfy the approved NFKC requirement. The recommended option is the direct, already locked normalization package; no new parser or remote module is proposed.
 
-## Approval and additional requirements
+## Implementation requirements
 
-The analyst approved the batch method, closed profile, checked host selector and exact direct dependency in PR #169. The implementation is a separate PR; this document changes no signed bytes.
+The batch method, closed profile, checked host selector and normalizer dependency are defined in [PR #169](https://github.com/ns2switch/irmind/pull/169). The implementation is a separate PR; this document changes no signed bytes.
 
 Derive the normalization policy identifier from `unicode_normalization::UNICODE_VERSION`. A regression test pins the approved Unicode version and identifier. Updating the crate's Unicode tables must fail that test and require a reviewed new policy rather than silently changing historical allocation.
 

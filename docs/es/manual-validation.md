@@ -1,4 +1,4 @@
-Traducción de docs/development/manual-validation.md en el commit 2570e840584ba72decd0e35f3096362b1e3b4494; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/manual-validation.md en el commit 8da2130e1c826feb8708ab2882aabe9a6bd06e62; si hay diferencias, prevalece la versión en inglés.
 
 # Validación manual del MVP
 
@@ -32,41 +32,27 @@ Usa un bucket desechable y una identidad con `s3:ListBucket` en un prefijo y `s3
 
 ## Registro de resultados
 
-| Comprobación | Registro |
-| --- | --- |
-| Fecha de la prueba | 2026-11-01, facilitada por el analista. |
-| Modelo | `deepseek v4.1 flash`, facilitado por el analista. |
-| Sistema operativo | Debian Linux 12, facilitado por el analista. |
-| Versión / commit de IRMind | Versión 0.1.2; no se ha facilitado un commit exacto. |
-| Operador y proveedor | Analista; servicio real de DeepSeek. |
-| Prueba de conexión H5 | Pendiente de registrar por el analista. |
-| Saludo H5 | Observado por el analista: reconoce `hola` como saludo y responde con naturalidad, sin llamadas a herramientas innecesarias. |
-| Investigación con cita del hash | Pendiente de registrar por el analista; no se declara observada. |
-| Seguimiento y streaming | Pendiente de registrar por el analista; no se declaran observados. |
-| Política, redacción y avisos de inyección | Pendiente de registrar, salvo la ausencia observada de herramientas innecesarias en el saludo. |
-| `/verify` de H5 | Pendiente de registrar por el analista; no se declara observado. |
-| Veredicto H5 | **Hecha por decisión del analista.** Aceptada tras el saludo con DeepSeek real. Los pasos no descritos siguen pendientes de registro y no se declaran superados. |
-| Conector real | **Pendiente de validación por el analista.** No se ha facilitado un resultado. |
-| Versión/digest de Splunk, índice y TLS | Pendiente de registrar por el analista. |
-| Búsqueda: resultados esperados/observados y hash | Pendiente de registrar por el analista. |
-| Aprobación: alcance, decisión y resultado | Pendiente de registrar por el analista. |
-| Verificación de custodia del conector e incidencias | Pendiente de registrar por el analista. |
+Guarda los registros detallados de validación en privado. El resumen público debe contener solo la versión del producto, el proveedor, el comportamiento observado y las pruebas pendientes. No publiques identificadores del equipo, rutas personales, credenciales ni salidas completas del proveedor o de incidentes.
 
-No incluyas secretos, respuestas completas del proveedor, rutas personales ni datos reales de incidentes.
+| Comprobación de compatibilidad | Resumen público |
+| --- | --- |
+| Saludo con DeepSeek, IRMind 0.1.2 | Se observó una respuesta natural sin herramientas innecesarias. |
+| Investigación, cita de hash, seguimiento, streaming y `/verify` | No constan como observados. |
+| Conector real | La validación sigue pendiente. |
 
 ## Evaluación opcional con HuntEval y modelo real
 
 Es una comprobación manual con datos sintéticos, posterior a la evaluación determinista semanal. No se ejecuta en CI ni envía las respuestas ocultas al modelo. Usa un directorio de prueba dedicado y un modelo configurado en `/settings model`. La CLI puede pedir desbloquear el archivo: introduce la passphrase en el terminal, nunca en argumentos ni variables de entorno.
 
-1. Obtén [HuntEval](https://github.com/ns2switch/HuntEval) en el commit `4cbb555a56bc17cb03b988ad2f15b1374eecf183`. Desde ese checkout, ejecuta `sha256sum -c /path/to/irmind/scripts/hunteval.sha256` en Linux. El script verifica el origen público antes de la ejecución y la respuesta privada después.
+1. Obtén [HuntEval](https://github.com/ns2switch/HuntEval) en el commit `4cbb555a56bc17cb03b988ad2f15b1374eecf183`. Desde ese checkout, ejecuta `sha256sum -c ../irmind/scripts/hunteval.sha256` en Linux. El script verifica el origen público antes de la ejecución y la respuesta privada después.
 2. Compila IRMind, configura el modelo en el directorio dedicado y ejecuta el comando de desarrollo. Crea un caso, ingiere solo `source/events.json`, solicita hallazgos respaldados, verifica custodia y compara identificadores. Nunca aprueba herramientas automáticamente.
 
 ```sh
 python3 scripts/hunteval_model_eval.py \
-  /path/to/HuntEval \
+  ../HuntEval \
   aws-iam-001 \
   target/debug/irmind \
-  /path/to/dedicated-test-home \
+  ../irmind-evaluation \
   llm-deepseek
 ```
 

@@ -20,7 +20,7 @@ The presentation always uses the scripted model and does not even probe loopback
 
 The private temporary directory and ephemeral file keystore are deleted when the demo returns, including error and cancellation. Terminal restoration remains protected by the existing session guard. The SSH/GUI terminal matrix for Ctrl+O is documented separately in [platforms](../platforms.md#card-expansion-and-terminal-keymaps).
 
-## Early review checkpoint
+## Presentation previews
 
 The real-binary PTY test reaches the ingestion result and checks parser confidence, exits with Esc, and checks both the existing real-data directory and temporary parent. The screenshots below use the reviewed, digest-pinned VHS image with network disabled, bounded container resources and fixed identity variables. They show the actual 0.1.5 development binary, not a mockup.
 
@@ -30,7 +30,7 @@ The real-binary PTY test reaches the ingestion result and checks parser confiden
 
 ![Completed synthetic evidence ingestion with parser-json and 90 percent confidence.](../ux/demo-guide/presentation-preview/03-evidence.png)
 
-Reproduce with the [preview generator](../demo/generate_presentation_preview.py), passing the current development binary through its binary option; see the script help. The generator removes its scratch directory after capture or error. The three-scene checkpoint was published in draft PR #165 before the remaining scenes were completed. The finished recording uses [community.tape](../demo/community.tape); all ten scene screenshots are generated beside these previews.
+Reproduce with the [preview generator](../demo/generate_presentation_preview.py), passing the current development binary through its binary option; see the script help. The generator removes its scratch directory after capture or error. The finished recording uses [community.tape](../demo/community.tape); all ten scene screenshots are generated beside these previews.
 
 ## Complete presentation
 
