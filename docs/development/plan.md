@@ -127,3 +127,7 @@ Priority before artifact V2: deliver global card expansion and its `/expand` fal
 The demo must support 80 × 24; 100 × 40 is recommended. Compact narration scrolls with fixed controls, and secondary panels hide at small sizes. Publish this adjustment before the artifact-V2 implementation, without a separate release.
 
 Implement the [approved artifact-V2 design](parquet-artifact-v2-design.md) in separate PRs: checked instant/precision types and signed envelope/goldens; V2 writes and mixed reads with one stable comparator; generic bounded partitions; explicit open-case migration and export V5; release-mode 15 GB cloud and endpoint/network cardinality benchmarks. Start the host cap at 64 and retain 1,024 as the hard ceiling. Stop before a merge if implementation would depart from the approved design. The isolated EVTX helper, Elastic and Chronicle follow this work.
+
+### Artifact V2 implementation evidence
+
+The first implementation PR defines checked instants/precision, the additive signed envelope and [canonical golden layout](parquet-artifact-v2-wire.md). Production writes remain V1 until the separate mixed-reader/writer PR. Generic bounded partition allocation, explicit open-case migration/export V5 and the cloud/host-cardinality release benchmarks remain separate tasks. The 64-host initial cap is not yet a benchmark-selected final default.

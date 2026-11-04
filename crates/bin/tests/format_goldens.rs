@@ -25,6 +25,9 @@ use std::{collections::BTreeMap, fs, sync::Arc};
 
 type Goldens = BTreeMap<String, String>;
 
+#[path = "support/artifact_v2_goldens.rs"]
+mod artifact_v2_goldens;
+
 struct FixedClock;
 impl Clock for FixedClock {
     fn now(&self) -> Result<u64, AppError> {

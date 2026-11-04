@@ -114,6 +114,7 @@ fn verify_export_chain(bundle: &ExportBundle, id: &CaseId) -> Result<LocalVerifi
             || entry.seq != index as u64 + 1
             || entry.prev != prev
             || sha256(&entry.canonical()) != entry.hash
+            || entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV2
         {
             return Err(AppError::InvalidChain(entry.seq));
         }

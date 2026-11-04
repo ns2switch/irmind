@@ -35,6 +35,7 @@ impl LocalStore {
                 || entry.seq != index as u64 + 1
                 || entry.prev != previous
                 || sha256(&entry.canonical()) != entry.hash
+                || entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV2
             {
                 return Err(AppError::InvalidChain(entry.seq));
             }

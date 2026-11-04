@@ -6,6 +6,29 @@ fuzz_target!(|bytes: &[u8]| {
     if bytes.len() > 65_536 {
         return;
     }
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        if let Ok(artifact) = irmind_domain::ParquetArtifactV2::decode(text.trim()) {
+            let wire = artifact
+                .encode()
+                .expect("a validated artifact encodes canonically");
+            assert_eq!(
+                irmind_domain::ParquetArtifactV2::decode(&wire).unwrap(),
+                artifact
+            );
+            assert!(irmind_domain::ParquetArtifactV2::decode(&(wire + "00")).is_err());
+        }
+        for parsed in [
+            irmind_app::IndexedTime::from_rfc3339(text, false),
+            irmind_app::IndexedTime::from_epoch_decimal(text, false),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let restored =
+                irmind_app::IndexedTime::from_rfc3339(&parsed.to_rfc3339(), false).unwrap();
+            assert_eq!(restored, parsed);
+        }
+    }
     if let Ok(entry) = serde_json::from_slice::<SignedEntry>(bytes) {
         let first = entry.canonical();
         let second = entry.canonical();

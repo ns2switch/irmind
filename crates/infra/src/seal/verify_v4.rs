@@ -220,6 +220,7 @@ impl ChainState {
             || entry.seq != index + 1
             || entry.prev != self.previous
             || sha256(&entry.canonical()) != entry.hash
+            || entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV2
             || (index == 0 && entry.kind != AuditEventKind::CaseCreated)
             || (index > 0 && entry.kind == AuditEventKind::CaseCreated)
             || self

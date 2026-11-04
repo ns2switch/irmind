@@ -82,6 +82,7 @@ macro_rules! streaming_test_model {
     };
 }
 
+mod artifact_v2_foundation;
 mod foundation;
 mod test_support;
 use foundation::{
