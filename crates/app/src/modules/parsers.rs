@@ -125,6 +125,33 @@ pub struct RebuildParser {
 }
 
 impl StreamingEventParser for RebuildParser {
+    fn parse_indexed_reader_report(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        evidence_hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<crate::IndexedGraphRecord>) -> Result<(), AppError>,
+    ) -> Result<crate::ParseReport, AppError> {
+        self.sources
+            .get(source)
+            .ok_or_else(|| AppError::Policy("source has no signed parser selection".into()))?
+            .parse_indexed_reader_report(source, reader, evidence_hash, cancel, emit)
+    }
+
+    fn parse_indexed_local_file_report(
+        &self,
+        source: &str,
+        file: &mut std::fs::File,
+        evidence_hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<crate::IndexedGraphRecord>) -> Result<(), AppError>,
+    ) -> Result<crate::ParseReport, AppError> {
+        self.sources
+            .get(source)
+            .ok_or_else(|| AppError::Policy("source has no signed parser selection".into()))?
+            .parse_indexed_local_file_report(source, file, evidence_hash, cancel, emit)
+    }
     fn streaming_version(&self) -> &'static str {
         "signed-parser-router-v1"
     }

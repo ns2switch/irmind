@@ -353,6 +353,7 @@ fn neighbors_marks_bounded_results_instead_of_claiming_a_complete_count() {
         )
         .unwrap();
     let output = store
+        .queries(&BTreeMap::new())
         .neighbors_native(
             &case_id,
             &prepared.artifacts,

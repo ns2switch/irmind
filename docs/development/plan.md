@@ -108,7 +108,7 @@ The experimental `parser-declarative` module is integrated through [PR #151](htt
 
 ## Native syslog parser
 
-The experimental feature-gated `parser-syslog` uses the shared detection registry and existing SourceManifestV2. RFC 5424 retains source precision; RFC 3164 binds explicit year and fixed offset into the signed inference context and parser version. Bounded gzip uses the reviewed, analyst-approved `flate2` dependency. Synthetic contracts, signed ingestion/reconstruction, unchanged-format goldens, fuzzing and local throughput measurements are documented in [the parser contract](syslog-parser.md) and [benchmarks](benchmarks.md). Linux remains the next module; artifact-V2 implementation has not started.
+The experimental feature-gated `parser-syslog` uses the shared detection registry and existing SourceManifestV2. RFC 5424 retains source precision; RFC 3164 binds explicit year and fixed offset into the signed inference context and parser version. Bounded gzip uses the reviewed, analyst-approved `flate2` dependency. Synthetic contracts, signed ingestion/reconstruction, unchanged-format goldens, fuzzing and local throughput measurements are documented in [the parser contract](syslog-parser.md) and [benchmarks](benchmarks.md). Linux was delivered separately; artifact-V2 implementation follows the sequence below.
 
 ### Per-ingestion RFC 3164 time correction
 
@@ -130,4 +130,7 @@ Implement the [approved artifact-V2 design](parquet-artifact-v2-design.md) in se
 
 ### Artifact V2 implementation evidence
 
-The first implementation PR defines checked instants/precision, the additive signed envelope and [canonical golden layout](parquet-artifact-v2-wire.md). Production writes remain V1 until the separate mixed-reader/writer PR. Generic bounded partition allocation, explicit open-case migration/export V5 and the cloud/host-cardinality release benchmarks remain separate tasks. The 64-host initial cap is not yet a benchmark-selected final default.
+The first implementation PR defines checked instants/precision, the additive signed envelope and [canonical golden layout](parquet-artifact-v2-wire.md). Default CLI/TUI writes remain V1 while the mixed reader/writer, generic allocator and export V5 land in separate PRs. Generic bounded partition allocation, explicit open-case migration/export V5 and the cloud/host-cardinality release benchmarks remain separate tasks. The 64-host initial cap is not yet a benchmark-selected final default.
+
+
+Step (b), [PR #168](https://github.com/ns2switch/irmind/pull/168), implements the [approved storage/parser contracts](parquet-v2-port-transition.md), an explicit precise writer, mixed-schema queries, reproducible compatible compaction and native precision projections without changing V1 goldens. Production activation waits for generic partitions and V5 export; this prevents an intermediate rollout from blocking ordinary case export. Steps (c)–(e) remain pending, including the host-cap benchmark and migration crash tests.

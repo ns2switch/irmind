@@ -133,3 +133,18 @@ pub(super) fn parse(line: &[u8], index: usize) -> Result<GraphRecord, AppError> 
 fn bad() -> AppError {
     AppError::Policy("invalid Chainsaw result".into())
 }
+
+pub(super) fn indexed_project(
+    record: &GraphRecord,
+) -> Result<irmind_app::IndexedProjection, AppError> {
+    let row: Row<'_> = serde_json::from_str(&record.text).map_err(|_| bad())?;
+    let event = row
+        .event
+        .as_ref()
+        .or_else(|| row.document.as_ref()?.data.as_ref()?.event.as_ref());
+    let raw = row
+        .timestamp
+        .or_else(|| event?.system.as_ref()?.time.as_ref()?.system_time)
+        .ok_or_else(bad)?;
+    Ok((Some(irmind_app::indexed_rfc3339(raw, false, false)?), None))
+}

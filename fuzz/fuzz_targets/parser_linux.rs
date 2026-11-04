@@ -20,7 +20,7 @@ fuzz_target!(|bytes: &[u8]| {
     for selected in [&parser as &dyn irmind_app::LogParser, configured.as_ref()] {
         let _ = selected.detect("synthetic.log", bytes);
         let _ = selected.time_context_requirement("synthetic.log", bytes);
-        let _ = selected.parse_reader_report(
+        let _ = selected.parse_indexed_reader_report(
             "synthetic.log",
             &mut bytes.as_ref(),
             sha256(bytes),

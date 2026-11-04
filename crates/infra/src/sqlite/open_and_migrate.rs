@@ -5,11 +5,24 @@ use super::{
 
 impl LocalStore {
     pub fn open(root: &Path) -> Result<Self, AppError> {
+        Self::open_store(root, false)
+    }
+
+    /// Explicit V2 construction while the default rollout awaits partitions and export V5.
+    pub fn open_precise(root: &Path) -> Result<Self, AppError> {
+        Self::open_store(root, true)
+    }
+
+    fn open_store(root: &Path, precise: bool) -> Result<Self, AppError> {
         let (evidence_dir, seal_dir, lock_dir) = Self::prepare_directories(root)?;
         let db = Self::open_database(root)?;
         let store = Self {
             db: Mutex::new(db),
-            parquet: ParquetStore::open(root)?,
+            parquet: if precise {
+                ParquetStore::open_precise(root)?
+            } else {
+                ParquetStore::open(root)?
+            },
             graph_catalog: Mutex::new(std::collections::HashMap::new()),
             evidence_dir,
             seal_dir,

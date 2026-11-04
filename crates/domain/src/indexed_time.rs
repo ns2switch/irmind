@@ -1,5 +1,7 @@
 mod calendar;
+mod order;
 mod parse;
+pub use order::{StableRecordKey, compare_record_keys};
 
 use crate::DomainError;
 

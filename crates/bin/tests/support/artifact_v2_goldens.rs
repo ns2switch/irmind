@@ -24,3 +24,30 @@ fn new_artifact_bytes_and_hash_do_not_depend_on_json_map_order_or_platform() {
     let kind = AuditEventKind::ParquetArtifactV2;
     assert_eq!(AuditEventKind::parse(kind.as_str()), Ok(kind));
 }
+
+#[test]
+fn precise_parquet_physical_bytes_and_envelopes_are_portable() {
+    use irmind_app::{CancellationToken, LargeCaseStore};
+    let root = tempfile::tempdir().unwrap();
+    let input = br#"{"Records":[{"eventTime":"1969-12-31T23:59:59.999999900Z","eventName":"BeforeEpoch","sourceIPAddress":"203.0.113.4"},{"eventTime":"2026-11-01T00:00:00.000000Z","eventName":"MicroZero","sourceIPAddress":"203.0.113.4"},{"eventName":"NoTime","sourceIPAddress":"203.0.113.4"}]}"#;
+    std::fs::write(root.path().join("synthetic.json"), input).unwrap();
+    let store = irmind_infra::ParquetStore::open_precise(root.path()).unwrap();
+    let id = irmind_domain::CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+    let prepared = store
+        .prepare_local(
+            &id,
+            root.path(),
+            "synthetic.json",
+            false,
+            &irmind_mod_parser_json::JsonParser,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    let mut actual = std::collections::BTreeMap::new();
+    for artifact in prepared.artifacts {
+        actual.insert(artifact.path().to_owned(), serde_json::json!({"size": artifact.size(), "sha256": artifact.sha256().as_str(), "envelope": artifact.encode().unwrap()}));
+    }
+    let expected: std::collections::BTreeMap<String, serde_json::Value> =
+        serde_json::from_str(include_str!("../fixtures/formats-artifact-v2.json")).unwrap();
+    assert_eq!(actual, expected);
+}

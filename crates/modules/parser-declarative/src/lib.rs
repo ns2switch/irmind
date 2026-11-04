@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+mod indexed;
 
 use irmind_app::AppError;
 use regex::Regex;

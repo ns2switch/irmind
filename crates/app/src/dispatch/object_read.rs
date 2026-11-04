@@ -286,7 +286,7 @@ impl Engine<'_> {
             let mut known = index
                 .artifacts
                 .into_iter()
-                .map(|item| (item.path.clone(), item))
+                .map(|item| (item.path().to_owned(), item))
                 .collect();
             let large = LargeCaseUseCases {
                 engine: &local,

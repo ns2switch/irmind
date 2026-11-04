@@ -1,16 +1,15 @@
 use super::{
-    AppError, CancellationToken, CaseId, EventHit, GraphQueryFilter, Instant, ParquetArtifactV1,
-    ParquetStore, Predicate, QUERY_DEADLINE, ScanFlow, ScanSpec, complete, recent, text,
-    time_rules,
+    AppError, CancellationToken, CaseId, EventHit, GraphQueryFilter, Instant, ParquetArtifact,
+    Predicate, QUERY_DEADLINE, QueryStore, ScanFlow, ScanSpec, complete, recent, text, time_rules,
 };
 use irmind_app::TimelineEvent;
 use std::collections::BTreeMap;
 
-impl ParquetStore {
+impl QueryStore<'_> {
     pub(crate) fn search_native(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         term: &str,
         limit: usize,
@@ -35,9 +34,15 @@ impl ParquetStore {
             },
             |batch| {
                 for row in 0..batch.num_rows() {
-                    hits.push(EventHit::from_batch(batch, row)?);
+                    hits.push(EventHit::from_batch(
+                        batch,
+                        row,
+                        artifacts
+                            .iter()
+                            .any(|a| matches!(a, ParquetArtifact::V2(_))),
+                    )?);
                 }
-                recent(&mut hits, limit);
+                recent(&mut hits, limit)?;
                 Ok(ScanFlow::Continue)
             },
         )?;
@@ -49,7 +54,7 @@ impl ParquetStore {
             .into_iter()
             .map(|hit| {
                 let at = hit.at.chars().take(32).collect::<String>();
-                let event = hit.event.chars().take(160).collect::<String>();
+                let event = hit.annotated_event().chars().take(160).collect::<String>();
                 format!("{at} {event} source={}", hit.source())
             })
             .collect::<Vec<_>>()
@@ -59,7 +64,7 @@ impl ParquetStore {
     pub(crate) fn timeline_native(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         limit: usize,
         cancel: &CancellationToken,
@@ -68,13 +73,13 @@ impl ParquetStore {
         let mut hits = Vec::new();
         let deadline = Instant::now() + QUERY_DEADLINE;
         let rules = time_rules(filter);
-        let mut dates = BTreeMap::<&str, Vec<ParquetArtifactV1>>::new();
+        let mut dates = BTreeMap::<&str, Vec<ParquetArtifact>>::new();
         for artifact in artifacts.iter().filter(|artifact| {
-            artifact.schema_version == "irmind-events-v2"
+            super::super::format::same_family(artifact.schema_version(), "irmind-events-v2")
                 && super::super::scan::partition_matches(artifact, filter)
         }) {
             dates
-                .entry(&artifact.partition_date)
+                .entry(artifact.partition_date())
                 .or_default()
                 .push(artifact.clone());
         }
@@ -93,9 +98,15 @@ impl ParquetStore {
                 },
                 |batch| {
                     for row in 0..batch.num_rows() {
-                        hits.push(EventHit::from_batch(batch, row)?);
+                        hits.push(EventHit::from_batch(
+                            batch,
+                            row,
+                            artifacts
+                                .iter()
+                                .any(|a| matches!(a, ParquetArtifact::V2(_))),
+                        )?);
                     }
-                    recent(&mut hits, limit);
+                    recent(&mut hits, limit)?;
                     Ok(ScanFlow::Continue)
                 },
             )?;
@@ -107,8 +118,8 @@ impl ParquetStore {
         hits.into_iter()
             .map(|hit| {
                 Ok(TimelineEvent {
-                    at: hit.at,
-                    event: hit.event,
+                    at: hit.at.clone(),
+                    event: hit.annotated_event(),
                     evidence_hash: hit.hash,
                     record_index: usize::try_from(hit.index).map_err(super::super::storage)?,
                 })
@@ -119,7 +130,7 @@ impl ParquetStore {
     pub(crate) fn raw_native(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         hash: &str,
         index: usize,
         cancel: &CancellationToken,
@@ -128,7 +139,7 @@ impl ParquetStore {
             .iter()
             .filter(|artifact| {
                 artifact
-                    .source_hashes
+                    .source_hashes()
                     .iter()
                     .any(|item| item.as_str() == hash)
             })
@@ -165,10 +176,14 @@ impl ParquetStore {
     pub(crate) fn summary_native(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        let (mut count, mut first, mut last) = (0u64, None::<String>, None::<String>);
+        let (mut count, mut first, mut last) = (
+            0u64,
+            None::<super::super::time_cell::TimeCell>,
+            None::<super::super::time_cell::TimeCell>,
+        );
         let status = self.scan_artifacts(
             ScanSpec {
                 id,
@@ -182,13 +197,25 @@ impl ParquetStore {
             },
             |batch| {
                 for row in 0..batch.num_rows() {
-                    let at = text(batch, "event_time", row)?;
+                    let at = super::super::time_cell::TimeCell::from_batch(batch, row)?;
                     count += 1;
-                    if first.as_deref().is_none_or(|old| at < old) {
-                        first = Some(at.into());
-                    }
-                    if last.as_deref().is_none_or(|old| at > old) {
-                        last = Some(at.into());
+                    if at.time.is_some() {
+                        if first
+                            .as_ref()
+                            .map(|old| at.compare(old, false))
+                            .transpose()?
+                            .is_none_or(std::cmp::Ordering::is_lt)
+                        {
+                            first = Some(at.clone());
+                        }
+                        if last
+                            .as_ref()
+                            .map(|old| at.compare(old, false))
+                            .transpose()?
+                            .is_none_or(std::cmp::Ordering::is_gt)
+                        {
+                            last = Some(at);
+                        }
                     }
                 }
                 Ok(ScanFlow::Continue)
@@ -197,8 +224,8 @@ impl ParquetStore {
         complete(status)?;
         Ok(format!(
             "Parquet records={count}; first={}; last={}",
-            first.unwrap_or_default(),
-            last.unwrap_or_default()
+            first.map_or_else(String::new, |t| t.display()),
+            last.map_or_else(String::new, |t| t.display())
         ))
     }
 }

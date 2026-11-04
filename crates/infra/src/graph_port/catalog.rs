@@ -1,8 +1,14 @@
 use super::{AppError, AuditLog, CaseId, LocalStore, Repository, storage};
 use irmind_app::{SignedOperation, seal_challenge, sha256};
-use irmind_domain::{
-    AuditEventKind, EvidenceHash, ParquetArtifactV1, SealedParquetMigrationV1, SourceManifestV1,
-};
+mod entries;
+
+struct CatalogContents {
+    artifacts: Option<Vec<ParquetArtifact>>,
+    has_legacy: bool,
+    source_names: std::collections::BTreeMap<String, String>,
+}
+
+use irmind_domain::{AuditEventKind, EvidenceHash, ParquetArtifact, SealedParquetMigrationV1};
 
 pub(crate) struct CachedCatalog {
     seq: u64,
@@ -10,29 +16,35 @@ pub(crate) struct CachedCatalog {
     operation_seq: u64,
     operation_hash: [u8; 32],
     data_version: u64,
-    artifacts: Option<Vec<ParquetArtifactV1>>,
+    artifacts: Option<Vec<ParquetArtifact>>,
     has_legacy: bool,
+    source_names: std::collections::BTreeMap<String, String>,
 }
 
 impl LocalStore {
+    pub(super) fn query_catalog(&self, id: &CaseId) -> Result<super::QueryCatalog, AppError> {
+        self.signed_parquet_artifacts(id)?;
+        let cache = self.graph_catalog.lock().map_err(storage)?;
+        let data = cache.get(id).ok_or(AppError::InvalidChain(0))?;
+        if data.has_legacy {
+            return Err(AppError::Policy("derived graph is unavailable until legacy evidence is migrated to Parquet; the signed case chain remains accessible".into()));
+        }
+        Ok(super::QueryCatalog {
+            artifacts: data.artifacts.clone().unwrap_or_default(),
+            source_names: data.source_names.clone(),
+        })
+    }
+
     fn graph_data_version(&self) -> Result<u64, AppError> {
         self.conn()?
             .query_row("PRAGMA data_version", [], |row| row.get(0))
             .map_err(storage)
     }
 
-    pub(super) fn has_legacy_graph(&self, id: &CaseId) -> Result<bool, AppError> {
-        self.graph_catalog
-            .lock()
-            .map_err(storage)?
-            .get(id)
-            .map(|catalog| catalog.has_legacy)
-            .ok_or(AppError::InvalidChain(0))
-    }
     pub(crate) fn signed_parquet_artifacts(
         &self,
         id: &CaseId,
-    ) -> Result<Option<Vec<ParquetArtifactV1>>, AppError> {
+    ) -> Result<Option<Vec<ParquetArtifact>>, AppError> {
         let last = self.last_entry(id)?.ok_or(AppError::InvalidChain(0))?;
         let operation = self.last_operation(id)?;
         let operation_seq = operation.as_ref().map_or(0, |entry| entry.seq);
@@ -68,8 +80,11 @@ impl LocalStore {
         } else {
             (Vec::new(), None)
         };
-        let (selected, has_legacy) =
-            collect_signed_artifacts(self.entries(id)?, operations, seal_hash, id, &last)?;
+        let CatalogContents {
+            artifacts: selected,
+            has_legacy,
+            source_names,
+        } = collect_signed_artifacts(self.entries(id)?, operations, seal_hash, id, &last)?;
         self.graph_catalog.lock().map_err(storage)?.insert(
             id.clone(),
             CachedCatalog {
@@ -80,6 +95,7 @@ impl LocalStore {
                 data_version,
                 artifacts: selected.clone(),
                 has_legacy,
+                source_names,
             },
         );
         Ok(selected)
@@ -92,13 +108,9 @@ fn collect_signed_artifacts(
     seal_hash: Option<[u8; 32]>,
     id: &CaseId,
     last: &irmind_app::SignedEntry,
-) -> Result<(Option<Vec<ParquetArtifactV1>>, bool), AppError> {
+) -> Result<CatalogContents, AppError> {
+    let mut state = entries::SignedSources::default();
     let mut previous = [0u8; 32];
-    let mut sources = std::collections::BTreeSet::new();
-    let mut new_source_hashes = std::collections::BTreeSet::new();
-    let mut legacy_hashes = std::collections::BTreeSet::new();
-    let mut artifacts = Vec::new();
-    let mut new_sources = false;
     let mut seen = 0u64;
     let mut analyst_key = None;
     for (index, entry) in entries.into_iter().enumerate() {
@@ -113,41 +125,7 @@ fn collect_signed_artifacts(
         check_analyst_key(&entry, &mut analyst_key)?;
         previous = entry.hash;
         seen = entry.seq;
-        match entry.kind {
-            AuditEventKind::EvidenceIngested | AuditEventKind::GraphIndexed => {
-                let hash = entry
-                    .evidence
-                    .as_deref()
-                    .ok_or(AppError::InvalidChain(entry.seq))?;
-                let hash = irmind_domain::EvidenceHash::parse(hash)
-                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                if entry.kind == AuditEventKind::GraphIndexed {
-                    legacy_hashes.insert(hash.clone());
-                }
-                sources.insert(hash);
-            }
-            AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2 => {
-                let source = SourceManifestV1::decode_signed(entry.kind, &entry.payload)
-                    .map_err(|_| AppError::InvalidChain(entry.seq))?
-                    .ok_or(AppError::InvalidChain(entry.seq))?;
-                new_source_hashes.insert(source.sha256.clone());
-                sources.insert(source.sha256);
-                new_sources = true;
-            }
-            AuditEventKind::ParquetArtifactV1 => {
-                let artifact = ParquetArtifactV1::decode(&entry.payload)
-                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                if artifact
-                    .source_hashes
-                    .iter()
-                    .any(|hash| !sources.contains(hash))
-                {
-                    return Err(AppError::InvalidChain(entry.seq));
-                }
-                artifacts.push(artifact);
-            }
-            _ => {}
-        }
+        state.accept(&entry)?;
     }
     if seen != last.seq || previous != last.hash {
         return Err(AppError::InvalidChain(last.seq));
@@ -158,19 +136,28 @@ fn collect_signed_artifacts(
             seal_hash,
             id,
             analyst_key.as_deref(),
-            &legacy_hashes,
-            &mut artifacts,
+            &state.legacy_hashes,
+            &mut state.artifacts,
         )?;
     }
-    let converted = artifacts
+    let converted = state
+        .artifacts
         .iter()
-        .flat_map(|artifact| artifact.source_hashes.iter())
+        .flat_map(|a| a.source_hashes().iter())
         .cloned()
-        .collect::<std::collections::BTreeSet<_>>();
-    let has_legacy = !legacy_hashes.is_subset(&converted);
-    let selected =
-        select_active_artifacts(artifacts, &legacy_hashes, &new_source_hashes, new_sources)?;
-    Ok((selected, has_legacy))
+        .collect();
+    let has_legacy = !state.legacy_hashes.is_subset(&converted);
+    let selected = select_active_artifacts(
+        state.artifacts,
+        &state.legacy_hashes,
+        &state.new_source_hashes,
+        !state.new_source_hashes.is_empty(),
+    )?;
+    Ok(CatalogContents {
+        artifacts: selected,
+        has_legacy,
+        source_names: state.source_names,
+    })
 }
 
 fn check_analyst_key(
@@ -195,7 +182,7 @@ fn collect_operational_artifacts(
     id: &CaseId,
     analyst_key: Option<&[u8]>,
     legacy_hashes: &std::collections::BTreeSet<EvidenceHash>,
-    artifacts: &mut Vec<ParquetArtifactV1>,
+    artifacts: &mut Vec<ParquetArtifact>,
 ) -> Result<(), AppError> {
     let mut previous = [0; 32];
     for (index, operation) in operations.into_iter().enumerate() {
@@ -217,11 +204,11 @@ fn collect_operational_artifacts(
                 || !legacy_hashes.contains(&record.artifact.source_hashes[0])
                 || artifacts
                     .iter()
-                    .any(|item| item.path == record.artifact.path)
+                    .any(|item| item.path() == record.artifact.path)
             {
                 return Err(AppError::InvalidChain(operation.seq));
             }
-            artifacts.push(record.artifact);
+            artifacts.push(record.artifact.into());
         }
         previous = operation.hash;
     }
@@ -229,47 +216,39 @@ fn collect_operational_artifacts(
 }
 
 fn select_active_artifacts(
-    mut artifacts: Vec<ParquetArtifactV1>,
+    mut artifacts: Vec<ParquetArtifact>,
     legacy_hashes: &std::collections::BTreeSet<EvidenceHash>,
     new_source_hashes: &std::collections::BTreeSet<EvidenceHash>,
     new_sources: bool,
-) -> Result<Option<Vec<ParquetArtifactV1>>, AppError> {
+) -> Result<Option<Vec<ParquetArtifact>>, AppError> {
     let converted = artifacts
         .iter()
-        .flat_map(|artifact: &ParquetArtifactV1| artifact.source_hashes.iter())
+        .flat_map(|artifact: &ParquetArtifact| artifact.source_hashes().iter())
         .cloned()
         .collect::<std::collections::BTreeSet<_>>();
     if !legacy_hashes.is_subset(&converted) {
         artifacts.retain(|artifact| {
             artifact
-                .source_hashes
+                .source_hashes()
                 .iter()
                 .any(|hash| new_source_hashes.contains(hash))
         });
     }
     let covered = artifacts
         .iter()
-        .filter(|artifact| artifact.source_hashes.len() > 1)
+        .filter(|artifact| artifact.source_hashes().len() > 1)
         .flat_map(|artifact| {
-            artifact.source_hashes.iter().map(|hash| {
-                (
-                    artifact.partition_date.clone(),
-                    artifact.partition_account.clone(),
-                    artifact.partition_region.clone(),
-                    artifact.schema_version.clone(),
-                    hash.clone(),
-                )
-            })
+            artifact
+                .source_hashes()
+                .iter()
+                .map(|hash| (artifact.compaction_key(), hash.clone()))
         })
         .collect::<std::collections::BTreeSet<_>>();
     artifacts.retain(|artifact| {
-        artifact.source_hashes.len() > 1
+        artifact.source_hashes().len() > 1
             || !covered.contains(&(
-                artifact.partition_date.clone(),
-                artifact.partition_account.clone(),
-                artifact.partition_region.clone(),
-                artifact.schema_version.clone(),
-                artifact.source_hashes[0].clone(),
+                artifact.compaction_key(),
+                artifact.source_hashes()[0].clone(),
             ))
     });
     if new_sources && artifacts.is_empty() {

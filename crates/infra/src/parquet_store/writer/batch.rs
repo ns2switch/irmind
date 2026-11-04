@@ -1,6 +1,6 @@
 use super::{AppError, Arc, ArrayRef, RecordBatch, RecordRow, StringArray, UInt64Array, storage};
 
-fn pairs(rows: &[RecordRow], sorted: bool) -> Vec<(usize, usize)> {
+pub(super) fn pairs(rows: &[RecordRow], sorted: bool) -> Vec<(usize, usize)> {
     let mut pairs = rows
         .iter()
         .enumerate()

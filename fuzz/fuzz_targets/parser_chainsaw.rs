@@ -5,7 +5,7 @@ use libfuzzer_sys::fuzz_target;
 fuzz_target!(|bytes: &[u8]| {
     if bytes.len() <= 65_536 {
         let _ = ChainsawParser.detect("fuzz.log", bytes);
-        let _ = ChainsawParser.parse_reader_report(
+        let _ = ChainsawParser.parse_indexed_reader_report(
             "fuzz.log",
             &mut std::io::Cursor::new(bytes),
             sha256(bytes),

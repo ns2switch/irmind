@@ -1,120 +1,34 @@
-use super::{
-    AppError, CancellationToken, CaseId, ParquetArtifactV1, ParquetStore, Path, Seek, SeekFrom,
-    storage,
-};
-use arrow::array::{Array, BooleanArray, StringArray, UInt64Array};
+use super::{AppError, CancellationToken, CaseId, ParquetArtifact, ParquetStore, Path, storage};
+use arrow::array::BooleanArray;
 use arrow::datatypes::DataType;
-use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use irmind_domain::GraphQueryFilter;
-use memchr::{memchr, memchr2};
 use parquet::arrow::ProjectionMask;
 use parquet::arrow::arrow_reader::{ArrowPredicateFn, ParquetRecordBatchReaderBuilder, RowFilter};
 use parquet::file::properties::ReaderProperties;
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use parquet::file::serialized_reader::ReadOptionsBuilder;
-use sha2::{Digest, Sha256};
-use std::io::Read as _;
 use std::sync::mpsc::{SyncSender, sync_channel};
 use std::time::Instant;
 
 pub(super) const MAX_QUERY_FILES: usize = 8192;
 const FILE_WORKERS: usize = 4;
+mod predicate;
+mod verification;
+pub(super) use predicate::Predicate;
+#[cfg(test)]
+use predicate::contains_ignore_case;
 
 #[derive(Clone, Copy)]
 pub(super) struct ScanSpec<'a> {
     pub id: &'a CaseId,
-    pub artifacts: &'a [ParquetArtifactV1],
+    pub artifacts: &'a [ParquetArtifact],
     pub filter: &'a GraphQueryFilter,
     pub schema: &'a str,
     pub columns: &'a [&'a str],
     pub predicates: &'a [Predicate],
     pub deadline: Instant,
     pub cancel: &'a CancellationToken,
-}
-
-#[derive(Clone)]
-pub(super) enum Predicate {
-    Equal(&'static str, String),
-    Range(&'static str, String, String),
-    ContainsIgnoreCase(&'static str, String),
-    Index(u64),
-}
-
-impl Predicate {
-    fn column(&self) -> &'static str {
-        match self {
-            Self::Equal(column, _)
-            | Self::Range(column, _, _)
-            | Self::ContainsIgnoreCase(column, _) => column,
-            Self::Index(_) => "record_index",
-        }
-    }
-
-    fn matches(&self, batch: &RecordBatch, row: usize) -> Result<bool, ArrowError> {
-        let column = batch
-            .column_by_name(self.column())
-            .ok_or_else(|| ArrowError::SchemaError("missing Parquet predicate column".into()))?;
-        if let Self::Index(index) = self {
-            let values = column
-                .as_any()
-                .downcast_ref::<UInt64Array>()
-                .ok_or_else(|| {
-                    ArrowError::SchemaError("invalid Parquet record index column".into())
-                })?;
-            Ok(!values.is_null(row) && values.value(row) == *index)
-        } else {
-            let values = column
-                .as_any()
-                .downcast_ref::<StringArray>()
-                .ok_or_else(|| ArrowError::SchemaError("invalid Parquet text column".into()))?;
-            if values.is_null(row) {
-                return Ok(false);
-            }
-            let value = values.value(row);
-            Ok(match self {
-                Self::Equal(_, expected) => value == expected,
-                Self::Range(_, first, last) => value >= first.as_str() && value <= last.as_str(),
-                Self::ContainsIgnoreCase(_, needle) => contains_ignore_case(value, needle),
-                Self::Index(_) => false,
-            })
-        }
-    }
-}
-
-pub(super) fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
-    if needle.is_ascii() {
-        let bytes = haystack.as_bytes();
-        let target = needle.as_bytes();
-        if target.is_empty() {
-            return true;
-        }
-        if target.len() > bytes.len() {
-            return false;
-        }
-        let last = target[target.len() - 1];
-        let mut offset = target.len() - 1;
-        while offset < bytes.len() {
-            let remaining = &bytes[offset..];
-            let found = if last.is_ascii_alphabetic() {
-                memchr2(
-                    last.to_ascii_lowercase(),
-                    last.to_ascii_uppercase(),
-                    remaining,
-                )
-            } else {
-                memchr(last, remaining)
-            };
-            let Some(found) = found else { break };
-            let end = offset + found + 1;
-            if bytes[end - target.len()..end].eq_ignore_ascii_case(target) {
-                return true;
-            }
-            offset = end;
-        }
-        return false;
-    }
-    haystack.to_lowercase().contains(&needle.to_lowercase())
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -139,15 +53,14 @@ impl ParquetStore {
     pub(super) fn scan_artifacts(
         &self,
         spec: ScanSpec<'_>,
+        source_names: &std::collections::BTreeMap<String, String>,
         mut visit: impl FnMut(&RecordBatch) -> Result<ScanFlow, AppError>,
     ) -> Result<ScanStatus, AppError> {
         let selected = spec
             .artifacts
             .iter()
             .filter(|artifact| {
-                (artifact.schema_version == spec.schema
-                    || (spec.schema == "irmind-entities-v1"
-                        && artifact.schema_version == "irmind-entities-v2"))
+                super::format::same_family(artifact.schema_version(), spec.schema)
                     && partition_matches(artifact, spec.filter)
             })
             .collect::<Vec<_>>();
@@ -157,6 +70,7 @@ impl ParquetStore {
             ));
         }
         let case_dir = self.case_dir(spec.id)?;
+        let mut source_units = std::collections::BTreeMap::new();
         for group in selected.chunks(FILE_WORKERS) {
             let status = std::thread::scope(|scope| {
                 let receivers = group
@@ -165,8 +79,13 @@ impl ParquetStore {
                         let (sender, receiver) = sync_channel(1);
                         let case_dir = case_dir.clone();
                         scope.spawn(move || {
-                            let result =
-                                self.scan_one_artifact(&case_dir, artifact, &spec, &sender);
+                            let result = self.scan_one_artifact(
+                                &case_dir,
+                                artifact,
+                                &spec,
+                                source_names,
+                                &sender,
+                            );
                             let message = result.map(ScanMessage::Done);
                             let _ = sender.send(message);
                         });
@@ -178,6 +97,7 @@ impl ParquetStore {
                         let message = receiver.recv().map_err(storage)??;
                         match message {
                             ScanMessage::Batch(batch) => {
+                                super::time_cell::validate_source_units(&batch, &mut source_units)?;
                                 if visit(&batch)? == ScanFlow::Stop {
                                     return Ok(ScanStatus::Stopped);
                                 }
@@ -199,21 +119,37 @@ impl ParquetStore {
     fn scan_one_artifact(
         &self,
         case_dir: &Path,
-        artifact: &ParquetArtifactV1,
+        artifact: &ParquetArtifact,
         spec: &ScanSpec<'_>,
+        source_names: &std::collections::BTreeMap<String, String>,
         sender: &SyncSender<Result<ScanMessage, AppError>>,
     ) -> Result<ScanStatus, AppError> {
         let Some(file) = self.verify_for_scan(case_dir, artifact, spec)? else {
             return Ok(ScanStatus::Deadline);
         };
         let scan_started = Instant::now();
-        let bloom = bloom_reader(&file, artifact, spec.predicates)?;
+        let precise = matches!(artifact, ParquetArtifact::V2(_));
+        let rules = rules_for_artifact(spec, precise)?;
+        let bloom = bloom_reader(&file, artifact, &rules)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).map_err(storage)?;
-        let required = projection(&builder, spec.columns)?;
+        super::format::validate_schema(artifact, builder.schema().as_ref())?;
+        let mut columns = spec.columns.to_vec();
+        columns.extend(["source_hash", "record_index", "event_time"]);
+        if precise {
+            columns.extend([
+                "submicro_nanos",
+                "time_precision",
+                "time_inferred",
+                "source_offset",
+            ]);
+        }
+        columns.sort_unstable();
+        columns.dedup();
+        let required = projection(&builder, &columns)?;
         let mut groups = Vec::new();
         for (index, group) in builder.metadata().row_groups().iter().enumerate() {
-            if row_group_matches(&builder, group, spec.predicates)
-                && bloom_matches(bloom.as_ref(), index, &builder, spec.predicates)?
+            if row_group_matches(&builder, group, &rules)
+                && bloom_matches(bloom.as_ref(), index, &builder, &rules)?
             {
                 groups.push(index);
             }
@@ -221,7 +157,7 @@ impl ParquetStore {
         if groups.is_empty() {
             return Ok(ScanStatus::Complete);
         }
-        let filter = row_filter(&builder, spec.predicates)?;
+        let filter = row_filter(&builder, &rules)?;
         let mut reader = builder
             .with_row_groups(groups)
             .with_projection(required)
@@ -237,7 +173,11 @@ impl ParquetStore {
                 return Ok(ScanStatus::Deadline);
             }
             if sender
-                .send(Ok(ScanMessage::Batch(batch.map_err(storage)?)))
+                .send(Ok(ScanMessage::Batch(super::format::normalize_batch(
+                    &batch.map_err(storage)?,
+                    artifact,
+                    source_names,
+                )?)))
                 .is_err()
             {
                 return Ok(ScanStatus::Stopped);
@@ -248,49 +188,22 @@ impl ParquetStore {
         }
         Ok(ScanStatus::Complete)
     }
-
-    fn verify_for_scan(
-        &self,
-        case_dir: &Path,
-        artifact: &ParquetArtifactV1,
-        spec: &ScanSpec<'_>,
-    ) -> Result<Option<std::fs::File>, AppError> {
-        if spec.cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        if Instant::now() >= spec.deadline {
-            return Ok(None);
-        }
-        artifact.validate().map_err(|_| super::invalid_source())?;
-        let verify_started = Instant::now();
-        let mut file = irmind_fs::open_regular_no_follow(case_dir, Path::new(&artifact.path))
-            .map_err(storage)?;
-        let Some((digest, size)) = hash_until_deadline(&mut file, spec.cancel, spec.deadline)?
-        else {
-            return Ok(None);
-        };
-        if size != artifact.size || digest != super::parse_hash(&artifact.sha256)? {
-            return Err(AppError::EvidenceMismatch(artifact.sha256.as_str().into()));
-        }
-        file.seek(SeekFrom::Start(0)).map_err(storage)?;
-        if let Some(profile) = &self.profile {
-            profile.record_query_verify(verify_started.elapsed());
-        }
-        Ok(Some(file))
-    }
 }
 
 fn bloom_reader(
     file: &std::fs::File,
-    artifact: &ParquetArtifactV1,
+    artifact: &ParquetArtifact,
     predicates: &[Predicate],
 ) -> Result<Option<SerializedFileReader<std::fs::File>>, AppError> {
     if !predicates
         .iter()
         .any(|predicate| matches!(predicate, Predicate::Equal("entity_value", _)))
         || !matches!(
-            artifact.schema_version.as_str(),
-            "irmind-entities-v2" | "irmind-coobservations-v1"
+            artifact.schema_version(),
+            "irmind-entities-v2"
+                | "irmind-entities-v3"
+                | "irmind-coobservations-v1"
+                | "irmind-coobservations-v2"
         )
     {
         return Ok(None);
@@ -331,32 +244,6 @@ fn bloom_matches(
         .is_none_or(|filter| filter.check(&value.as_str())))
 }
 
-fn hash_until_deadline(
-    file: &mut std::fs::File,
-    cancel: &CancellationToken,
-    deadline: Instant,
-) -> Result<Option<([u8; 32], u64)>, AppError> {
-    let mut hasher = Sha256::new();
-    let mut size = 0u64;
-    let mut buffer = vec![0u8; 64 * 1024].into_boxed_slice();
-    loop {
-        if cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        if Instant::now() >= deadline {
-            return Ok(None);
-        }
-        let count = file.read(&mut buffer).map_err(storage)?;
-        if count == 0 {
-            return Ok(Some((hasher.finalize().into(), size)));
-        }
-        size = size
-            .checked_add(count as u64)
-            .ok_or_else(|| AppError::Policy("Parquet size overflow".into()))?;
-        hasher.update(&buffer[..count]);
-    }
-}
-
 fn projection(
     builder: &ParquetRecordBatchReaderBuilder<std::fs::File>,
     columns: &[&str],
@@ -365,11 +252,14 @@ fn projection(
     for name in columns {
         let index = builder.schema().index_of(name).map_err(storage)?;
         let field = builder.schema().field(index);
-        let expected = if *name == "record_index" {
-            DataType::UInt64
-        } else {
-            DataType::Utf8
-        };
+        let precise = matches!(
+            builder
+                .schema()
+                .field_with_name("event_time")
+                .map(arrow::datatypes::Field::data_type),
+            Ok(DataType::Timestamp(_, _))
+        );
+        let expected = super::format::expected_type(name, precise);
         if field.data_type() != &expected {
             return Err(super::invalid_source());
         }
@@ -385,7 +275,22 @@ fn row_filter(
     if predicates.is_empty() {
         return Ok(RowFilter::new(Vec::new()));
     }
-    let names = predicates.iter().map(Predicate::column).collect::<Vec<_>>();
+    let mut names = predicates.iter().map(Predicate::column).collect::<Vec<_>>();
+    if predicates
+        .iter()
+        .any(|p| matches!(p, Predicate::TimeRange(..)))
+        && matches!(
+            builder
+                .schema()
+                .field_with_name("event_time")
+                .map(arrow::datatypes::Field::data_type),
+            Ok(DataType::Timestamp(_, _))
+        )
+    {
+        names.push("submicro_nanos");
+    }
+    names.sort_unstable();
+    names.dedup();
     let projection = projection(builder, &names)?;
     let rules = predicates.to_vec();
     let predicate = ArrowPredicateFn::new(projection, move |batch: RecordBatch| {
@@ -411,6 +316,22 @@ fn row_group_matches(
     predicates: &[Predicate],
 ) -> bool {
     predicates.iter().all(|rule| {
+        if let Predicate::TimeRange(from, to) = rule {
+            let Ok(index) = builder.schema().index_of("event_time") else {
+                return true;
+            };
+            if let Some(parquet::file::statistics::Statistics::Int64(stats)) =
+                group.column(index).statistics()
+            {
+                return stats
+                    .min_opt()
+                    .zip(stats.max_opt())
+                    .is_none_or(|(min, max)| {
+                        *min <= to.unix_micros() && *max >= from.unix_micros()
+                    });
+            }
+            return true;
+        }
         let (name, lower, upper) = match rule {
             Predicate::Equal(name, value) => (*name, value.as_bytes(), value.as_bytes()),
             Predicate::Range(name, first, last) => (*name, first.as_bytes(), last.as_bytes()),
@@ -429,18 +350,51 @@ fn row_group_matches(
     })
 }
 
-pub(super) fn partition_matches(artifact: &ParquetArtifactV1, filter: &GraphQueryFilter) -> bool {
+pub(super) fn partition_matches(artifact: &ParquetArtifact, filter: &GraphQueryFilter) -> bool {
+    if matches!(artifact, ParquetArtifact::V2(_)) {
+        return filter.time_range().is_none_or(|(from, to)| {
+            artifact.partition_date() == "unknown"
+                || (artifact.partition_date() >= &from[..10]
+                    && artifact.partition_date() <= &to[..10])
+        });
+    }
     filter.time_range().is_none_or(|(from, to)| {
-        artifact.partition_date.len() == 10
-            && artifact.partition_date.as_str() >= &from[..10]
-            && artifact.partition_date.as_str() <= &to[..10]
+        artifact.partition_date().len() == 10
+            && artifact.partition_date() >= &from[..10]
+            && artifact.partition_date() <= &to[..10]
     }) && filter
         .account_or_project()
-        .is_none_or(|value| artifact.partition_account == super::writer::safe_partition(value))
+        .is_none_or(|value| artifact.partition_account() == super::writer::safe_partition(value))
         && filter
             .region()
-            .is_none_or(|value| artifact.partition_region == super::writer::safe_partition(value))
+            .is_none_or(|value| artifact.partition_region() == super::writer::safe_partition(value))
 }
 
 #[cfg(test)]
 mod tests;
+
+fn rules_for_artifact(spec: &ScanSpec<'_>, precise: bool) -> Result<Vec<Predicate>, AppError> {
+    let mut rules = Vec::new();
+    for rule in spec.predicates {
+        if let Predicate::Range("event_time", from, to) = rule {
+            let first = irmind_app::IndexedTime::from_rfc3339(from, false)
+                .map_err(|_| super::invalid_source())?
+                .instant();
+            let last = irmind_app::IndexedTime::from_rfc3339(to, false)
+                .map_err(|_| super::invalid_source())?
+                .instant();
+            rules.push(Predicate::TimeRange(first, last));
+            continue;
+        }
+        rules.push(rule.clone());
+    }
+    if precise {
+        if let Some(account) = spec.filter.account_or_project() {
+            rules.push(Predicate::Equal("scope_account", account.into()));
+        }
+        if let Some(region) = spec.filter.region() {
+            rules.push(Predicate::Equal("scope_region", region.into()));
+        }
+    }
+    Ok(rules)
+}

@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+mod indexed;
 
 use chrono::{DateTime, Utc};
 use irmind_app::{
@@ -126,6 +127,23 @@ impl StreamingEventParser for EcsParser {
         emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
         parse_lines(source, reader, evidence_hash, cancel, emit)
+    }
+
+    fn parse_indexed_reader_report(
+        &self,
+        source: &str,
+        reader: &mut dyn std::io::Read,
+        evidence_hash: [u8; 32],
+        cancel: &irmind_app::CancellationToken,
+        emit: &mut dyn FnMut(
+            irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
+        ) -> Result<(), irmind_app::AppError>,
+    ) -> Result<irmind_app::ParseReport, irmind_app::AppError> {
+        irmind_app::parse_indexed_report(
+            |forward| self.parse_reader_report(source, reader, evidence_hash, cancel, forward),
+            crate::indexed::project,
+            emit,
+        )
     }
 }
 

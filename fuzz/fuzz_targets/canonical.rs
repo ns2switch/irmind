@@ -7,15 +7,21 @@ fuzz_target!(|bytes: &[u8]| {
         return;
     }
     if let Ok(text) = std::str::from_utf8(bytes) {
-        if let Ok(artifact) = irmind_domain::ParquetArtifactV2::decode(text.trim()) {
-            let wire = artifact
-                .encode()
-                .expect("a validated artifact encodes canonically");
-            assert_eq!(
-                irmind_domain::ParquetArtifactV2::decode(&wire).unwrap(),
-                artifact
-            );
-            assert!(irmind_domain::ParquetArtifactV2::decode(&(wire + "00")).is_err());
+        for kind in [
+            irmind_domain::AuditEventKind::ParquetArtifactV1,
+            irmind_domain::AuditEventKind::ParquetArtifactV2,
+        ] {
+            if let Ok(artifact) = irmind_domain::ParquetArtifact::decode(kind, text.trim()) {
+                let wire = artifact
+                    .encode()
+                    .expect("a validated artifact encodes canonically");
+                assert_eq!(artifact.audit_kind(), kind);
+                assert_eq!(
+                    irmind_domain::ParquetArtifact::decode(kind, &wire).unwrap(),
+                    artifact
+                );
+                assert!(irmind_domain::ParquetArtifact::decode(kind, &(wire + "00")).is_err());
+            }
         }
         for parsed in [
             irmind_app::IndexedTime::from_rfc3339(text, false),

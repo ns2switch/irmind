@@ -133,12 +133,13 @@ impl LargeCaseUseCases<'_, '_> {
                 .artifacts
                 .iter()
                 .filter(|artifact| {
-                    artifact.source_hashes.len() == 1 && artifact.source_hashes[0].as_str() == hash
+                    artifact.source_hashes().len() == 1
+                        && artifact.source_hashes()[0].as_str() == hash
                 })
                 .cloned()
                 .collect::<Vec<_>>();
-            rebuilt.sort_by(|left, right| left.path.cmp(&right.path));
-            signed.sort_by(|left, right| left.path.cmp(&right.path));
+            rebuilt.sort_by(|left, right| left.path().cmp(right.path()));
+            signed.sort_by(|left, right| left.path().cmp(right.path()));
             if rebuilt != signed || rebuilt.is_empty() {
                 return Err(AppError::EvidenceMismatch(hash.to_owned()));
             }

@@ -17,6 +17,7 @@ pub(super) struct StreamInput<'a> {
     pub(super) cancel: &'a CancellationToken,
     pub(super) profile: Option<&'a ParquetProfile>,
     pub(super) legacy_entities: bool,
+    pub(super) precise_time: bool,
 }
 
 pub(super) fn stream_records(
@@ -34,14 +35,24 @@ pub(super) fn stream_records(
         cancel,
         profile,
         legacy_entities,
+        precise_time,
     } = input;
     let mut open: BTreeMap<Partition, PartitionSinks> = BTreeMap::new();
     let mut grouped: BTreeMap<Partition, Vec<RecordRow>> = BTreeMap::new();
     let mut buffered = 0usize;
-    let mut emit = |tainted: irmind_domain::Tainted<GraphRecord>| {
+    let mut offset_mode = None;
+    let mut emit = |tainted: irmind_domain::Tainted<irmind_app::IndexedGraphRecord>| {
         let row_started = Instant::now();
         let mut row = None;
-        tainted.inspect(|record| row = Some(RecordRow::from_record(record, hash_value)));
+        tainted.inspect(|record| {
+            if precise_time
+                && let Err(error) = validate_offset(&mut offset_mode, record.source_offset, size)
+            {
+                row = Some(Err(error));
+                return;
+            }
+            row = Some(RecordRow::from_indexed(record, hash_value, precise_time));
+        });
         let row = row.ok_or_else(invalid_source)??;
         if let Some(profile) = profile {
             profile.record_row(row_started.elapsed());
@@ -71,6 +82,7 @@ pub(super) fn stream_records(
             hash_value,
             size,
             cancel,
+            precise_time,
         },
         &mut emit,
     )?;
@@ -100,11 +112,14 @@ struct VerifiedInput<'a> {
     hash_value: &'a EvidenceHash,
     size: u64,
     cancel: &'a CancellationToken,
+    precise_time: bool,
 }
 
 fn parse_and_verify(
     input: VerifiedInput<'_>,
-    emit: &mut dyn FnMut(irmind_domain::Tainted<GraphRecord>) -> Result<(), AppError>,
+    emit: &mut dyn FnMut(
+        irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
+    ) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
     let VerifiedInput {
         source,
@@ -115,17 +130,23 @@ fn parse_and_verify(
         hash_value,
         size,
         cancel,
+        precise_time,
     } = input;
     source.seek(SeekFrom::Start(0)).map_err(storage)?;
     if parser.prefers_local_file(relative_path, sample) {
-        let report = parser
-            .parse_local_file_report(relative_path, source, hash, cancel, emit)
-            .map_err(|error| {
-                storage_phase(
-                    error,
-                    irmind_app::AdapterStorageError::CannotParseParquetSource,
-                )
-            })?;
+        let report = if precise_time {
+            parser.parse_indexed_local_file_report(relative_path, source, hash, cancel, emit)
+        } else {
+            parser.parse_local_file_report(relative_path, source, hash, cancel, &mut |row| {
+                emit(wrap_replay(&row)?)
+            })
+        }
+        .map_err(|error| {
+            storage_phase(
+                error,
+                irmind_app::AdapterStorageError::CannotParseParquetSource,
+            )
+        })?;
         source.seek(SeekFrom::Start(0)).map_err(storage)?;
         let (observed_hash, observed_size) = ParquetStore::hash_reader(source, cancel)?;
         if observed_size != size || observed_hash != hash {
@@ -134,14 +155,19 @@ fn parse_and_verify(
         return Ok(report);
     }
     let mut second_pass = HashingReader::new(source);
-    let report = parser
-        .parse_reader_report(relative_path, &mut second_pass, hash, cancel, emit)
-        .map_err(|error| {
-            storage_phase(
-                error,
-                irmind_app::AdapterStorageError::CannotParseParquetSource,
-            )
-        })?;
+    let report = if precise_time {
+        parser.parse_indexed_reader_report(relative_path, &mut second_pass, hash, cancel, emit)
+    } else {
+        parser.parse_reader_report(relative_path, &mut second_pass, hash, cancel, &mut |row| {
+            emit(wrap_replay(&row)?)
+        })
+    }
+    .map_err(|error| {
+        storage_phase(
+            error,
+            irmind_app::AdapterStorageError::CannotParseParquetSource,
+        )
+    })?;
     second_pass.drain(cancel).map_err(|error| {
         storage_phase(
             error,
@@ -200,4 +226,51 @@ pub(super) fn initial_hash(
         return Err(invalid_source());
     }
     Ok((metadata, hash, size))
+}
+
+fn wrap_replay(
+    row: &irmind_domain::Tainted<GraphRecord>,
+) -> Result<irmind_domain::Tainted<irmind_app::IndexedGraphRecord>, AppError> {
+    let mut out = None;
+    row.inspect(|record| {
+        out = Some(irmind_domain::Tainted::from_external(
+            irmind_app::IndexedGraphRecord {
+                record: record.clone(),
+                time: None,
+                source_offset: None,
+            },
+            row.provenance().clone(),
+        ));
+    });
+    out.ok_or_else(invalid_source)
+}
+
+fn validate_offset(
+    mode: &mut Option<bool>,
+    offset: Option<u64>,
+    size: u64,
+) -> Result<(), AppError> {
+    let has_offset = offset.is_some();
+    if offset.is_some_and(|n| n >= size) || mode.is_some_and(|old| old != has_offset) {
+        return Err(invalid_source());
+    }
+    *mode = Some(has_offset);
+    Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    #[test]
+    fn offset_units_are_consistent_and_bounded_by_the_source() {
+        let mut bytes = None;
+        validate_offset(&mut bytes, Some(0), 10).unwrap();
+        validate_offset(&mut bytes, Some(9), 10).unwrap();
+        assert!(validate_offset(&mut bytes, None, 10).is_err());
+        assert!(validate_offset(&mut bytes, Some(10), 10).is_err());
+        let mut records = None;
+        validate_offset(&mut records, None, 10).unwrap();
+        assert!(validate_offset(&mut records, Some(1), 10).is_err());
+    }
 }

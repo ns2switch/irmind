@@ -150,7 +150,7 @@ impl ArtifactPartitionV2 {
         Ok(path)
     }
 
-    pub(super) fn write(&self, out: &mut Vec<u8>) {
+    pub(in crate::custody_manifest) fn write(&self, out: &mut Vec<u8>) {
         for value in [&self.date, &self.key_set, &self.policy] {
             put(out, value.as_bytes());
         }
