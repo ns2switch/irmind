@@ -1,8 +1,5 @@
 #![no_main]
-use irmind_app::{
-    CancellationToken, LogParser as _, ParserTimeBasis, ParserTimeContext,
-    StreamingEventParser as _, sha256,
-};
+use irmind_app::{CancellationToken, LogParser as _, ParserTimeBasis, ParserTimeContext, sha256};
 use irmind_mod_parser_syslog::{LegacyTimestamp, SyslogParser};
 use libfuzzer_sys::fuzz_target;
 fuzz_target!(|bytes: &[u8]| {
@@ -24,7 +21,7 @@ fuzz_target!(|bytes: &[u8]| {
         ] {
             let _ = parser.detect("fuzz.log", bytes);
             let _ = parser.time_context_requirement("fuzz.log", bytes);
-            let _ = parser.parse_reader_report(
+            let _ = parser.parse_indexed_reader_report(
                 "fuzz.log",
                 &mut std::io::Cursor::new(bytes),
                 sha256(bytes),

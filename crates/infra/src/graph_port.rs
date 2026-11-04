@@ -3,8 +3,18 @@ use crate::{
     TimelineEvent, storage, storage_reason,
 };
 use irmind_app::{CancellationToken, GraphRecord};
-use irmind_domain::{CaseScope, GraphQueryFilter, ParquetArtifactV1};
+use irmind_domain::{CaseScope, GraphQueryFilter, ParquetArtifact};
 
+struct QueryCatalog {
+    artifacts: Vec<ParquetArtifact>,
+    source_names: std::collections::BTreeMap<String, String>,
+}
+impl std::ops::Deref for QueryCatalog {
+    type Target = [ParquetArtifact];
+    fn deref(&self) -> &Self::Target {
+        &self.artifacts
+    }
+}
 mod catalog;
 pub(crate) use catalog::CachedCatalog;
 
@@ -38,6 +48,7 @@ impl EvidenceGraph for LocalStore {
     fn graph_summary(&self, id: &CaseId) -> Result<String, AppError> {
         let artifacts = self.query_artifacts(id, &GraphQueryFilter::default())?;
         self.parquet
+            .queries(&artifacts.source_names)
             .summary_native(id, &artifacts, &CancellationToken::new())
     }
 
@@ -49,6 +60,7 @@ impl EvidenceGraph for LocalStore {
     ) -> Result<Vec<TimelineEvent>, AppError> {
         let artifacts = self.query_artifacts(id, filter)?;
         self.parquet
+            .queries(&artifacts.source_names)
             .timeline_native(id, &artifacts, filter, limit, &CancellationToken::new())
     }
 
@@ -61,7 +73,7 @@ impl EvidenceGraph for LocalStore {
     ) -> Result<String, AppError> {
         self.check_entity_query(id, kind, value, 1)?;
         let artifacts = self.query_artifacts(id, filter)?;
-        self.parquet.entity_native(
+        self.parquet.queries(&artifacts.source_names).entity_native(
             id,
             &artifacts,
             filter,
@@ -81,14 +93,16 @@ impl EvidenceGraph for LocalStore {
     ) -> Result<String, AppError> {
         self.check_entity_query(id, kind, value, limit)?;
         let artifacts = self.query_artifacts(id, filter)?;
-        self.parquet.neighbors_native(
-            id,
-            &artifacts,
-            filter,
-            (kind, value),
-            limit,
-            &CancellationToken::new(),
-        )
+        self.parquet
+            .queries(&artifacts.source_names)
+            .neighbors_native(
+                id,
+                &artifacts,
+                filter,
+                (kind, value),
+                limit,
+                &CancellationToken::new(),
+            )
     }
 
     fn entity_timeline_filtered(
@@ -101,14 +115,16 @@ impl EvidenceGraph for LocalStore {
     ) -> Result<String, AppError> {
         self.check_entity_query(id, kind, value, limit)?;
         let artifacts = self.query_artifacts(id, filter)?;
-        self.parquet.entity_timeline_native(
-            id,
-            &artifacts,
-            filter,
-            (kind, value),
-            limit,
-            &CancellationToken::new(),
-        )
+        self.parquet
+            .queries(&artifacts.source_names)
+            .entity_timeline_native(
+                id,
+                &artifacts,
+                filter,
+                (kind, value),
+                limit,
+                &CancellationToken::new(),
+            )
     }
 
     fn graph_path_filtered(
@@ -121,8 +137,14 @@ impl EvidenceGraph for LocalStore {
         self.check_entity_query(id, from.0, from.1, 1)?;
         self.check_entity_query(id, to.0, to.1, 1)?;
         let artifacts = self.query_artifacts(id, filter)?;
-        self.parquet
-            .path_native(id, &artifacts, filter, from, to, &CancellationToken::new())
+        self.parquet.queries(&artifacts.source_names).path_native(
+            id,
+            &artifacts,
+            filter,
+            from,
+            to,
+            &CancellationToken::new(),
+        )
     }
 
     fn text_search_filtered(
@@ -139,7 +161,7 @@ impl EvidenceGraph for LocalStore {
             )));
         }
         let artifacts = self.query_artifacts(id, filter)?;
-        self.parquet.search_native(
+        self.parquet.queries(&artifacts.source_names).search_native(
             id,
             &artifacts,
             filter,
@@ -160,15 +182,15 @@ impl EvidenceGraph for LocalStore {
             )));
         }
         let hash = hash.to_ascii_lowercase();
-        if let Some(artifacts) = self.signed_parquet_artifacts(id)?
-            && artifacts.iter().any(|item| {
-                item.source_hashes
-                    .iter()
-                    .any(|source| source.as_str() == hash)
-            })
-        {
+        let artifacts = self.query_catalog(id)?;
+        if artifacts.iter().any(|item| {
+            item.source_hashes()
+                .iter()
+                .any(|source| source.as_str() == hash)
+        }) {
             let raw = self
                 .parquet
+                .queries(&artifacts.source_names)
                 .raw_native(id, &artifacts, &hash, index, &CancellationToken::new())?
                 .ok_or_else(|| storage_reason("record pointer missing from signed Parquet"))?;
             return Ok(format_raw(&hash, index, &raw));
@@ -218,18 +240,14 @@ impl LocalStore {
         &self,
         id: &CaseId,
         filter: &GraphQueryFilter,
-    ) -> Result<Vec<ParquetArtifactV1>, AppError> {
+    ) -> Result<QueryCatalog, AppError> {
         let case = self.get_case(id)?;
         let scope = CaseScope::parse(&case.scope)
             .map_err(|_| AppError::Policy("invalid case scope".into()))?;
         if !filter.within_scope(&scope) {
             return Err(AppError::Policy("graph filter outside case scope".into()));
         }
-        let artifacts = self.signed_parquet_artifacts(id)?;
-        if self.has_legacy_graph(id)? {
-            return Err(AppError::Policy("derived graph is unavailable until legacy evidence is migrated to Parquet; the signed case chain remains accessible".into()));
-        }
-        Ok(artifacts.unwrap_or_default())
+        self.query_catalog(id)
     }
 
     fn check_entity_query(

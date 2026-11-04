@@ -1,6 +1,6 @@
 use super::{
     AppError, CancellationToken, CaseId, GraphQueryFilter, Instant, MAX_NEIGHBOR_RECORDS,
-    ParquetArtifactV1, ParquetStore, Predicate, ScanFlow, ScanSpec, ScanStatus, number, text,
+    ParquetArtifact, Predicate, QueryStore, ScanFlow, ScanSpec, ScanStatus, number, text,
     time_rules,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -14,22 +14,21 @@ pub(super) struct CoobservationScan {
 }
 
 pub(super) fn coobservation_available(
-    artifacts: &[ParquetArtifactV1],
+    artifacts: &[ParquetArtifact],
     filter: &GraphQueryFilter,
 ) -> bool {
     let sources = |schema: &str| {
         artifacts
             .iter()
             .filter(|artifact| {
-                artifact.schema_version == schema
+                super::super::format::same_family(artifact.schema_version(), schema)
                     && crate::parquet_store::scan::partition_matches(artifact, filter)
             })
             .flat_map(|artifact| {
-                artifact.source_hashes.iter().map(|hash| {
+                artifact.source_hashes().iter().map(|hash| {
                     (
-                        &artifact.partition_date,
-                        &artifact.partition_account,
-                        &artifact.partition_region,
+                        artifact.path().rsplit_once('/').map(|(parent, _)| parent),
+                        artifact.parser_version(),
                         hash,
                     )
                 })
@@ -39,17 +38,17 @@ pub(super) fn coobservation_available(
     let entities = sources("irmind-entities-v2");
     !entities.is_empty()
         && !artifacts.iter().any(|artifact| {
-            artifact.schema_version == "irmind-entities-v1"
+            artifact.schema_version() == "irmind-entities-v1"
                 && crate::parquet_store::scan::partition_matches(artifact, filter)
         })
         && entities == sources("irmind-coobservations-v1")
 }
 
-impl ParquetStore {
+impl QueryStore<'_> {
     pub(super) fn scan_coobservations(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         entity: (&str, &str),
         deadline: Instant,
@@ -61,6 +60,7 @@ impl ParquetStore {
             Predicate::Equal("entity_value", entity.1.into()),
         ]);
         let mut neighbors = BTreeMap::<Entity, (u64, String)>::new();
+        let mut selected_times = BTreeMap::<Entity, super::super::time_cell::TimeCell>::new();
         let mut count = 0;
         let status = self.scan_artifacts(
             ScanSpec {
@@ -86,14 +86,23 @@ impl ParquetStore {
                     );
                     let peers: Vec<Entity> = serde_json::from_str(text(batch, "co_entities", row)?)
                         .map_err(crate::parquet_store::storage)?;
+                    let time = super::super::time_cell::TimeCell::from_batch(batch, row)?;
                     for peer in peers {
                         if peer.0 == entity.0 && peer.1 == entity.1 {
                             continue;
                         }
-                        let entry = neighbors.entry(peer).or_insert_with(|| (0, source.clone()));
+                        let entry = neighbors
+                            .entry(peer.clone())
+                            .or_insert_with(|| (0, source.clone()));
                         entry.0 += 1;
-                        if source < entry.1 {
+                        if selected_times
+                            .get(&peer)
+                            .map(|old| time.compare(old, false))
+                            .transpose()?
+                            .is_none_or(std::cmp::Ordering::is_lt)
+                        {
                             entry.1.clone_from(&source);
+                            selected_times.insert(peer, time.clone());
                         }
                     }
                 }

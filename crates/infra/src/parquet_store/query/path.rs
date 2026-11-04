@@ -1,6 +1,6 @@
 use super::{
-    AppError, CancellationToken, CaseId, GraphQueryFilter, Instant, ParquetArtifactV1,
-    ParquetStore, QUERY_DEADLINE, ScanFlow, ScanSpec, ScanStatus, TargetScan,
+    AppError, CancellationToken, CaseId, GraphQueryFilter, Instant, ParquetArtifact,
+    QUERY_DEADLINE, QueryStore, ScanFlow, ScanSpec, ScanStatus, TargetScan,
     coobservation_available, number, text, time_rules,
 };
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
@@ -17,11 +17,11 @@ pub(super) struct CandidateBatch {
     partial: bool,
 }
 
-impl ParquetStore {
+impl QueryStore<'_> {
     pub(crate) fn path_native(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         from: (&str, &str),
         to: (&str, &str),
@@ -84,7 +84,7 @@ impl ParquetStore {
     fn path_candidates_native(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         entity: &Entity,
         deadline: Instant,
@@ -119,7 +119,7 @@ impl ParquetStore {
     fn path_candidates_legacy(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         entity: &Entity,
         deadline: Instant,
@@ -141,6 +141,7 @@ impl ParquetStore {
             return Ok(None);
         }
         let mut neighbors = BTreeMap::<Entity, String>::new();
+        let mut times = BTreeMap::<Entity, super::super::time_cell::TimeCell>::new();
         let status = self.scan_artifacts(
             ScanSpec {
                 id,
@@ -168,11 +169,19 @@ impl ParquetStore {
                         continue;
                     }
                     let source = format!("{hash}#{index}");
+                    let key = (kind.into(), value.into());
+                    let time = super::super::time_cell::TimeCell::from_batch(batch, row)?;
                     let current = neighbors
-                        .entry((kind.into(), value.into()))
+                        .entry(key.clone())
                         .or_insert_with(|| source.clone());
-                    if source < *current {
+                    if times
+                        .get(&key)
+                        .map(|old| time.compare(old, false))
+                        .transpose()?
+                        .is_none_or(std::cmp::Ordering::is_lt)
+                    {
                         *current = source;
+                        times.insert(key, time);
                     }
                 }
                 Ok(ScanFlow::Continue)

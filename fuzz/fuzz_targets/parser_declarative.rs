@@ -1,5 +1,5 @@
 #![no_main]
-use irmind_app::{CancellationToken, sha256};
+use irmind_app::{CancellationToken, StreamingEventParser as _, sha256};
 use irmind_mod_parser_declarative::DeclarativeParser;
 use libfuzzer_sys::fuzz_target;
 
@@ -28,7 +28,7 @@ fuzz_target!(|bytes: &[u8]| {
         return;
     };
     let _ = parser.detect_sample(data);
-    let _ = parser.parse_source(
+    let _ = parser.parse_indexed_reader_report(
         "synthetic/fuzz.log",
         &mut std::io::Cursor::new(data),
         sha256(data),

@@ -1,5 +1,5 @@
 use super::{
-    AppError, CancellationToken, CaseId, EvidenceHash, File, OpenOptions, ParquetArtifactV1,
+    AppError, CancellationToken, CaseId, EvidenceHash, File, OpenOptions, ParquetArtifact,
     ParquetStore, Path, StagedArtifact, fs, invalid_source, storage,
 };
 use arrow::compute::{SortColumn, lexsort_to_indices, take};
@@ -8,55 +8,22 @@ use parquet::arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder}
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
 use parquet::schema::types::ColumnPath;
-use std::collections::BTreeSet;
+use std::io::{Seek as _, SeekFrom};
+mod manifest;
+use manifest::validate_sources;
 
 impl ParquetStore {
     pub(super) fn compact_signed_sources(
         &self,
         id: &CaseId,
-        sources: &[ParquetArtifactV1],
+        sources: &[ParquetArtifact],
         cancel: &CancellationToken,
-    ) -> Result<ParquetArtifactV1, AppError> {
+    ) -> Result<ParquetArtifact, AppError> {
         let (mut ordered, hashes) = validate_sources(sources)?;
-        ordered.sort_by(|left, right| left.path.cmp(&right.path));
+        ordered.sort_by(|left, right| left.path().cmp(right.path()));
         let first = ordered.first().ok_or_else(invalid_source)?;
-        let part = format!(
-            "date={}/account={}/region={}",
-            first.partition_date, first.partition_account, first.partition_region
-        );
-        let digest_input = format!(
-            "irmind-parquet-compact-v1\n{}\n{}",
-            first.schema_version,
-            hashes
-                .iter()
-                .map(EvidenceHash::as_str)
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
-        let name = format!(
-            "bundle-{}.parquet",
-            irmind_app::hex(&irmind_app::sha256(digest_input.as_bytes()))
-        );
-        let path = format!("{part}/{name}");
         let case_dir = self.case_dir(id)?;
-        let dir = case_dir.join(&part);
-        fs::create_dir_all(&dir).map_err(storage)?;
-        irmind_fs::private_dir(&dir).map_err(storage)?;
-        let temporary = dir.join(format!(".{name}.{}.tmp", rand::random::<u64>()));
-        let mut staged = StagedArtifact {
-            temporary,
-            manifest: ParquetArtifactV1 {
-                path,
-                size: 0,
-                sha256: EvidenceHash::parse(&"0".repeat(64)).map_err(|_| invalid_source())?,
-                parser_version: "json-stream-v2+compact-v1".into(),
-                schema_version: first.schema_version.clone(),
-                partition_date: first.partition_date.clone(),
-                partition_account: first.partition_account.clone(),
-                partition_region: first.partition_region.clone(),
-                source_hashes: hashes,
-            },
-        };
+        let mut staged = manifest::stage(&case_dir, first, hashes)?;
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
         #[cfg(unix)]
@@ -67,61 +34,39 @@ impl ParquetStore {
         let output = options.open(&staged.temporary).map_err(storage)?;
         irmind_fs::private_file(&staged.temporary).map_err(storage)?;
         let (size, digest) = write_compact(&case_dir, &staged.temporary, &ordered, output, cancel)?;
-        staged.manifest.size = size;
-        staged.manifest.sha256 =
-            EvidenceHash::parse(&irmind_app::hex(&digest)).map_err(|_| invalid_source())?;
+        match &mut staged.manifest {
+            ParquetArtifact::V1(v) => {
+                v.size = size;
+                v.sha256 =
+                    EvidenceHash::parse(&irmind_app::hex(&digest)).map_err(|_| invalid_source())?;
+            }
+            ParquetArtifact::V2(v) => {
+                v.size = size;
+                v.sha256 =
+                    EvidenceHash::parse(&irmind_app::hex(&digest)).map_err(|_| invalid_source())?;
+            }
+        }
         self.finish_artifacts(id, vec![staged])?
             .pop()
             .ok_or_else(invalid_source)
     }
 }
 
-fn validate_sources(
-    sources: &[ParquetArtifactV1],
-) -> Result<(Vec<ParquetArtifactV1>, Vec<EvidenceHash>), AppError> {
-    if !(2..=128).contains(&sources.len()) {
-        return Err(AppError::Policy(
-            "Parquet compaction requires 2–128 sources".into(),
-        ));
-    }
-    let first = &sources[0];
-    let mut hashes = BTreeSet::new();
-    for source in sources {
-        source.validate().map_err(|_| invalid_source())?;
-        if source.parser_version != "json-stream-v2"
-            || !matches!(
-                source.schema_version.as_str(),
-                "irmind-events-v2"
-                    | "irmind-entities-v1"
-                    | "irmind-entities-v2"
-                    | "irmind-coobservations-v1"
-            )
-            || source.schema_version != first.schema_version
-            || source.source_hashes.len() != 1
-            || source.partition_date != first.partition_date
-            || source.partition_account != first.partition_account
-            || source.partition_region != first.partition_region
-            || !hashes.insert(source.source_hashes[0].clone())
-        {
-            return Err(invalid_source());
-        }
-    }
-    Ok((sources.to_vec(), hashes.into_iter().collect()))
-}
-
 fn write_compact(
     case_dir: &Path,
     output_path: &Path,
-    sources: &[ParquetArtifactV1],
+    sources: &[ParquetArtifact],
     output: File,
     cancel: &CancellationToken,
 ) -> Result<(u64, [u8; 32]), AppError> {
-    let schema = sources
-        .first()
-        .ok_or_else(invalid_source)?
-        .schema_version
-        .as_str();
-    let optimized = matches!(schema, "irmind-entities-v2" | "irmind-coobservations-v1");
+    let schema = sources.first().ok_or_else(invalid_source)?.schema_version();
+    let optimized = matches!(
+        schema,
+        "irmind-entities-v2"
+            | "irmind-coobservations-v1"
+            | "irmind-entities-v3"
+            | "irmind-coobservations-v2"
+    );
     let mut properties = WriterProperties::builder()
         .set_compression(Compression::SNAPPY)
         .set_max_row_group_row_count(Some(if optimized { 1024 } else { 8192 }));
@@ -137,19 +82,16 @@ fn write_compact(
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let mut check = irmind_fs::open_regular_no_follow(case_dir, Path::new(&source.path))
+        let mut check = irmind_fs::open_regular_no_follow(case_dir, Path::new(&source.path()))
             .map_err(storage)?;
         let (digest, size) = ParquetStore::hash_reader(&mut check, cancel)?;
-        if digest != super::parse_hash(&source.sha256)? || size != source.size {
-            return Err(AppError::EvidenceMismatch(source.sha256.as_str().into()));
+        if digest != super::parse_hash(source.sha256())? || size != source.size() {
+            return Err(AppError::EvidenceMismatch(source.sha256().as_str().into()));
         }
-        let file = irmind_fs::open_regular_no_follow(case_dir, Path::new(&source.path))
-            .map_err(storage)?;
-        let reader = ParquetRecordBatchReaderBuilder::try_new(file)
-            .map_err(storage)?
-            .with_batch_size(8192)
-            .build()
-            .map_err(storage)?;
+        check.seek(SeekFrom::Start(0)).map_err(storage)?;
+        let builder = ParquetRecordBatchReaderBuilder::try_new(check).map_err(storage)?;
+        super::format::validate_schema(source, builder.schema().as_ref())?;
+        let reader = builder.with_batch_size(8192).build().map_err(storage)?;
         for batch in reader {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);

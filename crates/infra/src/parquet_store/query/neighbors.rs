@@ -1,16 +1,16 @@
 use super::{
     AppError, CancellationToken, CaseId, GraphQueryFilter, Instant, MAX_NEIGHBOR_RECORDS,
-    ParquetArtifactV1, ParquetStore, Predicate, QUERY_DEADLINE, ScanFlow, ScanSpec, TargetScan,
+    ParquetArtifact, Predicate, QUERY_DEADLINE, QueryStore, ScanFlow, ScanSpec, TargetScan,
     complete, coobservation_available, number, text, time_rules,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write as _;
 
-impl ParquetStore {
+impl QueryStore<'_> {
     pub(crate) fn neighbors_native(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         entity: (&str, &str),
         limit: usize,
@@ -79,7 +79,7 @@ impl ParquetStore {
     fn neighbors_from_coobservations(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         entity: (&str, &str),
         limit: usize,
@@ -115,7 +115,7 @@ impl ParquetStore {
     pub(super) fn native_targets(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         entity: (&str, &str),
         deadline: Instant,

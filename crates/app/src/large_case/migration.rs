@@ -1,6 +1,6 @@
 use super::{
     AppError, AuditEventKind, AuditOrigin, BTreeMap, BTreeSet, CancellationToken, CaseId,
-    LargeCaseUseCases, ParquetArtifactV1, invalid_manifest, read_manifest_index,
+    LargeCaseUseCases, ParquetArtifact, invalid_manifest, read_manifest_index,
 };
 
 impl LargeCaseUseCases<'_, '_> {
@@ -34,7 +34,7 @@ impl LargeCaseUseCases<'_, '_> {
         let mut existing = read_manifest_index(&entries)?
             .artifacts
             .into_iter()
-            .map(|artifact| (artifact.path.clone(), artifact))
+            .map(|artifact| (artifact.path().to_owned(), artifact))
             .collect::<BTreeMap<_, _>>();
         let hashes = entries
             .iter()
@@ -54,7 +54,7 @@ impl LargeCaseUseCases<'_, '_> {
             let mut added = false;
             for artifact in artifacts {
                 self.store.verify_artifact(id, &artifact, cancel)?;
-                added |= !existing.contains_key(&artifact.path);
+                added |= !existing.contains_key(artifact.path());
                 self.audit_artifact(id, artifact, &mut existing)?;
             }
             if added {
@@ -88,7 +88,7 @@ impl LargeCaseUseCases<'_, '_> {
         let operations = self.engine.audit_log.operations(id)?;
         let mut existing = super::read_sealed_artifacts(&entries, &operations, seal.hash)?
             .into_iter()
-            .map(|artifact| (artifact.path.clone(), artifact))
+            .map(|artifact| (artifact.path().to_owned(), artifact))
             .collect::<BTreeMap<_, _>>();
         let hashes = entries
             .iter()
@@ -108,21 +108,21 @@ impl LargeCaseUseCases<'_, '_> {
                     .prepare_legacy_evidence(id, &hash, &bytes, self.parser, cancel)?
             {
                 self.store.verify_artifact(id, &artifact, cancel)?;
-                if let Some(previous) = existing.get(&artifact.path) {
+                if let Some(previous) = existing.get(artifact.path()) {
                     if previous != &artifact {
-                        return Err(AppError::EvidenceMismatch(artifact.path));
+                        return Err(AppError::EvidenceMismatch(artifact.path().to_owned()));
                     }
                     continue;
                 }
                 let record = irmind_domain::SealedParquetMigrationV1 {
                     seal_hash: seal.hash,
-                    artifact: artifact.clone(),
+                    artifact: artifact.v1().map_err(|_| invalid_manifest())?.clone(),
                 };
                 self.engine.record_operational_event_unlocked(
                     id,
                     &record.encode().map_err(|_| invalid_manifest())?,
                 )?;
-                existing.insert(artifact.path.clone(), artifact);
+                existing.insert(artifact.path().to_owned(), artifact);
                 added = true;
             }
             if added {
@@ -136,23 +136,23 @@ impl LargeCaseUseCases<'_, '_> {
     pub(super) fn audit_artifact(
         &self,
         id: &CaseId,
-        artifact: ParquetArtifactV1,
-        existing: &mut BTreeMap<String, ParquetArtifactV1>,
+        artifact: ParquetArtifact,
+        existing: &mut BTreeMap<String, ParquetArtifact>,
     ) -> Result<(), AppError> {
-        if let Some(previous) = existing.get(&artifact.path) {
+        if let Some(previous) = existing.get(artifact.path()) {
             if previous != &artifact {
-                return Err(AppError::EvidenceMismatch(artifact.path));
+                return Err(AppError::EvidenceMismatch(artifact.path().to_owned()));
             }
             return Ok(());
         }
         self.engine.audit(
             id,
             AuditOrigin::System,
-            AuditEventKind::ParquetArtifactV1,
+            artifact.audit_kind(),
             &artifact.encode().map_err(|_| invalid_manifest())?,
             None,
         )?;
-        existing.insert(artifact.path.clone(), artifact);
+        existing.insert(artifact.path().to_owned(), artifact);
         Ok(())
     }
 }

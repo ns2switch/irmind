@@ -223,10 +223,10 @@ fn one_parser_golden(
             out,
             &format!(
                 "artifact/{name}/{}/{}/{}/{}",
-                artifact.schema_version,
-                artifact.partition_date,
-                artifact.partition_account,
-                artifact.partition_region
+                artifact.schema_version(),
+                artifact.partition_date(),
+                artifact.partition_account(),
+                artifact.partition_region()
             ),
             artifact.encode().unwrap().as_bytes(),
         );
@@ -441,3 +441,6 @@ fn linux_signed_and_reconstructed_format_goldens_are_unchanged() {
         serde_json::from_str(include_str!("fixtures/formats-linux-v1.json")).unwrap();
     assert_eq!(actual, expected);
 }
+
+#[path = "support/indexed_parser_contracts.rs"]
+mod indexed_parser_contracts;

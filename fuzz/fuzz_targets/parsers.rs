@@ -9,7 +9,7 @@ fuzz_target!(|bytes: &[u8]| {
     if bytes.len() <= 65_536 {
         let _ = JsonParser.detect("fuzz.jsonl", bytes);
         let _ = JsonParser.parse("fuzz.json", bytes);
-        let _ = JsonParser.parse_reader_report(
+        let _ = JsonParser.parse_indexed_reader_report(
             "fuzz.jsonl",
             &mut std::io::Cursor::new(bytes),
             sha256(bytes),

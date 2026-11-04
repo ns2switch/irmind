@@ -69,13 +69,13 @@ fn source_and_parquet_are_streamed_and_verified_independently() {
     assert_eq!(prepared.records, 1);
     assert_eq!(prepared.artifacts.len(), 3);
     assert!(prepared.artifacts.iter().any(|artifact| {
-        artifact.schema_version == "irmind-coobservations-v1"
-            && artifact.source_hashes == vec![prepared.manifest.sha256.clone()]
+        artifact.schema_version() == "irmind-coobservations-v1"
+            && artifact.source_hashes() == vec![prepared.manifest.sha256.clone()]
     }));
     assert!(!prepared.manifest.copied);
     assert!(
         prepared.artifacts[0]
-            .path
+            .path()
             .contains("date=2026-10-28/account=123456789012/region=eu-west-1")
     );
     store
@@ -118,9 +118,9 @@ fn new_entity_artifact_has_a_value_bloom_filter() {
     let artifact = prepared
         .artifacts
         .iter()
-        .find(|artifact| artifact.schema_version == "irmind-entities-v2")
+        .find(|artifact| artifact.schema_version() == "irmind-entities-v2")
         .unwrap();
-    let file = File::open(store.case_dir(&id).unwrap().join(&artifact.path)).unwrap();
+    let file = File::open(store.case_dir(&id).unwrap().join(artifact.path())).unwrap();
     let reader = SerializedFileReader::new_with_options(
         file,
         ReadOptionsBuilder::new()
@@ -136,7 +136,7 @@ fn new_entity_artifact_has_a_value_bloom_filter() {
     let bloom = group.get_column_bloom_filter(5).unwrap();
     assert!(bloom.check(&"203.0.113.4"));
     let batches = parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder::try_new(
-        File::open(store.case_dir(&id).unwrap().join(&artifact.path)).unwrap(),
+        File::open(store.case_dir(&id).unwrap().join(artifact.path())).unwrap(),
     )
     .unwrap()
     .build()
@@ -203,15 +203,18 @@ fn old_entity_artifacts_remain_queryable_and_rebuildable() {
     assert_eq!(new.artifacts.len(), 3);
     let filter = irmind_domain::GraphQueryFilter::default();
     let cancel = CancellationToken::new();
-    let lookup = |id: &CaseId, artifacts: &[ParquetArtifactV1]| {
+    let lookup = |id: &CaseId, artifacts: &[ParquetArtifact]| {
         (
             store
+                .queries(&BTreeMap::new())
                 .entity_native(id, artifacts, &filter, "ip", "203.0.113.4", &cancel)
                 .unwrap(),
             store
+                .queries(&BTreeMap::new())
                 .neighbors_native(id, artifacts, &filter, ("ip", "203.0.113.4"), 10, &cancel)
                 .unwrap(),
             store
+                .queries(&BTreeMap::new())
                 .path_native(
                     id,
                     artifacts,
@@ -297,6 +300,7 @@ fn mixed_old_and_new_artifacts_keep_full_neighbor_results() {
         .chain(new.artifacts)
         .collect::<Vec<_>>();
     let result = store
+        .queries(&BTreeMap::new())
         .neighbors_native(
             &id,
             &artifacts,
@@ -353,6 +357,7 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
     let hash = prepared.manifest.sha256.as_str();
     assert_eq!(
         store
+            .queries(&BTreeMap::new())
             .search_native(&id, artifacts, &filter, "AssumeRole", 10, &cancel)
             .unwrap(),
         format!(
@@ -360,6 +365,7 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
         )
     );
     let timeline = store
+        .queries(&BTreeMap::new())
         .timeline_native(&id, artifacts, &filter, 10, &cancel)
         .unwrap();
     assert_eq!(
@@ -372,18 +378,21 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
     assert!(timeline.iter().all(|entry| entry.evidence_hash == hash));
     assert_eq!(
         store
+            .queries(&BTreeMap::new())
             .entity_native(&id, artifacts, &filter, "ip", "203.0.113.4", &cancel)
             .unwrap(),
         "ip 203.0.113.4: count=2; first=2026-10-28T12:00:00Z; last=2026-10-28T12:10:00Z"
     );
     assert_eq!(
         store
+            .queries(&BTreeMap::new())
             .entity_native(&id, artifacts, &filter, "account", "123456789012", &cancel)
             .unwrap(),
         "account 123456789012: count=3; first=2026-10-28T12:00:00Z; last=2026-10-28T12:10:00Z"
     );
     assert_eq!(
         store
+            .queries(&BTreeMap::new())
             .entity_timeline_native(&id, artifacts, &filter, ("ip", "203.0.113.4"), 10, &cancel)
             .unwrap(),
         format!(
@@ -392,12 +401,14 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
     );
     assert_eq!(
         store
+            .queries(&BTreeMap::new())
             .neighbors_native(&id, artifacts, &filter, ("ip", "203.0.113.4"), 10, &cancel)
             .unwrap(),
         "account 123456789012 co-observed 2 times"
     );
     assert_eq!(
         store
+            .queries(&BTreeMap::new())
             .neighbors_native(
                 &id,
                 artifacts,
@@ -411,6 +422,7 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
     );
     assert_eq!(
         store
+            .queries(&BTreeMap::new())
             .path_native(
                 &id,
                 artifacts,
@@ -423,6 +435,7 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
         format!("ip 203.0.113.4 --[co-observed in {hash}#0]--> account 123456789012")
     );
     let raw = store
+        .queries(&BTreeMap::new())
         .raw_native(&id, artifacts, hash, 0, &cancel)
         .unwrap()
         .unwrap();
@@ -432,12 +445,15 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
         serde_json::from_str::<serde_json::Value>(expected).unwrap()
     );
     assert_eq!(
-        store.summary_native(&id, artifacts, &cancel).unwrap(),
+        store
+            .queries(&BTreeMap::new())
+            .summary_native(&id, artifacts, &cancel)
+            .unwrap(),
         "Parquet records=3; first=2026-10-28T12:00:00Z; last=2026-10-28T12:10:00Z"
     );
     let coobservations = artifacts
         .iter()
-        .find(|artifact| artifact.schema_version == "irmind-coobservations-v1")
+        .find(|artifact| artifact.schema_version() == "irmind-coobservations-v1")
         .unwrap();
     let narrowed = irmind_domain::GraphQueryFilter::parse(
         Some("2026-10-28T12:04:00Z"),
@@ -449,12 +465,14 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
     .unwrap();
     assert_eq!(
         store
+            .queries(&BTreeMap::new())
             .search_native(&id, artifacts, &narrowed, "AssumeRole", 10, &cancel)
             .unwrap(),
         format!("2026-10-28T12:10:00Z AssumeRole source={hash}#2")
     );
     assert_eq!(
         store
+            .queries(&BTreeMap::new())
             .timeline_native(&id, artifacts, &narrowed, 10, &cancel)
             .unwrap()
             .iter()
@@ -463,18 +481,29 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
         [2, 1]
     );
     fs::write(
-        store.case_dir(&id).unwrap().join(&coobservations.path),
+        store.case_dir(&id).unwrap().join(coobservations.path()),
         b"changed",
     )
     .unwrap();
     assert!(matches!(
-        store.neighbors_native(&id, artifacts, &filter, ("ip", "203.0.113.4"), 10, &cancel),
+        store.queries(&BTreeMap::new()).neighbors_native(
+            &id,
+            artifacts,
+            &filter,
+            ("ip", "203.0.113.4"),
+            10,
+            &cancel
+        ),
         Err(AppError::EvidenceMismatch(_))
     ));
-    let tampered = store.case_dir(&id).unwrap().join(&artifacts[0].path);
+    let tampered = store.case_dir(&id).unwrap().join(artifacts[0].path());
     fs::write(tampered, b"changed").unwrap();
     assert!(matches!(
-        store.summary_native(&id, artifacts, &cancel),
+        store
+            .queries(&BTreeMap::new())
+            .summary_native(&id, artifacts, &cancel),
         Err(AppError::EvidenceMismatch(_))
     ));
 }
+
+mod precise;

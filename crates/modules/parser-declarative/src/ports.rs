@@ -73,6 +73,23 @@ impl StreamingEventParser for DeclarativeParser {
     ) -> Result<ParseReport, AppError> {
         self.parse_source(source, reader, hash, cancel, emit)
     }
+
+    fn parse_indexed_reader_report(
+        &self,
+        source: &str,
+        reader: &mut dyn std::io::Read,
+        evidence_hash: [u8; 32],
+        cancel: &irmind_app::CancellationToken,
+        emit: &mut dyn FnMut(
+            irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
+        ) -> Result<(), irmind_app::AppError>,
+    ) -> Result<irmind_app::ParseReport, irmind_app::AppError> {
+        irmind_app::parse_indexed_report(
+            |forward| self.parse_reader_report(source, reader, evidence_hash, cancel, forward),
+            |record| crate::indexed::project(self, record),
+            emit,
+        )
+    }
 }
 
 impl LogParser for DeclarativeParser {

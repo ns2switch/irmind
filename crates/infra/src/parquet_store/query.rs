@@ -1,10 +1,35 @@
-use super::{AppError, CancellationToken, CaseId, ParquetArtifactV1, ParquetStore};
+use super::{AppError, CancellationToken, CaseId, ParquetArtifact, ParquetStore};
 use crate::parquet_store::scan::{Predicate, ScanFlow, ScanSpec, ScanStatus};
 use arrow::array::{StringArray, UInt64Array};
 use arrow::record_batch::RecordBatch;
 use irmind_domain::GraphQueryFilter;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
+
+pub(crate) struct QueryStore<'a> {
+    store: &'a ParquetStore,
+    source_names: &'a std::collections::BTreeMap<String, String>,
+}
+impl ParquetStore {
+    pub(crate) fn queries<'a>(
+        &'a self,
+        names: &'a std::collections::BTreeMap<String, String>,
+    ) -> QueryStore<'a> {
+        QueryStore {
+            store: self,
+            source_names: names,
+        }
+    }
+}
+impl QueryStore<'_> {
+    fn scan_artifacts(
+        &self,
+        spec: ScanSpec<'_>,
+        visit: impl FnMut(&RecordBatch) -> Result<ScanFlow, AppError>,
+    ) -> Result<ScanStatus, AppError> {
+        self.store.scan_artifacts(spec, self.source_names, visit)
+    }
+}
 
 mod coobservations;
 mod entity;
@@ -28,16 +53,28 @@ pub(super) struct EventHit {
     event: String,
     hash: String,
     index: u64,
+    time: super::time_cell::TimeCell,
+    show_precision: bool,
 }
 
 impl EventHit {
-    fn from_batch(batch: &RecordBatch, row: usize) -> Result<Self, AppError> {
+    fn from_batch(batch: &RecordBatch, row: usize, show_precision: bool) -> Result<Self, AppError> {
         Ok(Self {
+            show_precision,
             at: text(batch, "event_time", row)?.into(),
             event: text(batch, "event", row)?.into(),
             hash: text(batch, "source_hash", row)?.into(),
             index: number(batch, "record_index", row)?,
+            time: super::time_cell::TimeCell::from_batch(batch, row)?,
         })
+    }
+
+    fn annotated_event(&self) -> String {
+        if self.show_precision {
+            format!("{} [{}]", self.event, self.time.note())
+        } else {
+            self.event.clone()
+        }
     }
 
     fn source(&self) -> String {
@@ -81,13 +118,18 @@ pub(super) fn complete(status: ScanStatus) -> Result<(), AppError> {
     }
 }
 
-pub(super) fn recent(rows: &mut Vec<EventHit>, limit: usize) {
-    rows.sort_by(|left, right| {
-        right
-            .at
-            .cmp(&left.at)
-            .then_with(|| left.hash.cmp(&right.hash))
-            .then_with(|| left.index.cmp(&right.index))
+pub(super) fn recent(rows: &mut Vec<EventHit>, limit: usize) -> Result<(), AppError> {
+    let mut error = None;
+    rows.sort_by(|left, right| match left.time.compare(&right.time, true) {
+        Ok(order) => order,
+        Err(failure) => {
+            error = Some(failure);
+            std::cmp::Ordering::Equal
+        }
     });
+    if let Some(error) = error {
+        return Err(error);
+    }
     rows.truncate(limit);
+    Ok(())
 }

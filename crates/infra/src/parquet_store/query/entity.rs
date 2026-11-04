@@ -1,14 +1,13 @@
 use super::{
-    AppError, CancellationToken, CaseId, EventHit, GraphQueryFilter, Instant, ParquetArtifactV1,
-    ParquetStore, Predicate, QUERY_DEADLINE, ScanFlow, ScanSpec, complete, recent, text,
-    time_rules,
+    AppError, CancellationToken, CaseId, EventHit, GraphQueryFilter, Instant, ParquetArtifact,
+    Predicate, QUERY_DEADLINE, QueryStore, ScanFlow, ScanSpec, complete, recent, time_rules,
 };
 
-impl ParquetStore {
+impl QueryStore<'_> {
     pub(crate) fn entity_timeline_native(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         entity: (&str, &str),
         limit: usize,
@@ -34,9 +33,15 @@ impl ParquetStore {
             },
             |batch| {
                 for row in 0..batch.num_rows() {
-                    hits.push(EventHit::from_batch(batch, row)?);
+                    hits.push(EventHit::from_batch(
+                        batch,
+                        row,
+                        artifacts
+                            .iter()
+                            .any(|a| matches!(a, ParquetArtifact::V2(_))),
+                    )?);
                 }
-                recent(&mut hits, limit);
+                recent(&mut hits, limit)?;
                 Ok(ScanFlow::Continue)
             },
         )?;
@@ -46,7 +51,14 @@ impl ParquetStore {
         }
         Ok(hits
             .into_iter()
-            .map(|hit| format!("{} {} source={}", hit.at, hit.event, hit.source()))
+            .map(|hit| {
+                format!(
+                    "{} {} source={}",
+                    hit.at,
+                    hit.annotated_event(),
+                    hit.source()
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n"))
     }
@@ -54,7 +66,7 @@ impl ParquetStore {
     pub(crate) fn entity_native(
         &self,
         id: &CaseId,
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         filter: &GraphQueryFilter,
         kind: &str,
         value: &str,
@@ -65,7 +77,11 @@ impl ParquetStore {
             Predicate::Equal("entity_kind", kind.into()),
             Predicate::Equal("entity_value", value.into()),
         ]);
-        let (mut count, mut first, mut last) = (0u64, None::<String>, None::<String>);
+        let (mut count, mut first, mut last) = (
+            0u64,
+            None::<super::super::time_cell::TimeCell>,
+            None::<super::super::time_cell::TimeCell>,
+        );
         let status = self.scan_artifacts(
             ScanSpec {
                 id,
@@ -79,13 +95,25 @@ impl ParquetStore {
             },
             |batch| {
                 for row in 0..batch.num_rows() {
-                    let at = text(batch, "event_time", row)?;
+                    let at = super::super::time_cell::TimeCell::from_batch(batch, row)?;
                     count += 1;
-                    if first.as_deref().is_none_or(|old| at < old) {
-                        first = Some(at.into());
-                    }
-                    if last.as_deref().is_none_or(|old| at > old) {
-                        last = Some(at.into());
+                    if at.time.is_some() {
+                        if first
+                            .as_ref()
+                            .map(|old| at.compare(old, false))
+                            .transpose()?
+                            .is_none_or(std::cmp::Ordering::is_lt)
+                        {
+                            first = Some(at.clone());
+                        }
+                        if last
+                            .as_ref()
+                            .map(|old| at.compare(old, false))
+                            .transpose()?
+                            .is_none_or(std::cmp::Ordering::is_gt)
+                        {
+                            last = Some(at);
+                        }
                     }
                 }
                 Ok(ScanFlow::Continue)
@@ -94,8 +122,8 @@ impl ParquetStore {
         complete(status)?;
         Ok(format!(
             "{kind} {value}: count={count}; first={}; last={}",
-            first.unwrap_or_default(),
-            last.unwrap_or_default()
+            first.map_or_else(String::new, |t| t.display()),
+            last.map_or_else(String::new, |t| t.display())
         ))
     }
 }

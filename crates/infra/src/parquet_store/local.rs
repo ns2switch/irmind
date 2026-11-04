@@ -3,7 +3,7 @@ use stream::{StreamInput, initial_hash, stream_records};
 
 use super::{
     AppError, BATCH_BYTES, BATCH_ROWS, BTreeMap, CancellationToken, CaseId, EvidenceHash, File,
-    GraphRecord, HashingReader, Instant, LargeCaseStore, OpenOptions, ParquetArtifactV1,
+    GraphRecord, HashingReader, Instant, LargeCaseStore, OpenOptions, ParquetArtifact,
     ParquetProfile, ParquetStore, ParseReport, Partition, PartitionSinks, Path, PreparedSource,
     RecordRow, Seek, SeekFrom, SourceManifestV1, StreamingEventParser, TempWorkspace, UNIX_EPOCH,
     Write, batch_to_parquet, finish_parquet, invalid_source, parse_hash, storage, storage_phase,
@@ -67,6 +67,7 @@ impl LargeCaseStore for ParquetStore {
             cancel,
             profile: self.profile.as_deref(),
             legacy_entities: self.legacy_entities,
+            precise_time: self.precise_time,
         })?;
         verify_source_unchanged(&source, &metadata, &hash_value)?;
         if cancel.is_cancelled() {
@@ -79,7 +80,7 @@ impl LargeCaseStore for ParquetStore {
         let staged = finish_parquet(
             open,
             &hash_value,
-            parser.identity_for_source(relative_path)?.version,
+            parser.identity_for_source(relative_path)?,
         )
         .map_err(|error| {
             storage_phase(
@@ -117,7 +118,7 @@ impl LargeCaseStore for ParquetStore {
         bytes: &[u8],
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
-    ) -> Result<Vec<ParquetArtifactV1>, AppError> {
+    ) -> Result<Vec<ParquetArtifact>, AppError> {
         let hash = EvidenceHash::parse(hash).map_err(|_| invalid_source())?;
         if bytes.len() > 50_000_000 || irmind_app::hex(&irmind_app::sha256(bytes)) != hash.as_str()
         {
@@ -137,7 +138,9 @@ impl LargeCaseStore for ParquetStore {
         file.write_all(bytes).map_err(storage)?;
         file.sync_all().map_err(storage)?;
         drop(file);
-        let prepared = self.prepare_local(
+        let mut legacy = Self::open(self.root.parent().ok_or_else(invalid_source)?)?;
+        legacy.legacy_entities = self.legacy_entities;
+        let prepared = legacy.prepare_local(
             case_id,
             &temporary.path,
             hash.as_str(),
@@ -154,9 +157,9 @@ impl LargeCaseStore for ParquetStore {
     fn compact_artifacts(
         &self,
         case_id: &CaseId,
-        sources: &[ParquetArtifactV1],
+        sources: &[ParquetArtifact],
         cancel: &CancellationToken,
-    ) -> Result<ParquetArtifactV1, AppError> {
+    ) -> Result<ParquetArtifact, AppError> {
         self.compact_signed_sources(case_id, sources, cancel)
     }
 
@@ -187,7 +190,7 @@ impl LargeCaseStore for ParquetStore {
     fn verify_artifact(
         &self,
         case_id: &CaseId,
-        artifact: &ParquetArtifactV1,
+        artifact: &ParquetArtifact,
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
         artifact.validate().map_err(|_| invalid_source())?;
@@ -197,7 +200,7 @@ impl LargeCaseStore for ParquetStore {
                 irmind_app::AdapterStorageError::CannotVerifyParquetArtifact,
             )
         })?;
-        let mut file = irmind_fs::open_regular_no_follow(&case_dir, Path::new(&artifact.path))
+        let mut file = irmind_fs::open_regular_no_follow(&case_dir, Path::new(&artifact.path()))
             .map_err(|_| {
                 AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
                     irmind_app::AdapterStorageError::CannotVerifyParquetArtifact,
@@ -209,8 +212,10 @@ impl LargeCaseStore for ParquetStore {
                 irmind_app::AdapterStorageError::CannotVerifyParquetArtifact,
             )
         })?;
-        if size != artifact.size || hash != parse_hash(&artifact.sha256)? {
-            return Err(AppError::EvidenceMismatch(artifact.sha256.as_str().into()));
+        if size != artifact.size() || hash != parse_hash(artifact.sha256())? {
+            return Err(AppError::EvidenceMismatch(
+                artifact.sha256().as_str().into(),
+            ));
         }
         Ok(())
     }
@@ -240,7 +245,7 @@ impl LargeCaseStore for ParquetStore {
         case_id: &CaseId,
         source_root: &Path,
         sources: &[SourceManifestV1],
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
@@ -252,10 +257,13 @@ impl LargeCaseStore for ParquetStore {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
+            fresh.precise_time = artifacts.iter().any(|a| {
+                matches!(a, ParquetArtifact::V2(_)) && a.source_hashes().contains(&source.sha256)
+            });
             fresh.legacy_entities = artifacts.iter().any(|artifact| {
-                artifact.source_hashes.len() == 1
-                    && artifact.source_hashes[0] == source.sha256
-                    && artifact.schema_version == "irmind-entities-v1"
+                artifact.source_hashes().len() == 1
+                    && artifact.source_hashes()[0] == source.sha256
+                    && artifact.schema_version() == "irmind-entities-v1"
             });
             let prepared =
                 fresh.prepare_local(case_id, source_root, &source.source, false, parser, cancel)?;
@@ -263,18 +271,18 @@ impl LargeCaseStore for ParquetStore {
                 return Err(AppError::EvidenceMismatch(source.sha256.as_str().into()));
             }
             let mut actual = prepared.artifacts;
-            actual.sort_by(|a, b| a.path.cmp(&b.path));
+            actual.sort_by(|a, b| a.path().cmp(b.path()));
             let parser_version = parser.identity_for_source(&source.source)?.version;
             let mut signed = artifacts
                 .iter()
                 .filter(|artifact| {
-                    artifact.source_hashes.len() == 1
-                        && artifact.parser_version == parser_version
-                        && artifact.source_hashes.contains(&source.sha256)
+                    artifact.source_hashes().len() == 1
+                        && artifact.parser_version() == parser_version
+                        && artifact.source_hashes().contains(&source.sha256)
                 })
                 .cloned()
                 .collect::<Vec<_>>();
-            signed.sort_by(|a, b| a.path.cmp(&b.path));
+            signed.sort_by(|a, b| a.path().cmp(b.path()));
             if actual != signed {
                 return Err(AppError::EvidenceMismatch(source.sha256.as_str().into()));
             }
@@ -286,9 +294,9 @@ impl LargeCaseStore for ParquetStore {
             .map(|source| source.sha256.clone())
             .collect::<std::collections::BTreeSet<_>>();
         for signed in artifacts.iter().filter(|artifact| {
-            artifact.source_hashes.len() > 1
+            artifact.source_hashes().len() > 1
                 && artifact
-                    .source_hashes
+                    .source_hashes()
                     .iter()
                     .all(|hash| source_hashes.contains(hash))
         }) {
@@ -297,18 +305,17 @@ impl LargeCaseStore for ParquetStore {
             }
             let inputs = rebuilt
                 .iter()
-                .filter(|artifact: &&ParquetArtifactV1| {
-                    artifact.partition_date == signed.partition_date
-                        && artifact.partition_account == signed.partition_account
-                        && artifact.partition_region == signed.partition_region
-                        && artifact.schema_version == signed.schema_version
-                        && signed.source_hashes.contains(&artifact.source_hashes[0])
+                .filter(|artifact: &&ParquetArtifact| {
+                    artifact.compaction_key() == signed.compaction_key()
+                        && signed
+                            .source_hashes()
+                            .contains(&artifact.source_hashes()[0])
                 })
                 .cloned()
                 .collect::<Vec<_>>();
             let actual = fresh.compact_signed_sources(case_id, &inputs, cancel)?;
             if &actual != signed {
-                return Err(AppError::EvidenceMismatch(signed.sha256.as_str().into()));
+                return Err(AppError::EvidenceMismatch(signed.sha256().as_str().into()));
             }
         }
         Ok(checked)

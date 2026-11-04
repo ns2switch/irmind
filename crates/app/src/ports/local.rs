@@ -2,7 +2,7 @@ use crate::{
     Actor, AppError, CancellationToken, Case, CaseId, CaseSeal, GraphQueryFilter, GraphRecord,
     SignedEntry, SignedOperation, Tainted, TimelineEvent,
 };
-use irmind_domain::{ParquetArtifactV1, SourceManifestV1};
+use irmind_domain::{ParquetArtifact, SourceManifestV1};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -260,6 +260,32 @@ pub trait StreamingEventParser: Send + Sync {
     ) -> Result<ParseReport, AppError> {
         self.parse_reader_report(source, file, evidence_hash, cancel, emit)
     }
+
+    fn parse_indexed_reader_report(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        evidence_hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<crate::IndexedGraphRecord>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        self.parse_reader_report(source, reader, evidence_hash, cancel, &mut |record| {
+            emit(crate::indexed_parser::lift_legacy_indexed(&record)?)
+        })
+    }
+
+    fn parse_indexed_local_file_report(
+        &self,
+        source: &str,
+        file: &mut File,
+        evidence_hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<crate::IndexedGraphRecord>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        self.parse_local_file_report(source, file, evidence_hash, cancel, &mut |record| {
+            emit(crate::indexed_parser::lift_legacy_indexed(&record)?)
+        })
+    }
 }
 
 pub struct ParseReport {
@@ -316,7 +342,7 @@ pub trait LogParser: EventParser + StreamingEventParser {
 
 pub struct PreparedSource {
     pub manifest: SourceManifestV1,
-    pub artifacts: Vec<ParquetArtifactV1>,
+    pub artifacts: Vec<ParquetArtifact>,
     pub records: usize,
     pub format_sample_sha256: [u8; 32],
     pub parse_report: ParseReport,
@@ -357,14 +383,14 @@ pub trait LargeCaseStore: Send + Sync {
         bytes: &[u8],
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
-    ) -> Result<Vec<ParquetArtifactV1>, AppError>;
+    ) -> Result<Vec<ParquetArtifact>, AppError>;
 
     fn compact_artifacts(
         &self,
         case_id: &CaseId,
-        sources: &[ParquetArtifactV1],
+        sources: &[ParquetArtifact],
         cancel: &CancellationToken,
-    ) -> Result<ParquetArtifactV1, AppError>;
+    ) -> Result<ParquetArtifact, AppError>;
 
     fn verify_local_source(
         &self,
@@ -383,7 +409,7 @@ pub trait LargeCaseStore: Send + Sync {
     fn verify_artifact(
         &self,
         case_id: &CaseId,
-        artifact: &ParquetArtifactV1,
+        artifact: &ParquetArtifact,
         cancel: &CancellationToken,
     ) -> Result<(), AppError>;
 
@@ -392,7 +418,7 @@ pub trait LargeCaseStore: Send + Sync {
         case_id: &CaseId,
         source_root: &Path,
         sources: &[SourceManifestV1],
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError>;

@@ -1,5 +1,5 @@
 use super::{
-    AppError, CancellationToken, CaseId, LargeCaseStore, ParquetArtifactV1, Path, PreparedSource,
+    AppError, CancellationToken, CaseId, LargeCaseStore, ParquetArtifact, Path, PreparedSource,
     SourceManifestV1, StreamingEventParser,
 };
 
@@ -42,7 +42,7 @@ impl LargeCaseStore for crate::LocalStore {
         bytes: &[u8],
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
-    ) -> Result<Vec<ParquetArtifactV1>, AppError> {
+    ) -> Result<Vec<ParquetArtifact>, AppError> {
         self.parquet
             .prepare_legacy_evidence(case_id, hash, bytes, parser, cancel)
     }
@@ -50,9 +50,9 @@ impl LargeCaseStore for crate::LocalStore {
     fn compact_artifacts(
         &self,
         case_id: &CaseId,
-        sources: &[ParquetArtifactV1],
+        sources: &[ParquetArtifact],
         cancel: &CancellationToken,
-    ) -> Result<ParquetArtifactV1, AppError> {
+    ) -> Result<ParquetArtifact, AppError> {
         self.parquet.compact_artifacts(case_id, sources, cancel)
     }
 
@@ -78,7 +78,7 @@ impl LargeCaseStore for crate::LocalStore {
     fn verify_artifact(
         &self,
         case_id: &CaseId,
-        artifact: &ParquetArtifactV1,
+        artifact: &ParquetArtifact,
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
         self.parquet.verify_artifact(case_id, artifact, cancel)
@@ -89,7 +89,7 @@ impl LargeCaseStore for crate::LocalStore {
         case_id: &CaseId,
         source_root: &Path,
         sources: &[SourceManifestV1],
-        artifacts: &[ParquetArtifactV1],
+        artifacts: &[ParquetArtifact],
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {

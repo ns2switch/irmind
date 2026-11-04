@@ -7,7 +7,7 @@ use irmind_app::{
     AppError, CancellationToken, GraphRecord, LargeCaseStore, ParseReport, PreparedSource,
     StreamingEventParser,
 };
-use irmind_domain::{CaseId, EvidenceHash, ParquetArtifactV1, SourceManifestV1};
+use irmind_domain::{CaseId, EvidenceHash, ParquetArtifact, SourceManifestV1};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
@@ -22,11 +22,13 @@ use std::time::UNIX_EPOCH;
 use std::time::{Duration, Instant};
 
 mod compact;
+mod format;
 mod local;
 mod query;
 mod scan;
 mod spool;
 mod store_bridge;
+mod time_cell;
 mod writer;
 use writer::{
     Partition, PartitionSinks, RecordRow, StagedArtifact, batch_to_parquet, finish_parquet,
@@ -60,6 +62,7 @@ pub struct ParquetStore {
     finish_lock: std::sync::Mutex<()>,
     profile: Option<Arc<ParquetProfile>>,
     legacy_entities: bool,
+    precise_time: bool,
 }
 
 #[derive(Default)]
@@ -120,6 +123,12 @@ impl ParquetProfile {
 }
 
 impl ParquetStore {
+    pub fn open_precise(data_root: &Path) -> Result<Self, AppError> {
+        let mut store = Self::open(data_root)?;
+        store.precise_time = true;
+        Ok(store)
+    }
+
     pub fn open(data_root: &Path) -> Result<Self, AppError> {
         #[cfg(windows)]
         let data_root = &fs::canonicalize(data_root).map_err(storage)?;
@@ -131,6 +140,7 @@ impl ParquetStore {
             finish_lock: std::sync::Mutex::new(()),
             profile: None,
             legacy_entities: false,
+            precise_time: false,
         })
     }
 
@@ -214,13 +224,13 @@ impl ParquetStore {
         &self,
         id: &CaseId,
         staged: Vec<StagedArtifact>,
-    ) -> Result<Vec<ParquetArtifactV1>, AppError> {
+    ) -> Result<Vec<ParquetArtifact>, AppError> {
         let _finish_lock = self.finish_lock.lock().map_err(storage)?;
         let case_dir = self.case_dir(id)?;
         let mut artifacts = Vec::with_capacity(staged.len());
         for artifact in staged {
             artifact.manifest.validate().map_err(|_| invalid_source())?;
-            let target = case_dir.join(&artifact.manifest.path);
+            let target = case_dir.join(artifact.manifest.path());
             if let Some(parent) = target.parent() {
                 fs::create_dir_all(parent).map_err(storage)?;
                 irmind_fs::private_dir(parent).map_err(storage)?;
@@ -228,12 +238,14 @@ impl ParquetStore {
             if target.exists() {
                 let mut file = irmind_fs::open_regular_no_follow(
                     &case_dir,
-                    Path::new(&artifact.manifest.path),
+                    Path::new(&artifact.manifest.path()),
                 )
                 .map_err(storage)?;
                 let existing = Self::hash_reader(&mut file, &CancellationToken::new())?;
-                if existing.0 != parse_hash(&artifact.manifest.sha256)? {
-                    return Err(AppError::EvidenceMismatch(artifact.manifest.path.clone()));
+                if existing.0 != parse_hash(artifact.manifest.sha256())? {
+                    return Err(AppError::EvidenceMismatch(
+                        artifact.manifest.path().to_owned(),
+                    ));
                 }
                 fs::remove_file(&artifact.temporary).map_err(storage)?;
             } else {

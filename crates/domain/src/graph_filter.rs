@@ -1,10 +1,10 @@
-use crate::{BTreeMap, CaseScope, DomainError, UtcTimestamp};
+use crate::{BTreeMap, CaseScope, DomainError, IndexedInstant, IndexedTime};
 
 /// A bounded, optional partition and timestamp filter for local graph queries.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct GraphQueryFilter {
-    from: Option<UtcTimestamp>,
-    to: Option<UtcTimestamp>,
+    from: Option<(String, IndexedInstant)>,
+    to: Option<(String, IndexedInstant)>,
     account: Option<String>,
     project: Option<String>,
     region: Option<String>,
@@ -21,9 +21,12 @@ impl GraphQueryFilter {
         if from.is_some() != to.is_some() || account.is_some() && project.is_some() {
             return Err(DomainError::InvalidScope);
         }
-        let from = from.map(UtcTimestamp::parse).transpose()?;
-        let to = to.map(UtcTimestamp::parse).transpose()?;
-        if from.as_ref().zip(to.as_ref()).is_some_and(|(a, b)| a > b)
+        let from = from.map(parse_boundary).transpose()?;
+        let to = to.map(parse_boundary).transpose()?;
+        if from
+            .as_ref()
+            .zip(to.as_ref())
+            .is_some_and(|(a, b)| a.1 > b.1)
             || [account, project, region]
                 .into_iter()
                 .flatten()
@@ -61,7 +64,7 @@ impl GraphQueryFilter {
         self.from
             .as_ref()
             .zip(self.to.as_ref())
-            .map(|(from, to)| (from.as_str(), to.as_str()))
+            .map(|(from, to)| (from.0.as_str(), to.0.as_str()))
     }
 
     pub fn account_or_project(&self) -> Option<&str> {
@@ -91,16 +94,24 @@ impl GraphQueryFilter {
                 .as_ref()
                 .is_none_or(|project| projects.contains(project))
             && self.time_range().is_none_or(|(start, end)| {
-                UtcTimestamp::parse(from)
+                parse_boundary(from)
                     .ok()
-                    .zip(UtcTimestamp::parse(to).ok())
-                    .zip(UtcTimestamp::parse(start).ok())
-                    .zip(UtcTimestamp::parse(end).ok())
+                    .zip(parse_boundary(to).ok())
+                    .zip(parse_boundary(start).ok())
+                    .zip(parse_boundary(end).ok())
                     .is_some_and(|(((scope_start, scope_end), start), end)| {
-                        start >= scope_start && end <= scope_end
+                        start.1 >= scope_start.1 && end.1 <= scope_end.1
                     })
             })
     }
+}
+
+fn parse_boundary(raw: &str) -> Result<(String, IndexedInstant), DomainError> {
+    if !raw.ends_with('Z') {
+        return Err(DomainError::InvalidScope);
+    }
+    let time = IndexedTime::from_rfc3339(raw, false).map_err(|_| DomainError::InvalidScope)?;
+    Ok((raw.into(), time.instant()))
 }
 
 fn valid_partition_value(value: &str) -> bool {
@@ -131,6 +142,40 @@ mod tests {
             GraphQueryFilter::parse(
                 Some("2026-10-29T00:00:00Z"),
                 Some("2026-10-28T00:00:00Z"),
+                None,
+                None,
+                None
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn fractional_boundaries_use_instants_and_keep_the_organization_ceiling() {
+        let filter = GraphQueryFilter::parse(
+            Some("2026-11-01T00:00:00.000001100Z"),
+            Some("2026-11-01T00:00:00.000001900Z"),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(filter.within_scope(&CaseScope::parse("v2;sources=local;accounts=111111111111;projects=;hosts=;from=2026-11-01T00:00:00Z;to=2026-11-01T00:00:01Z").unwrap()));
+        assert!(!filter.within_scope(&CaseScope::parse("v2;sources=local;accounts=111111111111;projects=;hosts=;from=2026-11-01T00:00:00Z;to=2026-11-01T00:00:00Z").unwrap()));
+        assert!(
+            GraphQueryFilter::parse(
+                Some("2026-11-01T00:00:00.9Z"),
+                Some("2026-11-01T00:00:00.10Z"),
+                None,
+                None,
+                None
+            )
+            .is_err()
+        );
+        assert!(
+            GraphQueryFilter::parse(
+                Some("2026-11-01T00:00:00.1234567891Z"),
+                Some("2026-11-01T00:00:01Z"),
                 None,
                 None,
                 None

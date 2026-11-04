@@ -1,13 +1,13 @@
 use super::{
     AppError, ArrayRef, ArrowWriter, BTreeMap, CancellationToken, Compression, EvidenceHash, File,
-    GraphRecord, OpenOptions, ParquetArtifactV1, ParquetStore, Path, PathBuf, RecordBatch,
+    GraphRecord, OpenOptions, ParquetArtifact, ParquetStore, Path, PathBuf, RecordBatch,
     StringArray, UInt64Array, WriterProperties, fs, invalid_source, storage,
 };
-use chrono::{DateTime, SecondsFormat, Utc};
-use serde_json::Value;
+use irmind_domain::ParquetArtifactV1;
 use std::sync::Arc;
 
 mod batch;
+pub(super) mod precise;
 use batch::{coobservation_batch, entity_batch, record_batch};
 use parquet::schema::types::ColumnPath;
 
@@ -18,138 +18,11 @@ pub(super) struct Partition {
     region: String,
 }
 
-pub(super) struct RecordRow {
-    pub partition: Partition,
-    hash: String,
-    index: u64,
-    at: String,
-    event: String,
-    text: String,
-    entities: String,
-    entity_pairs: Vec<(String, String)>,
-    relations: String,
-}
-
-impl RecordRow {
-    pub(super) fn from_record(record: &GraphRecord, hash: &EvidenceHash) -> Result<Self, AppError> {
-        let value: Value = serde_json::from_str(&record.text).map_err(storage)?;
-        let at = if record.at.is_empty() {
-            String::new()
-        } else {
-            DateTime::parse_from_rfc3339(&record.at)
-                .map_err(|_| invalid_source())?
-                .with_timezone(&Utc)
-                .to_rfc3339_opts(SecondsFormat::Secs, true)
-        };
-        let account = first_string(
-            &value,
-            &[
-                "/account_id",
-                "/recipientAccountId",
-                "/userIdentity/accountId",
-                "/resource/labels/project_id",
-                "/protoPayload/resourceName",
-                "/subscriptionId",
-            ],
-        );
-        let region = first_string(
-            &value,
-            &[
-                "/provider",
-                "/awsRegion",
-                "/resource/labels/location",
-                "/region",
-                "/location",
-            ],
-        );
-        let region = if region.is_empty()
-            && value.get("event_id").is_some()
-            && value
-                .get("principal")
-                .and_then(Value::as_str)
-                .is_some_and(|principal| principal.starts_with("arn:aws:"))
-        {
-            "aws"
-        } else {
-            region
-        };
-        let relations = record
-            .relations
-            .iter()
-            .map(|relation| {
-                [
-                    relation.from_kind.as_str(),
-                    relation.from_value.as_str(),
-                    relation.relation.as_str(),
-                    relation.to_kind.as_str(),
-                    relation.to_value.as_str(),
-                ]
-            })
-            .collect::<Vec<_>>();
-        Ok(Self {
-            partition: Partition {
-                date: if at.is_empty() {
-                    "unknown".into()
-                } else {
-                    at[..10].into()
-                },
-                account: safe_partition(account),
-                region: safe_partition(region),
-            },
-            hash: hash.as_str().into(),
-            index: u64::try_from(record.index).map_err(storage)?,
-            at,
-            event: record.event.clone(),
-            text: record.text.clone(),
-            entities: serde_json::to_string(&record.entities).map_err(storage)?,
-            entity_pairs: record.entities.clone(),
-            relations: serde_json::to_string(&relations).map_err(storage)?,
-        })
-    }
-
-    pub(super) fn estimated_bytes(&self) -> usize {
-        self.text.len()
-            + self.entities.len()
-            + self.relations.len()
-            + self.event.len()
-            + self.at.len()
-            + self.hash.len()
-            + self.entities.len().saturating_mul(self.entity_pairs.len())
-            + self
-                .entity_pairs
-                .iter()
-                .map(|(kind, value)| kind.len() + value.len())
-                .sum::<usize>()
-    }
-}
-
-fn first_string<'a>(value: &'a Value, pointers: &[&str]) -> &'a str {
-    pointers
-        .iter()
-        .find_map(|pointer| value.pointer(pointer).and_then(Value::as_str))
-        .unwrap_or("")
-}
-
-pub(super) fn safe_partition(value: &str) -> String {
-    if value.is_empty() {
-        return "unknown".into();
-    }
-    if value.len() <= 128
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
-    {
-        return value.to_ascii_lowercase();
-    }
-    format!(
-        "h{}",
-        &irmind_app::hex(&irmind_app::sha256(value.as_bytes()))[..16]
-    )
-}
-
+mod row;
+pub(super) use row::{RecordRow, safe_partition};
 pub(super) struct StagedArtifact {
     pub temporary: PathBuf,
-    pub manifest: ParquetArtifactV1,
+    pub manifest: ParquetArtifact,
 }
 
 pub(super) struct ArtifactSink {
@@ -158,6 +31,7 @@ pub(super) struct ArtifactSink {
     partition: Partition,
     writer: Option<ArrowWriter<File>>,
     kind: ArtifactKind,
+    precise: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -210,14 +84,35 @@ impl ArtifactSink {
         batch: &RecordBatch,
         kind: ArtifactKind,
     ) -> Result<Self, AppError> {
-        let part = format!(
-            "date={}/account={}/region={}",
-            partition.date, partition.account, partition.region
+        let precise = matches!(
+            batch
+                .schema()
+                .field_with_name("event_time")
+                .map(arrow::datatypes::Field::data_type),
+            Ok(arrow::datatypes::DataType::Timestamp(_, _))
         );
+        let part = if precise {
+            format!("date={}", partition.date)
+        } else {
+            format!(
+                "date={}/account={}/region={}",
+                partition.date, partition.account, partition.region
+            )
+        };
         let dir = case_dir.join(&part);
         fs::create_dir_all(&dir).map_err(storage)?;
         irmind_fs::private_dir(&dir).map_err(storage)?;
-        let name = format!("{}.{}.parquet", hash.as_str(), kind.suffix());
+        let name = if precise {
+            let key = format!("{}\0{}", partition.account, partition.region);
+            format!(
+                "{}.{}.{}.parquet",
+                hash.as_str(),
+                irmind_app::hex(&irmind_app::sha256(key.as_bytes())),
+                kind.suffix()
+            )
+        } else {
+            format!("{}.{}.parquet", hash.as_str(), kind.suffix())
+        };
         let temporary = dir.join(format!(".{name}.{}.tmp", rand::random::<u64>()));
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
@@ -252,6 +147,7 @@ impl ArtifactSink {
                 partition,
                 writer: Some(writer),
                 kind,
+                precise,
             })
         })();
         if result.is_err() {
@@ -275,7 +171,7 @@ impl ArtifactSink {
     fn finish(
         mut self,
         hash: &EvidenceHash,
-        parser_version: &str,
+        parser: irmind_app::ParserIdentity<'_>,
     ) -> Result<StagedArtifact, AppError> {
         let writer = self.writer.take().ok_or_else(invalid_source)?;
         writer.close().map_err(storage)?;
@@ -290,17 +186,22 @@ impl ArtifactSink {
         let (digest, size) = ParquetStore::hash_reader(&mut file, &CancellationToken::new())?;
         Ok(StagedArtifact {
             temporary: self.temporary.take().ok_or_else(invalid_source)?,
-            manifest: ParquetArtifactV1 {
-                path: self.relative_path.clone(),
-                size,
-                sha256: EvidenceHash::parse(&irmind_app::hex(&digest))
-                    .map_err(|_| invalid_source())?,
-                parser_version: parser_version.into(),
-                schema_version: self.kind.schema().into(),
-                partition_date: self.partition.date.clone(),
-                partition_account: self.partition.account.clone(),
-                partition_region: self.partition.region.clone(),
-                source_hashes: vec![hash.clone()],
+            manifest: if self.precise {
+                precise::manifest(&self, hash, parser, size, &digest)?
+            } else {
+                ParquetArtifactV1 {
+                    path: self.relative_path.clone(),
+                    size,
+                    sha256: EvidenceHash::parse(&irmind_app::hex(&digest))
+                        .map_err(|_| invalid_source())?,
+                    parser_version: parser.version.into(),
+                    schema_version: self.kind.schema().into(),
+                    partition_date: self.partition.date.clone(),
+                    partition_account: self.partition.account.clone(),
+                    partition_region: self.partition.region.clone(),
+                    source_hashes: vec![hash.clone()],
+                }
+                .into()
             },
         })
     }
@@ -323,11 +224,22 @@ pub(super) fn batch_to_parquet(
         if rows.is_empty() {
             continue;
         }
-        let events = record_batch(&rows)?;
-        let entities = entity_batch(&rows, !legacy_entities)?;
-        let coobservations = (!legacy_entities)
+        let mut events = record_batch(&rows)?;
+        let mut entities = entity_batch(&rows, !legacy_entities)?;
+        let mut coobservations = (!legacy_entities)
             .then(|| coobservation_batch(&rows))
             .transpose()?;
+        if rows[0].precise {
+            events = precise::columns(&events, &rows, &(0..rows.len()).collect::<Vec<_>>())?;
+            let pairs = batch::pairs(&rows, true)
+                .into_iter()
+                .map(|(row, _)| row)
+                .collect::<Vec<_>>();
+            entities = precise::columns(&entities, &rows, &pairs)?;
+            coobservations = coobservations
+                .map(|batch| precise::columns(&batch, &rows, &pairs))
+                .transpose()?;
+        }
         if !open.contains_key(&partition) {
             if open.len() >= 64 {
                 return Err(AppError::Policy(
@@ -383,14 +295,14 @@ pub(super) fn batch_to_parquet(
 pub(super) fn finish_parquet(
     open: BTreeMap<Partition, PartitionSinks>,
     hash: &EvidenceHash,
-    parser_version: &str,
+    parser: irmind_app::ParserIdentity<'_>,
 ) -> Result<Vec<StagedArtifact>, AppError> {
     let mut artifacts = Vec::new();
     for sinks in open.into_values() {
-        artifacts.push(sinks.events.finish(hash, parser_version)?);
-        artifacts.push(sinks.entities.finish(hash, parser_version)?);
+        artifacts.push(sinks.events.finish(hash, parser)?);
+        artifacts.push(sinks.entities.finish(hash, parser)?);
         if let Some(coobservations) = sinks.coobservations {
-            artifacts.push(coobservations.finish(hash, parser_version)?);
+            artifacts.push(coobservations.finish(hash, parser)?);
         }
     }
     Ok(artifacts)

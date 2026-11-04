@@ -5,9 +5,10 @@ use crate::{
 
 mod manifest;
 mod migration;
+mod source_event;
 mod verification;
 use irmind_domain::{
-    EvidenceHash, ParquetArtifactV1, ParserSelectionMode, SourceManifestV1, SourceManifestV2,
+    EvidenceHash, ParquetArtifact, ParserSelectionMode, SourceManifestV1, SourceManifestV2,
 };
 use manifest::select_sources;
 pub(crate) use manifest::{read_manifest_index, read_sealed_artifacts};
@@ -36,7 +37,7 @@ pub struct SourceCheckReport {
 
 pub(crate) struct ManifestIndex {
     pub sources: Vec<SourceManifestV1>,
-    pub artifacts: Vec<ParquetArtifactV1>,
+    pub artifacts: Vec<ParquetArtifact>,
 }
 
 #[derive(Clone, Debug)]
@@ -63,51 +64,38 @@ impl LargeCaseUseCases<'_, '_> {
         let mut known = index
             .artifacts
             .iter()
-            .map(|artifact| (artifact.path.clone(), artifact.clone()))
+            .map(|artifact| (artifact.path().to_owned(), artifact.clone()))
             .collect::<BTreeMap<_, _>>();
         let covered = index
             .artifacts
             .iter()
-            .filter(|artifact| artifact.source_hashes.len() > 1)
+            .filter(|artifact| artifact.source_hashes().len() > 1)
             .flat_map(|artifact| {
-                artifact.source_hashes.iter().map(|hash| {
-                    (
-                        artifact.partition_date.clone(),
-                        artifact.partition_account.clone(),
-                        artifact.partition_region.clone(),
-                        artifact.schema_version.clone(),
-                        hash.clone(),
-                    )
-                })
+                artifact
+                    .source_hashes()
+                    .iter()
+                    .map(|hash| (artifact.compaction_key(), hash.clone()))
             })
             .collect::<BTreeSet<_>>();
-        let mut groups: BTreeMap<(String, String, String, String), Vec<ParquetArtifactV1>> =
-            BTreeMap::new();
+        let mut groups: BTreeMap<Vec<u8>, Vec<ParquetArtifact>> = BTreeMap::new();
         for artifact in index.artifacts {
-            if artifact.source_hashes.len() == 1
-                && artifact.parser_version == "json-stream-v2"
+            if artifact.source_hashes().len() == 1
+                && (artifact.parser_version() == "json-stream-v2"
+                    || matches!(artifact, ParquetArtifact::V2(_)))
                 && !covered.contains(&(
-                    artifact.partition_date.clone(),
-                    artifact.partition_account.clone(),
-                    artifact.partition_region.clone(),
-                    artifact.schema_version.clone(),
-                    artifact.source_hashes[0].clone(),
+                    artifact.compaction_key(),
+                    artifact.source_hashes()[0].clone(),
                 ))
             {
                 groups
-                    .entry((
-                        artifact.partition_date.clone(),
-                        artifact.partition_account.clone(),
-                        artifact.partition_region.clone(),
-                        artifact.schema_version.clone(),
-                    ))
+                    .entry(artifact.compaction_key())
                     .or_default()
                     .push(artifact);
             }
         }
         let mut compacted = 0usize;
         for artifacts in groups.values_mut() {
-            artifacts.sort_by(|left, right| left.source_hashes[0].cmp(&right.source_hashes[0]));
+            artifacts.sort_by(|left, right| left.source_hashes()[0].cmp(&right.source_hashes()[0]));
             for chunk in artifacts.chunks(128) {
                 if chunk.len() < 2 {
                     continue;
@@ -194,7 +182,7 @@ impl LargeCaseUseCases<'_, '_> {
         let mut known_artifacts = index
             .artifacts
             .into_iter()
-            .map(|artifact| (artifact.path.clone(), artifact))
+            .map(|artifact| (artifact.path().to_owned(), artifact))
             .collect::<BTreeMap<_, _>>();
         let mut known_sources = index
             .sources
@@ -281,8 +269,18 @@ impl LargeCaseUseCases<'_, '_> {
         prepared: crate::PreparedSource,
         selection: Option<&ParserSelection>,
         cancel: &CancellationToken,
-        known_artifacts: &mut BTreeMap<String, ParquetArtifactV1>,
+        known_artifacts: &mut BTreeMap<String, ParquetArtifact>,
     ) -> Result<EvidenceHash, AppError> {
+        if prepared
+            .artifacts
+            .iter()
+            .any(|a| matches!(a, ParquetArtifact::V2(_)))
+            && selection.is_none()
+        {
+            return Err(AppError::Policy(
+                "precise artifacts require a signed parser selection".into(),
+            ));
+        }
         if prepared.records == 0 || prepared.artifacts.is_empty() {
             return Err(AppError::Policy(
                 "source produced no Parquet records".into(),
@@ -290,63 +288,40 @@ impl LargeCaseUseCases<'_, '_> {
         }
         let source_hash = prepared.manifest.sha256.clone();
         for artifact in &prepared.artifacts {
-            if artifact.source_hashes.as_slice() != [source_hash.clone()] {
+            if artifact.source_hashes() != [source_hash.clone()] {
                 return Err(AppError::Policy("Parquet source linkage is invalid".into()));
+            }
+            if known_artifacts.values().any(|old| {
+                old.audit_kind() != artifact.audit_kind()
+                    && old.source_hashes().binary_search(&source_hash).is_ok()
+            }) {
+                return Err(AppError::Policy(
+                    "source already has another artifact version; explicit migration is required"
+                        .into(),
+                ));
             }
             self.store.verify_artifact(id, artifact, cancel)?;
         }
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let source_event = match selection {
-            Some(selection) => {
-                if selection.parser_version != self.parser.identity().version
-                    || selection.parser_id != self.parser.identity().name
-                    || selection.format_sample_sha256 != prepared.format_sample_sha256
-                {
-                    return Err(invalid_manifest());
-                }
-                let manifest = SourceManifestV2 {
-                    source: prepared.manifest.clone(),
-                    parser_id: selection.parser_id.clone(),
-                    parser_version: selection.parser_version.clone(),
-                    confidence: selection.confidence,
-                    selection: selection.mode,
-                    timestamp_context: Some(
-                        selection
-                            .timestamp_context
-                            .clone()
-                            .unwrap_or_else(|| "normalized-utc".into()),
-                    ),
-                    rejected_records: prepared.parse_report.rejected,
-                    rejected_sample: prepared.parse_report.samples.clone(),
-                };
-                (
-                    AuditEventKind::SourceManifestV2,
-                    manifest.encode().map_err(|_| invalid_manifest())?,
-                )
-            }
-            None => (
-                AuditEventKind::SourceManifestV1,
-                prepared.manifest.encode().map_err(|_| invalid_manifest())?,
-            ),
-        };
+        let source_event = self.source_event(&prepared, selection)?;
         let mut events = vec![(AuditOrigin::System, source_event.0, source_event.1)];
         let mut new_artifacts = Vec::new();
         let mut new_paths = BTreeSet::new();
         for artifact in prepared.artifacts {
-            if let Some(previous) = known_artifacts.get(&artifact.path) {
+            if let Some(previous) = known_artifacts.get(artifact.path()) {
                 if previous != &artifact {
-                    return Err(AppError::EvidenceMismatch(artifact.path));
+                    return Err(AppError::EvidenceMismatch(artifact.path().to_owned()));
                 }
                 continue;
             }
-            if !new_paths.insert(artifact.path.clone()) {
+            if !new_paths.insert(artifact.path().to_owned()) {
                 return Err(invalid_manifest());
             }
             events.push((
                 AuditOrigin::System,
-                AuditEventKind::ParquetArtifactV1,
+                artifact.audit_kind(),
                 artifact.encode().map_err(|_| invalid_manifest())?,
             ));
             new_artifacts.push(artifact);
@@ -355,7 +330,7 @@ impl LargeCaseUseCases<'_, '_> {
         known_artifacts.extend(
             new_artifacts
                 .into_iter()
-                .map(|artifact| (artifact.path.clone(), artifact)),
+                .map(|artifact| (artifact.path().to_owned(), artifact)),
         );
         Ok(source_hash)
     }

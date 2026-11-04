@@ -1,5 +1,5 @@
 use super::{
-    AppError, AuditEventKind, BTreeMap, BTreeSet, EvidenceHash, ManifestIndex, ParquetArtifactV1,
+    AppError, AuditEventKind, BTreeMap, BTreeSet, EvidenceHash, ManifestIndex, ParquetArtifact,
     SourceCheckMode, SourceManifestV1, sha256,
 };
 use crate::SignedOperation;
@@ -46,17 +46,17 @@ pub(crate) fn read_manifest_index(
                     &mut parser_selections,
                 )?;
             }
-            AuditEventKind::ParquetArtifactV1 => {
+            AuditEventKind::ParquetArtifactV1 | AuditEventKind::ParquetArtifactV2 => {
                 if entry.evidence.is_some() {
                     return Err(AppError::InvalidChain(entry.seq));
                 }
-                let artifact = ParquetArtifactV1::decode(&entry.payload)
+                let artifact = ParquetArtifact::decode(entry.kind, &entry.payload)
                     .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                if !artifact_paths.insert(artifact.path.clone()) {
+                if !artifact_paths.insert(artifact.path().to_owned()) {
                     return Err(AppError::InvalidChain(entry.seq));
                 }
                 if artifact
-                    .source_hashes
+                    .source_hashes()
                     .iter()
                     .any(|hash| !source_hashes.contains(hash))
                 {
@@ -64,8 +64,6 @@ pub(crate) fn read_manifest_index(
                 }
                 artifacts.push(artifact);
             }
-            // This foundation release knows the envelope, but cannot yet verify V2 rows.
-            AuditEventKind::ParquetArtifactV2 => return Err(AppError::InvalidChain(entry.seq)),
             _ => {}
         }
     }
@@ -76,12 +74,12 @@ pub(crate) fn read_manifest_index(
 fn validate_manifest_links(
     entries: &[crate::SignedEntry],
     sources: &[SourceManifestV1],
-    artifacts: &[ParquetArtifactV1],
+    artifacts: &[ParquetArtifact],
     parser_selections: BTreeMap<String, (SourceManifestV2, u64)>,
 ) -> Result<(), AppError> {
     let indexed: BTreeSet<_> = artifacts
         .iter()
-        .flat_map(|artifact| artifact.source_hashes.iter())
+        .flat_map(|artifact| artifact.source_hashes().iter())
         .cloned()
         .collect();
     let manifest_hashes = sources
@@ -93,11 +91,34 @@ fn validate_manifest_links(
             entries.last().map_or(0, |entry| entry.seq),
         ));
     }
+    let legacy_hashes = artifacts
+        .iter()
+        .filter(|a| matches!(a, ParquetArtifact::V1(_)))
+        .flat_map(|a| a.source_hashes().iter())
+        .collect::<BTreeSet<_>>();
+    for artifact in artifacts {
+        if let ParquetArtifact::V2(value) = artifact
+            && (!value.superseded_hashes.is_empty()
+                || value
+                    .source_hashes
+                    .iter()
+                    .any(|h| legacy_hashes.contains(h))
+                || value.source_hashes.iter().any(|hash| {
+                    !parser_selections.values().any(|(selection, _)| {
+                        selection.source.sha256 == *hash
+                            && selection.parser_id == value.parser_id
+                            && selection.parser_version == value.parser_version
+                    })
+                }))
+        {
+            return Err(AppError::InvalidChain(0));
+        }
+    }
     for (_, (selection, seq)) in parser_selections {
         if !artifacts.iter().any(|artifact| {
-            artifact.source_hashes.len() == 1
-                && artifact.source_hashes[0] == selection.source.sha256
-                && artifact.parser_version == selection.parser_version
+            artifact.source_hashes().len() == 1
+                && artifact.source_hashes()[0] == selection.source.sha256
+                && artifact.parser_version() == selection.parser_version
         }) {
             return Err(AppError::InvalidChain(seq));
         }
@@ -134,7 +155,7 @@ pub(crate) fn read_sealed_artifacts(
     entries: &[crate::SignedEntry],
     operations: &[SignedOperation],
     seal_hash: [u8; 32],
-) -> Result<Vec<ParquetArtifactV1>, AppError> {
+) -> Result<Vec<ParquetArtifact>, AppError> {
     let legacy = entries
         .iter()
         .filter(|entry| entry.kind == AuditEventKind::GraphIndexed)
@@ -145,7 +166,7 @@ pub(crate) fn read_sealed_artifacts(
     let mut paths = read_manifest_index(entries)?
         .artifacts
         .into_iter()
-        .map(|artifact| artifact.path)
+        .map(|artifact| artifact.path().to_owned())
         .collect::<BTreeSet<_>>();
     let mut artifacts = Vec::new();
     for operation in operations {
@@ -162,7 +183,7 @@ pub(crate) fn read_sealed_artifacts(
         {
             return Err(AppError::InvalidChain(operation.seq));
         }
-        artifacts.push(record.artifact);
+        artifacts.push(record.artifact.into());
     }
     Ok(artifacts)
 }
@@ -191,3 +212,6 @@ pub(super) fn select_sources(
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
