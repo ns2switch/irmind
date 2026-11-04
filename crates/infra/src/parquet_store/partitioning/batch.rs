@@ -82,7 +82,8 @@ impl ParquetStore {
         let parser = request
             .parser
             .identity_for_source(&source.manifest.source)?;
-        let mut reader = std::io::BufReader::new(source.spool.as_file_mut());
+        let mut reader =
+            std::io::BufReader::new(super::super::HashingReader::new(source.spool.as_file_mut()));
         loop {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
@@ -98,34 +99,13 @@ impl ParquetStore {
             if bytes.len() as u64 > MAX_STAGED_ROW || bytes.last() != Some(&b'\n') {
                 return Err(invalid_source());
             }
-            let mut row: RecordRow = serde_json::from_slice(&bytes).map_err(storage)?;
-            let profile = match row.profile {
-                0 => PartitionProfile::Unpartitioned,
-                1 => PartitionProfile::CloudAccountRegion,
-                2 => PartitionProfile::EndpointHost,
-                _ => return Err(invalid_source()),
-            };
-            let scope = allocator.assign(
-                row.partition.utc_date(),
-                profile,
-                [&row.scope_account, &row.scope_region, &row.scope_host],
-            )?;
-            let key = scope.path_prefix().map_err(|_| invalid_source())?;
-            if state.keys.len() == WRITER_PARTITIONS && !state.keys.contains(&key) {
-                state.finish(&dir, &source.manifest.sha256, parser)?;
-            }
-            state.keys.insert(key);
-            row.partition = row.partition.with_scope(scope, state.segment);
-            state.bytes = state.bytes.saturating_add(row.estimated_bytes());
-            state.rows += 1;
-            state
-                .grouped
-                .entry(row.partition.clone())
-                .or_default()
-                .push(row);
-            if state.bytes >= BATCH_BYTES || state.rows >= BATCH_ROWS {
-                state.flush(&dir, &source.manifest.sha256)?;
-            }
+            let row: RecordRow = serde_json::from_slice(&bytes).map_err(storage)?;
+            state.push_row(row, allocator, &dir, &source.manifest.sha256, parser)?;
+        }
+        if reader.into_inner().finish() != source.normalized_hash {
+            return Err(AppError::EvidenceMismatch(
+                source.manifest.sha256.as_str().into(),
+            ));
         }
         state.finish(&dir, &source.manifest.sha256, parser)?;
         if cancel.is_cancelled() {
@@ -170,6 +150,42 @@ struct Writing {
 }
 
 impl Writing {
+    fn push_row(
+        &mut self,
+        mut row: RecordRow,
+        allocator: &mut Allocator,
+        dir: &std::path::Path,
+        hash: &irmind_domain::EvidenceHash,
+        parser: irmind_app::ParserIdentity<'_>,
+    ) -> Result<(), AppError> {
+        let profile = match row.profile {
+            0 => PartitionProfile::Unpartitioned,
+            1 => PartitionProfile::CloudAccountRegion,
+            2 => PartitionProfile::EndpointHost,
+            _ => return Err(invalid_source()),
+        };
+        let scope = allocator.assign(
+            row.partition.utc_date(),
+            profile,
+            [&row.scope_account, &row.scope_region, &row.scope_host],
+        )?;
+        let key = scope.path_prefix().map_err(|_| invalid_source())?;
+        if self.keys.len() == WRITER_PARTITIONS && !self.keys.contains(&key) {
+            self.finish(dir, hash, parser)?;
+        }
+        self.keys.insert(key);
+        row.partition = row.partition.with_scope(scope, self.segment);
+        self.bytes = self.bytes.saturating_add(row.estimated_bytes());
+        self.rows += 1;
+        self.grouped
+            .entry(row.partition.clone())
+            .or_default()
+            .push(row);
+        if self.bytes >= BATCH_BYTES || self.rows >= BATCH_ROWS {
+            self.flush(dir, hash)?;
+        }
+        Ok(())
+    }
     fn flush(
         &mut self,
         dir: &std::path::Path,
@@ -205,4 +221,60 @@ impl Writing {
 
 pub(in crate::parquet_store) fn supported_builder(version: &str) -> bool {
     matches!(version, super::super::writer::precise::BUILDER | BUILDER)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod integrity_tests {
+    use super::*;
+    use irmind_mod_parser_json::JsonParser;
+
+    #[test]
+    fn a_changed_normalized_spool_cannot_publish_artifacts() {
+        let root = tempfile::tempdir().unwrap();
+        let inputs = tempfile::tempdir().unwrap();
+        std::fs::write(
+            inputs.path().join("event.json"),
+            br#"{"eventTime":"2026-11-01T00:00:00Z","host":"host-a"}"#,
+        )
+        .unwrap();
+        let store = ParquetStore::open_precise(root.path()).unwrap();
+        let id = irmind_domain::CaseId::parse("00000000-0000-0000-0000-000000000019").unwrap();
+        let paths = ["event.json".into()];
+        let mut input = store.staging_inputs(&id, inputs.path(), &paths).unwrap();
+        let source = store
+            .stage_source(
+                &id,
+                input.remove(0),
+                &JsonParser,
+                false,
+                &CancellationToken::new(),
+            )
+            .unwrap();
+        source.spool.as_file().set_len(0).unwrap();
+        let request = LocalBatchRequest {
+            case_id: &id,
+            source_root: inputs.path(),
+            relative_paths: &paths,
+            copy_original: false,
+            parser: &JsonParser,
+            committed_artifacts: &[],
+            limits: irmind_app::PartitionLimits::default(),
+        };
+        let mut allocation = Allocator::from_signed(&[], request.limits).unwrap();
+        let result = store.write_partition_source(
+            &request,
+            source,
+            &mut allocation,
+            &CancellationToken::new(),
+            0,
+        );
+        assert!(matches!(result, Err(AppError::EvidenceMismatch(_))));
+        assert_eq!(
+            std::fs::read_dir(store.spool_dir(&id).unwrap())
+                .unwrap()
+                .count(),
+            0
+        );
+    }
 }

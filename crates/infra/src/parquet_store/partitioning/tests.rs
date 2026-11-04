@@ -111,3 +111,40 @@ fn signed_caps_are_authoritative_and_cannot_be_exceeded() {
         .is_err()
     );
 }
+
+#[test]
+fn the_hard_host_ceiling_keeps_the_1025th_value_in_typed_overflow() {
+    let mut allocation = Allocator::from_signed(
+        &[],
+        PartitionLimits {
+            host: 1024,
+            ..PartitionLimits::default()
+        },
+    )
+    .unwrap();
+    for n in 0..1024 {
+        assert!(matches!(
+            assign(&mut allocation, &format!("host-{n}")).scopes[0].value,
+            Value::Ordinary(_)
+        ));
+    }
+    assert_eq!(
+        assign(&mut allocation, "host-1024").scopes[0].value,
+        Value::Overflow(Reason::Cardinality)
+    );
+    assert!(matches!(
+        assign(&mut allocation, "host-0").scopes[0].value,
+        Value::Ordinary(_)
+    ));
+    let first = assign(&mut allocation, "host-0");
+    let mut restored = Allocator::from_signed(
+        &[],
+        PartitionLimits {
+            host: 1,
+            ..PartitionLimits::default()
+        },
+    )
+    .unwrap();
+    restored.observe(&first).unwrap();
+    assert_eq!(assign(&mut restored, "host-other").scopes[0].cap, 1024);
+}

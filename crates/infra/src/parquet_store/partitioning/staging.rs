@@ -3,6 +3,7 @@ use super::super::{
     AppError, CancellationToken, CaseId, File, ParquetStore, ParseReport, Path, RecordRow,
     SourceManifestV1, StreamingEventParser, invalid_source, storage,
 };
+use sha2::{Digest, Sha256};
 use std::io::{Read, Seek, SeekFrom, Write};
 
 const EXPANSION_RESERVATION: u64 = 16;
@@ -21,6 +22,7 @@ pub(super) struct StagedSource {
     pub manifest: SourceManifestV1,
     pub report: ParseReport,
     pub sample_hash: [u8; 32],
+    pub normalized_hash: [u8; 32],
 }
 
 impl ParquetStore {
@@ -74,6 +76,8 @@ impl ParquetStore {
         let mut spool = self.create_normalized_spool(case)?;
         let mut writer = std::io::BufWriter::new(spool.as_file_mut());
         let mut bytes = 0u64;
+        let mut normalized_hash = Sha256::new();
+        let mut accepted = 0usize;
         let mut offset_mode = None;
         let mut position = None;
         let report = stream::parse_and_verify(
@@ -92,20 +96,7 @@ impl ParquetStore {
                 if cancel.is_cancelled() {
                     return Err(AppError::Cancelled);
                 }
-                let mut row = None;
-                record.inspect(|indexed| {
-                    row = Some((|| {
-                        stream::validate_offset(&mut offset_mode, indexed.source_offset, size)?;
-                        let mut row = RecordRow::from_partitioned(indexed, &value)?;
-                        row.profile = match parser.partition_profile(&indexed.record) {
-                            irmind_app::PartitionProfile::Unpartitioned => 0,
-                            irmind_app::PartitionProfile::CloudAccountRegion => 1,
-                            irmind_app::PartitionProfile::EndpointHost => 2,
-                        };
-                        Ok(row)
-                    })());
-                });
-                let row = row.ok_or_else(invalid_source)??;
+                let row = normalized_row(&record, parser, &value, &mut offset_mode, size)?;
                 let key = row.position();
                 if position.is_some_and(|old: (u64, Option<u64>)| {
                     old.0 >= key.0 || old.1.zip(key.1).is_some_and(|(a, b)| a > b)
@@ -119,6 +110,9 @@ impl ParquetStore {
                 if count > MAX_STAGED_ROW || bytes > input.budget {
                     return Err(no_space());
                 }
+                normalized_hash.update(&encoded);
+                normalized_hash.update(b"\n");
+                accepted = accepted.checked_add(1).ok_or_else(invalid_source)?;
                 writer.write_all(&encoded).map_err(storage)?;
                 writer.write_all(b"\n").map_err(storage)?;
                 Ok(())
@@ -126,7 +120,7 @@ impl ParquetStore {
         )?;
         writer.flush().map_err(storage)?;
         drop(writer);
-        if report.accepted == 0 {
+        if report.accepted == 0 || report.accepted != accepted {
             return Err(invalid_source());
         }
         verify_source_unchanged(&input.file, &metadata, &value)?;
@@ -140,6 +134,7 @@ impl ParquetStore {
             manifest: Self::source_manifest(&input.path, &metadata, size, value, copied)?,
             report,
             sample_hash: irmind_app::sha256(&sample),
+            normalized_hash: normalized_hash.finalize().into(),
         })
     }
 }
@@ -152,4 +147,27 @@ pub(super) fn check_space(available: u64, required: u64) -> Result<(), AppError>
 }
 fn no_space() -> AppError {
     AppError::Fixed(irmind_app::FixedAppError::StorageNormalizedStagingSpace)
+}
+
+fn normalized_row(
+    record: &irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
+    parser: &dyn StreamingEventParser,
+    hash: &irmind_domain::EvidenceHash,
+    offset_mode: &mut Option<bool>,
+    size: u64,
+) -> Result<RecordRow, AppError> {
+    let mut row = None;
+    record.inspect(|indexed| {
+        row = Some((|| {
+            stream::validate_offset(offset_mode, indexed.source_offset, size)?;
+            let mut row = RecordRow::from_partitioned(indexed, hash)?;
+            row.profile = match parser.partition_profile(&indexed.record) {
+                irmind_app::PartitionProfile::Unpartitioned => 0,
+                irmind_app::PartitionProfile::CloudAccountRegion => 1,
+                irmind_app::PartitionProfile::EndpointHost => 2,
+            };
+            Ok(row)
+        })());
+    });
+    row.ok_or_else(invalid_source)?
 }
