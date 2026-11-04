@@ -57,7 +57,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "migrate",
-        description: "Convert copied evidence in an open case to Parquet",
+        description: "Migrate copied evidence; --v2 [source-root] upgrades open cases",
         shortcut: "",
         slash: true,
     },

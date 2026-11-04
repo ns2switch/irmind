@@ -1,4 +1,5 @@
 use super::*;
+use irmind_app::LargeCaseStore;
 
 impl LocalStore {
     pub(crate) fn reconcile_pending_seals(&self) -> Result<(), AppError> {
@@ -35,7 +36,6 @@ impl LocalStore {
                 || entry.seq != index as u64 + 1
                 || entry.prev != previous
                 || sha256(&entry.canonical()) != entry.hash
-                || entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV2
             {
                 return Err(AppError::InvalidChain(entry.seq));
             }
@@ -49,15 +49,20 @@ impl LocalStore {
         {
             return Err(AppError::InvalidChain(last.seq));
         }
-        let hashes = self.evidence_hashes(id)?;
+        let blobs = self.evidence_hashes(id)?;
+        let hashes = irmind_app::seal_inventory(&entries, &blobs)?;
         if last.payload != hashes.join(",") {
             return Err(AppError::InvalidChain(last.seq));
         }
-        for hash in &hashes {
+        for hash in &blobs {
             let bytes = self.get_evidence(id, hash)?;
             if hex(&sha256(&bytes)) != *hash {
                 return Err(AppError::EvidenceMismatch(hash.clone()));
             }
+        }
+        for artifact in irmind_app::artifact_catalog(&entries)?.all {
+            self.parquet
+                .verify_artifact(id, &artifact, &CancellationToken::new())?;
         }
         for entry in &entries {
             if let Some(hash) = &entry.evidence
@@ -122,7 +127,9 @@ impl LocalStore {
             || seal.hash != entry.hash
             || seal.public_key != entry.public_key
             || seal.analyst_key_fingerprint != hex(&sha256(&entry.public_key))
-            || entry.payload != self.evidence_hashes(id)?.join(",")
+            || entry.payload
+                != irmind_app::seal_inventory(&self.entries(id)?, &self.evidence_hashes(id)?)?
+                    .join(",")
         {
             return Err(AppError::InvalidChain(entry.seq));
         }
@@ -181,15 +188,10 @@ impl LocalStore {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        if self.entries(id)?.iter().any(|entry| {
-            matches!(
-                entry.kind,
-                irmind_domain::AuditEventKind::SourceManifestV1
-                    | irmind_domain::AuditEventKind::SourceManifestV2
-                    | irmind_domain::AuditEventKind::ParquetArtifactV1
-            )
-        }) {
-            return self.export_v4(id, path, None, false, cancel);
+        match archive_version(&self.entries(id)?) {
+            5 => return self.export_v5(id, path, None, false, cancel),
+            4 => return self.export_v4(id, path, None, false, cancel),
+            _ => {}
         }
         let case = self.get_case(id)?;
         if !case.sealed {
@@ -255,5 +257,28 @@ impl LocalStore {
             let _ = fs::remove_file(path);
         }
         result
+    }
+}
+
+fn archive_version(entries: &[SignedEntry]) -> u32 {
+    use irmind_domain::AuditEventKind;
+    if entries.iter().any(|e| {
+        matches!(
+            e.kind,
+            AuditEventKind::ParquetArtifactV2 | AuditEventKind::ParquetArtifactsMigrated
+        )
+    }) {
+        5
+    } else if entries.iter().any(|e| {
+        matches!(
+            e.kind,
+            AuditEventKind::SourceManifestV1
+                | AuditEventKind::SourceManifestV2
+                | AuditEventKind::ParquetArtifactV1
+        )
+    }) {
+        4
+    } else {
+        3
     }
 }

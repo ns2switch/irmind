@@ -99,16 +99,32 @@ impl AutomationContext<'_, '_> {
             cancel,
             ..
         } = self;
-        let Command::Migrate { case_id } = command else {
+        let Command::Migrate {
+            case_id,
+            artifact_v2,
+            source_root,
+        } = command
+        else {
             return Err(anyhow!("invalid command dispatch"));
         };
         let id = parse_id(&case_id)?;
+        let catalog = self.registry.parser_catalog();
+        let router = catalog.rebuild_router(&engine.audit_log.entries(&id)?)?;
         let parser = JsonParser;
+        let selected: &dyn irmind_app::StreamingEventParser =
+            if artifact_v2 { &router } else { &parser };
         let large = LargeCaseUseCases {
             engine,
             store: store.as_ref(),
-            parser: &parser,
+            parser: selected,
         };
+        if artifact_v2 {
+            let count = large.migrate_artifacts_v2(&id, source_root.as_deref(), cancel)?;
+            println!(
+                "migrated {count} signed Parquet artifacts to V2; historical artifacts retained"
+            );
+            return Ok(false);
+        }
         let count = large.migrate_legacy(&id, cancel)?;
         let bundles = if engine.repo.get_case(&id)?.sealed {
             0

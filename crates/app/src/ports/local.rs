@@ -362,6 +362,16 @@ pub struct PreparedSource {
 /// The local adapter owns all paths and derived files. The application signs
 /// the returned manifests before any derived file is exposed to model tools.
 pub trait LargeCaseStore: Send + Sync {
+    fn prepare_artifact_migration(
+        &self,
+        _request: crate::ArtifactMigrationRequest<'_>,
+        _cancel: &CancellationToken,
+    ) -> Result<Box<dyn crate::PreparedArtifactMigration>, AppError> {
+        Err(AppError::Fixed(
+            crate::FixedAppError::PolicyArtifactMigrationUnavailable,
+        ))
+    }
+
     /// Prepare a canonical bounded batch against the verified signed snapshot.
     fn prepare_local_batch(
         &self,
@@ -515,6 +525,19 @@ pub struct ExportVerification {
 }
 
 pub trait LargeCaseExporter: Send + Sync {
+    fn export_case_v5(
+        &self,
+        _id: &CaseId,
+        _path: &Path,
+        _source_root: Option<&Path>,
+        _include_originals: bool,
+        _cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        Err(AppError::Fixed(
+            crate::FixedAppError::PolicyExportV5Unavailable,
+        ))
+    }
+
     fn export_case_v4(
         &self,
         id: &CaseId,

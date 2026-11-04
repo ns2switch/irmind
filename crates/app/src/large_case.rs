@@ -4,6 +4,7 @@ use crate::{
 };
 
 mod manifest;
+mod migrate_v2;
 mod migration;
 mod source_event;
 mod verification;
@@ -60,14 +61,12 @@ impl LargeCaseUseCases<'_, '_> {
             return Err(AppError::Sealed);
         }
         self.engine.verify_ingest_checkpoint(id, cancel)?;
-        let index = read_manifest_index(&self.engine.audit_log.entries(id)?)?;
+        let index = crate::artifact_catalog(&self.engine.audit_log.entries(id)?)?.active;
         let mut known = index
-            .artifacts
             .iter()
             .map(|artifact| (artifact.path().to_owned(), artifact.clone()))
             .collect::<BTreeMap<_, _>>();
         let covered = index
-            .artifacts
             .iter()
             .filter(|artifact| artifact.source_hashes().len() > 1)
             .flat_map(|artifact| {
@@ -78,8 +77,9 @@ impl LargeCaseUseCases<'_, '_> {
             })
             .collect::<BTreeSet<_>>();
         let mut groups: BTreeMap<Vec<u8>, Vec<ParquetArtifact>> = BTreeMap::new();
-        for artifact in index.artifacts {
-            if artifact.source_hashes().len() == 1
+        for artifact in index {
+            if !matches!(&artifact, ParquetArtifact::V2(v) if !v.superseded_hashes.is_empty())
+                && artifact.source_hashes().len() == 1
                 && (artifact.parser_version() == "json-stream-v2"
                     || matches!(artifact, ParquetArtifact::V2(_)))
                 && !covered.contains(&(

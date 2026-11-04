@@ -163,9 +163,10 @@ def source_cli() -> tuple[set[str], set[str], set[str]]:
 
 def source_tui_flags() -> set[str]:
     source = "\n".join((ROOT / name).read_text(encoding="utf-8") for name in (
-        "crates/tui/src/case/commands/export.rs", "crates/tui/src/case/commands.rs"
+        "crates/tui/src/case/commands/export.rs", "crates/tui/src/case/commands.rs",
+        "crates/tui/src/case/commands/migration.rs"
     ))
-    return set(re.findall(r'strip_prefix\("(?:/[a-z-]+ )?(--[a-z-]+) ?"\)', source))
+    return set(re.findall(r'strip_prefix\("(?:/[a-z-]+ )?(--[a-z0-9-]+) ?"\)', source))
 
 
 def check_cli(paths: list[Path], binary: Path | None) -> tuple[int, list[str]]:

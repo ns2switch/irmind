@@ -84,7 +84,7 @@ impl LocalStore {
             artifacts: selected,
             has_legacy,
             source_names,
-        } = collect_signed_artifacts(self.entries(id)?, operations, seal_hash, id, &last)?;
+        } = collect_signed_artifacts(&self.entries(id)?, operations, seal_hash, id, &last)?;
         self.graph_catalog.lock().map_err(storage)?.insert(
             id.clone(),
             CachedCatalog {
@@ -103,7 +103,7 @@ impl LocalStore {
 }
 
 fn collect_signed_artifacts(
-    entries: Vec<irmind_app::SignedEntry>,
+    entries: &[irmind_app::SignedEntry],
     operations: Vec<SignedOperation>,
     seal_hash: Option<[u8; 32]>,
     id: &CaseId,
@@ -113,7 +113,7 @@ fn collect_signed_artifacts(
     let mut previous = [0u8; 32];
     let mut seen = 0u64;
     let mut analyst_key = None;
-    for (index, entry) in entries.into_iter().enumerate() {
+    for (index, entry) in entries.iter().enumerate() {
         if entry.seq != index as u64 + 1
             || entry.case_id != id.as_str()
             || entry.prev != previous
@@ -122,10 +122,22 @@ fn collect_signed_artifacts(
             return Err(AppError::InvalidChain(entry.seq));
         }
         crate::signing::verify_signature(&entry.public_key, &entry.hash, &entry.sig)?;
-        check_analyst_key(&entry, &mut analyst_key)?;
+        check_analyst_key(entry, &mut analyst_key)?;
         previous = entry.hash;
         seen = entry.seq;
-        state.accept(&entry)?;
+        state.accept(entry)?;
+    }
+    state.artifacts = irmind_app::artifact_catalog(entries)?.active;
+    // Copied sources predating manifests retain their signed hash identity.
+    for artifact in &state.artifacts {
+        if matches!(artifact, ParquetArtifact::V2(_)) {
+            for hash in artifact.source_hashes() {
+                state
+                    .source_names
+                    .entry(hash.as_str().into())
+                    .or_insert_with(|| hash.as_str().into());
+            }
+        }
     }
     if seen != last.seq || previous != last.hash {
         return Err(AppError::InvalidChain(last.seq));

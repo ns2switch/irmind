@@ -11,6 +11,14 @@ use super::{
 use std::io::Read as _;
 
 impl LargeCaseStore for ParquetStore {
+    fn prepare_artifact_migration(
+        &self,
+        request: irmind_app::ArtifactMigrationRequest<'_>,
+        cancel: &CancellationToken,
+    ) -> Result<Box<dyn irmind_app::PreparedArtifactMigration>, AppError> {
+        self.prepare_migration(&request, cancel)
+    }
+
     fn prepare_local_batch(
         &self,
         request: irmind_app::LocalBatchRequest<'_>,
@@ -283,82 +291,7 @@ impl LargeCaseStore for ParquetStore {
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
-        let temporary = TempWorkspace::new(&self.spool_dir(case_id)?)?;
-        let mut fresh = ParquetStore::open(&temporary.path)?;
-        let mut checked = 0usize;
-        let mut rebuilt = Vec::new();
-        for source in sources {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            fresh.replay_mode(source, artifacts);
-            let paths = [source.source.clone()];
-            let prepared = fresh.replay_prepared(
-                irmind_app::LocalBatchRequest {
-                    case_id,
-                    source_root,
-                    relative_paths: &paths,
-                    copy_original: false,
-                    parser,
-                    committed_artifacts: &rebuilt,
-                    limits: super::partitioning::replay_limits(artifacts)?,
-                },
-                source,
-                artifacts,
-                cancel,
-            )?;
-            if prepared.manifest.sha256 != source.sha256 || prepared.manifest.size != source.size {
-                return Err(AppError::EvidenceMismatch(source.sha256.as_str().into()));
-            }
-            let mut actual = prepared.artifacts;
-            actual.sort_by(|a, b| a.path().cmp(b.path()));
-            let parser_version = parser.identity_for_source(&source.source)?.version;
-            let mut signed = artifacts
-                .iter()
-                .filter(|artifact| {
-                    artifact.source_hashes().len() == 1
-                        && artifact.parser_version() == parser_version
-                        && artifact.source_hashes().contains(&source.sha256)
-                })
-                .cloned()
-                .collect::<Vec<_>>();
-            signed.sort_by(|a, b| a.path().cmp(b.path()));
-            if actual != signed {
-                return Err(AppError::EvidenceMismatch(source.sha256.as_str().into()));
-            }
-            rebuilt.extend(actual);
-            checked += 1;
-        }
-        let source_hashes = sources
-            .iter()
-            .map(|source| source.sha256.clone())
-            .collect::<std::collections::BTreeSet<_>>();
-        for signed in artifacts.iter().filter(|artifact| {
-            artifact.source_hashes().len() > 1
-                && artifact
-                    .source_hashes()
-                    .iter()
-                    .all(|hash| source_hashes.contains(hash))
-        }) {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            let inputs = rebuilt
-                .iter()
-                .filter(|artifact: &&ParquetArtifact| {
-                    artifact.compaction_key() == signed.compaction_key()
-                        && signed
-                            .source_hashes()
-                            .contains(&artifact.source_hashes()[0])
-                })
-                .cloned()
-                .collect::<Vec<_>>();
-            let actual = fresh.compact_signed_sources(case_id, &inputs, cancel)?;
-            if &actual != signed {
-                return Err(AppError::EvidenceMismatch(signed.sha256().as_str().into()));
-            }
-        }
-        Ok(checked)
+        self.rebuild_generations(case_id, source_root, sources, artifacts, parser, cancel)
     }
 }
 
@@ -380,7 +313,7 @@ pub(super) fn verify_source_unchanged(
 }
 
 impl ParquetStore {
-    fn replay_mode(&mut self, source: &SourceManifestV1, artifacts: &[ParquetArtifact]) {
+    pub(super) fn replay_mode(&mut self, source: &SourceManifestV1, artifacts: &[ParquetArtifact]) {
         self.precise_time = artifacts.iter().any(|a| {
             matches!(a, ParquetArtifact::V2(_)) && a.source_hashes().contains(&source.sha256)
         });
@@ -391,7 +324,7 @@ impl ParquetStore {
         });
     }
 
-    fn replay_prepared(
+    pub(super) fn replay_prepared(
         &self,
         request: irmind_app::LocalBatchRequest<'_>,
         source: &SourceManifestV1,

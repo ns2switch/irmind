@@ -7,6 +7,17 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum FixedAppError {
+    #[error("policy denied: explicit artifact migration is unavailable")]
+    PolicyArtifactMigrationUnavailable,
+    #[error("policy denied: export V5 is unavailable")]
+    PolicyExportV5Unavailable,
+    #[error("policy denied: migration would change normalized record meaning")]
+    PolicyArtifactMigrationMeaning,
+    #[error("migration requires the exact signed parser identity and version")]
+    PolicyArtifactMigrationParser,
+    #[error("policy denied: no artifact generation needs migration")]
+    PolicyArtifactMigrationNotNeeded,
+
     #[error("policy denied: source has no signed parser selection")]
     PolicyMissingSignedParserSelection,
     #[error("policy denied: partitioned preparation is unavailable")]

@@ -67,38 +67,7 @@ impl SignedSources {
     fn artifact(&mut self, entry: &irmind_app::SignedEntry) -> Result<(), AppError> {
         let artifact = ParquetArtifact::decode(entry.kind, &entry.payload)
             .map_err(|_| AppError::InvalidChain(entry.seq))?;
-        if self.artifacts.iter().any(|a| {
-            !a.same_generation(&artifact)
-                && a.source_hashes()
-                    .iter()
-                    .any(|h| artifact.source_hashes().contains(h))
-        }) {
-            return Err(AppError::InvalidChain(entry.seq));
-        }
-        if entry.evidence.is_some()
-            || artifact
-                .source_hashes()
-                .iter()
-                .any(|h| !self.sources.contains(h))
-            || self
-                .artifacts
-                .iter()
-                .any(|old| old.path() == artifact.path())
-        {
-            return Err(AppError::InvalidChain(entry.seq));
-        }
-        if let ParquetArtifact::V2(v) = &artifact
-            && (!v.superseded_hashes.is_empty()
-                || !matches!(
-                    v.builder_version.as_str(),
-                    "parquet-builder-v2" | "parquet-builder-v3"
-                )
-                || v.source_hashes.iter().any(|h| {
-                    self.parser_choices.get(h).is_none_or(|choices| {
-                        !choices.contains(&(v.parser_id.clone(), v.parser_version.clone()))
-                    })
-                }))
-        {
+        if entry.evidence.is_some() {
             return Err(AppError::InvalidChain(entry.seq));
         }
         self.artifacts.push(artifact);

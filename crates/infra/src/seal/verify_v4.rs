@@ -1,13 +1,12 @@
-use super::export_v4::{HeaderV4, MAGIC_V4, MAX_FRAME_BYTES, v4_result};
+mod frames;
+use super::export_v4::{HeaderV4, MAGIC_V4, MAGIC_V5, v4_result};
 use super::{
     AppError, CaseId, LocalVerifier, Path, Severity, hex, seal_challenge, sha256, storage,
     storage_reason, verify_case_metadata,
 };
+use frames::{read_frame, read_hash, read_u64, verify_raw};
 use irmind_app::{ExportVerification, SignedEntry, SignedOperation, Verifier};
-use irmind_domain::{
-    Actor, AuditEventKind, ParquetArtifactV1, SealedParquetMigrationV1, SourceManifestV1,
-};
-use sha2::{Digest, Sha256};
+use irmind_domain::{Actor, AuditEventKind, SealedParquetMigrationV1, SourceManifestV1};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::Read;
@@ -20,17 +19,32 @@ pub(super) fn verify_export_v4(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
+    verify_versioned(path, expected_key, 4)
+}
+
+pub(super) fn verify_export_v5(
+    path: &Path,
+    expected_key: Option<&str>,
+) -> Result<ExportVerification, AppError> {
+    verify_versioned(path, expected_key, 5)
+}
+
+fn verify_versioned(
+    path: &Path,
+    expected_key: Option<&str>,
+    version: u32,
+) -> Result<ExportVerification, AppError> {
     let mut input = File::open(path).map_err(storage)?;
     if input.metadata().map_err(storage)?.len() > MAX_V4_FILE_BYTES {
         return Err(storage_reason("export package exceeds size limit"));
     }
     let mut magic = [0u8; MAGIC_V4.len()];
     input.read_exact(&mut magic).map_err(storage)?;
-    if magic != MAGIC_V4 {
+    if magic != if version == 5 { MAGIC_V5 } else { MAGIC_V4 } {
         return Err(storage_reason("unsupported export version"));
     }
     let header: HeaderV4 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
-    if header.version != 4 {
+    if header.version != version {
         return Err(storage_reason("unsupported export version"));
     }
     let id =
@@ -39,7 +53,7 @@ pub(super) fn verify_export_v4(
     if count == 0 || count > MAX_AUDIT_ENTRIES {
         return Err(storage_reason("invalid audit entry count"));
     }
-    let mut chain = ChainState::new();
+    let mut chain = ChainState::new(version);
     for index in 0..count {
         let entry: SignedEntry =
             serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
@@ -61,12 +75,14 @@ pub(super) fn verify_export_v4(
     if input.read(&mut trailer).map_err(storage)? != 0 {
         return Err(storage_reason("export has trailing bytes"));
     }
-    Ok(v4_result(
+    let mut result = v4_result(
         fingerprint,
         usize::try_from(count).map_err(storage)?,
         chain.source_count,
         provided_count,
-    ))
+    );
+    result.format_version = version;
+    Ok(result)
 }
 
 fn verify_operation_frames(
@@ -138,12 +154,11 @@ fn verify_legacy_blobs(input: &mut File, chain: &ChainState) -> Result<(), AppEr
         verify_raw(input, size, &hash)?;
     }
     let last = chain.last.as_ref().ok_or(AppError::InvalidChain(0))?;
-    if evidence_hashes
-        .iter()
-        .cloned()
-        .collect::<Vec<_>>()
-        .join(",")
-        != last.payload
+    let mut inventory = evidence_hashes.clone();
+    if chain.version == 5 {
+        inventory.extend(chain.derived_hashes.iter().cloned());
+    }
+    if inventory.iter().cloned().collect::<Vec<_>>().join(",") != last.payload
         || chain.referenced_evidence.iter().any(|hash| {
             !evidence_hashes.contains(hash)
                 && !chain.sources.keys().any(|(source, _)| source == hash)
@@ -185,6 +200,9 @@ fn verify_source_frames(input: &mut File, chain: &mut ChainState) -> Result<usiz
 }
 
 struct ChainState {
+    version: u32,
+    catalog: irmind_app::ArtifactCatalogBuilder,
+    derived_hashes: BTreeSet<String>,
     previous: [u8; 32],
     verifier: LocalVerifier,
     metadata_entries: Vec<SignedEntry>,
@@ -198,8 +216,11 @@ struct ChainState {
 }
 
 impl ChainState {
-    fn new() -> Self {
+    fn new(version: u32) -> Self {
         Self {
+            version,
+            catalog: irmind_app::ArtifactCatalogBuilder::default(),
+            derived_hashes: BTreeSet::new(),
             previous: [0; 32],
             verifier: LocalVerifier {
                 trusted: BTreeMap::new(),
@@ -220,7 +241,11 @@ impl ChainState {
             || entry.seq != index + 1
             || entry.prev != self.previous
             || sha256(&entry.canonical()) != entry.hash
-            || entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV2
+            || (self.version == 4
+                && matches!(
+                    entry.kind,
+                    AuditEventKind::ParquetArtifactV2 | AuditEventKind::ParquetArtifactsMigrated
+                ))
             || (index == 0 && entry.kind != AuditEventKind::CaseCreated)
             || (index > 0 && entry.kind == AuditEventKind::CaseCreated)
             || self
@@ -238,6 +263,19 @@ impl ChainState {
             .clone()
             .with_trusted_key(&entry.actor, &entry.public_key)
             .map_err(|_| AppError::InvalidChain(entry.seq))?;
+        if self.version == 5 {
+            self.catalog.accept(&entry)?;
+        }
+        self.accept_metadata(&entry)?;
+        if let Some(hash) = &entry.evidence {
+            self.referenced_evidence.insert(hash.clone());
+        }
+        self.previous = entry.hash;
+        self.last = Some(entry);
+        Ok(())
+    }
+
+    fn accept_metadata(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
         match entry.kind {
             AuditEventKind::CaseCreated | AuditEventKind::CaseScopeChanged => {
                 self.metadata_entries.push(entry.clone());
@@ -260,18 +298,21 @@ impl ChainState {
                 }
                 self.source_count += 1;
                 self.source_hashes.insert(source.sha256.as_str().into());
+                self.derived_hashes.insert(source.sha256.as_str().into());
                 *self
                     .sources
                     .entry((source.sha256.as_str().into(), source.size))
                     .or_default() += 1;
             }
-            AuditEventKind::ParquetArtifactV1 => {
-                let artifact = ParquetArtifactV1::decode(&entry.payload)
+            AuditEventKind::ParquetArtifactV1 | AuditEventKind::ParquetArtifactV2 => {
+                let artifact = irmind_domain::ParquetArtifact::decode(entry.kind, &entry.payload)
                     .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                self.derived_hashes
+                    .insert(artifact.sha256().as_str().into());
                 if entry.evidence.is_some()
-                    || !self.artifact_paths.insert(artifact.path)
+                    || !self.artifact_paths.insert(artifact.path().into())
                     || artifact
-                        .source_hashes
+                        .source_hashes()
                         .iter()
                         .any(|hash| !self.source_hashes.contains(hash.as_str()))
                 {
@@ -279,22 +320,20 @@ impl ChainState {
                 }
                 self.artifact_sources.extend(
                     artifact
-                        .source_hashes
-                        .into_iter()
+                        .source_hashes()
+                        .iter()
                         .map(|hash| hash.as_str().to_owned()),
                 );
             }
             _ => {}
         }
-        if let Some(hash) = &entry.evidence {
-            self.referenced_evidence.insert(hash.clone());
-        }
-        self.previous = entry.hash;
-        self.last = Some(entry);
         Ok(())
     }
 
     fn verify_seal(&self, id: &CaseId, header: &HeaderV4) -> Result<(), AppError> {
+        if self.version == 5 {
+            self.catalog.validate()?;
+        }
         let severity = Severity::parse(&header.severity).map_err(|_| AppError::InvalidChain(1))?;
         verify_case_metadata(
             &header.title,
@@ -320,44 +359,4 @@ impl ChainState {
             )
             .map_err(|_| AppError::InvalidChain(last.seq))
     }
-}
-
-fn read_frame(input: &mut File) -> Result<Vec<u8>, AppError> {
-    let length = read_u64(input)?;
-    if length == 0 || length > MAX_FRAME_BYTES {
-        return Err(storage_reason("invalid export metadata frame length"));
-    }
-    let mut bytes = vec![0u8; usize::try_from(length).map_err(storage)?];
-    input.read_exact(&mut bytes).map_err(storage)?;
-    Ok(bytes)
-}
-
-fn read_u64(input: &mut File) -> Result<u64, AppError> {
-    let mut bytes = [0u8; 8];
-    input.read_exact(&mut bytes).map_err(storage)?;
-    Ok(u64::from_be_bytes(bytes))
-}
-
-fn read_hash(input: &mut File) -> Result<String, AppError> {
-    let mut bytes = [0u8; 64];
-    input.read_exact(&mut bytes).map_err(storage)?;
-    let hash = std::str::from_utf8(&bytes).map_err(storage)?;
-    irmind_domain::EvidenceHash::parse(hash).map_err(|_| storage_reason("invalid export hash"))?;
-    Ok(hash.into())
-}
-
-fn verify_raw(input: &mut File, size: u64, expected: &str) -> Result<(), AppError> {
-    let mut left = size;
-    let mut hasher = Sha256::new();
-    let mut chunk = vec![0u8; 1024 * 1024];
-    while left > 0 {
-        let count = usize::try_from(left.min(chunk.len() as u64)).map_err(storage)?;
-        input.read_exact(&mut chunk[..count]).map_err(storage)?;
-        hasher.update(&chunk[..count]);
-        left -= count as u64;
-    }
-    if hex(&hasher.finalize()) != expected {
-        return Err(AppError::EvidenceMismatch(expected.into()));
-    }
-    Ok(())
 }

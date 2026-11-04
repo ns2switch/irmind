@@ -161,7 +161,8 @@ pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Opt
         let detail = match confirm {
             Confirmation::Seal(_, info)
             | Confirmation::Export(_, info)
-            | Confirmation::ObjectRead(_, info) => info,
+            | Confirmation::ObjectRead(_, info)
+            | Confirmation::Migration(_, info) => info,
         };
         return Ok(Some(format!(
             "{}\n\n{} 1. Cancel   {} 2. Confirm\n↑/↓ choose · Enter select · Esc cancel",

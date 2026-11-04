@@ -5,6 +5,7 @@ use irmind_app::{
 };
 use std::path::Path;
 
+mod artifact_migration;
 pub(crate) mod ingest;
 
 /// Presentation controller shared by keyboard actions and `TestBackend` tests.
@@ -169,12 +170,12 @@ impl CaseWorkflow<'_, '_> {
     }
 
     fn has_parquet_artifacts(&self, id: &CaseId) -> Result<bool, AppError> {
-        let case_chain = self
-            .engine
-            .audit_log
-            .entries(id)?
-            .iter()
-            .any(|entry| entry.kind == AuditEventKind::ParquetArtifactV1);
+        let case_chain = self.engine.audit_log.entries(id)?.iter().any(|entry| {
+            matches!(
+                entry.kind,
+                AuditEventKind::ParquetArtifactV1 | AuditEventKind::ParquetArtifactV2
+            )
+        });
         for operation in self.engine.audit_log.operations(id)? {
             if SealedParquetMigrationV1::decode(&operation.operation)
                 .map_err(|_| AppError::InvalidChain(operation.seq))?

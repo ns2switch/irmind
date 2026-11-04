@@ -43,6 +43,15 @@ impl Engine<'_> {
         id: &CaseId,
         events: &[(AuditOrigin, AuditEventKind, String)],
     ) -> Result<(), AppError> {
+        let signed = self.prepare_audit_batch(id, events)?;
+        self.audit_log.append_batch(&signed)
+    }
+
+    pub(crate) fn prepare_audit_batch(
+        &self,
+        id: &CaseId,
+        events: &[(AuditOrigin, AuditEventKind, String)],
+    ) -> Result<Vec<SignedEntry>, AppError> {
         if events.is_empty() {
             return Err(AppError::InvalidChain(0));
         }
@@ -52,7 +61,7 @@ impl Engine<'_> {
             let previous = signed.last().or(last.as_ref());
             signed.push(self.signed_entry_after(id, previous, *origin, *kind, payload, None)?);
         }
-        self.audit_log.append_batch(&signed)
+        Ok(signed)
     }
 
     pub(crate) fn signed_entry(

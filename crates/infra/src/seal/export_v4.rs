@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 
 pub(super) const MAGIC_V4: &[u8] = b"IRMIND-EXPORT-V4\0";
+pub(super) const MAGIC_V5: &[u8] = b"IRMIND-EXPORT-V5\0";
 pub(super) const MAX_FRAME_BYTES: u64 = 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
@@ -35,6 +36,17 @@ struct ExportV4Request<'a> {
 }
 
 impl LargeCaseExporter for LocalStore {
+    fn export_case_v5(
+        &self,
+        id: &CaseId,
+        path: &Path,
+        source_root: Option<&Path>,
+        include_originals: bool,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        self.export_v5(id, path, source_root, include_originals, cancel)
+    }
+
     fn export_case_v4(
         &self,
         id: &CaseId,
@@ -56,13 +68,46 @@ impl LocalStore {
         include_originals: bool,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        self.export_versioned(id, path, source_root, include_originals, cancel, 4)
+    }
+
+    pub(super) fn export_v5(
+        &self,
+        id: &CaseId,
+        path: &Path,
+        source_root: Option<&Path>,
+        include_originals: bool,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        self.export_versioned(id, path, source_root, include_originals, cancel, 5)
+    }
+
+    fn export_versioned(
+        &self,
+        id: &CaseId,
+        path: &Path,
+        source_root: Option<&Path>,
+        include_originals: bool,
+        cancel: &CancellationToken,
+        version: u32,
+    ) -> Result<String, AppError> {
+        if version == 4
+            && self.entries(id)?.iter().any(|e| {
+                matches!(
+                    e.kind,
+                    AuditEventKind::ParquetArtifactV2 | AuditEventKind::ParquetArtifactsMigrated
+                )
+            })
+        {
+            return Err(storage_reason("export V4 requires V1-only artifacts"));
+        }
         let case = self.get_case(id)?;
         if !case.sealed {
             return Err(AppError::Sealed);
         }
         let seal = self.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
         let header = HeaderV4 {
-            version: 4,
+            version,
             case_id: id.as_str().into(),
             title: case.title,
             severity: case.severity.as_str().into(),
@@ -133,7 +178,12 @@ impl LocalStore {
         let mut out = options.open(path).map_err(storage)?;
         *created = true;
         private_file(path).map_err(storage)?;
-        out.write_all(MAGIC_V4).map_err(storage)?;
+        out.write_all(if header.version == 5 {
+            MAGIC_V5
+        } else {
+            MAGIC_V4
+        })
+        .map_err(storage)?;
         write_frame(&mut out, &serde_json::to_vec(&header).map_err(storage)?)?;
         out.write_all(&entry_count.to_be_bytes()).map_err(storage)?;
         let written = self.for_each_audit_entry(id, |entry| {
