@@ -1,5 +1,7 @@
 # Design decisions
 
+Proposed, awaiting analyst review: use one explicitly versioned artifact value at the existing storage boundary, plus additive typed parser callbacks, for [mixed V1/V2 ingestion](parquet-v2-port-transition.md). The recommendation avoids a second custody pipeline; it does not authorize changing V1 bytes. No port is changed by this documentation PR.
+
 This page is for maintainers reviewing tradeoffs that shape the current build. Each row states the context, choice, consequence, and decision date. The [reference plan](plan.md) holds acceptance criteria.
 
 | Context | Decision | Consequence | Date |
