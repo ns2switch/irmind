@@ -1,6 +1,23 @@
 name: Synthetic graph benchmark
 on:
   workflow_dispatch:
+    inputs:
+      scenario:
+        description: Release benchmark workload
+        type: choice
+        default: all
+        options:
+          - all
+          - cloud-v1
+          - cloud-v2
+          - endpoint-v1-1
+          - endpoint-v1-64
+          - endpoint-v1-1024
+          - endpoint-v1-1025
+          - endpoint-v2-1
+          - endpoint-v2-64
+          - endpoint-v2-1024
+          - endpoint-v2-1025
   schedule:
     - cron: '31 4 * * 1'
 permissions:
@@ -43,16 +60,28 @@ jobs:
           cargo test -p irmind-infra hunteval_reference_corpus --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee benchmark-results.txt
       - name: Compare V1 and V2 CloudTrail and endpoint Parquet in release mode
         shell: bash
+        env:
+          BENCH_SCENARIO: ${{ inputs.scenario || 'all' }}
         run: |
           set -euo pipefail
+          failed=0
           for version in v1 v2; do
             export IRMIND_BENCH_SCENARIO="cloud-$version"
-            cargo test -p irmind-infra parquet_benchmark_ --release --locked -- --ignored --nocapture --test-threads 1 --skip parquet_benchmark_50mb 2>&1 | tee -a benchmark-results.txt
+            if [[ "$BENCH_SCENARIO" == all || "$BENCH_SCENARIO" == "$IRMIND_BENCH_SCENARIO" ]]; then
+              if ! cargo test -p irmind-infra parquet_benchmark_ --release --locked -- --ignored --nocapture --test-threads 1 --skip parquet_benchmark_50mb 2>&1 | tee -a benchmark-results.txt; then
+                failed=1
+              fi
+            fi
             for hosts in 1 64 1024 1025; do
               export IRMIND_BENCH_SCENARIO="endpoint-$version-$hosts"
-              cargo test -p irmind-infra parquet_benchmark_15gb --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee -a benchmark-results.txt
+              if [[ "$BENCH_SCENARIO" == all || "$BENCH_SCENARIO" == "$IRMIND_BENCH_SCENARIO" ]]; then
+                if ! cargo test -p irmind-infra parquet_benchmark_15gb --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee -a benchmark-results.txt; then
+                  failed=1
+                fi
+              fi
             done
           done
+          exit "$failed"
       - name: Measure warm build and binary size
         shell: bash
         run: |
