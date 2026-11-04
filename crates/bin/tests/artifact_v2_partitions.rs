@@ -171,7 +171,7 @@ fn a_source_alias_cannot_bypass_explicit_generation_migration() {
         "alias.json".into(),
         ParserSelection {
             parser_id: "parser-json".into(),
-            parser_version: "json-stream-v2".into(),
+            parser_version: "json-stream-v3".into(),
             confidence: 90,
             mode: ParserSelectionMode::Automatic,
             timestamp_context: None,

@@ -20,6 +20,10 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | Syslog | RFC 5424/RFC 3164, texto o gzip acotado | PRI y forma de cabecera/instante, no extensión | Host, aplicación, PID, facility, severity, mensaje y tiempo completo | experimental |
 | Declarativo | CSV, JSON, NDJSON o regex acotada | Cabecera exacta, campos JSON o regex; máximo 70 % | Mapeo explícito descrito abajo | experimental |
 
+## Lectores actuales y casos existentes
+
+Las ingestas nuevas usan la versión del parser registrada en su manifiesto firmado. JSON usa `json-stream-v3`. No se conservan lectores históricos. Los bytes firmados existentes se pueden autenticar y exportar; para regenerar registros de un lector anterior, crea un caso nuevo e ingiere los originales verificados. Reinstala las definiciones declarativas después de actualizar su lector. Consulta el [registro de cambios](../../CHANGELOG.md#known-issue-fixed).
+
 ## Cobertura de Windows
 
 Hoy se investigan estos artefactos mediante exportaciones procesadas. Todos los módulos de la tabla son experimentales y están probados con datos sintéticos. IRMind ingiere las salidas; no ejecuta KAPE, EZTools, Velociraptor ni plaso, ni abre por sí mismo sus artefactos binarios originales.

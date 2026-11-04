@@ -18,8 +18,8 @@ pub(super) fn parse_array(
     };
     let mut offset = 0u64;
     let mut index = 0usize;
-    let first =
-        next_nonspace(reader, &mut offset)?.ok_or_else(|| policy("empty Chainsaw array"))?;
+    let first = next_nonspace(reader, &mut offset, cancel)?
+        .ok_or_else(|| policy("empty Chainsaw array"))?;
     if first != b'[' {
         return Err(policy("invalid Chainsaw array"));
     }
@@ -27,21 +27,21 @@ pub(super) fn parse_array(
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let mut marker = next_nonspace(reader, &mut offset)?
+        let mut marker = next_nonspace(reader, &mut offset, cancel)?
             .ok_or_else(|| policy("unterminated Chainsaw array"))?;
         if index > 0 {
             if marker == b']' {
-                return Ok(report);
+                return finish_array(reader, &mut offset, report, cancel);
             }
             if marker != b',' {
                 return Err(policy("Chainsaw array separator is missing"));
             }
-            marker = next_nonspace(reader, &mut offset)?
+            marker = next_nonspace(reader, &mut offset, cancel)?
                 .ok_or_else(|| policy("unterminated Chainsaw array"))?;
         }
         if marker == b']' {
             if index == 0 {
-                return Ok(report);
+                return finish_array(reader, &mut offset, report, cancel);
             }
             return Err(policy("Chainsaw array has a trailing comma"));
         }
@@ -72,15 +72,26 @@ pub(super) fn parse_array(
         index += 1;
     }
 }
-fn next_nonspace(reader: &mut impl BufRead, offset: &mut u64) -> Result<Option<u8>, AppError> {
+fn next_nonspace(
+    reader: &mut impl BufRead,
+    offset: &mut u64,
+    cancel: &CancellationToken,
+) -> Result<Option<u8>, AppError> {
     loop {
-        let byte = next_byte(reader, offset)?;
+        let byte = next_byte(reader, offset, cancel)?;
         if byte.is_none_or(|value| !value.is_ascii_whitespace()) {
             return Ok(byte);
         }
     }
 }
-fn next_byte(reader: &mut impl BufRead, offset: &mut u64) -> Result<Option<u8>, AppError> {
+fn next_byte(
+    reader: &mut impl BufRead,
+    offset: &mut u64,
+    cancel: &CancellationToken,
+) -> Result<Option<u8>, AppError> {
+    if offset.is_multiple_of(4096) && cancel.is_cancelled() {
+        return Err(AppError::Cancelled);
+    }
     let bytes = reader
         .fill_buf()
         .map_err(|_| policy("cannot read Chainsaw source"))?;
@@ -107,8 +118,8 @@ fn read_object(
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let byte =
-            next_byte(reader, offset)?.ok_or_else(|| policy("unterminated Chainsaw object"))?;
+        let byte = next_byte(reader, offset, cancel)?
+            .ok_or_else(|| policy("unterminated Chainsaw object"))?;
         if bytes.len() <= MAX_RECORD_BYTES {
             bytes.push(byte);
         }
@@ -142,4 +153,16 @@ fn read_object(
             _ => {}
         }
     }
+}
+
+fn finish_array(
+    reader: &mut impl BufRead,
+    offset: &mut u64,
+    report: ParseReport,
+    cancel: &CancellationToken,
+) -> Result<ParseReport, AppError> {
+    if next_nonspace(reader, offset, cancel)?.is_some() {
+        return Err(policy("trailing content after Chainsaw array"));
+    }
+    Ok(report)
 }

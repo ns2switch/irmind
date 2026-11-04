@@ -65,7 +65,7 @@ impl StreamingEventParser for JsonParser {
     }
 
     fn streaming_version(&self) -> &'static str {
-        "json-stream-v2"
+        "json-stream-v3"
     }
 
     fn parse_reader(

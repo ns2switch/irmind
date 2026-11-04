@@ -56,12 +56,12 @@ El repositorio incluye [install.sh](../../install.sh) e [install.ps1](../../inst
 
 ```sh
 # Linux o macOS, después de comprobar install.sh con SHA256SUMS:
-sh ./install.sh v0.1.1
+sh ./install.sh v0.1.6
 ```
 
 ```powershell
 # Windows, después de comprobar install.ps1 con SHA256SUMS:
-& .\install.ps1 -Version v0.1.1
+& .\install.ps1 -Version v0.1.6
 ```
 
 Omite la versión para elegir la última publicada, incluida una preliminar. Un segundo argumento de POSIX o `-InstallDir` en PowerShell cambia el directorio del usuario. Por defecto se instala en `~/.local/bin` o `%LOCALAPPDATA%\IRMind\bin`. Si no está en `PATH`, el script indica cómo añadirlo manualmente.

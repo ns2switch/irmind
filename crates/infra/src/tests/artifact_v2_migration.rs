@@ -222,7 +222,7 @@ fn failed_atomic_batch_removes_published_replacements_and_recovers_unsigned_orph
 }
 
 #[test]
-fn legacy_copied_case_can_explicitly_upgrade_after_its_compatible_parquet_conversion() {
+fn retired_legacy_requires_fresh_ingestion_before_precision_upgrade() {
     let root = tempfile::tempdir().unwrap();
     let (store, engine) = setup(root.path());
     let signer = LocalSigner {
@@ -234,14 +234,38 @@ fn legacy_copied_case_can_explicitly_upgrade_after_its_compatible_parquet_conver
         .unwrap()
         .id;
     ingest_historical_fixture(store.as_ref(),&signer,&id,br#"{"eventTime":"2026-11-01T00:00:00.000001900Z","eventName":"Login","sourceIPAddress":"203.0.113.77"}"#,"old.json");
+    let old_entries = store.entries(&id).unwrap();
+    let unavailable = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &JsonParser,
+    }
+    .migrate_legacy_open(&id, &CancellationToken::new())
+    .unwrap_err();
+    assert!(unavailable.to_string().contains("create a new case"));
+    assert_eq!(store.entries(&id).unwrap().len(), old_entries.len());
+    engine.verify(&id).unwrap();
+    let id = engine
+        .create_case("Fresh verified originals", "local only")
+        .unwrap()
+        .id;
+    let original = br#"{"eventTime":"2026-11-01T00:00:00.000001900Z","eventName":"Login","sourceIPAddress":"203.0.113.77"}"#;
+    fs::write(root.path().join("original.json"), original).unwrap();
     let large = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
         parser: &JsonParser,
     };
-    large
-        .migrate_legacy_open(&id, &CancellationToken::new())
+    let hash = large
+        .ingest_local(
+            &id,
+            root.path(),
+            "original.json",
+            true,
+            &CancellationToken::new(),
+        )
         .unwrap();
+    assert_eq!(hash.as_str(), hex(&sha256(original)));
     large
         .migrate_artifacts_v2(&id, None, &CancellationToken::new())
         .unwrap();

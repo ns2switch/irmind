@@ -166,3 +166,6 @@ fn bad(message: &'static str) -> AppError {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod completeness_tests;

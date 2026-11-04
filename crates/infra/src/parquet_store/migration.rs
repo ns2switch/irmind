@@ -69,10 +69,7 @@ impl ParquetStore {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            let parser = source_parser::SourceParser {
-                inner: request.parser,
-                logical: &input.manifest.source,
-            };
+            let parser = source_parser::SourceParser::new(request.parser, &input.manifest.source);
             let mut replay = input.manifest.clone();
             replay.source.clone_from(&input.relative);
             self.rebuild_compare(

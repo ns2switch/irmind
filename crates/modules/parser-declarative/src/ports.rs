@@ -8,7 +8,7 @@ use std::io::{Cursor, Read};
 
 impl EventParser for DeclarativeParser {
     fn version(&self) -> &'static str {
-        "declarative-v1"
+        "declarative-v2"
     }
     fn parse_each(
         &self,
@@ -45,7 +45,7 @@ impl StreamingEventParser for DeclarativeParser {
         "parser-declarative"
     }
     fn streaming_version(&self) -> &'static str {
-        "declarative-v1"
+        "declarative-v2"
     }
     fn identity(&self) -> ParserIdentity<'_> {
         ParserIdentity {

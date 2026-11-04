@@ -125,6 +125,7 @@ impl LargeCaseUseCases<'_, '_> {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
+            self.require_legacy_parser(hash)?;
             let bytes = self.engine.evidence_store.get_evidence(id, hash)?;
             let source = irmind_domain::SourceManifestV1 {
                 source: format!("legacy/{hash}.json"),

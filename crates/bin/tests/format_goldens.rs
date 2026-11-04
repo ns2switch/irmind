@@ -362,7 +362,8 @@ fn signed_and_reconstructed_format_goldens_are_unchanged() {
     let engine = engine(&store);
     signed_configuration_goldens(&mut actual, &store, &engine, root.path());
     export_goldens(&mut actual, &store, &engine, root.path());
-    let expected: Goldens = serde_json::from_str(include_str!("fixtures/formats-v1.json")).unwrap();
+    let expected: Goldens =
+        serde_json::from_str(include_str!("fixtures/formats-readers-v3.json")).unwrap();
     assert_eq!(
         actual.keys().collect::<Vec<_>>(),
         expected.keys().collect::<Vec<_>>()
@@ -447,3 +448,55 @@ mod indexed_parser_contracts;
 
 #[path = "support/json_order_contracts.rs"]
 mod json_order_contracts;
+
+#[test]
+fn historical_envelope_codecs_and_normalized_rows_remain_unchanged() {
+    let historical: Goldens =
+        serde_json::from_str(include_str!("fixtures/formats-v1.json")).unwrap();
+    let current: Goldens =
+        serde_json::from_str(include_str!("fixtures/formats-readers-v3.json")).unwrap();
+    for (key, value) in &historical {
+        if key.starts_with("parser/")
+            || key.starts_with("manifest/")
+            || key.starts_with("entry/")
+            || key.starts_with("seal/")
+            || key.starts_with("export/")
+            || key.starts_with("configuration/")
+            || key.starts_with("operation/")
+        {
+            assert_eq!(current.get(key), Some(value), "historical payload {key}");
+        }
+        if !key.ends_with("/bytes") {
+            continue;
+        }
+        let decode = || {
+            String::from_utf8(
+                value
+                    .as_bytes()
+                    .chunks_exact(2)
+                    .map(|p| u8::from_str_radix(std::str::from_utf8(p).unwrap(), 16).unwrap())
+                    .collect(),
+            )
+            .unwrap()
+        };
+        if key.starts_with("manifest-v2/") {
+            let wire = decode();
+            assert_eq!(
+                irmind_domain::SourceManifestV2::decode(&wire)
+                    .unwrap()
+                    .encode()
+                    .unwrap(),
+                wire
+            );
+        } else if key.starts_with("artifact/") {
+            let wire = decode();
+            assert_eq!(
+                irmind_domain::ParquetArtifactV1::decode(&wire)
+                    .unwrap()
+                    .encode()
+                    .unwrap(),
+                wire
+            );
+        }
+    }
+}

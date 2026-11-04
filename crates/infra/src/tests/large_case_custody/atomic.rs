@@ -66,7 +66,9 @@ fn failed_artifact_insert_rolls_back_the_source_manifest() {
     assert!(store.entries(&case.id).unwrap().iter().all(|entry| {
         !matches!(
             entry.kind,
-            AuditEventKind::SourceManifestV1 | AuditEventKind::ParquetArtifactV1
+            AuditEventKind::SourceManifestV1
+                | AuditEventKind::SourceManifestV2
+                | AuditEventKind::ParquetArtifactV1
         )
     }));
     external

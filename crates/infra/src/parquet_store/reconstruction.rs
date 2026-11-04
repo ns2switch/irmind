@@ -78,16 +78,23 @@ impl ParquetStore {
         let mut physical = source.clone();
         let legacy = source.source == format!("legacy/{}.json", source.sha256.as_str());
         let evidence_root = data_root.join("evidence");
+        let originals_root = data_root
+            .join("parquet")
+            .join(case.as_str())
+            .join("originals");
         let root = if legacy {
             physical.source = source.sha256.as_str().into();
             evidence_root.as_path()
+        } else if source.copied {
+            physical.source = source.sha256.as_str().into();
+            originals_root.as_path()
         } else {
+            if source.source.contains("://") {
+                physical.source = source.sha256.as_str().into();
+            }
             root
         };
-        let routed = super::source_parser::SourceParser {
-            inner: parser,
-            logical: &source.source,
-        };
+        let routed = super::source_parser::SourceParser::new(parser, &source.source);
         let paths = [physical.source.clone()];
         let prepared = self.replay_prepared(
             irmind_app::LocalBatchRequest {

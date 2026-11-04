@@ -268,6 +268,8 @@ impl Engine<'_> {
         self.blocking_local(move |local| {
             let (parser, selection) =
                 select_object_parser(&catalog, &root, &relative, &manifest.source)?;
+            let logical_source = manifest.source.clone();
+            let routed = crate::SourceParser::new(parser.as_ref(), &logical_source);
             let index = crate::large_case::read_manifest_index(&local.audit_log.entries(&id)?)?;
             let paths = [relative.clone()];
             let mut prepared: PreparedSource = store
@@ -277,7 +279,7 @@ impl Engine<'_> {
                         source_root: &root,
                         relative_paths: &paths,
                         copy_original: manifest.copied,
-                        parser: parser.as_ref() as &dyn crate::StreamingEventParser,
+                        parser: &routed,
                         committed_artifacts: &index.artifacts,
                         limits: crate::PartitionLimits::default(),
                     },
@@ -299,7 +301,7 @@ impl Engine<'_> {
             let large = LargeCaseUseCases {
                 engine: &local,
                 store: store.as_ref(),
-                parser: parser.as_ref() as &dyn crate::StreamingEventParser,
+                parser: &routed,
             };
             let hash = large.sign_prepared_with_selection(
                 &id,

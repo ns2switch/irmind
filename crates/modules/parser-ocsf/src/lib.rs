@@ -70,7 +70,7 @@ impl LogParser for OcsfParser {
 
 impl EventParser for OcsfParser {
     fn version(&self) -> &'static str {
-        "ocsf-stream-v1"
+        "ocsf-stream-v2"
     }
 
     fn parse_each(
@@ -129,7 +129,7 @@ impl StreamingEventParser for OcsfParser {
     }
 
     fn streaming_version(&self) -> &'static str {
-        "ocsf-stream-v1"
+        "ocsf-stream-v2"
     }
 
     fn parse_reader(
@@ -215,3 +215,6 @@ fn policy_error(message: &'static str) -> AppError {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod completeness_tests;

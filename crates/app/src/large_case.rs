@@ -80,7 +80,7 @@ impl LargeCaseUseCases<'_, '_> {
         for artifact in index {
             if !matches!(&artifact, ParquetArtifact::V2(v) if !v.superseded_hashes.is_empty())
                 && artifact.source_hashes().len() == 1
-                && (artifact.parser_version() == "json-stream-v2"
+                && (artifact.parser_version() == "json-stream-v3"
                     || matches!(artifact, ParquetArtifact::V2(_)))
                 && !covered.contains(&(
                     artifact.compaction_key(),

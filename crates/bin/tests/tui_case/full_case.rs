@@ -73,10 +73,11 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
         .entries(&id)
         .unwrap()
         .into_iter()
-        .find(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV1)
+        .find(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV2)
         .map(|entry| {
-            irmind_domain::SourceManifestV1::decode(&entry.payload)
+            irmind_domain::SourceManifestV2::decode(&entry.payload)
                 .unwrap()
+                .source
                 .sha256
                 .as_str()
                 .to_owned()

@@ -8,7 +8,7 @@ fn assert_historical_parser(name: &str) {
     let mut actual = Goldens::new();
     one_parser_golden(&mut actual, name, parser.as_ref(), bytes);
     let expected: Goldens =
-        serde_json::from_str(include_str!("../fixtures/formats-v1.json")).unwrap();
+        serde_json::from_str(include_str!("../fixtures/formats-readers-v3.json")).unwrap();
     for (key, bytes) in actual {
         assert_eq!(expected.get(&key), Some(&bytes), "{name}: {key}");
     }
@@ -125,5 +125,5 @@ fn fast_single_object_reproduces_the_pre_fix_released_v1_event_hash() {
         events[0].sha256().as_str(),
         "87c852208cfe1a67633e3dd4489729f9e6728fb7dfdf35ddc261f7dd9c1f4dab"
     );
-    assert_eq!(JsonParser.streaming_version(), "json-stream-v2");
+    assert_eq!(JsonParser.streaming_version(), "json-stream-v3");
 }

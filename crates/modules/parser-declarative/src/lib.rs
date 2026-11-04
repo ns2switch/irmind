@@ -61,7 +61,7 @@ impl DeclarativeParser {
         let detection_regex = config::compile_regex(definition.detect.pattern.as_deref())?;
         let id = format!("parser-declarative-{}", definition.name);
         let version = format!(
-            "declarative-v1:sha256={}",
+            "declarative-v2:sha256={}",
             irmind_app::hex(&irmind_app::sha256(text.as_bytes()))
         );
         let timestamp_context = format!(
@@ -98,3 +98,6 @@ fn error(message: &'static str) -> AppError {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod completeness_tests;

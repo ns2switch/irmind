@@ -54,12 +54,12 @@ The source tree contains [install.sh](../install.sh) and [install.ps1](../instal
 
 ```sh
 # Linux or macOS, after checking install.sh against the release SHA256SUMS:
-sh ./install.sh v0.1.1
+sh ./install.sh v0.1.6
 ```
 
 ```powershell
 # Windows, after checking install.ps1 against the release SHA256SUMS:
-& .\install.ps1 -Version v0.1.1
+& .\install.ps1 -Version v0.1.6
 ```
 
 Omit the version to select the newest published release, including a pre-release. An optional second POSIX argument or `-InstallDir` PowerShell argument chooses another user-owned directory. By default the binary goes to `~/.local/bin` on Linux and macOS or `%LOCALAPPDATA%\IRMind\bin` on Windows. If it is outside `PATH`, the script prints the path to add manually.

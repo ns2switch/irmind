@@ -53,7 +53,7 @@ fn signed_mixed_case_verifies_rebuilds_and_rejects_parser_substitution() {
         "new.json".into(),
         ParserSelection {
             parser_id: "parser-json".into(),
-            parser_version: "json-stream-v2".into(),
+            parser_version: "json-stream-v3".into(),
             confidence: 90,
             mode: ParserSelectionMode::Automatic,
             timestamp_context: None,
