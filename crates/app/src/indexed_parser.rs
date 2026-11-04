@@ -12,7 +12,9 @@ pub fn indexed_rfc3339(
     assume_utc: bool,
 ) -> Result<IndexedTime, AppError> {
     if raw.len() > 64 || !raw.is_ascii() {
-        return Err(AppError::Policy("invalid indexed timestamp".into()));
+        return Err(AppError::Fixed(
+            crate::FixedAppError::PolicyInvalidIndexedTimestamp,
+        ));
     }
     let mut value = raw.trim().to_owned();
     if value.as_bytes().get(10) == Some(&b' ') {
@@ -35,7 +37,7 @@ pub fn indexed_rfc3339(
         value.push('Z');
     }
     IndexedTime::from_rfc3339(&value, inferred)
-        .map_err(|_| AppError::Policy("invalid indexed timestamp".into()))
+        .map_err(|_| AppError::Fixed(crate::FixedAppError::PolicyInvalidIndexedTimestamp))
 }
 
 /// A rejected time is a rejected record. Errors from the storage callback still abort.
@@ -59,9 +61,9 @@ pub fn parse_indexed_report(
                 }),
             );
         });
-        if let Ok(record) =
-            result.ok_or_else(|| AppError::Policy("missing indexed record".into()))?
-        {
+        if let Ok(record) = result.ok_or(AppError::Fixed(
+            crate::FixedAppError::PolicyMissingIndexedRecord,
+        ))? {
             emit(Tainted::from_external(record, tainted.provenance().clone()))
         } else {
             rejected += 1;
@@ -74,11 +76,15 @@ pub fn parse_indexed_report(
     report.accepted = report
         .accepted
         .checked_sub(rejected)
-        .ok_or_else(|| AppError::Policy("invalid indexed parser count".into()))?;
+        .ok_or(AppError::Fixed(
+            crate::FixedAppError::PolicyInvalidIndexedParserCount,
+        ))?;
     report.rejected = report
         .rejected
         .checked_add(rejected as u64)
-        .ok_or_else(|| AppError::Policy("invalid indexed parser count".into()))?;
+        .ok_or(AppError::Fixed(
+            crate::FixedAppError::PolicyInvalidIndexedParserCount,
+        ))?;
     report.samples.extend(samples);
     report.samples.truncate(3);
     Ok(report)
@@ -93,14 +99,17 @@ pub(crate) fn lift_legacy_indexed(
             let time = if record.at.is_empty() {
                 None
             } else {
-                let parsed = IndexedTime::from_rfc3339(&record.at, false)
-                    .map_err(|_| AppError::Policy("invalid indexed timestamp".into()))?;
+                let parsed = IndexedTime::from_rfc3339(&record.at, false).map_err(|_| {
+                    AppError::Fixed(crate::FixedAppError::PolicyInvalidIndexedTimestamp)
+                })?;
                 let seconds = parsed.instant().unix_micros().div_euclid(1_000_000);
-                let instant = IndexedInstant::new(seconds * 1_000_000, 0)
-                    .map_err(|_| AppError::Policy("invalid indexed timestamp".into()))?;
+                let instant = IndexedInstant::new(seconds * 1_000_000, 0).map_err(|_| {
+                    AppError::Fixed(crate::FixedAppError::PolicyInvalidIndexedTimestamp)
+                })?;
                 Some(
-                    IndexedTime::new(instant, TimePrecision::Second, false)
-                        .map_err(|_| AppError::Policy("invalid indexed timestamp".into()))?,
+                    IndexedTime::new(instant, TimePrecision::Second, false).map_err(|_| {
+                        AppError::Fixed(crate::FixedAppError::PolicyInvalidIndexedTimestamp)
+                    })?,
                 )
             };
             Ok(IndexedGraphRecord {
@@ -110,7 +119,9 @@ pub(crate) fn lift_legacy_indexed(
             })
         })());
     });
-    let record = result.ok_or_else(|| AppError::Policy("missing indexed record".into()))??;
+    let record = result.ok_or(AppError::Fixed(
+        crate::FixedAppError::PolicyMissingIndexedRecord,
+    ))??;
     Ok(Tainted::from_external(record, tainted.provenance().clone()))
 }
 

@@ -2,7 +2,7 @@ use super::*;
 use irmind_domain::AuditEventKind;
 
 #[test]
-fn known_v2_audit_event_cannot_be_silently_omitted_by_the_current_graph_reader() {
+fn v2_artifact_without_signed_source_links_is_rejected() {
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(LocalStore::open(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {

@@ -277,8 +277,8 @@ impl LargeCaseUseCases<'_, '_> {
             .any(|a| matches!(a, ParquetArtifact::V2(_)))
             && selection.is_none()
         {
-            return Err(AppError::Policy(
-                "precise artifacts require a signed parser selection".into(),
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyPreciseArtifactsRequireParserSelection,
             ));
         }
         if prepared.records == 0 || prepared.artifacts.is_empty() {
@@ -295,9 +295,8 @@ impl LargeCaseUseCases<'_, '_> {
                 old.audit_kind() != artifact.audit_kind()
                     && old.source_hashes().binary_search(&source_hash).is_ok()
             }) {
-                return Err(AppError::Policy(
-                    "source already has another artifact version; explicit migration is required"
-                        .into(),
+                return Err(AppError::Fixed(
+                    crate::FixedAppError::PolicyArtifactVersionRequiresMigration,
                 ));
             }
             self.store.verify_artifact(id, artifact, cancel)?;

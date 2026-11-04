@@ -1,7 +1,7 @@
 use irmind_app::{AppError, GraphRecord, IndexedProjection, IndexedTime, indexed_rfc3339};
 use serde::Deserialize;
 fn invalid() -> AppError {
-    AppError::Policy("invalid precise source timestamp".into())
+    AppError::Fixed(irmind_app::FixedAppError::PolicyInvalidIndexedTimestamp)
 }
 #[derive(Deserialize)]
 struct Row<'a> {
