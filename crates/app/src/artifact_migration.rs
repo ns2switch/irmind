@@ -1,6 +1,8 @@
+mod inventory;
 use crate::{
     AppError, CancellationToken, CaseId, PartitionLimits, SignedEntry, StreamingEventParser,
 };
+pub use inventory::{SealInventoryBuilder, verify_seal_inventory_snapshot};
 use irmind_domain::{ParquetArtifactV2, ParquetMigrationV1};
 use std::path::Path;
 
@@ -132,7 +134,7 @@ pub fn artifact_catalog(entries: &[SignedEntry]) -> Result<ArtifactCatalog, AppE
 }
 
 pub fn seal_inventory(entries: &[SignedEntry], legacy: &[String]) -> Result<Vec<String>, AppError> {
-    use irmind_domain::{AuditEventKind, SourceManifestV1};
+    use irmind_domain::AuditEventKind;
     if !entries.iter().any(|e| {
         matches!(
             e.kind,
@@ -141,20 +143,21 @@ pub fn seal_inventory(entries: &[SignedEntry], legacy: &[String]) -> Result<Vec<
     }) {
         return Ok(legacy.to_vec());
     }
-    let catalog = artifact_catalog(entries)?;
-    let mut hashes = legacy
-        .iter()
-        .cloned()
-        .collect::<std::collections::BTreeSet<_>>();
+    let mut catalog = ArtifactCatalogBuilder::default();
+    let mut inventory = SealInventoryBuilder::default();
     for entry in entries {
-        if let Some(source) = SourceManifestV1::decode_signed(entry.kind, &entry.payload)
-            .map_err(|_| AppError::InvalidChain(entry.seq))?
-        {
-            hashes.insert(source.sha256.as_str().into());
-        }
+        catalog.accept(entry)?;
+        inventory.accept(entry)?;
     }
-    hashes.extend(catalog.all.iter().map(|a| a.sha256().as_str().to_owned()));
-    Ok(hashes.into_iter().collect())
+    catalog.validate()?;
+    for hash in legacy {
+        inventory.add_evidence(hash)?;
+    }
+    let payload = inventory
+        .commitment()?
+        .encode()
+        .map_err(|_| AppError::InvalidChain(0))?;
+    Ok(vec![payload])
 }
 
 #[cfg(test)]

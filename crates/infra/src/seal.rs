@@ -19,8 +19,10 @@ fn default_export_severity() -> String {
     "medium".into()
 }
 
+mod artifact_frames;
 mod export;
 mod export_v4;
+mod frames;
 mod local;
 mod verify_v4;
 pub use export::{LocalExportVerifier, verify_export, verify_export_expected};

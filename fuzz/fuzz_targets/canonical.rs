@@ -7,6 +7,14 @@ fuzz_target!(|bytes: &[u8]| {
         return;
     }
     if let Ok(text) = std::str::from_utf8(bytes) {
+        if let Ok(inventory) = irmind_domain::SealInventoryV2::decode(text.trim()) {
+            let wire = inventory.encode().unwrap();
+            assert_eq!(
+                irmind_domain::SealInventoryV2::decode(&wire).unwrap(),
+                inventory
+            );
+            assert!(irmind_domain::SealInventoryV2::decode(&(wire + "00")).is_err());
+        }
         if let Ok(migration) = irmind_domain::ParquetMigrationV1::decode(text.trim()) {
             let wire = migration.encode().unwrap();
             assert_eq!(

@@ -7,6 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct ArtifactLineage {
     all: Vec<ParquetArtifact>,
     retired: BTreeSet<String>,
+    paths: BTreeSet<String>,
+    active_generations: BTreeMap<EvidenceHash, ParquetArtifact>,
     pending: Vec<ParquetArtifact>,
     parsers: BTreeMap<EvidenceHash, (String, String)>,
     manifests: BTreeSet<EvidenceHash>,
@@ -18,6 +20,8 @@ impl ArtifactLineage {
         Self {
             all: Vec::new(),
             retired: BTreeSet::new(),
+            paths: BTreeSet::new(),
+            active_generations: BTreeMap::new(),
             pending: Vec::new(),
             parsers: BTreeMap::new(),
             manifests: BTreeSet::new(),
@@ -50,11 +54,7 @@ impl ArtifactLineage {
         {
             return Err(invalid());
         }
-        if self
-            .all
-            .iter()
-            .chain(&self.pending)
-            .any(|old| old.path() == artifact.path())
+        if self.paths.contains(artifact.path())
             || artifact
                 .source_hashes()
                 .iter()
@@ -63,24 +63,18 @@ impl ArtifactLineage {
             return Err(invalid());
         }
         if matches!(&artifact, ParquetArtifact::V2(v) if !v.superseded_hashes.is_empty()) {
+            self.paths.insert(artifact.path().into());
             self.pending.push(artifact);
             return Ok(());
         }
         if !self.pending.is_empty() {
             return Err(invalid());
         }
-        if self
-            .all
-            .iter()
-            .filter(|a| !self.retired.contains(a.path()))
-            .any(|old| {
-                !old.same_generation(&artifact)
-                    && old
-                        .source_hashes()
-                        .iter()
-                        .any(|h| artifact.source_hashes().contains(h))
-            })
-        {
+        if artifact.source_hashes().iter().any(|h| {
+            self.active_generations
+                .get(h)
+                .is_some_and(|old| !old.same_generation(&artifact))
+        }) {
             return Err(invalid());
         }
         if let ParquetArtifact::V2(v) = &artifact
@@ -90,6 +84,12 @@ impl ArtifactLineage {
             })
         {
             return Err(invalid());
+        }
+        self.paths.insert(artifact.path().into());
+        for hash in artifact.source_hashes() {
+            self.active_generations
+                .entry(hash.clone())
+                .or_insert_with(|| artifact.clone());
         }
         self.all.push(artifact);
         Ok(())
@@ -150,6 +150,12 @@ impl ArtifactLineage {
             .extend(previous.iter().map(|a| a.path().into()));
         self.manifests.extend(new_parsers.keys().cloned());
         self.parsers.extend(new_parsers);
+        for artifact in &self.pending {
+            for hash in artifact.source_hashes() {
+                self.active_generations
+                    .insert(hash.clone(), artifact.clone());
+            }
+        }
         self.all.append(&mut self.pending);
         Ok(())
     }

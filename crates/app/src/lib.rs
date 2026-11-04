@@ -88,5 +88,5 @@ mod tests;
 mod artifact_migration;
 pub use artifact_migration::{
     ArtifactCatalog, ArtifactCatalogBuilder, ArtifactMigrationRequest, PreparedArtifactMigration,
-    artifact_catalog, seal_inventory,
+    SealInventoryBuilder, artifact_catalog, seal_inventory, verify_seal_inventory_snapshot,
 };

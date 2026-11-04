@@ -1,6 +1,8 @@
 #![allow(clippy::too_many_lines)]
 use super::*;
+mod archive;
 mod rejections;
+mod seed;
 use irmind_app::{LargeCaseStore, LargeCaseUseCases};
 use irmind_domain::{AuditEventKind, ParquetArtifact};
 

@@ -1,5 +1,7 @@
 use crate::{AuditEventKind, DomainError, EvidenceHash, canonical::put};
 
+mod seal_inventory;
+pub use seal_inventory::*;
 mod migration;
 pub use migration::*;
 mod artifact_v2;
