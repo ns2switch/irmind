@@ -1,6 +1,6 @@
 # Manual MVP validation
 
-This guide is for the analyst closing the two manual release gates. Use only the synthetic files in `examples/`. Record the result below; a successful automated test does not replace either check.
+This guide is for the analyst closing the two manual release gates. Use only the synthetic files in `examples/`. Keep detailed results in a private record; a successful automated test does not replace either check.
 
 ## H5: real DeepSeek model
 
@@ -9,7 +9,7 @@ This guide is for the analyst closing the two manual release gates. Use only the
 3. Ask `Hello.` and check that the model replies naturally without an unnecessary tool call. Then ask it to explain the synthetic `ConsoleLogin` and `AssumeRole` events, cite the evidence hash, and identify uncertainty. Check that tool calls, if any, follow the policy and that the answer does not invent evidence.
 4. Ask a follow-up referring to the first answer. Check that the conversation continues, streaming finishes cleanly, and a tool result is not requested repeatedly. Use `/verify` with the source root and record the outcome. A response cut by a token limit should remain visible and offer a continuation path.
 
-Record the model ID, date, commit, observed tool behavior, any redaction or injection warning, verification result, and whether this meets H5. Do not paste the API key or full provider response into an issue or PR.
+Privately record the model ID, date, commit, observed tool behavior, any redaction or injection warning, verification result, and whether this meets H5. Do not paste the API key or full provider response into an issue or PR.
 
 ## Connector: Splunk Enterprise test container
 
@@ -30,43 +30,27 @@ Use a disposable bucket and a dedicated identity with only `s3:ListBucket` on on
 
 ## Result record
 
-[Spanish result record](../es/manual-validation.md#registro-de-resultados).
+Store detailed validation records privately. Public summaries should include only the product version, provider, observed behavior and untested checks. Do not publish machine identifiers, personal paths, credentials or full incident/provider output.
 
-| Check | Record |
+| Compatibility check | Public summary |
 | --- | --- |
-| Test date | 2026-11-01, supplied by the analyst. |
-| Model | `deepseek v4.1 flash`, supplied by the analyst. |
-| Operating system | Debian Linux 12, supplied by the analyst. |
-| IRMind version / commit | Version 0.1.2; an exact commit was not supplied. |
-| Operator and provider | Analyst; real DeepSeek service. |
-| H5 connection probe | Pending analyst record. |
-| H5 greeting | Observed by the analyst: `hola` is recognized as a greeting and answered naturally, without unnecessary tool calls. |
-| H5 investigation question with evidence-hash citation | Pending analyst record; not reported as observed. |
-| H5 follow-up and streaming | Pending analyst record; not reported as observed. |
-| H5 tool policy, redaction or injection warnings | Pending analyst record beyond the observed absence of unnecessary tools for the greeting. |
-| H5 `/verify` | Pending analyst record; not reported as observed. |
-| H5 verdict | **Done by analyst decision.** The analyst accepts H5 based on the observed real-DeepSeek greeting. Unreported procedure steps remain pending records, not claimed passes. |
-| Real connector verdict | **Pending analyst validation.** No live connector result has been supplied. |
-| Splunk image digest/version, test index, TLS setup | Pending analyst record. |
-| Structured search: expected / observed count and evidence hash | Pending analyst record. |
-| Alert approval: exact scope, decision, expected / observed result | Pending analyst record. |
-| Connector custody verification and follow-up issue | Pending analyst record. |
-
-Keep secrets, complete provider output, personal paths, and real incident data out of the record.
+| DeepSeek greeting, IRMind 0.1.2 | A natural greeting response without unnecessary tool calls was observed. |
+| Investigation, evidence-hash citation, follow-up, streaming and `/verify` | Not recorded as observed. |
+| Real connector | Validation remains pending. |
 
 ## Optional HuntEval model evaluation
 
 This is a manual, synthetic-data check after the deterministic weekly evaluation. It never runs in CI and never sends HuntEval's hidden answers to the model. Use a dedicated IRMind test data directory with a model already configured in `/settings model`. The CLI may ask you to unlock the file keystore for each invocation; enter the passphrase in the terminal, never in an argument or environment variable.
 
-1. Check out [HuntEval](https://github.com/ns2switch/HuntEval) at commit `4cbb555a56bc17cb03b988ad2f15b1374eecf183`. From that checkout, run `sha256sum -c /path/to/irmind/scripts/hunteval.sha256` on Linux. The script also verifies the selected public source before the model run and its private answer afterward.
+1. Check out [HuntEval](https://github.com/ns2switch/HuntEval) at commit `4cbb555a56bc17cb03b988ad2f15b1374eecf183`. From that checkout, run `sha256sum -c ../irmind/scripts/hunteval.sha256` on Linux. The script also verifies the selected public source before the model run and its private answer afterward.
 2. Build IRMind and configure a model in the dedicated test directory. Run one episode with the development command below, replacing the paths and module ID. The command creates a case, ingests only `source/events.json`, asks the model to propose evidence-backed findings, verifies custody, and then scores exact IDs in the findings. It never auto-approves a tool call.
 
 ```sh
 python3 scripts/hunteval_model_eval.py \
-  /path/to/HuntEval \
+  ../HuntEval \
   aws-iam-001 \
   target/debug/irmind \
-  /path/to/dedicated-test-home \
+  ../irmind-evaluation \
   llm-deepseek
 ```
 

@@ -4,13 +4,19 @@ Traducción de SECURITY.md en el commit e31fd5cc947308542888df4a52164d8892c56b93
 
 # Política de seguridad
 
-Esta página es para quienes quieren comunicar una vulnerabilidad de IRMind. El proyecto está en desarrollo y **no está listo para incidentes reales ni datos sensibles**. Revisamos los informes que afecten a la rama pública actual; todavía no se admite una versión de producción.
+Esta página es para quienes quieren comunicar una vulnerabilidad de IRMind. El proyecto está en desarrollo y **no está listo para incidentes reales ni datos sensibles**. Las correcciones de seguridad se dirigen a la última versión preliminar 0.1.x y a la rama principal de desarrollo. Las versiones anteriores deben actualizarse; una versión preliminar no supone soporte de producción.
 
 ## Comunicar en privado
 
 No publiques vulnerabilidades, detalles de explotación, datos reales de incidentes ni secretos en issues o PR. En GitHub, usa **Security → Advisories → Report a vulnerability** para enviar un informe privado. Incluye la versión o commit afectado, el impacto, pasos para reproducirlo con datos sintéticos y una forma de contacto.
 
 Si no aparece esa opción, abre un issue pidiendo que se habilite **sin detalles técnicos de la vulnerabilidad**. Este archivo no activa por sí mismo el reporte privado.
+
+## Divulgación coordinada
+
+Mantén privados los informes y los pasos de reproducción hasta que se publique una versión corregida. Usa un GitHub Security Advisory privado y su fork privado temporal para coordinar el arreglo. No abras issues, PRs, commits ni comentarios públicos que describan una debilidad sin resolver en la política, la custodia, las firmas, el aislamiento del contenido o el manejo de secretos. Tras publicar la corrección, añade la entrada del changelog y, cuando corresponda, el aviso coordinado.
+
+Los informes detallados del analista y los registros de su entorno se conservan en privado. Las PRs públicas describen el comportamiento, las pruebas, los benchmarks release y las decisiones de diseño sin información personal del equipo ni credenciales.
 
 ## Plazos orientativos
 

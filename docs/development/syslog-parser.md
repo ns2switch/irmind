@@ -26,7 +26,7 @@ The common graph policy currently accepts a closed list of query entity kinds th
 
 ## Dependency review
 
-The analyst approved adding `flate2` for gzip. Version 1.1.10 is pinned with defaults disabled and the explicit `miniz_oxide` feature. Its published archive SHA-256 is `6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb`; the review checked it before reading the source. The project has recent maintained releases and MIT OR Apache-2.0 licensing. This is dependency review evidence, not a complete security audit.
+Gzip support uses `flate2`. Version 1.1.10 is pinned with defaults disabled and the explicit `miniz_oxide` feature. Its published archive SHA-256 is `6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb`; the review checked it before reading the source. The project has recent maintained releases and MIT OR Apache-2.0 licensing. This is dependency review evidence, not a complete security audit.
 
 The selected backend needs no system zlib or C decoder. Required new packages are flate2, miniz_oxide, adler2, simd-adler32 and crc32fast; the lockfile pins their exact versions. Checksum acceleration can contain target-specific unsafe code, so the dependency closure is not described as entirely unsafe-free. IRMind's module forbids unsafe. The reviewed gzip header parser bounds filename/comment buffers to 65,535 bytes; IRMind additionally bounds stream input/output and tests corruption and cancellation. Cargo-deny must pass without new exceptions.
 

@@ -1,75 +1,26 @@
-# JSON line ordering: released compatibility
+# JSON serialization compatibility
 
-This note is for the analyst reviewing artifact V2 partitions in [PR #170](https://github.com/ns2switch/irmind/pull/170). It describes a reproduced historical reconstruction defect. The analyst approved the release-audit decision below. No signed wire encoding or historical golden changes.
+This page is for maintainers changing parser implementations or JSON dependency features. It defines the supported serialization contract and release-build checks.
 
-## Finding
+## Release audit
 
-`parser-json` identifies itself as `json-stream-v2`. Its whole-document `RecordSink::accept` explicitly calls `sort_all_objects()` after normalization. Its `parse_reader_report` fast path does not. The fast path handles NDJSON and newline-terminated single-object JSON.
+The [machine-readable audit](release-json-feature-audit.json) checks the locked build graph for every shipped target from v0.1.0 through v0.1.5: 23 graphs. None enables `serde_json/preserve_order`. Each tagged workflow builds `cargo build --release -p irmind --locked`; the audit uses that package, default features and target, excluding development dependencies.
 
-Consequently, enabling `serde_json/preserve_order` changes the normalized `GraphRecord.text` produced from identical source bytes. Bounded entity extraction also traverses maps, so a fix must preserve the historical traversal and extraction caps when replaying old cases; sorting only the final text is insufficient.
+In workspace tests, the AWS connector's development-only `aws-smithy-http-client/test-util` enables insertion-ordered JSON. Release dependency graphs exclude that utility. Every release-build job checks the shipped normal/build graph before compiling the binary.
 
-The source manifest pins the parser version, not the dependency feature that selected map iteration order. This affects historical V1 artifacts as well as the new partitioned V2 builder. The approved source-aware partition callback does not cause this defect.
+## Supported serialization
 
-## Reproduction and evidence
+`json-stream-v2` uses explicit recursive lexicographic object ordering before extraction and serialization on all supported input paths. Array order is preserved. The same bytes and hashes must result with either serde map implementation. Original evidence and deliberately retained raw JSON remain unchanged. Insertion-dependent development artifacts are outside the supported reconstruction contract.
 
-The new synthetic inputs are in `crates/testkit/fixtures/artifact-v2-partitions/`. The new test `partitioned_parquet_physical_bytes_and_envelopes_are_portable` compares actual artifact bytes and envelopes with one explicit lexical-order fixture. No existing golden has been changed.
+## Parser coverage
 
-Run the same format test normally and with the alternate feature:
-
-```sh
-cargo nextest run -p irmind --all-features \
-  -E 'test(partitioned_parquet_physical_bytes_and_envelopes_are_portable)'
-cargo nextest run -p irmind --all-features --features serde_json/preserve_order \
-  -E 'test(partitioned_parquet_physical_bytes_and_envelopes_are_portable)'
-```
-
-Before the correction, the first passed and the second failed. The workspace test graph also enabled the feature and failed this new regression. Historical goldens passed because their wrapped-document inputs took the already sorted path. Both commands now pass with the exact same golden. The fast path explicitly sorts recursively before extraction and serialization.
-
-For the supplied `b.json` synthetic cloud source, all source bytes and source SHA-256 values remain identical. A temporary local diagnostic decoded both generated event files and confirmed the only difference in this record is object key order:
-
-```text
-Lexical:   awsRegion, eventName, eventTime, recipientAccountId, sourceIPAddress
-Insertion: eventTime, eventName, recipientAccountId, awsRegion, sourceIPAddress
-```
-
-| Writer | Lexical-order event SHA-256 | Insertion-order event SHA-256 |
+| Parser | Representation | Compatibility checks |
 | --- | --- | --- |
-| Historical V1 | `87c852208cfe1a67633e3dd4489729f9e6728fb7dfdf35ddc261f7dd9c1f4dab` | `33f0fdd406bd762d5d39c3134515c4c158c94445b3b02147cb9eca5f6a44be6a` |
-| Partitioned V2 | `45e33a90dfbb9c2ceb3ce87f11a6ddb504948afbaca7e0d4ce639aeccd19a52d` | `abdf34c5ae1e309a54235ab26d8aa24350b50c8240d4c86481329de11fb967ff` |
+| JSON | Recursively ordered normalized objects | NDJSON, single objects, documents, nested objects/arrays and bounded extraction |
+| ECS | Fixed extraction and recursively ordered normalized maps | Historical normalized, manifest and Parquet bytes |
+| OCSF | Fixed extraction and recursively ordered normalized maps | Historical bytes and native Parquet conversion |
+| Velociraptor, Chainsaw, plaso | Typed fields and retained original input | Historical bytes for each module |
+| Linux journald | Typed normalized fields and retained raw input | Historical normalized, manifest and Parquet bytes |
+| Declarative | Ordered mappings and retained RawValue | Historical bytes |
 
-Across the two sources, enabling the feature changes 2 of 9 historical V1 artifacts and 3 of 12 partitioned V2 artifacts. Entity and co-observation artifact hashes match in this small fixture. That observation does not establish that extraction is order-independent for inputs reaching the extraction cap.
-
-## Release audit and approved decision
-
-The [machine-readable audit](release-json-feature-audit.json) records the exact tagged commit, build command and feature query for every shipped target from v0.1.0 through v0.1.5: **23 locked target graphs, none with `preserve_order` enabled**. Every workflow builds with `cargo build --release -p irmind --locked`; macOS sets `CARGO_BUILD_TARGET=aarch64-apple-darwin`, and the other runners use their native target. The feature queries use the same package/default features and target and exclude development edges, as the build does.
-
-| Tags | Targets checked | Release `preserve_order` |
-| --- | --- | --- |
-| v0.1.0 | Linux x86_64, Windows x86_64 MSVC, macOS aarch64 | Absent in all three |
-| v0.1.1–v0.1.5, each individually | The above plus Linux aarch64 | Absent in all four per tag |
-
-In the workspace **test** graph, `irmind-mod-cloud-aws` has a development dependency on `aws-smithy-http-client` with `test-util`. That optional test utility enables its `serde_json` dependency with `preserve_order` to support the SDK's HTTP test machinery. The normal/build graph does not activate it. `--all-features` alone is not the cause; including development edges for workspace tests is. A preceding nextest invocation does not carry feature selections into a separate release build.
-
-Following the analyst's decision, retain `json-stream-v2` and reproduce the released lexicographic interpretation for both whole documents and the fast line path, independently of serde's map representation. No insertion-order reader is created. Cases generated by unsupported development builds whose fast-path artifacts depended on `preserve_order` are not supported for reconstruction: mismatched signed hashes fail verification. Such artifacts are never silently reinterpreted, resigned or accepted with different hashes.
-
-The AWS test utility already stays outside release dependency edges; it is retained for its contract tests. Every release build job now runs `check_release_json_features.py`, which rejects the feature in the shipped normal/build graph. It honors the job's target. The explicit alternate-feature test job remains; it verifies lexical bytes even with an insertion-ordered map. It does not publish binaries from that graph.
-
-## Other JSON parser review
-
-| Module | Feature-independent behavior | Added alternate-feature coverage |
-| --- | --- | --- |
-| JSON | Explicit recursive lexical sorting before bounded extraction and serialization on both paths | NDJSON, newline-terminated single objects, nested maps/arrays, raw wrapper, capped extraction and the unchanged partitioned physical golden |
-| ECS | Fixed mapped fields and recursive ordering of normalized object maps | Dedicated test reuses historical normalized, manifest and Parquet goldens |
-| OCSF | Fixed extraction order; recursively sorted normalized object; native Parquet row conversion also sorts | Dedicated historical bytes test, including existing OCSF artifacts |
-| Velociraptor | Typed deserialization, sorted entities, deliberately retained original JSON text | Dedicated historical bytes test |
-| Chainsaw | Typed deserialization, sorted entities, retained original input | Dedicated historical bytes test |
-| plaso | Typed deserialization and retained original input | Dedicated historical bytes test |
-| Linux journald | Typed fields/serialization and original microsecond timestamp retained in raw text | Dedicated historical journald normalized, manifest and Parquet bytes test |
-| Declarative | BTreeMap mappings/fields and retained RawValue; no serde Map traversal for output | Dedicated historical bytes test |
-| Zeek and Suricata | No parser module is present in this workspace | No test or implementation claimed; extend this matrix when those modules are integrated |
-
-Original evidence and intentionally retained raw JSON are not reordered. All existing historical goldens remain unchanged. A further physical V1 assertion reproduces the lexical event SHA-256 captured before this correction, in both feature graphs. The new tests run in `format_goldens` under the explicit `preserve_order` job as well as the ordinary Linux workspace suite. The parser's own regressions also cover the same routes with 40 candidate entities against the 32-entity cap, preserving array order.
-
-## Rollout
-
-No new parser version, production package, insertion-order reader or signed wire encoding is introduced. Step (c) can proceed through its normal checks. Migration/export V5 remain step (d); the TUI continues writing V1 until both steps are integrated. Release-scale host/cardinality and temporary-disk measurements remain step (e).
+The `format_goldens` suite runs on the normal test graph and explicitly with `preserve_order`. It reuses the same checked-in fixtures. Add equivalent coverage when another JSON parser is integrated. See [the format rules](json-format-order.md) for reproduction commands.

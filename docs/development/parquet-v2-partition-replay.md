@@ -1,6 +1,6 @@
 # Source-bound partition replay
 
-This note is for the analyst reviewing a small addition discovered while implementing the approved partition batch. The analyst approved this compatible addition; it changes no signed bytes.
+This page explains source-bound profile routing during mixed-parser reconstruction. The optional callback is backward compatible and does not change signed bytes.
 
 ## Why the source must reach the profile router
 
@@ -24,4 +24,4 @@ fn partition_profile_for_source(
 
 Native parsers keep their current implementation. Only `RebuildParser` overrides the companion, looks up the exact signed source parser and delegates to it. An unknown source is an error. The batch coordinator calls the checked companion. No additional dependency, credential, format, capability or permission is introduced.
 
-Add a reconstruction regression with two signed source parsers using different profiles. Worker ordering, cancellation and historical builder replay remain covered separately. The analyst approved the optional companion before implementation.
+Add a reconstruction regression with two signed source parsers using different profiles. Worker ordering, cancellation and historical builder replay remain covered separately.
