@@ -8,5 +8,5 @@ pub(super) fn project(record: &GraphRecord) -> Result<IndexedProjection, AppErro
     Ok((Some(indexed_rfc3339(raw, false, false)?), None))
 }
 fn invalid() -> AppError {
-    AppError::Policy("invalid precise ECS time".into())
+    AppError::Fixed(irmind_app::FixedAppError::PolicyInvalidIndexedTimestamp)
 }

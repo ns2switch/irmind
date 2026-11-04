@@ -25,5 +25,5 @@ pub(super) fn project(record: &GraphRecord) -> Result<IndexedProjection, AppErro
     Ok((Some(time), None))
 }
 fn invalid() -> AppError {
-    AppError::Policy("invalid precise OCSF time".into())
+    AppError::Fixed(irmind_app::FixedAppError::PolicyInvalidIndexedTimestamp)
 }

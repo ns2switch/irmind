@@ -71,6 +71,18 @@ pub enum FixedAppError {
     PolicyConfigurationAuditMismatch,
     #[error("policy denied: configuration change requires explicit analyst confirmation")]
     PolicyConfigurationConfirmationRequired,
+    #[error("policy denied: invalid indexed timestamp")]
+    PolicyInvalidIndexedTimestamp,
+    #[error("policy denied: missing indexed record")]
+    PolicyMissingIndexedRecord,
+    #[error("policy denied: invalid indexed parser count")]
+    PolicyInvalidIndexedParserCount,
+    #[error("policy denied: precise artifacts require a signed parser selection")]
+    PolicyPreciseArtifactsRequireParserSelection,
+    #[error(
+        "policy denied: source already has another artifact version; explicit migration is required"
+    )]
+    PolicyArtifactVersionRequiresMigration,
     #[error("policy denied: invalid local tool")]
     PolicyInvalidLocalTool,
     #[error("policy denied: invalid module fingerprint")]
