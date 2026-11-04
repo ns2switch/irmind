@@ -20,6 +20,30 @@ impl From<ParquetArtifactV2> for ParquetArtifact {
 }
 
 impl ParquetArtifact {
+    /// A source can acquire a new derived generation only through migration.
+    pub fn same_generation(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::V1(a), Self::V1(b)) => {
+                a.parser_version
+                    .strip_suffix("+compact-v1")
+                    .unwrap_or(&a.parser_version)
+                    == b.parser_version
+                        .strip_suffix("+compact-v1")
+                        .unwrap_or(&b.parser_version)
+            }
+            (Self::V2(a), Self::V2(b)) => {
+                a.parser_id == b.parser_id
+                    && a.parser_version == b.parser_version
+                    && a.builder_version == b.builder_version
+                    && a.time_semantics == b.time_semantics
+                    && a.stable_order == b.stable_order
+                    && a.partition.key_set == b.partition.key_set
+                    && a.partition.policy == b.partition.policy
+            }
+            _ => false,
+        }
+    }
+
     pub fn decode(kind: AuditEventKind, payload: &str) -> Result<Self, DomainError> {
         match kind {
             AuditEventKind::ParquetArtifactV1 => ParquetArtifactV1::decode(payload).map(Self::V1),

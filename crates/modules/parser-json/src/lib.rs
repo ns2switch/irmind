@@ -42,6 +42,7 @@ impl StreamingEventParser for JsonParser {
         };
         if [
             "eventSource",
+            "recipientAccountId",
             "protoPayload",
             "subscriptionId",
             "account_id",

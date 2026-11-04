@@ -288,7 +288,7 @@ impl LargeCaseUseCases<'_, '_> {
                 return Err(AppError::Policy("Parquet source linkage is invalid".into()));
             }
             if known_artifacts.values().any(|old| {
-                old.audit_kind() != artifact.audit_kind()
+                !old.same_generation(artifact)
                     && old.source_hashes().binary_search(&source_hash).is_ok()
             }) {
                 return Err(AppError::Fixed(

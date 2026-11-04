@@ -7,6 +7,8 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum FixedAppError {
+    #[error("policy denied: source has no signed parser selection")]
+    PolicyMissingSignedParserSelection,
     #[error("policy denied: partitioned preparation is unavailable")]
     PolicyPartitionBatchUnavailable,
     #[error("policy denied: partition cap must be between 1 and 1024")]

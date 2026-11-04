@@ -62,6 +62,14 @@ mod parser_router_tests {
         }
     }
     impl StreamingEventParser for FakeParser {
+        fn partition_profile(&self, _: &GraphRecord) -> crate::PartitionProfile {
+            if self.0 == "parser-json" {
+                crate::PartitionProfile::CloudAccountRegion
+            } else {
+                crate::PartitionProfile::EndpointHost
+            }
+        }
+
         fn streaming_version(&self) -> &'static str {
             self.1
         }
@@ -144,6 +152,48 @@ mod parser_router_tests {
         );
         assert!(router.version_for_source("other.log").is_err());
     }
+
+    #[test]
+    fn profile_router_uses_only_the_signed_source_and_default_native_callback() {
+        let router = RebuildParser {
+            sources: BTreeMap::from([
+                (
+                    "cloud.json".into(),
+                    Arc::new(FakeParser("parser-json", "json-stream-v2")) as Arc<dyn LogParser>,
+                ),
+                (
+                    "audit.log".into(),
+                    Arc::new(FakeParser("parser-linux", "linux-v2")) as Arc<dyn LogParser>,
+                ),
+            ]),
+        };
+        let record = GraphRecord {
+            index: 0,
+            at: String::new(),
+            event: String::new(),
+            text: "{}".into(),
+            entities: Vec::new(),
+            relations: Vec::new(),
+        };
+        assert_eq!(
+            router
+                .partition_profile_for_source("cloud.json", &record)
+                .unwrap(),
+            crate::PartitionProfile::CloudAccountRegion
+        );
+        assert_eq!(
+            router
+                .partition_profile_for_source("audit.log", &record)
+                .unwrap(),
+            crate::PartitionProfile::EndpointHost
+        );
+        assert!(
+            router
+                .partition_profile_for_source("unknown", &record)
+                .is_err()
+        );
+    }
+
     #[test]
     fn optional_time_context_does_not_change_existing_parser_defaults_or_identity() {
         let parser = FakeParser("parser-json", "json-stream-v2");

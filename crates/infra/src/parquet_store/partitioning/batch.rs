@@ -21,7 +21,7 @@ impl ParquetStore {
         let mut allocator = Allocator::from_signed(request.committed_artifacts, request.limits)?;
         let inputs =
             self.staging_inputs(request.case_id, request.source_root, request.relative_paths)?;
-        let staged = std::thread::scope(|scope| {
+        let mut staged = std::thread::scope(|scope| {
             let workers = inputs
                 .into_iter()
                 .map(|input| {
@@ -43,6 +43,7 @@ impl ParquetStore {
                 .collect::<Vec<_>>();
             joined.into_iter().collect::<Result<Vec<_>, _>>()
         })?;
+        self.sort_staged_sources(request.case_id, &mut staged, cancel)?;
         let mut normalized_bytes = staged.iter().try_fold(0u64, |n, s| {
             Ok::<_, AppError>(
                 n.saturating_add(s.spool.as_file().metadata().map_err(storage)?.len()),

@@ -51,3 +51,64 @@ fn precise_parquet_physical_bytes_and_envelopes_are_portable() {
         serde_json::from_str(include_str!("../fixtures/formats-artifact-v2.json")).unwrap();
     assert_eq!(actual, expected);
 }
+
+#[test]
+fn partitioned_parquet_physical_bytes_and_envelopes_are_portable() {
+    use irmind_app::{CancellationToken, LargeCaseStore, LocalBatchRequest, PartitionLimits};
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(
+        root.path().join("a.jsonl"),
+        include_bytes!("../../../testkit/fixtures/artifact-v2-partitions/a.jsonl"),
+    )
+    .unwrap();
+    std::fs::write(
+        root.path().join("b.json"),
+        include_bytes!("../../../testkit/fixtures/artifact-v2-partitions/b.json"),
+    )
+    .unwrap();
+    let store = irmind_infra::ParquetStore::open_precise(root.path()).unwrap();
+    let id = irmind_domain::CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+    let paths = ["a.jsonl".into(), "b.json".into()];
+    let prepared = store
+        .prepare_local_batch(
+            LocalBatchRequest {
+                case_id: &id,
+                source_root: root.path(),
+                relative_paths: &paths,
+                copy_original: false,
+                parser: &irmind_mod_parser_json::JsonParser,
+                committed_artifacts: &[],
+                limits: PartitionLimits {
+                    host: 1,
+                    ..PartitionLimits::default()
+                },
+            },
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    let mut actual = std::collections::BTreeMap::new();
+    for artifact in prepared.into_iter().flat_map(|source| source.artifacts) {
+        actual.insert(artifact.path().to_owned(), serde_json::json!({"size":artifact.size(),"sha256":artifact.sha256().as_str(),"envelope":artifact.encode().unwrap()}));
+    }
+    let expected: std::collections::BTreeMap<String, serde_json::Value> = serde_json::from_str(
+        include_str!("../fixtures/formats-artifact-v2-partitions.json"),
+    )
+    .unwrap();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn generations_distinguish_builder_and_parser_without_using_bucket_names() {
+    let old = ParquetArtifactV2::decode(
+        include_str!("../../../domain/tests/fixtures/parquet-artifact-v2.hex").trim(),
+    )
+    .unwrap();
+    let baseline = irmind_domain::ParquetArtifact::V2(old.clone());
+    let mut changed = old.clone();
+    changed.builder_version.push_str("-new");
+    assert!(!baseline.same_generation(&changed.into()));
+    let mut changed = old;
+    changed.parser_version.push_str("-new");
+    assert!(!baseline.same_generation(&changed.into()));
+    assert!(baseline.same_generation(&baseline));
+}

@@ -57,6 +57,21 @@ impl ParquetStore {
         for entry in fs::read_dir(&dir).map_err(storage)? {
             let entry = entry.map_err(storage)?;
             let name = entry.file_name();
+            if name
+                .to_string_lossy()
+                .strip_prefix(".verify-")
+                .is_some_and(|suffix| {
+                    !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit())
+                })
+            {
+                let metadata = fs::symlink_metadata(entry.path()).map_err(storage)?;
+                if !metadata.is_dir() || metadata.file_type().is_symlink() {
+                    return Err(super::invalid_source());
+                }
+                fs::remove_dir_all(entry.path()).map_err(storage)?;
+                removed += 1;
+                continue;
+            }
             if ![SPOOL_PREFIX, "irmind-normalized-"]
                 .iter()
                 .any(|prefix| name.to_string_lossy().starts_with(prefix))
@@ -157,6 +172,36 @@ mod tests {
         drop(file);
         assert_eq!(store.remove_orphaned_object_spools(&id).unwrap(), 1);
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn recovery_removes_only_owned_reconstruction_directories() {
+        let root = tempfile::tempdir().unwrap();
+        let store = ParquetStore::open(root.path()).unwrap();
+        let id = case();
+        let spool = store.spool_dir(&id).unwrap();
+        let orphan = spool.join(".verify-123");
+        fs::create_dir(&orphan).unwrap();
+        fs::write(orphan.join("synthetic.json"), b"{}").unwrap();
+        let unrelated = spool.join(".verify-not-owned");
+        fs::create_dir(&unrelated).unwrap();
+        assert_eq!(store.remove_orphaned_object_spools(&id).unwrap(), 1);
+        assert!(!orphan.exists());
+        assert!(unrelated.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn recovery_does_not_follow_reconstruction_directory_symlinks() {
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        fs::write(outside.path().join("keep"), b"synthetic").unwrap();
+        let store = ParquetStore::open(root.path()).unwrap();
+        let id = case();
+        let link = store.spool_dir(&id).unwrap().join(".verify-123");
+        std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+        assert!(store.remove_orphaned_object_spools(&id).is_err());
+        assert!(outside.path().join("keep").exists());
     }
 
     #[test]

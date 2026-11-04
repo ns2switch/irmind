@@ -158,7 +158,7 @@ impl LargeCaseStore for ParquetStore {
         {
             return Err(AppError::EvidenceMismatch(hash.as_str().into()));
         }
-        let temporary = TempWorkspace::new(&self.root)?;
+        let temporary = TempWorkspace::new(&self.spool_dir(case_id)?)?;
         let input = temporary.path.join(hash.as_str());
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
@@ -283,7 +283,7 @@ impl LargeCaseStore for ParquetStore {
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
-        let temporary = TempWorkspace::new(&self.root)?;
+        let temporary = TempWorkspace::new(&self.spool_dir(case_id)?)?;
         let mut fresh = ParquetStore::open(&temporary.path)?;
         let mut checked = 0usize;
         let mut rebuilt = Vec::new();

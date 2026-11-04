@@ -50,6 +50,19 @@ impl RecordRow {
                 .map_or_else(|| "unknown".into(), |t| t.instant().utc_date());
             let value: serde_json::Value =
                 serde_json::from_str(&indexed.record.text).map_err(storage)?;
+            if generic {
+                row.scope_region = first_string(
+                    &value,
+                    &[
+                        "/awsRegion",
+                        "/region",
+                        "/resource/labels/location",
+                        "/location",
+                        "/provider",
+                    ],
+                )
+                .into();
+            }
             row.scope_host = if generic {
                 raw_host(&value)
             } else {

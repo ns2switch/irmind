@@ -214,6 +214,14 @@ pub trait StreamingEventParser: Send + Sync {
     fn partition_profile(&self, _record: &GraphRecord) -> crate::PartitionProfile {
         crate::PartitionProfile::Unpartitioned
     }
+    fn partition_profile_for_source(
+        &self,
+        _source: &str,
+        record: &GraphRecord,
+    ) -> Result<crate::PartitionProfile, AppError> {
+        Ok(self.partition_profile(record))
+    }
+
     fn timestamp_context(&self) -> Option<&str> {
         None
     }

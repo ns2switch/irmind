@@ -125,6 +125,19 @@ pub struct RebuildParser {
 }
 
 impl StreamingEventParser for RebuildParser {
+    fn partition_profile_for_source(
+        &self,
+        source: &str,
+        record: &GraphRecord,
+    ) -> Result<crate::PartitionProfile, AppError> {
+        self.sources
+            .get(source)
+            .ok_or(AppError::Fixed(
+                crate::FixedAppError::PolicyMissingSignedParserSelection,
+            ))?
+            .partition_profile_for_source(source, record)
+    }
+
     fn parse_indexed_reader_report(
         &self,
         source: &str,
