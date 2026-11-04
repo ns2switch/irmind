@@ -4,6 +4,14 @@ use super::{
 };
 
 impl LargeCaseStore for crate::LocalStore {
+    fn prepare_local_batch(
+        &self,
+        request: irmind_app::LocalBatchRequest<'_>,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<PreparedSource>, AppError> {
+        self.parquet.prepare_local_batch(request, cancel)
+    }
+
     fn create_object_spool(
         &self,
         case_id: &CaseId,

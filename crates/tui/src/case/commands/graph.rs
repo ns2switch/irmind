@@ -48,10 +48,15 @@ impl CaseRuntime<'_, '_, '_> {
                 }
                 let graph = self.engine.graph.clone();
                 let id = self.id.clone();
+                let repo = self.engine.repo.clone();
+                let ceiling = self.engine.policy.scope.clone();
                 self.start_task(title, move |cancel| {
                     if cancel.is_cancelled() {
                         return Err(AppError::Cancelled);
                     }
+                    let scope = irmind_app::CaseScope::parse(&repo.get_case(&id)?.scope)
+                        .map_err(|_| invalid_graph_arguments())?;
+                    validate_scope(&action, &scope, ceiling.as_ref())?;
                     let result = run_graph_action(graph.as_ref(), &id, &action)?;
                     if cancel.is_cancelled() {
                         Err(AppError::Cancelled)
@@ -119,7 +124,8 @@ fn parse_graph_options(
     input: &str,
     require_query: bool,
 ) -> Result<(String, GraphQueryFilter), AppError> {
-    let (mut from, mut to, mut account, mut project, mut region) = (None, None, None, None, None);
+    let (mut from, mut to, mut account, mut project, mut region, mut host) =
+        (None, None, None, None, None, None);
     let mut query = Vec::new();
     for token in input.split_whitespace() {
         if let Some(value) = token.strip_prefix("--from=") {
@@ -132,6 +138,8 @@ fn parse_graph_options(
             set_once(&mut project, value)?;
         } else if let Some(value) = token.strip_prefix("--region=") {
             set_once(&mut region, value)?;
+        } else if let Some(value) = token.strip_prefix("--host=") {
+            set_once(&mut host, value)?;
         } else if token.starts_with("--") {
             return Err(invalid_graph_arguments());
         } else {
@@ -141,12 +149,13 @@ fn parse_graph_options(
     if query.is_empty() == require_query {
         return Err(invalid_graph_arguments());
     }
-    let filter = GraphQueryFilter::parse(
+    let filter = GraphQueryFilter::parse_with_host(
         from.as_deref(),
         to.as_deref(),
         account.as_deref(),
         project.as_deref(),
         region.as_deref(),
+        host.as_deref(),
     )
     .map_err(|_| invalid_graph_arguments())?;
     Ok((query.join(" "), filter))
@@ -162,6 +171,21 @@ fn set_once(slot: &mut Option<String>, value: &str) -> Result<(), AppError> {
 
 fn invalid_graph_arguments() -> AppError {
     AppError::Policy("invalid graph command arguments or partition filter".into())
+}
+
+fn validate_scope(
+    action: &GraphAction,
+    scope: &irmind_app::CaseScope,
+    ceiling: Option<&irmind_app::CaseScope>,
+) -> Result<(), AppError> {
+    let filter = match action {
+        GraphAction::Query(_, _, f) | GraphAction::Timeline(f) => f,
+        GraphAction::Raw(..) => return Ok(()),
+    };
+    if !filter.within_scope(scope) || ceiling.is_some_and(|s| !filter.within_scope(s)) {
+        return Err(invalid_graph_arguments());
+    }
+    Ok(())
 }
 
 #[cfg(test)]

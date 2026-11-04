@@ -90,3 +90,8 @@ The TUI accepts `/ingest --year 2026 --utc-offset +01:00 <path>` with the same v
 ### Presentation timing
 
 `irmind demo --presentation-speed 50` accelerates presentation timing for development and cross-platform PTY tests. Normal playback defaults to 1 and gives each narration at least six seconds. Acceleration does not skip commands, signed decisions, verification or completion events. The compatibility flag `--scripted` remains accepted; all presentations now use the offline scripted model.
+
+
+### Exact host graph filters
+
+The graph automation subcommands accept `--host <host>` in addition to the existing time, account/project and region filters. In the case workspace, use `--host=<host>` with graph/search/timeline commands. Host values are checked untrusted arguments: paths, controls and reserved overflow-shaped selectors are errors. Case and organization ceilings still apply. Partition normalization only prunes candidates; matching uses the actual host value. Missing, overflow and legacy metadata do not grant a wildcard match.

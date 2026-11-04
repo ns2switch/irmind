@@ -134,3 +134,6 @@ The first implementation PR defines checked instants/precision, the additive sig
 
 
 Step (b), [PR #168](https://github.com/ns2switch/irmind/pull/168), implements the [approved storage/parser contracts](parquet-v2-port-transition.md), an explicit precise writer, mixed-schema queries, reproducible compatible compaction and native precision projections without changing V1 goldens. Production activation waits for generic partitions and V5 export; this prevents an intermediate rollout from blocking ordinary case export. Steps (c)–(e) remain pending, including the host-cap benchmark and migration crash tests.
+
+
+Step (c) is in progress on the deterministic partition implementation branch. The approved contracts are [recorded separately](parquet-v2-partition-contracts.md). Unicode-policy pinning, private bounded staging with disk preflight, parser-owned profiles, overflow allocation and checked host filters are under test. A [source-bound replay companion](parquet-v2-partition-replay.md) needs approval before implementation; the current profile callback cannot resolve a mixed-parser reconstruction. No production V2 activation occurs in this step. Migration/export V5 and the 15 GB cloud/host benchmarks remain steps (d) and (e).

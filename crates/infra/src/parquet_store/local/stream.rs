@@ -103,19 +103,19 @@ pub(super) fn stream_records(
     Ok((report, open))
 }
 
-struct VerifiedInput<'a> {
-    source: &'a mut File,
-    sample: &'a [u8],
-    relative_path: &'a str,
-    parser: &'a dyn StreamingEventParser,
-    hash: [u8; 32],
-    hash_value: &'a EvidenceHash,
-    size: u64,
-    cancel: &'a CancellationToken,
-    precise_time: bool,
+pub(in crate::parquet_store) struct VerifiedInput<'a> {
+    pub(in crate::parquet_store) source: &'a mut File,
+    pub(in crate::parquet_store) sample: &'a [u8],
+    pub(in crate::parquet_store) relative_path: &'a str,
+    pub(in crate::parquet_store) parser: &'a dyn StreamingEventParser,
+    pub(in crate::parquet_store) hash: [u8; 32],
+    pub(in crate::parquet_store) hash_value: &'a EvidenceHash,
+    pub(in crate::parquet_store) size: u64,
+    pub(in crate::parquet_store) cancel: &'a CancellationToken,
+    pub(in crate::parquet_store) precise_time: bool,
 }
 
-fn parse_and_verify(
+pub(in crate::parquet_store) fn parse_and_verify(
     input: VerifiedInput<'_>,
     emit: &mut dyn FnMut(
         irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
@@ -201,7 +201,7 @@ fn flush_batch(
     Ok(())
 }
 
-pub(super) fn initial_hash(
+pub(in crate::parquet_store) fn initial_hash(
     source: &mut File,
     cancel: &CancellationToken,
     profile: Option<&ParquetProfile>,
@@ -245,7 +245,7 @@ fn wrap_replay(
     out.ok_or_else(invalid_source)
 }
 
-fn validate_offset(
+pub(in crate::parquet_store) fn validate_offset(
     mode: &mut Option<bool>,
     offset: Option<u64>,
     size: u64,

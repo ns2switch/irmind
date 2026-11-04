@@ -1,0 +1,208 @@
+use super::super::{
+    AppError, BATCH_BYTES, BATCH_ROWS, BTreeMap, CancellationToken, ParquetStore, Partition,
+    PartitionSinks, PreparedSource, RecordRow, StagedArtifact, batch_to_parquet, finish_parquet,
+    invalid_source, storage,
+};
+use super::staging::{MAX_STAGED_ROW, StagedSource};
+use super::{Allocator, BUILDER};
+use irmind_app::{LargeCaseStore as _, LocalBatchRequest, PartitionProfile};
+use std::io::{BufRead, Read};
+
+const WRITER_PARTITIONS: usize = 16;
+const MAX_ARTIFACTS: usize = 8192;
+
+impl ParquetStore {
+    pub(in crate::parquet_store) fn prepare_partition_batch(
+        &self,
+        request: &LocalBatchRequest<'_>,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<PreparedSource>, AppError> {
+        request.validate()?;
+        let mut allocator = Allocator::from_signed(request.committed_artifacts, request.limits)?;
+        let inputs =
+            self.staging_inputs(request.case_id, request.source_root, request.relative_paths)?;
+        let staged = std::thread::scope(|scope| {
+            let workers = inputs
+                .into_iter()
+                .map(|input| {
+                    scope.spawn(|| {
+                        self.stage_source(
+                            request.case_id,
+                            input,
+                            request.parser,
+                            request.copy_original,
+                            cancel,
+                        )
+                    })
+                })
+                .collect::<Vec<_>>();
+            // Join all workers even on failure, before removing their private files.
+            let joined = workers
+                .into_iter()
+                .map(|w| w.join().map_err(|_| invalid_source())?)
+                .collect::<Vec<_>>();
+            joined.into_iter().collect::<Result<Vec<_>, _>>()
+        })?;
+        let mut normalized_bytes = staged.iter().try_fold(0u64, |n, s| {
+            Ok::<_, AppError>(
+                n.saturating_add(s.spool.as_file().metadata().map_err(storage)?.len()),
+            )
+        })?;
+        if let Some(profile) = &self.profile {
+            profile.record_staging_peak(normalized_bytes);
+        }
+        let mut prepared = Vec::new();
+        for source in staged {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let bytes = source.spool.as_file().metadata().map_err(storage)?.len();
+            prepared.push(self.write_partition_source(
+                request,
+                source,
+                &mut allocator,
+                cancel,
+                normalized_bytes,
+            )?);
+            normalized_bytes = normalized_bytes.saturating_sub(bytes);
+        }
+        Ok(prepared)
+    }
+
+    fn write_partition_source(
+        &self,
+        request: &LocalBatchRequest<'_>,
+        mut source: StagedSource,
+        allocator: &mut Allocator,
+        cancel: &CancellationToken,
+        normalized_bytes: u64,
+    ) -> Result<PreparedSource, AppError> {
+        let mut state = Writing::default();
+        let dir = self.case_dir(request.case_id)?;
+        let parser = request
+            .parser
+            .identity_for_source(&source.manifest.source)?;
+        let mut reader = std::io::BufReader::new(source.spool.as_file_mut());
+        loop {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let mut bytes = Vec::new();
+            (&mut reader)
+                .take(MAX_STAGED_ROW + 1)
+                .read_until(b'\n', &mut bytes)
+                .map_err(storage)?;
+            if bytes.is_empty() {
+                break;
+            }
+            if bytes.len() as u64 > MAX_STAGED_ROW || bytes.last() != Some(&b'\n') {
+                return Err(invalid_source());
+            }
+            let mut row: RecordRow = serde_json::from_slice(&bytes).map_err(storage)?;
+            let profile = match row.profile {
+                0 => PartitionProfile::Unpartitioned,
+                1 => PartitionProfile::CloudAccountRegion,
+                2 => PartitionProfile::EndpointHost,
+                _ => return Err(invalid_source()),
+            };
+            let scope = allocator.assign(
+                row.partition.utc_date(),
+                profile,
+                [&row.scope_account, &row.scope_region, &row.scope_host],
+            )?;
+            let key = scope.path_prefix().map_err(|_| invalid_source())?;
+            if state.keys.len() == WRITER_PARTITIONS && !state.keys.contains(&key) {
+                state.finish(&dir, &source.manifest.sha256, parser)?;
+            }
+            state.keys.insert(key);
+            row.partition = row.partition.with_scope(scope, state.segment);
+            state.bytes = state.bytes.saturating_add(row.estimated_bytes());
+            state.rows += 1;
+            state
+                .grouped
+                .entry(row.partition.clone())
+                .or_default()
+                .push(row);
+            if state.bytes >= BATCH_BYTES || state.rows >= BATCH_ROWS {
+                state.flush(&dir, &source.manifest.sha256)?;
+            }
+        }
+        state.finish(&dir, &source.manifest.sha256, parser)?;
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        self.verify_local_source(request.source_root, &source.manifest, cancel)?;
+        if request.copy_original {
+            self.copy_source(
+                request.case_id,
+                &mut source.source,
+                &source.manifest.sha256,
+                cancel,
+            )?;
+        }
+        let staged = super::consolidate::consolidate(
+            &dir,
+            state.staged,
+            cancel,
+            self.profile.as_deref(),
+            normalized_bytes,
+        )?;
+        let artifacts = self.finish_artifacts(request.case_id, staged)?;
+        Ok(PreparedSource {
+            manifest: source.manifest,
+            artifacts,
+            records: source.report.accepted,
+            format_sample_sha256: source.sample_hash,
+            parse_report: source.report,
+        })
+    }
+}
+
+#[derive(Default)]
+struct Writing {
+    grouped: BTreeMap<Partition, Vec<RecordRow>>,
+    open: BTreeMap<Partition, PartitionSinks>,
+    staged: Vec<StagedArtifact>,
+    keys: std::collections::BTreeSet<String>,
+    segment: u32,
+    rows: usize,
+    bytes: usize,
+}
+
+impl Writing {
+    fn flush(
+        &mut self,
+        dir: &std::path::Path,
+        hash: &irmind_domain::EvidenceHash,
+    ) -> Result<(), AppError> {
+        batch_to_parquet(dir, hash, &mut self.grouped, &mut self.open, false)?;
+        self.bytes = 0;
+        self.rows = 0;
+        Ok(())
+    }
+    fn finish(
+        &mut self,
+        dir: &std::path::Path,
+        hash: &irmind_domain::EvidenceHash,
+        parser: irmind_app::ParserIdentity<'_>,
+    ) -> Result<(), AppError> {
+        self.flush(dir, hash)?;
+        self.staged.extend(finish_parquet(
+            std::mem::take(&mut self.open),
+            hash,
+            parser,
+        )?);
+        if self.staged.len() > MAX_ARTIFACTS {
+            return Err(AppError::Fixed(
+                irmind_app::FixedAppError::PolicyPartitionArtifactLimit,
+            ));
+        }
+        self.segment = self.segment.checked_add(1).ok_or_else(invalid_source)?;
+        self.keys.clear();
+        Ok(())
+    }
+}
+
+pub(in crate::parquet_store) fn supported_builder(version: &str) -> bool {
+    matches!(version, super::super::writer::precise::BUILDER | BUILDER)
+}

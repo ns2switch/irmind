@@ -59,6 +59,24 @@ fn write_compact(
     output: File,
     cancel: &CancellationToken,
 ) -> Result<(u64, [u8; 32]), AppError> {
+    write_inputs(
+        case_dir,
+        output_path,
+        sources,
+        output,
+        cancel,
+        &std::collections::BTreeMap::new(),
+    )
+}
+
+pub(super) fn write_inputs(
+    case_dir: &Path,
+    output_path: &Path,
+    sources: &[ParquetArtifact],
+    output: File,
+    cancel: &CancellationToken,
+    temporary_paths: &std::collections::BTreeMap<String, std::path::PathBuf>,
+) -> Result<(u64, [u8; 32]), AppError> {
     let schema = sources.first().ok_or_else(invalid_source)?.schema_version();
     let optimized = matches!(
         schema,
@@ -67,23 +85,18 @@ fn write_compact(
             | "irmind-entities-v3"
             | "irmind-coobservations-v2"
     );
-    let mut properties = WriterProperties::builder()
-        .set_compression(Compression::SNAPPY)
-        .set_max_row_group_row_count(Some(if optimized { 1024 } else { 8192 }));
-    if optimized {
-        properties = properties
-            .set_column_bloom_filter_enabled(ColumnPath::from("entity_value"), true)
-            .set_column_bloom_filter_fpp(ColumnPath::from("entity_value"), 0.01);
-    }
-    let properties = properties.build();
+    let properties = compact_properties(optimized);
     let mut output = Some(output);
     let mut writer: Option<ArrowWriter<File>> = None;
     for source in sources {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let mut check = irmind_fs::open_regular_no_follow(case_dir, Path::new(&source.path()))
-            .map_err(storage)?;
+        let relative = temporary_paths.get(source.path()).map_or_else(
+            || Ok(Path::new(source.path())),
+            |path| path.strip_prefix(case_dir).map_err(|_| invalid_source()),
+        )?;
+        let mut check = irmind_fs::open_regular_no_follow(case_dir, relative).map_err(storage)?;
         let (digest, size) = ParquetStore::hash_reader(&mut check, cancel)?;
         if digest != super::parse_hash(source.sha256())? || size != source.size() {
             return Err(AppError::EvidenceMismatch(source.sha256().as_str().into()));
@@ -162,4 +175,16 @@ fn sort_entity_batch(batch: &RecordBatch) -> Result<RecordBatch, AppError> {
         .map(|column| take(column, &indices, None).map_err(storage))
         .collect::<Result<Vec<_>, _>>()?;
     RecordBatch::try_new(batch.schema(), columns).map_err(storage)
+}
+
+fn compact_properties(optimized: bool) -> WriterProperties {
+    let mut properties = WriterProperties::builder()
+        .set_compression(Compression::SNAPPY)
+        .set_max_row_group_row_count(Some(if optimized { 1024 } else { 8192 }));
+    if optimized {
+        properties = properties
+            .set_column_bloom_filter_enabled(ColumnPath::from("entity_value"), true)
+            .set_column_bloom_filter_fpp(ColumnPath::from("entity_value"), 0.01);
+    }
+    properties.build()
 }

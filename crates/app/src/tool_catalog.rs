@@ -102,6 +102,10 @@ fn add_graph_filters(spec: &mut ToolSpec) {
             "Optional project partition within case scope; exclusive with account",
         ),
         ("region", "Optional region partition"),
+        (
+            "host",
+            "Optional exact host within case and organization scope",
+        ),
     ] {
         properties.insert(
             name.into(),

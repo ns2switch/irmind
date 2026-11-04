@@ -5,11 +5,24 @@ const SPOOL_PREFIX: &str = "irmind-object-";
 const MIN_FREE_MARGIN: u64 = 64 * 1024 * 1024;
 
 impl ParquetStore {
-    fn spool_dir(&self, case_id: &CaseId) -> Result<std::path::PathBuf, AppError> {
+    pub(super) fn spool_dir(&self, case_id: &CaseId) -> Result<std::path::PathBuf, AppError> {
         let dir = self.case_dir(case_id)?.join("spool");
         fs::create_dir_all(&dir).map_err(storage)?;
         irmind_fs::private_dir(&dir).map_err(storage)?;
         Ok(dir)
+    }
+
+    pub(super) fn create_normalized_spool(
+        &self,
+        case_id: &CaseId,
+    ) -> Result<tempfile::NamedTempFile, AppError> {
+        let dir = self.spool_dir(case_id)?;
+        let spool = tempfile::Builder::new()
+            .prefix("irmind-normalized-")
+            .tempfile_in(&dir)
+            .map_err(storage)?;
+        irmind_fs::private_file(spool.path()).map_err(storage)?;
+        Ok(spool)
     }
 
     pub(super) fn create_private_object_spool(
@@ -44,7 +57,10 @@ impl ParquetStore {
         for entry in fs::read_dir(&dir).map_err(storage)? {
             let entry = entry.map_err(storage)?;
             let name = entry.file_name();
-            if !name.to_string_lossy().starts_with(SPOOL_PREFIX) {
+            if ![SPOOL_PREFIX, "irmind-normalized-"]
+                .iter()
+                .any(|prefix| name.to_string_lossy().starts_with(prefix))
+            {
                 continue;
             }
             let file =
@@ -105,6 +121,42 @@ mod tests {
         drop(file);
         assert_eq!(store.remove_orphaned_object_spools(&id).unwrap(), 1);
         assert!(!orphan.exists());
+    }
+
+    #[test]
+    fn normalized_spools_use_the_same_private_directory_and_orphan_recovery() {
+        let root = tempfile::tempdir().unwrap();
+        let store = ParquetStore::open(root.path()).unwrap();
+        let id = case();
+        let normalized = store.create_normalized_spool(&id).unwrap();
+        assert_eq!(
+            normalized.path().parent(),
+            Some(store.spool_dir(&id).unwrap().as_path())
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            assert_eq!(
+                fs::metadata(normalized.path())
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
+            );
+            assert_eq!(
+                fs::metadata(normalized.path().parent().unwrap())
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o700
+            );
+        }
+        let (file, path) = normalized.keep().unwrap();
+        drop(file);
+        assert_eq!(store.remove_orphaned_object_spools(&id).unwrap(), 1);
+        assert!(!path.exists());
     }
 
     #[test]

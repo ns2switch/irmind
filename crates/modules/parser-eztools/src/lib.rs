@@ -76,6 +76,10 @@ impl EventParser for EztoolsParser {
     }
 }
 impl StreamingEventParser for EztoolsParser {
+    fn partition_profile(&self, _record: &GraphRecord) -> irmind_app::PartitionProfile {
+        irmind_app::PartitionProfile::EndpointHost
+    }
+
     fn parser_name(&self) -> &'static str {
         "parser-eztools"
     }

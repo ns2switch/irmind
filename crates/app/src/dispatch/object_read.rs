@@ -268,21 +268,29 @@ impl Engine<'_> {
         self.blocking_local(move |local| {
             let (parser, selection) =
                 select_object_parser(&catalog, &root, &relative, &manifest.source)?;
-            let mut prepared: PreparedSource = store.prepare_local(
-                &id,
-                &root,
-                &relative,
-                manifest.copied,
-                parser.as_ref() as &dyn crate::StreamingEventParser,
-                &cancel,
-            )?;
+            let index = crate::large_case::read_manifest_index(&local.audit_log.entries(&id)?)?;
+            let paths = [relative.clone()];
+            let mut prepared: PreparedSource = store
+                .prepare_local_batch(
+                    crate::LocalBatchRequest {
+                        case_id: &id,
+                        source_root: &root,
+                        relative_paths: &paths,
+                        copy_original: manifest.copied,
+                        parser: parser.as_ref() as &dyn crate::StreamingEventParser,
+                        committed_artifacts: &index.artifacts,
+                        limits: crate::PartitionLimits::default(),
+                    },
+                    &cancel,
+                )?
+                .pop()
+                .ok_or(AppError::RemoteTool)?;
             if prepared.manifest.sha256 != manifest.sha256
                 || prepared.manifest.size != manifest.size
             {
                 return Err(AppError::EvidenceMismatch(manifest.sha256.as_str().into()));
             }
             prepared.manifest = manifest;
-            let index = crate::large_case::read_manifest_index(&local.audit_log.entries(&id)?)?;
             let mut known = index
                 .artifacts
                 .into_iter()

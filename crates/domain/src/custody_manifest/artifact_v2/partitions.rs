@@ -7,7 +7,7 @@ pub const ARTIFACT_V2_MAX_KEY_VALUES: u16 = 1024;
 pub const ARTIFACT_V2_INITIAL_HOST_CAP: u16 = 64;
 pub const ARTIFACT_V2_MAX_DATE_TUPLES: u64 = 4096;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ScopePartitionKey {
     Account,
     Cluster,
@@ -36,7 +36,7 @@ impl ScopePartitionKey {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum PartitionOverflowReason {
     Cardinality,
     TupleBudget,
@@ -61,20 +61,20 @@ impl PartitionOverflowReason {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ScopePartitionValue {
     Ordinary(String),
     Overflow(PartitionOverflowReason),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ScopePartitionV2 {
     pub key: ScopePartitionKey,
     pub cap: u16,
     pub value: ScopePartitionValue,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ArtifactPartitionV2 {
     pub date: String,
     pub key_set: String,

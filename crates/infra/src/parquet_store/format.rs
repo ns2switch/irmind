@@ -30,7 +30,10 @@ pub(super) fn expected_type(name: &str, precise: bool) -> DataType {
 
 pub(super) fn validate_schema(artifact: &ParquetArtifact, schema: &Schema) -> Result<(), AppError> {
     if let ParquetArtifact::V2(v) = artifact {
-        if v.builder_version != super::writer::precise::BUILDER {
+        if !super::partitioning::supported_builder(&v.builder_version)
+            || (v.builder_version == super::writer::precise::BUILDER
+                && (!v.partition.scopes.is_empty() || v.partition.all_scope_overflow))
+        {
             return Err(invalid_source());
         }
         let mut names = vec![

@@ -89,7 +89,10 @@ impl SignedSources {
         }
         if let ParquetArtifact::V2(v) = &artifact
             && (!v.superseded_hashes.is_empty()
-                || v.builder_version != "parquet-builder-v2"
+                || !matches!(
+                    v.builder_version.as_str(),
+                    "parquet-builder-v2" | "parquet-builder-v3"
+                )
                 || v.source_hashes.iter().any(|h| {
                     self.parser_choices.get(h).is_none_or(|choices| {
                         !choices.contains(&(v.parser_id.clone(), v.parser_version.clone()))

@@ -78,6 +78,10 @@ impl EventParser for ChainsawParser {
     }
 }
 impl StreamingEventParser for ChainsawParser {
+    fn partition_profile(&self, _record: &GraphRecord) -> irmind_app::PartitionProfile {
+        irmind_app::PartitionProfile::EndpointHost
+    }
+
     fn parser_name(&self) -> &'static str {
         "parser-chainsaw"
     }

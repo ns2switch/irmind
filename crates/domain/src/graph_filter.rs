@@ -8,6 +8,7 @@ pub struct GraphQueryFilter {
     account: Option<String>,
     project: Option<String>,
     region: Option<String>,
+    host: Option<String>,
 }
 
 impl GraphQueryFilter {
@@ -18,6 +19,20 @@ impl GraphQueryFilter {
         project: Option<&str>,
         region: Option<&str>,
     ) -> Result<Self, DomainError> {
+        Self::parse_with_host(from, to, account, project, region, None)
+    }
+
+    pub fn parse_with_host(
+        from: Option<&str>,
+        to: Option<&str>,
+        account: Option<&str>,
+        project: Option<&str>,
+        region: Option<&str>,
+        host: Option<&str>,
+    ) -> Result<Self, DomainError> {
+        if host.is_some_and(|h| !valid_host(h)) {
+            return Err(DomainError::InvalidScope);
+        }
         if from.is_some() != to.is_some() || account.is_some() && project.is_some() {
             return Err(DomainError::InvalidScope);
         }
@@ -40,16 +55,18 @@ impl GraphQueryFilter {
             account: account.map(str::to_owned),
             project: project.map(str::to_owned),
             region: region.map(str::to_owned),
+            host: host.map(str::to_owned),
         })
     }
 
     pub fn from_args(args: &BTreeMap<String, String>) -> Result<Self, DomainError> {
-        Self::parse(
+        Self::parse_with_host(
             args.get("from").map(String::as_str),
             args.get("to").map(String::as_str),
             args.get("account").map(String::as_str),
             args.get("project").map(String::as_str),
             args.get("region").map(String::as_str),
+            args.get("host").map(String::as_str),
         )
     }
 
@@ -58,6 +75,7 @@ impl GraphQueryFilter {
             && self.account.is_none()
             && self.project.is_none()
             && self.region.is_none()
+            && self.host.is_none()
     }
 
     pub fn time_range(&self) -> Option<(&str, &str)> {
@@ -75,10 +93,15 @@ impl GraphQueryFilter {
         self.region.as_deref()
     }
 
+    pub fn host(&self) -> Option<&str> {
+        self.host.as_deref()
+    }
+
     pub fn within_scope(&self, scope: &CaseScope) -> bool {
         let CaseScope::Remote {
             accounts,
             projects,
+            hosts,
             from,
             to,
             ..
@@ -86,9 +109,11 @@ impl GraphQueryFilter {
         else {
             return true;
         };
-        self.account
-            .as_ref()
-            .is_none_or(|account| accounts.contains(account))
+        self.host.as_ref().is_none_or(|host| hosts.contains(host))
+            && self
+                .account
+                .as_ref()
+                .is_none_or(|account| accounts.contains(account))
             && self
                 .project
                 .as_ref()
@@ -104,6 +129,20 @@ impl GraphQueryFilter {
                     })
             })
     }
+}
+
+fn valid_host(value: &str) -> bool {
+    valid_partition_value(value)
+        && value
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+        && !value.contains("..")
+        && !value.to_ascii_lowercase().starts_with("overflow-")
+        && !matches!(
+            value,
+            "cardinality" | "tuple-budget" | "unrepresentable-value"
+        )
 }
 
 fn parse_boundary(raw: &str) -> Result<(String, IndexedInstant), DomainError> {
@@ -132,6 +171,34 @@ mod tests {
     };
 
     #[test]
+    fn malicious_host_selectors_fail_closed_in_constructors_and_policy() {
+        for host in [
+            "../host",
+            "host/a",
+            "host\\a",
+            "a\nb",
+            "a\u{202e}b",
+            "overflow-cardinality-cap64",
+            "tuple-budget",
+            "",
+        ] {
+            assert!(
+                GraphQueryFilter::parse_with_host(None, None, None, None, None, Some(host))
+                    .is_err(),
+                "{host:?}"
+            );
+            let args = BTreeMap::from([("host".into(), host.into())]);
+            assert!(GraphQueryFilter::from_args(&args).is_err());
+        }
+        let filter =
+            GraphQueryFilter::parse_with_host(None, None, None, None, None, Some("lab-host"))
+                .unwrap();
+        assert_eq!(filter.host(), Some("lab-host"));
+        let scope = CaseScope::parse("v2;sources=local;accounts=;projects=;hosts=other;from=2026-11-01T00:00:00Z;to=2026-11-02T00:00:00Z").unwrap();
+        assert!(!filter.within_scope(&scope));
+    }
+
+    #[test]
     fn rejects_invalid_or_ambiguous_filters() {
         assert!(
             GraphQueryFilter::parse(Some("2026-10-28T00:00:00Z"), None, None, None, None).is_err()
@@ -148,6 +215,56 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn a_host_filter_cannot_exceed_either_scope_ceiling() {
+        let scope = "v2;sources=local;accounts=;projects=;hosts=host-a,host-b;from=2026-11-01T00:00:00Z;to=2026-11-02T00:00:00Z";
+        let case = Case {
+            id: CaseId::parse("00000000-0000-0000-0000-000000000018").unwrap(),
+            title: "Host scope".into(),
+            severity: Severity::Medium,
+            scope: scope.into(),
+            sealed: false,
+        };
+        let rules = PolicyRules {
+            scope: Some(CaseScope::parse(&scope.replace("host-a,host-b", "host-a")).unwrap()),
+            ..PolicyRules::default()
+        };
+        for host in [
+            "host-b",
+            "host-c",
+            "../host-a",
+            "overflow-cardinality-cap64",
+        ] {
+            let proposal = ProposedCall {
+                tool: Tool::Neighbors,
+                args: BTreeMap::from([
+                    ("kind".into(), "ip".into()),
+                    ("value".into(), "203.0.113.8".into()),
+                    ("host".into(), host.into()),
+                ]),
+            };
+            assert!(
+                matches!(
+                    evaluate_with_rules(&case, proposal, 1, ExecutionMode::Attended, 0, &rules),
+                    Decision::Deny(_)
+                ),
+                "{host}"
+            );
+        }
+        let proposal = ProposedCall {
+            tool: Tool::Neighbors,
+            args: BTreeMap::from([
+                ("kind".into(), "ip".into()),
+                ("value".into(), "203.0.113.8".into()),
+                ("host".into(), "host-a".into()),
+            ]),
+        };
+        assert!(matches!(
+            evaluate_with_rules(&case, proposal, 1, ExecutionMode::Attended, 0, &rules),
+            Decision::Allow(_)
+        ));
     }
 
     #[test]

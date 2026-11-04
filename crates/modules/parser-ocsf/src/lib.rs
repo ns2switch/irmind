@@ -90,6 +90,14 @@ impl EventParser for OcsfParser {
 }
 
 impl StreamingEventParser for OcsfParser {
+    fn partition_profile(&self, record: &GraphRecord) -> irmind_app::PartitionProfile {
+        if record.entities.iter().any(|(kind, _)| kind == "account") {
+            irmind_app::PartitionProfile::CloudAccountRegion
+        } else {
+            irmind_app::PartitionProfile::EndpointHost
+        }
+    }
+
     fn parser_name(&self) -> &'static str {
         "parser-ocsf"
     }

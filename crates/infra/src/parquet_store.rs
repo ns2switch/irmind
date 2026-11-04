@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 mod compact;
 mod format;
 mod local;
+mod partitioning;
 mod query;
 mod scan;
 mod spool;
@@ -73,6 +74,7 @@ pub(crate) struct ParquetProfile {
     parquet: AtomicU64,
     query_verify: AtomicU64,
     query_scan: AtomicU64,
+    staging_peak: AtomicU64,
 }
 
 impl ParquetProfile {
@@ -107,6 +109,15 @@ impl ParquetProfile {
     fn record_query_scan(&self, duration: Duration) {
         self.query_scan
             .fetch_add(Self::nanos(duration), Ordering::Relaxed);
+    }
+
+    fn record_staging_peak(&self, bytes: u64) {
+        self.staging_peak.fetch_max(bytes, Ordering::Relaxed);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn temporary_disk_peak(&self) -> u64 {
+        self.staging_peak.load(Ordering::Relaxed)
     }
 
     #[cfg(test)]

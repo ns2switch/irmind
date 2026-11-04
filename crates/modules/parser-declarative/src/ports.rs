@@ -33,6 +33,14 @@ impl EventParser for DeclarativeParser {
 }
 
 impl StreamingEventParser for DeclarativeParser {
+    fn partition_profile(&self, _record: &GraphRecord) -> irmind_app::PartitionProfile {
+        if self.definition.mapping.contains_key("host") {
+            irmind_app::PartitionProfile::EndpointHost
+        } else {
+            irmind_app::PartitionProfile::Unpartitioned
+        }
+    }
+
     fn parser_name(&self) -> &'static str {
         "parser-declarative"
     }
