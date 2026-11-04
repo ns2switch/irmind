@@ -2597,6 +2597,7 @@ dependencies = [
  "irmind-domain",
  "irmind-fs",
  "irmind-mod-parser-json",
+ "irmind-mod-parser-linux",
  "irmind-security",
  "irmind-testkit",
  "keyring",

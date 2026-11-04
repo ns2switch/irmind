@@ -15,7 +15,7 @@ env:
 jobs:
   graph_benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
@@ -41,11 +41,18 @@ jobs:
         run: |
           set -o pipefail
           cargo test -p irmind-infra hunteval_reference_corpus --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee benchmark-results.txt
-      - name: Profile Parquet conversion and HuntEval needles in 1 GB and 15 GB
+      - name: Compare V1 and V2 CloudTrail and endpoint Parquet in release mode
         shell: bash
         run: |
-          set -o pipefail
-          cargo test -p irmind-infra parquet_benchmark_ --release --locked -- --ignored --nocapture --test-threads 1 --skip parquet_benchmark_50mb 2>&1 | tee -a benchmark-results.txt
+          set -euo pipefail
+          for version in v1 v2; do
+            export IRMIND_BENCH_SCENARIO="cloud-$version"
+            cargo test -p irmind-infra parquet_benchmark_ --release --locked -- --ignored --nocapture --test-threads 1 --skip parquet_benchmark_50mb 2>&1 | tee -a benchmark-results.txt
+            for hosts in 1 64 1024 1025; do
+              export IRMIND_BENCH_SCENARIO="endpoint-$version-$hosts"
+              cargo test -p irmind-infra parquet_benchmark_15gb --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee -a benchmark-results.txt
+            done
+          done
       - name: Measure warm build and binary size
         shell: bash
         run: |
