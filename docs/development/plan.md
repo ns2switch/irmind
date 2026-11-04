@@ -143,3 +143,8 @@ Step (c) is integrated in [PR #170](https://github.com/ns2switch/irmind/pull/170
 ### Explicit migration and export V5
 
 [PR #172](https://github.com/ns2switch/irmind/pull/172) implements attended open-case migration and V5 export through shared application cases of use. Historical V1 envelopes, source manifests and seal challenges retain their encodings. Preparation verifies originals and old/new reconstruction before one atomic signed replacement batch. A shared lineage interpreter serves application checks, queries and export verification. See [migration guidance](case-migration.md) and [bounded wire commitments](parquet-v2-migration-contracts.md#bounded-canonical-migration-record). Default production writing stays V1 until this implementation and step (e)'s release benchmarks have merged. EVTX and experimental SIEM connectors follow those steps.
+
+
+### Artifact V2 release benchmark
+
+Step (e) compares release-mode V1/V2 CloudTrail ingestion and queries at 1 GB and 15 GB, plus 15 GB endpoint corpora with 1, 64, 1,024 and 1,025 hosts. It records normalized staging disk peaks, signed partition/file counts, compressed column sizes and filtered/unfiltered latency. The initial 64-host cap remains provisional until the measured recommendation in [benchmarks](benchmarks.md#timestamp-and-host-partition-comparison); its hard ceiling is 1,024. Production writing remains V1 until migration/export V5 and the measured benchmark change have both merged.
