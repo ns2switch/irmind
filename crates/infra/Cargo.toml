@@ -35,6 +35,7 @@ tempfile = "3"
 dbus = { version = "0.9", features = ["vendored"] }
 
 [dev-dependencies]
+irmind-mod-parser-linux = { path = "../modules/parser-linux", version = "0.1.0" }
 irmind-security = { path = "../security", version = "0.1.0" }
 irmind-mod-parser-json = { path = "../modules/parser-json", version = "0.1.0" }
 irmind-testkit = { path = "../testkit", version = "0.1.0" }

@@ -154,3 +154,7 @@ New ingestions use the current reader identities, including `json-stream-v3`. Re
 Case opening and verification warn about the affected retired JSON, ECS, OCSF, DFIR and declarative readers from v0.1.1–v0.1.5. An authenticated original size at or below 4 MiB suppresses the warning; missing size remains conservative. The TUI displays a guarded, unfolded warning, and CLI verification writes it to stderr without changing a valid result or signed history. Guidance links to the published changelog and creating a fresh case from verified originals. No release is created only for this notice.
 
 The [proposed parser retention policy](decisions.md#parser-retention-policy-for-10-pending-confirmation) is a [1.0 criterion](roadmap.md#10-criteria), pending confirmation before that release.
+
+### Artifact V2 release benchmark
+
+Step (e) compares release-mode V1/V2 CloudTrail ingestion and queries at 1 GB and 15 GB, plus 15 GB endpoint corpora with 1, 64, 1,024 and 1,025 hosts. It records normalized staging disk peaks, signed partition/file counts, compressed column sizes and filtered/unfiltered latency. The initial 64-host cap remains provisional until the measured recommendation in [benchmarks](benchmarks.md#timestamp-and-host-partition-comparison); its hard ceiling is 1,024. Production writing remains V1 until migration/export V5 and the measured benchmark change have both merged.
