@@ -75,6 +75,7 @@ pub(crate) struct ParquetProfile {
     query_verify: AtomicU64,
     query_scan: AtomicU64,
     staging_peak: AtomicU64,
+    staging_live: AtomicU64,
 }
 
 impl ParquetProfile {

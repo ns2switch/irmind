@@ -68,7 +68,7 @@ impl SignedSources {
         let artifact = ParquetArtifact::decode(entry.kind, &entry.payload)
             .map_err(|_| AppError::InvalidChain(entry.seq))?;
         if self.artifacts.iter().any(|a| {
-            a.audit_kind() != artifact.audit_kind()
+            !a.same_generation(&artifact)
                 && a.source_hashes()
                     .iter()
                     .any(|h| artifact.source_hashes().contains(h))

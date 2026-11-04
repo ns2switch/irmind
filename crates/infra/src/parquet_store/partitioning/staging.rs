@@ -3,6 +3,7 @@ use super::super::{
     AppError, CancellationToken, CaseId, File, ParquetStore, ParseReport, Path, RecordRow,
     SourceManifestV1, StreamingEventParser, invalid_source, storage,
 };
+use super::temporary::DiskLease;
 use sha2::{Digest, Sha256};
 use std::io::{Read, Seek, SeekFrom, Write};
 
@@ -23,6 +24,8 @@ pub(super) struct StagedSource {
     pub report: ParseReport,
     pub sample_hash: [u8; 32],
     pub normalized_hash: [u8; 32],
+    pub needs_sort: bool,
+    pub disk: DiskLease,
 }
 
 impl ParquetStore {
@@ -50,7 +53,7 @@ impl ParquetStore {
                 budget,
             });
         }
-        let dir = self.case_dir(case)?;
+        let dir = self.spool_dir(case)?;
         check_space(fs4::available_space(&dir).map_err(storage)?, required)?;
         Ok(inputs)
     }
@@ -80,6 +83,8 @@ impl ParquetStore {
         let mut accepted = 0usize;
         let mut offset_mode = None;
         let mut position = None;
+        let mut needs_sort = false;
+        let mut disk = DiskLease::new(self.profile.clone());
         let report = stream::parse_and_verify(
             stream::VerifiedInput {
                 source: &mut input.file,
@@ -96,12 +101,13 @@ impl ParquetStore {
                 if cancel.is_cancelled() {
                     return Err(AppError::Cancelled);
                 }
-                let row = normalized_row(&record, parser, &value, &mut offset_mode, size)?;
-                let key = row.position();
-                if position.is_some_and(|old: (u64, Option<u64>)| {
-                    old.0 >= key.0 || old.1.zip(key.1).is_some_and(|(a, b)| a > b)
-                }) {
-                    return Err(invalid_source());
+                let row =
+                    normalized_row(&record, parser, &input.path, &value, &mut offset_mode, size)?;
+                let key = row.sort_key();
+                if let Some(old) = position {
+                    needs_sort |= irmind_domain::compare_record_keys(old, key, false)
+                        .map_err(|_| invalid_source())?
+                        .is_gt();
                 }
                 position = Some(key);
                 let encoded = serde_json::to_vec(&row).map_err(storage)?;
@@ -115,6 +121,7 @@ impl ParquetStore {
                 accepted = accepted.checked_add(1).ok_or_else(invalid_source)?;
                 writer.write_all(&encoded).map_err(storage)?;
                 writer.write_all(b"\n").map_err(storage)?;
+                disk.add(count)?;
                 Ok(())
             },
         )?;
@@ -135,6 +142,8 @@ impl ParquetStore {
             report,
             sample_hash: irmind_app::sha256(&sample),
             normalized_hash: normalized_hash.finalize().into(),
+            needs_sort,
+            disk,
         })
     }
 }
@@ -152,6 +161,7 @@ fn no_space() -> AppError {
 fn normalized_row(
     record: &irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
     parser: &dyn StreamingEventParser,
+    source: &str,
     hash: &irmind_domain::EvidenceHash,
     offset_mode: &mut Option<bool>,
     size: u64,
@@ -160,8 +170,16 @@ fn normalized_row(
     record.inspect(|indexed| {
         row = Some((|| {
             stream::validate_offset(offset_mode, indexed.source_offset, size)?;
+            if indexed
+                .time
+                .is_some_and(|time| time.precision() == irmind_app::TimePrecision::Unknown)
+            {
+                return Err(AppError::Fixed(
+                    irmind_app::FixedAppError::PolicyInvalidIndexedTimestamp,
+                ));
+            }
             let mut row = RecordRow::from_partitioned(indexed, hash)?;
-            row.profile = match parser.partition_profile(&indexed.record) {
+            row.profile = match parser.partition_profile_for_source(source, &indexed.record)? {
                 irmind_app::PartitionProfile::Unpartitioned => 0,
                 irmind_app::PartitionProfile::CloudAccountRegion => 1,
                 irmind_app::PartitionProfile::EndpointHost => 2,

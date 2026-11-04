@@ -171,3 +171,13 @@ Context: the approved artifact V2 cannot pass through a V1-only storage port, an
 ## Deterministic generic partition preparation
 
 Context: concurrent per-source writers cannot deterministically allocate signed cardinality slots. Decision: use the analyst-approved additive batch preparation, parser-owned closed profiles and checked host selectors. Add the already locked `unicode-normalization =0.1.26` directly to infra, derive the policy ID from its declared Unicode version, and pin that version in a test. Stage at most four normalized sources privately after a disk-space preflight; bound writes and report peak temporary storage in the 15 GB benchmark. Consequences: allocations depend only on signed history and canonical source/record order. Invalid host selectors fail closed and cannot exceed either scope ceiling. Historical builders and golden bytes remain unchanged; the TUI keeps V1 writing until generic partitions and migration/export V5 are both integrated. See [approved contracts](parquet-v2-partition-contracts.md).
+
+
+## Source-bound partition replay
+
+Context: a mixed-source reconstruction router cannot identify a signed parser from a normalized record alone. Decision: the analyst approved the additive optional `partition_profile_for_source(source, record)` companion. Its default delegates to the approved closed profile; only the signed-source router resolves the source and fails on an unknown source. Consequences: native implementations remain compatible, routing has no mutable last-source state, and storage does not guess a product dialect. Signed formats and historical builder behavior are unchanged.
+
+
+## JSON fast-path reconstruction compatibility: proposal pending
+
+Context: the partition regression in [PR #170](https://github.com/ns2switch/irmind/pull/170) reproduces different event hashes for identical source bytes with `serde_json/preserve_order`. The historical line fast path lacks the whole-document path's explicit lexical ordering; V1 is affected too. Proposal, not yet accepted: version canonical new JSON ingests and retain both historical interpretations, accepting replay only when all signed artifacts match. Consequences: keep the failing regression and existing goldens; do not merge partitions, change normalized historical output or enable V2 by default pending the analyst's decision. See [evidence and compatibility proposal](json-line-order-compatibility.md).

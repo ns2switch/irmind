@@ -101,8 +101,14 @@ impl RecordRow {
         })
     }
 
-    pub(in crate::parquet_store) fn position(&self) -> (u64, Option<u64>) {
-        (self.index, self.source_offset)
+    pub(in crate::parquet_store) fn sort_key(&self) -> irmind_domain::StableRecordKey<'static> {
+        irmind_domain::StableRecordKey {
+            instant: self.time.map(irmind_app::IndexedTime::instant),
+            source: "",
+            source_hash: "",
+            source_offset: self.source_offset,
+            record_index: self.index,
+        }
     }
 
     pub(in crate::parquet_store) fn estimated_bytes(&self) -> usize {

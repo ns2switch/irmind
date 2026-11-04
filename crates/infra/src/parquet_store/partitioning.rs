@@ -1,7 +1,9 @@
 mod batch;
 mod consolidate;
 mod normalize;
+mod sorting;
 mod staging;
+mod temporary;
 #[cfg(test)]
 mod tests;
 pub(super) use batch::supported_builder;
