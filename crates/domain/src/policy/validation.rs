@@ -148,6 +148,7 @@ fn valid_local(proposal: &ProposedCall) -> bool {
                     "account",
                     "project",
                     "region",
+                    "host",
                 ],
             ) && proposal
                 .args
@@ -165,7 +166,7 @@ fn valid_local(proposal: &ProposedCall) -> bool {
             valid_args(
                 &proposal.args,
                 &[
-                    "query", "limit", "from", "to", "account", "project", "region",
+                    "query", "limit", "from", "to", "account", "project", "region", "host",
                 ],
             ) && proposal
                 .args
@@ -397,11 +398,11 @@ fn valid_limit(value: Option<&String>) -> bool {
 fn valid_entity_args(args: &BTreeMap<String, String>, allow_limit: bool) -> bool {
     let fields: &[&str] = if allow_limit {
         &[
-            "kind", "value", "limit", "from", "to", "account", "project", "region",
+            "kind", "value", "limit", "from", "to", "account", "project", "region", "host",
         ]
     } else {
         &[
-            "kind", "value", "from", "to", "account", "project", "region",
+            "kind", "value", "from", "to", "account", "project", "region", "host",
         ]
     };
     valid_args(args, fields)

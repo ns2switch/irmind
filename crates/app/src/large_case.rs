@@ -210,8 +210,14 @@ impl LargeCaseUseCases<'_, '_> {
                     pending.push(path);
                 }
             }
-            let prepared =
-                self.prepare_sources_parallel(id, source_root, &pending, copy_original, cancel)?;
+            let prepared = self.prepare_sources_parallel(
+                id,
+                source_root,
+                &pending,
+                copy_original,
+                &known_artifacts,
+                cancel,
+            )?;
             for (path, source) in pending.iter().zip(prepared) {
                 known_sources.insert((*path).clone(), source.manifest.clone());
                 let hash = self.sign_prepared_with_selection(
@@ -234,33 +240,23 @@ impl LargeCaseUseCases<'_, '_> {
         source_root: &Path,
         pending: &[&String],
         copy_original: bool,
+        known: &BTreeMap<String, ParquetArtifact>,
         cancel: &CancellationToken,
     ) -> Result<Vec<crate::PreparedSource>, AppError> {
-        std::thread::scope(|scope| {
-            let handles = pending
-                .iter()
-                .map(|path| {
-                    scope.spawn(move || {
-                        self.store.prepare_local(
-                            id,
-                            source_root,
-                            path,
-                            copy_original,
-                            self.parser,
-                            cancel,
-                        )
-                    })
-                })
-                .collect::<Vec<_>>();
-            handles
-                .into_iter()
-                .map(|handle| {
-                    handle
-                        .join()
-                        .map_err(|_| AppError::Policy("source preparation worker failed".into()))?
-                })
-                .collect::<Result<Vec<_>, _>>()
-        })
+        let paths = pending.iter().map(|p| (*p).clone()).collect::<Vec<_>>();
+        let committed = known.values().cloned().collect::<Vec<_>>();
+        self.store.prepare_local_batch(
+            crate::LocalBatchRequest {
+                case_id: id,
+                source_root,
+                relative_paths: &paths,
+                copy_original,
+                parser: self.parser,
+                committed_artifacts: &committed,
+                limits: crate::PartitionLimits::default(),
+            },
+            cancel,
+        )
     }
 
     pub(crate) fn sign_prepared_with_selection(

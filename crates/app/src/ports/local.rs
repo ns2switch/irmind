@@ -211,6 +211,9 @@ pub trait StreamingEventParser: Send + Sync {
             version: self.version_for_source(source)?,
         })
     }
+    fn partition_profile(&self, _record: &GraphRecord) -> crate::PartitionProfile {
+        crate::PartitionProfile::Unpartitioned
+    }
     fn timestamp_context(&self) -> Option<&str> {
         None
     }
@@ -351,6 +354,40 @@ pub struct PreparedSource {
 /// The local adapter owns all paths and derived files. The application signs
 /// the returned manifests before any derived file is exposed to model tools.
 pub trait LargeCaseStore: Send + Sync {
+    /// Prepare a canonical bounded batch against the verified signed snapshot.
+    fn prepare_local_batch(
+        &self,
+        request: crate::LocalBatchRequest<'_>,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<PreparedSource>, AppError> {
+        request.validate()?;
+        let mut prepared = Vec::new();
+        for path in request.relative_paths {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let source = self.prepare_local(
+                request.case_id,
+                request.source_root,
+                path,
+                request.copy_original,
+                request.parser,
+                cancel,
+            )?;
+            if source
+                .artifacts
+                .iter()
+                .any(|a| matches!(a, ParquetArtifact::V2(_)))
+            {
+                return Err(AppError::Fixed(
+                    crate::FixedAppError::PolicyPartitionBatchUnavailable,
+                ));
+            }
+            prepared.push(source);
+        }
+        Ok(prepared)
+    }
+
     /// Creates a private, automatically removed object spool under this case's
     /// data directory. Implementations check available space before creating it.
     fn create_object_spool(

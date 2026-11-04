@@ -1266,6 +1266,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "toml",
+ "unicode-normalization",
 ]
 
 [[package]]

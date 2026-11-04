@@ -7,6 +7,19 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum FixedAppError {
+    #[error("policy denied: partitioned preparation is unavailable")]
+    PolicyPartitionBatchUnavailable,
+    #[error("policy denied: partition cap must be between 1 and 1024")]
+    PolicyInvalidPartitionCap,
+    #[error("policy denied: partition preparation requires at most four sorted unique sources")]
+    PolicyInvalidPartitionBatch,
+    #[error("policy denied: source exceeds bounded Parquet artifact count")]
+    PolicyPartitionArtifactLimit,
+    #[error(
+        "storage: not enough space for bounded normalized staging in the case directory (including safety margin)"
+    )]
+    StorageNormalizedStagingSpace,
+
     #[error(transparent)]
     Definition(crate::DefinitionError),
     #[error("model: LLM module is not registered")]

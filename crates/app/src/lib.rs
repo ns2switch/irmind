@@ -76,6 +76,8 @@ mod indexed_parser;
 pub use indexed_parser::{IndexedProjection, indexed_rfc3339, parse_indexed_report};
 pub use keystore::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
 pub use large_case::{LargeCaseUseCases, ParserSelection, SourceCheckMode, SourceCheckReport};
+mod partition_preparation;
+pub use partition_preparation::{LocalBatchRequest, PartitionLimits, PartitionProfile};
 pub use ports::*;
 use ports::{isolate_untrusted, remote_tool_error, run_async, safe_markdown};
 pub use report::{EntityDetails, Finding, FindingKind};

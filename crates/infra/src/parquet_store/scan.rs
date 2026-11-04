@@ -13,6 +13,7 @@ use std::time::Instant;
 
 pub(super) const MAX_QUERY_FILES: usize = 8192;
 const FILE_WORKERS: usize = 4;
+mod host;
 mod predicate;
 mod verification;
 pub(super) use predicate::Predicate;
@@ -98,6 +99,11 @@ impl ParquetStore {
                         match message {
                             ScanMessage::Batch(batch) => {
                                 super::time_cell::validate_source_units(&batch, &mut source_units)?;
+                                let (batch, host_status) =
+                                    self.filter_legacy_host(spec, source_names, batch)?;
+                                if host_status == ScanStatus::Deadline {
+                                    return Ok(host_status);
+                                }
                                 if visit(&batch)? == ScanFlow::Stop {
                                     return Ok(ScanStatus::Stopped);
                                 }
@@ -351,12 +357,13 @@ fn row_group_matches(
 }
 
 pub(super) fn partition_matches(artifact: &ParquetArtifact, filter: &GraphQueryFilter) -> bool {
-    if matches!(artifact, ParquetArtifact::V2(_)) {
-        return filter.time_range().is_none_or(|(from, to)| {
-            artifact.partition_date() == "unknown"
-                || (artifact.partition_date() >= &from[..10]
-                    && artifact.partition_date() <= &to[..10])
-        });
+    if let ParquetArtifact::V2(v) = artifact {
+        return scope_partition_matches(&v.partition, filter)
+            && filter.time_range().is_none_or(|(from, to)| {
+                artifact.partition_date() == "unknown"
+                    || (artifact.partition_date() >= &from[..10]
+                        && artifact.partition_date() <= &to[..10])
+            });
     }
     filter.time_range().is_none_or(|(from, to)| {
         artifact.partition_date().len() == 10
@@ -389,6 +396,9 @@ fn rules_for_artifact(spec: &ScanSpec<'_>, precise: bool) -> Result<Vec<Predicat
         rules.push(rule.clone());
     }
     if precise {
+        if let Some(host) = spec.filter.host() {
+            rules.push(Predicate::Equal("scope_host", host.into()));
+        }
         if let Some(account) = spec.filter.account_or_project() {
             rules.push(Predicate::Equal("scope_account", account.into()));
         }
@@ -397,4 +407,31 @@ fn rules_for_artifact(spec: &ScanSpec<'_>, precise: bool) -> Result<Vec<Predicat
         }
     }
     Ok(rules)
+}
+
+fn scope_partition_matches(
+    partition: &irmind_domain::ArtifactPartitionV2,
+    filter: &GraphQueryFilter,
+) -> bool {
+    use irmind_domain::{ScopePartitionKey as Key, ScopePartitionValue as Value};
+    [
+        (Key::Account, filter.account_or_project()),
+        (Key::Region, filter.region()),
+        (Key::Host, filter.host()),
+    ]
+    .iter()
+    .all(|(key, raw)| {
+        let Some(expected) = raw else {
+            return true;
+        };
+        let Some(scope) = partition.scopes.iter().find(|s| s.key == *key) else {
+            return true;
+        };
+        match &scope.value {
+            Value::Overflow(_) => true,
+            Value::Ordinary(value) => {
+                super::partitioning::normalize(expected).is_none_or(|n| n == *value)
+            }
+        }
+    })
 }

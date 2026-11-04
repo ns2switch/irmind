@@ -1,4 +1,4 @@
-mod stream;
+pub(super) mod stream;
 use stream::{StreamInput, initial_hash, stream_records};
 
 use super::{
@@ -11,6 +11,40 @@ use super::{
 use std::io::Read as _;
 
 impl LargeCaseStore for ParquetStore {
+    fn prepare_local_batch(
+        &self,
+        request: irmind_app::LocalBatchRequest<'_>,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<PreparedSource>, AppError> {
+        request.validate()?;
+        if self.precise_time {
+            return self.prepare_partition_batch(&request, cancel);
+        }
+        std::thread::scope(|scope| {
+            let workers = request
+                .relative_paths
+                .iter()
+                .map(|path| {
+                    scope.spawn(|| {
+                        self.prepare_local(
+                            request.case_id,
+                            request.source_root,
+                            path,
+                            request.copy_original,
+                            request.parser,
+                            cancel,
+                        )
+                    })
+                })
+                .collect::<Vec<_>>();
+            let outcomes = workers
+                .into_iter()
+                .map(|w| w.join().map_err(|_| invalid_source())?)
+                .collect::<Vec<_>>();
+            outcomes.into_iter().collect()
+        })
+    }
+
     fn create_object_spool(
         &self,
         case_id: &CaseId,
@@ -257,16 +291,22 @@ impl LargeCaseStore for ParquetStore {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            fresh.precise_time = artifacts.iter().any(|a| {
-                matches!(a, ParquetArtifact::V2(_)) && a.source_hashes().contains(&source.sha256)
-            });
-            fresh.legacy_entities = artifacts.iter().any(|artifact| {
-                artifact.source_hashes().len() == 1
-                    && artifact.source_hashes()[0] == source.sha256
-                    && artifact.schema_version() == "irmind-entities-v1"
-            });
-            let prepared =
-                fresh.prepare_local(case_id, source_root, &source.source, false, parser, cancel)?;
+            fresh.replay_mode(source, artifacts);
+            let paths = [source.source.clone()];
+            let prepared = fresh.replay_prepared(
+                irmind_app::LocalBatchRequest {
+                    case_id,
+                    source_root,
+                    relative_paths: &paths,
+                    copy_original: false,
+                    parser,
+                    committed_artifacts: &rebuilt,
+                    limits: super::partitioning::replay_limits(artifacts)?,
+                },
+                source,
+                artifacts,
+                cancel,
+            )?;
             if prepared.manifest.sha256 != source.sha256 || prepared.manifest.size != source.size {
                 return Err(AppError::EvidenceMismatch(source.sha256.as_str().into()));
             }
@@ -322,7 +362,7 @@ impl LargeCaseStore for ParquetStore {
     }
 }
 
-fn verify_source_unchanged(
+pub(super) fn verify_source_unchanged(
     source: &std::fs::File,
     metadata: &std::fs::Metadata,
     hash: &EvidenceHash,
@@ -337,4 +377,42 @@ fn verify_source_unchanged(
         return Err(AppError::EvidenceMismatch(hash.as_str().into()));
     }
     Ok(())
+}
+
+impl ParquetStore {
+    fn replay_mode(&mut self, source: &SourceManifestV1, artifacts: &[ParquetArtifact]) {
+        self.precise_time = artifacts.iter().any(|a| {
+            matches!(a, ParquetArtifact::V2(_)) && a.source_hashes().contains(&source.sha256)
+        });
+        self.legacy_entities = artifacts.iter().any(|artifact| {
+            artifact.source_hashes().len() == 1
+                && artifact.source_hashes()[0] == source.sha256
+                && artifact.schema_version() == "irmind-entities-v1"
+        });
+    }
+
+    fn replay_prepared(
+        &self,
+        request: irmind_app::LocalBatchRequest<'_>,
+        source: &SourceManifestV1,
+        signed: &[ParquetArtifact],
+        cancel: &CancellationToken,
+    ) -> Result<PreparedSource, AppError> {
+        let partitioned = signed.iter().any(|a| matches!(a, ParquetArtifact::V2(v)
+            if v.builder_version == super::partitioning::BUILDER && v.source_hashes.contains(&source.sha256)));
+        if partitioned {
+            self.prepare_local_batch(request, cancel)?
+                .pop()
+                .ok_or_else(invalid_source)
+        } else {
+            self.prepare_local(
+                request.case_id,
+                request.source_root,
+                &source.source,
+                false,
+                request.parser,
+                cancel,
+            )
+        }
+    }
 }

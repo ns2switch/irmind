@@ -97,6 +97,10 @@ impl EventParser for EcsParser {
 }
 
 impl StreamingEventParser for EcsParser {
+    fn partition_profile(&self, _record: &GraphRecord) -> irmind_app::PartitionProfile {
+        irmind_app::PartitionProfile::EndpointHost
+    }
+
     fn parser_name(&self) -> &'static str {
         "parser-ecs"
     }

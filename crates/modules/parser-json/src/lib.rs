@@ -36,6 +36,29 @@ impl JsonParser {
 }
 
 impl StreamingEventParser for JsonParser {
+    fn partition_profile(&self, record: &GraphRecord) -> irmind_app::PartitionProfile {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&record.text) else {
+            return irmind_app::PartitionProfile::Unpartitioned;
+        };
+        if [
+            "eventSource",
+            "protoPayload",
+            "subscriptionId",
+            "account_id",
+        ]
+        .iter()
+        .any(|k| value.get(k).is_some())
+        {
+            irmind_app::PartitionProfile::CloudAccountRegion
+        } else if value.get("host").is_some_and(serde_json::Value::is_string)
+            || record.entities.iter().any(|(kind, _)| kind == "host")
+        {
+            irmind_app::PartitionProfile::EndpointHost
+        } else {
+            irmind_app::PartitionProfile::Unpartitioned
+        }
+    }
+
     fn parser_name(&self) -> &'static str {
         "parser-json"
     }

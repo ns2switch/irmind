@@ -20,6 +20,7 @@ keyring = { version = "3", features = ["linux-native", "apple-native", "windows-
 rand = "0.8"
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde_json = "1"
+unicode-normalization = "=0.1.26"
 serde = { version = "1", features = ["derive"] }
 base64 = "0.22"
 arrow = { version = "=59.3.0", default-features = false }

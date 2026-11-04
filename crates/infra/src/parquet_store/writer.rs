@@ -8,18 +8,37 @@ use std::sync::Arc;
 
 mod batch;
 pub(super) mod precise;
+mod staged_time;
 use batch::{coobservation_batch, entity_batch, record_batch};
 use parquet::schema::types::ColumnPath;
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, serde::Serialize, serde::Deserialize)]
 pub(super) struct Partition {
     date: String,
     account: String,
     region: String,
+    #[serde(skip)]
+    scope: Option<irmind_domain::ArtifactPartitionV2>,
+    segment: u32,
+}
+
+impl Partition {
+    pub(in crate::parquet_store) fn utc_date(&self) -> &str {
+        &self.date
+    }
+    pub(in crate::parquet_store) fn with_scope(
+        mut self,
+        scope: irmind_domain::ArtifactPartitionV2,
+        segment: u32,
+    ) -> Self {
+        self.scope = Some(scope);
+        self.segment = segment;
+        self
+    }
 }
 
 mod row;
-pub(super) use row::{RecordRow, safe_partition};
+pub(super) use row::{RecordRow, raw_host, safe_partition};
 pub(super) struct StagedArtifact {
     pub temporary: PathBuf,
     pub manifest: ParquetArtifact,
@@ -91,28 +110,10 @@ impl ArtifactSink {
                 .map(arrow::datatypes::Field::data_type),
             Ok(arrow::datatypes::DataType::Timestamp(_, _))
         );
-        let part = if precise {
-            format!("date={}", partition.date)
-        } else {
-            format!(
-                "date={}/account={}/region={}",
-                partition.date, partition.account, partition.region
-            )
-        };
+        let (part, name) = Self::location(&partition, hash, kind, precise)?;
         let dir = case_dir.join(&part);
         fs::create_dir_all(&dir).map_err(storage)?;
         irmind_fs::private_dir(&dir).map_err(storage)?;
-        let name = if precise {
-            let key = format!("{}\0{}", partition.account, partition.region);
-            format!(
-                "{}.{}.{}.parquet",
-                hash.as_str(),
-                irmind_app::hex(&irmind_app::sha256(key.as_bytes())),
-                kind.suffix()
-            )
-        } else {
-            format!("{}.{}.parquet", hash.as_str(), kind.suffix())
-        };
         let temporary = dir.join(format!(".{name}.{}.tmp", rand::random::<u64>()));
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
@@ -154,6 +155,47 @@ impl ArtifactSink {
             let _ = fs::remove_file(&temporary);
         }
         result
+    }
+
+    fn location(
+        partition: &Partition,
+        hash: &EvidenceHash,
+        kind: ArtifactKind,
+        precise: bool,
+    ) -> Result<(String, String), AppError> {
+        let part = if let Some(scope) = &partition.scope {
+            scope
+                .path_prefix()
+                .map_err(|_| invalid_source())?
+                .trim_end_matches('/')
+                .to_owned()
+        } else if precise {
+            format!("date={}", partition.date)
+        } else {
+            format!(
+                "date={}/account={}/region={}",
+                partition.date, partition.account, partition.region
+            )
+        };
+        let name = if partition.scope.is_some() {
+            format!(
+                "{}.part-{}.{}.parquet",
+                hash.as_str(),
+                partition.segment,
+                kind.suffix()
+            )
+        } else if precise {
+            let key = format!("{}\0{}", partition.account, partition.region);
+            format!(
+                "{}.{}.{}.parquet",
+                hash.as_str(),
+                irmind_app::hex(&irmind_app::sha256(key.as_bytes())),
+                kind.suffix()
+            )
+        } else {
+            format!("{}.{}.parquet", hash.as_str(), kind.suffix())
+        };
+        Ok((part, name))
     }
 
     fn append(&mut self, batch: &RecordBatch) -> Result<(), AppError> {

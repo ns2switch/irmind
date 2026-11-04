@@ -1,4 +1,4 @@
-use super::row::first_string;
+use super::row::{first_string, raw_host};
 use super::{
     AppError, Arc, ArrayRef, ArtifactKind, ArtifactSink, EvidenceHash, ParquetArtifact,
     RecordBatch, RecordRow, StringArray, UInt64Array, invalid_source, storage,
@@ -19,6 +19,22 @@ impl RecordRow {
         hash: &EvidenceHash,
         precise: bool,
     ) -> Result<Self, AppError> {
+        Self::indexed_row(indexed, hash, precise, false)
+    }
+
+    pub(in crate::parquet_store) fn from_partitioned(
+        indexed: &irmind_app::IndexedGraphRecord,
+        hash: &EvidenceHash,
+    ) -> Result<Self, AppError> {
+        Self::indexed_row(indexed, hash, true, true)
+    }
+
+    fn indexed_row(
+        indexed: &irmind_app::IndexedGraphRecord,
+        hash: &EvidenceHash,
+        precise: bool,
+        generic: bool,
+    ) -> Result<Self, AppError> {
         let mut row = Self::from_record(&indexed.record, hash)?;
         if precise {
             row.precise = true;
@@ -34,18 +50,22 @@ impl RecordRow {
                 .map_or_else(|| "unknown".into(), |t| t.instant().utc_date());
             let value: serde_json::Value =
                 serde_json::from_str(&indexed.record.text).map_err(storage)?;
-            row.scope_host = first_string(
-                &value,
-                &[
-                    "/host",
-                    "/hostname",
-                    "/hostName",
-                    "/event/host",
-                    "/Computer",
-                    "/Host",
-                    "/_Source",
-                ],
-            )
+            row.scope_host = if generic {
+                raw_host(&value)
+            } else {
+                first_string(
+                    &value,
+                    &[
+                        "/host",
+                        "/hostname",
+                        "/hostName",
+                        "/event/host",
+                        "/Computer",
+                        "/Host",
+                        "/_Source",
+                    ],
+                )
+            }
             .into();
         }
         Ok(row)
@@ -183,18 +203,26 @@ pub(super) fn manifest(
         parser_id: parser.name.into(),
         parser_version: parser.version.into(),
         schema,
-        partition: ArtifactPartitionV2 {
-            date: sink.partition.date.clone(),
-            key_set: ARTIFACT_V2_SCOPE_KEYS.into(),
-            policy: ARTIFACT_V2_PARTITION_POLICY.into(),
-            tuple_cap: ARTIFACT_V2_MAX_DATE_TUPLES,
-            all_scope_overflow: false,
-            scopes: Vec::new(),
-        },
+        partition: sink
+            .partition
+            .scope
+            .clone()
+            .unwrap_or_else(|| ArtifactPartitionV2 {
+                date: sink.partition.date.clone(),
+                key_set: ARTIFACT_V2_SCOPE_KEYS.into(),
+                policy: ARTIFACT_V2_PARTITION_POLICY.into(),
+                tuple_cap: ARTIFACT_V2_MAX_DATE_TUPLES,
+                all_scope_overflow: false,
+                scopes: Vec::new(),
+            }),
         source_hashes: vec![hash.clone()],
         time_semantics: ARTIFACT_V2_TIME_SEMANTICS.into(),
         stable_order: ARTIFACT_V2_STABLE_ORDER.into(),
-        builder_version: BUILDER.into(),
+        builder_version: if sink.partition.scope.is_some() {
+            crate::parquet_store::partitioning::BUILDER.into()
+        } else {
+            BUILDER.into()
+        },
         superseded_hashes: Vec::new(),
     }
     .into())

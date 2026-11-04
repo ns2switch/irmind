@@ -28,7 +28,7 @@ pub(super) fn validate_sources(
                     )
             }
             ParquetArtifact::V2(v) => {
-                v.builder_version == super::super::writer::precise::BUILDER
+                super::super::partitioning::supported_builder(&v.builder_version)
                     && v.superseded_hashes.is_empty()
             }
         };

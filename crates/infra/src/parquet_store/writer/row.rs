@@ -1,6 +1,7 @@
 use super::{AppError, EvidenceHash, GraphRecord, Partition, invalid_source, storage};
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::Value;
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(in crate::parquet_store) struct RecordRow {
     pub(in crate::parquet_store) partition: Partition,
     pub(super) hash: String,
@@ -11,12 +12,14 @@ pub(in crate::parquet_store) struct RecordRow {
     pub(super) entities: String,
     pub(super) entity_pairs: Vec<(String, String)>,
     pub(super) relations: String,
+    #[serde(with = "super::staged_time")]
     pub(super) time: Option<irmind_app::IndexedTime>,
     pub(super) source_offset: Option<u64>,
     pub(super) precise: bool,
-    pub(super) scope_account: String,
-    pub(super) scope_region: String,
-    pub(super) scope_host: String,
+    pub(in crate::parquet_store) profile: u8,
+    pub(in crate::parquet_store) scope_account: String,
+    pub(in crate::parquet_store) scope_region: String,
+    pub(in crate::parquet_store) scope_host: String,
 }
 
 impl RecordRow {
@@ -79,15 +82,7 @@ impl RecordRow {
             })
             .collect::<Vec<_>>();
         Ok(Self {
-            partition: Partition {
-                date: if at.is_empty() {
-                    "unknown".into()
-                } else {
-                    at[..10].into()
-                },
-                account: safe_partition(account),
-                region: safe_partition(region),
-            },
+            partition: legacy_partition(&at, account, region),
             hash: hash.as_str().into(),
             index: u64::try_from(record.index).map_err(storage)?,
             at,
@@ -99,10 +94,15 @@ impl RecordRow {
             time: None,
             source_offset: None,
             precise: false,
+            profile: 0,
             scope_account: account.into(),
             scope_region: region.into(),
             scope_host: String::new(),
         })
+    }
+
+    pub(in crate::parquet_store) fn position(&self) -> (u64, Option<u64>) {
+        (self.index, self.source_offset)
     }
 
     pub(in crate::parquet_store) fn estimated_bytes(&self) -> usize {
@@ -143,4 +143,36 @@ pub(in crate::parquet_store) fn safe_partition(value: &str) -> String {
         "h{}",
         &irmind_app::hex(&irmind_app::sha256(value.as_bytes()))[..16]
     )
+}
+
+pub(in crate::parquet_store) fn raw_host(value: &Value) -> &str {
+    first_string(
+        value,
+        &[
+            "/host",
+            "/hostname",
+            "/hostName",
+            "/event/host",
+            "/Computer",
+            "/Host",
+            "/host/name",
+            "/device/hostname",
+            "/attributes/host/name",
+            "/attributes/device/hostname",
+        ],
+    )
+}
+
+fn legacy_partition(at: &str, account: &str, region: &str) -> Partition {
+    Partition {
+        date: if at.is_empty() {
+            "unknown".into()
+        } else {
+            at[..10].into()
+        },
+        account: safe_partition(account),
+        region: safe_partition(region),
+        scope: None,
+        segment: 0,
+    }
 }
