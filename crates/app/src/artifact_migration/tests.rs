@@ -72,13 +72,44 @@ fn mixed_seal_inventory_includes_both_generations_and_matches_golden_order() {
     ];
     let golden = include_str!("../../tests/fixtures/mixed-seal-inventory.txt").trim();
     assert_eq!(
-        seal_inventory(&entries, &["3".repeat(64)])
-            .unwrap()
-            .join(","),
+        explicit_reference(&entries, &["3".repeat(64)]).join(","),
         golden
+    );
+    let mut builder = SealInventoryBuilder::default();
+    for entry in &entries {
+        builder.accept(entry).unwrap();
+    }
+    builder.add_evidence(&"3".repeat(64)).unwrap();
+    let payload = seal_inventory(&entries, &["3".repeat(64)])
+        .unwrap()
+        .join(",");
+    builder.verify(&payload).unwrap();
+    assert_eq!(
+        irmind_domain::SealInventoryV2::decode(&payload)
+            .unwrap()
+            .count,
+        5
     );
     assert_eq!(
         seal_inventory(&entries[..2], &["3".repeat(64)]).unwrap(),
         ["3".repeat(64)]
     );
 }
+
+fn explicit_reference(entries: &[SignedEntry], legacy: &[String]) -> Vec<String> {
+    let mut hashes = legacy
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    for entry in entries {
+        if let Some(source) = SourceManifestV1::decode_signed(entry.kind, &entry.payload).unwrap() {
+            hashes.insert(source.sha256.as_str().into());
+        }
+        if let Ok(artifact) = irmind_domain::ParquetArtifact::decode(entry.kind, &entry.payload) {
+            hashes.insert(artifact.sha256().as_str().into());
+        }
+    }
+    hashes.into_iter().collect()
+}
+
+mod scale;

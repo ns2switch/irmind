@@ -28,6 +28,6 @@ V2 can recover the precision present in the original. It cannot recover precisio
 
 Run `/verify-graph <original-source-root>` to reconstruct both generations and compare their signed metadata and file hashes. Ordinary graph queries select only the committed active generation; explicit verification still checks historical artifacts.
 
-Seal and export through the ordinary commands. Cases containing V2 artifacts or migration records use export V5 automatically. V5 carries both generations' signed metadata and can include originals. Public-key verification still accepts an expected analyst fingerprint and needs no keystore. V3 and V4 remain supported; a V4 package cannot carry V2 records.
+Seal and export through the ordinary commands. Cases containing V2 artifacts or migration records use export V5 automatically. V5 carries both generations' signed metadata and hash-checked derived files, and can include originals. Public-key verification still accepts an expected analyst fingerprint and needs no keystore. V3 and V4 remain supported; a V4 package cannot carry V2 records.
 
 Default TUI writing remains V1 until migration/export and the release-profile cloud/host-cardinality benchmarks are integrated. The [migration contract](parquet-v2-migration-contracts.md) describes the wire commitment and application boundary.

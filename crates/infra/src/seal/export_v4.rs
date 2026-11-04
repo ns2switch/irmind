@@ -221,6 +221,9 @@ impl LocalStore {
             }
             write_frame(&mut out, &serde_json::to_vec(&operation).map_err(storage)?)?;
         }
+        if header.version == 5 {
+            self.write_artifact_frames(id, &mut out, cancel)?;
+        }
         out.sync_all().map_err(storage)?;
         Ok(header.seal.analyst_key_fingerprint.clone())
     }
@@ -261,7 +264,7 @@ impl LocalStore {
     }
 }
 
-fn copy_verified(
+pub(super) fn copy_verified(
     input: &mut File,
     output: &mut File,
     manifest: &SourceManifestV1,

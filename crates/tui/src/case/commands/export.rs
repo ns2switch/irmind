@@ -97,7 +97,7 @@ impl CaseRuntime<'_, '_, '_> {
             } else {
                 let summary = confirmation_summary(self.engine, self.id, "Export")?;
                 let originals = request.source_root.as_ref().map_or_else(
-                    || "Originals: omitted; signed manifest only".into(),
+                    || "Originals: omitted; V5 includes verified derived artifacts".into(),
                     |root| format!("Originals: include from {}", root.display()),
                 );
                 self.state.confirmation_option = 0;

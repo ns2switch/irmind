@@ -1,10 +1,9 @@
-mod frames;
 use super::export_v4::{HeaderV4, MAGIC_V4, MAGIC_V5, v4_result};
+use super::frames::{read_frame, read_hash, read_u64, verify_raw};
 use super::{
     AppError, CaseId, LocalVerifier, Path, Severity, hex, seal_challenge, sha256, storage,
     storage_reason, verify_case_metadata,
 };
-use frames::{read_frame, read_hash, read_u64, verify_raw};
 use irmind_app::{ExportVerification, SignedEntry, SignedOperation, Verifier};
 use irmind_domain::{Actor, AuditEventKind, SealedParquetMigrationV1, SourceManifestV1};
 use std::collections::{BTreeMap, BTreeSet};
@@ -68,12 +67,16 @@ fn verify_versioned(
             ),
         ));
     }
-    verify_legacy_blobs(&mut input, &chain)?;
+    verify_legacy_blobs(&mut input, &mut chain)?;
     let provided_count = verify_source_frames(&mut input, &mut chain)?;
     verify_operation_frames(&mut input, &mut chain, &header)?;
-    let mut trailer = [0u8; 1];
-    if input.read(&mut trailer).map_err(storage)? != 0 {
-        return Err(storage_reason("export has trailing bytes"));
+    if version == 5 {
+        super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
+    } else {
+        let mut trailer = [0u8; 1];
+        if input.read(&mut trailer).map_err(storage)? != 0 {
+            return Err(storage_reason("export has trailing bytes"));
+        }
     }
     let mut result = v4_result(
         fingerprint,
@@ -139,7 +142,7 @@ fn verify_operation_frames(
     Ok(())
 }
 
-fn verify_legacy_blobs(input: &mut File, chain: &ChainState) -> Result<(), AppError> {
+fn verify_legacy_blobs(input: &mut File, chain: &mut ChainState) -> Result<(), AppError> {
     let evidence_count = read_u64(input)?;
     if evidence_count > MAX_SOURCE_MANIFESTS as u64 {
         return Err(storage_reason("too many copied evidence blobs"));
@@ -154,11 +157,20 @@ fn verify_legacy_blobs(input: &mut File, chain: &ChainState) -> Result<(), AppEr
         verify_raw(input, size, &hash)?;
     }
     let last = chain.last.as_ref().ok_or(AppError::InvalidChain(0))?;
-    let mut inventory = evidence_hashes.clone();
-    if chain.version == 5 {
-        inventory.extend(chain.derived_hashes.iter().cloned());
-    }
-    if inventory.iter().cloned().collect::<Vec<_>>().join(",") != last.payload
+    let matches = if chain.version == 5 && chain.inventory.has_v2() {
+        for hash in &evidence_hashes {
+            chain.inventory.add_evidence(hash)?;
+        }
+        chain.inventory.verify(&last.payload).is_ok()
+    } else {
+        evidence_hashes
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(",")
+            == last.payload
+    };
+    if !matches
         || chain.referenced_evidence.iter().any(|hash| {
             !evidence_hashes.contains(hash)
                 && !chain.sources.keys().any(|(source, _)| source == hash)
@@ -202,7 +214,8 @@ fn verify_source_frames(input: &mut File, chain: &mut ChainState) -> Result<usiz
 struct ChainState {
     version: u32,
     catalog: irmind_app::ArtifactCatalogBuilder,
-    derived_hashes: BTreeSet<String>,
+    inventory: irmind_app::SealInventoryBuilder,
+    artifacts: BTreeMap<String, super::artifact_frames::ArtifactFrame>,
     previous: [u8; 32],
     verifier: LocalVerifier,
     metadata_entries: Vec<SignedEntry>,
@@ -220,7 +233,8 @@ impl ChainState {
         Self {
             version,
             catalog: irmind_app::ArtifactCatalogBuilder::default(),
-            derived_hashes: BTreeSet::new(),
+            inventory: irmind_app::SealInventoryBuilder::default(),
+            artifacts: BTreeMap::new(),
             previous: [0; 32],
             verifier: LocalVerifier {
                 trusted: BTreeMap::new(),
@@ -265,6 +279,7 @@ impl ChainState {
             .map_err(|_| AppError::InvalidChain(entry.seq))?;
         if self.version == 5 {
             self.catalog.accept(&entry)?;
+            self.inventory.accept(&entry)?;
         }
         self.accept_metadata(&entry)?;
         if let Some(hash) = &entry.evidence {
@@ -298,7 +313,6 @@ impl ChainState {
                 }
                 self.source_count += 1;
                 self.source_hashes.insert(source.sha256.as_str().into());
-                self.derived_hashes.insert(source.sha256.as_str().into());
                 *self
                     .sources
                     .entry((source.sha256.as_str().into(), source.size))
@@ -307,8 +321,10 @@ impl ChainState {
             AuditEventKind::ParquetArtifactV1 | AuditEventKind::ParquetArtifactV2 => {
                 let artifact = irmind_domain::ParquetArtifact::decode(entry.kind, &entry.payload)
                     .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                self.derived_hashes
-                    .insert(artifact.sha256().as_str().into());
+                self.artifacts.insert(
+                    artifact.path().into(),
+                    super::artifact_frames::ArtifactFrame::from_artifact(&artifact),
+                );
                 if entry.evidence.is_some()
                     || !self.artifact_paths.insert(artifact.path().into())
                     || artifact

@@ -100,3 +100,22 @@ After the `irmind-parquet-migration-v1` NUL tag, fields are:
 A set commitment is a big-endian `u64` count followed by a length-prefixed lowercase SHA-256. Source-set hashing uses `irmind-migration-sources-v1` + NUL, the count, and length-prefixed source hashes in lexical order. Artifact-set hashing uses `irmind-migration-artifacts-v1` + NUL, the count, and length-prefixed complete canonical artifact payloads ordered by relative path. These are the UTF-8 bytes of the lowercase hex string returned by `ParquetArtifact::encode`, as stored in the signed entry, not the decoded envelope bytes. Including the full envelope distinguishes equal-content files with different signed metadata. Strings and counts use the existing canonical encoding; unknown or trailing bytes are invalid.
 
 The migration directory uses `migration-<previous-artifact-commitment>`. Every replacement keeps bounded supersession references to the previous artifacts of the same source and schema family. The shared lineage interpreter recomputes the complete commitments, validates source/family coverage and parser mapping, and retires paths only after accepting the final analyst record. The independent [golden payload](../../crates/domain/tests/fixtures/parquet-migration-v1.hex) fixes this new encoding without modifying any historical golden.
+
+
+## Bounded V2 seal inventory
+
+Cases containing V2 artifacts use a fixed-size `SealInventoryV2` descriptor in the existing signed seal event. V1-only cases retain their explicit inventory byte for byte. The seal challenge and analyst fingerprint do not change.
+
+The descriptor is `irmind-seal-inventory-v2` + NUL, a big-endian `u64` item count, and a length-prefixed lowercase SHA-256. It uses the existing canonical hex envelope and strict decoding. The independent [golden](../../crates/domain/tests/fixtures/seal-inventory-v2.hex) and [SHA-256](../../crates/domain/tests/fixtures/seal-inventory-v2.sha256) pin the bytes; the alternate JSON-map CI job checks them too.
+
+Items have a closed kind: legacy copied evidence (0), source manifest (1), or artifact manifest (2). Their identity is respectively the evidence hash, signed source name/URI, or relative artifact path. Each item hash is SHA-256 over `irmind-seal-inventory-item-v2` + NUL, its one-byte kind, length-prefixed UTF-8 identity, and length-prefixed canonical payload. Evidence uses its lowercase hash as payload; manifests use the canonical lowercase hex envelope. Different paths with identical file contents remain distinct items.
+
+The root hash covers `irmind-seal-inventory-items-v2` + NUL, the `u64` count, and every item in strict `(kind, identity)` byte order. Each root item contains the kind, length-prefixed identity and fixed 32-byte item digest. Counts are bounded; duplicates and noncanonical order are invalid. All historical and active artifact manifests participate. The descriptor is not a substitute for those manifests or the case chain.
+
+Verification authenticates the entire ordered audit chain and the separate seal signature, reconstructs the inventory from its signed entries and verified copied-evidence frames, and compares both count and root. A standalone descriptor never verifies a case. Metadata tests exercise 20,000 and 100,000 artifacts, including insertion, removal, reordering and changed bytes. Smaller real-signature archive tests also reject an incorrect root or counter even when signed again with the synthetic analyst key.
+
+## V5 derived-file frames
+
+After the existing operation frames, V5 exports include the complete derived-file set named in the case chain, including historical generations. A `u64` count precedes files in strict relative-path order. Each file has one bounded JSON metadata frame (`path`, `sha256`, `size`) and exactly that many raw bytes. The verifier matches every field to the authenticated artifact manifest and hashes the body in bounded chunks. Missing, duplicate, reordered, changed, extra or truncated files invalidate verification. Original log inclusion remains optional and independent of derived files.
+
+All metadata frames retain the 1 MiB ceiling. Only the historical empty-artifact V5 seed may end at the previous section boundary; a case with artifacts cannot omit the derived-file section. V3/V4 framing and historical golden bytes remain unchanged. Export verification requires only public keys and the expected fingerprint when supplied.
