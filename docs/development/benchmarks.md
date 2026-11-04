@@ -255,4 +255,5 @@ The release-only benchmark compares the current V1 writer with the explicit V2 w
 
 Query samples retain SHA-256 verification and the existing result, sampling, expansion and 10-second limits. Five samples report p50/p95 for term search, entity lookup, neighbors, timeline and path. Endpoint runs compare unfiltered queries, an ordinary host and the final host, which enters signed overflow above the initial 64-host cap. Cloud runs retain the independent HuntEval needles and bounded three-hop worst-path case. Source batches and cases are removed after each scenario. These are benchmarks of synthetic data, not sizing guarantees for arbitrary endpoint logs.
 
-The host-cap recommendation and result tables are filled from the workflow output before production V2 writing is enabled. The hard ceiling remains 1,024. No runtime limit is relaxed by the benchmark.
+The workflow accepts a specific scenario for reproducing a measured failure. A full comparison continues through the remaining workloads if one fails, then returns a failing status; individual query and ingestion targets are unchanged. The host-cap recommendation and result tables are filled from the workflow output before production V2 writing is enabled. The hard ceiling remains 1,024. No runtime limit is relaxed by the benchmark.
+
