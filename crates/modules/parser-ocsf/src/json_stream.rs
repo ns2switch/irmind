@@ -27,7 +27,8 @@ pub(super) fn parse(
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let (mut line, consumed) = bounded_line(&mut reader)?;
+        let (mut line, consumed) =
+            bounded_line(&mut reader, cancel, MAX_SOURCE_BYTES.saturating_sub(offset))?;
         if consumed == 0 {
             return Ok(report);
         }
@@ -36,7 +37,7 @@ pub(super) fn parse(
         if offset > MAX_SOURCE_BYTES {
             return Err(policy_error("OCSF source exceeds 50 GiB"));
         }
-        if line.iter().all(u8::is_ascii_whitespace) {
+        if consumed <= MAX_RECORD_BYTES as u64 && line.iter().all(u8::is_ascii_whitespace) {
             continue;
         }
         if index >= MAX_RECORDS {
@@ -47,7 +48,7 @@ pub(super) fn parse(
             index += 1;
             continue;
         }
-        let parsed = parse_json_value(&mut reader, &mut line, &mut offset)?;
+        let parsed = parse_json_value(&mut reader, &mut line, &mut offset, cancel)?;
         if line.len() > MAX_RECORD_BYTES {
             reject(&mut report, &line);
             index += 1;
@@ -89,6 +90,7 @@ fn parse_json_value(
     reader: &mut impl BufRead,
     line: &mut Vec<u8>,
     offset: &mut u64,
+    cancel: &CancellationToken,
 ) -> Result<Result<Value, serde_json::Error>, AppError> {
     let trimmed = line.trim_ascii();
     let multiline = trimmed == b"{" || trimmed == b"[";
@@ -97,7 +99,8 @@ fn parse_json_value(
         && parsed.as_ref().is_err_and(serde_json::Error::is_eof)
         && line.len() <= MAX_RECORD_BYTES
     {
-        let (next, consumed) = bounded_line(reader)?;
+        let (next, consumed) =
+            bounded_line(reader, cancel, MAX_SOURCE_BYTES.saturating_sub(*offset))?;
         if consumed == 0 {
             break;
         }
@@ -111,10 +114,17 @@ fn parse_json_value(
     Ok(parsed)
 }
 
-fn bounded_line(reader: &mut impl BufRead) -> Result<(Vec<u8>, u64), AppError> {
+fn bounded_line(
+    reader: &mut impl BufRead,
+    cancel: &CancellationToken,
+    remaining: u64,
+) -> Result<(Vec<u8>, u64), AppError> {
     let mut line = Vec::new();
     let mut consumed = 0u64;
     loop {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
         let available = reader
             .fill_buf()
             .map_err(|_| policy_error("cannot read OCSF source"))?;
@@ -131,6 +141,9 @@ fn bounded_line(reader: &mut impl BufRead) -> Result<(Vec<u8>, u64), AppError> {
             .saturating_sub(line.len());
         line.extend_from_slice(&available[..end.min(room)]);
         consumed = consumed.saturating_add(end as u64);
+        if consumed > remaining {
+            return Err(policy_error("OCSF source exceeds 50 GiB"));
+        }
         reader.consume(end);
         if newline {
             return Ok((line, consumed));

@@ -44,7 +44,7 @@ fn signed_v2_manifest_counts_malformed_jsonl_without_dropping_later_records() {
         "events.jsonl".to_owned(),
         irmind_app::ParserSelection {
             parser_id: "parser-json".into(),
-            parser_version: "json-stream-v2".into(),
+            parser_version: "json-stream-v3".into(),
             confidence: 90,
             mode: irmind_domain::ParserSelectionMode::Automatic,
             timestamp_context: None,
@@ -148,7 +148,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
         "cloudtrail.json".to_owned(),
         irmind_app::ParserSelection {
             parser_id: "parser-json".into(),
-            parser_version: "json-stream-v2".into(),
+            parser_version: "json-stream-v3".into(),
             confidence: 90,
             mode: irmind_domain::ParserSelectionMode::Automatic,
             timestamp_context: None,
@@ -420,7 +420,7 @@ fn parallel_batch_signs_sources_in_order_and_reuses_identical_artifact() {
     assert_eq!(
         entries
             .iter()
-            .filter(|e| e.kind == AuditEventKind::SourceManifestV1)
+            .filter(|e| e.kind == AuditEventKind::SourceManifestV2)
             .count(),
         2
     );

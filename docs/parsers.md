@@ -18,6 +18,10 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | DFIR tools | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Format markers or exact CSV headers | Time, host, user, process, action and available entities | experimental |
 | Declarative | CSV, JSON, NDJSON or bounded regex | Exact header, required JSON pointers or sample regex; at most 70% | Explicit mapping described below | experimental |
 
+## Current readers and existing cases
+
+New ingestion uses the current parser version recorded in its signed source manifest. JSON uses `json-stream-v3`. Historical parsing engines are not retained. Existing signed bytes can still be authenticated and exported; to regenerate records from an older reader, create a new case and ingest the verified originals. Reinstall declarative definitions after a reader-version update. See the [changelog](../CHANGELOG.md#known-issue-fixed).
+
 ## Windows coverage
 
 Use processed exports to investigate these artifacts today. All listed modules are experimental and tested with synthetic data. IRMind ingests the exports; it does not run KAPE, EZTools, Velociraptor or plaso, or open their raw binary artifacts itself.

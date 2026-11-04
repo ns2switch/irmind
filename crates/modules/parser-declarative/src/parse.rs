@@ -40,7 +40,10 @@ impl DeclarativeParser {
             if offset > 50 * 1024 * 1024 * 1024 {
                 return Err(error("declarative source exceeds 50 GiB"));
             }
-            if !frame.invalid && frame.bytes.iter().all(u8::is_ascii_whitespace) {
+            if !frame.invalid
+                && frame.consumed <= self.definition.limits.record_bytes as u64
+                && frame.bytes.iter().all(u8::is_ascii_whitespace)
+            {
                 continue;
             }
             if index >= self.definition.limits.records {

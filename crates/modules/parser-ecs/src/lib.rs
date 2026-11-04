@@ -77,7 +77,7 @@ impl LogParser for EcsParser {
 
 impl EventParser for EcsParser {
     fn version(&self) -> &'static str {
-        "ecs-ndjson-v1"
+        "ecs-ndjson-v2"
     }
 
     fn parse_each(
@@ -106,7 +106,7 @@ impl StreamingEventParser for EcsParser {
     }
 
     fn streaming_version(&self) -> &'static str {
-        "ecs-ndjson-v1"
+        "ecs-ndjson-v2"
     }
 
     fn parse_reader(
@@ -170,7 +170,8 @@ fn parse_lines(
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let (line, consumed) = bounded_line(&mut reader)?;
+        let (line, consumed) =
+            bounded_line(&mut reader, cancel, MAX_SOURCE_BYTES.saturating_sub(offset))?;
         if consumed == 0 {
             return Ok(report);
         }
@@ -182,7 +183,7 @@ fn parse_lines(
         if offset > MAX_SOURCE_BYTES {
             return Err(policy_error("ECS source exceeds 50 GiB"));
         }
-        if line.iter().all(u8::is_ascii_whitespace) {
+        if consumed <= MAX_RECORD_BYTES as u64 && line.iter().all(u8::is_ascii_whitespace) {
             index += 1;
             continue;
         }
@@ -212,10 +213,17 @@ fn parse_lines(
     }
 }
 
-fn bounded_line(reader: &mut impl BufRead) -> Result<(Vec<u8>, u64), AppError> {
+fn bounded_line(
+    reader: &mut impl BufRead,
+    cancel: &CancellationToken,
+    remaining: u64,
+) -> Result<(Vec<u8>, u64), AppError> {
     let mut line = Vec::new();
     let mut consumed = 0u64;
     loop {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
         let available = reader
             .fill_buf()
             .map_err(|_| policy_error("cannot read ECS source"))?;
@@ -232,6 +240,9 @@ fn bounded_line(reader: &mut impl BufRead) -> Result<(Vec<u8>, u64), AppError> {
             .saturating_sub(line.len());
         line.extend_from_slice(&available[..end.min(room)]);
         consumed = consumed.saturating_add(end as u64);
+        if consumed > remaining {
+            return Err(policy_error("parser source exceeds 50 GiB"));
+        }
         reader.consume(end);
         if newline {
             return Ok((line, consumed));
@@ -433,3 +444,6 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod completeness_tests;

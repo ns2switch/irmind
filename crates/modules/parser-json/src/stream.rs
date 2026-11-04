@@ -3,6 +3,7 @@ use super::{AppError, GraphRecord, Tainted, normalize_record, parse_record, sha2
 use irmind_app::{CancellationToken, ParseReport};
 use irmind_domain::ParserLocation;
 use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
+use serde_json::error::Category;
 use serde_json::{Map, Value};
 use std::cell::Cell;
 use std::io::{self, BufRead, BufReader, Cursor, Read};
@@ -17,10 +18,14 @@ const MAX_DEPTH: usize = 64;
 struct CountingReader<R> {
     inner: R,
     bytes: Rc<Cell<u64>>,
+    cancel: CancellationToken,
 }
 
 impl<R: Read> Read for CountingReader<R> {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        if self.bytes.get().is_multiple_of(4096) && self.cancel.is_cancelled() {
+            return Err(io::Error::other("JSON parsing cancelled"));
+        }
         let count = self.inner.read(output)?;
         self.bytes
             .set(self.bytes.get().saturating_add(count as u64));
@@ -32,10 +37,14 @@ struct RecordLimitReader<R> {
     inner: R,
     record_bytes: Rc<Cell<usize>>,
     max_record_bytes: usize,
+    active: Rc<Cell<bool>>,
 }
 
 impl<R: Read> Read for RecordLimitReader<R> {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        if !self.active.get() {
+            return self.inner.read(output);
+        }
         let used = self.record_bytes.get();
         let remaining = self.max_record_bytes.saturating_sub(used);
         let allowed = output.len().min(remaining.saturating_add(1));
@@ -62,6 +71,7 @@ struct RecordSink<'a> {
     profile: Option<&'a ParserProfile>,
     record_bytes: Option<Rc<Cell<usize>>>,
     byte_count: Option<Rc<Cell<u64>>>,
+    limit_active: Option<Rc<Cell<bool>>>,
     record_offset: u64,
 }
 
@@ -154,10 +164,17 @@ fn validate_shape(value: &Value) -> Result<(), AppError> {
 
 /// Reads a line while retaining at most one record's worth of bytes. The
 /// remainder of an oversized line is consumed so following records survive.
-fn bounded_line(reader: &mut impl BufRead) -> Result<(Vec<u8>, u64), AppError> {
+fn bounded_line(
+    reader: &mut impl BufRead,
+    prefix_only: bool,
+    cancel: &CancellationToken,
+) -> Result<(Vec<u8>, u64), AppError> {
     let mut line = Vec::new();
     let mut total = 0u64;
     loop {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
         let available = reader
             .fill_buf()
             .map_err(|_| AppError::Policy("cannot read JSON line".into()))?;
@@ -168,14 +185,15 @@ fn bounded_line(reader: &mut impl BufRead) -> Result<(Vec<u8>, u64), AppError> {
             .iter()
             .position(|byte| *byte == b'\n')
             .map_or(available.len(), |index| index + 1);
-        let had_newline = available.get(end.saturating_sub(1)) == Some(&b'\n');
         let room = MAX_STREAM_RECORD_BYTES
             .saturating_add(1)
             .saturating_sub(line.len());
+        let end = if prefix_only { end.min(room) } else { end };
+        let had_newline = available.get(end.saturating_sub(1)) == Some(&b'\n');
         line.extend_from_slice(&available[..end.min(room)]);
         total = total.saturating_add(end as u64);
         reader.consume(end);
-        if had_newline {
+        if had_newline || (prefix_only && line.len() > MAX_STREAM_RECORD_BYTES) {
             break;
         }
     }
@@ -198,12 +216,14 @@ pub(super) fn parse_reader_report(
     emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
     let mut buffered = BufReader::new(reader);
-    let (first, first_len) = bounded_line(&mut buffered)?;
     let explicitly_lines = std::path::Path::new(source)
         .extension()
         .is_some_and(|extension| {
             extension.eq_ignore_ascii_case("jsonl") || extension.eq_ignore_ascii_case("ndjson")
         });
+    // Keep unread document bytes in the reader when the first line exceeds
+    // the sampling bound. Only known line formats may discard an invalid line.
+    let (first, first_len) = bounded_line(&mut buffered, !explicitly_lines, cancel)?;
     let first_value = (first.len() <= MAX_STREAM_RECORD_BYTES)
         .then(|| serde_json::from_slice::<Value>(&first).ok())
         .flatten();
@@ -242,11 +262,11 @@ pub(super) fn parse_reader_report(
         }
         let (line, consumed) = pending
             .take()
-            .map_or_else(|| bounded_line(&mut buffered), Ok)?;
+            .map_or_else(|| bounded_line(&mut buffered, false, cancel), Ok)?;
         if consumed == 0 {
             return Ok(report);
         }
-        if !line.iter().all(u8::is_ascii_whitespace) {
+        if consumed > MAX_STREAM_RECORD_BYTES as u64 || !line.iter().all(u8::is_ascii_whitespace) {
             let candidate = (line.len() <= MAX_STREAM_RECORD_BYTES)
                 .then(|| serde_json::from_slice::<Value>(&line).ok())
                 .flatten();
@@ -300,7 +320,13 @@ impl<'de> Visitor<'de> for RootVisitor<'_, '_> {
         loop {
             self.0.reset_record_limit();
             self.0.start_array_record(first);
-            let Some(value) = seq.next_element::<Value>()? else {
+            if let Some(active) = &self.0.limit_active {
+                active.set(false);
+            }
+            let Some(value) = seq.next_element_seed(LimitedValue(self.0))? else {
+                if let Some(active) = &self.0.limit_active {
+                    active.set(true);
+                }
                 break;
             };
             self.0.accept_json(value)?;
@@ -327,6 +353,22 @@ impl<'de> Visitor<'de> for RootVisitor<'_, '_> {
             self.0.accept_json(Value::Object(object))?;
         }
         Ok(())
+    }
+}
+
+struct LimitedValue<'a, 'b>(&'a mut RecordSink<'b>);
+impl<'de> DeserializeSeed<'de> for LimitedValue<'_, '_> {
+    type Value = Value;
+    fn deserialize<D: de::Deserializer<'de>>(self, deserializer: D) -> Result<Value, D::Error> {
+        // SeqAccess consumes separators and whitespace before entering the
+        // value seed. Its one peeked byte is part of this record's budget.
+        if let Some(bytes) = &self.0.record_bytes {
+            bytes.set(1);
+        }
+        if let Some(active) = &self.0.limit_active {
+            active.set(true);
+        }
+        serde::Deserialize::deserialize(deserializer)
     }
 }
 
@@ -364,6 +406,7 @@ pub(super) fn parse_each(
         profile,
         record_bytes: None,
         byte_count: None,
+        limit_active: None,
         record_offset: 0,
     };
     let mut deserializer = serde_json::Deserializer::from_slice(bytes);
@@ -372,10 +415,12 @@ pub(super) fn parse_each(
             return Err(sink
                 .failure
                 .take()
-                .unwrap_or_else(|| AppError::Storage(format!("invalid JSON record: {error}"))));
+                .unwrap_or_else(|| json_error(&error, cancel)));
         }
-        if deserializer.end().is_ok() {
-            break;
+        match deserializer.end() {
+            Ok(()) => break,
+            Err(error) if error.classify() == Category::Syntax => {}
+            Err(error) => return Err(json_error(&error, cancel)),
         }
     }
     if let Some(profile) = profile {
@@ -393,13 +438,16 @@ pub(super) fn parse_reader(
 ) -> Result<usize, AppError> {
     let record_bytes = Rc::new(Cell::new(0));
     let byte_count = Rc::new(Cell::new(0));
+    let active = Rc::new(Cell::new(true));
     let bounded = RecordLimitReader {
         inner: CountingReader {
             inner: BufReader::new(reader),
             bytes: Rc::clone(&byte_count),
+            cancel: cancel.clone(),
         },
         record_bytes: Rc::clone(&record_bytes),
         max_record_bytes: MAX_STREAM_RECORD_BYTES,
+        active: Rc::clone(&active),
     };
     let mut sink = RecordSink {
         source,
@@ -410,23 +458,40 @@ pub(super) fn parse_reader(
         max_records: MAX_STREAM_RECORDS,
         failure: None,
         profile: None,
-        record_bytes: Some(record_bytes),
+        record_bytes: Some(Rc::clone(&record_bytes)),
         byte_count: Some(byte_count),
+        limit_active: Some(Rc::clone(&active)),
         record_offset: 0,
     };
     let mut deserializer = serde_json::Deserializer::from_reader(bounded);
+    let mut has_peeked_start = false;
     loop {
         sink.reset_record_limit();
+        record_bytes.set(usize::from(has_peeked_start));
+        active.set(true);
         sink.start_record();
         if let Err(error) = Root(&mut sink).deserialize(&mut deserializer) {
             return Err(sink
                 .failure
                 .take()
-                .unwrap_or_else(|| AppError::Storage(format!("invalid JSON record: {error}"))));
+                .unwrap_or_else(|| json_error(&error, cancel)));
         }
-        if deserializer.end().is_ok() {
-            break;
+        // Whitespace between complete roots is streamed without allocating
+        // a record. A peeked first byte belongs to the next record budget.
+        active.set(false);
+        match deserializer.end() {
+            Ok(()) => break,
+            Err(error) if error.classify() == Category::Syntax => has_peeked_start = true,
+            Err(error) => return Err(json_error(&error, cancel)),
         }
     }
     Ok(sink.count)
+}
+
+fn json_error(error: &serde_json::Error, cancel: &CancellationToken) -> AppError {
+    if cancel.is_cancelled() {
+        AppError::Cancelled
+    } else {
+        AppError::Storage(format!("invalid JSON record: {error}"))
+    }
 }

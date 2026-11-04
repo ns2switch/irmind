@@ -4,6 +4,17 @@ use super::{
 };
 
 impl LargeCaseUseCases<'_, '_> {
+    pub(super) fn require_legacy_parser(&self, hash: &str) -> Result<(), AppError> {
+        let source = format!("legacy/{hash}.json");
+        let identity = self.parser.identity_for_source(&source)?;
+        if identity.name != "parser-json" || identity.version != "json-stream-v2" {
+            return Err(AppError::Policy(
+                "legacy parser is unavailable; create a new case and re-ingest originals".into(),
+            ));
+        }
+        Ok(())
+    }
+
     pub fn migrate_legacy(
         &self,
         id: &CaseId,
@@ -47,6 +58,7 @@ impl LargeCaseUseCases<'_, '_> {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
+            self.require_legacy_parser(&hash)?;
             let bytes = self.engine.evidence_store.get_evidence(id, &hash)?;
             let artifacts =
                 self.store
@@ -101,6 +113,7 @@ impl LargeCaseUseCases<'_, '_> {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
+            self.require_legacy_parser(&hash)?;
             let bytes = self.engine.evidence_store.get_evidence(id, &hash)?;
             let mut added = false;
             for artifact in

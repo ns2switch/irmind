@@ -50,190 +50,95 @@ fn missing_legacy_original_keeps_a_verified_read_only_chain() {
 }
 
 #[test]
-fn open_legacy_case_migrates_with_verified_chain_and_v4_export() {
-    let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
-    let signer = Arc::new(LocalSigner {
-        key: SigningKey::from_bytes(&[73u8; 32]),
-        actor: Actor::Analyst,
-    });
-    let parser = Arc::new(JsonParser);
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(
-                signer.clone(),
-                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-            ),
-            Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
-    let case = engine
-        .create_case("legacy", "account 123456789012")
-        .unwrap();
-    let bytes = br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin","sourceIPAddress":"203.0.113.9"}"#;
-    ingest_historical_fixture(
-        store.as_ref(),
-        signer.as_ref(),
-        &case.id,
-        bytes,
-        "legacy.json",
-    );
-    assert_eq!(engine.verify(&case.id).unwrap(), 3);
-    let use_cases = LargeCaseUseCases {
-        engine: &engine,
-        store: store.as_ref(),
-        parser: parser.as_ref(),
-    };
-    assert_eq!(
-        use_cases
-            .migrate_legacy_open(&case.id, &CancellationToken::new())
-            .unwrap(),
-        1
-    );
-    assert_eq!(
-        use_cases
-            .migrate_legacy_open(&case.id, &CancellationToken::new())
-            .unwrap(),
-        0
-    );
-    assert_eq!(engine.verify(&case.id).unwrap(), 6);
-    assert_eq!(
-        use_cases
-            .verify_parquet_rebuild(&case.id, root.path(), &CancellationToken::new())
-            .unwrap(),
-        1
-    );
-    assert!(
-        store
-            .text_search(&case.id, "203.0.113.9", 10)
-            .unwrap()
-            .contains("ConsoleLogin")
-    );
-    engine.seal(&case.id).unwrap();
-    let path = root.path().join("migrated.irmind");
-    irmind_app::export_case(
-        &engine,
-        store.as_ref(),
-        &case.id,
-        &path,
-        &CancellationToken::new(),
-    )
-    .unwrap();
-    let report = verify_export_details(&LocalExportVerifier, &path, None).unwrap();
-    assert_eq!(report.format_version, 4);
-    assert_eq!(report.source_manifests, 0);
-    assert_eq!(report.source_bytes_unavailable, 0);
-}
-
-#[test]
 #[allow(clippy::too_many_lines)]
-fn sealed_legacy_migration_keeps_the_seal_and_exports_signed_operations() {
-    let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
-    let signer = Arc::new(LocalSigner {
-        key: SigningKey::from_bytes(&[74u8; 32]),
-        actor: Actor::Analyst,
-    });
-    let parser = Arc::new(JsonParser);
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(
-                signer.clone(),
-                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+fn retired_reader_cannot_reinterpret_open_or_sealed_history_but_exports_still_verify() {
+    for sealed in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let store = Arc::new(LocalStore::open(root.path()).unwrap());
+        let signer = Arc::new(LocalSigner {
+            key: SigningKey::from_bytes(&[73; 32]),
+            actor: Actor::Analyst,
+        });
+        let engine = Engine::new(
+            EnginePorts::new(
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                CryptoPorts::new(
+                    signer.clone(),
+                    Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+                ),
+                Arc::new(MandatoryGuard::new().unwrap()),
+                Arc::new(JsonParser),
             ),
-            Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
-    let case = engine
-        .create_case("sealed legacy", "account 123456789012")
+            ExecutionMode::Attended,
+            Arc::new(SystemClock),
+        )
         .unwrap();
-    ingest_historical_fixture(store.as_ref(), signer.as_ref(),
-        &case.id,
-        br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin","sourceIPAddress":"203.0.113.9"}"#,
-        "legacy.json",
-    );
-    engine.seal(&case.id).unwrap();
-    let original_seal = store.case_seal(&case.id).unwrap().unwrap();
-    let original_entries = engine.verify(&case.id).unwrap();
-    assert!(store.graph_summary(&case.id).is_err());
-    let use_cases = LargeCaseUseCases {
-        engine: &engine,
-        store: store.as_ref(),
-        parser: parser.as_ref(),
-    };
-    assert_eq!(
-        use_cases
+        let case = engine
+            .create_case("Legacy authenticated history", "local only")
+            .unwrap();
+        ingest_historical_fixture(store.as_ref(), signer.as_ref(), &case.id, br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin","sourceIPAddress":"203.0.113.9"}"#, "legacy.json");
+        if sealed {
+            engine.seal(&case.id).unwrap();
+        }
+        let before = store.entries(&case.id).unwrap();
+        let before_seal = store.case_seal(&case.id).unwrap();
+        let before_operations = store.operations(&case.id).unwrap().len();
+        let large = LargeCaseUseCases {
+            engine: &engine,
+            store: store.as_ref(),
+            parser: &JsonParser,
+        };
+        assert!(
+            large
+                .verify_parquet_rebuild(&case.id, root.path(), &CancellationToken::new())
+                .is_err()
+        );
+        let error = large
             .migrate_legacy(&case.id, &CancellationToken::new())
-            .unwrap(),
-        1
-    );
-    assert_eq!(
-        use_cases
-            .migrate_legacy(&case.id, &CancellationToken::new())
-            .unwrap(),
-        0
-    );
-    assert_eq!(engine.verify(&case.id).unwrap(), original_entries);
-    assert_eq!(
-        store.case_seal(&case.id).unwrap().unwrap().hash,
-        original_seal.hash
-    );
-    assert_eq!(
-        use_cases
-            .verify_parquet_rebuild(&case.id, root.path(), &CancellationToken::new())
-            .unwrap(),
-        1
-    );
-    assert!(
-        store
-            .text_search(&case.id, "203.0.113.9", 10)
-            .unwrap()
-            .contains("ConsoleLogin")
-    );
-    let package = root.path().join("sealed-migrated.irmind");
-    irmind_app::export_case_v4(
-        &engine,
-        store.as_ref(),
-        &case.id,
-        &package,
-        None,
-        false,
-        &CancellationToken::new(),
-    )
-    .unwrap();
-    assert_eq!(
-        verify_export_details(&LocalExportVerifier, &package, None)
-            .unwrap()
-            .format_version,
-        4
-    );
-    let bytes = fs::read(&package).unwrap();
-    let marker = b"sealed-parquet-artifact-v1:";
-    let offset = bytes
-        .windows(marker.len())
-        .position(|part| part == marker)
+            .unwrap_err();
+        assert!(error.to_string().contains("create a new case"));
+        assert_eq!(
+            store
+                .entries(&case.id)
+                .unwrap()
+                .iter()
+                .map(|e| e.hash)
+                .collect::<Vec<_>>(),
+            before.iter().map(|e| e.hash).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            store.case_seal(&case.id).unwrap().map(|s| s.hash),
+            before_seal.map(|s| s.hash)
+        );
+        assert_eq!(store.operations(&case.id).unwrap().len(), before_operations);
+        assert_eq!(engine.verify(&case.id).unwrap(), before.len());
+        if !sealed {
+            engine.seal(&case.id).unwrap();
+        }
+        let path = root.path().join("legacy.irmind");
+        irmind_app::export_case(
+            &engine,
+            store.as_ref(),
+            &case.id,
+            &path,
+            &CancellationToken::new(),
+        )
         .unwrap();
-    let mut changed = bytes;
-    changed[offset + marker.len() - 2] = b'2';
-    let tampered = root.path().join("tampered.irmind");
-    fs::write(&tampered, changed).unwrap();
-    assert!(verify_export_details(&LocalExportVerifier, &tampered, None).is_err());
+        assert_eq!(
+            verify_export_details(&LocalExportVerifier, &path, None)
+                .unwrap()
+                .format_version,
+            3
+        );
+        let mut tampered = fs::read(&path).unwrap();
+        let last = tampered.len() - 1;
+        tampered[last] ^= 1;
+        fs::write(&path, tampered).unwrap();
+        assert!(verify_export_details(&LocalExportVerifier, &path, None).is_err());
+    }
 }
 
 #[test]

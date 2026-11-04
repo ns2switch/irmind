@@ -178,7 +178,7 @@ Context: concurrent per-source writers cannot deterministically allocate signed 
 Context: a mixed-source reconstruction router cannot identify a signed parser from a normalized record alone. Decision: use the additive optional `partition_profile_for_source(source, record)` companion. Its default delegates to the approved closed profile; only the signed-source router resolves the source and fails on an unknown source. Consequences: native implementations remain compatible, routing has no mutable last-source state, and storage does not guess a product dialect. Signed formats and historical builder behavior are unchanged.
 
 
-## Released JSON fast-path reconstruction is lexical
+## Released JSON fast-path reconstruction is lexical (historical through 0.1.5)
 
 Context: parser output must be independent of serde map representation. Published-build feature graphs define the compatibility boundary. [All 23 locked release target graphs](release-json-feature-audit.json) for v0.1.0–v0.1.5 exclude `preserve_order`. In workspace tests, the AWS connector's development-only `aws-smithy-http-client/test-util` enables it; release normal/build edges do not.
 
@@ -195,3 +195,10 @@ Context: precise derived artifacts need an explicit transition that preserves hi
 ## Counted V2 seal inventory and authenticated derived exports
 
 Context: precise cases retain both derived generations, whose metadata belongs to one complete inventory. Decision: use the versioned counted canonical commitment specified in the [migration contract](parquet-v2-migration-contracts.md#bounded-v2-seal-inventory). Recompute it from the authenticated chain; never trust a supplied count or root alone. V5 carries every case-chain derived file in canonical path order and verifies each size and SHA-256 against its signed manifest. Consequences: the 1 MiB metadata-frame ceiling, V1 seal inventory, historical goldens and seal-signature challenge stay unchanged. Tests cover large metadata inventories and real signed packages; canonical/export fuzzing uses AddressSanitizer.
+
+
+## Current parser identities and reconstruction
+
+Context: parser completeness is part of the derived-evidence contract, independently of source hashing and chain authentication. Decision: new JSON ingestions use `json-stream-v3`. The affected ECS, OCSF, Velociraptor, Hayabusa, Chainsaw, plaso and declarative readers use their next identity. Every new ingestion records that identity explicitly in the existing SourceManifestV2 encoding, including directly configured parsers without detector confidence.
+
+Consequences: do not ship historical parsing implementations or reinterpret their identities as current algorithms. Existing chain authentication, original-byte checks and export verification remain available. Rebuilding with a retired parser fails clearly; create a new case and re-ingest verified originals with current readers. Reinstall declarative definitions to approve the new compiler identity. Historical golden bytes remain unchanged; separate fixtures cover current identities. No signed wire encoding, production dependency or port changes.

@@ -47,8 +47,10 @@ fn precise_parquet_physical_bytes_and_envelopes_are_portable() {
     for artifact in prepared.artifacts {
         actual.insert(artifact.path().to_owned(), serde_json::json!({"size": artifact.size(), "sha256": artifact.sha256().as_str(), "envelope": artifact.encode().unwrap()}));
     }
-    let expected: std::collections::BTreeMap<String, serde_json::Value> =
-        serde_json::from_str(include_str!("../fixtures/formats-artifact-v2.json")).unwrap();
+    let expected: std::collections::BTreeMap<String, serde_json::Value> = serde_json::from_str(
+        include_str!("../fixtures/formats-artifact-v2-readers-v3.json"),
+    )
+    .unwrap();
     assert_eq!(actual, expected);
 }
 
@@ -91,7 +93,7 @@ fn partitioned_parquet_physical_bytes_and_envelopes_are_portable() {
         actual.insert(artifact.path().to_owned(), serde_json::json!({"size":artifact.size(),"sha256":artifact.sha256().as_str(),"envelope":artifact.encode().unwrap()}));
     }
     let expected: std::collections::BTreeMap<String, serde_json::Value> = serde_json::from_str(
-        include_str!("../fixtures/formats-artifact-v2-partitions.json"),
+        include_str!("../fixtures/formats-artifact-v2-partitions-readers-v3.json"),
     )
     .unwrap();
     assert_eq!(actual, expected);

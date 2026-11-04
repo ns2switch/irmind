@@ -18,7 +18,7 @@ pub(super) fn validate_sources(
         source.validate().map_err(|_| invalid_source())?;
         let allowed = match source {
             ParquetArtifact::V1(v) => {
-                v.parser_version == "json-stream-v2"
+                v.parser_version == "json-stream-v3"
                     && matches!(
                         v.schema_version.as_str(),
                         "irmind-events-v2"
@@ -95,7 +95,7 @@ pub(super) fn stage(
             path,
             size: 0,
             sha256: zero,
-            parser_version: "json-stream-v2+compact-v1".into(),
+            parser_version: format!("{}+compact-v1", v.parser_version),
             schema_version: v.schema_version.clone(),
             partition_date: v.partition_date.clone(),
             partition_account: v.partition_account.clone(),

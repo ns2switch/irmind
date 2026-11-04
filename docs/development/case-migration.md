@@ -6,7 +6,7 @@ This guide is for analysts and maintainers evaluating precise timestamps in an e
 
 Keep the original logs available. IRMind can use a retained original, a local source directory, or a verified local copy of a cloud object. It does not download cloud originals during this operation. Missing or changed originals stop migration. Keep enough free space for both generations and bounded private staging.
 
-Open the case and run `/migrate --v2` for retained originals, or `/migrate --v2 <original-source-root>` for in-place sources. Review the confirmation. The task runs in the background and supports `/pause`. Historical cases that have only copied evidence and no signed Parquet inventory first use the existing `/migrate` conversion.
+Open the case and run `/migrate --v2` for retained originals, or `/migrate --v2 <original-source-root>` for in-place sources. Review the confirmation. The task runs in the background and supports `/pause`. Migration requires the exact signed parser version. Retired parser versions are unavailable; create a new case and re-ingest verified originals with the current reader. Existing signed bytes still authenticate and export without rebuilding.
 
 For automation, the equivalent is:
 

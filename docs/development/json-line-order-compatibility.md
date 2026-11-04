@@ -10,7 +10,7 @@ In workspace tests, the AWS connector's development-only `aws-smithy-http-client
 
 ## Supported serialization
 
-`json-stream-v2` uses explicit recursive lexicographic object ordering before extraction and serialization on all supported input paths. Array order is preserved. The same bytes and hashes must result with either serde map implementation. Original evidence and deliberately retained raw JSON remain unchanged. Insertion-dependent development artifacts are outside the supported reconstruction contract.
+For releases through v0.1.5, `json-stream-v2` uses explicit recursive lexicographic object ordering before extraction and serialization on all supported input paths. Array order is preserved. The same bytes and hashes must result with either serde map implementation. Original evidence and deliberately retained raw JSON remain unchanged. Insertion-dependent development artifacts are outside the supported reconstruction contract.
 
 ## Parser coverage
 
@@ -24,3 +24,6 @@ In workspace tests, the AWS connector's development-only `aws-smithy-http-client
 | Declarative | Ordered mappings and retained RawValue | Historical bytes |
 
 The `format_goldens` suite runs on the normal test graph and explicitly with `preserve_order`. It reuses the same checked-in fixtures. Add equivalent coverage when another JSON parser is integrated. See [the format rules](json-format-order.md) for reproduction commands.
+
+
+Current ingestion uses `json-stream-v3` with the same explicit lexical ordering. Historical parsing implementations are retired; the [current reader decision](decisions.md#current-parser-identities-and-reconstruction) defines regeneration. The historical golden fixtures and this release feature audit remain unchanged.

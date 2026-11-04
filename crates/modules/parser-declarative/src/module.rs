@@ -52,7 +52,7 @@ impl Module for DeclarativeModule {
 struct Unconfigured;
 impl EventParser for Unconfigured {
     fn version(&self) -> &'static str {
-        "declarative-v1"
+        "declarative-v2"
     }
     fn parse_each(
         &self,
@@ -71,7 +71,7 @@ impl StreamingEventParser for Unconfigured {
         "parser-declarative"
     }
     fn streaming_version(&self) -> &'static str {
-        "declarative-v1"
+        "declarative-v2"
     }
     fn parse_reader(
         &self,

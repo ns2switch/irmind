@@ -384,3 +384,7 @@ fn normalized_json_and_capped_entity_selection_ignore_object_insertion_order() {
 }
 
 mod order;
+
+mod completeness;
+
+mod reader_errors;

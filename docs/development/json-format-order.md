@@ -37,4 +37,7 @@ A changed historical golden is a custody compatibility decision, not a fixture r
 
 ## Released JSON line compatibility
 
-The [release feature audit](json-line-order-compatibility.md#release-audit) checks every shipped target in v0.1.0–v0.1.5. None enabled `preserve_order`. `json-stream-v2` therefore retains lexical order on all paths without a version bump. Development builds that relied on the former insertion-ordered fast path are unsupported; hash mismatches remain verification errors. The alternate-feature job includes NDJSON/single-object regressions and dedicated historical byte checks for ECS, OCSF, DFIR, Linux journald and declarative JSON. Every release build separately rejects `preserve_order` in its normal/build dependency graph.
+The [release feature audit](json-line-order-compatibility.md#release-audit) checks every shipped target in v0.1.0–v0.1.5. None enabled `preserve_order`. For that historical identity, `json-stream-v2` retains lexical order on all paths without a version bump. Development builds that relied on the former insertion-ordered fast path are unsupported; hash mismatches remain verification errors. The alternate-feature job includes NDJSON/single-object regressions and dedicated historical byte checks for ECS, OCSF, DFIR, Linux journald and declarative JSON. Every release build separately rejects `preserve_order` in its normal/build dependency graph.
+
+
+Current ingestions use the versioned readers described in [the reconstruction decision](decisions.md#current-parser-identities-and-reconstruction). Their normalized ordinary records retain these lexical golden bytes.

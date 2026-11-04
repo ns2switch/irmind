@@ -9,6 +9,7 @@ const TO: &str = "2026-10-23T23:59:59Z";
 const URI: &str = "s3://synthetic-audit/AWSLogs/123/a.json";
 
 struct FakeObjectSource {
+    uri: &'static str,
     bytes: Vec<u8>,
     reads: AtomicUsize,
     stream_mode: AtomicUsize,
@@ -18,8 +19,12 @@ struct FakeObjectSource {
 impl FakeObjectSource {
     fn entry(&self) -> ObjectEntry {
         ObjectEntry {
-            uri: URI.into(),
-            key: "AWSLogs/123/a.json".into(),
+            uri: self.uri.into(),
+            key: self
+                .uri
+                .strip_prefix("s3://synthetic-audit/")
+                .unwrap()
+                .into(),
             size: self.bytes.len() as u64,
             modified_unix_seconds: Some(1_792_756_800),
             version: Some("v1".into()),
@@ -123,6 +128,7 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
         .register(Box::new(JsonParser), &ModuleConfig::new())
         .unwrap();
     let source = FakeObjectSource {
+        uri: URI,
         bytes: br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.8"}]}"#.to_vec(),
         reads: AtomicUsize::new(0),
         stream_mode: AtomicUsize::new(0),
@@ -297,6 +303,14 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
         .verify_copied_source(&copied_case.id, &manifest, &CancellationToken::new())
         .unwrap();
     assert!(engine.verify(&copied_case.id).is_ok());
+    let reads = source.reads.load(Ordering::SeqCst);
+    assert_eq!(
+        large
+            .verify_parquet_rebuild(&copied_case.id, root.path(), &CancellationToken::new())
+            .unwrap(),
+        1
+    );
+    assert_eq!(source.reads.load(Ordering::SeqCst), reads);
     engine.seal(&copied_case.id).unwrap();
     let package = root.path().join("copied-cloud.irmind");
     irmind_app::export_case_v4(
@@ -357,6 +371,7 @@ fn cloud_object_without_a_unique_high_confidence_parser_is_not_converted() {
         .register(Box::new(JsonParser), &ModuleConfig::new())
         .unwrap();
     let source = FakeObjectSource {
+        uri: URI,
         bytes: br#"{"unrecognized":"format"}"#.to_vec(),
         reads: AtomicUsize::new(0),
         stream_mode: AtomicUsize::new(0),
@@ -411,3 +426,5 @@ fn cloud_object_without_a_unique_high_confidence_parser_is_not_converted() {
             .any(|entry| { entry.kind == irmind_domain::AuditEventKind::SourceManifestV2 })
     );
 }
+
+mod completeness;

@@ -60,7 +60,7 @@ impl LogParser for HayabusaParser {
 }
 impl EventParser for HayabusaParser {
     fn version(&self) -> &'static str {
-        "hayabusa-json-csv-v1"
+        "hayabusa-json-csv-v2"
     }
     fn parse_each(
         &self,
@@ -86,7 +86,7 @@ impl StreamingEventParser for HayabusaParser {
         "parser-hayabusa"
     }
     fn streaming_version(&self) -> &'static str {
-        "hayabusa-json-csv-v1"
+        "hayabusa-json-csv-v2"
     }
     fn parse_reader(
         &self,
@@ -166,7 +166,7 @@ fn parse_lines(
         if offset > MAX_SOURCE_BYTES {
             return Err(policy("parser source exceeds 50 GiB"));
         }
-        if line.iter().all(u8::is_ascii_whitespace) {
+        if consumed <= MAX_RECORD_BYTES as u64 && line.iter().all(u8::is_ascii_whitespace) {
             index += 1;
             continue;
         }
@@ -390,3 +390,6 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod completeness_tests;

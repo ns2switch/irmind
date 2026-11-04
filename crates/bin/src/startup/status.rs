@@ -56,7 +56,7 @@ fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
         (
             "parser-json",
             cfg!(feature = "parser-json"),
-            "json-stream-v2",
+            "json-stream-v3",
         ),
         (
             "parser-syslog",
@@ -64,31 +64,31 @@ fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
             "syslog-v2",
         ),
         ("parser-linux", cfg!(feature = "parser-linux"), "linux-v1"),
-        ("parser-ecs", cfg!(feature = "parser-ecs"), "ecs-ndjson-v1"),
+        ("parser-ecs", cfg!(feature = "parser-ecs"), "ecs-ndjson-v2"),
         (
             "parser-ocsf",
             cfg!(feature = "parser-ocsf"),
-            "ocsf-stream-v1",
+            "ocsf-stream-v2",
         ),
         (
             "parser-velociraptor",
             cfg!(feature = "parser-velociraptor"),
-            "velociraptor-json-v1",
+            "velociraptor-json-v2",
         ),
         (
             "parser-hayabusa",
             cfg!(feature = "parser-hayabusa"),
-            "hayabusa-json-csv-v1",
+            "hayabusa-json-csv-v2",
         ),
         (
             "parser-chainsaw",
             cfg!(feature = "parser-chainsaw"),
-            "chainsaw-json-v1",
+            "chainsaw-json-v2",
         ),
         (
             "parser-plaso",
             cfg!(feature = "parser-plaso"),
-            "plaso-json-v1",
+            "plaso-json-v2",
         ),
         (
             "parser-eztools",

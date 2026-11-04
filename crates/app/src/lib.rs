@@ -46,6 +46,8 @@ mod adapter_policy_errors;
 pub use adapter_policy_errors::AdapterPolicyError;
 mod fixed_errors;
 mod ingest;
+mod logical_source;
+pub use logical_source::SourceParser;
 mod ingest_options;
 pub use ingest_options::{IngestOptions, command_time_context};
 mod keystore;

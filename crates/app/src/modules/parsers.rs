@@ -60,7 +60,7 @@ impl ParserCatalog {
             _ => self
                 .resolver
                 .as_ref()
-                .ok_or_else(|| AppError::Policy("signed parser version is unavailable".into()))?
+                .ok_or_else(|| AppError::Policy("signed parser version is unavailable; create a new case and re-ingest originals with the current parser".into()))?
                 .resolve(id, version)?,
         };
         if parser.identity().name != id || parser.identity().version != version {
