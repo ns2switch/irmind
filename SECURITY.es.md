@@ -1,4 +1,4 @@
-Traducción de SECURITY.md en el commit e31fd5cc947308542888df4a52164d8892c56b93; si hay diferencias, prevalece la versión en inglés.
+Traducción de SECURITY.md en el commit 8da2130e1c826feb8708ab2882aabe9a6bd06e62; si hay diferencias, prevalece la versión en inglés.
 
 [English source](SECURITY.md)
 
