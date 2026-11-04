@@ -83,6 +83,7 @@ macro_rules! streaming_test_model {
 }
 
 mod artifact_v2_foundation;
+mod artifact_v2_migration;
 mod artifact_v2_reader;
 mod foundation;
 mod test_support;

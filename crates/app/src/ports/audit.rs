@@ -274,3 +274,9 @@ pub fn hex(bytes: &[u8]) -> String {
     }
     out
 }
+
+pub fn sha256_stream(visit: &mut irmind_domain::ByteStream<'_>) -> [u8; 32] {
+    let mut state = Sha256::new();
+    visit(&mut |bytes| state.update(bytes));
+    state.finalize().into()
+}

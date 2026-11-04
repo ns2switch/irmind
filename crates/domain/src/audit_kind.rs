@@ -36,6 +36,7 @@ pub enum AuditEventKind {
     SourceManifestV2,
     ParquetArtifactV1,
     ParquetArtifactV2,
+    ParquetArtifactsMigrated,
     ParserSelectionRequired,
     TaintDeclassified,
     ToolDispatch,
@@ -44,7 +45,7 @@ pub enum AuditEventKind {
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 38] = [
+    pub const ALL: [Self; 39] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -78,6 +79,7 @@ impl AuditEventKind {
         Self::SourceManifestV2,
         Self::ParquetArtifactV1,
         Self::ParquetArtifactV2,
+        Self::ParquetArtifactsMigrated,
         Self::ParserSelectionRequired,
         Self::TaintDeclassified,
         Self::ToolDispatch,
@@ -120,6 +122,7 @@ impl AuditEventKind {
             Self::SourceManifestV2 => "SourceManifestV2",
             Self::ParquetArtifactV1 => "ParquetArtifactV1",
             Self::ParquetArtifactV2 => "ParquetArtifactV2",
+            Self::ParquetArtifactsMigrated => "ParquetArtifactsMigrated",
             Self::ParserSelectionRequired => "ParserSelectionRequired",
             Self::TaintDeclassified => "TaintDeclassified",
             Self::ToolDispatch => "ToolDispatch",
@@ -149,7 +152,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 38] = [
+        const EXPECTED: [&str; 39] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -183,6 +186,7 @@ mod tests {
             "SourceManifestV2",
             "ParquetArtifactV1",
             "ParquetArtifactV2",
+            "ParquetArtifactsMigrated",
             "ParserSelectionRequired",
             "TaintDeclassified",
             "ToolDispatch",

@@ -1,5 +1,7 @@
 use crate::{AuditEventKind, DomainError, EvidenceHash, canonical::put};
 
+mod migration;
+pub use migration::*;
 mod artifact_v2;
 pub use artifact_v2::*;
 mod versioned_artifact;

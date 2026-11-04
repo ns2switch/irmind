@@ -4,6 +4,14 @@ use super::{
 };
 
 impl LargeCaseStore for crate::LocalStore {
+    fn prepare_artifact_migration(
+        &self,
+        request: irmind_app::ArtifactMigrationRequest<'_>,
+        cancel: &CancellationToken,
+    ) -> Result<Box<dyn irmind_app::PreparedArtifactMigration>, AppError> {
+        self.parquet.prepare_artifact_migration(request, cancel)
+    }
+
     fn prepare_local_batch(
         &self,
         request: irmind_app::LocalBatchRequest<'_>,
@@ -21,7 +29,14 @@ impl LargeCaseStore for crate::LocalStore {
     }
 
     fn clean_orphan_spools(&self, case_id: &CaseId) -> Result<usize, AppError> {
-        self.parquet.clean_orphan_spools(case_id)
+        use irmind_app::AuditLog as _;
+        // Validate signatures before using the inventory to protect files.
+        self.signed_parquet_artifacts(case_id)?;
+        let catalog = irmind_app::artifact_catalog(&self.entries(case_id)?)?;
+        let removed = self
+            .parquet
+            .remove_orphaned_migrations(case_id, &catalog.all)?;
+        Ok(removed + self.parquet.clean_orphan_spools(case_id)?)
     }
 
     fn prepare_local(

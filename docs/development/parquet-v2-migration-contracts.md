@@ -40,7 +40,7 @@ The default method reports unsupported migration. It never delegates to V1 prepa
 
 The adapter resolves retained copies or the supplied source root, verifies original hashes and stages deterministic V2 replacements in the case's private directory. URI originals require a verified local source obtained through the existing authorized object-source workflow; the local adapter never introduces a network path. Missing, changed or unavailable originals produce an explicit error.
 
-Preparation verifies staged artifact hashes and reconstruction, record identities/counts and non-time semantics. A change beyond timestamp precision is not part of this migration. Already generic V2 inputs seed the existing signed partition allocation; the same source cannot acquire slots through unsigned work.
+Preparation verifies staged artifact hashes and reconstruction, record identities/counts and non-time semantics. A change beyond timestamp precision is not part of this migration. The precision-only operation keeps each parser ID and version pinned; it does not select parser upgrades automatically. Already generic V2 inputs seed the existing signed partition allocation; the same source cannot acquire slots through unsigned work.
 
 ## Staging lifecycle
 
@@ -84,4 +84,19 @@ The existing seal challenge and analyst fingerprint remain unchanged. The seal m
 - V3/V4 verification remains compatible; V5 verifies without a keystore and rejects malformed or incomplete packages.
 - Extend canonical/export fuzz targets and retain all guard/provenance boundaries.
 
-Default TUI writing switches to V2 only with the completed migration/export implementation. Host/default and 15 GB temporary-disk measurements remain in the subsequent release-profile benchmark work.
+Default TUI writing switches to V2 only after migration/export and the release-profile benchmarks are integrated. Host/default and 15 GB temporary-disk measurements remain in the subsequent release-profile benchmark work.
+
+
+## Bounded canonical migration record
+
+The new record binds complete signed inventories with counted SHA-256 commitments. This keeps one atomic migration within the existing 16 KiB payload ceiling even for cases with thousands of artifacts. Individual source and artifact envelopes remain in the signed chain and are not replaced by these commitments.
+
+After the `irmind-parquet-migration-v1` NUL tag, fields are:
+
+1. Source-set commitment, previous-artifact commitment and replacement-artifact commitment.
+2. Up to 32 parser transitions, sorted uniquely by old ID/version and new ID/version. Each transition carries the commitment to its source subset. Subset counts must cover the source count exactly.
+3. Builder version and time-semantics identifier.
+
+A set commitment is a big-endian `u64` count followed by a length-prefixed lowercase SHA-256. Source-set hashing uses `irmind-migration-sources-v1` + NUL, the count, and length-prefixed source hashes in lexical order. Artifact-set hashing uses `irmind-migration-artifacts-v1` + NUL, the count, and length-prefixed complete canonical artifact payloads ordered by relative path. These are the UTF-8 bytes of the lowercase hex string returned by `ParquetArtifact::encode`, as stored in the signed entry, not the decoded envelope bytes. Including the full envelope distinguishes equal-content files with different signed metadata. Strings and counts use the existing canonical encoding; unknown or trailing bytes are invalid.
+
+The migration directory uses `migration-<previous-artifact-commitment>`. Every replacement keeps bounded supersession references to the previous artifacts of the same source and schema family. The shared lineage interpreter recomputes the complete commitments, validates source/family coverage and parser mapping, and retires paths only after accepting the final analyst record. The independent [golden payload](../../crates/domain/tests/fixtures/parquet-migration-v1.hex) fixes this new encoding without modifying any historical golden.

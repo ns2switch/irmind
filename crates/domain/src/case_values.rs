@@ -79,6 +79,16 @@ impl UtcTimestamp {
 pub struct EvidenceHash(String);
 
 impl EvidenceHash {
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let mut value = String::with_capacity(64);
+        for byte in bytes {
+            value.push(char::from(HEX[usize::from(byte >> 4)]));
+            value.push(char::from(HEX[usize::from(byte & 15)]));
+        }
+        Self(value)
+    }
+
     pub fn parse(value: &str) -> Result<Self, DomainError> {
         if value.len() != 64
             || !value

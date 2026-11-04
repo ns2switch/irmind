@@ -1,3 +1,4 @@
+mod migration;
 use super::command_registry;
 use super::conversation::{Card, CardKind};
 use super::demo_guide::DemoEvent;
@@ -373,6 +374,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                     .rebuild_graph(id, &cancel)
                     .map(|count| format!("Converted {count} copied sources to Parquet"))
             });
+            return Ok(true);
+        }
+        if self.migrate_v2_command(prompt)? {
             return Ok(true);
         }
         if prompt == "/migrate" {

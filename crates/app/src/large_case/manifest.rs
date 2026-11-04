@@ -8,6 +8,7 @@ use irmind_domain::{Actor, SealedParquetMigrationV1, SourceManifestV2};
 pub(crate) fn read_manifest_index(
     entries: &[crate::SignedEntry],
 ) -> Result<ManifestIndex, AppError> {
+    crate::artifact_catalog(entries)?;
     let mut sources = Vec::new();
     let mut artifacts = Vec::new();
     let mut source_hashes = BTreeSet::new();
@@ -90,29 +91,6 @@ fn validate_manifest_links(
         return Err(AppError::InvalidChain(
             entries.last().map_or(0, |entry| entry.seq),
         ));
-    }
-    let legacy_hashes = artifacts
-        .iter()
-        .filter(|a| matches!(a, ParquetArtifact::V1(_)))
-        .flat_map(|a| a.source_hashes().iter())
-        .collect::<BTreeSet<_>>();
-    for artifact in artifacts {
-        if let ParquetArtifact::V2(value) = artifact
-            && (!value.superseded_hashes.is_empty()
-                || value
-                    .source_hashes
-                    .iter()
-                    .any(|h| legacy_hashes.contains(h))
-                || value.source_hashes.iter().any(|hash| {
-                    !parser_selections.values().any(|(selection, _)| {
-                        selection.source.sha256 == *hash
-                            && selection.parser_id == value.parser_id
-                            && selection.parser_version == value.parser_version
-                    })
-                }))
-        {
-            return Err(AppError::InvalidChain(0));
-        }
     }
     for (_, (selection, seq)) in parser_selections {
         if !artifacts.iter().any(|artifact| {

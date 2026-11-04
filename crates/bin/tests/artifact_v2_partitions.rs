@@ -200,3 +200,49 @@ fn a_source_alias_cannot_bypass_explicit_generation_migration() {
     assert_eq!(store.entries(&case.id).unwrap().len(), count);
     engine.verify(&case.id).unwrap();
 }
+
+#[test]
+fn mixed_reconstruction_preserves_allocation_order_across_explicit_migration() {
+    let data = tempfile::tempdir().unwrap();
+    let inputs = tempfile::tempdir().unwrap();
+    let store = Arc::new(LocalStore::open(data.path()).unwrap());
+    let engine = engine(&store);
+    let case = engine
+        .create_case("Interleaved generations", "local only")
+        .unwrap();
+    let v1 = ParquetStore::open(data.path()).unwrap();
+    let v2 = ParquetStore::open_precise(data.path()).unwrap();
+    ingest(&engine,&v1,&case.id,inputs.path(),"old.json",br#"{"eventTime":"2026-11-01T01:00:00.000001Z","eventName":"AssumeRole","recipientAccountId":"111111111111","awsRegion":"eu-west-1"}"#,&JsonParser);
+    let linux = LinuxParser::default();
+    ingest(&engine,&v2,&case.id,inputs.path(),"before.json",br#"{"__REALTIME_TIMESTAMP":"1793494800000100","_HOSTNAME":"before-host","MESSAGE":"before migration"}"#,&linux);
+    LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &JsonParser,
+    }
+    .migrate_artifacts_v2(&case.id, Some(inputs.path()), &CancellationToken::new())
+    .unwrap();
+    ingest(&engine,&v2,&case.id,inputs.path(),"after.json",br#"{"__REALTIME_TIMESTAMP":"1793494800000200","_HOSTNAME":"after-host","MESSAGE":"after migration"}"#,&linux);
+    let mut registry = ModuleRegistry::new();
+    registry
+        .register(Box::new(JsonParser), &ModuleConfig::default())
+        .unwrap();
+    registry
+        .register(Box::<LinuxParser>::default(), &ModuleConfig::default())
+        .unwrap();
+    let router = registry
+        .parser_catalog()
+        .rebuild_router(&store.entries(&case.id).unwrap())
+        .unwrap();
+    assert_eq!(
+        LargeCaseUseCases {
+            engine: &engine,
+            store: store.as_ref(),
+            parser: &router
+        }
+        .verify_parquet_rebuild(&case.id, inputs.path(), &CancellationToken::new())
+        .unwrap(),
+        3
+    );
+    assert_eq!(store.timeline(&case.id, 10).unwrap().len(), 3);
+}

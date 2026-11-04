@@ -126,23 +126,24 @@ impl LargeCaseUseCases<'_, '_> {
                 return Err(AppError::Cancelled);
             }
             let bytes = self.engine.evidence_store.get_evidence(id, hash)?;
-            let mut rebuilt =
-                self.store
-                    .prepare_legacy_evidence(id, hash, &bytes, self.parser, cancel)?;
-            let mut signed = index
-                .artifacts
-                .iter()
-                .filter(|artifact| {
-                    artifact.source_hashes().len() == 1
-                        && artifact.source_hashes()[0].as_str() == hash
-                })
-                .cloned()
-                .collect::<Vec<_>>();
-            rebuilt.sort_by(|left, right| left.path().cmp(right.path()));
-            signed.sort_by(|left, right| left.path().cmp(right.path()));
-            if rebuilt != signed || rebuilt.is_empty() {
-                return Err(AppError::EvidenceMismatch(hash.to_owned()));
-            }
+            let source = irmind_domain::SourceManifestV1 {
+                source: format!("legacy/{hash}.json"),
+                size: bytes.len() as u64,
+                modified_unix_seconds: None,
+                version: None,
+                provider_checksum: None,
+                sha256: irmind_domain::EvidenceHash::parse(hash)
+                    .map_err(|_| AppError::InvalidChain(0))?,
+                copied: true,
+            };
+            self.store.rebuild_compare(
+                id,
+                source_root,
+                &[source],
+                &index.artifacts,
+                self.parser,
+                cancel,
+            )?;
             checked += 1;
         }
         Ok(checked)

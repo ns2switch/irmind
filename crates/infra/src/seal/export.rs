@@ -30,7 +30,9 @@ impl ExportVerifier for LocalExportVerifier {
         path: &Path,
         expected_key: Option<&str>,
     ) -> Result<irmind_app::ExportVerification, AppError> {
-        if is_v4(path)? {
+        if archive_version(path)? == 5 {
+            super::verify_v4::verify_export_v5(path, expected_key)
+        } else if archive_version(path)? == 4 {
             super::verify_v4::verify_export_v4(path, expected_key)
         } else {
             let (analyst_key_fingerprint, entries) = verify_export_expected(path, expected_key)?;
@@ -50,7 +52,11 @@ pub fn verify_export_expected(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<(String, usize), AppError> {
-    if is_v4(path)? {
+    if archive_version(path)? == 5 {
+        let result = super::verify_v4::verify_export_v5(path, expected_key)?;
+        return Ok((result.analyst_key_fingerprint, result.entries));
+    }
+    if archive_version(path)? == 4 {
         let result = super::verify_v4::verify_export_v4(path, expected_key)?;
         return Ok((result.analyst_key_fingerprint, result.entries));
     }
@@ -78,11 +84,17 @@ pub fn verify_export_expected(
     Ok((fingerprint, bundle.audit.len()))
 }
 
-fn is_v4(path: &Path) -> Result<bool, AppError> {
+fn archive_version(path: &Path) -> Result<u32, AppError> {
     let mut file = fs::File::open(path).map_err(storage)?;
     let mut prefix = [0u8; super::export_v4::MAGIC_V4.len()];
     file.read_exact(&mut prefix).map_err(storage)?;
-    Ok(prefix == super::export_v4::MAGIC_V4)
+    Ok(if prefix == super::export_v4::MAGIC_V5 {
+        5
+    } else if prefix == super::export_v4::MAGIC_V4 {
+        4
+    } else {
+        3
+    })
 }
 
 fn read_export_bundle(path: &Path) -> Result<ExportBundle, AppError> {
@@ -114,7 +126,11 @@ fn verify_export_chain(bundle: &ExportBundle, id: &CaseId) -> Result<LocalVerifi
             || entry.seq != index as u64 + 1
             || entry.prev != prev
             || sha256(&entry.canonical()) != entry.hash
-            || entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV2
+            || matches!(
+                entry.kind,
+                irmind_domain::AuditEventKind::ParquetArtifactV2
+                    | irmind_domain::AuditEventKind::ParquetArtifactsMigrated
+            )
         {
             return Err(AppError::InvalidChain(entry.seq));
         }

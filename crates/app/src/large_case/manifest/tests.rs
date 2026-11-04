@@ -90,7 +90,7 @@ fn a_v2_envelope_requires_an_exact_signed_parser_binding_and_no_partial_replacem
                 artifact.encode().unwrap()
             )
         ]),
-        Err(AppError::InvalidChain(0))
+        Err(AppError::InvalidChain(2))
     ));
     artifact.parser_id.clone_from(&source.parser_id);
     artifact.superseded_hashes = vec![EvidenceHash::parse(&"9".repeat(64)).unwrap()];

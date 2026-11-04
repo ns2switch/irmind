@@ -28,6 +28,7 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 | `irmind case scope <CASE_ID> <SCOPE>` | Sign a new scope. |
 | `irmind ingest <CASE_ID> <PATH> [--copy-original]` | Hash originals in place and index JSON as Parquet. Copy originals only when requested. Symlinks are rejected. |
 | `irmind migrate <CASE_ID>` | Verify an open legacy case, convert copied indexed JSON to signed Parquet artifacts, and verify again. |
+| `irmind migrate <CASE_ID> --artifact-v2 [--source-root <PATH>]` | Explicitly upgrade an open case after source and artifact verification; retain the original signed generation. See [case migration](case-migration.md). |
 | `irmind evidence <CASE_ID> <HASH> [--output <PATH>]` | Display or save original evidence. |
 | `irmind findings <CASE_ID>` | List proposed and confirmed findings. |
 | `irmind add-finding <CASE_ID> <KIND> <VALUE> <EVIDENCE_HASH>` | Propose a finding. |

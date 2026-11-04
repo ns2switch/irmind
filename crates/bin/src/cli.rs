@@ -70,6 +70,12 @@ pub(super) enum Command {
     },
     Migrate {
         case_id: String,
+        /// Explicitly upgrade verified artifacts of an open case to V2.
+        #[arg(long)]
+        artifact_v2: bool,
+        /// Resolve originals that were not retained in the case.
+        #[arg(long, requires = "artifact_v2")]
+        source_root: Option<PathBuf>,
     },
     Ask {
         case_id: String,

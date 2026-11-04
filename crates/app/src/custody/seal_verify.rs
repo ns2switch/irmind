@@ -40,7 +40,11 @@ impl Engine<'_> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let manifest = self.evidence_store.evidence_hashes(id)?.join(",");
+        let manifest = crate::seal_inventory(
+            &self.audit_log.entries(id)?,
+            &self.evidence_store.evidence_hashes(id)?,
+        )?
+        .join(",");
         let entry = self.signed_entry(
             id,
             crate::AuditOrigin::Analyst,
@@ -72,7 +76,11 @@ impl Engine<'_> {
             .audit_log
             .last_entry(&id)?
             .ok_or(AppError::InvalidChain(0))?;
-        let manifest = self.evidence_store.evidence_hashes(&id)?.join(",");
+        let manifest = crate::seal_inventory(
+            &self.audit_log.entries(&id)?,
+            &self.evidence_store.evidence_hashes(&id)?,
+        )?
+        .join(",");
         if Some(preview.entry.seq) != last.seq.checked_add(1)
             || preview.entry.prev != last.hash
             || preview.entry.payload != manifest
@@ -167,7 +175,12 @@ impl Engine<'_> {
                 && seal.analyst_key_fingerprint != hex(&sha256(&last.public_key)))
             || last.kind != irmind_domain::AuditEventKind::CaseSealed
             || last.actor != Actor::Analyst
-            || last.payload != self.evidence_store.evidence_hashes(id)?.join(",")
+            || last.payload
+                != crate::seal_inventory(
+                    &self.audit_log.entries(id)?,
+                    &self.evidence_store.evidence_hashes(id)?,
+                )?
+                .join(",")
         {
             return Err(AppError::InvalidChain(last.seq));
         }

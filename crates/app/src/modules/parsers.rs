@@ -91,6 +91,20 @@ impl ParserCatalog {
         let mut sources = BTreeMap::new();
         for entry in entries {
             let (source, id, version) = match entry.kind {
+                AuditEventKind::GraphIndexed => {
+                    let hash = entry
+                        .evidence
+                        .as_deref()
+                        .ok_or(AppError::InvalidChain(entry.seq))?;
+                    if sources.contains_key(&format!("legacy/{hash}.json")) {
+                        continue;
+                    }
+                    (
+                        format!("legacy/{hash}.json"),
+                        "parser-json".to_owned(),
+                        "json-stream-v2".to_owned(),
+                    )
+                }
                 AuditEventKind::SourceManifestV1 => {
                     let manifest = SourceManifestV1::decode(&entry.payload)
                         .map_err(|_| AppError::InvalidChain(entry.seq))?;
@@ -208,6 +222,20 @@ impl StreamingEventParser for RebuildParser {
                 "source has no signed parser selection".into(),
             ))?
             .parse_reader(source, reader, evidence_hash, cancel, emit)
+    }
+
+    fn parse_reader_report(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        evidence_hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
+    ) -> Result<crate::ParseReport, AppError> {
+        self.sources
+            .get(source)
+            .ok_or_else(|| AppError::Policy("source has no signed parser selection".into()))?
+            .parse_reader_report(source, reader, evidence_hash, cancel, emit)
     }
 
     fn parse_local_file_report(

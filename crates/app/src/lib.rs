@@ -84,3 +84,9 @@ pub use report::{EntityDetails, Finding, FindingKind};
 
 #[cfg(test)]
 mod tests;
+
+mod artifact_migration;
+pub use artifact_migration::{
+    ArtifactCatalog, ArtifactCatalogBuilder, ArtifactMigrationRequest, PreparedArtifactMigration,
+    artifact_catalog, seal_inventory,
+};
