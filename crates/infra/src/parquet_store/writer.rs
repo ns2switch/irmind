@@ -204,7 +204,8 @@ impl ArtifactSink {
         if matches!(
             self.kind,
             ArtifactKind::Entities | ArtifactKind::Coobservations
-        ) {
+        ) || (self.partition.scope.is_some() && writer.memory_size() >= super::BATCH_BYTES)
+        {
             writer.flush().map_err(storage)?;
         }
         Ok(())

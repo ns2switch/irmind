@@ -34,11 +34,11 @@ No approved signed layout or golden is changed. The date-only precise builder re
 
 ## 6. Security
 
-The normalization ID is derived from `unicode_normalization::UNICODE_VERSION`; a test pins Unicode 18.0.0 and the approved identifier. Normalization is bounded before and after expansion. Bad source values use typed overflow, retaining actual values. Host tool arguments reject traversal, controls and overflow impersonation; invalid filters never become absent filters. Policy tests deny selectors outside either ceiling. Exact host tests include normalization collisions, overflow and V1 records. Every selected Parquet is hash-verified before scanning.
+The normalization ID is derived from `unicode_normalization::UNICODE_VERSION`; a test pins Unicode 18.0.0 and the approved identifier. Normalization is bounded before and after expansion. Bad source values use typed overflow, retaining actual values. Host tool arguments reject traversal, controls and overflow impersonation; invalid filters never become absent filters. Policy tests deny selectors outside either ceiling. Exact host tests include normalization collisions, overflow and V1 records. Every selected Parquet is hash-verified before scanning. Graph summaries label counts of overflow event files by their signed reason; these are file counts, not a claim about the percentage of events.
 
 ## 7. Storage and signatures
 
-At most four normalized streams are staged beneath the private case spool. Preflight reserves 16 times each source size plus 64 MiB per source, with a further 64 MiB safety margin; writes are bounded by the reservation. This is deliberately conservative and fails before staging when space is insufficient. A streaming hash also binds the normalized spool to the emitted parser records; truncation is detected before publication. RAII handles errors/cancellation; case-open recovery removes orphaned normalized spools. A bounded 16-partition writer pool consolidates revisited segments before publication. The profiler counts normalized streams, segment files and consolidation output at their overlap. **The actual 15 GB temporary-disk peak has not been measured; it belongs to the release benchmark in (e).**
+At most four normalized streams are staged beneath the private case spool. Preflight reserves 16 times each source size plus 64 MiB per source, with a further 64 MiB safety margin; writes are bounded by the reservation. This is deliberately conservative and fails before staging when space is insufficient. A streaming hash also binds the normalized spool to the emitted parser records; truncation is detected before publication. RAII handles errors/cancellation; case-open recovery removes orphaned normalized spools. A bounded 16-partition writer pool also flushes buffered column data at the batch-byte budget and consolidates revisited segments before publication. Historical builders retain their exact flush rules. The profiler counts normalized streams, segment files and consolidation output at their overlap. **The actual 15 GB temporary-disk peak has not been measured; it belongs to the release benchmark in (e).**
 
 ## 8. Quality
 
@@ -50,7 +50,7 @@ The only direct production edge added is `unicode-normalization =0.1.26` for det
 
 ## 10. Debt and remaining work
 
-Complete source-bound mixed-parser replay after approval. Extend cardinality/replay, cancellation and cross-platform evidence before declaring (c) done. No new fuzzing or 15 GB benchmark is claimed in this checkpoint. Legacy host joins use bounded batches and the same query deadline; their cost must be included in later mixed-case measurements. The final host default remains undecided by measurement, initially 64 and never above 1,024.
+Complete source-bound mixed-parser replay after approval. Extend cardinality/replay, cancellation and cross-platform evidence before declaring (c) done. The staging draft currently requires increasing record positions; interleaved Linux audit groups can complete out of order. Finish bounded canonical ordering and add that native regression before enabling or merging (c), without changing parser output or dropping records. No new fuzzing or 15 GB benchmark is claimed in this checkpoint. Legacy host joins use bounded batches and the same query deadline; their cost must be included in later mixed-case measurements. The final host default remains undecided by measurement, initially 64 and never above 1,024.
 
 ## 11. Blocking decision
 
