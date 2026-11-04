@@ -1,0 +1,186 @@
+[
+  {
+    "tag": "v0.1.0",
+    "commit": "aa9cc600ec1fb5ac4ee8485fa0aff08bbc2da040",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.0",
+    "commit": "aa9cc600ec1fb5ac4ee8485fa0aff08bbc2da040",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-pc-windows-msvc",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-pc-windows-msvc -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.0",
+    "commit": "aa9cc600ec1fb5ac4ee8485fa0aff08bbc2da040",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-apple-darwin",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-apple-darwin -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.1",
+    "commit": "2803f083eebb4e3ea21c7b0793073bc7424576ea",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.1",
+    "commit": "2803f083eebb4e3ea21c7b0793073bc7424576ea",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-pc-windows-msvc",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-pc-windows-msvc -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.1",
+    "commit": "2803f083eebb4e3ea21c7b0793073bc7424576ea",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-apple-darwin",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-apple-darwin -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.1",
+    "commit": "2803f083eebb4e3ea21c7b0793073bc7424576ea",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.2",
+    "commit": "6bc9eb7f335d31c2a603566bc8da3a49197bd82d",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.2",
+    "commit": "6bc9eb7f335d31c2a603566bc8da3a49197bd82d",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-pc-windows-msvc",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-pc-windows-msvc -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.2",
+    "commit": "6bc9eb7f335d31c2a603566bc8da3a49197bd82d",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-apple-darwin",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-apple-darwin -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.2",
+    "commit": "6bc9eb7f335d31c2a603566bc8da3a49197bd82d",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.3",
+    "commit": "52bb023515123d5e36efe610799ea420cbfbc93b",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.3",
+    "commit": "52bb023515123d5e36efe610799ea420cbfbc93b",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-pc-windows-msvc",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-pc-windows-msvc -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.3",
+    "commit": "52bb023515123d5e36efe610799ea420cbfbc93b",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-apple-darwin",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-apple-darwin -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.3",
+    "commit": "52bb023515123d5e36efe610799ea420cbfbc93b",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.4",
+    "commit": "53e4d20581a7e945241a239a43aa109d93f4d979",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.4",
+    "commit": "53e4d20581a7e945241a239a43aa109d93f4d979",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-pc-windows-msvc",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-pc-windows-msvc -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.4",
+    "commit": "53e4d20581a7e945241a239a43aa109d93f4d979",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-apple-darwin",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-apple-darwin -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.4",
+    "commit": "53e4d20581a7e945241a239a43aa109d93f4d979",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.5",
+    "commit": "b764f54138d3d6935a74eae5b59f8b2664103d34",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.5",
+    "commit": "b764f54138d3d6935a74eae5b59f8b2664103d34",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "x86_64-pc-windows-msvc",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target x86_64-pc-windows-msvc -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.5",
+    "commit": "b764f54138d3d6935a74eae5b59f8b2664103d34",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-apple-darwin",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-apple-darwin -i serde_json --prefix none",
+    "preserve_order": false
+  },
+  {
+    "tag": "v0.1.5",
+    "commit": "b764f54138d3d6935a74eae5b59f8b2664103d34",
+    "build_command": "cargo build --release -p irmind --locked",
+    "target": "aarch64-unknown-linux-gnu",
+    "tree_command": "cargo tree --locked -p irmind -e normal,build,features --target aarch64-unknown-linux-gnu -i serde_json --prefix none",
+    "preserve_order": false
+  }
+]

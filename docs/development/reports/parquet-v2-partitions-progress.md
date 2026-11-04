@@ -1,73 +1,77 @@
-# Artifact V2 partitions: implementation review checkpoint
+# Artifact V2 partitions: step (c) report
 
-This report is for the analyst reviewing step (c). This is an unfinished draft, not a completion or merge request.
+This report is for the analyst reviewing [PR #170](https://github.com/ns2switch/irmind/pull/170). It covers generic partitions and the approved JSON compatibility correction. Migration/export V5 and release-scale benchmarks remain separate steps.
 
 ## 1. Summary
 
-The approved contract document is merged in [PR #169](https://github.com/ns2switch/irmind/pull/169). [Main CI passed](https://github.com/ns2switch/irmind/actions/runs/41787683760). Step (c) has a separately tested implementation draft. The approved source-aware callback and bounded canonical ordering are implemented. A new golden exposed historical JSON fast-path dependence on the serde map feature; a separate compatibility decision is required before further changes. Production CLI/TUI writing remains V1; migration/export V5 and release benchmarks are not implemented here.
+Step (c) implements the [approved partition contracts](../parquet-v2-partition-contracts.md) and source-aware replay. Normalization, deterministic allocation, bounded staging/sorting, overflow and checked host queries share the existing custody path. The release audit permits retaining `json-stream-v2`: its fast path now explicitly reproduces released lexical bytes. Default CLI/TUI sessions still write V1 until step (d) integrates migration/export V5.
 
 ## 2. Milestones
 
-| Milestone | State relevant to this change | Completion evidence |
-| --- | --- | --- |
-| H0 | Existing gates retained | Dependency direction is part of the passing local suite. |
-| H1 | Additive checked host selector | Invalid values and both scope ceilings tested; existing wire goldens pass. |
-| H2 | Approved batch/profile additions implemented | Local/object ingestion share preparation; signed source-bound replay tested. |
-| H3 | Existing guard retained | No new path sends parsed or indexed text directly to the model. |
-| H4 | Existing custody retained | Existing source, audit, signature and seal encodings unchanged. |
-| H5 | Existing analyst acceptance retained | No model/provider/default changes. |
-| H6 | Host option added | Uses ordinary graph commands and checked scope, with no new presentation use case. |
-| H7 | Existing delivered milestone retained | Artifact-V2 enhancement incomplete; no new performance claim. |
-| H8 | Existing modules retained | No remote product module or credential added. |
+| Milestone | Change and evidence |
+| --- | --- |
+| H0 | Existing dependency-direction and quality gates retained; release JSON isolation gate added. |
+| H1 | Checked host selectors, unchanged signed encodings, shared stable event ordering. |
+| H2 | Approved additive batch/profile and source-aware callbacks; native mixed-parser replay tested. |
+| H3 | No guard bypass or new untrusted-to-model route; invalid filters fail closed. |
+| H4 | Signed history controls allocation; explicit migration required to change a source generation. |
+| H5 | Existing analyst acceptance unchanged; no provider or default configuration changes. |
+| H6 | Existing graph commands accept the checked host field; no new presentation use case. |
+| H7 | Generic V2 partition enhancement implemented; release-scale host/default measurements remain step (e). |
+| H8 | Existing modules retained; no remote connector or credential added. |
 
 ## 3. Structure
 
-The application owns the batch contract and closed profiles. Native parser modules declare their capability. Infra owns normalization, allocation, staging, segment consolidation and scans in real private modules. It has no production dependency on another adapter or the security implementation. Existing tests still exercise the dependency direction.
+Application contracts own the closed profiles, checked batch and signed-source router. Parser modules declare their own capabilities. Infra owns private normalization, staging, bounded external ordering, allocation, segment consolidation and scans in real modules. No adapter depends on another adapter. The ordinary suite includes the dependency-direction test.
 
 ## 4. Types and ports
 
-Implemented draft: additive `LargeCaseStore::prepare_local_batch`, checked `LocalBatchRequest`/`PartitionLimits`, optional `StreamingEventParser::partition_profile`, and `GraphQueryFilter::parse_with_host`/`host`. Existing methods retain their signatures. The analyst-approved optional `partition_profile_for_source(source, record)` is implemented with a compatible default. The signed parser router rejects unknown sources; native modules keep their own profiles. No other port change is implemented.
+The analyst approved `LargeCaseStore::prepare_local_batch`, `LocalBatchRequest`, `PartitionLimits`, optional `StreamingEventParser::partition_profile`, its source-aware optional companion, and `GraphQueryFilter::parse_with_host`/`host`. Existing methods keep their signatures. Unknown replay sources are errors, with no mutable last-source routing state. No further port expansion is introduced here.
 
-## 5. Design deviations
+## 5. Compatibility decisions
 
-No approved signed layout or golden is changed. The date-only precise builder retains its historical host mapping and replay. The partitioned builder has its own revision. The previously requested source-aware companion is approved and implemented, without shared mutable routing or a storage-side format selector. The new reproducibility test identified a pre-existing JSON normalization difference, also affecting historical V1. The [compatibility proposal](https://github.com/ns2switch/irmind/blob/feat/parquet-v2-partitions/docs/development/json-line-order-compatibility.md) is not implemented; normalized historical output has not been altered.
+The [audit](../release-json-feature-audit.json) checks **23 exact locked release target graphs** from v0.1.0 through v0.1.5; none enabled `serde_json/preserve_order`. The AWS SDK's development-only HTTP test utility activates it in workspace tests. Following the analyst's decision, `json-stream-v2` remains lexical on every path. No insertion reader or new parser version is created. Unsupported development artifacts that depended on insertion order fail reconstruction against their signed hashes.
+
+The new physical-byte regression is retained. No pre-existing fixture/golden is modified. The date-only precise builder keeps its historical mapping and flush behavior; generic partitions use their own builder revision. Source aliases cannot silently switch builder/parser generation. [Full evidence and parser audit](../json-line-order-compatibility.md).
 
 ## 6. Security
 
-The normalization ID is derived from `unicode_normalization::UNICODE_VERSION`; a test pins Unicode 18.0.0 and the approved identifier. Normalization is bounded before and after expansion. Bad source values use typed overflow, retaining actual values. Host tool arguments reject traversal, controls and overflow impersonation; invalid filters never become absent filters. Policy tests deny selectors outside either ceiling. Exact host tests include normalization collisions, overflow and V1 records. Every selected Parquet is hash-verified before scanning. Graph summaries label counts of overflow event files by their signed reason; these are file counts, not a claim about the percentage of events.
+Normalization derives its policy ID from `unicode_normalization::UNICODE_VERSION`; a test pins Unicode 18.0.0 and the approved identifier. Input/output expansion is bounded. Invalid source values use typed overflow and keep actual values. Host arguments reject paths, controls and overflow impersonation, cannot exceed either scope ceiling and never become an absent filter on failure. Exact matching includes overflow, normalization collisions and legacy rows. Selected Parquet files are hash-verified. Existing query sampling, expansion, result and time limits remain intact. Overflow summaries count signed event files, not an inferred percentage of events.
 
 ## 7. Storage and signatures
 
-At most four normalized streams are staged beneath the private case spool. Preflight reserves 16 times each source size plus 64 MiB per source, with a further 64 MiB safety margin; writes are bounded by the reservation. This is deliberately conservative and fails before staging when space is insufficient. A streaming hash also binds the normalized spool to the emitted parser records; truncation is detected before publication. RAII handles errors/cancellation; case-open recovery removes orphaned normalized spools and owned reconstruction workspaces. Reconstruction workspaces are now case-local. Recovery rejects a symlink in place of an owned workspace. A bounded 16-partition writer pool also flushes buffered column data at the batch-byte budget and consolidates revisited segments before publication. Out-of-order completed groups use a bounded, hash-checked external merge sort, with two readers and at most 64 run levels. Ordered input avoids that pass. Sorting stays inside the private case spool and preflights an additional twice the largest staged source plus 64 MiB. Historical builders retain their exact flush rules. The profiler counts normalized streams, segment files and consolidation output at their overlap. **The actual 15 GB temporary-disk peak has not been measured; it belongs to the release benchmark in (e).**
+At most four normalized sources are staged privately below the case spool. Preflight reserves 16 times each input plus 64 MiB per source and another 64 MiB margin; writes cannot exceed the reservation. Only out-of-order sources require external sorting. Sorting preflights another twice the largest staged stream plus 64 MiB, uses bounded chunks, two readers and at most 64 run levels. Every intermediate stream is hash/size/count checked. Cancellation checks remain between rows and batches.
+
+A bounded 16-partition writer pool flushes at the byte budget and consolidates revisited segments. RAII removes temporary files on success/error/cancellation. Case-open recovery removes owned orphaned normalized/reconstruction workspaces and rejects symlink substitutes. Allocations are derived only from verified signed history and canonical source/record order; cancelled work consumes no signed slots. Tests cover native interleaved Linux audit completion, cancellation/retry and generation aliases.
+
+The profiler tracks logical overlapping normalized/sort/segment/merge bytes. **The actual 15 GB temporary-disk peak has not been measured in this PR**; it must be reported with release benchmarks in step (e). Host starts at 64, with the unchanged hard ceiling of 1,024; measurement decides the final default.
 
 ## 8. Quality
 
-Local Linux results are explicit, not a declaration of completion:
-
-| Check | Result |
+| Check | Local result |
 | --- | --- |
-| rustfmt | Passed after the implementation changes. |
-| Clippy, workspace/all-features/all-targets, `-D warnings` | Passed. |
-| Workspace suite excluding the unchanged demo PTY binary | **511 passed, 1 failed, 8 existing skips** in 152.390 s. The sole failure is the newly added physical-byte golden under the workspace's `preserve_order` feature graph. |
-| Earlier full run including PTYs | All 12 demo PTYs passed. A new native-cloud partition assertion failed, then was corrected and passed in the subsequent run. This is not a final full-suite pass. |
-| Format tests | The new physical-byte golden passed in the package-only default graph. With explicit `preserve_order`: **9 passed, 1 failed, 0 skipped**, 1.450 s. The failure is the new golden; the eight existing goldens remain unchanged and pass. |
-| Final infra suite | **101 passed, 4 existing skips** in 53.149 s; includes orphan recovery and symlink rejection. |
-| Documentation | Passed, with the pre-existing stale `SECURITY.es.md` warning. |
+| rustfmt and workspace/all-features/all-targets Clippy `-D warnings` | Passed. |
+| Complete workspace suite including demo PTYs | **537 passed, 0 failed, 8 existing manual/benchmark skips**, 442.116 s; includes all demo PTYs. The subsequently added V1 physical-hash assertion also passes in both final format runs. |
+| Explicit preserve-order format suite | **20 passed, 0 failed**, 1.569 s; the same 20 pass without the feature in 1.380 s. Includes the pre-fix released-graph V1 physical-hash assertion. |
+| JSON module with explicit preserve-order | 18 passed, including nested/raw wrappers, arrays and capped extraction. |
+| Release-gate unit checks | 3 passed; the current normal/build graphs also pass the actual guard. |
+| Cargo-deny | Advisories, bans, licenses and sources pass; existing duplicate warnings remain. |
+| Documentation checks | Pass, with the pre-existing stale `SECURITY.es.md` warning. |
 
-The last published head before this update, `58f7151`, passed [CI](https://github.com/ns2switch/irmind/actions/runs/41794152019): Linux 7m38s, macOS 6m06s, Windows 9m36s and alternate-format checks 2m40s. Those results do not validate the newer changes or the newly exposed regression. No required test is disabled to obtain a green check. Cargo-deny passed on the earlier draft; it has not been rerun for this checkpoint.
+The explicit alternate-feature job runs NDJSON and single-object routes and dedicated historical-byte tests for ECS, OCSF, Velociraptor, Chainsaw, plaso, journald and declarative JSON. Zeek and Suricata modules are absent from this workspace, so no coverage is claimed for them. Final remote CI and merge evidence belong to the PR's checks and completion comment; an older green commit does not validate newer code.
 
 ## 9. External dependencies
 
-The only direct production edge added is `unicode-normalization =0.1.26` for deterministic NFKC. The package is already locked through security; its license is `(MIT OR Apache-2.0) AND Unicode-3.0`. Package counts are unchanged: workspace **565 → 565**, fuzz workspace **308 → 308**. No new package, unsafe block, network client or credential is added.
+The sole direct production edge added by partitions is the already approved `unicode-normalization =0.1.26` for NFKC; it was already locked through security. Workspace packages remain **565 → 565**, fuzz workspace **308 → 308**. This JSON correction adds no package. No new unsafe block, network client or credential is introduced. AWS test utilities remain development-only; every release build job rejects a shipped `preserve_order` feature.
 
 ## 10. Debt and remaining work
 
-The callback and interleaved Linux audit regression are implemented. Sources sharing a hash cannot silently switch parser/builder generation through a different filename; tests require explicit migration. Bounded sorting and native mixed-parser reconstruction pass locally. The historical JSON fast-path issue blocks reproducibility and must be resolved before (c) can merge. No new fuzzing or 15 GB benchmark is claimed. Legacy host joins use bounded batches and the same query deadline; their cost remains part of later mixed-case measurements. The final host default remains undecided by measurement, initially 64 and never above 1,024.
+No new fuzzing or 15 GB performance result is claimed here. Legacy host joins keep bounded batches and the existing deadline; their cost belongs to mixed-case benchmarks. Step (d) must add explicit open-case migration/export V5 before enabling default V2 writing. Step (e) must measure disk peaks, cloud/endpoint/network host cardinalities and query latency, retaining the hard caps. No control is relaxed for a test.
 
-## 11. Blocking decision
+## 11. Decisions and blockers
 
-Approve the [JSON compatibility correction](https://github.com/ns2switch/irmind/blob/feat/parquet-v2-partitions/docs/development/json-line-order-compatibility.md): a canonical new JSON parser version, plus historical replay accepted only when its complete output matches the signed artifacts. The source-aware partition callback needs no further approval. The earlier instruction requires asking before changing historical hash-dependent behavior, so no JSON fast-path normalization fix has been applied.
+The source-aware callback and release-only lexical JSON reconstruction decisions are approved and implemented. No further analyst decision is requested for this correction. Merge requires green checks on the current PR head and a green main run afterward, following the normal process. Any future departure from the approved migration or signed envelope still requires prior review.
 
 ## 12. Next step
 
-After the compatibility decision, implement and test that correction without changing signed wire encodings or historical goldens, complete required CI and merge (c) through the normal gates. Then implement explicit open-case migration/export V5 in its own PR, followed by release-only cloud and host-cardinality benchmarks. Enable default TUI V2 writing only after (c) and (d) are integrated.
+Integrate step (c) only after current-head CI passes. Then implement explicit open-case migration/export V5 in its own PR and release benchmarks in the following PR. Keep V1 as the default writer until both (c) and (d) are integrated.

@@ -444,3 +444,6 @@ fn linux_signed_and_reconstructed_format_goldens_are_unchanged() {
 
 #[path = "support/indexed_parser_contracts.rs"]
 mod indexed_parser_contracts;
+
+#[path = "support/json_order_contracts.rs"]
+mod json_order_contracts;

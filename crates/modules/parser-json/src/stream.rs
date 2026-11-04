@@ -252,13 +252,10 @@ pub(super) fn parse_reader_report(
                 .flatten();
             let record = candidate.and_then(|value| {
                 validate_shape(&value).ok()?;
-                parse_record(
-                    source,
-                    evidence_hash,
-                    report.accepted,
-                    &normalize_record(value),
-                )
-                .ok()
+                let mut value = normalize_record(value);
+                // Match released lexical extraction and bytes, including nested maps.
+                value.sort_all_objects();
+                parse_record(source, evidence_hash, report.accepted, &value).ok()
             });
             if let Some(record) = record {
                 let location = ParserLocation::new(source, "parser-json", offset)
