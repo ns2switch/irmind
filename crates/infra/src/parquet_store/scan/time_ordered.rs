@@ -4,14 +4,16 @@ use super::{
     AppError, Instant, ParquetStore, RecordBatch, ScanSpec, ScanStatus, projection, row_filter,
     row_group_matches, rules_for_artifact, storage,
 };
-use irmind_app::IndexedInstant;
+mod keys;
 use parquet::arrow::arrow_reader::{
     ArrowReaderMetadata, ArrowReaderOptions, ParquetRecordBatchReaderBuilder,
 };
 use std::collections::BTreeMap;
 
-#[derive(Clone, Copy)]
-pub(in crate::parquet_store) struct TimeCutoff(pub(in crate::parquet_store) Option<IndexedInstant>);
+#[derive(Clone)]
+pub(in crate::parquet_store) struct TimeCutoff(
+    pub(in crate::parquet_store) super::super::time_cell::TimeCell,
+);
 
 impl ParquetStore {
     pub(in crate::parquet_store) fn scan_time_ordered_file(
@@ -41,7 +43,9 @@ impl ParquetStore {
                 .map_err(storage)?;
         let columns = super::required_columns(&spec, precise);
         for (bound, group) in groups {
-            if cutoff.is_some_and(|c| bound.cannot_beat(c.0, newest)) {
+            if cutoff.as_ref().is_some_and(|c| {
+                bound.cannot_beat(c.0.time.map(irmind_app::IndexedTime::instant), newest)
+            }) {
                 break;
             }
             if spec.cancel.is_cancelled() {
@@ -49,6 +53,13 @@ impl ParquetStore {
             }
             if Instant::now() >= spec.deadline {
                 return Ok(ScanStatus::Deadline);
+            }
+            if !precise
+                && let Some(cutoff) = &cutoff
+                && bound == TimeBound::Known(cutoff.0.time.map(irmind_app::IndexedTime::instant))
+                && keys::cannot_beat(&file, &metadata, &spec, names, group, &cutoff.0)?
+            {
+                continue;
             }
             let reader = group_reader(&file, &metadata, &columns, &rules, group)?;
             for batch in reader {

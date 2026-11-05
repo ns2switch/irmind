@@ -46,7 +46,9 @@ impl QueryStore<'_> {
         limit: usize,
         newest: bool,
     ) -> Result<Vec<EventHit>, AppError> {
-        let files = self.store.time_ordered_artifacts(&spec, newest)?;
+        let files = self
+            .store
+            .time_ordered_artifacts(&spec, newest, self.source_names)?;
         let precise = spec
             .artifacts
             .iter()
@@ -65,11 +67,8 @@ impl QueryStore<'_> {
             }
             let cutoff = (hits.len() >= limit)
                 .then(|| {
-                    hits.last().map(|h| {
-                        super::super::scan::TimeCutoff(
-                            h.time.time.map(irmind_app::IndexedTime::instant),
-                        )
-                    })
+                    hits.last()
+                        .map(|h| super::super::scan::TimeCutoff(h.time.clone()))
                 })
                 .flatten();
             let status = self.store.scan_time_ordered_file(
@@ -87,11 +86,8 @@ impl QueryStore<'_> {
                     }
                     ordered(&mut hits, limit, newest)?;
                     Ok(if hits.len() >= limit {
-                        hits.last().map(|h| {
-                            super::super::scan::TimeCutoff(
-                                h.time.time.map(irmind_app::IndexedTime::instant),
-                            )
-                        })
+                        hits.last()
+                            .map(|h| super::super::scan::TimeCutoff(h.time.clone()))
                     } else {
                         None
                     })
