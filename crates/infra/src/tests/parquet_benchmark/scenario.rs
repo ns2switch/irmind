@@ -4,6 +4,7 @@ pub(super) struct Scenario {
     pub(super) precise: bool,
     pub(super) hosts: Option<usize>,
     pub(super) source_bytes: usize,
+    pub(super) chronological: bool,
 }
 
 impl Scenario {
@@ -18,27 +19,41 @@ impl Scenario {
         assert!(matches!(parts.get(1), Some(&"v1" | &"v2")));
         let hosts = (parts[0] == "endpoint").then(|| parts[2].parse::<usize>().unwrap());
         assert!(hosts.is_none_or(|n| [1, 64, 1024, 1025].contains(&n)));
-        assert_eq!(parts.len(), if hosts.is_some() { 3 } else { 2 });
+        let chronological = parts.last() == Some(&"chronological");
+        assert_eq!(
+            parts.len(),
+            if hosts.is_some() {
+                3 + usize::from(chronological)
+            } else {
+                2
+            }
+        );
         Self {
             precise: parts[1] == "v2",
             hosts,
             source_bytes: 1_045_000,
+            chronological,
         }
     }
 
     pub(super) fn name(&self) -> String {
         let version = if self.precise { 2 } else { 1 };
-        self.hosts.map_or_else(
+        let mut name = self.hosts.map_or_else(
             || format!("cloud-v{version}"),
             |n| format!("endpoint-v{version}-{n}"),
-        )
+        );
+        if self.chronological {
+            name.push_str("-chronological");
+        }
+        name
     }
 
     pub(super) fn source(&self, file: usize, multiplier: usize) -> String {
         if let Some(hosts) = self.hosts {
             let mut lines = String::new();
             let mut record = 0;
-            while lines.len() < self.source_bytes {
+            while lines.len() < self.source_bytes * if self.chronological { multiplier } else { 1 }
+            {
                 let sequence = file * 1000 + record;
                 // One endpoint per file; the 24/25 additional hosts share the
                 // first 24/25 files so every 1,024/1,025-host corpus is complete.
@@ -59,7 +74,11 @@ impl Scenario {
                 lines.push('\n');
                 record += 1;
             }
-            return lines.repeat(multiplier);
+            return if self.chronological {
+                lines
+            } else {
+                lines.repeat(multiplier)
+            };
         }
         let records = representative_records(file);
         let body = std::iter::repeat_n(records.as_str(), multiplier)
@@ -107,5 +126,30 @@ fn endpoint_corpora_have_their_declared_number_of_hosts() {
             }
         }
         assert_eq!(seen.len(), hosts);
+    }
+}
+
+#[test]
+fn chronological_endpoint_sources_do_not_reset_their_timestamps() {
+    for chronological in [false, true] {
+        let scenario = Scenario {
+            chronological,
+            source_bytes: 2048,
+            ..Scenario::named("endpoint-v2-64")
+        };
+        let text = scenario.source(0, 15);
+        let times = text
+            .lines()
+            .map(|line| {
+                let v: serde_json::Value = serde_json::from_str(line).unwrap();
+                v["__REALTIME_TIMESTAMP"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(times.windows(2).all(|w| w[0] <= w[1]), chronological);
+        assert!(text.len() >= 2048 * 15);
     }
 }
