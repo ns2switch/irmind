@@ -8,6 +8,7 @@ import math
 import re
 import subprocess
 import time
+from threading import Timer
 import zipfile
 from pathlib import Path
 
@@ -35,16 +36,34 @@ FIELDS = {
 }
 
 
+def download(endpoint):
+    with subprocess.Popen(
+        ["gh", "api", f"repos/{REPO}/{endpoint}"],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    ) as process:
+        timer = Timer(60, process.kill)
+        timer.daemon = True
+        timer.start()
+        try:
+            if process.stdout is None:
+                raise RuntimeError("benchmark download has no output stream")
+            data = process.stdout.read(MAX_ARCHIVE + 1)
+            if len(data) > MAX_ARCHIVE:
+                raise RuntimeError("benchmark download limit exceeded")
+            return process.wait(timeout=60), data
+        finally:
+            timer.cancel()
+            timer.join()
+            if process.poll() is None:
+                process.kill()
+            process.wait()
+
+
 def fetch(endpoint):
     for attempt in range(2):
-        result = subprocess.run(
-            ["gh", "api", f"repos/{REPO}/{endpoint}"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
-        )
-        if len(result.stdout) > MAX_ARCHIVE:
-            raise RuntimeError("benchmark download limit exceeded")
-        if result.returncode == 0:
-            return result.stdout
+        status, data = download(endpoint)
+        if status == 0:
+            return data
         if attempt == 0:
             time.sleep(1)
     raise RuntimeError("cannot fetch bounded benchmark metadata or artifact")

@@ -4,7 +4,7 @@ import io
 import json
 import unittest
 import zipfile
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import collect_parquet_pairs as collector
 
@@ -21,6 +21,16 @@ class MetricCollection(unittest.TestCase):
         for line in [b"PARQUET_QUERY scenario=../invalid", b"PARQUET_QUERY p95_seconds=nan", b"PARQUET_QUERY p95_seconds=-1", b"PARQUET_QUERY errors=-1", b"PARQUET_COLD_QUERY error=unknown"]:
             with self.subTest(line=line), self.assertRaises(ValueError):
                 collector.parse_log(line)
+
+    def test_raw_download_stops_at_the_byte_limit(self):
+        process = MagicMock()
+        process.__enter__.return_value = process
+        process.stdout.read.return_value = b"123"
+        process.poll.return_value = None
+        with patch.object(collector, "MAX_ARCHIVE", 2), patch.object(collector.subprocess, "Popen", return_value=process), self.assertRaisesRegex(RuntimeError, "limit exceeded"):
+            collector.download("actions/artifacts/1/zip")
+        process.stdout.read.assert_called_once_with(3)
+        process.kill.assert_called()
 
     def test_archive_member_and_expanded_size_are_bounded(self):
         for name, payload in [("../unexpected", b"x"), ("benchmark-pair-baseline.txt", b"x" * 33)]:
