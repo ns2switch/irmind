@@ -21,62 +21,10 @@ impl ParquetStore {
         let mut allocator = Allocator::from_signed(request.committed_artifacts, request.limits)?;
         let inputs =
             self.staging_inputs(request.case_id, request.source_root, request.relative_paths)?;
-        let mut staged = std::thread::scope(|scope| {
-            let workers = inputs
-                .into_iter()
-                .map(|input| {
-                    scope.spawn(|| {
-                        self.stage_source(
-                            request.case_id,
-                            input,
-                            request.parser,
-                            request.copy_original,
-                            cancel,
-                        )
-                    })
-                })
-                .collect::<Vec<_>>();
-            // Join all workers even on failure, before removing their private files.
-            let joined = workers
-                .into_iter()
-                .map(|w| w.join().map_err(|_| invalid_source())?)
-                .collect::<Vec<_>>();
-            joined.into_iter().collect::<Result<Vec<_>, _>>()
-        })?;
-        {
-            let _sort = self
-                .profile
-                .as_ref()
-                .map(|p| p.measure(super::super::PartitionPhase::Sort));
-            self.sort_staged_sources(request.case_id, &mut staged, cancel)?;
-        }
-        let mut normalized_bytes = staged.iter().try_fold(0u64, |n, s| {
-            Ok::<_, AppError>(
-                n.saturating_add(s.spool.as_file().metadata().map_err(storage)?.len()),
-            )
-        })?;
-        if let Some(profile) = &self.profile {
-            profile.record_staging_peak(normalized_bytes);
-        }
-        let mut prepared = Vec::new();
-        for source in staged {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            let bytes = source.spool.as_file().metadata().map_err(storage)?.len();
-            prepared.push(self.write_partition_source(
-                request,
-                source,
-                &mut allocator,
-                cancel,
-                normalized_bytes,
-            )?);
-            normalized_bytes = normalized_bytes.saturating_sub(bytes);
-        }
-        Ok(prepared)
+        self.prepare_ordered_sources(request, inputs, &mut allocator, cancel)
     }
 
-    fn write_partition_source(
+    pub(super) fn write_partition_source(
         &self,
         request: &LocalBatchRequest<'_>,
         mut source: StagedSource,
@@ -120,6 +68,25 @@ impl ParquetStore {
         }
         state.finish(&dir, &source.manifest.sha256, parser)?;
         drop(replay);
+        let parsed = super::ordered::ParsedSource {
+            source: source.source,
+            manifest: source.manifest,
+            report: source.report,
+            sample_hash: source.sample_hash,
+            budget: 0,
+        };
+        self.publish_partition_source(request, parsed, state.staged, cancel, normalized_bytes)
+    }
+
+    pub(super) fn publish_partition_source(
+        &self,
+        request: &LocalBatchRequest<'_>,
+        mut source: super::ordered::ParsedSource,
+        staged: Vec<StagedArtifact>,
+        cancel: &CancellationToken,
+        normalized_bytes: u64,
+    ) -> Result<PreparedSource, AppError> {
+        let dir = self.case_dir(request.case_id)?;
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
@@ -144,7 +111,7 @@ impl ParquetStore {
         }
         let staged = super::consolidate::consolidate(
             &dir,
-            state.staged,
+            staged,
             cancel,
             self.profile.as_deref(),
             normalized_bytes,
@@ -161,10 +128,10 @@ impl ParquetStore {
 }
 
 #[derive(Default)]
-struct Writing {
+pub(super) struct Writing {
     grouped: BTreeMap<Partition, Vec<RecordRow>>,
     open: BTreeMap<Partition, PartitionSinks>,
-    staged: Vec<StagedArtifact>,
+    pub(super) staged: Vec<StagedArtifact>,
     keys: std::collections::BTreeSet<String>,
     segment: u32,
     rows: usize,
@@ -172,7 +139,7 @@ struct Writing {
 }
 
 impl Writing {
-    fn push_row(
+    pub(super) fn push_row(
         &mut self,
         mut row: RecordRow,
         allocator: &mut Allocator,
@@ -218,7 +185,7 @@ impl Writing {
         self.rows = 0;
         Ok(())
     }
-    fn finish(
+    pub(super) fn finish(
         &mut self,
         dir: &std::path::Path,
         hash: &irmind_domain::EvidenceHash,
