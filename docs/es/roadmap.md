@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 5d7a59b246db1e06bd67b6833a873b72a00e9ff2; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit a2c7c28ebeb8503d16523e7f0f5744f80b5896df; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -68,6 +68,7 @@ Consultas estructuradas y con presupuesto en Athena, CloudTrail Lake, Security L
 ## Criterios para 1.0
 
 - Formatos firmados estables para casos, manifiestos, skills, subagentes y protocolo del motor, con migraciones probadas.
+- Confirmar antes de 1.0 una política de compatibilidad de parsers: desde 1.0, conservar una versión obsoleta para reconstrucción y verificación durante al menos dos versiones menores posteriores, o un periodo equivalente. Anunciar su retirada con antelación en el CHANGELOG y ofrecer un procedimiento de migración. Esta propuesta no recupera lectores retirados anteriores a 1.0.
 - Revisión externa de seguridad.
 - Al menos tres conectores validados en entornos reales de pruebas.
 - Binarios de release firmados en Linux, macOS y Windows.
