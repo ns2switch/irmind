@@ -2,10 +2,12 @@
 use super::super::super::local::{stream, verify_source_unchanged};
 use super::super::super::{
     AppError, BATCH_BYTES, BATCH_ROWS, CancellationToken, File, ParquetStore, ParseReport,
-    RecordRow, SourceManifestV1, StreamingEventParser, invalid_source,
+    RecordRow, SourceManifestV1, invalid_source, storage,
 };
+use super::super::staging::StagedSource;
 use super::super::staging::{Input, MAX_STAGED_ROW, no_space, normalized_row, source_sample};
-use std::io::Write;
+use irmind_app::LocalBatchRequest;
+use std::io::{Seek as _, SeekFrom, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::SyncSender;
 
@@ -18,6 +20,41 @@ pub(in crate::parquet_store::partitioning) struct ParsedSource {
     pub(in crate::parquet_store::partitioning) budget: u64,
 }
 
+pub(super) enum ProducedSource {
+    Ordered(ParsedSource),
+    Disordered(StagedSource),
+}
+
+impl ParsedSource {
+    fn prepared(
+        self,
+        store: &ParquetStore,
+        request: &LocalBatchRequest<'_>,
+        cancel: &CancellationToken,
+    ) -> Result<ProducedSource, AppError> {
+        if self.report.is_some() {
+            return Ok(ProducedSource::Ordered(self));
+        }
+        let mut source = self.source;
+        source.seek(SeekFrom::Start(0)).map_err(storage)?;
+        let input = Input {
+            file: source,
+            path: self.manifest.source,
+            budget: self.budget,
+        };
+        let initial = self.initial.ok_or_else(invalid_source)?;
+        let staged = store.stage_hashed_source(
+            request.case_id,
+            input,
+            request.parser,
+            request.copy_original,
+            cancel,
+            initial,
+        )?;
+        Ok(ProducedSource::Disordered(staged))
+    }
+}
+
 pub(super) struct RowBatch {
     pub(super) rows: Vec<RecordRow>,
     pub(super) hash: irmind_domain::EvidenceHash,
@@ -27,15 +64,15 @@ impl ParquetStore {
     pub(super) fn produce_ordered_rows(
         &self,
         mut input: Input,
-        parser: &dyn StreamingEventParser,
-        copied: bool,
+        request: &LocalBatchRequest<'_>,
         cancel: &CancellationToken,
         sender: &SyncSender<RowBatch>,
         restart: &AtomicBool,
-    ) -> Result<ParsedSource, AppError> {
+    ) -> Result<ProducedSource, AppError> {
+        let copied = request.copy_original;
         let (metadata, hash, size) =
             stream::initial_hash(&mut input.file, cancel, self.profile.as_deref())?;
-        let _stage = self
+        let stage = self
             .profile
             .as_ref()
             .map(|p| p.measure(super::super::super::PartitionPhase::Stage));
@@ -54,7 +91,7 @@ impl ParquetStore {
                 hash_value: &value,
                 size,
                 cancel,
-                parser,
+                parser: request.parser,
                 precise_time: true,
             },
             &mut |record| {
@@ -67,7 +104,7 @@ impl ParquetStore {
                 }
                 let result = rows.push(normalized_row(
                     &record,
-                    parser,
+                    request.parser,
                     &input.path,
                     &value,
                     &mut offset_mode,
@@ -100,14 +137,17 @@ impl ParquetStore {
             Ok(report)
         });
         let report = completed_report(result, stopped_for_restart, cancel)?;
-        Ok(ParsedSource {
+        drop(rows);
+        drop(stage);
+        ParsedSource {
             source: input.file,
             manifest: Self::source_manifest(&input.path, &metadata, size, value, copied)?,
             report,
             sample_hash: irmind_app::sha256(&sample),
             budget: input.budget,
             initial: Some((metadata, hash, size)),
-        })
+        }
+        .prepared(self, request, cancel)
     }
 }
 

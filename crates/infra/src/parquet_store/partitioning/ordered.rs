@@ -1,15 +1,12 @@
 //! Speculative direct writing. Publication waits for the complete source hash.
 mod producer;
-use super::super::{
-    AppError, CancellationToken, ParquetStore, PreparedSource, invalid_source, storage,
-};
+use super::super::{AppError, CancellationToken, ParquetStore, PreparedSource, invalid_source};
 use super::Allocator;
 use super::batch::{PreparedPartition, Writing};
 use super::staging::Input;
 use irmind_app::LocalBatchRequest;
 pub(super) use producer::ParsedSource;
-use producer::RowBatch;
-use std::io::{Seek as _, SeekFrom};
+use producer::{ProducedSource, RowBatch};
 use std::sync::mpsc::{Receiver, sync_channel};
 use std::sync::{
     Arc,
@@ -34,14 +31,7 @@ impl ParquetStore {
                     let restart = Arc::new(AtomicBool::new(false));
                     let worker_restart = Arc::clone(&restart);
                     let worker = scope.spawn(move || {
-                        self.produce_ordered_rows(
-                            input,
-                            request.parser,
-                            request.copy_original,
-                            cancel,
-                            &sender,
-                            &worker_restart,
-                        )
+                        self.produce_ordered_rows(input, request, cancel, &sender, &worker_restart)
                     });
                     (receiver, worker, path, restart)
                 })
@@ -144,16 +134,14 @@ impl ParquetStore {
     fn finish_ordered_source(
         &self,
         request: &LocalBatchRequest<'_>,
-        mut source: ParsedSource,
+        source: ProducedSource,
         state: Option<Writing>,
         trial: Allocator,
         allocator: &mut Allocator,
         cancel: &CancellationToken,
     ) -> Result<PreparedPartition, AppError> {
-        // A producer can stop before emitting its first decreasing record.
-        // Discard its ordered prefix and authenticate a complete fallback.
-        let state = if source.report.is_some() { state } else { None };
-        if let Some(mut state) = state {
+        if let ProducedSource::Ordered(source) = source {
+            let mut state = state.ok_or_else(invalid_source)?;
             let parser = request
                 .parser
                 .identity_for_source(&source.manifest.source)?;
@@ -165,35 +153,12 @@ impl ParquetStore {
             *allocator = trial;
             return PreparedPartition::new(source, state.staged, self.profile.clone());
         }
-        source.source.seek(SeekFrom::Start(0)).map_err(storage)?;
-        let expected = source.manifest.clone();
-        let expected_sample = source.sample_hash;
-        let input = Input {
-            file: source.source,
-            path: source.manifest.source,
-            budget: source.budget,
+        // The parser worker prepares a complete authenticated fallback while
+        // the other source workers continue in parallel.
+        drop(state);
+        let ProducedSource::Disordered(mut staged) = source else {
+            return Err(invalid_source());
         };
-        let mut staged = if let Some(initial) = source.initial {
-            self.stage_hashed_source(
-                request.case_id,
-                input,
-                request.parser,
-                request.copy_original,
-                cancel,
-                initial,
-            )?
-        } else {
-            self.stage_source(
-                request.case_id,
-                input,
-                request.parser,
-                request.copy_original,
-                cancel,
-            )?
-        };
-        if staged.manifest != expected || staged.sample_hash != expected_sample {
-            return Err(AppError::EvidenceMismatch(expected.sha256.as_str().into()));
-        }
         {
             let _sort = self
                 .profile

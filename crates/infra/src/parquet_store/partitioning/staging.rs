@@ -58,6 +58,7 @@ impl ParquetStore {
         Ok(inputs)
     }
 
+    #[cfg(test)]
     pub(super) fn stage_source(
         &self,
         case: &CaseId,
