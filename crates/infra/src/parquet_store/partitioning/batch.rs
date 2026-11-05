@@ -89,7 +89,8 @@ impl ParquetStore {
         let parsed = super::ordered::ParsedSource {
             source: source.source,
             manifest: source.manifest,
-            report: source.report,
+            report: Some(source.report),
+            initial: None,
             sample_hash: source.sample_hash,
             budget: 0,
         };
@@ -104,6 +105,7 @@ impl ParquetStore {
         cancel: &CancellationToken,
         normalized_bytes: u64,
     ) -> Result<PreparedSource, AppError> {
+        let report = source.report.take().ok_or_else(invalid_source)?;
         let dir = self.case_dir(request.case_id)?;
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
@@ -138,9 +140,9 @@ impl ParquetStore {
         Ok(PreparedSource {
             manifest: source.manifest,
             artifacts,
-            records: source.report.accepted,
+            records: report.accepted,
             format_sample_sha256: source.sample_hash,
-            parse_report: source.report,
+            parse_report: report,
         })
     }
 }
