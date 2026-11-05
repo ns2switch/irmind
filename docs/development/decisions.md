@@ -218,3 +218,11 @@ Context: the Unix test driver used a separate terminal-process dependency chain.
 Decision: use that same pinned development dependency on every supported platform. Keep real terminal input, rendered-screen checks, explicit terminal dimensions, timeout/output bounds, process termination and temporary-data cleanup. Bound the reader queue and share the driver with the first-run regression test.
 
 Consequences: remove the separate `expectrl`, `ptyprocess` and legacy `nix` chain, including its unmaintained `pin-utils` dependency. Do not add an advisory exception. No production dependency, application behavior, signed format or agreed port changes.
+
+## V2 ingestion optimization gates
+
+Context: full-size cloud and endpoint measurements exceed the existing V2 ingestion or query targets. V1 remains the default writer.
+
+Decision: retain 64 ordinary host partition values per case, with a configurable ceiling of 1,024 and signed overflow. Optimize ordered ingestion, disordered runs and bounded queries in separate changes. Compare baseline and candidate release builds on the same runner, with separate chronological and disordered 15 GB endpoint corpora. Keep the 900-second ingestion and existing query limits unchanged.
+
+Consequences: the direct-write path assigns partitions in deterministic source order through bounded parser queues. Its Parquet files and allocator changes remain provisional until the complete source is verified. Disorder discards those files and allocations and uses the existing verified spool/sort path. Historical builder identities, signed formats and reconstruction bytes remain unchanged. V2 activation requires the cloud and chronological corpus targets to pass; report the disordered corpus independently against the same ingestion target.
