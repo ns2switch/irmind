@@ -1,0 +1,866 @@
+{
+  "artifacts": [
+    {
+      "artifact_id": 13442468826,
+      "download_sha256": "02238648fe8f7a6d520aecb5bd35febbce3a97058dab8d2532a37ca22e0dbd2f",
+      "name": "parquet-pair-cloud-v2",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "efd52a1849f03bf5a40d3d212ec9915d9dbc4339",
+            "metric": "PAIRED_REVISION",
+            "scenario": "cloud-v2",
+            "stage": "baseline"
+          },
+          {
+            "bundles": 36,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 8924960490,
+            "active_files": 3855,
+            "historical_files": 3855,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 0,
+            "overflow_artifacts": 0,
+            "partitions": 260,
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 4035843143,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 121433474,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 20131190,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 639916676,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 11704591,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 20536598,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 2052699068,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 91355776,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 20912049,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 19763679,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 41884098,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 19012423,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 729559220,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 11098128,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "cloud-v2",
+            "normalized_stage_peak_bytes": 17227901,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15685651146,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 5960101247,
+            "files": 1000,
+            "hash_seconds": 11.543,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 8924960490,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 946.036
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 1.084,
+            "replay_seconds": 647.649,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 10.875,
+            "stage_seconds": 1780.317
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 7.102
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 3.92,
+            "p95_seconds": 3.953,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 2,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 10.007,
+            "p95_seconds": 10.028,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.681,
+            "p95_seconds": 0.781,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.031,
+            "p95_seconds": 0.031,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.679,
+            "p95_seconds": 0.681,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 164.245,
+            "verify_seconds": 12.164
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "aws"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.003,
+            "provider": "aws",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "aws",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "azure"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.003,
+            "provider": "azure",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "azure",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "gcp"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.003,
+            "provider": "gcp",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "gcp",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "metric": "PARQUET_WORST_PATH",
+            "seconds": 10.212,
+            "time_budget": true,
+            "truncated": true
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "453483105986ee89f54940135bac4283ec50feca",
+            "metric": "PAIRED_REVISION",
+            "scenario": "cloud-v2",
+            "stage": "candidate"
+          },
+          {
+            "bundles": 36,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 8924960490,
+            "active_files": 3855,
+            "historical_files": 3855,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 0,
+            "overflow_artifacts": 0,
+            "partitions": 260,
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 4035843143,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 121433474,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 20131190,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 639916676,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 11704591,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 20536598,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 2052699068,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 91355776,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 20912049,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 19763679,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 41884098,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 19012423,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 729559220,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 11098128,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "cloud-v2",
+            "normalized_stage_peak_bytes": 17227901,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15685651146,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 5960101247,
+            "files": 1000,
+            "hash_seconds": 11.554,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 8924960490,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1042.39
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 1.122,
+            "replay_seconds": 744.071,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 10.862,
+            "stage_seconds": 1924.831
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 7.23
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 3.92,
+            "p95_seconds": 3.946,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 2,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 9.986,
+            "p95_seconds": 10.026,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.672,
+            "p95_seconds": 0.751,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.03,
+            "p95_seconds": 0.031,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.671,
+            "p95_seconds": 0.675,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 166.001,
+            "verify_seconds": 12.158
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "aws"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.003,
+            "provider": "aws",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.003,
+            "provider": "aws",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "aws",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "azure"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.003,
+            "provider": "azure",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.008,
+            "provider": "azure",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.003,
+            "provider": "azure",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "gcp"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.003,
+            "provider": "gcp",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "gcp",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "metric": "PARQUET_WORST_PATH",
+            "seconds": 10.392,
+            "time_budget": true,
+            "truncated": true
+          }
+        ]
+      }
+    }
+  ],
+  "run_url": "https://github.com/ns2switch/irmind/actions/runs/42079404417"
+}
