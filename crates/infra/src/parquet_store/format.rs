@@ -79,6 +79,7 @@ pub(super) fn normalize_batch(
     batch: &RecordBatch,
     artifact: &ParquetArtifact,
     names: &BTreeMap<String, String>,
+    display_time: bool,
 ) -> Result<RecordBatch, AppError> {
     let precise = matches!(artifact, ParquetArtifact::V2(_));
     let hashes = batch
@@ -106,7 +107,7 @@ pub(super) fn normalize_batch(
             return Err(invalid_source());
         }
         source_names.push(names.get(hash).map_or(hash, String::as_str));
-        if precise {
+        if precise && display_time {
             displayed.push(
                 super::time_cell::read_time(batch, row)?
                     .map_or_else(String::new, irmind_app::IndexedTime::to_rfc3339),
@@ -126,10 +127,12 @@ pub(super) fn normalize_batch(
             .position(|(n, _)| n == "event_time")
             .ok_or_else(invalid_source)?;
         columns[pos].0 = "_irmind_instant".into();
-        columns.push((
-            "event_time".into(),
-            Arc::new(StringArray::from(displayed)) as ArrayRef,
-        ));
+        if display_time {
+            columns.push((
+                "event_time".into(),
+                Arc::new(StringArray::from(displayed)) as ArrayRef,
+            ));
+        }
     }
     columns.push((
         "_irmind_source".into(),

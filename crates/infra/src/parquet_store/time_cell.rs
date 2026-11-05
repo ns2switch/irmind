@@ -1,9 +1,10 @@
 use super::{AppError, RecordBatch, invalid_source};
 use arrow::array::{
-    Array, BooleanArray, StringArray, TimestampMicrosecondArray, UInt8Array, UInt16Array,
-    UInt64Array,
+    Array, BooleanArray, TimestampMicrosecondArray, UInt8Array, UInt16Array, UInt64Array,
 };
 use irmind_app::{IndexedInstant, IndexedTime, TimePrecision};
+mod borrowed;
+pub(super) use borrowed::BorrowedCell;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct TimeCell {
@@ -16,24 +17,7 @@ pub(super) struct TimeCell {
 
 impl TimeCell {
     pub(super) fn from_batch(batch: &RecordBatch, row: usize) -> Result<Self, AppError> {
-        let time = read_time(batch, row)?;
-        let hash = super::query::text(batch, "source_hash", row)?.to_owned();
-        let source = batch
-            .column_by_name("_irmind_source")
-            .and_then(|a| a.as_any().downcast_ref::<StringArray>())
-            .map_or(hash.as_str(), |a| a.value(row))
-            .to_owned();
-        let offset = batch
-            .column_by_name("source_offset")
-            .and_then(|a| a.as_any().downcast_ref::<UInt64Array>())
-            .and_then(|a| (!a.is_null(row)).then(|| a.value(row)));
-        Ok(Self {
-            time,
-            source,
-            hash,
-            offset,
-            index: super::query::number(batch, "record_index", row)?,
-        })
+        Ok(BorrowedCell::from_batch(batch, row)?.to_owned())
     }
     fn key(&self) -> irmind_domain::StableRecordKey<'_> {
         irmind_domain::StableRecordKey {
@@ -135,10 +119,13 @@ pub(super) fn validate_source_units(
     for row in 0..batch.num_rows() {
         let hash = super::query::text(batch, "source_hash", row)?;
         let has_offset = offsets.is_some_and(|a| !a.is_null(row));
-        if modes.get(hash).is_some_and(|old| *old != has_offset) {
-            return Err(invalid_source());
+        match modes.get(hash) {
+            Some(old) if *old != has_offset => return Err(invalid_source()),
+            None => {
+                modes.insert(hash.into(), has_offset);
+            }
+            Some(_) => {}
         }
-        modes.insert(hash.into(), has_offset);
     }
     Ok(())
 }
