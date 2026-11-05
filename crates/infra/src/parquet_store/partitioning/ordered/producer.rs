@@ -6,12 +6,14 @@ use super::super::super::{
 };
 use super::super::staging::{Input, MAX_STAGED_ROW, no_space, normalized_row, source_sample};
 use std::io::Write;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::SyncSender;
 
 pub(in crate::parquet_store::partitioning) struct ParsedSource {
     pub(in crate::parquet_store::partitioning) source: File,
     pub(in crate::parquet_store::partitioning) manifest: SourceManifestV1,
-    pub(in crate::parquet_store::partitioning) report: ParseReport,
+    pub(in crate::parquet_store::partitioning) report: Option<ParseReport>,
+    pub(in crate::parquet_store::partitioning) initial: Option<(std::fs::Metadata, [u8; 32], u64)>,
     pub(in crate::parquet_store::partitioning) sample_hash: [u8; 32],
     pub(in crate::parquet_store::partitioning) budget: u64,
 }
@@ -29,6 +31,7 @@ impl ParquetStore {
         copied: bool,
         cancel: &CancellationToken,
         sender: &SyncSender<RowBatch>,
+        restart: &AtomicBool,
     ) -> Result<ParsedSource, AppError> {
         let (metadata, hash, size) =
             stream::initial_hash(&mut input.file, cancel, self.profile.as_deref())?;
@@ -41,7 +44,8 @@ impl ParquetStore {
         let sample = source_sample(&mut input.file)?;
         let mut rows = RowBuffer::new(sender, input.budget, value.clone());
         let mut offset_mode = None;
-        let report = stream::parse_and_verify(
+        let mut stopped_for_restart = false;
+        let result = stream::parse_and_verify(
             stream::VerifiedInput {
                 source: &mut input.file,
                 sample: &sample,
@@ -57,28 +61,62 @@ impl ParquetStore {
                 if cancel.is_cancelled() {
                     return Err(AppError::Cancelled);
                 }
-                rows.push(normalized_row(
+                if restart.load(Ordering::Acquire) {
+                    stopped_for_restart = true;
+                    return Err(AppError::Cancelled);
+                }
+                let result = rows.push(normalized_row(
                     &record,
                     parser,
                     &input.path,
                     &value,
                     &mut offset_mode,
                     size,
-                )?)
+                )?);
+                if result
+                    .as_ref()
+                    .is_err_and(|e| matches!(e, AppError::Cancelled))
+                    && restart.load(Ordering::Acquire)
+                    && !cancel.is_cancelled()
+                {
+                    stopped_for_restart = true;
+                }
+                result
             },
-        )?;
-        rows.finish()?;
-        if report.accepted == 0 || report.accepted != rows.accepted {
-            return Err(invalid_source());
-        }
-        verify_source_unchanged(&input.file, &metadata, &value)?;
+        )
+        .and_then(|report| {
+            let finished = rows.finish();
+            if finished.is_err() && restart.load(Ordering::Acquire) && !cancel.is_cancelled() {
+                stopped_for_restart = true;
+            }
+            finished?;
+            if report.accepted == 0 || report.accepted != rows.accepted {
+                return Err(invalid_source());
+            }
+            verify_source_unchanged(&input.file, &metadata, &value)?;
+            Ok(report)
+        });
+        let report = completed_report(result, stopped_for_restart, cancel)?;
         Ok(ParsedSource {
             source: input.file,
             manifest: Self::source_manifest(&input.path, &metadata, size, value, copied)?,
             report,
             sample_hash: irmind_app::sha256(&sample),
             budget: input.budget,
+            initial: Some((metadata, hash, size)),
         })
+    }
+}
+
+fn completed_report(
+    result: Result<ParseReport, AppError>,
+    stopped_for_restart: bool,
+    cancel: &CancellationToken,
+) -> Result<Option<ParseReport>, AppError> {
+    match result {
+        Ok(report) => Ok(Some(report)),
+        Err(AppError::Cancelled) if stopped_for_restart && !cancel.is_cancelled() => Ok(None),
+        Err(error) => Err(error),
     }
 }
 
@@ -121,7 +159,7 @@ impl<'a> RowBuffer<'a> {
         self.accepted = self.accepted.checked_add(1).ok_or_else(invalid_source)?;
         self.bytes = self.bytes.saturating_add(row.estimated_bytes());
         self.rows.push(row);
-        if self.bytes >= BATCH_BYTES || self.rows.len() >= BATCH_ROWS {
+        if self.bytes >= BATCH_BYTES / 8 || self.rows.len() >= BATCH_ROWS / 8 {
             self.finish()?;
         }
         Ok(())
@@ -161,6 +199,25 @@ impl Write for EncodedSize {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_an_internally_initiated_stop_can_restart_a_source() {
+        let cancel = CancellationToken::new();
+        assert!(matches!(
+            completed_report(Err(AppError::Cancelled), false, &cancel),
+            Err(AppError::Cancelled)
+        ));
+        assert!(
+            completed_report(Err(AppError::Cancelled), true, &cancel)
+                .unwrap()
+                .is_none()
+        );
+        cancel.cancel();
+        assert!(matches!(
+            completed_report(Err(AppError::Cancelled), true, &cancel),
+            Err(AppError::Cancelled)
+        ));
+    }
 
     #[test]
     fn direct_rows_keep_the_existing_normalized_size_limits_and_error() {

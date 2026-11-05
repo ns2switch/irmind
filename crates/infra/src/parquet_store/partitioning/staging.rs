@@ -68,6 +68,19 @@ impl ParquetStore {
     ) -> Result<StagedSource, AppError> {
         let (metadata, hash, size) =
             stream::initial_hash(&mut input.file, cancel, self.profile.as_deref())?;
+        self.stage_hashed_source(case, input, parser, copied, cancel, (metadata, hash, size))
+    }
+
+    pub(super) fn stage_hashed_source(
+        &self,
+        case: &CaseId,
+        mut input: Input,
+        parser: &dyn StreamingEventParser,
+        copied: bool,
+        cancel: &CancellationToken,
+        initial: (std::fs::Metadata, [u8; 32], u64),
+    ) -> Result<StagedSource, AppError> {
+        let (metadata, hash, size) = initial;
         let _stage = self
             .profile
             .as_ref()
