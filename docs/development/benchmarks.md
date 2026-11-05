@@ -420,3 +420,11 @@ Ordered sources create no normalized-record spool. The nonzero candidate tempora
 | endpoint-v2-64-chronological | 901.833 | 0.000 | 290.543 | 9.516 | 8.374 |
 
 Staging sums concurrent worker time and can include backpressure; direct replay can wait for those workers. These counters overlap and are not additive wall percentages. Query deadline failures remain recorded as failures, including those addressed by the separate timeline and entity changes. The full-size workflow therefore stays red where an unchanged ingestion or query target is missed; ordinary code-test CI is independent. Keep V1 as the default until the activation gate is met.
+
+### Parser handoff diagnostic
+
+An intermediate [same-runner cloud pair](https://github.com/ns2switch/irmind/actions/runs/42079404417) compares `efd52a1849f03bf5a40d3d212ec9915d9dbc4339` and `453483105986ee89f54940135bac4283ec50feca`. The [structured observation](benchmarks/v2-small-handoff-prototype.json) records this single completed pair. Other scenarios from that intermediate run are not acceptance results.
+
+Reducing parser handoffs from 8 MiB to 1 MiB raises 15 GB cloud ingestion from 946.036 to 1,042.390 seconds (+10.2%). Sorting is zero in both revisions, so this comparison does not measure the natural-run algorithm. Accumulated staging changes from 1,780.317 to 1,924.831 seconds and replay/writing from 647.649 to 744.071 seconds; they overlap and are not additive wall percentages. Both runs retain 8,924,960,490 Parquet bytes, including 5,960,101,247 co-observation bytes. Neither meets the unchanged 900-second target.
+
+The current ordered-source implementation detects decreasing keys inside each parser worker, retains bounded 8 MiB handoffs and prepares fallback spools in parallel. The natural-run implementation also reuses canonical encoded rows during splitting and merging. New paired measurements isolate that algorithm from the corrected ordered-source baseline. Signed encodings, ordering, quotas, cancellation and source/run hashes remain unchanged.
