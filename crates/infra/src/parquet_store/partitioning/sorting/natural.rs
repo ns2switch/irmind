@@ -29,7 +29,7 @@ fn split_runs(
     let mut writer = RunWriter::new(store, case)?;
     let mut runs = Vec::new();
     let mut previous = None;
-    while let Some(row) = reader.next(cancel)? {
+    while let Some((row, encoded)) = reader.next_encoded(cancel)? {
         let key = row.sort_key();
         if let Some(old) = previous
             && irmind_domain::compare_record_keys(old, key, false)
@@ -43,7 +43,7 @@ fn split_runs(
             runs.push(writer.finish()?);
             writer = RunWriter::new(store, case)?;
         }
-        writer.push(&row)?;
+        writer.push_encoded(&encoded)?;
         previous = Some(key);
     }
     runs.push(writer.finish()?);
@@ -63,8 +63,8 @@ fn merge_runs(
     let mut heads = Vec::new();
     let mut bytes = 0usize;
     for reader in &mut readers {
-        let head = reader.next(cancel)?;
-        bytes = bytes.saturating_add(head.as_ref().map_or(0, RecordRow::estimated_bytes));
+        let head = reader.next_encoded(cancel)?;
+        bytes = bytes.saturating_add(head_bytes(head.as_ref()));
         if bytes > BATCH_BYTES {
             return Ok(None);
         }
@@ -75,12 +75,12 @@ fn merge_runs(
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let row = heads[index].take().ok_or_else(invalid_source)?;
-        writer.push(&row)?;
-        bytes = bytes.saturating_sub(row.estimated_bytes());
-        drop(row);
-        let next = readers[index].next(cancel)?;
-        bytes = bytes.saturating_add(next.as_ref().map_or(0, RecordRow::estimated_bytes));
+        let head = heads[index].take().ok_or_else(invalid_source)?;
+        writer.push_encoded(&head.1)?;
+        bytes = bytes.saturating_sub(head.0.estimated_bytes().saturating_add(head.1.capacity()));
+        drop(head);
+        let next = readers[index].next_encoded(cancel)?;
+        bytes = bytes.saturating_add(head_bytes(next.as_ref()));
         if bytes > BATCH_BYTES {
             return Ok(None);
         }
@@ -90,7 +90,7 @@ fn merge_runs(
     Ok(Some(writer.finish()?))
 }
 
-fn smallest_head(heads: &[Option<RecordRow>]) -> Result<Option<usize>, AppError> {
+fn smallest_head(heads: &[Option<(RecordRow, Vec<u8>)>]) -> Result<Option<usize>, AppError> {
     let mut best: Option<usize> = None;
     for (index, row) in heads.iter().enumerate() {
         let Some(row) = row else {
@@ -100,11 +100,17 @@ fn smallest_head(heads: &[Option<RecordRow>]) -> Result<Option<usize>, AppError>
             let old = heads[old].as_ref().ok_or_else(invalid_source)?;
             // Equal keys retain their original run order, as in the stable
             // external merge. Use the shared fallible comparator throughout.
-            if compare(row, old)? != Ordering::Less {
+            if compare(&row.0, &old.0)? != Ordering::Less {
                 continue;
             }
         }
         best = Some(index);
     }
     Ok(best)
+}
+
+fn head_bytes(row: Option<&(RecordRow, Vec<u8>)>) -> usize {
+    row.map_or(0, |(row, encoded)| {
+        row.estimated_bytes().saturating_add(encoded.capacity())
+    })
 }

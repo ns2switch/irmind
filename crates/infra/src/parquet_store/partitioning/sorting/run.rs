@@ -35,6 +35,14 @@ impl RunReader {
         &mut self,
         cancel: &CancellationToken,
     ) -> Result<Option<RecordRow>, AppError> {
+        self.next_encoded(cancel)
+            .map(|row| row.map(|(value, _)| value))
+    }
+
+    pub(super) fn next_encoded(
+        &mut self,
+        cancel: &CancellationToken,
+    ) -> Result<Option<(RecordRow, Vec<u8>)>, AppError> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
@@ -63,7 +71,8 @@ impl RunReader {
             return Err(invalid_source());
         }
         self.hash.update(&line);
-        serde_json::from_slice(&line).map(Some).map_err(storage)
+        let value = serde_json::from_slice(&line).map_err(storage)?;
+        Ok(Some((value, line)))
     }
 }
 impl Run {
@@ -114,6 +123,22 @@ impl RunWriter {
         self.hash.update(b"\n");
         self.disk.add(count)
     }
+    pub(super) fn push_encoded(&mut self, line: &[u8]) -> Result<(), AppError> {
+        let count = u64::try_from(line.len()).map_err(storage)?;
+        if count > MAX_STAGED_ROW || line.last() != Some(&b'\n') {
+            return Err(invalid_source());
+        }
+        self.bytes = self.bytes.checked_add(count).ok_or_else(invalid_source)?;
+        self.rows = self.rows.checked_add(1).ok_or_else(invalid_source)?;
+        self.writer
+            .as_mut()
+            .ok_or_else(invalid_source)?
+            .write_all(line)
+            .map_err(storage)?;
+        self.hash.update(line);
+        self.disk.add(count)
+    }
+
     pub(super) fn finish(mut self) -> Result<Run, AppError> {
         self.writer
             .as_mut()
