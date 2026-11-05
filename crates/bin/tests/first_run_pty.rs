@@ -1,24 +1,20 @@
 #![cfg(unix)]
 #![allow(clippy::unwrap_used)]
 
-use expectrl::{Expect as _, Session, session::OsSession};
-use std::{io::ErrorKind, path::Path, process::Command, thread, time::Duration};
+use std::{path::Path, process::Command, thread, time::Duration};
 
-fn drain_output(session: &mut OsSession) {
-    let mut output = [0_u8; 8192];
-    loop {
-        match session.try_read(&mut output) {
-            Ok(0) => break,
-            Ok(_) => {}
-            Err(error) => {
-                assert_eq!(error.kind(), ErrorKind::WouldBlock, "PTY read: {error}");
-                break;
-            }
-        }
-    }
+#[path = "support/terminal_screen.rs"]
+mod terminal_screen;
+
+#[path = "support/demo_session.rs"]
+mod demo_session;
+use demo_session::DemoSession;
+
+fn drain_output(session: &mut DemoSession) {
+    while session.poll().unwrap() {}
 }
 
-fn send_and_drain(session: &mut OsSession, input: &str) {
+fn send_and_drain(session: &mut DemoSession, input: &str) {
     session.send(input).unwrap();
     for _ in 0..10 {
         drain_output(session);
@@ -26,7 +22,7 @@ fn send_and_drain(session: &mut OsSession, input: &str) {
     }
 }
 
-fn wait_for_file(session: &mut OsSession, path: &Path) -> bool {
+fn wait_for_file(session: &mut DemoSession, path: &Path) -> bool {
     for _ in 0..900 {
         drain_output(session);
         if path.is_file() {
@@ -53,8 +49,9 @@ fn terminal_command(binary: &str, home: &Path) -> Command {
 fn first_run_creates_file_keystore_without_leaving_the_tui() {
     let home = tempfile::tempdir().unwrap();
     let binary = env!("CARGO_BIN_EXE_irmind");
-    let mut session = Session::spawn(terminal_command(binary, home.path())).unwrap();
-    session.set_expect_timeout(Some(Duration::from_secs(45)));
+    let mut session =
+        DemoSession::spawn_sized(&terminal_command(binary, home.path()), 100, 32).unwrap();
+    session.timeout = Duration::from_secs(45);
     session.expect("Welcome").unwrap();
     send_and_drain(&mut session, "\r");
     send_and_drain(&mut session, "\x1b[B");
@@ -75,8 +72,9 @@ fn first_run_creates_file_keystore_without_leaving_the_tui() {
     session.send("/quit\r\r").unwrap();
     drop(session);
 
-    let mut unlock = Session::spawn(terminal_command(binary, home.path())).unwrap();
-    unlock.set_expect_timeout(Some(Duration::from_secs(45)));
+    let mut unlock =
+        DemoSession::spawn_sized(&terminal_command(binary, home.path()), 100, 32).unwrap();
+    unlock.timeout = Duration::from_secs(45);
     unlock.expect("Unlock").unwrap();
     unlock.send("incorrect synthetic phrase\r").unwrap();
     unlock.expect("incorrect").unwrap();
