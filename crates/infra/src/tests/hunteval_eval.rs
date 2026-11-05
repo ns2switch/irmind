@@ -10,6 +10,10 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+mod filters;
+mod reference;
+use filters::episode_filter;
+
 #[derive(Deserialize)]
 struct GroundTruth {
     episode_id: String,
@@ -91,22 +95,6 @@ pub(super) fn evaluate_case(
         evaluate_entities(store, id, episode, &filter, stats);
         evaluate_path(store, id, episode, &filter, stats);
     }
-}
-
-fn episode_filter(episode: &Episode) -> GraphQueryFilter {
-    let times = episode
-        .events
-        .iter()
-        .map(|event| event["event_time"].as_str().unwrap())
-        .collect::<Vec<_>>();
-    GraphQueryFilter::parse(
-        Some(times.iter().copied().min().unwrap()),
-        Some(times.iter().copied().max().unwrap()),
-        None,
-        None,
-        Some(&episode.provider),
-    )
-    .unwrap()
 }
 
 fn event_ref(episode: &Episode, event_id: &str) -> String {
@@ -361,75 +349,4 @@ fn private_answers_are_never_ingested_or_displayed() {
     }
     assert!(partitions.contains(&"111122223333".to_owned()));
     assert!(partitions.contains(&"444455556666".to_owned()));
-}
-
-#[test]
-#[ignore = "weekly evaluation requires the pinned external HuntEval source and private answers"]
-fn hunteval_reference_corpus() -> Result<(), String> {
-    let source = root_from_environment().ok_or("IRMIND_HUNTEVAL_ROOT is required")?;
-    let episodes = load_episodes(&source);
-    let mut metrics = BTreeMap::new();
-    for episode in &episodes {
-        let root = tempfile::tempdir().unwrap();
-        let input = root.path().join("source");
-        fs::create_dir(&input).unwrap();
-        let names = stage_sources(&input, std::slice::from_ref(episode));
-        let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
-        let signer = Arc::new(LocalSigner {
-            key: SigningKey::from_bytes(&[75u8; 32]),
-            actor: Actor::Analyst,
-        });
-        let parser = Arc::new(JsonParser);
-        let engine = Engine::new(
-            EnginePorts::new(
-                store.clone(),
-                store.clone(),
-                store.clone(),
-                store.clone(),
-                CryptoPorts::new(
-                    signer.clone(),
-                    Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-                ),
-                Arc::new(MandatoryGuard::new().unwrap()),
-                parser.clone(),
-            ),
-            ExecutionMode::Attended,
-            Arc::new(SystemClock),
-        )
-        .unwrap();
-        let case = engine
-            .create_case("HuntEval synthetic episode", "local")
-            .unwrap();
-        let ingest = LargeCaseUseCases {
-            engine: &engine,
-            store: store.as_ref(),
-            parser: parser.as_ref(),
-        };
-        let count = ingest
-            .ingest_local_batch(&case.id, &input, &names, false, &CancellationToken::new())
-            .unwrap();
-        assert_eq!(count.len(), 1);
-        assert_eq!(
-            ingest
-                .verify_parquet_rebuild(&case.id, &input, &CancellationToken::new())
-                .unwrap(),
-            1
-        );
-        assert!(
-            !store
-                .entries(&case.id)
-                .unwrap()
-                .iter()
-                .any(|entry| entry.payload.contains("ground-truth")
-                    || entry.payload.contains("acceptable_conclusions"))
-        );
-        evaluate_case(
-            store.as_ref(),
-            &case.id,
-            std::slice::from_ref(episode),
-            &mut metrics,
-        );
-    }
-    report_metrics("reference", &metrics);
-    Ok(())
 }

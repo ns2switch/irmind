@@ -1,0 +1,2398 @@
+{
+  "build": {
+    "BINARY_BUILD_SECONDS": 401,
+    "BINARY_BYTES": 51545776,
+    "BUILD_HOT_SECONDS": 15
+  },
+  "commit": "26885cf2f4061c0970f5adde55af696e683c61aa",
+  "conclusion": "failure",
+  "host_cap": 64,
+  "host_ceiling": 1024,
+  "ingest_target_seconds": 900,
+  "observed_scenarios": 12,
+  "phase_accounting": "Stage and V1 worker counters accumulate concurrent worker time; do not sum them as wall percentages. Sort, replay, source verification and publication run sequentially inside each batch. Wall time also includes generation, signed custody and final compaction.",
+  "profile": "release",
+  "query_target_seconds": 10,
+  "reference_hunteval_queries": [
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "aws",
+      "query": "case_timeline",
+      "samples": 6
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "aws",
+      "query": "entity",
+      "samples": 10
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "aws",
+      "query": "event",
+      "samples": 19
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "aws",
+      "query": "neighbors",
+      "samples": 10
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "aws",
+      "query": "path",
+      "samples": 14
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "aws",
+      "query": "term",
+      "samples": 19
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "aws",
+      "query": "timeline",
+      "samples": 19
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "azure",
+      "query": "case_timeline",
+      "samples": 6
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "azure",
+      "query": "entity",
+      "samples": 10
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "azure",
+      "query": "event",
+      "samples": 19
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "azure",
+      "query": "neighbors",
+      "samples": 10
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "azure",
+      "query": "path",
+      "samples": 14
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "azure",
+      "query": "term",
+      "samples": 19
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "azure",
+      "query": "timeline",
+      "samples": 19
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "gcp",
+      "query": "case_timeline",
+      "samples": 6
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "gcp",
+      "query": "entity",
+      "samples": 10
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "gcp",
+      "query": "event",
+      "samples": 19
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "gcp",
+      "query": "neighbors",
+      "samples": 10
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "gcp",
+      "query": "path",
+      "samples": 14
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "gcp",
+      "query": "term",
+      "samples": 19
+    },
+    {
+      "corpus": "reference",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "gcp",
+      "query": "timeline",
+      "samples": 19
+    }
+  ],
+  "reference_hunteval_recall": [
+    {
+      "corpus": "reference",
+      "entities": "10/10",
+      "events": "19/19",
+      "parse_errors": 0,
+      "path": "14/14",
+      "provider": "aws"
+    },
+    {
+      "corpus": "reference",
+      "entities": "10/10",
+      "events": "19/19",
+      "parse_errors": 0,
+      "path": "14/14",
+      "provider": "azure"
+    },
+    {
+      "corpus": "reference",
+      "entities": "10/10",
+      "events": "19/19",
+      "parse_errors": 0,
+      "path": "14/14",
+      "provider": "gcp"
+    }
+  ],
+  "results": [
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 4.397
+      },
+      "compaction": {
+        "bundles": 36
+      },
+      "compressed_columns": {
+        "co_entities": 4035842120,
+        "entities": 121433474,
+        "entity_kind": 20129894,
+        "entity_value": 639915266,
+        "event": 11704027,
+        "event_time": 23955039,
+        "record_index": 2052698032,
+        "relations": 91355776,
+        "source_hash": 41881506,
+        "text": 729559220
+      },
+      "hunteval_queries": [
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.005,
+          "provider": "aws",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.003,
+          "provider": "aws",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "timeline",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.003,
+          "provider": "azure",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "timeline",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.003,
+          "provider": "gcp",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "timeline",
+          "samples": 19
+        }
+      ],
+      "hunteval_recall": [
+        {
+          "corpus": "15gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "aws"
+        },
+        {
+          "corpus": "15gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "azure"
+        },
+        {
+          "corpus": "15gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "gcp"
+        }
+      ],
+      "ingestion": {
+        "bytes": 15685651146,
+        "conversion_seconds": 1260.363,
+        "coobservation_bytes": 5723788884,
+        "files": 1000,
+        "hash_seconds": 21.423,
+        "parquet_bytes": 8451871774,
+        "parquet_seconds": 262.766,
+        "row_seconds": 190.742,
+        "wall_seconds": 530.67
+      },
+      "layout": {
+        "active_bytes": 8451871774,
+        "active_files": 3855,
+        "historical_files": 3855,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "cloud-v1"
+      },
+      "name": "cloud-v1",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 5.141,
+          "p95_seconds": 5.217,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 5.648,
+          "p95_seconds": 5.788,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.619,
+          "p95_seconds": 0.65,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.02,
+          "p95_seconds": 0.023,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.626,
+          "p95_seconds": 0.638,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 134.494,
+        "verify_seconds": 15.653
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.0,
+        "replay_seconds": 0.0,
+        "sort_seconds": 0.0,
+        "source_verify_seconds": 0.0,
+        "stage_seconds": 0.0
+      },
+      "worst_path": {
+        "seconds": 10.002,
+        "time_budget": true,
+        "truncated": true
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 0.541
+      },
+      "compaction": {
+        "bundles": 33
+      },
+      "compressed_columns": {
+        "co_entities": 296721403,
+        "entities": 46350009,
+        "entity_kind": 1599026,
+        "entity_value": 70433770,
+        "event": 927286,
+        "event_time": 1840658,
+        "record_index": 107182603,
+        "relations": 32073177,
+        "source_hash": 3277087,
+        "text": 159310422
+      },
+      "hunteval_queries": [
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "aws",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "aws",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "aws",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "aws",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "aws",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "aws",
+          "query": "timeline",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "azure",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "azure",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "azure",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "azure",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "azure",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "azure",
+          "query": "timeline",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "timeline",
+          "samples": 19
+        }
+      ],
+      "hunteval_recall": [
+        {
+          "corpus": "1gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "aws"
+        },
+        {
+          "corpus": "1gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "azure"
+        },
+        {
+          "corpus": "1gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "gcp"
+        }
+      ],
+      "ingestion": {
+        "bytes": 1045757022,
+        "conversion_seconds": 97.448,
+        "coobservation_bytes": 417450101,
+        "files": 1000,
+        "hash_seconds": 1.66,
+        "parquet_bytes": 782415667,
+        "parquet_seconds": 22.851,
+        "row_seconds": 13.787,
+        "wall_seconds": 53.548
+      },
+      "layout": {
+        "active_bytes": 782415667,
+        "active_files": 3084,
+        "historical_files": 3084,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "cloud-v1"
+      },
+      "name": "cloud-v1",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.428,
+          "p95_seconds": 0.438,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.374,
+          "p95_seconds": 0.382,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.096,
+          "p95_seconds": 0.097,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.595,
+          "p95_seconds": 0.604,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.095,
+          "p95_seconds": 0.096,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 19.406,
+        "verify_seconds": 3.436
+      },
+      "size": "1gb",
+      "v2_phases": {
+        "publish_seconds": 0.0,
+        "replay_seconds": 0.0,
+        "sort_seconds": 0.0,
+        "source_verify_seconds": 0.0,
+        "stage_seconds": 0.0
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 5.669
+      },
+      "compaction": {
+        "bundles": 0
+      },
+      "compressed_columns": {
+        "co_entities": 12852000,
+        "entities": 380000,
+        "entity_kind": 7166000,
+        "entity_value": 8980000,
+        "event": 3922000,
+        "event_time": 8696000,
+        "record_index": 765062000,
+        "relations": 92000,
+        "source_hash": 15179102,
+        "text": 1371149245
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 654.816,
+        "coobservation_bytes": 480939572,
+        "files": 1000,
+        "hash_seconds": 21.439,
+        "parquet_bytes": 2390220347,
+        "parquet_seconds": 214.134,
+        "row_seconds": 155.849,
+        "wall_seconds": 194.199
+      },
+      "layout": {
+        "active_bytes": 2390220347,
+        "active_files": 3000,
+        "historical_files": 3000,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "endpoint-v1-1"
+      },
+      "name": "endpoint-v1-1",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 7.461,
+          "p95_seconds": 7.586,
+          "scenario": "endpoint-v1-1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 6.005,
+          "p95_seconds": 6.088,
+          "scenario": "endpoint-v1-1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.016,
+          "p95_seconds": 0.016,
+          "scenario": "endpoint-v1-1",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.034,
+          "p95_seconds": 10.044,
+          "scenario": "endpoint-v1-1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.015,
+          "p95_seconds": 0.016,
+          "scenario": "endpoint-v1-1",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "term",
+          "p50_seconds": 10.009,
+          "p95_seconds": 10.032,
+          "scenario": "endpoint-v1-1",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "entity",
+          "p50_seconds": 10.014,
+          "p95_seconds": 10.019,
+          "scenario": "endpoint-v1-1",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "neighbors",
+          "p50_seconds": 10.012,
+          "p95_seconds": 10.017,
+          "scenario": "endpoint-v1-1",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.009,
+          "p95_seconds": 10.013,
+          "scenario": "endpoint-v1-1",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 10.01,
+          "p95_seconds": 10.015,
+          "scenario": "endpoint-v1-1",
+          "scope": "endpoint-0000"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 1035.222,
+        "verify_seconds": 53.481
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.0,
+        "replay_seconds": 0.0,
+        "sort_seconds": 0.0,
+        "source_verify_seconds": 0.0,
+        "stage_seconds": 0.0
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 5.586
+      },
+      "compaction": {
+        "bundles": 0
+      },
+      "compressed_columns": {
+        "co_entities": 12822352,
+        "entities": 379128,
+        "entity_kind": 7166000,
+        "entity_value": 8980000,
+        "event": 3922000,
+        "event_time": 8696000,
+        "record_index": 765062000,
+        "relations": 92000,
+        "source_hash": 15178826,
+        "text": 1372736952
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 647.436,
+        "coobservation_bytes": 480909788,
+        "files": 1000,
+        "hash_seconds": 21.352,
+        "parquet_bytes": 2391777258,
+        "parquet_seconds": 209.654,
+        "row_seconds": 155.383,
+        "wall_seconds": 192.285
+      },
+      "layout": {
+        "active_bytes": 2391777258,
+        "active_files": 3000,
+        "historical_files": 3000,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "endpoint-v1-64"
+      },
+      "name": "endpoint-v1-64",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 7.24,
+          "p95_seconds": 7.303,
+          "scenario": "endpoint-v1-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.47,
+          "p95_seconds": 0.478,
+          "scenario": "endpoint-v1-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.013,
+          "scenario": "endpoint-v1-64",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.029,
+          "p95_seconds": 10.043,
+          "scenario": "endpoint-v1-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.014,
+          "scenario": "endpoint-v1-64",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "term",
+          "p50_seconds": 10.006,
+          "p95_seconds": 10.009,
+          "scenario": "endpoint-v1-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "entity",
+          "p50_seconds": 10.011,
+          "p95_seconds": 10.015,
+          "scenario": "endpoint-v1-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "neighbors",
+          "p50_seconds": 10.011,
+          "p95_seconds": 10.019,
+          "scenario": "endpoint-v1-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.012,
+          "p95_seconds": 10.021,
+          "scenario": "endpoint-v1-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 10.01,
+          "p95_seconds": 10.014,
+          "scenario": "endpoint-v1-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "term",
+          "p50_seconds": 10.012,
+          "p95_seconds": 10.015,
+          "scenario": "endpoint-v1-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 5,
+          "name": "entity",
+          "p50_seconds": 10.013,
+          "p95_seconds": 10.014,
+          "scenario": "endpoint-v1-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 5,
+          "name": "neighbors",
+          "p50_seconds": 10.01,
+          "p95_seconds": 10.013,
+          "scenario": "endpoint-v1-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.01,
+          "p95_seconds": 10.014,
+          "scenario": "endpoint-v1-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 10.008,
+          "p95_seconds": 10.01,
+          "scenario": "endpoint-v1-64",
+          "scope": "endpoint-0063"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 1639.332,
+        "verify_seconds": 99.326
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.0,
+        "replay_seconds": 0.0,
+        "sort_seconds": 0.0,
+        "source_verify_seconds": 0.0,
+        "stage_seconds": 0.0
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 5.617
+      },
+      "compaction": {
+        "bundles": 0
+      },
+      "compressed_columns": {
+        "co_entities": 12864512,
+        "entities": 382068,
+        "entity_kind": 7166000,
+        "entity_value": 8982832,
+        "event": 3922000,
+        "event_time": 8696000,
+        "record_index": 765040016,
+        "relations": 92000,
+        "source_hash": 15178412,
+        "text": 1374008086
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 656.382,
+        "coobservation_bytes": 480942360,
+        "files": 1000,
+        "hash_seconds": 21.284,
+        "parquet_bytes": 2393074334,
+        "parquet_seconds": 216.66,
+        "row_seconds": 155.57,
+        "wall_seconds": 193.037
+      },
+      "layout": {
+        "active_bytes": 2393074334,
+        "active_files": 3000,
+        "historical_files": 3000,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "endpoint-v1-1024"
+      },
+      "name": "endpoint-v1-1024",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 7.336,
+          "p95_seconds": 7.477,
+          "scenario": "endpoint-v1-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.382,
+          "p95_seconds": 0.385,
+          "scenario": "endpoint-v1-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.013,
+          "scenario": "endpoint-v1-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.031,
+          "p95_seconds": 10.041,
+          "scenario": "endpoint-v1-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.012,
+          "p95_seconds": 0.014,
+          "scenario": "endpoint-v1-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "term",
+          "p50_seconds": 10.01,
+          "p95_seconds": 10.013,
+          "scenario": "endpoint-v1-1024",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "entity",
+          "p50_seconds": 10.011,
+          "p95_seconds": 10.014,
+          "scenario": "endpoint-v1-1024",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "neighbors",
+          "p50_seconds": 10.013,
+          "p95_seconds": 10.02,
+          "scenario": "endpoint-v1-1024",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.007,
+          "p95_seconds": 10.017,
+          "scenario": "endpoint-v1-1024",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 10.009,
+          "p95_seconds": 10.014,
+          "scenario": "endpoint-v1-1024",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "term",
+          "p50_seconds": 10.013,
+          "p95_seconds": 10.017,
+          "scenario": "endpoint-v1-1024",
+          "scope": "endpoint-1023"
+        },
+        {
+          "errors": 5,
+          "name": "entity",
+          "p50_seconds": 10.011,
+          "p95_seconds": 10.013,
+          "scenario": "endpoint-v1-1024",
+          "scope": "endpoint-1023"
+        },
+        {
+          "errors": 5,
+          "name": "neighbors",
+          "p50_seconds": 10.018,
+          "p95_seconds": 10.02,
+          "scenario": "endpoint-v1-1024",
+          "scope": "endpoint-1023"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.007,
+          "p95_seconds": 10.018,
+          "scenario": "endpoint-v1-1024",
+          "scope": "endpoint-1023"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 10.011,
+          "p95_seconds": 10.019,
+          "scenario": "endpoint-v1-1024",
+          "scope": "endpoint-1023"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 1644.292,
+        "verify_seconds": 98.334
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.0,
+        "replay_seconds": 0.0,
+        "sort_seconds": 0.0,
+        "source_verify_seconds": 0.0,
+        "stage_seconds": 0.0
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 5.673
+      },
+      "compaction": {
+        "bundles": 0
+      },
+      "compressed_columns": {
+        "co_entities": 12866115,
+        "entities": 382186,
+        "entity_kind": 7166000,
+        "entity_value": 8982950,
+        "event": 3922000,
+        "event_time": 8696000,
+        "record_index": 765039100,
+        "relations": 92000,
+        "source_hash": 15178412,
+        "text": 1374038710
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 656.2,
+        "coobservation_bytes": 480943572,
+        "files": 1000,
+        "hash_seconds": 21.32,
+        "parquet_bytes": 2393105898,
+        "parquet_seconds": 215.897,
+        "row_seconds": 156.191,
+        "wall_seconds": 192.942
+      },
+      "layout": {
+        "active_bytes": 2393105898,
+        "active_files": 3000,
+        "historical_files": 3000,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "endpoint-v1-1025"
+      },
+      "name": "endpoint-v1-1025",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 7.298,
+          "p95_seconds": 7.354,
+          "scenario": "endpoint-v1-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.385,
+          "p95_seconds": 0.388,
+          "scenario": "endpoint-v1-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.012,
+          "p95_seconds": 0.013,
+          "scenario": "endpoint-v1-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.036,
+          "p95_seconds": 10.039,
+          "scenario": "endpoint-v1-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.014,
+          "scenario": "endpoint-v1-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "term",
+          "p50_seconds": 10.006,
+          "p95_seconds": 10.017,
+          "scenario": "endpoint-v1-1025",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "entity",
+          "p50_seconds": 10.007,
+          "p95_seconds": 10.008,
+          "scenario": "endpoint-v1-1025",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "neighbors",
+          "p50_seconds": 10.006,
+          "p95_seconds": 10.013,
+          "scenario": "endpoint-v1-1025",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.012,
+          "p95_seconds": 10.017,
+          "scenario": "endpoint-v1-1025",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 10.01,
+          "p95_seconds": 10.01,
+          "scenario": "endpoint-v1-1025",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "term",
+          "p50_seconds": 10.01,
+          "p95_seconds": 10.011,
+          "scenario": "endpoint-v1-1025",
+          "scope": "endpoint-1024"
+        },
+        {
+          "errors": 5,
+          "name": "entity",
+          "p50_seconds": 10.01,
+          "p95_seconds": 10.012,
+          "scenario": "endpoint-v1-1025",
+          "scope": "endpoint-1024"
+        },
+        {
+          "errors": 5,
+          "name": "neighbors",
+          "p50_seconds": 10.011,
+          "p95_seconds": 10.014,
+          "scenario": "endpoint-v1-1025",
+          "scope": "endpoint-1024"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.01,
+          "p95_seconds": 10.013,
+          "scenario": "endpoint-v1-1025",
+          "scope": "endpoint-1024"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 10.01,
+          "p95_seconds": 10.016,
+          "scenario": "endpoint-v1-1025",
+          "scope": "endpoint-1024"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 1639.339,
+        "verify_seconds": 102.582
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.0,
+        "replay_seconds": 0.0,
+        "sort_seconds": 0.0,
+        "source_verify_seconds": 0.0,
+        "stage_seconds": 0.0
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 7.152
+      },
+      "compaction": {
+        "bundles": 36
+      },
+      "compressed_columns": {
+        "co_entities": 4035843143,
+        "entities": 121433474,
+        "entity_kind": 20131190,
+        "entity_value": 639916676,
+        "event": 11704591,
+        "event_time": 20536598,
+        "record_index": 2052699068,
+        "relations": 91355776,
+        "scope_account": 20912049,
+        "scope_host": 16349877,
+        "scope_region": 19763679,
+        "source_hash": 41884098,
+        "source_offset": 16349877,
+        "submicro_nanos": 19012423,
+        "text": 729559220,
+        "time_inferred": 11098128,
+        "time_precision": 16349877
+      },
+      "ingestion": {
+        "bytes": 15685651146,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 5960101247,
+        "files": 1000,
+        "hash_seconds": 21.293,
+        "parquet_bytes": 8924960490,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 1149.683
+      },
+      "layout": {
+        "active_bytes": 8924960490,
+        "active_files": 3855,
+        "historical_files": 3855,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 260,
+        "scenario": "cloud-v2"
+      },
+      "name": "cloud-v2",
+      "normalized_stage_peak_bytes": 140944753,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 4.719,
+          "p95_seconds": 4.74,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 9.311,
+          "p95_seconds": 9.396,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.734,
+          "p95_seconds": 0.739,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.028,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.708,
+          "p95_seconds": 0.743,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 174.263,
+        "verify_seconds": 16.506
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.931,
+        "replay_seconds": 439.526,
+        "sort_seconds": 0.0,
+        "source_verify_seconds": 13.85,
+        "stage_seconds": 1518.791
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 0.742
+      },
+      "compaction": {
+        "bundles": 33
+      },
+      "compressed_columns": {
+        "co_entities": 296721403,
+        "entities": 46350009,
+        "entity_kind": 1599026,
+        "entity_value": 70433770,
+        "event": 927286,
+        "event_time": 1578371,
+        "record_index": 107182603,
+        "relations": 32073177,
+        "scope_account": 1604212,
+        "scope_host": 1254052,
+        "scope_region": 1516090,
+        "source_hash": 3277087,
+        "source_offset": 1254052,
+        "submicro_nanos": 1458200,
+        "text": 159310422,
+        "time_inferred": 827950,
+        "time_precision": 1254052
+      },
+      "ingestion": {
+        "bytes": 1045757022,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 435375256,
+        "files": 1000,
+        "hash_seconds": 1.675,
+        "parquet_bytes": 820357273,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 106.714
+      },
+      "layout": {
+        "active_bytes": 820357273,
+        "active_files": 3084,
+        "historical_files": 3084,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 9,
+        "scenario": "cloud-v2"
+      },
+      "name": "cloud-v2",
+      "normalized_stage_peak_bytes": 9521718,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.43,
+          "p95_seconds": 0.446,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.593,
+          "p95_seconds": 0.617,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.12,
+          "p95_seconds": 0.123,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.63,
+          "p95_seconds": 0.661,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.118,
+          "p95_seconds": 0.118,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 23.685,
+        "verify_seconds": 3.544
+      },
+      "size": "1gb",
+      "v2_phases": {
+        "publish_seconds": 0.555,
+        "replay_seconds": 30.136,
+        "sort_seconds": 0.0,
+        "source_verify_seconds": 0.976,
+        "stage_seconds": 113.816
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 9.753
+      },
+      "compaction": {
+        "bundles": 24
+      },
+      "compressed_columns": {
+        "co_entities": 24940000,
+        "entities": 684438,
+        "entity_kind": 14008000,
+        "entity_value": 17674000,
+        "event": 7590436,
+        "event_time": 298855350,
+        "record_index": 1531795983,
+        "relations": 166902,
+        "scope_account": 11495714,
+        "scope_host": 14974436,
+        "scope_region": 11495714,
+        "source_hash": 29488662,
+        "source_offset": 11495714,
+        "submicro_nanos": 13363458,
+        "text": 188259683,
+        "time_inferred": 7857538,
+        "time_precision": 11495714
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 1249196006,
+        "files": 1000,
+        "hash_seconds": 21.202,
+        "parquet_bytes": 2814352218,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 1554.457
+      },
+      "layout": {
+        "active_bytes": 2814352218,
+        "active_files": 3024,
+        "historical_files": 3024,
+        "ordinary_hosts": 1,
+        "overflow_artifacts": 0,
+        "partitions": 1,
+        "scenario": "endpoint-v2-1"
+      },
+      "name": "endpoint-v2-1",
+      "normalized_stage_peak_bytes": 206404230,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 2.594,
+          "p95_seconds": 2.641,
+          "scenario": "endpoint-v2-1",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "entity",
+          "p50_seconds": 10.034,
+          "p95_seconds": 10.035,
+          "scenario": "endpoint-v2-1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.591,
+          "p95_seconds": 0.593,
+          "scenario": "endpoint-v2-1",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.012,
+          "p95_seconds": 10.016,
+          "scenario": "endpoint-v2-1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.577,
+          "p95_seconds": 0.61,
+          "scenario": "endpoint-v2-1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 2.695,
+          "p95_seconds": 2.853,
+          "scenario": "endpoint-v2-1",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "entity",
+          "p50_seconds": 10.031,
+          "p95_seconds": 10.033,
+          "scenario": "endpoint-v2-1",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.705,
+          "p95_seconds": 0.715,
+          "scenario": "endpoint-v2-1",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.013,
+          "p95_seconds": 10.016,
+          "scenario": "endpoint-v2-1",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.693,
+          "p95_seconds": 0.723,
+          "scenario": "endpoint-v2-1",
+          "scope": "endpoint-0000"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 504.621,
+        "verify_seconds": 20.411
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.76,
+        "replay_seconds": 373.859,
+        "sort_seconds": 737.661,
+        "source_verify_seconds": 13.851,
+        "stage_seconds": 797.788
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 9.537
+      },
+      "compaction": {
+        "bundles": 192
+      },
+      "compressed_columns": {
+        "co_entities": 24882448,
+        "entities": 686952,
+        "entity_kind": 14008000,
+        "entity_value": 17674000,
+        "event": 7591600,
+        "event_time": 298848893,
+        "record_index": 1531783392,
+        "relations": 167824,
+        "scope_account": 11496592,
+        "scope_host": 14975600,
+        "scope_region": 11496592,
+        "source_hash": 29487712,
+        "source_offset": 11496592,
+        "submicro_nanos": 13364456,
+        "text": 188485107,
+        "time_inferred": 7858064,
+        "time_precision": 11496592
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 1248898206,
+        "files": 1000,
+        "hash_seconds": 21.228,
+        "parquet_bytes": 2814149558,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 1555.721
+      },
+      "layout": {
+        "active_bytes": 2814149558,
+        "active_files": 3192,
+        "historical_files": 3192,
+        "ordinary_hosts": 64,
+        "overflow_artifacts": 0,
+        "partitions": 64,
+        "scenario": "endpoint-v2-64"
+      },
+      "name": "endpoint-v2-64",
+      "normalized_stage_peak_bytes": 206404230,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 2.438,
+          "p95_seconds": 2.502,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.712,
+          "p95_seconds": 0.715,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.064,
+          "p95_seconds": 0.065,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.011,
+          "p95_seconds": 10.013,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.064,
+          "p95_seconds": 0.065,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.087,
+          "p95_seconds": 0.105,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.203,
+          "p95_seconds": 0.205,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.056,
+          "p95_seconds": 0.057,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.202,
+          "p95_seconds": 0.204,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.056,
+          "p95_seconds": 0.059,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.092,
+          "p95_seconds": 0.097,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.191,
+          "p95_seconds": 0.197,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.054,
+          "p95_seconds": 0.054,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.19,
+          "p95_seconds": 0.19,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.054,
+          "p95_seconds": 0.057,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 196.457,
+        "verify_seconds": 7.027
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.743,
+        "replay_seconds": 374.252,
+        "sort_seconds": 738.858,
+        "source_verify_seconds": 13.84,
+        "stage_seconds": 795.831
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 9.637
+      },
+      "compaction": {
+        "bundles": 24
+      },
+      "compressed_columns": {
+        "co_entities": 24424928,
+        "entities": 688404,
+        "entity_kind": 13754672,
+        "entity_value": 17353840,
+        "event": 7448500,
+        "event_time": 291496017,
+        "record_index": 1500894435,
+        "relations": 163846,
+        "scope_account": 11280498,
+        "scope_host": 14703731,
+        "scope_region": 11280498,
+        "source_hash": 28935090,
+        "source_offset": 11280498,
+        "submicro_nanos": 13113018,
+        "text": 184806184,
+        "time_inferred": 7708399,
+        "time_precision": 11280498
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 1223844769,
+        "files": 1000,
+        "hash_seconds": 21.194,
+        "parquet_bytes": 2757751378,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 1532.162
+      },
+      "layout": {
+        "active_bytes": 2757751378,
+        "active_files": 3096,
+        "historical_files": 3096,
+        "ordinary_hosts": 64,
+        "overflow_artifacts": 2904,
+        "partitions": 65,
+        "scenario": "endpoint-v2-1024"
+      },
+      "name": "endpoint-v2-1024",
+      "normalized_stage_peak_bytes": 206404230,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 2.265,
+          "p95_seconds": 2.363,
+          "scenario": "endpoint-v2-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.679,
+          "p95_seconds": 0.696,
+          "scenario": "endpoint-v2-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.012,
+          "p95_seconds": 0.016,
+          "scenario": "endpoint-v2-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.011,
+          "p95_seconds": 10.013,
+          "scenario": "endpoint-v2-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.012,
+          "p95_seconds": 0.012,
+          "scenario": "endpoint-v2-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.075,
+          "p95_seconds": 0.077,
+          "scenario": "endpoint-v2-1024",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.703,
+          "p95_seconds": 0.712,
+          "scenario": "endpoint-v2-1024",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.284,
+          "p95_seconds": 0.331,
+          "scenario": "endpoint-v2-1024",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.078,
+          "p95_seconds": 0.079,
+          "scenario": "endpoint-v2-1024",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.285,
+          "p95_seconds": 0.288,
+          "scenario": "endpoint-v2-1024",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.076,
+          "p95_seconds": 0.079,
+          "scenario": "endpoint-v2-1024",
+          "scope": "endpoint-1023"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.705,
+          "p95_seconds": 0.714,
+          "scenario": "endpoint-v2-1024",
+          "scope": "endpoint-1023"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.286,
+          "p95_seconds": 0.291,
+          "scenario": "endpoint-v2-1024",
+          "scope": "endpoint-1023"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.078,
+          "p95_seconds": 0.081,
+          "scenario": "endpoint-v2-1024",
+          "scope": "endpoint-1023"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.286,
+          "p95_seconds": 0.293,
+          "scenario": "endpoint-v2-1024",
+          "scope": "endpoint-1023"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 160.701,
+        "verify_seconds": 23.105
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.747,
+        "replay_seconds": 363.501,
+        "sort_seconds": 738.015,
+        "source_verify_seconds": 13.873,
+        "stage_seconds": 794.47
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 9.657
+      },
+      "compaction": {
+        "bundles": 24
+      },
+      "compressed_columns": {
+        "co_entities": 24437772,
+        "entities": 688817,
+        "entity_kind": 13762410,
+        "entity_value": 17363732,
+        "event": 7452414,
+        "event_time": 291592136,
+        "record_index": 1501648769,
+        "relations": 163938,
+        "scope_account": 11286418,
+        "scope_host": 14711454,
+        "scope_region": 11286418,
+        "source_hash": 28950323,
+        "source_offset": 11286418,
+        "submicro_nanos": 13119897,
+        "text": 184900291,
+        "time_inferred": 7712387,
+        "time_precision": 11286418
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 1224446333,
+        "files": 1000,
+        "hash_seconds": 21.304,
+        "parquet_bytes": 2759113023,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 1539.551
+      },
+      "layout": {
+        "active_bytes": 2759113023,
+        "active_files": 3099,
+        "historical_files": 3099,
+        "ordinary_hosts": 64,
+        "overflow_artifacts": 2907,
+        "partitions": 65,
+        "scenario": "endpoint-v2-1025"
+      },
+      "name": "endpoint-v2-1025",
+      "normalized_stage_peak_bytes": 206404230,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 2.321,
+          "p95_seconds": 2.423,
+          "scenario": "endpoint-v2-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.672,
+          "p95_seconds": 0.702,
+          "scenario": "endpoint-v2-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.011,
+          "p95_seconds": 0.012,
+          "scenario": "endpoint-v2-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.011,
+          "p95_seconds": 10.013,
+          "scenario": "endpoint-v2-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.012,
+          "p95_seconds": 0.012,
+          "scenario": "endpoint-v2-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.076,
+          "p95_seconds": 0.077,
+          "scenario": "endpoint-v2-1025",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.703,
+          "p95_seconds": 0.774,
+          "scenario": "endpoint-v2-1025",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.286,
+          "p95_seconds": 0.287,
+          "scenario": "endpoint-v2-1025",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.078,
+          "p95_seconds": 0.082,
+          "scenario": "endpoint-v2-1025",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.283,
+          "p95_seconds": 0.287,
+          "scenario": "endpoint-v2-1025",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.076,
+          "p95_seconds": 0.082,
+          "scenario": "endpoint-v2-1025",
+          "scope": "endpoint-1024"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.706,
+          "p95_seconds": 0.715,
+          "scenario": "endpoint-v2-1025",
+          "scope": "endpoint-1024"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.285,
+          "p95_seconds": 0.289,
+          "scenario": "endpoint-v2-1025",
+          "scope": "endpoint-1024"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.077,
+          "p95_seconds": 0.08,
+          "scenario": "endpoint-v2-1025",
+          "scope": "endpoint-1024"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.288,
+          "p95_seconds": 0.292,
+          "scenario": "endpoint-v2-1025",
+          "scope": "endpoint-1024"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 161.385,
+        "verify_seconds": 23.172
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.751,
+        "replay_seconds": 365.153,
+        "sort_seconds": 739.346,
+        "source_verify_seconds": 13.848,
+        "stage_seconds": 799.355
+      }
+    }
+  ],
+  "run": "https://github.com/ns2switch/irmind/actions/runs/41984151442",
+  "runner": "ubuntu-latest",
+  "validation_not_collected": [
+    {
+      "checks": [
+        "hunteval_recall",
+        "worst_path"
+      ],
+      "name": "cloud-v2",
+      "reason": "The evaluator supplied a directory-derived region for the legacy AWS episode whose records declare neither provider nor region; its exact source-pointer assertion stopped validation before recall reporting.",
+      "size": "15gb"
+    },
+    {
+      "checks": [
+        "hunteval_recall"
+      ],
+      "name": "cloud-v2",
+      "reason": "The evaluator supplied a directory-derived region for the legacy AWS episode whose records declare neither provider nor region; its exact source-pointer assertion stopped validation before recall reporting.",
+      "size": "1gb"
+    }
+  ]
+}
