@@ -55,6 +55,7 @@ impl ParquetStore {
         &self,
         spec: &ScanSpec<'a>,
         newest: bool,
+        names: &std::collections::BTreeMap<String, String>,
     ) -> Result<Vec<(TimeBound, &'a ParquetArtifact)>, AppError> {
         let selected = spec
             .artifacts
@@ -109,10 +110,28 @@ impl ParquetStore {
             }
         }
         ordered.sort_by(|(a, fa), (b, fb)| {
-            a.compare(*b, newest).then_with(|| fa.path().cmp(fb.path()))
+            a.compare(*b, newest)
+                .then_with(|| first_source(fa, names).cmp(&first_source(fb, names)))
+                .then_with(|| fa.path().cmp(fb.path()))
         });
         Ok(ordered)
     }
+}
+
+fn first_source<'a>(
+    artifact: &'a ParquetArtifact,
+    names: &'a std::collections::BTreeMap<String, String>,
+) -> Option<(&'a str, &'a str)> {
+    artifact
+        .source_hashes()
+        .iter()
+        .map(|h| {
+            (
+                names.get(h.as_str()).map_or(h.as_str(), String::as_str),
+                h.as_str(),
+            )
+        })
+        .min()
 }
 
 fn file_bound(metadata: &ParquetMetaData, index: usize, newest: bool) -> TimeBound {

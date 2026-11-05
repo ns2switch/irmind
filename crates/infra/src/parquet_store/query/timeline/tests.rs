@@ -132,11 +132,9 @@ fn compacted_style_files_prune_row_groups_in_both_generations_and_directions() {
                         hits.push(EventHit::from_batch(batch, row, precise)?);
                     }
                     ordered(&mut hits, 10, newest)?;
-                    Ok(hits.last().map(|h| {
-                        crate::parquet_store::scan::TimeCutoff(
-                            h.time.time.map(irmind_app::IndexedTime::instant),
-                        )
-                    }))
+                    Ok(hits
+                        .last()
+                        .map(|h| crate::parquet_store::scan::TimeCutoff(h.time.clone())))
                 })
                 .unwrap();
             complete(status).unwrap();
@@ -172,3 +170,5 @@ fn ordered_sources() -> tempfile::TempDir {
     std::fs::write(sources.path().join("events.json"), text).unwrap();
     sources
 }
+
+mod ties;
