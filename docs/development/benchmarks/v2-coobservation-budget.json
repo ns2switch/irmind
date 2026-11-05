@@ -1,0 +1,2228 @@
+{
+  "artifacts": [
+    {
+      "artifact_id": 13447477436,
+      "download_sha256": "19aff6e8dab087d096f2cb388f1c2aa2ce4576400084d9109554dbf8349ad9a6",
+      "name": "parquet-pair-cloud-v2",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "53e281238c6a247ddbebf0b7763e371cfe133fcd",
+            "metric": "PAIRED_REVISION",
+            "scenario": "cloud-v2",
+            "stage": "baseline"
+          },
+          {
+            "active_bytes": 8924960490,
+            "active_files": 3855,
+            "historical_files": 3855,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 0,
+            "overflow_artifacts": 0,
+            "partitions": 260,
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 4035843143,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 10065595,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 319958338,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 10168836,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 967378240,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 10356131,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 8096423,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 9788522,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 20708964,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 8096423,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 9414241,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 5445180,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 8096423,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "active_file_bytes": 5960101247,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 41221103,
+            "scenario": "cloud-v2"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "cloud-v2",
+            "normalized_stage_peak_bytes": 17227901,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15685651146,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 5960101247,
+            "files": 1000,
+            "hash_seconds": 10.25,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 8924960490,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 874.634
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "3504cfc58ada428f6546728f1ba9f630c536e18b",
+            "metric": "PAIRED_REVISION",
+            "scenario": "cloud-v2",
+            "stage": "candidate"
+          },
+          {
+            "active_bytes": 8924960490,
+            "active_files": 3855,
+            "historical_files": 3855,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 0,
+            "overflow_artifacts": 0,
+            "partitions": 260,
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 4035843143,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 10065595,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 319958338,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 10168836,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 967378240,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 10356131,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 8096423,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 9788522,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 20708964,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 8096423,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 9414241,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 5445180,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 8096423,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "active_file_bytes": 5960101247,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 41221103,
+            "scenario": "cloud-v2"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "cloud-v2",
+            "normalized_stage_peak_bytes": 17227901,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15685651146,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 5960101247,
+            "files": 1000,
+            "hash_seconds": 10.231,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 8924960490,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 865.973
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13446459916,
+      "download_sha256": "aeb4cf4a6f83b82abf6b7cd225d2f09eb0f2a10b5986fe85597c35b87f761546",
+      "name": "parquet-pair-endpoint-v2-1",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "53e281238c6a247ddbebf0b7763e371cfe133fcd",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1",
+            "stage": "baseline"
+          },
+          {
+            "active_bytes": 2814352218,
+            "active_files": 3024,
+            "historical_files": 3024,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 1,
+            "overflow_artifacts": 0,
+            "partitions": 1,
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24940000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 7004000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8837000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 143218058,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 692475000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7384000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14509228,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6588000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3809000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "active_file_bytes": 1249196006,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 164951058,
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1249196006,
+            "files": 1000,
+            "hash_seconds": 10.174,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2814352218,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1135.168
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "3504cfc58ada428f6546728f1ba9f630c536e18b",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1",
+            "stage": "candidate"
+          },
+          {
+            "active_bytes": 2814352218,
+            "active_files": 3024,
+            "historical_files": 3024,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 1,
+            "overflow_artifacts": 0,
+            "partitions": 1,
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24940000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 7004000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8837000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 143218058,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 692475000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7384000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14509228,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6588000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3809000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "active_file_bytes": 1249196006,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 164951058,
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1249196006,
+            "files": 1000,
+            "hash_seconds": 10.17,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2814352218,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1120.179
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13448363829,
+      "download_sha256": "65d36bb17db4dbcb4beb8ad9181bec6533941a6810f47653237b0e8581ca2605",
+      "name": "parquet-pair-endpoint-v2-1-chronological",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "53e281238c6a247ddbebf0b7763e371cfe133fcd",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1-chronological",
+            "stage": "baseline"
+          },
+          {
+            "active_bytes": 6604462744,
+            "active_files": 3024,
+            "historical_files": 3024,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 1,
+            "overflow_artifacts": 0,
+            "partitions": 1,
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24940000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 7004000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8837000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 692828039,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 691628430,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7384000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14510020,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6588000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3808982,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "active_file_bytes": 1798265433,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 714561021,
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1-chronological",
+            "normalized_stage_peak_bytes": 13251564,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1798265433,
+            "files": 1000,
+            "hash_seconds": 10.53,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6604462744,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 516.979
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "3504cfc58ada428f6546728f1ba9f630c536e18b",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1-chronological",
+            "stage": "candidate"
+          },
+          {
+            "active_bytes": 6604462744,
+            "active_files": 3024,
+            "historical_files": 3024,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 1,
+            "overflow_artifacts": 0,
+            "partitions": 1,
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24940000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 7004000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8837000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 692828039,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 691628430,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7384000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14510020,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6588000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3808982,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "active_file_bytes": 1798265433,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 714561021,
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1-chronological",
+            "normalized_stage_peak_bytes": 13251564,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1798265433,
+            "files": 1000,
+            "hash_seconds": 10.484,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6604462744,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 508.475
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13450318269,
+      "download_sha256": "ee00def59346b737ea913ae7234f2cf7a8de9a420531dfb89cfb9d07274b1337",
+      "name": "parquet-pair-endpoint-v2-1024",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "53e281238c6a247ddbebf0b7763e371cfe133fcd",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1024",
+            "stage": "baseline"
+          },
+          {
+            "active_bytes": 2757751378,
+            "active_files": 3096,
+            "historical_files": 3096,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2904,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24424928,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 6877336,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8676920,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 139662553,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 678491560,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7245824,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14237456,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6464512,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3736736,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "active_file_bytes": 1223844769,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 160987513,
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1024",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1223844769,
+            "files": 1000,
+            "hash_seconds": 11.597,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2757751378,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1019.857
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "3504cfc58ada428f6546728f1ba9f630c536e18b",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1024",
+            "stage": "candidate"
+          },
+          {
+            "active_bytes": 2757751378,
+            "active_files": 3096,
+            "historical_files": 3096,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2904,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24424928,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 6877336,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8676920,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 139662553,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 678491560,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7245824,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14237456,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6464512,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3736736,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "active_file_bytes": 1223844769,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 160987513,
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1024",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1223844769,
+            "files": 1000,
+            "hash_seconds": 11.537,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2757751378,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1007.507
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13452501711,
+      "download_sha256": "668242a8f61631e30fed75f272936d015c1ac581e81fa00688b04df9e786b393",
+      "name": "parquet-pair-endpoint-v2-1024-chronological",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "53e281238c6a247ddbebf0b7763e371cfe133fcd",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1024-chronological",
+            "stage": "baseline"
+          },
+          {
+            "active_bytes": 6475978072,
+            "active_files": 3096,
+            "historical_files": 3096,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2904,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24424928,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 6877312,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8676896,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 678780974,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 677599350,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7245824,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14240104,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6464512,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3736718,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "active_file_bytes": 1762374572,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 700105916,
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1024-chronological",
+            "normalized_stage_peak_bytes": 13258682,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1762374572,
+            "files": 1000,
+            "hash_seconds": 9.956,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6475978072,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 473.668
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "3504cfc58ada428f6546728f1ba9f630c536e18b",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1024-chronological",
+            "stage": "candidate"
+          },
+          {
+            "active_bytes": 6475978072,
+            "active_files": 3096,
+            "historical_files": 3096,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2904,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24424928,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 6877312,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8676896,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 678780974,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 677599350,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7245824,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14240104,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6464512,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3736718,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5561856,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "active_file_bytes": 1762374572,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 700105916,
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1024-chronological",
+            "normalized_stage_peak_bytes": 13258682,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1762374572,
+            "files": 1000,
+            "hash_seconds": 10.323,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6475978072,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 488.131
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13450946002,
+      "download_sha256": "7c3bde596cbd36770c3f01f6c748950a4ce368fcfd034e21d35b44cb03fbe9d4",
+      "name": "parquet-pair-endpoint-v2-1025",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "53e281238c6a247ddbebf0b7763e371cfe133fcd",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1025",
+            "stage": "baseline"
+          },
+          {
+            "active_bytes": 2759113023,
+            "active_files": 3099,
+            "historical_files": 3099,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2907,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24437772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 6881205,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8681866,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 139707574,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 678832130,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7249624,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14244928,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6467900,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3738669,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "active_file_bytes": 1224446333,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 161043687,
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1025",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1224446333,
+            "files": 1000,
+            "hash_seconds": 10.193,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2759113023,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1099.951
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "3504cfc58ada428f6546728f1ba9f630c536e18b",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1025",
+            "stage": "candidate"
+          },
+          {
+            "active_bytes": 2759113023,
+            "active_files": 3099,
+            "historical_files": 3099,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2907,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24437772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 6881205,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8681866,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 139707574,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 678832130,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7249624,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14244928,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6467900,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3738669,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "active_file_bytes": 1224446333,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 161043687,
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1025",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1224446333,
+            "files": 1000,
+            "hash_seconds": 10.202,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2759113023,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1101.84
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13451773402,
+      "download_sha256": "0f98792a9d5d937b847226a786a9cadf417cff6e3463f94fcd1bac99afa376ff",
+      "name": "parquet-pair-endpoint-v2-1025-chronological",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "53e281238c6a247ddbebf0b7763e371cfe133fcd",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1025-chronological",
+            "stage": "baseline"
+          },
+          {
+            "active_bytes": 6479270339,
+            "active_files": 3099,
+            "historical_files": 3099,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2907,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24437772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 6881180,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8681841,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 679119283,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 677936901,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7249624,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14247712,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6467900,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3738651,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "active_file_bytes": 1763266696,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 700455378,
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1025-chronological",
+            "normalized_stage_peak_bytes": 13258682,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1763266696,
+            "files": 1000,
+            "hash_seconds": 12.759,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6479270339,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 562.992
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "3504cfc58ada428f6546728f1ba9f630c536e18b",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1025-chronological",
+            "stage": "candidate"
+          },
+          {
+            "active_bytes": 6479270339,
+            "active_files": 3099,
+            "historical_files": 3099,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2907,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24437772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 6881180,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8681841,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 679119283,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 677936901,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7249624,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14247712,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6467900,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3738651,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5564772,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "active_file_bytes": 1763266696,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 700455378,
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1025-chronological",
+            "normalized_stage_peak_bytes": 13258682,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1763266696,
+            "files": 1000,
+            "hash_seconds": 12.726,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6479270339,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 559.978
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13447917247,
+      "download_sha256": "fd78858265ed5a4f3d97ff17aa806243b0544fcafcafc51af0d097a4b7e05c4e",
+      "name": "parquet-pair-endpoint-v2-64",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "53e281238c6a247ddbebf0b7763e371cfe133fcd",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-64",
+            "stage": "baseline"
+          },
+          {
+            "active_bytes": 2814149558,
+            "active_files": 3192,
+            "historical_files": 3192,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 0,
+            "partitions": 64,
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24882448,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 7004000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8837000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 143218058,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 692475000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7384000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14508964,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6588000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3809000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "active_file_bytes": 1248898206,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 164951058,
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-64",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1248898206,
+            "files": 1000,
+            "hash_seconds": 10.565,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2814149558,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1051.634
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "3504cfc58ada428f6546728f1ba9f630c536e18b",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-64",
+            "stage": "candidate"
+          },
+          {
+            "active_bytes": 2814149558,
+            "active_files": 3192,
+            "historical_files": 3192,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 0,
+            "partitions": 64,
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24882448,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 7004000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8837000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 143218058,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 692475000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7384000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14508964,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6588000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3809000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "active_file_bytes": 1248898206,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 164951058,
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-64",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1248898206,
+            "files": 1000,
+            "hash_seconds": 10.645,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2814149558,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1071.745
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13450879211,
+      "download_sha256": "b0b3a49e3b43f4152d03d127918ebb5a86b6849fd52eef0561affbf35783db32",
+      "name": "parquet-pair-endpoint-v2-64-chronological",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "53e281238c6a247ddbebf0b7763e371cfe133fcd",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-64-chronological",
+            "stage": "baseline"
+          },
+          {
+            "active_bytes": 6607573126,
+            "active_files": 3192,
+            "historical_files": 3192,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 0,
+            "partitions": 64,
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24882448,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 7004000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8837000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 692828039,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 691628430,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7384000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14509096,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6588000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3808982,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "active_file_bytes": 1798087725,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 714561021,
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-64-chronological",
+            "normalized_stage_peak_bytes": 13258409,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1798087725,
+            "files": 1000,
+            "hash_seconds": 12.696,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6607573126,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 562.491
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "3504cfc58ada428f6546728f1ba9f630c536e18b",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-64-chronological",
+            "stage": "candidate"
+          },
+          {
+            "active_bytes": 6607573126,
+            "active_files": 3192,
+            "historical_files": 3192,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 0,
+            "partitions": 64,
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24882448,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 7004000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 8837000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 692828039,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 691628430,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 7384000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 14509096,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 6588000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 3808982,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 5668000,
+            "metric": "PARQUET_COOBS_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "active_file_bytes": 1798087725,
+            "metric": "PARQUET_COOBS_BUDGET",
+            "repeated_time_column_bytes": 714561021,
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-64-chronological",
+            "normalized_stage_peak_bytes": 13258409,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1798087725,
+            "files": 1000,
+            "hash_seconds": 12.622,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6607573126,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 561.596
+          }
+        ]
+      }
+    }
+  ],
+  "run_url": "https://github.com/ns2switch/irmind/actions/runs/42090681509"
+}
