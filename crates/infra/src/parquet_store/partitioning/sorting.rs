@@ -1,5 +1,6 @@
 //! External stable ordering for parsers whose completed groups arrive out of
 //! source order. Ordered sources avoid this pass entirely.
+mod natural;
 mod run;
 use super::super::{
     AppError, BATCH_BYTES, BATCH_ROWS, CancellationToken, CaseId, ParquetStore, RecordRow,
@@ -131,18 +132,47 @@ fn sort_source(
     source: &mut StagedSource,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
+    let final_run = match natural::try_sort(store, case, source, cancel)? {
+        Some(run) => run,
+        None => external_sort(store, case, source, cancel)?,
+    };
+    source.normalized_hash = run::copy_final(
+        &final_run,
+        source.spool.as_file_mut(),
+        &mut source.disk,
+        cancel,
+    )?;
+    source
+        .spool
+        .as_file_mut()
+        .seek(SeekFrom::Start(0))
+        .map_err(storage)?;
+    source.needs_sort = false;
+    Ok(())
+}
+
+fn staged_reader(source: &mut StagedSource) -> Result<RunReader, AppError> {
     source
         .spool
         .as_file_mut()
         .seek(SeekFrom::Start(0))
         .map_err(storage)?;
     let size = source.spool.as_file().metadata().map_err(storage)?.len();
-    let mut reader = RunReader::new(
+    Ok(RunReader::new(
         source.spool.as_file().try_clone().map_err(storage)?,
         source.normalized_hash,
         size,
         source.report.accepted,
-    );
+    ))
+}
+
+fn external_sort(
+    store: &ParquetStore,
+    case: &CaseId,
+    source: &mut StagedSource,
+    cancel: &CancellationToken,
+) -> Result<Run, AppError> {
+    let mut reader = staged_reader(source)?;
     let mut levels = Vec::new();
     let mut rows = Vec::new();
     let mut bytes = 0usize;
@@ -170,20 +200,7 @@ fn sort_source(
             cancel,
         )?;
     }
-    let final_run = finish_runs(store, case, levels, cancel)?;
-    source.normalized_hash = run::copy_final(
-        &final_run,
-        source.spool.as_file_mut(),
-        &mut source.disk,
-        cancel,
-    )?;
-    source
-        .spool
-        .as_file_mut()
-        .seek(SeekFrom::Start(0))
-        .map_err(storage)?;
-    source.needs_sort = false;
-    Ok(())
+    finish_runs(store, case, levels, cancel)
 }
 
 fn finish_runs(
