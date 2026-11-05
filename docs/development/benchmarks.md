@@ -363,3 +363,26 @@ All V2 queries passed. V1 correctly fails the query target because both host-fil
 Keep **64 hosts per case as the provisional default**, with the approved **1,024 hard ceiling**. This run created 1, 64 and 65 scope partitions for the 1-host, 64-host and larger cases; the latter retain 64 ordinary hosts plus signed overflow. Values beyond the cap remain available in row columns and entity queries. Raising the cap is not supported as an ingestion fix: V2 wall times differ by only about 3% across these workloads, while the shared V2 path is roughly eleven times slower than V1.
 
 The profiled run supports retaining 64 as a conservative starting cap: it bounds large cases to 65 scope buckets and keeps measured ordinary/overflow filtered queries below 0.8 s with 64, 1,024 and 1,025 source hosts. It still varies source cardinality under a fixed cap, so it does not establish that 64 is optimal or measure an alternative cap. Global endpoint timelines and the one-host aggregate remain over budget, and 15 GB V2 ingestion remains over 15 minutes. Keep production V2 writing disabled and step (e) open. Prioritize the external-sort and spool replay paths, then the unfiltered timeline; retain exact ordering, cancellation, signed allocations, rollback and hash checks. Re-measure the unchanged corpus and an additional chronological endpoint control before enabling the writer.
+
+
+### Same-runner ordered-write prototype
+
+The [paired release run](https://github.com/ns2switch/irmind/actions/runs/42062238235) compares baseline `e0c23b603dc581ab8a1146c08f94d3aa8311729b` with prototype `2afce210ba7d5564aa36ef9ee88e9b179211d035`. Each row runs both revisions on the same standard Linux runner. The [structured metrics](benchmarks/v2-ordered-write-prototype.json) retain artifact IDs, download SHA-256 values, phase counters, layout, query p50/p95 and errors. These timings predate immediate speculative-parser restart and are not final optimization acceptance results.
+
+| 15 GB V2 workload | Baseline seconds | Prototype seconds | Change |
+| --- | ---: | ---: | ---: |
+| cloud-v2 | 758.306 | 675.129 | -11.0% |
+| endpoint-v2-1 | 1,487.275 | 1,938.262 | +30.3% |
+| endpoint-v2-1-chronological | 627.333 | 524.809 | -16.3% |
+| endpoint-v2-1024 | 1,247.763 | 1,595.456 | +27.9% |
+| endpoint-v2-1024-chronological | 703.962 | 547.298 | -22.3% |
+| endpoint-v2-1025 | 1,219.913 | 1,607.066 | +31.7% |
+| endpoint-v2-1025-chronological | 697.302 | 554.597 | -20.5% |
+| endpoint-v2-64 | 1,470.019 | 1,929.690 | +31.3% |
+| endpoint-v2-64-chronological | 710.338 | 561.777 | -20.9% |
+
+Cloud ingestion improves by 11%; chronological endpoint ingestion improves by 16–22%. The disordered workloads regress by 28–32% because the prototype finishes its speculative parse before reading the source again for sorting. For 64 hosts, accumulated staging rises from 544.055 to 3,284.603 seconds, while sorting remains about 661–666 seconds and replay/writing rises from 319.301 to 573.886 seconds. Staging includes concurrent parser backpressure; these values are not additive wall-clock percentages.
+
+The implementation now stops speculation at the first decreasing batch, retains the original hash/metadata snapshot and authenticates the complete fallback parse. Real cancellation and parser errors remain errors. Ordered sources use no normalized spool. Temporary-disk accounting includes all retained provisional batch artifacts, not just normalized records; the historical metric name remains `normalized_stage_peak_bytes`.
+
+Both revisions retain 19/19 events, 10/10 entities and 14/14 path checks per cloud provider, with zero parse errors. Historical and active Parquet byte totals match within each pair; that size equality alone is not a full-file hash-equivalence proof. Dedicated reconstruction and byte-equivalence tests cover the writer. Disordered ingestion and some endpoint timelines still fail their unchanged targets in this prototype run. Keep V1 as the default and use the subsequent corrected paired measurements for activation decisions.
