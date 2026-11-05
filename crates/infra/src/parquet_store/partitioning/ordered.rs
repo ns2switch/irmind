@@ -4,7 +4,7 @@ use super::super::{
     AppError, CancellationToken, ParquetStore, PreparedSource, invalid_source, storage,
 };
 use super::Allocator;
-use super::batch::Writing;
+use super::batch::{PreparedPartition, Writing};
 use super::staging::Input;
 use irmind_app::LocalBatchRequest;
 pub(super) use producer::ParsedSource;
@@ -20,7 +20,7 @@ impl ParquetStore {
         allocator: &mut Allocator,
         cancel: &CancellationToken,
     ) -> Result<Vec<PreparedSource>, AppError> {
-        std::thread::scope(|scope| {
+        let prepared = std::thread::scope(|scope| {
             let workers = inputs
                 .into_iter()
                 .map(|input| {
@@ -68,7 +68,30 @@ impl ParquetStore {
                 }
             }
             prepared
-        })
+        })?;
+        // Preserve all-or-nothing parser preparation: no durable artifact is
+        // published until every source has completed parsing and hash checks.
+        prepared
+            .into_iter()
+            .map(|p| {
+                let PreparedPartition {
+                    source,
+                    staged,
+                    disk,
+                } = p;
+                drop(disk);
+                let other_temporary_bytes = self.profile.as_ref().map_or(0, |p| {
+                    p.staging_live.load(std::sync::atomic::Ordering::Relaxed)
+                });
+                self.publish_partition_source(
+                    request,
+                    source,
+                    staged,
+                    cancel,
+                    other_temporary_bytes,
+                )
+            })
+            .collect()
     }
 
     fn consume_ordered_rows(
@@ -118,7 +141,7 @@ impl ParquetStore {
         trial: Allocator,
         allocator: &mut Allocator,
         cancel: &CancellationToken,
-    ) -> Result<PreparedSource, AppError> {
+    ) -> Result<PreparedPartition, AppError> {
         if let Some(mut state) = state {
             let parser = request
                 .parser
@@ -128,10 +151,8 @@ impl ParquetStore {
                 &source.manifest.sha256,
                 parser,
             )?;
-            let prepared =
-                self.publish_partition_source(request, source, state.staged, cancel, 0)?;
             *allocator = trial;
-            return Ok(prepared);
+            return PreparedPartition::new(source, state.staged, self.profile.clone());
         }
         source.source.seek(SeekFrom::Start(0)).map_err(storage)?;
         let expected = source.manifest.clone();
@@ -158,8 +179,7 @@ impl ParquetStore {
                 .map(|p| p.measure(super::super::PartitionPhase::Sort));
             self.sort_staged_sources(request.case_id, std::slice::from_mut(&mut staged), cancel)?;
         }
-        let bytes = staged.spool.as_file().metadata().map_err(storage)?.len();
-        self.write_partition_source(request, staged, allocator, cancel, bytes)
+        self.replay_partition_source(request, staged, allocator, cancel)
     }
 }
 

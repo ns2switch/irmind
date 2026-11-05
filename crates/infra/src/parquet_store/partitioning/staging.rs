@@ -162,7 +162,7 @@ pub(super) fn check_space(available: u64, required: u64) -> Result<(), AppError>
     }
     Ok(())
 }
-fn no_space() -> AppError {
+pub(super) fn no_space() -> AppError {
     AppError::Fixed(irmind_app::FixedAppError::StorageNormalizedStagingSpace)
 }
 
