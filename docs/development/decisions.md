@@ -255,6 +255,6 @@ Consequences: any production implementation remains a separate compatibility dec
 
 Context: precise entity queries need exact counts and earliest/latest records, not a rendered timestamp for every matching row. Formatting every timestamp and allocating source/hash ordering keys adds work that legacy second-resolution queries avoid.
 
-Decision: retain physical precise timestamps during count/extrema scans, compare borrowed source/hash keys with the existing stable comparator, and allocate only retained extrema. Render their timestamps once when producing the final result. Other query projections keep their displayed timestamps. Record separate verification, scan, normalization and aggregation timers in paired release measurements.
+Decision: retain physical precise timestamps during count/extrema scans, compare borrowed source/hash keys with the existing stable comparator, and allocate at most two retained extrema per batch. Render their timestamps once when producing the final result. Other query projections keep their displayed timestamps. Record separate verification, scan, normalization and aggregation timers in paired release measurements.
 
 Consequences: preserve exact mixed-generation, pre-epoch and submicrosecond ordering, unknown-time counts, source membership validation and hash checks. No schema, signed encoding, port or default-writer change. Query phase timers overlap the scan pipeline and must not be summed as wall-clock percentages.

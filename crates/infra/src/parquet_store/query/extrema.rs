@@ -11,27 +11,44 @@ pub(super) fn accumulate(
     profile: Option<&ParquetProfile>,
 ) -> Result<(), AppError> {
     let _aggregate = profile.map(|p| p.query_timer(super::super::profile::QueryPhase::Aggregate));
+    let (mut batch_first, mut batch_last) = (None::<BorrowedCell<'_>>, None::<BorrowedCell<'_>>);
     for row in 0..batch.num_rows() {
         let at = BorrowedCell::from_batch(batch, row)?;
         *count += 1;
         if at.has_time() {
-            if first
-                .as_ref()
-                .map(|old| at.compare(old, false))
+            if batch_first
+                .map(|old| at.compare_borrowed(old))
                 .transpose()?
                 .is_none_or(std::cmp::Ordering::is_lt)
             {
-                *first = Some(at.to_owned());
+                batch_first = Some(at);
             }
-            if last
-                .as_ref()
-                .map(|old| at.compare(old, false))
+            if batch_last
+                .map(|old| at.compare_borrowed(old))
                 .transpose()?
                 .is_none_or(std::cmp::Ordering::is_gt)
             {
-                *last = Some(at.to_owned());
+                batch_last = Some(at);
             }
         }
+    }
+    if let Some(at) = batch_first
+        && first
+            .as_ref()
+            .map(|old| at.compare(old, false))
+            .transpose()?
+            .is_none_or(std::cmp::Ordering::is_lt)
+    {
+        *first = Some(at.to_owned());
+    }
+    if let Some(at) = batch_last
+        && last
+            .as_ref()
+            .map(|old| at.compare(old, false))
+            .transpose()?
+            .is_none_or(std::cmp::Ordering::is_gt)
+    {
+        *last = Some(at.to_owned());
     }
 
     Ok(())

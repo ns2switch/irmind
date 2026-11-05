@@ -3,6 +3,7 @@ use super::{AppError, RecordBatch, TimeCell, invalid_source, read_time};
 use arrow::array::{Array as _, StringArray, UInt64Array};
 use irmind_app::IndexedTime;
 
+#[derive(Clone, Copy)]
 pub(in crate::parquet_store) struct BorrowedCell<'a> {
     time: Option<IndexedTime>,
     source: &'a str,
@@ -44,21 +45,29 @@ impl<'a> BorrowedCell<'a> {
         other: &TimeCell,
         newest: bool,
     ) -> Result<std::cmp::Ordering, AppError> {
-        irmind_domain::compare_record_keys(
-            irmind_domain::StableRecordKey {
-                instant: self.time.map(IndexedTime::instant),
-                source: self.source,
-                source_hash: self.hash,
-                source_offset: self.offset,
-                record_index: self.index,
-            },
-            other.key(),
-            newest,
-        )
-        .map_err(|_| invalid_source())
+        irmind_domain::compare_record_keys(self.key(), other.key(), newest)
+            .map_err(|_| invalid_source())
     }
 
-    pub(in crate::parquet_store) fn to_owned(&self) -> TimeCell {
+    pub(in crate::parquet_store) fn compare_borrowed(
+        self,
+        other: Self,
+    ) -> Result<std::cmp::Ordering, AppError> {
+        irmind_domain::compare_record_keys(self.key(), other.key(), false)
+            .map_err(|_| invalid_source())
+    }
+
+    fn key(self) -> irmind_domain::StableRecordKey<'a> {
+        irmind_domain::StableRecordKey {
+            instant: self.time.map(IndexedTime::instant),
+            source: self.source,
+            source_hash: self.hash,
+            source_offset: self.offset,
+            record_index: self.index,
+        }
+    }
+
+    pub(in crate::parquet_store) fn to_owned(self) -> TimeCell {
         TimeCell {
             time: self.time,
             source: self.source.into(),
