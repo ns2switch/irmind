@@ -83,6 +83,7 @@ jobs:
           done
           exit "$failed"
       - name: Measure warm build and binary size
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -o pipefail

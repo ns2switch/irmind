@@ -113,15 +113,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
                 .map(|name| fs::metadata(source_root.join(name)).unwrap().len())
                 .sum::<u64>();
             for batch in names.chunks(4) {
-                ingest
-                    .ingest_local_batch(
-                        &case.id,
-                        &source_root,
-                        batch,
-                        false,
-                        &CancellationToken::new(),
-                    )
-                    .unwrap();
+                corpus::ingest_selected(&ingest, &case.id, &source_root, batch);
             }
             episodes
         });
@@ -151,9 +143,15 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         parquet_time.as_secs_f64(),
         ingest_time.as_secs_f64()
     );
-    assert!(
-        ingest_time < std::time::Duration::from_mins(15),
-        "Parquet ingestion exceeded the 15-minute benchmark target"
+    let ingest_target = ingest_time < std::time::Duration::from_mins(15);
+    let [stage, sort, replay, source_verify, publish] = profile.partition_snapshot();
+    println!(
+        "PARQUET_V2_PHASE stage_seconds={:.3} sort_seconds={:.3} replay_seconds={:.3} source_verify_seconds={:.3} publish_seconds={:.3}",
+        stage.as_secs_f64(),
+        sort.as_secs_f64(),
+        replay.as_secs_f64(),
+        source_verify.as_secs_f64(),
+        publish.as_secs_f64()
     );
     let cold_started = Instant::now();
     let cold = store.graph_summary(&case.id);
@@ -162,8 +160,8 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         cold_started.elapsed().as_secs_f64(),
         cold.is_err()
     );
-    cold.unwrap();
-    measurements::report_queries(store.as_ref(), &case.id, scenario);
+    let cold_target = cold.is_ok();
+    let query_target = measurements::report_queries(store.as_ref(), &case.id, scenario);
     let [_, _, _, _, verify_time, scan_time] = profile.snapshot();
     println!(
         "PARQUET_QUERY_PHASE verify_seconds={:.3} scan_seconds={:.3}",
@@ -188,6 +186,15 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         );
         assert!(path.contains("truncated"));
     }
+    assert!(
+        ingest_target,
+        "Parquet ingestion exceeded the 15-minute benchmark target"
+    );
+    assert!(cold_target, "cold graph summary failed");
+    assert!(
+        query_target,
+        "Parquet queries failed or exceeded the 10-second benchmark target"
+    );
 }
 
 #[test]

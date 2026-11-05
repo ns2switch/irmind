@@ -68,14 +68,13 @@ impl ParquetStore {
     ) -> Result<StagedSource, AppError> {
         let (metadata, hash, size) =
             stream::initial_hash(&mut input.file, cancel, self.profile.as_deref())?;
+        let _stage = self
+            .profile
+            .as_ref()
+            .map(|p| p.measure(super::super::PartitionPhase::Stage));
         let value = irmind_domain::EvidenceHash::parse(&irmind_app::hex(&hash))
             .map_err(|_| invalid_source())?;
-        input.file.seek(SeekFrom::Start(0)).map_err(storage)?;
-        let mut sample = Vec::new();
-        (&mut input.file)
-            .take(64 * 1024)
-            .read_to_end(&mut sample)
-            .map_err(storage)?;
+        let sample = source_sample(&mut input.file)?;
         let mut spool = self.create_normalized_spool(case)?;
         let mut writer = std::io::BufWriter::new(spool.as_file_mut());
         let mut bytes = 0u64;
@@ -146,6 +145,15 @@ impl ParquetStore {
             disk,
         })
     }
+}
+
+fn source_sample(file: &mut File) -> Result<Vec<u8>, AppError> {
+    file.seek(SeekFrom::Start(0)).map_err(storage)?;
+    let mut sample = Vec::new();
+    file.take(64 * 1024)
+        .read_to_end(&mut sample)
+        .map_err(storage)?;
+    Ok(sample)
 }
 
 pub(super) fn check_space(available: u64, required: u64) -> Result<(), AppError> {

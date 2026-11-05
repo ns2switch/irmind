@@ -68,18 +68,19 @@ pub(super) fn report_storage(
     coobs
 }
 
-pub(super) fn report_queries(store: &LocalStore, id: &CaseId, scenario: &Scenario) {
+pub(super) fn report_queries(store: &LocalStore, id: &CaseId, scenario: &Scenario) -> bool {
     let filter = GraphQueryFilter::default();
-    sample_queries(store, id, scenario, &filter, "all");
+    let mut met_target = sample_queries(store, id, scenario, &filter, "all");
     if let Some(hosts) = scenario.hosts {
-        for host in [0, hosts - 1] {
+        for host in [0, hosts - 1].into_iter().collect::<BTreeSet<_>>() {
             let name = format!("endpoint-{host:04}");
             let filter =
                 GraphQueryFilter::parse_with_host(None, None, None, None, None, Some(&name))
                     .unwrap();
-            sample_queries(store, id, scenario, &filter, &name);
+            met_target = sample_queries(store, id, scenario, &filter, &name) && met_target;
         }
     }
+    met_target
 }
 
 fn sample_queries(
@@ -88,13 +89,14 @@ fn sample_queries(
     scenario: &Scenario,
     filter: &GraphQueryFilter,
     scope: &str,
-) {
+) -> bool {
     let (kind, value, to_kind, to_value) = scenario.target();
     let value = if scope.starts_with("endpoint-") {
         scope
     } else {
         value
     };
+    let mut met_target = true;
     for label in ["term", "entity", "neighbors", "timeline", "path"] {
         let mut timings = Vec::new();
         let mut errors = 0;
@@ -127,10 +129,7 @@ fn sample_queries(
             timings[2].as_secs_f64(),
             timings[4].as_secs_f64()
         );
-        assert_eq!(errors, 0, "{label} query failed");
-        assert!(
-            timings[4] < std::time::Duration::from_secs(10),
-            "{label} query exceeded the 10-second benchmark target"
-        );
+        met_target &= errors == 0 && timings[4] < std::time::Duration::from_secs(10);
     }
+    met_target
 }
