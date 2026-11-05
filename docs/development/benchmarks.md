@@ -257,3 +257,34 @@ Query samples retain SHA-256 verification and the existing result, sampling, exp
 
 The workflow accepts a specific scenario for reproducing a measured failure. A full comparison continues through the remaining workloads if one fails, then returns a failing status; individual query and ingestion targets are unchanged. The host-cap recommendation and result tables are filled from the workflow output before production V2 writing is enabled. The hard ceiling remains 1,024. No runtime limit is relaxed by the benchmark.
 
+
+### Initial standard-runner measurement
+
+The [initial release run](https://github.com/ns2switch/irmind/actions/runs/41936657135) completed unsuccessfully. The [machine-readable measurements](benchmarks/artifact-v2-initial.json) retain its observed results, not acceptance claims. All scenarios used the same standard Linux runner and source commit. No timing below comes from an unoptimized build.
+
+| Scenario | Input GB | Ingestion seconds | Parquet GB | Co-observation GB | Normalized staging peak MiB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| cloud-v1 (15gb) | 15.686 | 308.245 | 8.452 | 5.724 | 0.000 |
+| cloud-v1 (1gb) | 1.046 | 33.019 | 0.782 | 0.417 | 0.000 |
+| endpoint-v1-1 (15gb) | 15.676 | 112.184 | 2.390 | 0.481 | 0.000 |
+| endpoint-v1-64 (15gb) | 15.676 | 115.244 | 2.392 | 0.481 | 0.000 |
+| endpoint-v1-1024 (15gb) | 15.676 | 111.085 | 2.393 | 0.481 | 0.000 |
+| endpoint-v1-1025 (15gb) | 15.676 | 111.963 | 2.393 | 0.481 | 0.000 |
+| endpoint-v2-1 (15gb) | 15.676 | 1259.540 | 2.814 | 1.249 | 196.842 |
+| endpoint-v2-64 (15gb) | 15.676 | 1251.331 | 2.814 | 1.249 | 196.842 |
+| endpoint-v2-1024 (15gb) | 15.676 | 1233.883 | 2.758 | 1.224 | 196.842 |
+| endpoint-v2-1025 (15gb) | 15.676 | 1220.351 | 2.759 | 1.224 | 196.842 |
+
+V1 CloudTrail passed the ingestion and sampled-query targets at both sizes. On 15 GB, p95 was 2.546 s for term search, 3.706 s for entity lookup, 0.502 s for neighbors, 0.019 s for timeline and 0.500 s for path. HuntEval retained 19/19 malicious events, 10/10 entities and 14/14 path checks for each provider, with zero parse errors, in the reference, 1 GB and 15 GB corpora. The bounded worst-case path took 10.001 s and explicitly reported time-budget truncation.
+
+V1 endpoint timelines hit the unchanged 10-second deadline in all four host workloads. The first query failure prevented the original harness from collecting later unfiltered/host-filtered measurements. V2 endpoint ingestion took 1,220–1,260 seconds, exceeding the 900-second target; its original ingestion assertion prevented query sampling. The cloud V2 workloads stopped when the benchmark inserted HuntEval without the required explicit parser selection. This is an invalid benchmark call, not a reason to bypass that requirement.
+
+The original conversion, row and Parquet counters cover V1 only. Their V2 zeroes mean uninstrumented phases, not zero work. V1 accumulated worker durations overlap and must not be added or presented as percentages of wall time. The normalized staging peak is 206,404,230 bytes (196.842 MiB); it excludes published Parquet and original sources. The new optional V2 counters separate parsing/normalized staging, sorting, spool replay/partitioned writing, original re-verification and consolidation/publication. Staging accumulates concurrent worker time; the later phases are sequential within a prepared batch. These counters record no source content.
+
+All four endpoint V1 cases store 8,696,000 compressed bytes in `event_time`, compared with 291,496,017–298,855,350 in V2 across the recorded artifacts. This is not a type-only integer-versus-string comparison: V1 collapses the synthetic microseconds to repeated whole seconds, whereas V2 retains the distinct instants. The JSON measurement records every compressed column, including the new precision/scope metadata. Aggregate Parquet grows from about 2.39 GB to 2.76–2.81 GB, with co-observation growing from about 0.48 GB to 1.22–1.25 GB.
+
+### Host-cap recommendation and remaining gate
+
+Keep **64 hosts per case as the provisional default**, with the approved **1,024 hard ceiling**. This run created 1, 64 and 65 scope partitions for the 1-host, 64-host and larger cases; the latter retain 64 ordinary hosts plus signed overflow. Values beyond the cap remain available in row columns and entity queries. Raising the cap is not supported as an ingestion fix: V2 wall times differ by only about 3% across these workloads, while the shared V2 path is roughly eleven times slower than V1.
+
+The run varies source cardinality under a fixed cap of 64; it does not prove that 64 is an optimal cap or establish V2 query latency. Keep production V2 writing disabled. The corrected harness records all query scopes and its failure targets before failing, uses the selected-parser ingestion path for HuntEval, and collects warm-build/binary-size measurements even when a target fails. The final workflow still fails for any ingestion/query target violation. Complete the phase profile and filtered/overflow query measurements before treating this recommendation as validated or closing step (e).

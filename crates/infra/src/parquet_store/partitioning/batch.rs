@@ -43,7 +43,13 @@ impl ParquetStore {
                 .collect::<Vec<_>>();
             joined.into_iter().collect::<Result<Vec<_>, _>>()
         })?;
-        self.sort_staged_sources(request.case_id, &mut staged, cancel)?;
+        {
+            let _sort = self
+                .profile
+                .as_ref()
+                .map(|p| p.measure(super::super::PartitionPhase::Sort));
+            self.sort_staged_sources(request.case_id, &mut staged, cancel)?;
+        }
         let mut normalized_bytes = staged.iter().try_fold(0u64, |n, s| {
             Ok::<_, AppError>(
                 n.saturating_add(s.spool.as_file().metadata().map_err(storage)?.len()),
@@ -78,6 +84,10 @@ impl ParquetStore {
         cancel: &CancellationToken,
         normalized_bytes: u64,
     ) -> Result<PreparedSource, AppError> {
+        let replay = self
+            .profile
+            .as_ref()
+            .map(|p| p.measure(super::super::PartitionPhase::Replay));
         let mut state = Writing::default();
         let dir = self.case_dir(request.case_id)?;
         let parser = request
@@ -109,10 +119,21 @@ impl ParquetStore {
             ));
         }
         state.finish(&dir, &source.manifest.sha256, parser)?;
+        drop(replay);
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        self.verify_local_source(request.source_root, &source.manifest, cancel)?;
+        {
+            let _verify = self
+                .profile
+                .as_ref()
+                .map(|p| p.measure(super::super::PartitionPhase::SourceVerify));
+            self.verify_local_source(request.source_root, &source.manifest, cancel)?;
+        }
+        let _publish = self
+            .profile
+            .as_ref()
+            .map(|p| p.measure(super::super::PartitionPhase::Publish));
         if request.copy_original {
             self.copy_source(
                 request.case_id,

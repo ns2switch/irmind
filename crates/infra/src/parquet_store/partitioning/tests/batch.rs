@@ -172,6 +172,12 @@ fn revisiting_evicted_buckets_publishes_one_artifact_per_family() {
         )
         .unwrap();
     assert!(profile.temporary_disk_peak() > 0);
+    let [stage, _, replay, source_verify, publish] = profile.partition_snapshot();
+    assert!(
+        [stage, replay, source_verify, publish]
+            .iter()
+            .all(|d| !d.is_zero())
+    );
     assert_eq!(prepared[0].records, 40);
     assert_eq!(prepared[0].artifacts.len(), 60);
     for a in &prepared[0].artifacts {

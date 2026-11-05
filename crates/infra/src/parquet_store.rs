@@ -17,15 +17,17 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 use std::time::UNIX_EPOCH;
-use std::time::{Duration, Instant};
 
 mod compact;
 mod format;
 mod local;
 mod migration;
 mod partitioning;
+mod profile;
+pub(crate) use profile::ParquetProfile;
+use profile::PartitionPhase;
 mod query;
 mod reconstruction;
 mod scan;
@@ -67,74 +69,6 @@ pub struct ParquetStore {
     profile: Option<Arc<ParquetProfile>>,
     legacy_entities: bool,
     precise_time: bool,
-}
-
-#[derive(Default)]
-pub(crate) struct ParquetProfile {
-    hash: AtomicU64,
-    conversion: AtomicU64,
-    row: AtomicU64,
-    parquet: AtomicU64,
-    query_verify: AtomicU64,
-    query_scan: AtomicU64,
-    staging_peak: AtomicU64,
-    staging_live: AtomicU64,
-}
-
-impl ParquetProfile {
-    fn nanos(duration: Duration) -> u64 {
-        u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
-    }
-
-    fn record_hash(&self, duration: Duration) {
-        self.hash
-            .fetch_add(Self::nanos(duration), Ordering::Relaxed);
-    }
-
-    fn record_conversion(&self, duration: Duration) {
-        self.conversion
-            .fetch_add(Self::nanos(duration), Ordering::Relaxed);
-    }
-
-    fn record_row(&self, duration: Duration) {
-        self.row.fetch_add(Self::nanos(duration), Ordering::Relaxed);
-    }
-
-    fn record_parquet(&self, duration: Duration) {
-        self.parquet
-            .fetch_add(Self::nanos(duration), Ordering::Relaxed);
-    }
-
-    fn record_query_verify(&self, duration: Duration) {
-        self.query_verify
-            .fetch_add(Self::nanos(duration), Ordering::Relaxed);
-    }
-
-    fn record_query_scan(&self, duration: Duration) {
-        self.query_scan
-            .fetch_add(Self::nanos(duration), Ordering::Relaxed);
-    }
-
-    fn record_staging_peak(&self, bytes: u64) {
-        self.staging_peak.fetch_max(bytes, Ordering::Relaxed);
-    }
-
-    #[cfg(test)]
-    pub(crate) fn temporary_disk_peak(&self) -> u64 {
-        self.staging_peak.load(Ordering::Relaxed)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn snapshot(&self) -> [Duration; 6] {
-        [
-            Duration::from_nanos(self.hash.load(Ordering::Relaxed)),
-            Duration::from_nanos(self.conversion.load(Ordering::Relaxed)),
-            Duration::from_nanos(self.row.load(Ordering::Relaxed)),
-            Duration::from_nanos(self.parquet.load(Ordering::Relaxed)),
-            Duration::from_nanos(self.query_verify.load(Ordering::Relaxed)),
-            Duration::from_nanos(self.query_scan.load(Ordering::Relaxed)),
-        ]
-    }
 }
 
 impl ParquetStore {

@@ -1,0 +1,675 @@
+{
+  "commit": "7a25406f1410a602ebe50e7fecf7f58f8d3ecee9",
+  "ingest_target_seconds": 900,
+  "missing_scenarios": [
+    {
+      "name": "cloud-v2",
+      "reason": "Benchmark HuntEval insertion omitted the required explicit parser selection.",
+      "size": "1gb"
+    },
+    {
+      "name": "cloud-v2",
+      "reason": "Benchmark HuntEval insertion omitted the required explicit parser selection.",
+      "size": "15gb"
+    }
+  ],
+  "passed": false,
+  "phase_accounting": "V1 counters accumulate overlapping worker time. V2 conversion, row and parquet zeroes are uninstrumented, not zero-cost operations.",
+  "profile": "release",
+  "query_target_seconds": 10,
+  "results": [
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 2.98
+      },
+      "compressed_columns": {
+        "co_entities": 4035842120,
+        "entities": 121433474,
+        "entity_kind": 20129894,
+        "entity_value": 639915266,
+        "event": 11704027,
+        "event_time": 23955039,
+        "record_index": 2052698032,
+        "relations": 91355776,
+        "source_hash": 41881506,
+        "text": 729559220
+      },
+      "ingestion": {
+        "bytes": 15685651146,
+        "conversion_seconds": 668.91,
+        "coobservation_bytes": 5723788884,
+        "files": 1000,
+        "hash_seconds": 10.41,
+        "parquet_bytes": 8451871774,
+        "parquet_seconds": 207.187,
+        "row_seconds": 92.093,
+        "wall_seconds": 308.245
+      },
+      "layout": {
+        "active_bytes": 8451871774,
+        "active_files": 3855,
+        "historical_files": 3855,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "cloud-v1"
+      },
+      "name": "cloud-v1",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 2.497,
+          "p95_seconds": 2.546,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 3.632,
+          "p95_seconds": 3.706,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.446,
+          "p95_seconds": 0.502,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.019,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.447,
+          "p95_seconds": 0.5,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        }
+      ],
+      "size": "15gb",
+      "worst_path": {
+        "seconds": 10.001,
+        "time_budget": true,
+        "truncated": true
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 0.382
+      },
+      "compressed_columns": {
+        "co_entities": 296721403,
+        "entities": 46350009,
+        "entity_kind": 1599026,
+        "entity_value": 70433770,
+        "event": 927286,
+        "event_time": 1840658,
+        "record_index": 107182603,
+        "relations": 32073177,
+        "source_hash": 3277087,
+        "text": 159310422
+      },
+      "ingestion": {
+        "bytes": 1045757022,
+        "conversion_seconds": 52.667,
+        "coobservation_bytes": 417450101,
+        "files": 1000,
+        "hash_seconds": 0.833,
+        "parquet_bytes": 782415667,
+        "parquet_seconds": 14.895,
+        "row_seconds": 6.473,
+        "wall_seconds": 33.019
+      },
+      "layout": {
+        "active_bytes": 782415667,
+        "active_files": 3084,
+        "historical_files": 3084,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "cloud-v1"
+      },
+      "name": "cloud-v1",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.205,
+          "p95_seconds": 0.239,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.236,
+          "p95_seconds": 0.238,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.061,
+          "p95_seconds": 0.063,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.389,
+          "p95_seconds": 0.394,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.059,
+          "p95_seconds": 0.062,
+          "scenario": "cloud-v1",
+          "scope": "all"
+        }
+      ],
+      "size": "1gb"
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 3.704
+      },
+      "compressed_columns": {
+        "co_entities": 12852000,
+        "entities": 380000,
+        "entity_kind": 7166000,
+        "entity_value": 8980000,
+        "event": 3922000,
+        "event_time": 8696000,
+        "record_index": 765062000,
+        "relations": 92000,
+        "source_hash": 15179102,
+        "text": 1371149245
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 376.966,
+        "coobservation_bytes": 480939572,
+        "files": 1000,
+        "hash_seconds": 10.562,
+        "parquet_bytes": 2390220347,
+        "parquet_seconds": 148.057,
+        "row_seconds": 77.834,
+        "wall_seconds": 112.184
+      },
+      "layout": {
+        "active_bytes": 2390220347,
+        "active_files": 3000,
+        "historical_files": 3000,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "endpoint-v1-1"
+      },
+      "name": "endpoint-v1-1",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 3.679,
+          "p95_seconds": 3.683,
+          "scenario": "endpoint-v1-1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 3.959,
+          "p95_seconds": 4.019,
+          "scenario": "endpoint-v1-1",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.01,
+          "p95_seconds": 0.011,
+          "scenario": "endpoint-v1-1",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.02,
+          "p95_seconds": 10.026,
+          "scenario": "endpoint-v1-1",
+          "scope": "all"
+        }
+      ],
+      "size": "15gb"
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 3.585
+      },
+      "compressed_columns": {
+        "co_entities": 12822352,
+        "entities": 379128,
+        "entity_kind": 7166000,
+        "entity_value": 8980000,
+        "event": 3922000,
+        "event_time": 8696000,
+        "record_index": 765062000,
+        "relations": 92000,
+        "source_hash": 15178826,
+        "text": 1372736952
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 377.135,
+        "coobservation_bytes": 480909788,
+        "files": 1000,
+        "hash_seconds": 10.729,
+        "parquet_bytes": 2391777258,
+        "parquet_seconds": 144.139,
+        "row_seconds": 80.089,
+        "wall_seconds": 115.244
+      },
+      "layout": {
+        "active_bytes": 2391777258,
+        "active_files": 3000,
+        "historical_files": 3000,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "endpoint-v1-64"
+      },
+      "name": "endpoint-v1-64",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 3.316,
+          "p95_seconds": 3.356,
+          "scenario": "endpoint-v1-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.26,
+          "p95_seconds": 0.261,
+          "scenario": "endpoint-v1-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.008,
+          "p95_seconds": 0.009,
+          "scenario": "endpoint-v1-64",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.022,
+          "p95_seconds": 10.027,
+          "scenario": "endpoint-v1-64",
+          "scope": "all"
+        }
+      ],
+      "size": "15gb"
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 3.656
+      },
+      "compressed_columns": {
+        "co_entities": 12864512,
+        "entities": 382068,
+        "entity_kind": 7166000,
+        "entity_value": 8982832,
+        "event": 3922000,
+        "event_time": 8696000,
+        "record_index": 765040016,
+        "relations": 92000,
+        "source_hash": 15178412,
+        "text": 1374008086
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 371.216,
+        "coobservation_bytes": 480942360,
+        "files": 1000,
+        "hash_seconds": 10.549,
+        "parquet_bytes": 2393074334,
+        "parquet_seconds": 143.759,
+        "row_seconds": 77.176,
+        "wall_seconds": 111.085
+      },
+      "layout": {
+        "active_bytes": 2393074334,
+        "active_files": 3000,
+        "historical_files": 3000,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "endpoint-v1-1024"
+      },
+      "name": "endpoint-v1-1024",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 3.377,
+          "p95_seconds": 3.566,
+          "scenario": "endpoint-v1-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.198,
+          "p95_seconds": 0.206,
+          "scenario": "endpoint-v1-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.008,
+          "p95_seconds": 0.008,
+          "scenario": "endpoint-v1-1024",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.021,
+          "p95_seconds": 10.023,
+          "scenario": "endpoint-v1-1024",
+          "scope": "all"
+        }
+      ],
+      "size": "15gb"
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 3.593
+      },
+      "compressed_columns": {
+        "co_entities": 12866115,
+        "entities": 382186,
+        "entity_kind": 7166000,
+        "entity_value": 8982950,
+        "event": 3922000,
+        "event_time": 8696000,
+        "record_index": 765039100,
+        "relations": 92000,
+        "source_hash": 15178412,
+        "text": 1374038710
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 375.599,
+        "coobservation_bytes": 480943572,
+        "files": 1000,
+        "hash_seconds": 10.629,
+        "parquet_bytes": 2393105898,
+        "parquet_seconds": 146.946,
+        "row_seconds": 77.388,
+        "wall_seconds": 111.963
+      },
+      "layout": {
+        "active_bytes": 2393105898,
+        "active_files": 3000,
+        "historical_files": 3000,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 0,
+        "scenario": "endpoint-v1-1025"
+      },
+      "name": "endpoint-v1-1025",
+      "normalized_stage_peak_bytes": 0,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 3.323,
+          "p95_seconds": 3.453,
+          "scenario": "endpoint-v1-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.202,
+          "p95_seconds": 0.21,
+          "scenario": "endpoint-v1-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.008,
+          "p95_seconds": 0.009,
+          "scenario": "endpoint-v1-1025",
+          "scope": "all"
+        },
+        {
+          "errors": 5,
+          "name": "timeline",
+          "p50_seconds": 10.02,
+          "p95_seconds": 10.026,
+          "scenario": "endpoint-v1-1025",
+          "scope": "all"
+        }
+      ],
+      "size": "15gb"
+    },
+    {
+      "compressed_columns": {
+        "co_entities": 24940000,
+        "entities": 684438,
+        "entity_kind": 14008000,
+        "entity_value": 17674000,
+        "event": 7590436,
+        "event_time": 298855350,
+        "record_index": 1531795983,
+        "relations": 166902,
+        "scope_account": 11495714,
+        "scope_host": 14974436,
+        "scope_region": 11495714,
+        "source_hash": 29488662,
+        "source_offset": 11495714,
+        "submicro_nanos": 13363458,
+        "text": 188259683,
+        "time_inferred": 7857538,
+        "time_precision": 11495714
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 1249196006,
+        "files": 1000,
+        "hash_seconds": 10.716,
+        "parquet_bytes": 2814352218,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 1259.54
+      },
+      "layout": {
+        "active_bytes": 2814352218,
+        "active_files": 3024,
+        "historical_files": 3024,
+        "ordinary_hosts": 1,
+        "overflow_artifacts": 0,
+        "partitions": 1,
+        "scenario": "endpoint-v2-1"
+      },
+      "name": "endpoint-v2-1",
+      "normalized_stage_peak_bytes": 206404230,
+      "queries": [],
+      "size": "15gb"
+    },
+    {
+      "compressed_columns": {
+        "co_entities": 24882448,
+        "entities": 686952,
+        "entity_kind": 14008000,
+        "entity_value": 17674000,
+        "event": 7591600,
+        "event_time": 298848893,
+        "record_index": 1531783392,
+        "relations": 167824,
+        "scope_account": 11496592,
+        "scope_host": 14975600,
+        "scope_region": 11496592,
+        "source_hash": 29487712,
+        "source_offset": 11496592,
+        "submicro_nanos": 13364456,
+        "text": 188485107,
+        "time_inferred": 7858064,
+        "time_precision": 11496592
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 1248898206,
+        "files": 1000,
+        "hash_seconds": 10.569,
+        "parquet_bytes": 2814149558,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 1251.331
+      },
+      "layout": {
+        "active_bytes": 2814149558,
+        "active_files": 3192,
+        "historical_files": 3192,
+        "ordinary_hosts": 64,
+        "overflow_artifacts": 0,
+        "partitions": 64,
+        "scenario": "endpoint-v2-64"
+      },
+      "name": "endpoint-v2-64",
+      "normalized_stage_peak_bytes": 206404230,
+      "queries": [],
+      "size": "15gb"
+    },
+    {
+      "compressed_columns": {
+        "co_entities": 24424928,
+        "entities": 688404,
+        "entity_kind": 13754672,
+        "entity_value": 17353840,
+        "event": 7448500,
+        "event_time": 291496017,
+        "record_index": 1500894435,
+        "relations": 163846,
+        "scope_account": 11280498,
+        "scope_host": 14703731,
+        "scope_region": 11280498,
+        "source_hash": 28935090,
+        "source_offset": 11280498,
+        "submicro_nanos": 13113018,
+        "text": 184806184,
+        "time_inferred": 7708399,
+        "time_precision": 11280498
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 1223844769,
+        "files": 1000,
+        "hash_seconds": 10.583,
+        "parquet_bytes": 2757751378,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 1233.883
+      },
+      "layout": {
+        "active_bytes": 2757751378,
+        "active_files": 3096,
+        "historical_files": 3096,
+        "ordinary_hosts": 64,
+        "overflow_artifacts": 2904,
+        "partitions": 65,
+        "scenario": "endpoint-v2-1024"
+      },
+      "name": "endpoint-v2-1024",
+      "normalized_stage_peak_bytes": 206404230,
+      "queries": [],
+      "size": "15gb"
+    },
+    {
+      "compressed_columns": {
+        "co_entities": 24437772,
+        "entities": 688817,
+        "entity_kind": 13762410,
+        "entity_value": 17363732,
+        "event": 7452414,
+        "event_time": 291592136,
+        "record_index": 1501648769,
+        "relations": 163938,
+        "scope_account": 11286418,
+        "scope_host": 14711454,
+        "scope_region": 11286418,
+        "source_hash": 28950323,
+        "source_offset": 11286418,
+        "submicro_nanos": 13119897,
+        "text": 184900291,
+        "time_inferred": 7712387,
+        "time_precision": 11286418
+      },
+      "ingestion": {
+        "bytes": 15676080000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 1224446333,
+        "files": 1000,
+        "hash_seconds": 10.6,
+        "parquet_bytes": 2759113023,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 1220.351
+      },
+      "layout": {
+        "active_bytes": 2759113023,
+        "active_files": 3099,
+        "historical_files": 3099,
+        "ordinary_hosts": 64,
+        "overflow_artifacts": 2907,
+        "partitions": 65,
+        "scenario": "endpoint-v2-1025"
+      },
+      "name": "endpoint-v2-1025",
+      "normalized_stage_peak_bytes": 206404230,
+      "queries": [],
+      "size": "15gb"
+    }
+  ],
+  "run": "https://github.com/ns2switch/irmind/actions/runs/41936657135",
+  "runner": "ubuntu-latest"
+}
