@@ -234,3 +234,11 @@ Context: endpoint exports can contain a small number of monotonic timestamp runs
 Decision: split the verified normalized spool into at most 32 existing monotonic runs and merge them with the shared stable comparator. Limit combined merge-head storage to the existing batch memory budget. If either bound is exceeded, discard those temporary runs and use the existing external stable sort. Reuse each already-canonical encoded record during splitting and merging, rather than serializing it again. Account for both parsed merge heads and retained byte buffers. Check cancellation and authenticate each run's size, count and hash before publication.
 
 Consequences: preserve the normalized byte stream and all resulting Parquet hashes, signed envelopes and reconstruction rules. Compare natural-run output with the original external sorter, including a source that exceeds the run limit. Release benchmarks remain paired against the preceding optimization on the same runner; the 900-second and query acceptance limits do not change.
+
+## Authenticated time bounds for global timelines
+
+Context: a date partition can contain many files, so reading every event in that date can exhaust the existing query deadline even for a short timeline.
+
+Decision: obtain conservative per-file extrema from existing Parquet statistics only after checking the complete file against its signed hash. Order candidate files by those bounds and stop only when the retained cutoff is strictly better than every remaining bound. Equal instants remain candidates for the shared stable source/offset ordering. Missing or inexact statistics cannot prune a file. Reauthenticate each file when scanning its projected columns.
+
+Consequences: support legacy and precise artifacts without new signed metadata, schema or port changes. Keep the existing result/deadline limits and cancellation; metadata discovery shares that same deadline. Internal ordering supports both directions, while the public timeline keeps its existing most-recent-first behavior. Tests compare bounded results with complete mixed-generation scans, including submicrosecond ties and unknown times.
