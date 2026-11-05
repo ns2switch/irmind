@@ -516,3 +516,79 @@ Statistics are read only after hashing each file against its signed artifact. Un
 The writer and signed encodings are unchanged in this reader optimization. Ingestion includes source generation, signed custody and final compaction; these timing differences are not a claimed writer speedup. Candidate V2 cloud and disordered controls still miss 900 seconds in this pair. Other query failures remain in the JSON, including cloud entity lookup addressed separately. The paired workflow stays failed if either revision misses any unchanged target; passing global timelines alone does not close the ingestion gate.
 
 Both cloud writers retain 19/19 malicious events, 10/10 entities and 14/14 path checks per provider, with zero parse errors. Tests compare exact bounded/full-scan order for mixed generations, unknown and submicrosecond instants, legacy same-second compacted groups and both directions. A changed older artifact still fails authentication even when its time bound would exclude it. No hash or corruption check is skipped to obtain the latency result.
+
+### Entity-extrema release comparison
+
+The [complete paired release matrix](https://github.com/ns2switch/irmind/actions/runs/42090681509) compares a profiling-only [baseline `53e281238c6a`](https://github.com/ns2switch/irmind/commit/53e281238c6a247ddbebf0b7763e371cfe133fcd) with [candidate `3504cfc58ada`](https://github.com/ns2switch/irmind/commit/3504cfc58ada428f6546728f1ba9f630c536e18b). Each row runs both revisions in release mode on the same standard Linux runner. Rows use separate runner instances; absolute times from different rows or earlier matrices are not controlled speedup measurements. The [structured results](benchmarks/v2-entity-final.json) retain all 18 pairs, revisions, archive SHA-256 values, p50/p95 for every scope/query, counters, storage, initial summaries and failures.
+
+| 15 GB workload | Before entity p50 / p95 seconds | After entity p50 / p95 seconds | Before / after failed samples (of 5) |
+| --- | ---: | ---: | ---: |
+| cloud-v1 | 4.881 / 5.003 | 4.079 / 4.092 | 0 / 0 |
+| cloud-v2 | 8.635 / 8.712 | 4.447 / 4.580 | 0 / 0 |
+| endpoint-v1-1 | 6.038 / 6.160 | 5.079 / 5.332 | 0 / 0 |
+| endpoint-v1-1-chronological | 4.841 / 4.867 | 4.195 / 4.206 | 0 / 0 |
+| endpoint-v1-1024 | 0.309 / 0.310 | 0.311 / 0.312 | 0 / 0 |
+| endpoint-v1-1024-chronological | 0.243 / 0.246 | 0.241 / 0.244 | 0 / 0 |
+| endpoint-v1-1025 | 0.245 / 0.245 | 0.245 / 0.246 | 0 / 0 |
+| endpoint-v1-1025-chronological | 0.299 / 0.300 | 0.303 / 0.308 | 0 / 0 |
+| endpoint-v1-64 | 0.394 / 0.402 | 0.390 / 0.393 | 0 / 0 |
+| endpoint-v1-64-chronological | 0.466 / 0.558 | 0.462 / 0.464 | 0 / 0 |
+| endpoint-v2-1 | 9.824 / 9.901 | 4.370 / 4.424 | 0 / 0 |
+| endpoint-v2-1-chronological | 8.132 / 8.243 | 3.680 / 3.715 | 0 / 0 |
+| endpoint-v2-1024 | 0.617 / 0.680 | 0.636 / 0.682 | 0 / 0 |
+| endpoint-v2-1024-chronological | 0.446 / 0.488 | 0.460 / 0.495 | 0 / 0 |
+| endpoint-v2-1025 | 0.524 / 0.558 | 0.507 / 0.553 | 0 / 0 |
+| endpoint-v2-1025-chronological | 0.680 / 0.721 | 0.690 / 0.729 | 0 / 0 |
+| endpoint-v2-64 | 0.437 / 0.437 | 0.365 / 0.373 | 0 / 0 |
+| endpoint-v2-64-chronological | 0.645 / 0.647 | 0.530 / 0.554 | 0 / 0 |
+
+The historical same-runner V1/V2 entity comparison was 5.788 versus 9.396 seconds p95. The current matched V2 pair isolates the conversion overhead: entity p95 falls from 8.712 to 4.580 seconds (47.4%), with zero errors. Counting matches and finding first/last instants previously formatted every precise timestamp as RFC 3339 before aggregating it. It also repeated source-binding lookups and owned-key allocation. The optimized internal time-only projection keeps physical timestamps, compares borrowed keys, formats only the final extrema and reuses the immediately preceding validated binding within an immutable Arrow batch. Every changed source hash, null hash/index and offset unit is still validated. Other display projections keep their existing formatted output.
+
+| Cloud V2 entity phase, mean accumulated seconds per query | Before | After |
+| --- | ---: | ---: |
+| Hash verification | 0.624168 | 0.622699 |
+| Scan, including nested normalization | 17.974636 | 9.516951 |
+| Normalization | 4.990762 | 0.112866 |
+| Aggregation | 2.035705 | 2.049264 |
+
+Counters average five samples and sum worker durations. Scan includes normalization, and workers overlap; do not add these columns or present them as wall-time percentages. Hash-verification work is essentially unchanged. The matched data identifies avoidable conversion and allocation cost rather than a reason to remove verification.
+
+### Final V2 ingestion and query gate
+
+| 15 GB V2 workload | Ingestion seconds | Under 900 seconds | Largest query p95 across scopes | Query errors / samples | Initial graph summary seconds |
+| --- | ---: | --- | ---: | ---: | ---: |
+| cloud-v2 | 865.973 | yes | 4.580 s | 0 / 25 | 3.351 |
+| endpoint-v2-1 | 1,120.179 | no | 4.567 s | 0 / 50 | 3.739 |
+| endpoint-v2-1-chronological | 508.475 | yes | 3.776 s | 0 / 50 | 3.295 |
+| endpoint-v2-1024 | 1,007.507 | no | 1.810 s | 0 / 75 | 4.493 |
+| endpoint-v2-1024-chronological | 488.131 | yes | 3.067 s | 0 / 75 | 3.110 |
+| endpoint-v2-1025 | 1,101.840 | no | 1.385 s | 0 / 75 | 3.620 |
+| endpoint-v2-1025-chronological | 559.978 | yes | 4.207 s | 0 / 75 | 5.234 |
+| endpoint-v2-64 | 1,071.745 | no | 1.275 s | 0 / 75 | 3.228 |
+| endpoint-v2-64-chronological | 561.596 | yes | 4.602 s | 0 / 75 | 4.927 |
+
+The final candidate meets the existing cloud and chronological activation gate, including ordinary and overflow host queries. The four disordered controls still miss the same 900-second ingestion target. The complete workflow remains failed where either revision misses an unchanged target; a successful candidate query is not evidence that an entire pair passed. V1 filtered query failures also remain in the JSON rather than being omitted. These measurements do not establish a speed guarantee for every runner or arbitrary evidence. Earlier pairs include slower cloud instances; use their matched deltas, not a favorable cross-run comparison.
+
+The initial graph summary is the first summary after ingestion, not a measurement after evicting the operating-system page cache. Ingestion wall time includes source generation, signed custody and final compaction. Storage accounting and query sampling occur afterward. All inputs contain 1,000 files and about 15.68 decimal GB.
+
+| Candidate V2 workload | Accumulated staging seconds | Sorting seconds | Replay / writing seconds | Source re-verification seconds | Publication seconds | Temporary peak MiB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cloud-v2 | 1,434.638 | 0.000 | 498.111 | 9.516 | 5.738 | 16.430 |
+| endpoint-v2-1 | 579.535 | 355.127 | 441.935 | 9.447 | 2.399 | 196.842 |
+| endpoint-v2-1-chronological | 664.405 | 0.000 | 248.011 | 8.037 | 0.633 | 12.638 |
+| endpoint-v2-1024 | 807.041 | 355.374 | 493.821 | 10.888 | 0.807 | 196.842 |
+| endpoint-v2-1024-chronological | 646.305 | 0.000 | 241.214 | 7.911 | 0.601 | 12.644 |
+| endpoint-v2-1025 | 581.367 | 357.759 | 435.565 | 9.476 | 1.231 | 196.842 |
+| endpoint-v2-1025-chronological | 963.312 | 0.000 | 333.167 | 12.182 | 0.660 | 12.644 |
+| endpoint-v2-64 | 441.165 | 346.648 | 395.051 | 8.204 | 0.741 | 196.842 |
+| endpoint-v2-64-chronological | 957.612 | 0.000 | 331.871 | 12.092 | 0.630 | 12.644 |
+
+Staging sums concurrent workers, and direct replay can include producer waits. These phases overlap and are not additive wall percentages. Temporary peaks include retained provisional files needed for whole-batch rollback; chronological sources do not create a normalized-record spool. All per-pair Parquet/co-observation byte totals match. Byte-equivalence and reconstruction tests validate content compatibility independently of these sizes.
+
+Both cloud writers preserve 19/19 malicious events, 10/10 entities and 14/14 path checks per provider, with zero parse errors. Bounded worst-case paths still report time-budget truncation; no sample, expansion or deadline limit was raised. The [co-observation proposal](coobservation-reference-proposal.md) records the storage trade-off without implementing a schema change.
+
+### Remaining disordered-ingestion work
+
+The final four disordered cases take 1,007.507–1,120.179 seconds. Sorting and replay/writing remain the largest measured sequential costs. Natural-run merging still writes an intermediate merged stream, copies it back into the normalized spool and parses that spool again before writing Parquet.
+
+Next, measure splitting, merging, final copying and replay separately, then evaluate feeding the bounded merge directly into the existing provisional Parquet writer. Retain every run count/size/hash check at EOF, full-source authentication, deterministic partition allocation, stable order, cancellation and whole-batch rollback. Keep the current external-sort fallback above the run/head bounds. Require byte-equivalence and failure-cleanup tests and repeat all 15 GB pairs. The present counters do not measure the potential saving of that fusion, so no estimated sub-900 result is claimed. The 900-second target for the disordered corpus remains unchanged and open.
