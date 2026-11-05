@@ -15,6 +15,9 @@ pub(super) const MAX_QUERY_FILES: usize = 8192;
 const FILE_WORKERS: usize = 4;
 mod host;
 mod predicate;
+mod time_bounds;
+mod time_ordered;
+pub(super) use time_ordered::TimeCutoff;
 mod verification;
 pub(super) use predicate::Predicate;
 #[cfg(test)]
@@ -139,18 +142,7 @@ impl ParquetStore {
         let bloom = bloom_reader(&file, artifact, &rules)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).map_err(storage)?;
         super::format::validate_schema(artifact, builder.schema().as_ref())?;
-        let mut columns = spec.columns.to_vec();
-        columns.extend(["source_hash", "record_index", "event_time"]);
-        if precise {
-            columns.extend([
-                "submicro_nanos",
-                "time_precision",
-                "time_inferred",
-                "source_offset",
-            ]);
-        }
-        columns.sort_unstable();
-        columns.dedup();
+        let columns = required_columns(spec, precise);
         let required = projection(&builder, &columns)?;
         let mut groups = Vec::new();
         for (index, group) in builder.metadata().row_groups().iter().enumerate() {
@@ -434,4 +426,20 @@ fn scope_partition_matches(
             }
         }
     })
+}
+
+fn required_columns<'a>(spec: &ScanSpec<'a>, precise: bool) -> Vec<&'a str> {
+    let mut columns = spec.columns.to_vec();
+    columns.extend(["source_hash", "record_index", "event_time"]);
+    if precise {
+        columns.extend([
+            "submicro_nanos",
+            "time_precision",
+            "time_inferred",
+            "source_offset",
+        ]);
+    }
+    columns.sort_unstable();
+    columns.dedup();
+    columns
 }

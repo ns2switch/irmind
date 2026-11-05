@@ -2,8 +2,6 @@ use super::{
     AppError, CancellationToken, CaseId, EventHit, GraphQueryFilter, Instant, ParquetArtifact,
     Predicate, QUERY_DEADLINE, QueryStore, ScanFlow, ScanSpec, complete, recent, text, time_rules,
 };
-use irmind_app::TimelineEvent;
-use std::collections::BTreeMap;
 
 impl QueryStore<'_> {
     pub(crate) fn search_native(
@@ -59,72 +57,6 @@ impl QueryStore<'_> {
             })
             .collect::<Vec<_>>()
             .join("\n"))
-    }
-
-    pub(crate) fn timeline_native(
-        &self,
-        id: &CaseId,
-        artifacts: &[ParquetArtifact],
-        filter: &GraphQueryFilter,
-        limit: usize,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<TimelineEvent>, AppError> {
-        let limit = limit.min(100);
-        let mut hits = Vec::new();
-        let deadline = Instant::now() + QUERY_DEADLINE;
-        let rules = time_rules(filter);
-        let mut dates = BTreeMap::<&str, Vec<ParquetArtifact>>::new();
-        for artifact in artifacts.iter().filter(|artifact| {
-            super::super::format::same_family(artifact.schema_version(), "irmind-events-v2")
-                && super::super::scan::partition_matches(artifact, filter)
-        }) {
-            dates
-                .entry(artifact.partition_date())
-                .or_default()
-                .push(artifact.clone());
-        }
-        let unknown = dates.remove("unknown");
-        for group in dates.values().rev().chain(unknown.iter()) {
-            let status = self.scan_artifacts(
-                ScanSpec {
-                    id,
-                    artifacts: group,
-                    filter,
-                    schema: "irmind-events-v2",
-                    columns: &["event_time", "event", "source_hash", "record_index"],
-                    predicates: &rules,
-                    deadline,
-                    cancel,
-                },
-                |batch| {
-                    for row in 0..batch.num_rows() {
-                        hits.push(EventHit::from_batch(
-                            batch,
-                            row,
-                            artifacts
-                                .iter()
-                                .any(|a| matches!(a, ParquetArtifact::V2(_))),
-                        )?);
-                    }
-                    recent(&mut hits, limit)?;
-                    Ok(ScanFlow::Continue)
-                },
-            )?;
-            complete(status)?;
-            if hits.len() >= limit {
-                break;
-            }
-        }
-        hits.into_iter()
-            .map(|hit| {
-                Ok(TimelineEvent {
-                    at: hit.at.clone(),
-                    event: hit.annotated_event(),
-                    evidence_hash: hit.hash,
-                    record_index: usize::try_from(hit.index).map_err(super::super::storage)?,
-                })
-            })
-            .collect()
     }
 
     pub(crate) fn raw_native(

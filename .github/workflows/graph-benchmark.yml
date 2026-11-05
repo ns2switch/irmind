@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       compare_base:
-        description: Optional 40-character baseline commit for paired V2 release measurements
+        description: Optional 40-character baseline commit for paired release measurements
         type: string
         default: ""
       scenario:
@@ -121,7 +121,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        scenario: [cloud-v2, endpoint-v2-1, endpoint-v2-64, endpoint-v2-1024, endpoint-v2-1025, endpoint-v2-1-chronological, endpoint-v2-64-chronological, endpoint-v2-1024-chronological, endpoint-v2-1025-chronological]
+        scenario: [cloud-v2, endpoint-v2-1, endpoint-v2-64, endpoint-v2-1024, endpoint-v2-1025, endpoint-v2-1-chronological, endpoint-v2-64-chronological, endpoint-v2-1024-chronological, endpoint-v2-1025-chronological, cloud-v1, endpoint-v1-1, endpoint-v1-64, endpoint-v1-1024, endpoint-v1-1025, endpoint-v1-1-chronological, endpoint-v1-64-chronological, endpoint-v1-1024-chronological, endpoint-v1-1025-chronological]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false, fetch-depth: 0}

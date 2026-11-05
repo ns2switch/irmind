@@ -36,6 +36,7 @@ mod entity;
 mod events;
 mod neighbors;
 mod path;
+mod timeline;
 use coobservations::coobservation_available;
 
 pub(super) const QUERY_DEADLINE: Duration = Duration::from_secs(10);
@@ -119,8 +120,12 @@ pub(super) fn complete(status: ScanStatus) -> Result<(), AppError> {
 }
 
 pub(super) fn recent(rows: &mut Vec<EventHit>, limit: usize) -> Result<(), AppError> {
+    ordered(rows, limit, true)
+}
+
+fn ordered(rows: &mut Vec<EventHit>, limit: usize, newest: bool) -> Result<(), AppError> {
     let mut error = None;
-    rows.sort_by(|left, right| match left.time.compare(&right.time, true) {
+    rows.sort_by(|left, right| match left.time.compare(&right.time, newest) {
         Ok(order) => order,
         Err(failure) => {
             error = Some(failure);
