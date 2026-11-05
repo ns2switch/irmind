@@ -8,7 +8,7 @@ impl LocalStore {
         Self::open_store(root, false)
     }
 
-    /// Explicit V2 construction while the default rollout awaits partitions and export V5.
+    /// Precise artifact construction with compatible reads of existing V1 cases.
     pub fn open_precise(root: &Path) -> Result<Self, AppError> {
         Self::open_store(root, true)
     }

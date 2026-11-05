@@ -31,6 +31,7 @@ mod status;
 use status::module_statuses;
 mod preflight;
 mod retired_syslog;
+mod storage;
 use preflight::{decide_overrides, reconcile_configuration};
 
 struct PreparedStartup {
@@ -431,7 +432,7 @@ fn open_local(
             .to_path_buf(),
     };
     let store = loop {
-        match LocalStore::open(&home) {
+        match storage::open(&home, interactive) {
             Ok(store) => break Arc::new(store),
             Err(error) if interactive => {
                 let message = format!(
