@@ -249,7 +249,7 @@ The local Linux detect/parse ASAN fuzz run completed a 600-second budget (601 se
 
 ## Timestamp and host-partition comparison
 
-The release-only benchmark compares the current V1 writer with the explicit V2 writer using identical source bytes and four-source batches on the same standard Linux runner. It retains the 1 GB and 15 GB CloudTrail corpus and adds 15 GB journald endpoint corpora with exactly 1, 64, 1,024 and 1,025 hosts. Each endpoint file belongs to one host; the extra 24/25 hosts share the first files so the 1,000-file corpus contains every declared host. The production Linux parser preserves source microseconds. Source generation and parser selection are deterministic; both writers record an explicit parser selection.
+The release-only benchmark compares the current V1 writer with the explicit V2 writer using identical source bytes and four-source batches on the same standard Linux runner. V1/V2 here identify artifact writers, not retired parser versions; both use current readers. It retains the 1 GB and 15 GB CloudTrail corpus and adds 15 GB journald endpoint corpora with exactly 1, 64, 1,024 and 1,025 hosts. Each endpoint file belongs to one host; the extra 24/25 hosts share the first files so the 1,000-file corpus contains every declared host. The production Linux parser preserves source microseconds. Source generation and parser selection are deterministic; both writers record an explicit parser selection.
 
 The wall timer includes source generation, file writes/removal, selected-parser ingestion, signed custody and final compaction. The phase counters exclude source generation. Compare the two writers on the same scenario; these wall measurements are not isolated parser throughput.
 
@@ -333,6 +333,19 @@ Every failing entity/timeline label above had five failed samples. Ordinary and 
 V1 retains full HuntEval recall at 1 GB and 15 GB: each provider has 19/19 events, 10/10 entities, 14/14 path checks and zero parse errors. The initial profiled V2 evaluation stopped at the first legacy AWS episode: its records have no provider or region, but the evaluator supplied a region from the dataset directory. Those V2 recall and worst-path results are **not collected**, not zero and not passed. The evaluator now uses only a provider fallback explicitly declared consistently in source records; directory attribution does not create a query predicate. Exact source pointers, event/entity checks, path assertions, query limits and private-answer isolation remain unchanged. The release reference test now ingests and reconstructs all 18 episodes with both writers; all reference checks pass for AWS, Azure and GCP. Full-size validation is recorded separately from the matched performance run.
 
 The warm infrastructure test build took 15 s. The first default-feature CLI build in that job took 401 s and produced a 51,545,776-byte binary. This is a cache-dependent CLI build measurement, not a clean-workspace cold-build claim. Both measurements belong to the frozen run commit, rather than to later documentation or warning changes.
+
+### Full-size V2 needle validation
+
+The [cloud-only validation run](https://github.com/ns2switch/irmind/actions/runs/42013703628), at commit `8842bc73a18c3ee66c856caf8f4619a5eca55420`, repeats the two CloudTrail workloads with the corrected source-based evaluator. The [recorded validation](benchmarks/artifact-v2-cloud-validation.json) includes the paired V1/V2 reference checks and full-size V2 results. It runs on a separate standard runner; the lower wall times are not a measured ingestion optimization or a replacement for the matched V1/V2 comparison.
+
+At both 1 GB and 15 GB, each provider retains **19/19 events, 10/10 entities and 14/14 path checks**, with zero parse errors. The 18 episodes are also reconstructed independently with both writers. Original-pointer, timeline-order and private-answer isolation assertions remain active. Parquet byte totals match the corresponding V2 workloads in the profiled run.
+
+| V2 workload | Ingestion seconds | General query outcome | Worst bounded three-hop path |
+| --- | ---: | --- | --- |
+| CloudTrail 1 GB | 95.419 | all five labels pass; largest p95 0.599 s | not run at this size |
+| CloudTrail 15 GB | 1,001.320 | entity lookup: 1/5 samples fails, p95 10.036 s; other labels pass | 10.002 s; explicitly truncated by the time budget |
+
+The 15 GB term, neighbors, timeline and path p95 values are 3.807 s, 0.757 s, 0.035 s and 0.764 s. This run still fails: ingestion exceeds 900 s and one entity-lookup sample reaches the query deadline. Correct HuntEval recall does not close those performance targets. Its warm infrastructure test build takes 14 s; the first default-feature CLI build takes 399 s and produces 51,600,488 bytes, at this run's own source commit.
 
 ### Ordered endpoint control (local, 1 GB)
 

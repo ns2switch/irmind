@@ -1,0 +1,1013 @@
+{
+  "build": {
+    "BINARY_BUILD_SECONDS": 399,
+    "BINARY_BYTES": 51600488,
+    "BUILD_HOT_SECONDS": 14
+  },
+  "commit": "8842bc73a18c3ee66c856caf8f4619a5eca55420",
+  "conclusion": "failure",
+  "host_cap": 64,
+  "host_ceiling": 1024,
+  "ingest_target_seconds": 900,
+  "observed_scenarios": 2,
+  "phase_accounting": "Stage and V1 worker counters accumulate concurrent worker time; do not sum them as wall percentages. Sort, replay, source verification and publication run sequentially inside each batch. Wall time also includes generation, signed custody and final compaction.",
+  "profile": "release",
+  "query_target_seconds": 10,
+  "reference_hunteval_queries": [
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "aws",
+      "query": "case_timeline",
+      "samples": 6
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "aws",
+      "query": "entity",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "aws",
+      "query": "event",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "aws",
+      "query": "neighbors",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "aws",
+      "query": "path",
+      "samples": 14
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "aws",
+      "query": "term",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "aws",
+      "query": "timeline",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "azure",
+      "query": "case_timeline",
+      "samples": 6
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "azure",
+      "query": "entity",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "azure",
+      "query": "event",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "azure",
+      "query": "neighbors",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "azure",
+      "query": "path",
+      "samples": 14
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "azure",
+      "query": "term",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "azure",
+      "query": "timeline",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "gcp",
+      "query": "case_timeline",
+      "samples": 6
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "gcp",
+      "query": "entity",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "gcp",
+      "query": "event",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "gcp",
+      "query": "neighbors",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "gcp",
+      "query": "path",
+      "samples": 14
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "gcp",
+      "query": "term",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v1",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.0,
+      "provider": "gcp",
+      "query": "timeline",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "aws",
+      "query": "case_timeline",
+      "samples": 6
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "aws",
+      "query": "entity",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "aws",
+      "query": "event",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "aws",
+      "query": "neighbors",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.002,
+      "provider": "aws",
+      "query": "path",
+      "samples": 14
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "aws",
+      "query": "term",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "aws",
+      "query": "timeline",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "azure",
+      "query": "case_timeline",
+      "samples": 6
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "azure",
+      "query": "entity",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "azure",
+      "query": "event",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "azure",
+      "query": "neighbors",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.002,
+      "provider": "azure",
+      "query": "path",
+      "samples": 14
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "azure",
+      "query": "term",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "azure",
+      "query": "timeline",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "gcp",
+      "query": "case_timeline",
+      "samples": 6
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "gcp",
+      "query": "entity",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "gcp",
+      "query": "event",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.001,
+      "provider": "gcp",
+      "query": "neighbors",
+      "samples": 10
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.001,
+      "p95_seconds": 0.002,
+      "provider": "gcp",
+      "query": "path",
+      "samples": 14
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "gcp",
+      "query": "term",
+      "samples": 19
+    },
+    {
+      "corpus": "reference-v2",
+      "p50_seconds": 0.0,
+      "p95_seconds": 0.001,
+      "provider": "gcp",
+      "query": "timeline",
+      "samples": 19
+    }
+  ],
+  "reference_hunteval_recall": [
+    {
+      "corpus": "reference-v1",
+      "entities": "10/10",
+      "events": "19/19",
+      "parse_errors": 0,
+      "path": "14/14",
+      "provider": "aws"
+    },
+    {
+      "corpus": "reference-v1",
+      "entities": "10/10",
+      "events": "19/19",
+      "parse_errors": 0,
+      "path": "14/14",
+      "provider": "azure"
+    },
+    {
+      "corpus": "reference-v1",
+      "entities": "10/10",
+      "events": "19/19",
+      "parse_errors": 0,
+      "path": "14/14",
+      "provider": "gcp"
+    },
+    {
+      "corpus": "reference-v2",
+      "entities": "10/10",
+      "events": "19/19",
+      "parse_errors": 0,
+      "path": "14/14",
+      "provider": "aws"
+    },
+    {
+      "corpus": "reference-v2",
+      "entities": "10/10",
+      "events": "19/19",
+      "parse_errors": 0,
+      "path": "14/14",
+      "provider": "azure"
+    },
+    {
+      "corpus": "reference-v2",
+      "entities": "10/10",
+      "events": "19/19",
+      "parse_errors": 0,
+      "path": "14/14",
+      "provider": "gcp"
+    }
+  ],
+  "results": [
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 7.151
+      },
+      "compaction": {
+        "bundles": 36
+      },
+      "compressed_columns": {
+        "co_entities": 4035843143,
+        "entities": 121433474,
+        "entity_kind": 20131190,
+        "entity_value": 639916676,
+        "event": 11704591,
+        "event_time": 20536598,
+        "record_index": 2052699068,
+        "relations": 91355776,
+        "scope_account": 20912049,
+        "scope_host": 16349877,
+        "scope_region": 19763679,
+        "source_hash": 41884098,
+        "source_offset": 16349877,
+        "submicro_nanos": 19012423,
+        "text": 729559220,
+        "time_inferred": 11098128,
+        "time_precision": 16349877
+      },
+      "hunteval_queries": [
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.003,
+          "provider": "aws",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.003,
+          "p95_seconds": 0.004,
+          "provider": "aws",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "timeline",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.003,
+          "p95_seconds": 0.003,
+          "provider": "azure",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.003,
+          "p95_seconds": 0.004,
+          "provider": "azure",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "timeline",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.003,
+          "p95_seconds": 0.003,
+          "provider": "gcp",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.003,
+          "p95_seconds": 0.004,
+          "provider": "gcp",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "15gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "timeline",
+          "samples": 19
+        }
+      ],
+      "hunteval_recall": [
+        {
+          "corpus": "15gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "aws"
+        },
+        {
+          "corpus": "15gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "azure"
+        },
+        {
+          "corpus": "15gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "gcp"
+        }
+      ],
+      "ingestion": {
+        "bytes": 15685651146,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 5960101247,
+        "files": 1000,
+        "hash_seconds": 11.651,
+        "parquet_bytes": 8924960490,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 1001.32
+      },
+      "layout": {
+        "active_bytes": 8924960490,
+        "active_files": 3855,
+        "historical_files": 3855,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 260,
+        "scenario": "cloud-v2"
+      },
+      "name": "cloud-v2",
+      "normalized_stage_peak_bytes": 140944753,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 3.803,
+          "p95_seconds": 3.807,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 1,
+          "name": "entity",
+          "p50_seconds": 9.983,
+          "p95_seconds": 10.036,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.68,
+          "p95_seconds": 0.757,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.03,
+          "p95_seconds": 0.035,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.687,
+          "p95_seconds": 0.764,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 166.704,
+        "verify_seconds": 12.286
+      },
+      "size": "15gb",
+      "v2_phases": {
+        "publish_seconds": 0.925,
+        "replay_seconds": 376.396,
+        "sort_seconds": 0.0,
+        "source_verify_seconds": 10.843,
+        "stage_seconds": 1425.593
+      },
+      "worst_path": {
+        "seconds": 10.002,
+        "time_budget": true,
+        "truncated": true
+      }
+    },
+    {
+      "cold_query": {
+        "error": false,
+        "seconds": 0.786
+      },
+      "compaction": {
+        "bundles": 33
+      },
+      "compressed_columns": {
+        "co_entities": 296721403,
+        "entities": 46350009,
+        "entity_kind": 1599026,
+        "entity_value": 70433770,
+        "event": 927286,
+        "event_time": 1578371,
+        "record_index": 107182603,
+        "relations": 32073177,
+        "scope_account": 1604212,
+        "scope_host": 1254052,
+        "scope_region": 1516090,
+        "source_hash": 3277087,
+        "source_offset": 1254052,
+        "submicro_nanos": 1458200,
+        "text": 159310422,
+        "time_inferred": 827950,
+        "time_precision": 1254052
+      },
+      "hunteval_queries": [
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "aws",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "aws",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "aws",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.003,
+          "provider": "aws",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "aws",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "aws",
+          "query": "timeline",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "azure",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "azure",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "azure",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.003,
+          "provider": "azure",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "azure",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "azure",
+          "query": "timeline",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "case_timeline",
+          "samples": 6
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "entity",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "event",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.002,
+          "provider": "gcp",
+          "query": "neighbors",
+          "samples": 10
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.002,
+          "p95_seconds": 0.003,
+          "provider": "gcp",
+          "query": "path",
+          "samples": 14
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "term",
+          "samples": 19
+        },
+        {
+          "corpus": "1gb",
+          "p50_seconds": 0.001,
+          "p95_seconds": 0.001,
+          "provider": "gcp",
+          "query": "timeline",
+          "samples": 19
+        }
+      ],
+      "hunteval_recall": [
+        {
+          "corpus": "1gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "aws"
+        },
+        {
+          "corpus": "1gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "azure"
+        },
+        {
+          "corpus": "1gb",
+          "entities": "10/10",
+          "events": "19/19",
+          "parse_errors": 0,
+          "path": "14/14",
+          "provider": "gcp"
+        }
+      ],
+      "ingestion": {
+        "bytes": 1045757022,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 435375256,
+        "files": 1000,
+        "hash_seconds": 0.904,
+        "parquet_bytes": 820357273,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 95.419
+      },
+      "layout": {
+        "active_bytes": 820357273,
+        "active_files": 3084,
+        "historical_files": 3084,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "partitions": 9,
+        "scenario": "cloud-v2"
+      },
+      "name": "cloud-v2",
+      "normalized_stage_peak_bytes": 9521718,
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.304,
+          "p95_seconds": 0.307,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.588,
+          "p95_seconds": 0.599,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.102,
+          "p95_seconds": 0.105,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.574,
+          "p95_seconds": 0.59,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.102,
+          "p95_seconds": 0.103,
+          "scenario": "cloud-v2",
+          "scope": "all"
+        }
+      ],
+      "query_phases": {
+        "scan_seconds": 21.072,
+        "verify_seconds": 2.066
+      },
+      "size": "1gb",
+      "v2_phases": {
+        "publish_seconds": 0.623,
+        "replay_seconds": 25.556,
+        "sort_seconds": 0.0,
+        "source_verify_seconds": 0.769,
+        "stage_seconds": 103.191
+      }
+    }
+  ],
+  "run": "https://github.com/ns2switch/irmind/actions/runs/42013703628",
+  "runner": "ubuntu-latest"
+}
