@@ -250,3 +250,11 @@ Context: precise co-observations repeat time/order columns even though they alre
 Decision: measure the compressed bytes of those columns separately in release benchmarks and publish a [design proposal](coobservation-reference-proposal.md). Do not modify the approved V2 schema, builder identity, signed encoding or reconstruction algorithm in this measurement change.
 
 Consequences: any production implementation remains a separate compatibility decision with measured disk and latency results. Existing hash checks, time filters, bounded-query behavior and historical verification remain unchanged. The measured four-column payload is about 0.56% of cloud co-observation storage, 12.7% in disordered endpoints and 39.4% in chronological endpoints. Evaluate a new reference-only schema for endpoint storage separately; this stack retains the current schema and does not claim an achieved size saving or a free reference join.
+
+## Borrow batch-lifetime keys for entity extrema
+
+Context: precise entity queries need exact counts and earliest/latest records, not a rendered timestamp for every matching row. Formatting every timestamp and allocating source/hash ordering keys adds work that legacy second-resolution queries avoid.
+
+Decision: retain physical precise timestamps during count/extrema scans, compare borrowed source/hash keys with the existing stable comparator, and allocate only retained extrema. Render their timestamps once when producing the final result. Other query projections keep their displayed timestamps. Record separate verification, scan, normalization and aggregation timers in paired release measurements.
+
+Consequences: preserve exact mixed-generation, pre-epoch and submicrosecond ordering, unknown-time counts, source membership validation and hash checks. No schema, signed encoding, port or default-writer change. Query phase timers overlap the scan pipeline and must not be summed as wall-clock percentages.

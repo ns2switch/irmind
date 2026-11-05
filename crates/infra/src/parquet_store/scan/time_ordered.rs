@@ -80,6 +80,7 @@ impl ParquetStore {
                     &batch.map_err(storage)?,
                     artifact,
                     names,
+                    spec.columns != ["event_time"],
                 )?;
                 drop(normalize);
                 let (batch, status) = self.filter_legacy_host(spec, names, batch)?;

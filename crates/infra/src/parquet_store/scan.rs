@@ -177,8 +177,12 @@ impl ParquetStore {
                 .profile
                 .as_ref()
                 .map(|p| p.query_timer(super::profile::QueryPhase::Normalize));
-            let normalized =
-                super::format::normalize_batch(&batch.map_err(storage)?, artifact, source_names)?;
+            let normalized = super::format::normalize_batch(
+                &batch.map_err(storage)?,
+                artifact,
+                source_names,
+                spec.columns != ["event_time"],
+            )?;
             drop(normalize);
             if sender.send(Ok(ScanMessage::Batch(normalized))).is_err() {
                 return Ok(ScanStatus::Stopped);
