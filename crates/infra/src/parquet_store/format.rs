@@ -91,22 +91,27 @@ pub(super) fn normalize_batch(
         .and_then(|a| a.as_any().downcast_ref::<UInt64Array>())
         .ok_or_else(invalid_source)?;
     let mut source_names = Vec::with_capacity(batch.num_rows());
-    let mut displayed = Vec::with_capacity(batch.num_rows());
+    let mut displayed = Vec::with_capacity(if precise && display_time {
+        batch.num_rows()
+    } else {
+        0
+    });
+    let mut previous = None::<(&str, &str)>;
     for row in 0..batch.num_rows() {
-        if hashes.is_null(row)
-            || indexes.is_null(row)
-            || artifact
-                .source_hashes()
-                .binary_search_by(|h| h.as_str().cmp(hashes.value(row)))
-                .is_err()
-        {
+        if hashes.is_null(row) || indexes.is_null(row) {
             return Err(invalid_source());
         }
         let hash = hashes.value(row);
-        if precise && !names.contains_key(hash) {
-            return Err(invalid_source());
-        }
-        source_names.push(names.get(hash).map_or(hash, String::as_str));
+        let source = if let Some((old, name)) = previous
+            && old == hash
+        {
+            name
+        } else {
+            let name = source_name(hash, artifact, names, precise)?;
+            previous = Some((hash, name));
+            name
+        };
+        source_names.push(source);
         if precise && display_time {
             displayed.push(
                 super::time_cell::read_time(batch, row)?
@@ -150,3 +155,26 @@ pub(super) fn normalize_batch(
     )
     .map_err(storage)
 }
+
+fn source_name<'a>(
+    hash: &'a str,
+    artifact: &ParquetArtifact,
+    names: &'a BTreeMap<String, String>,
+    precise: bool,
+) -> Result<&'a str, AppError> {
+    if artifact
+        .source_hashes()
+        .binary_search_by(|h| h.as_str().cmp(hash))
+        .is_err()
+    {
+        return Err(invalid_source());
+    }
+    let source = names.get(hash);
+    if precise && source.is_none() {
+        return Err(invalid_source());
+    }
+    Ok(source.map_or(hash, String::as_str))
+}
+
+#[cfg(test)]
+mod tests;
