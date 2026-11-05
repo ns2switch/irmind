@@ -147,7 +147,7 @@ impl ParquetStore {
     }
 }
 
-fn source_sample(file: &mut File) -> Result<Vec<u8>, AppError> {
+pub(super) fn source_sample(file: &mut File) -> Result<Vec<u8>, AppError> {
     file.seek(SeekFrom::Start(0)).map_err(storage)?;
     let mut sample = Vec::new();
     file.take(64 * 1024)
@@ -166,7 +166,7 @@ fn no_space() -> AppError {
     AppError::Fixed(irmind_app::FixedAppError::StorageNormalizedStagingSpace)
 }
 
-fn normalized_row(
+pub(super) fn normalized_row(
     record: &irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
     parser: &dyn StreamingEventParser,
     source: &str,
