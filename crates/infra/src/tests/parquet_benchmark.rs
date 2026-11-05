@@ -161,7 +161,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         cold.is_err()
     );
     let cold_target = cold.is_ok();
-    let query_target = measurements::report_queries(store.as_ref(), &case.id, scenario);
+    let query_target = measurements::report_queries(store.as_ref(), &case.id, scenario, &profile);
     let [_, _, _, _, verify_time, scan_time] = profile.snapshot();
     println!(
         "PARQUET_QUERY_PHASE verify_seconds={:.3} scan_seconds={:.3}",

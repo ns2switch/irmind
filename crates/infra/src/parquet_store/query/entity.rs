@@ -94,28 +94,13 @@ impl QueryStore<'_> {
                 cancel,
             },
             |batch| {
-                for row in 0..batch.num_rows() {
-                    let at = super::super::time_cell::TimeCell::from_batch(batch, row)?;
-                    count += 1;
-                    if at.time.is_some() {
-                        if first
-                            .as_ref()
-                            .map(|old| at.compare(old, false))
-                            .transpose()?
-                            .is_none_or(std::cmp::Ordering::is_lt)
-                        {
-                            first = Some(at.clone());
-                        }
-                        if last
-                            .as_ref()
-                            .map(|old| at.compare(old, false))
-                            .transpose()?
-                            .is_none_or(std::cmp::Ordering::is_gt)
-                        {
-                            last = Some(at);
-                        }
-                    }
-                }
+                super::extrema::accumulate(
+                    batch,
+                    &mut count,
+                    &mut first,
+                    &mut last,
+                    self.store.profile.as_deref(),
+                )?;
                 Ok(ScanFlow::Continue)
             },
         )?;

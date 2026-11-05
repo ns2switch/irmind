@@ -136,7 +136,10 @@ impl ParquetStore {
         let Some(file) = self.verify_for_scan(case_dir, artifact, spec)? else {
             return Ok(ScanStatus::Deadline);
         };
-        let scan_started = Instant::now();
+        let _scan = self
+            .profile
+            .as_ref()
+            .map(|p| p.query_timer(super::profile::QueryPhase::Scan));
         let precise = matches!(artifact, ParquetArtifact::V2(_));
         let rules = rules_for_artifact(spec, precise)?;
         let bloom = bloom_reader(&file, artifact, &rules)?;
@@ -170,19 +173,16 @@ impl ParquetStore {
             if Instant::now() >= spec.deadline {
                 return Ok(ScanStatus::Deadline);
             }
-            if sender
-                .send(Ok(ScanMessage::Batch(super::format::normalize_batch(
-                    &batch.map_err(storage)?,
-                    artifact,
-                    source_names,
-                )?)))
-                .is_err()
-            {
+            let normalize = self
+                .profile
+                .as_ref()
+                .map(|p| p.query_timer(super::profile::QueryPhase::Normalize));
+            let normalized =
+                super::format::normalize_batch(&batch.map_err(storage)?, artifact, source_names)?;
+            drop(normalize);
+            if sender.send(Ok(ScanMessage::Batch(normalized))).is_err() {
                 return Ok(ScanStatus::Stopped);
             }
-        }
-        if let Some(profile) = &self.profile {
-            profile.record_query_scan(scan_started.elapsed());
         }
         Ok(ScanStatus::Complete)
     }
