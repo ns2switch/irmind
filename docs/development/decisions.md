@@ -249,4 +249,4 @@ Context: precise co-observations repeat time/order columns even though they alre
 
 Decision: measure the compressed bytes of those columns separately in release benchmarks and publish a [design proposal](coobservation-reference-proposal.md). Do not modify the approved V2 schema, builder identity, signed encoding or reconstruction algorithm in this measurement change.
 
-Consequences: any production implementation remains a separate compatibility decision with measured disk and latency results. Existing hash checks, time filters, bounded-query behavior and historical verification remain unchanged.
+Consequences: any production implementation remains a separate compatibility decision with measured disk and latency results. Existing hash checks, time filters, bounded-query behavior and historical verification remain unchanged. The measured four-column payload is about 0.56% of cloud co-observation storage, 12.7% in disordered endpoints and 39.4% in chronological endpoints. Evaluate a new reference-only schema for endpoint storage separately; this stack retains the current schema and does not claim an achieved size saving or a free reference join.
