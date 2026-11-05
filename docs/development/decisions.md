@@ -221,7 +221,7 @@ Consequences: remove the separate `expectrl`, `ptyprocess` and legacy `nix` chai
 
 ## V2 ingestion optimization gates
 
-Context: full-size cloud and endpoint measurements exceed the existing V2 ingestion or query targets. V1 remains the default writer. Complete every source's parser/hash checks before publishing batch output and account for all retained provisional files. Keep PTY regressions in a bounded interactive test group without changing their action deadlines or serializing the suite.
+Context: full-size cloud and endpoint measurements exceed the existing V2 ingestion or query targets. V1 remains the default writer. Complete every source's parser/hash checks before publishing batch output and account for all retained provisional files. Keep PTY regressions in a bounded interactive test group without changing their action deadlines or serializing the suite. On Windows, reserve the test-thread pool while a ConPTY session runs, so disk-heavy parser and compile-fail suites cannot compete with its custody operations. Other tests retain normal parallel scheduling outside those sessions. See [nextest resource reservations](https://nexte.st/docs/configuration/threads-required/).
 
 Decision: retain 64 ordinary host partition values per case, with a configurable ceiling of 1,024 and signed overflow. Optimize ordered ingestion, disordered runs and bounded queries in separate changes. Compare baseline and candidate release builds on the same runner, with separate chronological and disordered 15 GB endpoint corpora. Keep the 900-second ingestion and existing query limits unchanged.
 
