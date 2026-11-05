@@ -132,7 +132,7 @@ Implement the [approved artifact-V2 design](parquet-artifact-v2-design.md) in se
 
 ### Artifact V2 implementation evidence
 
-The first implementation PR defines checked instants/precision, the additive signed envelope and [canonical golden layout](parquet-artifact-v2-wire.md). Default CLI/TUI writes remain V1 while the mixed reader/writer, generic allocator and export V5 land in separate PRs. The separate partition, migration/export and release-benchmark workstreams below record their compatibility gates. The 64-host initial cap is not yet a benchmark-selected final default.
+The first implementation PR defines checked instants/precision, the additive signed envelope and [canonical golden layout](parquet-artifact-v2-wire.md). Default CLI/TUI writes remain V1 while the mixed reader/writer, generic allocator and export V5 land in separate PRs. The separate partition, migration/export and release-benchmark workstreams below record their compatibility gates. The approved operational default is 64 ordinary hosts; the optimization acceptance section below retains the activation gates and the 1,024 hard ceiling.
 
 
 Step (b), [PR #168](https://github.com/ns2switch/irmind/pull/168), implements the [approved storage/parser contracts](parquet-v2-port-transition.md), an explicit precise writer, mixed-schema queries, reproducible compatible compaction and native precision projections without changing V1 goldens. Production activation waits for generic partitions and V5 export; this prevents an intermediate rollout from blocking ordinary case export. Step (c) is integrated below. Explicit migration/export and release-profile benchmarks remain activation gates.

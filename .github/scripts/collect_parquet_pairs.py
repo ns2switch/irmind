@@ -19,6 +19,8 @@ FIELDS = {
     "PAIRED_REVISION": "stage commit scenario",
     "PARQUET_SCENARIO": "name size normalized_stage_peak_bytes",
     "PARQUET_INGEST": "bytes files hash_seconds conversion_seconds row_seconds parquet_seconds wall_seconds parquet_bytes coobservation_bytes",
+    "PARQUET_COMPACTION": "bundles",
+    "PARQUET_COLD_QUERY": "seconds error",
     "PARQUET_V2_PHASE": "stage_seconds sort_seconds replay_seconds source_verify_seconds publish_seconds",
     "PARQUET_QUERY": "scenario scope name p50_seconds p95_seconds errors",
     "PARQUET_LAYOUT": "scenario historical_files active_files partitions ordinary_hosts overflow_artifacts active_bytes",
@@ -65,7 +67,7 @@ def metric(prefix, key, raw):
         pattern = r"[a-z_]+"
     elif key in {"events", "entities", "path"}:
         pattern = r"[0-9]+/[0-9]+"
-    elif key in {"truncated", "time_budget"}:
+    elif key in {"truncated", "time_budget", "error"}:
         if raw not in {"true", "false"}:
             raise ValueError("invalid benchmark boolean")
         return raw == "true"
