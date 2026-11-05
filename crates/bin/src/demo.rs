@@ -239,7 +239,7 @@ fn run_in_directory(
 ) -> Result<()> {
     let source = root.join("events.json");
     std::fs::write(&source, EVENTS)?;
-    let store = Arc::new(LocalStore::open(root)?);
+    let store = Arc::new(LocalStore::open_precise(root)?);
     let keystore = FileKeystore::ephemeral(root)?;
     let signer = keystore.create(Actor::Analyst)?;
     let agent_id = AgentId::parse("demo-agent").map_err(|_| anyhow!("invalid demo agent ID"))?;
