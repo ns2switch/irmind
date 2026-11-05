@@ -1,4 +1,5 @@
 use super::*;
+mod columns;
 use irmind_domain::{GraphQueryFilter, ParquetArtifact, ScopePartitionValue};
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use std::collections::BTreeSet;
@@ -14,7 +15,7 @@ pub(super) fn report_storage(
     let mut partitions = BTreeSet::new();
     let mut ordinary_hosts = BTreeSet::new();
     let mut overflow = 0usize;
-    let mut columns = BTreeMap::<String, i64>::new();
+    let mut columns = columns::ColumnBudget::default();
     for artifact in &catalog.active {
         if let ParquetArtifact::V2(v) = artifact {
             partitions.insert(v.partition.path_prefix().unwrap());
@@ -33,12 +34,7 @@ pub(super) fn report_storage(
         let file =
             fs::File::open(root.join("parquet").join(id.as_str()).join(artifact.path())).unwrap();
         let reader = SerializedFileReader::new(file).unwrap();
-        for group in reader.metadata().row_groups() {
-            for column in group.columns() {
-                *columns.entry(column.column_path().string()).or_default() +=
-                    column.compressed_size();
-            }
-        }
+        columns.observe(artifact, reader.metadata());
     }
     let coobs = catalog
         .all
@@ -59,12 +55,7 @@ pub(super) fn report_storage(
             .map(ParquetArtifact::size)
             .sum::<u64>()
     );
-    for (column, bytes) in columns {
-        println!(
-            "PARQUET_COLUMN scenario={} column={column} compressed_bytes={bytes}",
-            scenario.name()
-        );
-    }
+    columns.print(&scenario.name());
     coobs
 }
 

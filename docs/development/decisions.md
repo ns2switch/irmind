@@ -242,3 +242,11 @@ Context: a date partition can contain many files, so reading every event in that
 Decision: obtain conservative per-file extrema from existing Parquet statistics only after checking the complete file against its signed hash. Order candidate files by those bounds and stop only when the retained cutoff is strictly better than every remaining bound. Equal instants retain the shared stable source/offset ordering. For legacy whole-second ties, authenticate existing source/index statistics; if a group contains multiple sources, project only its reference columns to derive a conservative stable-key bound. Prune a tied group only when that bound is strictly worse than the retained result. Missing or inexact time statistics cannot prune a file. Reauthenticate each file when scanning its projected columns.
 
 Consequences: support legacy and precise artifacts without new signed metadata, schema or port changes. Keep the existing result/deadline limits and cancellation; metadata discovery shares that same deadline. Internal ordering supports both directions, while the public timeline keeps its existing most-recent-first behavior. Tests compare bounded results with complete mixed-generation scans, including submicrosecond ties and unknown times.
+
+## Measure event-reference co-observations before a schema decision
+
+Context: precise co-observations repeat time/order columns even though they already carry a source hash and record index. Removing those columns would trade disk space for additional event-reference resolution during time-filtered queries.
+
+Decision: measure the compressed bytes of those columns separately in release benchmarks and publish a [design proposal](coobservation-reference-proposal.md). Do not modify the approved V2 schema, builder identity, signed encoding or reconstruction algorithm in this measurement change.
+
+Consequences: any production implementation remains a separate compatibility decision with measured disk and latency results. Existing hash checks, time filters, bounded-query behavior and historical verification remain unchanged.

@@ -160,3 +160,12 @@ The [proposed parser retention policy](decisions.md#parser-retention-policy-for-
 Step (e) compares release-mode V1/V2 CloudTrail ingestion and queries at 1 GB and 15 GB, plus 15 GB endpoint corpora with 1, 64, 1,024 and 1,025 hosts. It records normalized staging disk peaks, signed partition/file counts, compressed column sizes and filtered/unfiltered latency. The [measured recommendation](benchmarks.md#host-cap-recommendation-and-remaining-gate) retains 64 hosts as a conservative initial cap, with a hard ceiling of 1,024. It does not establish an optimal cap because the run holds that cap fixed while varying source cardinality.
 
 The complete profiled run exceeds the 900-second V2 ingestion target at 15 GB and the unfiltered endpoint timeline deadline. Step (e) remains open. Default production writing stays V1; recording benchmark results does not authorize switching the writer. Preserve all custody/query controls while addressing external sorting, spool replay and the global timeline.
+
+
+### V2 optimization acceptance
+
+The ordinary-host default is approved at **64 per case**, with an immutable ceiling of **1,024** and signed overflow. This is the selected operational default, not a claim that a fixed-cap cardinality experiment proved an optimum.
+
+Before activation, optimize ordered-source writing, bounded natural-run merges, authenticated file/row-group timeline pruning and cloud entity lookup in separate changes. Measure the release baseline and candidate in the same runner, with cloud and separate chronological/disordered endpoint corpora at 15 GB and 1, 64, 1,024 and 1,025 hosts. Preserve the 900-second ingestion target for both endpoint corpora and all existing query targets. A disordered-corpus miss must be reported rather than changing its target. V2 remains disabled until the cloud and chronological acceptance targets pass.
+
+[Event-reference co-observations](coobservation-reference-proposal.md) are an evaluation only. Any change to the signed schema requires its own decision before implementation.
