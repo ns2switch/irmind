@@ -24,14 +24,32 @@ impl ParquetStore {
         self.prepare_ordered_sources(request, inputs, &mut allocator, cancel)
     }
 
+    #[cfg(test)]
     pub(super) fn write_partition_source(
+        &self,
+        request: &LocalBatchRequest<'_>,
+        source: StagedSource,
+        allocator: &mut Allocator,
+        cancel: &CancellationToken,
+        normalized_bytes: u64,
+    ) -> Result<PreparedSource, AppError> {
+        let prepared = self.replay_partition_source(request, source, allocator, cancel)?;
+        self.publish_partition_source(
+            request,
+            prepared.source,
+            prepared.staged,
+            cancel,
+            normalized_bytes,
+        )
+    }
+
+    pub(super) fn replay_partition_source(
         &self,
         request: &LocalBatchRequest<'_>,
         mut source: StagedSource,
         allocator: &mut Allocator,
         cancel: &CancellationToken,
-        normalized_bytes: u64,
-    ) -> Result<PreparedSource, AppError> {
+    ) -> Result<PreparedPartition, AppError> {
         let replay = self
             .profile
             .as_ref()
@@ -75,7 +93,7 @@ impl ParquetStore {
             sample_hash: source.sample_hash,
             budget: 0,
         };
-        self.publish_partition_source(request, parsed, state.staged, cancel, normalized_bytes)
+        PreparedPartition::new(parsed, state.staged, self.profile.clone())
     }
 
     pub(super) fn publish_partition_source(
@@ -123,6 +141,30 @@ impl ParquetStore {
             records: source.report.accepted,
             format_sample_sha256: source.sample_hash,
             parse_report: source.report,
+        })
+    }
+}
+
+pub(super) struct PreparedPartition {
+    pub(super) source: super::ordered::ParsedSource,
+    pub(super) staged: Vec<StagedArtifact>,
+    pub(super) disk: super::temporary::DiskLease,
+}
+
+impl PreparedPartition {
+    pub(super) fn new(
+        source: super::ordered::ParsedSource,
+        staged: Vec<StagedArtifact>,
+        profile: Option<std::sync::Arc<super::super::ParquetProfile>>,
+    ) -> Result<Self, AppError> {
+        let mut disk = super::temporary::DiskLease::new(profile);
+        for artifact in &staged {
+            disk.add(artifact.manifest.size())?;
+        }
+        Ok(Self {
+            source,
+            staged,
+            disk,
         })
     }
 }
