@@ -386,3 +386,37 @@ Cloud ingestion improves by 11%; chronological endpoint ingestion improves by 16
 The implementation now detects the first decreasing record in the parser worker, stops speculation, retains the original hash/metadata snapshot and authenticates the complete fallback parse. It keeps bounded 8 MiB handoffs so ordered throughput does not depend on tiny queues. Each worker prepares its own complete fallback spool, retaining parallel parsing before deterministic sorting and allocation. Real cancellation and parser errors remain errors. Ordered sources use no normalized spool. Temporary-disk accounting includes all retained provisional batch artifacts, not just normalized records; the historical metric name remains `normalized_stage_peak_bytes`.
 
 Both revisions retain 19/19 events, 10/10 entities and 14/14 path checks per cloud provider, with zero parse errors. Historical and active Parquet byte totals match within each pair; that size equality alone is not a full-file hash-equivalence proof. Dedicated reconstruction and byte-equivalence tests cover the writer. Disordered ingestion and some endpoint timelines still fail their unchanged targets in this prototype run. Keep V1 as the default and use the subsequent corrected paired measurements for activation decisions.
+
+### Corrected ordered-source release comparison
+
+The [complete paired release run](https://github.com/ns2switch/irmind/actions/runs/42088793665) compares baseline [`a492613ef967`](https://github.com/ns2switch/irmind/commit/a492613ef967921ecb680f5c03a5912467ee8f22) with candidate [`b03faef4fe0d`](https://github.com/ns2switch/irmind/commit/b03faef4fe0d2a154e61d3ea91b4916e86eef3fb). Each of the nine rows runs both revisions on the same standard Linux runner. Different rows and runs use different runner instances; compare within a pair, not across their absolute times. The [structured results](benchmarks/v2-ordered-write-final.json) retain both frozen revisions, artifact IDs, ZIP SHA-256 values, phase counters, storage and every query p50/p95/error count. Later CI-only changes do not alter the measured Rust or benchmark code.
+
+| 15 GB V2 workload | Before seconds | After seconds | Change | Before / after temporary peak MiB |
+| --- | ---: | ---: | ---: | ---: |
+| cloud-v2 | 1,002.869 | 968.147 | -3.5% | 134.415 / 16.430 |
+| endpoint-v2-1 | 1,243.557 | 1,273.166 | +2.4% | 196.842 / 196.842 |
+| endpoint-v2-1-chronological | 578.161 | 471.893 | -18.4% | 134.388 / 12.638 |
+| endpoint-v2-1024 | 1,413.465 | 1,447.285 | +2.4% | 196.842 / 196.842 |
+| endpoint-v2-1024-chronological | 592.168 | 488.267 | -17.5% | 134.389 / 12.644 |
+| endpoint-v2-1025 | 1,249.799 | 1,287.936 | +3.1% | 196.842 / 196.842 |
+| endpoint-v2-1025-chronological | 714.692 | 586.189 | -18.0% | 134.389 / 12.644 |
+| endpoint-v2-64 | 1,229.691 | 1,267.184 | +3.0% | 196.842 / 196.842 |
+| endpoint-v2-64-chronological | 766.100 | 651.776 | -14.9% | 134.389 / 12.644 |
+
+All inputs are 1,000 files and approximately 15.68 decimal GB. Source generation, signed custody and final compaction remain inside the unchanged ingestion wall timer. Hash checks, reconstruction, parser limits, stable ordering, rollback and cancellation are retained. Parquet/co-observation byte totals match within every pair; dedicated byte-equivalence and reconstruction tests, rather than size equality, establish compatibility. The cloud evaluation retains 19/19 malicious events, 10/10 entities and 14/14 path checks for each provider, with zero parse errors in both revisions.
+
+Ordered sources create no normalized-record spool. The nonzero candidate temporary peak includes provisional Parquet files retained for whole-batch rollback. Disordered sources still use the authenticated fallback spool; their 206,404,230-byte peak is unchanged. The cloud pair improves from 1,002.869 to 968.147 seconds and still misses 900 seconds. Chronological endpoints improve, while disordered endpoints regress modestly before the separate natural-run optimization. This comparison does not justify enabling V2.
+
+| Candidate workload | Accumulated staging seconds | Sorting seconds | Replay / writing seconds | Source re-verification seconds | Publication seconds |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| cloud-v2 | 1,790.869 | 0.000 | 656.239 | 12.136 | 0.804 |
+| endpoint-v2-1 | 442.061 | 566.099 | 390.248 | 8.180 | 0.689 |
+| endpoint-v2-1-chronological | 610.579 | 0.000 | 227.886 | 7.554 | 0.530 |
+| endpoint-v2-1024 | 815.753 | 793.813 | 494.944 | 10.884 | 0.769 |
+| endpoint-v2-1024-chronological | 644.317 | 0.000 | 240.130 | 7.957 | 0.608 |
+| endpoint-v2-1025 | 442.887 | 572.535 | 393.953 | 8.236 | 0.732 |
+| endpoint-v2-1025-chronological | 843.717 | 0.000 | 279.426 | 9.486 | 5.463 |
+| endpoint-v2-64 | 445.948 | 565.942 | 392.081 | 8.171 | 0.716 |
+| endpoint-v2-64-chronological | 901.833 | 0.000 | 290.543 | 9.516 | 8.374 |
+
+Staging sums concurrent worker time and can include backpressure; direct replay can wait for those workers. These counters overlap and are not additive wall percentages. Query deadline failures remain recorded as failures, including those addressed by the separate timeline and entity changes. The full-size workflow therefore stays red where an unchanged ingestion or query target is missed; ordinary code-test CI is independent. Keep V1 as the default until the activation gate is met.
