@@ -207,6 +207,7 @@ fn parquet_v2_benchmark_endpoint_smoke() {
             precise: true,
             hosts: Some(2),
             source_bytes: 2048,
+            chronological: false,
         },
     );
 }
@@ -221,6 +222,7 @@ fn parquet_v1_benchmark_endpoint_smoke() {
             precise: false,
             hosts: Some(2),
             source_bytes: 2048,
+            chronological: false,
         },
     );
 }
