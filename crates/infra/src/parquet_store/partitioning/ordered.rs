@@ -150,10 +150,10 @@ impl ParquetStore {
         allocator: &mut Allocator,
         cancel: &CancellationToken,
     ) -> Result<PreparedPartition, AppError> {
+        // A producer can stop before emitting its first decreasing record.
+        // Discard its ordered prefix and authenticate a complete fallback.
+        let state = if source.report.is_some() { state } else { None };
         if let Some(mut state) = state {
-            if source.report.is_none() {
-                return Err(invalid_source());
-            }
             let parser = request
                 .parser
                 .identity_for_source(&source.manifest.source)?;

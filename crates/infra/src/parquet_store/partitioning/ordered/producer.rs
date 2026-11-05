@@ -73,6 +73,9 @@ impl ParquetStore {
                     &mut offset_mode,
                     size,
                 )?);
+                if rows.disordered {
+                    restart.store(true, Ordering::Release);
+                }
                 if result
                     .as_ref()
                     .is_err_and(|e| matches!(e, AppError::Cancelled))
@@ -127,6 +130,8 @@ struct RowBuffer<'a> {
     encoded: u64,
     budget: u64,
     accepted: usize,
+    previous: Option<irmind_domain::StableRecordKey<'static>>,
+    disordered: bool,
     hash: irmind_domain::EvidenceHash,
 }
 
@@ -143,11 +148,23 @@ impl<'a> RowBuffer<'a> {
             encoded: 0,
             budget,
             accepted: 0,
+            previous: None,
+            disordered: false,
             hash,
         }
     }
 
     fn push(&mut self, row: RecordRow) -> Result<(), AppError> {
+        let key = row.sort_key();
+        if let Some(old) = self.previous
+            && irmind_domain::compare_record_keys(old, key, false)
+                .map_err(|_| invalid_source())?
+                .is_gt()
+        {
+            self.disordered = true;
+            return Err(AppError::Cancelled);
+        }
+        self.previous = Some(key);
         // Preserve the existing per-row and per-source normalized-size limits
         // without allocating or writing a serialized copy of every record.
         let mut counter = EncodedSize(1);
@@ -159,7 +176,7 @@ impl<'a> RowBuffer<'a> {
         self.accepted = self.accepted.checked_add(1).ok_or_else(invalid_source)?;
         self.bytes = self.bytes.saturating_add(row.estimated_bytes());
         self.rows.push(row);
-        if self.bytes >= BATCH_BYTES / 8 || self.rows.len() >= BATCH_ROWS / 8 {
+        if self.bytes >= BATCH_BYTES || self.rows.len() >= BATCH_ROWS {
             self.finish()?;
         }
         Ok(())
