@@ -59,16 +59,21 @@ pub(super) fn report_storage(
     coobs
 }
 
-pub(super) fn report_queries(store: &LocalStore, id: &CaseId, scenario: &Scenario) -> bool {
+pub(super) fn report_queries(
+    store: &LocalStore,
+    id: &CaseId,
+    scenario: &Scenario,
+    profile: &ParquetProfile,
+) -> bool {
     let filter = GraphQueryFilter::default();
-    let mut met_target = sample_queries(store, id, scenario, &filter, "all");
+    let mut met_target = sample_queries(store, id, scenario, &filter, "all", profile);
     if let Some(hosts) = scenario.hosts {
         for host in [0, hosts - 1].into_iter().collect::<BTreeSet<_>>() {
             let name = format!("endpoint-{host:04}");
             let filter =
                 GraphQueryFilter::parse_with_host(None, None, None, None, None, Some(&name))
                     .unwrap();
-            met_target = sample_queries(store, id, scenario, &filter, &name) && met_target;
+            met_target = sample_queries(store, id, scenario, &filter, &name, profile) && met_target;
         }
     }
     met_target
@@ -80,6 +85,7 @@ fn sample_queries(
     scenario: &Scenario,
     filter: &GraphQueryFilter,
     scope: &str,
+    profile: &ParquetProfile,
 ) -> bool {
     let (kind, value, to_kind, to_value) = scenario.target();
     let value = if scope.starts_with("endpoint-") {
@@ -89,6 +95,7 @@ fn sample_queries(
     };
     let mut met_target = true;
     for label in ["term", "entity", "neighbors", "timeline", "path"] {
+        let before = profile.query_detail_snapshot();
         let mut timings = Vec::new();
         let mut errors = 0;
         for _ in 0..5 {
@@ -119,6 +126,18 @@ fn sample_queries(
             scenario.name(),
             timings[2].as_secs_f64(),
             timings[4].as_secs_f64()
+        );
+        let after = profile.query_detail_snapshot();
+        let phase = std::array::from_fn::<_, 4, _>(|i| {
+            after[i].checked_sub(before[i]).unwrap().as_secs_f64() / 5.0
+        });
+        println!(
+            "PARQUET_QUERY_PROFILE scenario={} scope={scope} name={label} verify_seconds={:.6} scan_seconds={:.6} normalize_seconds={:.6} aggregate_seconds={:.6}",
+            scenario.name(),
+            phase[0],
+            phase[1],
+            phase[2],
+            phase[3]
         );
         met_target &= errors == 0 && timings[4] < std::time::Duration::from_secs(10);
     }

@@ -10,6 +10,8 @@ pub(crate) struct ParquetProfile {
     parquet: AtomicU64,
     query_verify: AtomicU64,
     query_scan: AtomicU64,
+    query_normalize: AtomicU64,
+    query_aggregate: AtomicU64,
     staging_peak: AtomicU64,
     pub(super) staging_live: AtomicU64,
     partition_phases: [AtomicU64; 5],
@@ -47,6 +49,35 @@ impl ParquetProfile {
     pub(super) fn record_query_scan(&self, duration: Duration) {
         self.query_scan
             .fetch_add(Self::nanos(duration), Ordering::Relaxed);
+    }
+
+    pub(super) fn record_query_normalize(&self, duration: Duration) {
+        self.query_normalize
+            .fetch_add(Self::nanos(duration), Ordering::Relaxed);
+    }
+
+    pub(super) fn record_query_aggregate(&self, duration: Duration) {
+        self.query_aggregate
+            .fetch_add(Self::nanos(duration), Ordering::Relaxed);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn query_detail_snapshot(&self) -> [Duration; 4] {
+        [
+            &self.query_verify,
+            &self.query_scan,
+            &self.query_normalize,
+            &self.query_aggregate,
+        ]
+        .map(|counter| Duration::from_nanos(counter.load(Ordering::Relaxed)))
+    }
+
+    pub(super) fn query_timer(&self, phase: QueryPhase) -> QueryTimer<'_> {
+        QueryTimer {
+            profile: self,
+            phase,
+            started: Instant::now(),
+        }
     }
 
     pub(super) fn record_staging_peak(&self, bytes: u64) {
@@ -107,5 +138,28 @@ impl Drop for PhaseTimer<'_> {
             ParquetProfile::nanos(self.started.elapsed()),
             Ordering::Relaxed,
         );
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum QueryPhase {
+    Scan,
+    Normalize,
+    Aggregate,
+}
+
+pub(super) struct QueryTimer<'a> {
+    profile: &'a ParquetProfile,
+    phase: QueryPhase,
+    started: Instant,
+}
+impl Drop for QueryTimer<'_> {
+    fn drop(&mut self) {
+        let elapsed = self.started.elapsed();
+        match self.phase {
+            QueryPhase::Scan => self.profile.record_query_scan(elapsed),
+            QueryPhase::Normalize => self.profile.record_query_normalize(elapsed),
+            QueryPhase::Aggregate => self.profile.record_query_aggregate(elapsed),
+        }
     }
 }

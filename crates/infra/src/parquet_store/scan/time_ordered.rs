@@ -31,7 +31,10 @@ impl ParquetStore {
         let Some(file) = self.verify_for_scan(&self.case_dir(spec.id)?, artifact, &spec)? else {
             return Ok(ScanStatus::Deadline);
         };
-        let started = Instant::now();
+        let _scan = self
+            .profile
+            .as_ref()
+            .map(|p| p.query_timer(super::super::profile::QueryPhase::Scan));
         let builder = ParquetRecordBatchReaderBuilder::try_new(file.try_clone().map_err(storage)?)
             .map_err(storage)?;
         super::super::format::validate_schema(artifact, builder.schema().as_ref())?;
@@ -69,20 +72,22 @@ impl ParquetStore {
                 if Instant::now() >= spec.deadline {
                     return Ok(ScanStatus::Deadline);
                 }
+                let normalize = self
+                    .profile
+                    .as_ref()
+                    .map(|p| p.query_timer(super::super::profile::QueryPhase::Normalize));
                 let batch = super::super::format::normalize_batch(
                     &batch.map_err(storage)?,
                     artifact,
                     names,
                 )?;
+                drop(normalize);
                 let (batch, status) = self.filter_legacy_host(spec, names, batch)?;
                 if status == ScanStatus::Deadline {
                     return Ok(status);
                 }
                 cutoff = visit(&batch)?;
             }
-        }
-        if let Some(profile) = &self.profile {
-            profile.record_query_scan(started.elapsed());
         }
         Ok(ScanStatus::Complete)
     }

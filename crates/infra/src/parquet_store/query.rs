@@ -34,6 +34,7 @@ impl QueryStore<'_> {
 mod coobservations;
 mod entity;
 mod events;
+mod extrema;
 mod neighbors;
 mod path;
 mod timeline;
