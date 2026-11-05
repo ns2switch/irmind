@@ -13,6 +13,14 @@ test-group = 'network-contracts'
 
 # PTY processes perform real keystore/custody work; keep independent terminal
 # sessions from competing with one another while the rest of the suite runs.
+# ConPTY sessions include real custody IO; reserve the runner while they run
+# so disk-heavy parsers and compile-fail suites cannot consume their deadline.
+[[profile.default.overrides]]
+filter = 'package(irmind) and (binary(demo_pty) or binary(first_run_pty))'
+platform = 'cfg(windows)'
+test-group = 'interactive-pty'
+threads-required = "num-test-threads"
+
 [[profile.default.overrides]]
 filter = 'package(irmind) and (binary(demo_pty) or binary(first_run_pty))'
 test-group = 'interactive-pty'
