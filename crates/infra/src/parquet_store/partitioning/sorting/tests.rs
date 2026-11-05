@@ -5,6 +5,7 @@ use irmind_app::{
     PartitionLimits,
 };
 use irmind_domain::{EvidenceHash, ParquetArtifact, PartitionOverflowReason, ScopePartitionValue};
+use std::fmt::Write as _;
 
 fn case() -> CaseId {
     CaseId::parse("00000000-0000-0000-0000-000000000020").unwrap()
@@ -132,6 +133,107 @@ fn out_of_order_input_allocates_by_the_shared_stable_order_and_rebuilds() {
             &CancellationToken::new(),
         )
         .unwrap();
+    assert_eq!(
+        std::fs::read_dir(store.spool_dir(&case()).unwrap())
+            .unwrap()
+            .count(),
+        0
+    );
+}
+
+#[test]
+fn natural_runs_and_external_sort_produce_identical_normalized_bytes() {
+    for runs in [15, 33] {
+        let inputs = tempfile::tempdir().unwrap();
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let mut bytes = String::new();
+        for i in 0..runs * 10 {
+            writeln!(bytes, "{{\"eventTime\":\"2026-11-01T00:00:0{}Z\",\"host\":\"host-{}\",\"eventName\":\"event-{i}\"}}", i % 10, i % 20).unwrap();
+        }
+        std::fs::write(inputs.path().join("events.json"), bytes).unwrap();
+        let store = ParquetStore::open_precise(a.path()).unwrap();
+        let reference = ParquetStore::open_precise(b.path()).unwrap();
+        let paths = ["events.json".into()];
+        let cancel = CancellationToken::new();
+        let mut source = stage_for_sort(&store, inputs.path(), &paths, &cancel);
+        let mut expected = stage_for_sort(&reference, inputs.path(), &paths, &cancel);
+        let natural = natural::try_sort(&store, &case(), &mut source, &cancel).unwrap();
+        assert_eq!(natural.is_some(), runs <= 32);
+        let actual = natural
+            .unwrap_or_else(|| external_sort(&store, &case(), &mut source, &cancel).unwrap());
+        let external = external_sort(&reference, &case(), &mut expected, &cancel).unwrap();
+        let hash = run::copy_final(
+            &actual,
+            source.spool.as_file_mut(),
+            &mut source.disk,
+            &cancel,
+        )
+        .unwrap();
+        let expected_hash = run::copy_final(
+            &external,
+            expected.spool.as_file_mut(),
+            &mut expected.disk,
+            &cancel,
+        )
+        .unwrap();
+        assert_eq!(hash, expected_hash);
+        assert_eq!(
+            std::fs::read(source.spool.path()).unwrap(),
+            std::fs::read(expected.spool.path()).unwrap()
+        );
+        drop((actual, external, source, expected));
+        for store in [&store, &reference] {
+            assert_eq!(
+                std::fs::read_dir(store.spool_dir(&case()).unwrap())
+                    .unwrap()
+                    .count(),
+                0
+            );
+        }
+    }
+}
+
+fn stage_for_sort(
+    store: &ParquetStore,
+    root: &std::path::Path,
+    paths: &[String],
+    cancel: &CancellationToken,
+) -> StagedSource {
+    let mut inputs = store.staging_inputs(&case(), root, paths).unwrap();
+    store
+        .stage_source(
+            &case(),
+            inputs.remove(0),
+            &irmind_mod_parser_json::JsonParser,
+            false,
+            cancel,
+        )
+        .unwrap()
+}
+
+#[test]
+fn natural_run_integrity_errors_and_cancellation_fail_closed_and_clean_up() {
+    let inputs = tempfile::tempdir().unwrap();
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(
+        inputs.path().join("events.json"),
+        b"{\"eventTime\":\"2026-11-01T00:00:02Z\"}\n{\"eventTime\":\"2026-11-01T00:00:01Z\"}\n",
+    )
+    .unwrap();
+    let store = ParquetStore::open_precise(root.path()).unwrap();
+    let paths = ["events.json".into()];
+    let cancel = CancellationToken::new();
+    let mut source = stage_for_sort(&store, inputs.path(), &paths, &cancel);
+    cancel.cancel();
+    assert!(matches!(
+        natural::try_sort(&store, &case(), &mut source, &cancel),
+        Err(AppError::Cancelled)
+    ));
+    let cancel = CancellationToken::new();
+    source.spool.as_file().set_len(0).unwrap();
+    assert!(natural::try_sort(&store, &case(), &mut source, &cancel).is_err());
+    drop(source);
     assert_eq!(
         std::fs::read_dir(store.spool_dir(&case()).unwrap())
             .unwrap()
