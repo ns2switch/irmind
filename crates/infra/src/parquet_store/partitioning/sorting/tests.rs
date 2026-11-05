@@ -149,7 +149,12 @@ fn natural_runs_and_external_sort_produce_identical_normalized_bytes() {
         let b = tempfile::tempdir().unwrap();
         let mut bytes = String::new();
         for i in 0..runs * 10 {
-            writeln!(bytes, "{{\"eventTime\":\"2026-11-01T00:00:0{}Z\",\"host\":\"host-{}\",\"eventName\":\"event-{i}\"}}", i % 10, i % 20).unwrap();
+            let record = serde_json::json!({
+                "eventTime": format!("2026-11-01T00:00:0{}Z", i % 10),
+                "host": format!("host-{}", i % 20),
+                "eventName": format!("event-{i} \\ path \"quoted\" café"),
+            });
+            writeln!(bytes, "{record}").unwrap();
         }
         std::fs::write(inputs.path().join("events.json"), bytes).unwrap();
         let store = ParquetStore::open_precise(a.path()).unwrap();
