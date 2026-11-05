@@ -251,9 +251,13 @@ The local Linux detect/parse ASAN fuzz run completed a 600-second budget (601 se
 
 The release-only benchmark compares the current V1 writer with the explicit V2 writer using identical source bytes and four-source batches on the same standard Linux runner. It retains the 1 GB and 15 GB CloudTrail corpus and adds 15 GB journald endpoint corpora with exactly 1, 64, 1,024 and 1,025 hosts. Each endpoint file belongs to one host; the extra 24/25 hosts share the first files so the 1,000-file corpus contains every declared host. The production Linux parser preserves source microseconds. Source generation and parser selection are deterministic; both writers record an explicit parser selection.
 
+The wall timer includes source generation, file writes/removal, selected-parser ingestion, signed custody and final compaction. The phase counters exclude source generation. Compare the two writers on the same scenario; these wall measurements are not isolated parser throughput.
+
+Each 15 MB endpoint file repeats its 1 MB slab 15 times. The source microseconds therefore run backwards at 14 slab boundaries per file. V2 must externally sort those sources; V1 collapses their instants to the same second. This workload includes required stable-order work, not only host partitioning. The V2 sorting counter measures that pass. A separate chronological endpoint control is needed before attributing the whole slowdown to partition cardinality or treating the cap as optimal.
+
 `PARQUET_SCENARIO` identifies each measurement. `PARQUET_INGEST` retains hash, conversion, row preparation, Parquet-write and wall times. `normalized_stage_peak_bytes` measures the peak live normalized-source staging across workers, excluding originals and published artifacts. V1 does not use that staging path. `PARQUET_LAYOUT` reports signed historical and lineage-active files, partitions, ordinary hosts, overflow artifacts and their bytes. Compaction inputs remain signed historical files. `PARQUET_COLUMN` reports compressed column bytes, including time, precision, scope and co-observation columns.
 
-Query samples retain SHA-256 verification and the existing result, sampling, expansion and 10-second limits. Five samples report p50/p95 for term search, entity lookup, neighbors, timeline and path. Endpoint runs compare unfiltered queries, an ordinary host and the final host, which enters signed overflow above the initial 64-host cap. Cloud runs retain the independent HuntEval needles and bounded three-hop worst-path case. Source batches and cases are removed after each scenario. These are benchmarks of synthetic data, not sizing guarantees for arbitrary endpoint logs.
+Query samples retain SHA-256 verification and the existing result, sampling, expansion and 10-second limits. Five samples report p50/p95 for term search, entity lookup, neighbors, timeline and path. Endpoint runs compare unfiltered queries, an ordinary host and the final host, which enters signed overflow above the initial 64-host cap. Cloud runs retain the independent HuntEval needles and bounded three-hop worst-path case. Generated corpus files are removed after each ingested batch to bound disk use; the case is removed after each scenario. This benchmark does not retain the full original corpus for a later reconstruction. Separate reconstruction contracts cover that behavior. These are benchmarks of synthetic data, not sizing guarantees for arbitrary endpoint logs.
 
 The workflow accepts a specific scenario for reproducing a measured failure. A full comparison continues through the remaining workloads if one fails, then returns a failing status; individual query and ingestion targets are unchanged. The host-cap recommendation and result tables are filled from the workflow output before production V2 writing is enabled. The hard ceiling remains 1,024. No runtime limit is relaxed by the benchmark.
 
@@ -283,8 +287,66 @@ The original conversion, row and Parquet counters cover V1 only. Their V2 zeroes
 
 All four endpoint V1 cases store 8,696,000 compressed bytes in `event_time`, compared with 291,496,017–298,855,350 in V2 across the recorded artifacts. This is not a type-only integer-versus-string comparison: V1 collapses the synthetic microseconds to repeated whole seconds, whereas V2 retains the distinct instants. The JSON measurement records every compressed column, including the new precision/scope metadata. Aggregate Parquet grows from about 2.39 GB to 2.76–2.81 GB, with co-observation growing from about 0.48 GB to 1.22–1.25 GB.
 
+### Complete profiled run
+
+The [profiled standard-runner run](https://github.com/ns2switch/irmind/actions/runs/41984151442) completed all 12 timed scenarios on one runner, in release mode. It failed the existing targets. Its [raw measurements](benchmarks/artifact-v2-profiled.json) identify the frozen source commit, `26885cf2f4061c0970f5adde55af696e683c61aa`. Compare V1 and V2 within this run; absolute times from separate runners are not a controlled before/after comparison.
+
+| Scenario | Ingestion seconds | Parquet GB | Co-observation GB | Temporary staging peak MiB |
+| --- | ---: | ---: | ---: | ---: |
+| cloud-v1 (15gb) | 530.670 | 8.452 | 5.724 | 0.000 |
+| cloud-v1 (1gb) | 53.548 | 0.782 | 0.417 | 0.000 |
+| endpoint-v1-1 (15gb) | 194.199 | 2.390 | 0.481 | 0.000 |
+| endpoint-v1-64 (15gb) | 192.285 | 2.392 | 0.481 | 0.000 |
+| endpoint-v1-1024 (15gb) | 193.037 | 2.393 | 0.481 | 0.000 |
+| endpoint-v1-1025 (15gb) | 192.942 | 2.393 | 0.481 | 0.000 |
+| cloud-v2 (15gb) | 1149.683 | 8.925 | 5.960 | 134.415 |
+| cloud-v2 (1gb) | 106.714 | 0.820 | 0.435 | 9.081 |
+| endpoint-v2-1 (15gb) | 1554.457 | 2.814 | 1.249 | 196.842 |
+| endpoint-v2-64 (15gb) | 1555.721 | 2.814 | 1.249 | 196.842 |
+| endpoint-v2-1024 (15gb) | 1532.162 | 2.758 | 1.224 | 196.842 |
+| endpoint-v2-1025 (15gb) | 1539.551 | 2.759 | 1.224 | 196.842 |
+
+V2 endpoint ingestion is about eight times slower than its matching V1 runs. Cloud V2 takes 1,149.683 s for 15 GB, versus 530.670 s for V1. All V2 15 GB workloads exceed the unchanged 900-second target.
+
+| V2 scenario | Parallel staging (accumulated seconds) | Sorting (seconds, wall share) | Replay/writing (seconds, wall share) | Source re-verification seconds | Per-source publication seconds |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| cloud-v2 (15gb) | 1518.791 | 0.000 (0.0%) | 439.526 (38.2%) | 13.850 | 0.931 |
+| cloud-v2 (1gb) | 113.816 | 0.000 (0.0%) | 30.136 (28.2%) | 0.976 | 0.555 |
+| endpoint-v2-1 (15gb) | 797.788 | 737.661 (47.5%) | 373.859 (24.1%) | 13.851 | 0.760 |
+| endpoint-v2-64 (15gb) | 795.831 | 738.858 (47.5%) | 374.252 (24.1%) | 13.840 | 0.743 |
+| endpoint-v2-1024 (15gb) | 794.470 | 738.015 (48.2%) | 363.501 (23.7%) | 13.873 | 0.747 |
+| endpoint-v2-1025 (15gb) | 799.355 | 739.346 (48.0%) | 365.153 (23.7%) | 13.848 | 0.751 |
+
+Sorting takes 47–48% of endpoint wall time, and replay/writing takes about 24%. The staging column sums overlapping workers; it is not a wall percentage and must not be added to the sequential percentages. Generation, staging wall time, signed custody, final case compaction and other orchestration account for the remaining wall time. Publication here measures source consolidation/publication, not final case compaction. No timer justifies removing hashing, source re-verification or stable ordering.
+
+All five general CloudTrail queries completed without errors. Their V2 15 GB p95 values were term search 4.740 s, entity lookup 9.396 s, neighbors 0.739 s, timeline 0.028 s and path 0.743 s. The V1 values were 5.217 s, 5.788 s, 0.650 s, 0.023 s and 0.638 s respectively.
+
+| V2 endpoint hosts | Signed scope partitions | Worst ordinary-host query p95 | Worst overflow-host query p95 | Unfiltered timeline p95 |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 1 | 10.033 s (entity deadline); timeline also fails | not applicable | 10.016 s (deadline) |
+| 64 | 64 | 0.205 s | not applicable | 10.013 s (deadline) |
+| 1,024 | 65 | 0.712 s | 0.714 s | 10.013 s (deadline) |
+| 1,025 | 65 | 0.774 s | 0.715 s | 10.013 s (deadline) |
+
+Every failing entity/timeline label above had five failed samples. Ordinary and overflow queries for 64 or more hosts had zero errors. V1 endpoint timelines fail both without a host filter and with one. Its host-filtered term, entity and neighbor queries also hit the deadline; filtered paths return at the time budget and still fail the latency target. A zero error count alone is not a claim that a bounded path was exhaustive.
+
+V1 retains full HuntEval recall at 1 GB and 15 GB: each provider has 19/19 events, 10/10 entities, 14/14 path checks and zero parse errors. The initial profiled V2 evaluation stopped at the first legacy AWS episode: its records have no provider or region, but the evaluator supplied a region from the dataset directory. Those V2 recall and worst-path results are **not collected**, not zero and not passed. The evaluator now uses only a provider fallback explicitly declared consistently in source records; directory attribution does not create a query predicate. Exact source pointers, event/entity checks, path assertions, query limits and private-answer isolation remain unchanged. The release reference test now ingests and reconstructs all 18 episodes with both writers; all reference checks pass for AWS, Azure and GCP. Full-size validation is recorded separately from the matched performance run.
+
+The warm infrastructure test build took 15 s. The first default-feature CLI build in that job took 401 s and produced a 51,545,776-byte binary. This is a cache-dependent CLI build measurement, not a clean-workspace cold-build claim. Both measurements belong to the frozen run commit, rather than to later documentation or warning changes.
+
+### Ordered endpoint control (local, 1 GB)
+
+A separate local diagnostic uses 1,000 endpoint files, 64 hosts and 1,045,072,000 identical source bytes per writer. Each file has one chronological slab, so V2 does not need an external sort. Both writers run sequentially with the same optimized release binary, one build/test worker and five samples per query. This is not a standard-runner acceptance result or a comparison with the 15 GB runner's absolute times. The [machine-readable control](benchmarks/artifact-v2-local-control.json) records every sample summary and phase counter.
+
+| Writer | Ingestion seconds | Parquet MB | Co-observation MB | Unfiltered timeline p95 | Host-filtered entity p95 (worst of two hosts) | Host-filtered timeline p95 (worst of two hosts) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| V1 | 51.831 | 159.784 | 30.484 | 1.494 s | 6.531 s | 10.005 s (all five samples per host failed) |
+| V2 | 101.629 | 425.656 | 112.074 | 0.415 s | 0.015 s | 0.012 s |
+
+All V2 queries passed. V1 correctly fails the query target because both host-filtered timelines reach the unchanged 10-second deadline. V2 reports 19.040 s of accumulated parallel staging, less than 0.001 s of sorting, 34.730 s of sequential replay/writing, 0.779 s of source re-verification and 17.764 s of publication. Its temporary staging peak is 9,388,000 bytes. The V2 ingestion overhead persists without sorting; the local pair is about 1.96 times slower for ingestion, while host-filtered queries benefit from partition pruning. This control does not measure overflow or determine the best cap.
+
 ### Host-cap recommendation and remaining gate
 
 Keep **64 hosts per case as the provisional default**, with the approved **1,024 hard ceiling**. This run created 1, 64 and 65 scope partitions for the 1-host, 64-host and larger cases; the latter retain 64 ordinary hosts plus signed overflow. Values beyond the cap remain available in row columns and entity queries. Raising the cap is not supported as an ingestion fix: V2 wall times differ by only about 3% across these workloads, while the shared V2 path is roughly eleven times slower than V1.
 
-The run varies source cardinality under a fixed cap of 64; it does not prove that 64 is an optimal cap or establish V2 query latency. Keep production V2 writing disabled. The corrected harness records all query scopes and its failure targets before failing, uses the selected-parser ingestion path for HuntEval, and collects warm-build/binary-size measurements even when a target fails. The final workflow still fails for any ingestion/query target violation. Complete the phase profile and filtered/overflow query measurements before treating this recommendation as validated or closing step (e).
+The profiled run supports retaining 64 as a conservative starting cap: it bounds large cases to 65 scope buckets and keeps measured ordinary/overflow filtered queries below 0.8 s with 64, 1,024 and 1,025 source hosts. It still varies source cardinality under a fixed cap, so it does not establish that 64 is optimal or measure an alternative cap. Global endpoint timelines and the one-host aggregate remain over budget, and 15 GB V2 ingestion remains over 15 minutes. Keep production V2 writing disabled and step (e) open. Prioritize the external-sort and spool replay paths, then the unfiltered timeline; retain exact ordering, cancellation, signed allocations, rollback and hash checks. Re-measure the unchanged corpus and an additional chronological endpoint control before enabling the writer.

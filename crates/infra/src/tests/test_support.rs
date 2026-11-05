@@ -1,5 +1,8 @@
 use super::*;
 
+mod selected_ingest;
+pub(super) use selected_ingest::ingest_selected;
+
 pub(super) fn ingest_synthetic(
     engine: &Engine<'_>,
     store: &LocalStore,

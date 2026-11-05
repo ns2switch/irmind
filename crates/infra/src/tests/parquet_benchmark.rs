@@ -92,7 +92,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
                 name
             })
             .collect::<Vec<_>>();
-        corpus::ingest_selected(&ingest, &case.id, &source_root, &names);
+        ingest_selected(&ingest, &case.id, &source_root, &names);
         for name in names {
             fs::remove_file(source_root.join(name)).unwrap();
         }
@@ -113,7 +113,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
                 .map(|name| fs::metadata(source_root.join(name)).unwrap().len())
                 .sum::<u64>();
             for batch in names.chunks(4) {
-                corpus::ingest_selected(&ingest, &case.id, &source_root, batch);
+                ingest_selected(&ingest, &case.id, &source_root, batch);
             }
             episodes
         });

@@ -93,7 +93,7 @@ use foundation::{
 };
 use test_support::{
     CaptureModel, EdrModel, FakeCloudAudit, FakeInternalIntel, FakeSiem, TestSigner,
-    ingest_historical_fixture, ingest_synthetic, ingest_synthetic_result,
+    ingest_historical_fixture, ingest_selected, ingest_synthetic, ingest_synthetic_result,
 };
 #[allow(clippy::expect_used)]
 mod agent_loop;
