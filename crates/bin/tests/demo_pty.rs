@@ -74,7 +74,8 @@ fn automatic_presentation_reaches_signed_evidence_and_exits_cleanly() {
     let real_home = tempfile::tempdir().unwrap();
     let demo_parent = tempfile::tempdir().unwrap();
     let mut session =
-        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+        DemoSession::spawn_sized(&demo_command(real_home.path(), demo_parent.path()), 120, 40)
+            .unwrap();
     session.expect("Step 1 of 10").unwrap();
     session.expect("Step 2 of 10").unwrap();
     session.expect("Step 3 of 10").unwrap();
@@ -112,7 +113,8 @@ fn automatic_presentation_completes_real_queries_approval_and_custody() {
     let real_home = tempfile::tempdir().unwrap();
     let demo_parent = tempfile::tempdir().unwrap();
     let mut session =
-        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+        DemoSession::spawn_sized(&demo_command(real_home.path(), demo_parent.path()), 120, 40)
+            .unwrap();
     reach_final(&mut session);
     session
         .expect("Explore this demo case (sealed, read-only)")
@@ -127,7 +129,8 @@ fn manual_presentation_visits_every_narration_and_can_go_back() {
     let real_home = tempfile::tempdir().unwrap();
     let demo_parent = tempfile::tempdir().unwrap();
     let mut session =
-        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+        DemoSession::spawn_sized(&demo_command(real_home.path(), demo_parent.path()), 120, 40)
+            .unwrap();
     session.expect("Step 1 of 10").unwrap();
     session.send(" ").unwrap();
     session.expect("Paused").unwrap();
@@ -149,7 +152,8 @@ fn ingest_completion_is_visible_and_next_action_changes_the_screen() {
     let real_home = tempfile::tempdir().unwrap();
     let demo_parent = tempfile::tempdir().unwrap();
     let mut session =
-        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+        DemoSession::spawn_sized(&demo_command(real_home.path(), demo_parent.path()), 120, 40)
+            .unwrap();
     session.expect("Evidence ready:").unwrap();
     session.expect("parser-json").unwrap();
     session.expect("90% confidence").unwrap();
@@ -166,7 +170,8 @@ fn card_expands_from_the_text_box_with_control_o_and_slash_command() {
     let real_home = tempfile::tempdir().unwrap();
     let demo_parent = tempfile::tempdir().unwrap();
     let mut session =
-        DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+        DemoSession::spawn_sized(&demo_command(real_home.path(), demo_parent.path()), 120, 40)
+            .unwrap();
     reach_final(&mut session);
     session.send("\r").unwrap();
     session.expect("Demo exploration").unwrap();
@@ -191,7 +196,8 @@ fn escape_and_control_c_leave_real_configuration_untouched() {
         let sentinel = real_home.path().join("config.toml");
         std::fs::write(&sentinel, "a deliberately invalid real configuration").unwrap();
         let mut session =
-            DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+            DemoSession::spawn_sized(&demo_command(real_home.path(), demo_parent.path()), 120, 40)
+                .unwrap();
         session.expect("Step 3 of 10").unwrap();
         session.send(exit).unwrap();
         session.expect("Demo data deleted").unwrap();
@@ -209,7 +215,8 @@ fn cancel_at_every_step(exit_key: &str) {
         let real_home = tempfile::tempdir().unwrap();
         let demo_parent = tempfile::tempdir().unwrap();
         let mut session =
-            DemoSession::spawn(demo_command(real_home.path(), demo_parent.path())).unwrap();
+            DemoSession::spawn_sized(&demo_command(real_home.path(), demo_parent.path()), 120, 40)
+                .unwrap();
         for step in 1..=target {
             expect_step(&mut session, step);
         }
@@ -238,7 +245,7 @@ fn eighty_by_twenty_four_completes_the_automatic_presentation() {
     let real_home = tempfile::tempdir().unwrap();
     let demo_parent = tempfile::tempdir().unwrap();
     let command = sized_demo_command(real_home.path(), demo_parent.path(), 80, 24);
-    let mut session = DemoSession::spawn_sized(command, 80, 24).unwrap();
+    let mut session = DemoSession::spawn_sized(&command, 80, 24).unwrap();
     reach_final(&mut session);
     session.expect("1. Explore this demo case").unwrap();
     session.expect("3. Exit").unwrap();

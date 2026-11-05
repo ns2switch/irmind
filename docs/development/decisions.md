@@ -210,3 +210,11 @@ Context: signed parser identities make reconstruction dependent on the version t
 Proposed decision: from 1.0 onward, retain an obsolete parser version for reconstruction and verification for at least two subsequent minor releases, or an equivalent support period. Announce retirement in the changelog before removal and document a migration procedure. Confirm the policy and the meaning of an equivalent support period before 1.0.
 
 Consequences: include the policy in the [1.0 acceptance criteria](roadmap.md#10-criteria). This is a pending compatibility commitment, not an implementation or a restoration of retired pre-1.0 readers. Existing signed bytes and verification rules do not change.
+
+## One PTY backend for integration tests
+
+Context: the Unix test driver used a separate terminal-process dependency chain. The existing Windows driver already uses `portable-pty`.
+
+Decision: use that same pinned development dependency on every supported platform. Keep real terminal input, rendered-screen checks, explicit terminal dimensions, timeout/output bounds, process termination and temporary-data cleanup. Bound the reader queue and share the driver with the first-run regression test.
+
+Consequences: remove the separate `expectrl`, `ptyprocess` and legacy `nix` chain, including its unmaintained `pin-utils` dependency. Do not add an advisory exception. No production dependency, application behavior, signed format or agreed port changes.
