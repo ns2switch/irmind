@@ -84,6 +84,17 @@ fn retired_reader_cannot_reinterpret_open_or_sealed_history_but_exports_still_ve
             engine.seal(&case.id).unwrap();
         }
         let before = store.entries(&case.id).unwrap();
+        let warning = irmind_app::parser_extraction_warning(&before)
+            .unwrap()
+            .unwrap();
+        let shown = warning.display(engine.guard.as_ref()).unwrap();
+        assert!(shown.contains("https://github.com/ns2switch/irmind/"));
+        assert!(shown.contains("CHANGELOG.md#known-issue-fixed"));
+        assert!(
+            engine
+                .open_case_verified(&case.id, &CancellationToken::new())
+                .is_ok()
+        );
         let before_seal = store.case_seal(&case.id).unwrap();
         let before_operations = store.operations(&case.id).unwrap().len();
         let large = LargeCaseUseCases {

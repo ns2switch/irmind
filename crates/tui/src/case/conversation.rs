@@ -16,6 +16,7 @@ pub(super) enum CardKind {
     ToolResult,
     Finding,
     Notice,
+    Warning,
 }
 
 pub(super) struct Card {
@@ -82,6 +83,14 @@ impl Card {
             self.layout_message(width, theme);
             return;
         }
+        if matches!(self.kind, CardKind::Warning) {
+            self.lines = markdown::render(&self.body, width, false)
+                .into_iter()
+                .map(|line| line.style(theme.warning()))
+                .collect();
+            self.lines.push(Line::default());
+            return;
+        }
         let (heading, style) = match self.kind {
             CardKind::Analyst | CardKind::Model => (String::new(), theme.muted()),
             CardKind::Welcome => (
@@ -93,6 +102,7 @@ impl Card {
                 (format!("⏺ {}", self.title), theme.accent())
             }
             CardKind::Notice => (self.body.lines().next().unwrap_or("").into(), theme.muted()),
+            CardKind::Warning => (String::new(), theme.warning()),
             CardKind::Finding => (format!("⏺ {}", self.title), theme.muted()),
         };
         self.lines = vec![Line::from(Span::styled(heading, style))];

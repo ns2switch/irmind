@@ -202,3 +202,11 @@ Context: precise cases retain both derived generations, whose metadata belongs t
 Context: parser completeness is part of the derived-evidence contract, independently of source hashing and chain authentication. Decision: new JSON ingestions use `json-stream-v3`. The affected ECS, OCSF, Velociraptor, Hayabusa, Chainsaw, plaso and declarative readers use their next identity. Every new ingestion records that identity explicitly in the existing SourceManifestV2 encoding, including directly configured parsers without detector confidence.
 
 Consequences: do not ship historical parsing implementations or reinterpret their identities as current algorithms. Existing chain authentication, original-byte checks and export verification remain available. Rebuilding with a retired parser fails clearly; create a new case and re-ingest verified originals with current readers. Reinstall declarative definitions to approve the new compiler identity. Historical golden bytes remain unchanged; separate fixtures cover current identities. No signed wire encoding, production dependency or port changes.
+
+## Parser retention policy for 1.0 (pending confirmation)
+
+Context: signed parser identities make reconstruction dependent on the version that produced an artifact. Pre-release reader retirement is not a suitable long-term compatibility promise.
+
+Proposed decision: from 1.0 onward, retain an obsolete parser version for reconstruction and verification for at least two subsequent minor releases, or an equivalent support period. Announce retirement in the changelog before removal and document a migration procedure. Confirm the policy and the meaning of an equivalent support period before 1.0.
+
+Consequences: include the policy in the [1.0 acceptance criteria](roadmap.md#10-criteria). This is a pending compatibility commitment, not an implementation or a restoration of retired pre-1.0 readers. Existing signed bytes and verification rules do not change.

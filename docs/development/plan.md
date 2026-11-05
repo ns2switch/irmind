@@ -148,3 +148,9 @@ Step (c) is integrated in [PR #170](https://github.com/ns2switch/irmind/pull/170
 ### Current parser reconstruction boundary
 
 New ingestions use the current reader identities, including `json-stream-v3`. Retired parser implementations are not shipped. Existing signed formats remain readable and authenticatable; regenerating an older reader's records requires a new case with verified originals. See [the reader decision](decisions.md#current-parser-identities-and-reconstruction). The release-profile benchmark remains separate from reader correctness changes.
+
+### Informational warnings for retired readers
+
+Case opening and verification warn about the affected retired JSON, ECS, OCSF, DFIR and declarative readers from v0.1.1–v0.1.5. An authenticated original size at or below 4 MiB suppresses the warning; missing size remains conservative. The TUI displays a guarded, unfolded warning, and CLI verification writes it to stderr without changing a valid result or signed history. Guidance links to the published changelog and creating a fresh case from verified originals. No release is created only for this notice.
+
+The [proposed parser retention policy](decisions.md#parser-retention-policy-for-10-pending-confirmation) is a [1.0 criterion](roadmap.md#10-criteria), pending confirmation before that release.

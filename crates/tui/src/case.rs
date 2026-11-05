@@ -20,6 +20,7 @@ mod commands;
 mod confirmation;
 mod conversation;
 mod demo_guide;
+mod extraction_warning;
 mod markdown;
 mod operation;
 mod picker;
@@ -83,6 +84,27 @@ fn initial_demo_guide(io_ops: &dyn WorkspaceIo) -> Result<Option<demo_guide::Dem
         .transpose()
 }
 
+struct CaseEvidence {
+    hashes: Vec<String>,
+    entries: Vec<irmind_app::SignedEntry>,
+    operations: Vec<irmind_app::SignedOperation>,
+    timeline: Vec<irmind_app::TimelineEvent>,
+}
+
+fn load_case_evidence(
+    engine: &Engine<'_>,
+    id: &CaseId,
+    conversation: &mut Conversation,
+) -> Result<CaseEvidence> {
+    let _case_lock = engine.repo.lock_case(id)?;
+    Ok(CaseEvidence {
+        hashes: engine.evidence_store.evidence_hashes(id)?,
+        entries: engine.audit_log.entries(id)?,
+        operations: engine.audit_log.operations(id)?,
+        timeline: graph_timeline_or_notice(engine, id, conversation)?,
+    })
+}
+
 fn initial_state(
     engine: &Engine<'_>,
     id: &CaseId,
@@ -95,15 +117,13 @@ fn initial_state(
     let approvals = engine.pending_approvals(id)?;
     let approval_sources = load_approval_sources(engine, id, &approvals)?;
     let findings = engine.findings(id)?;
-    let (hashes, entries, operations, timeline) = {
-        let _case_lock = engine.repo.lock_case(id)?;
-        (
-            engine.evidence_store.evidence_hashes(id)?,
-            engine.audit_log.entries(id)?,
-            engine.audit_log.operations(id)?,
-            graph_timeline_or_notice(engine, id, &mut conversation)?,
-        )
-    };
+    let CaseEvidence {
+        hashes,
+        entries,
+        operations,
+        timeline,
+    } = load_case_evidence(engine, id, &mut conversation)?;
+    extraction_warning::append(&mut conversation, engine.guard.as_ref(), &entries)?;
     add_context_hints(
         &mut conversation,
         io_ops.show_hints() && !io_ops.demo_mode(),
@@ -419,16 +439,21 @@ fn run_signed_history_only(
     let case = engine.repo.get_case(id)?;
     let title = engine.guard.screen(&case.title)?.text;
     let entries = engine.audit_log.entries(id)?;
+    let warning = extraction_warning::message(engine.guard.as_ref(), &entries)?.unwrap_or_default();
     let mut offset = 0usize;
+    let mut page_rows = 1;
     let mut confirm_exit = false;
     loop {
         terminal.draw(|frame| {
-            let visible = usize::from(frame.area().height).saturating_sub(5);
+            let warning_lines = markdown::render(&warning, usize::from(frame.area().width), false);
+            let visible = usize::from(frame.area().height).saturating_sub(5 + warning_lines.len());
+            page_rows = visible.max(1);
             let mut lines = vec![
                 format!("IRMind · Signed history · {title}"),
                 format!("Original evidence unavailable or changed: {reason}"),
                 "Read-only view. Graph queries and case actions are disabled.".into(),
             ];
+            lines.extend(warning_lines.into_iter().map(|line| line.to_string()));
             lines.extend(entries.iter().skip(offset).take(visible).map(|entry| {
                 let hash = irmind_app::hex(&entry.hash);
                 format!(
@@ -465,8 +490,8 @@ fn run_signed_history_only(
         }
         match key.code {
             KeyCode::Esc => return Ok(CaseExit::Home),
-            KeyCode::PageUp => offset = offset.saturating_sub(20),
-            KeyCode::PageDown => offset = (offset + 20).min(entries.len().saturating_sub(1)),
+            KeyCode::PageUp => offset = offset.saturating_sub(page_rows),
+            KeyCode::PageDown => offset = (offset + page_rows).min(entries.len().saturating_sub(1)),
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 confirm_exit = true;
             }

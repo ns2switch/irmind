@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/case/extraction_warning/tests.rs
+expression: shown
+---
+Warning: the signed chain is valid, but extraction may be incomplete. 1 source
+used a retired reader affected by the v0.1.1–v0.1.5 issue: a first line over 4
+MiB could omit records. Create a new case and re-ingest verified originals with
+current readers. Details:
+https://github.com/ns2switch/irmind/blob/v0.1.6/CHANGELOG.md#known-issue-fixed
+Re-ingestion:
+https://github.com/ns2switch/irmind/blob/v0.1.6/docs/parsers.md#current-readers-
+and-existing-cases
+
+Verified 3 audit entries
+
+
+
+
+
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│/timeline                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Synthetic legacy … · no model · 0 tok
