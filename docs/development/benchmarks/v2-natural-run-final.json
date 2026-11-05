@@ -1,0 +1,5462 @@
+{
+  "artifacts": [
+    {
+      "artifact_id": 13445934229,
+      "download_sha256": "b9d6cb019878abb00e1132a908279a76a21b59a3b21c32596010349e87f7c4f5",
+      "name": "parquet-pair-cloud-v2",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "b03faef4fe0d2a154e61d3ea91b4916e86eef3fb",
+            "metric": "PAIRED_REVISION",
+            "scenario": "cloud-v2",
+            "stage": "baseline"
+          },
+          {
+            "bundles": 36,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 8924960490,
+            "active_files": 3855,
+            "historical_files": 3855,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 0,
+            "overflow_artifacts": 0,
+            "partitions": 260,
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 4035843143,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 121433474,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 20131190,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 639916676,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 11704591,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 20536598,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 2052699068,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 91355776,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 20912049,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 19763679,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 41884098,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 19012423,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 729559220,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 11098128,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "cloud-v2",
+            "normalized_stage_peak_bytes": 17227901,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15685651146,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 5960101247,
+            "files": 1000,
+            "hash_seconds": 10.217,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 8924960490,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 830.827
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 2.854,
+            "replay_seconds": 495.415,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 9.465,
+            "stage_seconds": 1394.665
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 5.83
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 2.952,
+            "p95_seconds": 2.963,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 8.729,
+            "p95_seconds": 8.782,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.652,
+            "p95_seconds": 0.669,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.025,
+            "p95_seconds": 0.026,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.691,
+            "p95_seconds": 0.72,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 138.34,
+            "verify_seconds": 10.875
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "aws"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "aws",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "azure"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "azure",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "gcp"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "gcp",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "metric": "PARQUET_WORST_PATH",
+            "seconds": 10.027,
+            "time_budget": true,
+            "truncated": true
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "2049b9cc6eb13dc793b0ef430e0a001213ae7d3f",
+            "metric": "PAIRED_REVISION",
+            "scenario": "cloud-v2",
+            "stage": "candidate"
+          },
+          {
+            "bundles": 36,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 8924960490,
+            "active_files": 3855,
+            "historical_files": 3855,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 0,
+            "overflow_artifacts": 0,
+            "partitions": 260,
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 4035843143,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 121433474,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 20131190,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 639916676,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 11704591,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 20536598,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 2052699068,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 91355776,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 20912049,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 19763679,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 41884098,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 19012423,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 729559220,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 11098128,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 16349877,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "cloud-v2"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "cloud-v2",
+            "normalized_stage_peak_bytes": 17227901,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15685651146,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 5960101247,
+            "files": 1000,
+            "hash_seconds": 10.186,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 8924960490,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 816.002
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 1.568,
+            "replay_seconds": 491.554,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 9.488,
+            "stage_seconds": 1376.144
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 6.005
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 3.074,
+            "p95_seconds": 3.103,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 8.774,
+            "p95_seconds": 8.829,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.624,
+            "p95_seconds": 0.693,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.024,
+            "p95_seconds": 0.025,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.623,
+            "p95_seconds": 0.703,
+            "scenario": "cloud-v2",
+            "scope": "all"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 142.539,
+            "verify_seconds": 10.896
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "aws"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "aws",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "aws",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "azure"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "azure",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "azure",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "entities": "10/10",
+            "events": "19/19",
+            "metric": "HUNTEVAL_RECALL",
+            "parse_errors": 0,
+            "path": "14/14",
+            "provider": "gcp"
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "case_timeline",
+            "samples": 6
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "entity",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "event",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "neighbors",
+            "samples": 10
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.003,
+            "p95_seconds": 0.004,
+            "provider": "gcp",
+            "query": "path",
+            "samples": 14
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "term",
+            "samples": 19
+          },
+          {
+            "corpus": "15gb",
+            "metric": "HUNTEVAL_QUERY",
+            "p50_seconds": 0.002,
+            "p95_seconds": 0.002,
+            "provider": "gcp",
+            "query": "timeline",
+            "samples": 19
+          },
+          {
+            "metric": "PARQUET_WORST_PATH",
+            "seconds": 10.095,
+            "time_budget": true,
+            "truncated": true
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13448931361,
+      "download_sha256": "19f79373b4f25feeb84a5b746880311fc86e36d84c5c79a350dbb4b3ee96f882",
+      "name": "parquet-pair-endpoint-v2-1",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "b03faef4fe0d2a154e61d3ea91b4916e86eef3fb",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1",
+            "stage": "baseline"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 2814352218,
+            "active_files": 3024,
+            "historical_files": 3024,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 1,
+            "overflow_artifacts": 0,
+            "partitions": 1,
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24940000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 684438,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 14008000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17674000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7590436,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 298855350,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1531795983,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 166902,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14974436,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 29488662,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13363458,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 188259683,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7857538,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1249196006,
+            "files": 1000,
+            "hash_seconds": 20.083,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2814352218,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1567.114
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.781,
+            "replay_seconds": 592.102,
+            "sort_seconds": 737.249,
+            "source_verify_seconds": 13.617,
+            "stage_seconds": 852.598
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 9.551
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 2.677,
+            "p95_seconds": 2.757,
+            "scenario": "endpoint-v2-1",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 10.037,
+            "p95_seconds": 10.038,
+            "scenario": "endpoint-v2-1",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.591,
+            "p95_seconds": 0.604,
+            "scenario": "endpoint-v2-1",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.012,
+            "p95_seconds": 10.013,
+            "scenario": "endpoint-v2-1",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.589,
+            "p95_seconds": 0.594,
+            "scenario": "endpoint-v2-1",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 2.819,
+            "p95_seconds": 3.084,
+            "scenario": "endpoint-v2-1",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 10.031,
+            "p95_seconds": 10.032,
+            "scenario": "endpoint-v2-1",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.707,
+            "p95_seconds": 0.709,
+            "scenario": "endpoint-v2-1",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.013,
+            "p95_seconds": 10.016,
+            "scenario": "endpoint-v2-1",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.688,
+            "p95_seconds": 0.699,
+            "scenario": "endpoint-v2-1",
+            "scope": "endpoint-0000"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 509.27,
+            "verify_seconds": 19.239
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "2049b9cc6eb13dc793b0ef430e0a001213ae7d3f",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1",
+            "stage": "candidate"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 2814352218,
+            "active_files": 3024,
+            "historical_files": 3024,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 1,
+            "overflow_artifacts": 0,
+            "partitions": 1,
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24940000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 684438,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 14008000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17674000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7590436,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 298855350,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1531795983,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 166902,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14974436,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 29488662,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13363458,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 188259683,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7857538,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1249196006,
+            "files": 1000,
+            "hash_seconds": 19.829,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2814352218,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1226.869
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.766,
+            "replay_seconds": 591.962,
+            "sort_seconds": 398.252,
+            "source_verify_seconds": 13.558,
+            "stage_seconds": 852.274
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 9.59
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 2.596,
+            "p95_seconds": 2.641,
+            "scenario": "endpoint-v2-1",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 10.035,
+            "p95_seconds": 10.037,
+            "scenario": "endpoint-v2-1",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.585,
+            "p95_seconds": 0.591,
+            "scenario": "endpoint-v2-1",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.013,
+            "p95_seconds": 10.015,
+            "scenario": "endpoint-v2-1",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.577,
+            "p95_seconds": 0.595,
+            "scenario": "endpoint-v2-1",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 2.873,
+            "p95_seconds": 2.991,
+            "scenario": "endpoint-v2-1",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 10.028,
+            "p95_seconds": 10.028,
+            "scenario": "endpoint-v2-1",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.681,
+            "p95_seconds": 0.682,
+            "scenario": "endpoint-v2-1",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.011,
+            "p95_seconds": 10.017,
+            "scenario": "endpoint-v2-1",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.699,
+            "p95_seconds": 0.705,
+            "scenario": "endpoint-v2-1",
+            "scope": "endpoint-0000"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 504.773,
+            "verify_seconds": 19.027
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13450573464,
+      "download_sha256": "df38a2eeaff724c9d230e6944a8757a86aee8e195ed02547b2eb7271f6bc0db5",
+      "name": "parquet-pair-endpoint-v2-1-chronological",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "b03faef4fe0d2a154e61d3ea91b4916e86eef3fb",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1-chronological",
+            "stage": "baseline"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 6604462744,
+            "active_files": 3024,
+            "historical_files": 3024,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 1,
+            "overflow_artifacts": 0,
+            "partitions": 1,
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24940000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 684438,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 14008000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17674000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7590436,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 1532434164,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1530018891,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 166902,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14974436,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 29490310,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13363458,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 2741869424,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7857502,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1-chronological",
+            "normalized_stage_peak_bytes": 13251564,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1798265433,
+            "files": 1000,
+            "hash_seconds": 11.584,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6604462744,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 554.546
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.737,
+            "replay_seconds": 327.97,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 10.884,
+            "stage_seconds": 955.124
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 9.98
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 5.109,
+            "p95_seconds": 5.199,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 10.031,
+            "p95_seconds": 10.035,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.551,
+            "p95_seconds": 0.589,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 2,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 9.99,
+            "p95_seconds": 10.009,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.562,
+            "p95_seconds": 0.567,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 4.974,
+            "p95_seconds": 5.276,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 10.025,
+            "p95_seconds": 10.032,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.689,
+            "p95_seconds": 0.787,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.006,
+            "p95_seconds": 10.008,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.683,
+            "p95_seconds": 0.689,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 627.666,
+            "verify_seconds": 37.028
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "2049b9cc6eb13dc793b0ef430e0a001213ae7d3f",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1-chronological",
+            "stage": "candidate"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 6604462744,
+            "active_files": 3024,
+            "historical_files": 3024,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 1,
+            "overflow_artifacts": 0,
+            "partitions": 1,
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24940000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 684438,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 14008000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17674000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7590436,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 1532434164,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1530018891,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 166902,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14974436,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 29490310,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13363458,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 2741869424,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7857502,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11495714,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1-chronological",
+            "normalized_stage_peak_bytes": 13251564,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1798265433,
+            "files": 1000,
+            "hash_seconds": 11.617,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6604462744,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 559.636
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.75,
+            "replay_seconds": 331.335,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 10.91,
+            "stage_seconds": 966.576
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 10.248
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 4.923,
+            "p95_seconds": 4.934,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 10.029,
+            "p95_seconds": 10.04,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.538,
+            "p95_seconds": 0.577,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.006,
+            "p95_seconds": 10.014,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.558,
+            "p95_seconds": 0.598,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 5.083,
+            "p95_seconds": 5.227,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 10.026,
+            "p95_seconds": 10.031,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.644,
+            "p95_seconds": 0.69,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.007,
+            "p95_seconds": 10.013,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.684,
+            "p95_seconds": 0.698,
+            "scenario": "endpoint-v2-1-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 616.654,
+            "verify_seconds": 37.068
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13448834156,
+      "download_sha256": "cee35f62a85cc416eca464e195ceeca3bfdc878a78579724aa2c07da31f99dd8",
+      "name": "parquet-pair-endpoint-v2-1024",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "b03faef4fe0d2a154e61d3ea91b4916e86eef3fb",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1024",
+            "stage": "baseline"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 2757751378,
+            "active_files": 3096,
+            "historical_files": 3096,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2904,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24424928,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 688404,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 13754672,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17353840,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7448500,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 291496017,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1500894435,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 163846,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14703731,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 28935090,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13113018,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 184806184,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7708399,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1024",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1223844769,
+            "files": 1000,
+            "hash_seconds": 11.526,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2757751378,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1442.758
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.775,
+            "replay_seconds": 494.562,
+            "sort_seconds": 789.798,
+            "source_verify_seconds": 10.871,
+            "stage_seconds": 818.065
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 9.577
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 1.753,
+            "p95_seconds": 1.785,
+            "scenario": "endpoint-v2-1024",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.699,
+            "p95_seconds": 0.821,
+            "scenario": "endpoint-v2-1024",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.011,
+            "p95_seconds": 0.015,
+            "scenario": "endpoint-v2-1024",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.012,
+            "p95_seconds": 10.012,
+            "scenario": "endpoint-v2-1024",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.012,
+            "p95_seconds": 0.012,
+            "scenario": "endpoint-v2-1024",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.049,
+            "p95_seconds": 0.049,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.691,
+            "p95_seconds": 0.693,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.297,
+            "p95_seconds": 0.304,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.052,
+            "p95_seconds": 0.055,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.293,
+            "p95_seconds": 0.299,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.049,
+            "p95_seconds": 0.054,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.705,
+            "p95_seconds": 0.864,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.292,
+            "p95_seconds": 0.303,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.051,
+            "p95_seconds": 0.055,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.293,
+            "p95_seconds": 0.294,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-1023"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 147.392,
+            "verify_seconds": 14.818
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "2049b9cc6eb13dc793b0ef430e0a001213ae7d3f",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1024",
+            "stage": "candidate"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 2757751378,
+            "active_files": 3096,
+            "historical_files": 3096,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2904,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24424928,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 688404,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 13754672,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17353840,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7448500,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 291496017,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1500894435,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 163846,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14703731,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 28935090,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13113018,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 184806184,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7708399,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1024",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1223844769,
+            "files": 1000,
+            "hash_seconds": 11.555,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2757751378,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1011.799
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.787,
+            "replay_seconds": 495.113,
+            "sort_seconds": 356.485,
+            "source_verify_seconds": 10.893,
+            "stage_seconds": 808.579
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 9.566
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 1.693,
+            "p95_seconds": 1.721,
+            "scenario": "endpoint-v2-1024",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.642,
+            "p95_seconds": 0.675,
+            "scenario": "endpoint-v2-1024",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.012,
+            "p95_seconds": 0.015,
+            "scenario": "endpoint-v2-1024",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.012,
+            "p95_seconds": 10.012,
+            "scenario": "endpoint-v2-1024",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.012,
+            "p95_seconds": 0.012,
+            "scenario": "endpoint-v2-1024",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.049,
+            "p95_seconds": 0.049,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.69,
+            "p95_seconds": 0.701,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.297,
+            "p95_seconds": 0.311,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.052,
+            "p95_seconds": 0.055,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.291,
+            "p95_seconds": 0.296,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.056,
+            "p95_seconds": 0.063,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.697,
+            "p95_seconds": 0.723,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.292,
+            "p95_seconds": 0.299,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.049,
+            "p95_seconds": 0.075,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.296,
+            "p95_seconds": 0.298,
+            "scenario": "endpoint-v2-1024",
+            "scope": "endpoint-1023"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 146.262,
+            "verify_seconds": 14.341
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13452343695,
+      "download_sha256": "65c80c3e6366f7f77c46d0e7f612fff5ef1079352df613209cfcae39677fb16a",
+      "name": "parquet-pair-endpoint-v2-1024-chronological",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "b03faef4fe0d2a154e61d3ea91b4916e86eef3fb",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1024-chronological",
+            "stage": "baseline"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 6475978072,
+            "active_files": 3096,
+            "historical_files": 3096,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2904,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24424928,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 688374,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 13754624,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17353792,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7448500,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 1501388404,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1499026411,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 163846,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14703763,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 28940469,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13113018,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 2690384125,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7708363,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1024-chronological",
+            "normalized_stage_peak_bytes": 13258682,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1762374572,
+            "files": 1000,
+            "hash_seconds": 11.537,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6475978072,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 534.332
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.717,
+            "replay_seconds": 320.466,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 10.793,
+            "stage_seconds": 937.111
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 9.819
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 4.44,
+            "p95_seconds": 4.466,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.657,
+            "p95_seconds": 0.688,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.011,
+            "p95_seconds": 0.014,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 1,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 9.928,
+            "p95_seconds": 10.01,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.011,
+            "p95_seconds": 0.012,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.361,
+            "p95_seconds": 0.361,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.722,
+            "p95_seconds": 0.725,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.307,
+            "p95_seconds": 0.314,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.362,
+            "p95_seconds": 0.368,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.29,
+            "p95_seconds": 0.314,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.36,
+            "p95_seconds": 0.366,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.68,
+            "p95_seconds": 0.727,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.284,
+            "p95_seconds": 0.294,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.362,
+            "p95_seconds": 0.363,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.297,
+            "p95_seconds": 0.322,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-1023"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 220.229,
+            "verify_seconds": 48.105
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "2049b9cc6eb13dc793b0ef430e0a001213ae7d3f",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1024-chronological",
+            "stage": "candidate"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 6475978072,
+            "active_files": 3096,
+            "historical_files": 3096,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2904,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24424928,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 688374,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 13754624,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17353792,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7448500,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 1501388404,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1499026411,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 163846,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14703763,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 28940469,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13113018,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 2690384125,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7708363,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11280498,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1024-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1024-chronological",
+            "normalized_stage_peak_bytes": 13258682,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1762374572,
+            "files": 1000,
+            "hash_seconds": 11.577,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6475978072,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 537.598
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.696,
+            "replay_seconds": 323.559,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 10.813,
+            "stage_seconds": 946.618
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 9.918
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 4.676,
+            "p95_seconds": 4.69,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.668,
+            "p95_seconds": 0.732,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.011,
+            "p95_seconds": 0.014,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 1,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 9.99,
+            "p95_seconds": 10.009,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.011,
+            "p95_seconds": 0.012,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.361,
+            "p95_seconds": 0.361,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.724,
+            "p95_seconds": 0.73,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.279,
+            "p95_seconds": 0.308,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.361,
+            "p95_seconds": 0.368,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.299,
+            "p95_seconds": 0.321,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.44,
+            "p95_seconds": 0.47,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.694,
+            "p95_seconds": 0.724,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.288,
+            "p95_seconds": 0.307,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.36,
+            "p95_seconds": 0.365,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-1023"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.27,
+            "p95_seconds": 0.285,
+            "scenario": "endpoint-v2-1024-chronological",
+            "scope": "endpoint-1023"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 226.87,
+            "verify_seconds": 48.448
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13450234453,
+      "download_sha256": "ed97b5c8bab4f8cb94eabd520dd77477846abbdbf70039e043b445e762e4f439",
+      "name": "parquet-pair-endpoint-v2-1025",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "b03faef4fe0d2a154e61d3ea91b4916e86eef3fb",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1025",
+            "stage": "baseline"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 2759113023,
+            "active_files": 3099,
+            "historical_files": 3099,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2907,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24437772,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 688817,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 13762410,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17363732,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7452414,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 291592136,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1501648769,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 163938,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14711454,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 28950323,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13119897,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 184900291,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7712387,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1025",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1224446333,
+            "files": 1000,
+            "hash_seconds": 10.844,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2759113023,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1286.537
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.731,
+            "replay_seconds": 397.026,
+            "sort_seconds": 576.995,
+            "source_verify_seconds": 8.241,
+            "stage_seconds": 449.719
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 6.235
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 1.121,
+            "p95_seconds": 1.202,
+            "scenario": "endpoint-v2-1025",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.436,
+            "p95_seconds": 0.501,
+            "scenario": "endpoint-v2-1025",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.007,
+            "p95_seconds": 0.012,
+            "scenario": "endpoint-v2-1025",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 8.294,
+            "p95_seconds": 8.423,
+            "scenario": "endpoint-v2-1025",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.007,
+            "p95_seconds": 0.008,
+            "scenario": "endpoint-v2-1025",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.043,
+            "p95_seconds": 0.043,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.493,
+            "p95_seconds": 0.503,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.215,
+            "p95_seconds": 0.224,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.044,
+            "p95_seconds": 0.047,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.213,
+            "p95_seconds": 0.219,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.042,
+            "p95_seconds": 0.046,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.468,
+            "p95_seconds": 0.497,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.209,
+            "p95_seconds": 0.214,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.042,
+            "p95_seconds": 0.048,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.209,
+            "p95_seconds": 0.214,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-1024"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 142.215,
+            "verify_seconds": 12.528
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "2049b9cc6eb13dc793b0ef430e0a001213ae7d3f",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1025",
+            "stage": "candidate"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 2759113023,
+            "active_files": 3099,
+            "historical_files": 3099,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2907,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24437772,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 688817,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 13762410,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17363732,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7452414,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 291592136,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1501648769,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 163938,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14711454,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 28950323,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13119897,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 184900291,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7712387,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1025",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1224446333,
+            "files": 1000,
+            "hash_seconds": 10.762,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2759113023,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1048.64
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.7,
+            "replay_seconds": 388.184,
+            "sort_seconds": 343.507,
+            "source_verify_seconds": 8.227,
+            "stage_seconds": 438.353
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 6.515
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 1.215,
+            "p95_seconds": 1.237,
+            "scenario": "endpoint-v2-1025",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.483,
+            "p95_seconds": 0.558,
+            "scenario": "endpoint-v2-1025",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.008,
+            "p95_seconds": 0.015,
+            "scenario": "endpoint-v2-1025",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 8.692,
+            "p95_seconds": 8.797,
+            "scenario": "endpoint-v2-1025",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.007,
+            "p95_seconds": 0.008,
+            "scenario": "endpoint-v2-1025",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.044,
+            "p95_seconds": 0.044,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.514,
+            "p95_seconds": 0.527,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.221,
+            "p95_seconds": 0.224,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.044,
+            "p95_seconds": 0.047,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.212,
+            "p95_seconds": 0.217,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.044,
+            "p95_seconds": 0.049,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.494,
+            "p95_seconds": 0.532,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.222,
+            "p95_seconds": 0.266,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.045,
+            "p95_seconds": 0.045,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.215,
+            "p95_seconds": 0.222,
+            "scenario": "endpoint-v2-1025",
+            "scope": "endpoint-1024"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 148.681,
+            "verify_seconds": 12.911
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13452218976,
+      "download_sha256": "747036d3d0c341987b3a64e0edf6c482fd35d343a390f7f7d51e14363c1bc487",
+      "name": "parquet-pair-endpoint-v2-1025-chronological",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "b03faef4fe0d2a154e61d3ea91b4916e86eef3fb",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1025-chronological",
+            "stage": "baseline"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 6479270339,
+            "active_files": 3099,
+            "historical_files": 3099,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2907,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24437772,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 688779,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 13762360,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17363682,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7452414,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 1502138065,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1499774553,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 163938,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14711486,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 28955981,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13119897,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 2691758472,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7712351,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1025-chronological",
+            "normalized_stage_peak_bytes": 13258682,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1763266696,
+            "files": 1000,
+            "hash_seconds": 12.623,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6479270339,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 560.488
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.64,
+            "replay_seconds": 333.544,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 12.125,
+            "stage_seconds": 964.329
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 10.119
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 4.158,
+            "p95_seconds": 4.342,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.674,
+            "p95_seconds": 0.817,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.012,
+            "p95_seconds": 0.015,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.009,
+            "p95_seconds": 10.009,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.012,
+            "p95_seconds": 0.012,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.413,
+            "p95_seconds": 0.414,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.775,
+            "p95_seconds": 0.776,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.318,
+            "p95_seconds": 0.354,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.414,
+            "p95_seconds": 0.42,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.321,
+            "p95_seconds": 0.345,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.414,
+            "p95_seconds": 0.42,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.749,
+            "p95_seconds": 0.769,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.304,
+            "p95_seconds": 0.338,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.414,
+            "p95_seconds": 0.417,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.333,
+            "p95_seconds": 0.343,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-1024"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 201.105,
+            "verify_seconds": 55.006
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "2049b9cc6eb13dc793b0ef430e0a001213ae7d3f",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-1025-chronological",
+            "stage": "candidate"
+          },
+          {
+            "bundles": 24,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 6479270339,
+            "active_files": 3099,
+            "historical_files": 3099,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 2907,
+            "partitions": 65,
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24437772,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 688779,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 13762360,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17363682,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7452414,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 1502138065,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1499774553,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 163938,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14711486,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 28955981,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13119897,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 2691758472,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7712351,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11286418,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-1025-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-1025-chronological",
+            "normalized_stage_peak_bytes": 13258682,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1763266696,
+            "files": 1000,
+            "hash_seconds": 12.637,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6479270339,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 560.036
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.632,
+            "replay_seconds": 335.213,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 12.128,
+            "stage_seconds": 970.41
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 10.282
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 4.159,
+            "p95_seconds": 4.176,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.701,
+            "p95_seconds": 0.763,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.013,
+            "p95_seconds": 0.016,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.006,
+            "p95_seconds": 10.008,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.013,
+            "p95_seconds": 0.013,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.414,
+            "p95_seconds": 0.419,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.721,
+            "p95_seconds": 0.759,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.331,
+            "p95_seconds": 0.342,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.417,
+            "p95_seconds": 0.42,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.333,
+            "p95_seconds": 0.339,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.414,
+            "p95_seconds": 0.419,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.736,
+            "p95_seconds": 0.768,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.301,
+            "p95_seconds": 0.312,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.415,
+            "p95_seconds": 0.419,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-1024"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.288,
+            "p95_seconds": 0.323,
+            "scenario": "endpoint-v2-1025-chronological",
+            "scope": "endpoint-1024"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 201.316,
+            "verify_seconds": 55.139
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13446973771,
+      "download_sha256": "0e68bd0ab28fd010c092105f13608868ac96f6b30bb69fdfb491bf458f302e46",
+      "name": "parquet-pair-endpoint-v2-64",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "b03faef4fe0d2a154e61d3ea91b4916e86eef3fb",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-64",
+            "stage": "baseline"
+          },
+          {
+            "bundles": 192,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 2814149558,
+            "active_files": 3192,
+            "historical_files": 3192,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 0,
+            "partitions": 64,
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24882448,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 686952,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 14008000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17674000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7591600,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 298848893,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1531783392,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 167824,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14975600,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 29487712,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13364456,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 188485107,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7858064,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-64",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1248898206,
+            "files": 1000,
+            "hash_seconds": 11.564,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2814149558,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1459.109
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.71,
+            "replay_seconds": 502.662,
+            "sort_seconds": 792.851,
+            "source_verify_seconds": 10.969,
+            "stage_seconds": 818.141
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 9.375
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 1.8,
+            "p95_seconds": 1.807,
+            "scenario": "endpoint-v2-64",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.578,
+            "p95_seconds": 0.585,
+            "scenario": "endpoint-v2-64",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.058,
+            "p95_seconds": 0.059,
+            "scenario": "endpoint-v2-64",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.009,
+            "p95_seconds": 10.011,
+            "scenario": "endpoint-v2-64",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.057,
+            "p95_seconds": 0.058,
+            "scenario": "endpoint-v2-64",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.072,
+            "p95_seconds": 0.083,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.208,
+            "p95_seconds": 0.212,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.058,
+            "p95_seconds": 0.063,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.188,
+            "p95_seconds": 0.189,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.057,
+            "p95_seconds": 0.058,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.062,
+            "p95_seconds": 0.064,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.195,
+            "p95_seconds": 0.195,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.055,
+            "p95_seconds": 0.056,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.176,
+            "p95_seconds": 0.178,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.054,
+            "p95_seconds": 0.056,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0063"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 183.098,
+            "verify_seconds": 4.187
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "2049b9cc6eb13dc793b0ef430e0a001213ae7d3f",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-64",
+            "stage": "candidate"
+          },
+          {
+            "bundles": 192,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 2814149558,
+            "active_files": 3192,
+            "historical_files": 3192,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 0,
+            "partitions": 64,
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24882448,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 686952,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 14008000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17674000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7591600,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 298848893,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1531783392,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 167824,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14975600,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 29487712,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13364456,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 188485107,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7858064,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-64",
+            "normalized_stage_peak_bytes": 206404230,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676080000,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1248898206,
+            "files": 1000,
+            "hash_seconds": 11.527,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 2814149558,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 1015.417
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.708,
+            "replay_seconds": 497.81,
+            "sort_seconds": 355.628,
+            "source_verify_seconds": 10.858,
+            "stage_seconds": 807.602
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 9.268
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 1.769,
+            "p95_seconds": 1.792,
+            "scenario": "endpoint-v2-64",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.578,
+            "p95_seconds": 0.583,
+            "scenario": "endpoint-v2-64",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.057,
+            "p95_seconds": 0.058,
+            "scenario": "endpoint-v2-64",
+            "scope": "all"
+          },
+          {
+            "errors": 5,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 10.01,
+            "p95_seconds": 10.012,
+            "scenario": "endpoint-v2-64",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.057,
+            "p95_seconds": 0.058,
+            "scenario": "endpoint-v2-64",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.077,
+            "p95_seconds": 0.083,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.209,
+            "p95_seconds": 0.209,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.058,
+            "p95_seconds": 0.058,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.186,
+            "p95_seconds": 0.186,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.058,
+            "p95_seconds": 0.058,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.061,
+            "p95_seconds": 0.063,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.194,
+            "p95_seconds": 0.195,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.055,
+            "p95_seconds": 0.059,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.174,
+            "p95_seconds": 0.175,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.055,
+            "p95_seconds": 0.056,
+            "scenario": "endpoint-v2-64",
+            "scope": "endpoint-0063"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 183.689,
+            "verify_seconds": 4.196
+          }
+        ]
+      }
+    },
+    {
+      "artifact_id": 13451502307,
+      "download_sha256": "11e4fa0303454a92649944c593f78963e1464c1619b08fb3e2654cc05446d1e6",
+      "name": "parquet-pair-endpoint-v2-64-chronological",
+      "stages": {
+        "baseline": [
+          {
+            "commit": "b03faef4fe0d2a154e61d3ea91b4916e86eef3fb",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-64-chronological",
+            "stage": "baseline"
+          },
+          {
+            "bundles": 192,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 6607573126,
+            "active_files": 3192,
+            "historical_files": 3192,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 0,
+            "partitions": 64,
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24882448,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 686952,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 14008000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17674000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7591600,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 1532455516,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1530007098,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 167824,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14975600,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 29487987,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13364456,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 2745197921,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7858028,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-64-chronological",
+            "normalized_stage_peak_bytes": 13258409,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1798087725,
+            "files": 1000,
+            "hash_seconds": 10.371,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6607573126,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 503.699
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.632,
+            "replay_seconds": 244.291,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 8.039,
+            "stage_seconds": 654.847
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 6.138
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 3.377,
+            "p95_seconds": 3.396,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.465,
+            "p95_seconds": 0.466,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.045,
+            "p95_seconds": 0.046,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 6.685,
+            "p95_seconds": 6.713,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.045,
+            "p95_seconds": 0.047,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.107,
+            "p95_seconds": 0.136,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.141,
+            "p95_seconds": 0.142,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.044,
+            "p95_seconds": 0.046,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.115,
+            "p95_seconds": 0.116,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.045,
+            "p95_seconds": 0.045,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.091,
+            "p95_seconds": 0.094,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.132,
+            "p95_seconds": 0.134,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.043,
+            "p95_seconds": 0.05,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.109,
+            "p95_seconds": 0.109,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.042,
+            "p95_seconds": 0.043,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0063"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 157.04,
+            "verify_seconds": 15.089
+          }
+        ],
+        "candidate": [
+          {
+            "commit": "2049b9cc6eb13dc793b0ef430e0a001213ae7d3f",
+            "metric": "PAIRED_REVISION",
+            "scenario": "endpoint-v2-64-chronological",
+            "stage": "candidate"
+          },
+          {
+            "bundles": 192,
+            "metric": "PARQUET_COMPACTION"
+          },
+          {
+            "active_bytes": 6607573126,
+            "active_files": 3192,
+            "historical_files": 3192,
+            "metric": "PARQUET_LAYOUT",
+            "ordinary_hosts": 64,
+            "overflow_artifacts": 0,
+            "partitions": 64,
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "co_entities",
+            "compressed_bytes": 24882448,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "entities",
+            "compressed_bytes": 686952,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "entity_kind",
+            "compressed_bytes": 14008000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "entity_value",
+            "compressed_bytes": 17674000,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "event",
+            "compressed_bytes": 7591600,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "event_time",
+            "compressed_bytes": 1532455516,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "record_index",
+            "compressed_bytes": 1530007098,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "relations",
+            "compressed_bytes": 167824,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_account",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_host",
+            "compressed_bytes": 14975600,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "scope_region",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "source_hash",
+            "compressed_bytes": 29487987,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "source_offset",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "submicro_nanos",
+            "compressed_bytes": 13364456,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "text",
+            "compressed_bytes": 2745197921,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "time_inferred",
+            "compressed_bytes": 7858028,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "column": "time_precision",
+            "compressed_bytes": 11496592,
+            "metric": "PARQUET_COLUMN",
+            "scenario": "endpoint-v2-64-chronological"
+          },
+          {
+            "metric": "PARQUET_SCENARIO",
+            "name": "endpoint-v2-64-chronological",
+            "normalized_stage_peak_bytes": 13258409,
+            "size": "15gb"
+          },
+          {
+            "bytes": 15676073910,
+            "conversion_seconds": 0.0,
+            "coobservation_bytes": 1798087725,
+            "files": 1000,
+            "hash_seconds": 10.292,
+            "metric": "PARQUET_INGEST",
+            "parquet_bytes": 6607573126,
+            "parquet_seconds": 0.0,
+            "row_seconds": 0.0,
+            "wall_seconds": 498.239
+          },
+          {
+            "metric": "PARQUET_V2_PHASE",
+            "publish_seconds": 0.586,
+            "replay_seconds": 243.551,
+            "sort_seconds": 0.0,
+            "source_verify_seconds": 7.901,
+            "stage_seconds": 651.421
+          },
+          {
+            "error": false,
+            "metric": "PARQUET_COLD_QUERY",
+            "seconds": 5.986
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 3.012,
+            "p95_seconds": 3.254,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.437,
+            "p95_seconds": 0.444,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.044,
+            "p95_seconds": 0.044,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 6.486,
+            "p95_seconds": 6.543,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.044,
+            "p95_seconds": 0.045,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "all"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.099,
+            "p95_seconds": 0.1,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.135,
+            "p95_seconds": 0.137,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.042,
+            "p95_seconds": 0.043,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.11,
+            "p95_seconds": 0.113,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.043,
+            "p95_seconds": 0.044,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0000"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "term",
+            "p50_seconds": 0.085,
+            "p95_seconds": 0.087,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "entity",
+            "p50_seconds": 0.127,
+            "p95_seconds": 0.129,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "neighbors",
+            "p50_seconds": 0.039,
+            "p95_seconds": 0.039,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "timeline",
+            "p50_seconds": 0.105,
+            "p95_seconds": 0.11,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0063"
+          },
+          {
+            "errors": 0,
+            "metric": "PARQUET_QUERY",
+            "name": "path",
+            "p50_seconds": 0.039,
+            "p95_seconds": 0.039,
+            "scenario": "endpoint-v2-64-chronological",
+            "scope": "endpoint-0063"
+          },
+          {
+            "metric": "PARQUET_QUERY_PHASE",
+            "scan_seconds": 147.34,
+            "verify_seconds": 14.864
+          }
+        ]
+      }
+    }
+  ],
+  "run_url": "https://github.com/ns2switch/irmind/actions/runs/42089238520"
+}

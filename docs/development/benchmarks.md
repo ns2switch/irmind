@@ -428,3 +428,37 @@ An intermediate [same-runner cloud pair](https://github.com/ns2switch/irmind/act
 Reducing parser handoffs from 8 MiB to 1 MiB raises 15 GB cloud ingestion from 946.036 to 1,042.390 seconds (+10.2%). Sorting is zero in both revisions, so this comparison does not measure the natural-run algorithm. Accumulated staging changes from 1,780.317 to 1,924.831 seconds and replay/writing from 647.649 to 744.071 seconds; they overlap and are not additive wall percentages. Both runs retain 8,924,960,490 Parquet bytes, including 5,960,101,247 co-observation bytes. Neither meets the unchanged 900-second target.
 
 The current ordered-source implementation detects decreasing keys inside each parser worker, retains bounded 8 MiB handoffs and prepares fallback spools in parallel. The natural-run implementation also reuses canonical encoded rows during splitting and merging. New paired measurements isolate that algorithm from the corrected ordered-source baseline. Signed encodings, ordering, quotas, cancellation and source/run hashes remain unchanged.
+
+### Natural-run release comparison
+
+The [complete paired release run](https://github.com/ns2switch/irmind/actions/runs/42089238520) compares baseline [`b03faef4fe0d`](https://github.com/ns2switch/irmind/commit/b03faef4fe0d2a154e61d3ea91b4916e86eef3fb) with candidate [`2049b9cc6eb1`](https://github.com/ns2switch/irmind/commit/2049b9cc6eb13dc793b0ef430e0a001213ae7d3f). Each of the nine rows runs both revisions on the same standard Linux runner. Different rows and runs use different runner instances; compare within a pair, not across their absolute times. The [structured results](benchmarks/v2-natural-run-final.json) retain both frozen revisions, artifact IDs, ZIP SHA-256 values, phase counters, storage and every query p50/p95/error count. Later CI-only changes do not alter the measured Rust or benchmark code.
+
+| 15 GB V2 workload | Before seconds | After seconds | Change | Before / after sorting seconds |
+| --- | ---: | ---: | ---: | ---: |
+| cloud-v2 | 830.827 | 816.002 | -1.8% | 0.000 / 0.000 |
+| endpoint-v2-1 | 1,567.114 | 1,226.869 | -21.7% | 737.249 / 398.252 |
+| endpoint-v2-1-chronological | 554.546 | 559.636 | +0.9% | 0.000 / 0.000 |
+| endpoint-v2-1024 | 1,442.758 | 1,011.799 | -29.9% | 789.798 / 356.485 |
+| endpoint-v2-1024-chronological | 534.332 | 537.598 | +0.6% | 0.000 / 0.000 |
+| endpoint-v2-1025 | 1,286.537 | 1,048.640 | -18.5% | 576.995 / 343.507 |
+| endpoint-v2-1025-chronological | 560.488 | 560.036 | -0.1% | 0.000 / 0.000 |
+| endpoint-v2-64 | 1,459.109 | 1,015.417 | -30.4% | 792.851 / 355.628 |
+| endpoint-v2-64-chronological | 503.699 | 498.239 | -1.1% | 0.000 / 0.000 |
+
+All inputs are 1,000 files and approximately 15.68 decimal GB. Source generation, signed custody and final compaction remain inside the unchanged ingestion wall timer. Hash checks, reconstruction, parser limits, stable ordering, rollback and cancellation are retained. Parquet/co-observation byte totals match within every pair; dedicated byte-equivalence and reconstruction tests, rather than size equality, establish compatibility. The cloud evaluation retains 19/19 malicious events, 10/10 entities and 14/14 path checks for each provider, with zero parse errors in both revisions.
+
+The disordered sources contain 15 monotonic runs each. Bounded merging reduces their ingestion by 18–30% and sorting by 40–55%, without changing output bytes. All four still exceed 900 seconds. Cloud and chronological sources require no sort; their small differences are not evidence of a natural-run speedup. Exceeding 32 runs or the merge-head memory bound retains the authenticated external-sort fallback.
+
+| Candidate workload | Accumulated staging seconds | Sorting seconds | Replay / writing seconds | Source re-verification seconds | Publication seconds |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| cloud-v2 | 1,376.144 | 0.000 | 491.554 | 9.488 | 1.568 |
+| endpoint-v2-1 | 852.274 | 398.252 | 591.962 | 13.558 | 0.766 |
+| endpoint-v2-1-chronological | 966.576 | 0.000 | 331.335 | 10.910 | 0.750 |
+| endpoint-v2-1024 | 808.579 | 356.485 | 495.113 | 10.893 | 0.787 |
+| endpoint-v2-1024-chronological | 946.618 | 0.000 | 323.559 | 10.813 | 0.696 |
+| endpoint-v2-1025 | 438.353 | 343.507 | 388.184 | 8.227 | 0.700 |
+| endpoint-v2-1025-chronological | 970.410 | 0.000 | 335.213 | 12.128 | 0.632 |
+| endpoint-v2-64 | 807.602 | 355.628 | 497.810 | 10.858 | 0.708 |
+| endpoint-v2-64-chronological | 651.421 | 0.000 | 243.551 | 7.901 | 0.586 |
+
+Staging sums concurrent worker time and can include backpressure; direct replay can wait for those workers. These counters overlap and are not additive wall percentages. Query deadline failures remain recorded as failures, including those addressed by the separate timeline and entity changes. The full-size workflow therefore stays red where an unchanged ingestion or query target is missed; ordinary code-test CI is independent. Keep V1 as the default until the activation gate is met.
