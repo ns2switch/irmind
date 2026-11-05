@@ -97,9 +97,9 @@ The experimental `parser-declarative` module is integrated through [PR #151](htt
 
 ## Approved timestamp precision design
 
-[Parquet artifact V2](parquet-artifact-v2-design.md) addresses [issue #143](https://github.com/ns2switch/irmind/issues/143): precise UTC instants, stable equal-time ordering, compatible reads and explicit verified migration. The design includes generic bounded scope partitions and signed overflow. Start host cardinality at 64; the 15 GB benchmark selects the default, with an immutable ceiling of 1,024. Implement only after JSON-order independence and syslog/Linux are complete, in separate PRs for types/envelope and golden bytes, mixed V1/V2 writes/reads, partitions, migration, export v5 and benchmarks. Design changes require a separate compatibility review. Existing parsers must retain full source timestamps while the current derived index remains second precision.
+[Parquet artifact V2](parquet-artifact-v2-design.md) addresses [issue #143](https://github.com/ns2switch/irmind/issues/143): precise UTC instants, stable equal-time ordering, compatible reads and explicit verified migration. The design includes generic bounded scope partitions and signed overflow. The selected default is 64 ordinary host values per case, with an immutable ceiling of 1,024 and signed overflow. Implement only after JSON-order independence and syslog/Linux are complete, in separate PRs for types/envelope and golden bytes, mixed V1/V2 writes/reads, partitions, migration, export v5 and benchmarks. Design changes require a separate compatibility review. Existing parsers must retain full source timestamps while the current derived index remains second precision.
 
-Generic partition preparation (step (c)) is implemented in [PR #170](https://github.com/ns2switch/irmind/pull/170): parser-owned closed profiles, signed deterministic caps/overflow, case-local bounded staging and stable ordering, hash-derived paths and checked host filters. The [release audit](json-line-order-compatibility.md) confirms lexical `json-stream-v2` compatibility for published tags through v0.1.5; development insertion-order cases are unsupported. Default TUI writing remains V1 until migration/export V5 (step (d)) and release-profile benchmarks (step (e)) are both integrated. The 15 GB staging peak and host default await step (e)'s release benchmarks.
+Generic partition preparation (step (c)) is implemented in [PR #170](https://github.com/ns2switch/irmind/pull/170): parser-owned closed profiles, signed deterministic caps/overflow, case-local bounded staging and stable ordering, hash-derived paths and checked host filters. The [release audit](json-line-order-compatibility.md) confirms lexical `json-stream-v2` compatibility for published tags through v0.1.5; development insertion-order cases are unsupported. The initial rollout kept default TUI writing at V1 until migration/export V5 and the release benchmarks were integrated. The current selection and measured gate are recorded below.
 
 ## Approved parser and precision work order
 
@@ -142,7 +142,7 @@ Step (c) is integrated in [PR #170](https://github.com/ns2switch/irmind/pull/170
 
 ### Explicit migration and export V5
 
-[PR #172](https://github.com/ns2switch/irmind/pull/172) implements attended open-case migration and V5 export through shared application cases of use. Historical V1 envelopes, source manifests and seal challenges retain their encodings. Preparation verifies originals and old/new reconstruction before one atomic signed replacement batch. A shared lineage interpreter serves application checks, queries and export verification. See [migration guidance](case-migration.md) and [bounded wire commitments](parquet-v2-migration-contracts.md#bounded-canonical-migration-record). Default production writing stays V1 until this implementation and step (e)'s release benchmarks have merged. EVTX and experimental SIEM connectors follow those steps.
+[PR #172](https://github.com/ns2switch/irmind/pull/172) implements attended open-case migration and V5 export through shared application cases of use. Historical V1 envelopes, source manifests and seal challenges retain their encodings. Preparation verifies originals and old/new reconstruction before one atomic signed replacement batch. A shared lineage interpreter serves application checks, queries and export verification. See [migration guidance](case-migration.md) and [bounded wire commitments](parquet-v2-migration-contracts.md#bounded-canonical-migration-record). The initial rollout retained V1 until migration/export and the release benchmarks were integrated. See the current interactive selection below. EVTX and experimental SIEM connectors follow those steps.
 
 
 ### Current parser reconstruction boundary
@@ -159,7 +159,7 @@ The [proposed parser retention policy](decisions.md#parser-retention-policy-for-
 
 Step (e) compares release-mode V1/V2 CloudTrail ingestion and queries at 1 GB and 15 GB, plus 15 GB endpoint corpora with 1, 64, 1,024 and 1,025 hosts. It records normalized staging disk peaks, signed partition/file counts, compressed column sizes and filtered/unfiltered latency. The [measured recommendation](benchmarks.md#host-cap-recommendation-and-remaining-gate) retains 64 hosts as a conservative initial cap, with a hard ceiling of 1,024. It does not establish an optimal cap because the run holds that cap fixed while varying source cardinality.
 
-The complete profiled run exceeds the 900-second V2 ingestion target at 15 GB and the unfiltered endpoint timeline deadline. Step (e) remains open. Default production writing stays V1; recording benchmark results does not authorize switching the writer. Preserve all custody/query controls while addressing external sorting, spool replay and the global timeline.
+The initial profiled run exceeded the 900-second V2 ingestion target and the unfiltered endpoint timeline deadline, so it retained V1 as the default. Later paired optimization results and the current interactive selection are recorded below. The disordered-corpus ingestion target remains unchanged and open.
 
 
 ### V2 optimization acceptance
@@ -169,3 +169,13 @@ The ordinary-host default is approved at **64 per case**, with an immutable ceil
 Before activation, optimize ordered-source writing, bounded natural-run merges, authenticated file/row-group timeline pruning and cloud entity lookup in separate changes. Measure the release baseline and candidate in the same runner, with cloud and separate chronological/disordered endpoint corpora at 15 GB and 1, 64, 1,024 and 1,025 hosts. Preserve the 900-second ingestion target for both endpoint corpora and all existing query targets. A disordered-corpus miss must be reported rather than changing its target. V2 remains disabled until the cloud and chronological acceptance targets pass.
 
 [Event-reference co-observations](coobservation-reference-proposal.md) are an evaluation only. Any change to the signed schema requires its own decision before implementation.
+
+### Current interactive V2 selection
+
+The [final paired release candidate](benchmarks.md#final-v2-ingestion-and-query-gate) meets the existing cloud and chronological activation gate: 15 GB cloud ingestion takes 865.973 seconds; chronological endpoint ingestion takes 488.131–561.596 seconds at 1, 64, 1,024 and 1,025 hosts. All sampled candidate queries, including ordinary and overflow filters, have zero errors and p95 below 4.7 seconds. The complete release matrices retain before/after data from the same runner for each pair; separate runner instances are not interchangeable speedup baselines.
+
+TUI and offline-demo sessions now select the existing V2 writer. Opening an existing V1 case does not migrate its artifacts or change signed history. New sources can coexist with V1 sources; replacing an indexed source's artifact version still requires explicit migration. Existing application export selects V5 whenever the signed case contains precise artifacts or a migration record. CLI automation retains its existing V1 writer and explicit migration command.
+
+The four disordered controls still take 1,007.507–1,120.179 seconds against the same 900-second goal. That performance work remains open. Measure split/merge/copy/replay separately and evaluate a bounded merge feeding the provisional writer directly, with unchanged source/run authentication, ordering, allocation, cancellation and rollback. No smaller corpus or higher deadline replaces the goal.
+
+The event-reference co-observation proposal remains a design evaluation. Its measured payload budget is not an implemented disk saving. Changing its signed schema requires a separate compatibility decision and new goldens.
