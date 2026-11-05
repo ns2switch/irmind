@@ -462,3 +462,57 @@ The disordered sources contain 15 monotonic runs each. Bounded merging reduces t
 | endpoint-v2-64-chronological | 651.421 | 0.000 | 243.551 | 7.901 | 0.586 |
 
 Staging sums concurrent worker time and can include backpressure; direct replay can wait for those workers. These counters overlap and are not additive wall percentages. Query deadline failures remain recorded as failures, including those addressed by the separate timeline and entity changes. The full-size workflow therefore stays red where an unchanged ingestion or query target is missed; ordinary code-test CI is independent. Keep V1 as the default until the activation gate is met.
+
+### Authenticated timeline release comparison
+
+The [complete paired release matrix](https://github.com/ns2switch/irmind/actions/runs/42089799831) compares [baseline `2049b9cc6eb1`](https://github.com/ns2switch/irmind/commit/2049b9cc6eb13dc793b0ef430e0a001213ae7d3f) with [candidate `ab20a08a47f7`](https://github.com/ns2switch/irmind/commit/ab20a08a47f7290c533f7a2625c5875256d233e4). Each of the 18 rows runs both revisions on the same standard Linux runner; rows use separate instances. The [structured results](benchmarks/v2-timeline-final.json) retain frozen revisions, archive SHA-256 values, every scope/query p50/p95 and error count, ingestion phases and storage.
+
+| 15 GB workload | Before global timeline p50 / p95 seconds | After global timeline p50 / p95 seconds | Before / after failed samples (of 5) | Largest filtered timeline p95 after |
+| --- | ---: | ---: | ---: | ---: |
+| cloud-v1 | 0.015 / 0.019 | 0.247 / 0.256 | 0 / 0 | — |
+| cloud-v2 | 0.030 / 0.031 | 0.274 / 0.283 | 0 / 0 | — |
+| endpoint-v1-1 | 10.029 / 10.047 | 1.444 / 1.628 | 5 / 0 | 1.706 s (0/5 failed) |
+| endpoint-v1-1-chronological | 10.030 / 10.032 | 0.310 / 0.314 | 5 / 0 | 0.343 s (0/5 failed) |
+| endpoint-v1-1024 | 10.037 / 10.045 | 1.436 / 1.439 | 5 / 0 | 4.310 s (0/10 failed) |
+| endpoint-v1-1024-chronological | 10.028 / 10.031 | 0.311 / 0.314 | 5 / 0 | 4.431 s (0/10 failed) |
+| endpoint-v1-1025 | 10.019 / 10.040 | 1.442 / 1.448 | 5 / 0 | 4.178 s (0/10 failed) |
+| endpoint-v1-1025-chronological | 10.032 / 10.043 | 0.351 / 0.352 | 5 / 0 | 5.150 s (0/10 failed) |
+| endpoint-v1-64 | 10.033 / 10.039 | 1.857 / 1.862 | 5 / 0 | 9.422 s (0/10 failed) |
+| endpoint-v1-64-chronological | 10.031 / 10.035 | 0.522 / 0.527 | 5 / 0 | 9.799 s (0/10 failed) |
+| endpoint-v2-1 | 10.009 / 10.018 | 0.063 / 0.064 | 5 / 0 | 0.070 s (0/5 failed) |
+| endpoint-v2-1-chronological | 7.024 / 7.117 | 0.388 / 0.392 | 0 / 0 | 0.381 s (0/5 failed) |
+| endpoint-v2-1024 | 10.012 / 10.022 | 0.077 / 0.078 | 5 / 0 | 0.212 s (0/10 failed) |
+| endpoint-v2-1024-chronological | 10.009 / 10.012 | 0.655 / 0.657 | 5 / 0 | 1.737 s (0/10 failed) |
+| endpoint-v2-1025 | 10.013 / 10.014 | 0.077 / 0.078 | 5 / 0 | 0.210 s (0/10 failed) |
+| endpoint-v2-1025-chronological | 10.005 / 10.007 | 0.466 / 0.470 | 4 / 0 | 1.443 s (0/10 failed) |
+| endpoint-v2-64 | 10.010 / 10.012 | 0.058 / 0.059 | 5 / 0 | 0.019 s (0/10 failed) |
+| endpoint-v2-64-chronological | 6.700 / 6.800 | 0.290 / 0.316 | 0 / 0 | 0.036 s (0/10 failed) |
+
+All eight V1 endpoint global timelines previously failed all five samples; the candidate worst p95 is 1.862 seconds. The V2 endpoint worst global p95 is 0.657 seconds with zero errors. Cloud global timelines rise from 0.019 to 0.256 seconds for V1 and 0.031 to 0.283 seconds for V2 because authenticated statistics discovery adds metadata work to an already short query. This is a real small-query regression, still well below the unchanged deadline. The table reports it rather than treating every query as faster.
+
+Statistics are read only after hashing each file against its signed artifact. Unknown/inexact extrema cannot prune. File and row-group ordering uses conservative time bounds, then the shared stable source/offset key for ties. V1 whole-second ties use authenticated source/index statistics or a narrow reference-column projection for compacted mixed-source groups. A candidate is skipped only when its bound is strictly worse than the retained cutoff. Metadata discovery and projected reads share the existing 10-second budget; cancellation remains active. The public timeline remains newest-first, while internal ascending and descending paths are tested against full scans. No new signed metadata or port fields are needed.
+
+| 15 GB workload | Before ingestion seconds | After ingestion seconds | After Parquet GB | After co-observation GB |
+| --- | ---: | ---: | ---: | ---: |
+| cloud-v1 | 379.108 | 411.400 | 8.452 | 5.724 |
+| cloud-v2 | 946.284 | 941.902 | 8.925 | 5.960 |
+| endpoint-v1-1 | 185.117 | 179.513 | 2.390 | 0.481 |
+| endpoint-v1-1-chronological | 175.941 | 173.447 | 2.390 | 0.481 |
+| endpoint-v1-1024 | 184.190 | 178.578 | 2.393 | 0.481 |
+| endpoint-v1-1024-chronological | 173.619 | 170.817 | 2.392 | 0.481 |
+| endpoint-v1-1025 | 182.917 | 176.522 | 2.393 | 0.481 |
+| endpoint-v1-1025-chronological | 210.723 | 204.830 | 2.392 | 0.481 |
+| endpoint-v1-64 | 194.372 | 192.655 | 2.392 | 0.481 |
+| endpoint-v1-64-chronological | 214.726 | 211.845 | 2.392 | 0.481 |
+| endpoint-v2-1 | 1,188.605 | 1,166.651 | 2.814 | 1.249 |
+| endpoint-v2-1-chronological | 523.902 | 520.854 | 6.604 | 1.798 |
+| endpoint-v2-1024 | 1,003.197 | 997.576 | 2.758 | 1.224 |
+| endpoint-v2-1024-chronological | 713.626 | 710.096 | 6.476 | 1.762 |
+| endpoint-v2-1025 | 1,021.349 | 1,011.117 | 2.759 | 1.224 |
+| endpoint-v2-1025-chronological | 555.157 | 543.541 | 6.479 | 1.763 |
+| endpoint-v2-64 | 1,031.257 | 1,025.825 | 2.814 | 1.249 |
+| endpoint-v2-64-chronological | 495.180 | 500.117 | 6.608 | 1.798 |
+
+The writer and signed encodings are unchanged in this reader optimization. Ingestion includes source generation, signed custody and final compaction; these timing differences are not a claimed writer speedup. Candidate V2 cloud and disordered controls still miss 900 seconds in this pair. Other query failures remain in the JSON, including cloud entity lookup addressed separately. The paired workflow stays failed if either revision misses any unchanged target; passing global timelines alone does not close the ingestion gate.
+
+Both cloud writers retain 19/19 malicious events, 10/10 entities and 14/14 path checks per provider, with zero parse errors. Tests compare exact bounded/full-scan order for mixed generations, unknown and submicrosecond instants, legacy same-second compacted groups and both directions. A changed older artifact still fails authentication even when its time bound would exclude it. No hash or corruption check is skipped to obtain the latency result.
