@@ -2,9 +2,9 @@
 use super::super::super::local::{stream, verify_source_unchanged};
 use super::super::super::{
     AppError, BATCH_BYTES, BATCH_ROWS, CancellationToken, File, ParquetStore, ParseReport,
-    RecordRow, SourceManifestV1, StreamingEventParser, invalid_source, storage,
+    RecordRow, SourceManifestV1, StreamingEventParser, invalid_source,
 };
-use super::super::staging::{Input, MAX_STAGED_ROW, normalized_row, source_sample};
+use super::super::staging::{Input, MAX_STAGED_ROW, no_space, normalized_row, source_sample};
 use std::io::Write;
 use std::sync::mpsc::SyncSender;
 
@@ -113,13 +113,10 @@ impl<'a> RowBuffer<'a> {
         // Preserve the existing per-row and per-source normalized-size limits
         // without allocating or writing a serialized copy of every record.
         let mut counter = EncodedSize(1);
-        serde_json::to_writer(&mut counter, &row).map_err(storage)?;
-        self.encoded = self
-            .encoded
-            .checked_add(counter.0)
-            .ok_or_else(invalid_source)?;
+        serde_json::to_writer(&mut counter, &row).map_err(|_| no_space())?;
+        self.encoded = self.encoded.checked_add(counter.0).ok_or_else(no_space)?;
         if self.encoded > self.budget {
-            return Err(invalid_source());
+            return Err(no_space());
         }
         self.accepted = self.accepted.checked_add(1).ok_or_else(invalid_source)?;
         self.bytes = self.bytes.saturating_add(row.estimated_bytes());
@@ -157,5 +154,43 @@ impl Write for EncodedSize {
     }
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn direct_rows_keep_the_existing_normalized_size_limits_and_error() {
+        let mut counter = EncodedSize(MAX_STAGED_ROW);
+        assert!(counter.write_all(b"x").is_err());
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        let hash = irmind_domain::EvidenceHash::parse(&"a".repeat(64)).unwrap();
+        let row = RecordRow::from_partitioned(
+            &irmind_app::IndexedGraphRecord {
+                record: irmind_app::GraphRecord {
+                    index: 0,
+                    at: String::new(),
+                    event: "Read".into(),
+                    text: "{}".into(),
+                    entities: vec![],
+                    relations: vec![],
+                },
+                time: None,
+                source_offset: None,
+            },
+            &hash,
+        )
+        .unwrap();
+        let mut buffer = RowBuffer::new(&sender, 0, hash);
+        assert!(matches!(
+            buffer.push(row),
+            Err(AppError::Fixed(
+                irmind_app::FixedAppError::StorageNormalizedStagingSpace
+            ))
+        ));
+        assert!(receiver.try_recv().is_err());
     }
 }

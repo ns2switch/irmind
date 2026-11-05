@@ -188,7 +188,10 @@ fn late_errors_and_cancellation_unblock_every_worker_and_remove_provisional_file
         let data = tempfile::tempdir().unwrap();
         let store = ParquetStore::open_precise(data.path()).unwrap();
         let id = case();
-        let parser = LateFailure { cancel };
+        let parser = LateFailure {
+            cancel,
+            only_last: false,
+        };
         let mut req = request(sources.path(), &id, &paths);
         req.parser = &parser;
         let result = store.prepare_local_batch(req, &CancellationToken::new());
@@ -208,6 +211,7 @@ fn late_errors_and_cancellation_unblock_every_worker_and_remove_provisional_file
 
 struct LateFailure {
     cancel: bool,
+    only_last: bool,
 }
 impl StreamingEventParser for LateFailure {
     fn streaming_version(&self) -> &'static str {
@@ -226,6 +230,9 @@ impl StreamingEventParser for LateFailure {
             irmind_domain::Tainted<irmind_app::GraphRecord>,
         ) -> Result<(), AppError>,
     ) -> Result<usize, AppError> {
+        if self.only_last && name != "source-3.json" {
+            return JsonParser.parse_reader(name, reader, hash, cancel, emit);
+        }
         let mut count = 0;
         JsonParser.parse_reader(name, reader, hash, cancel, &mut |row| {
             emit(row)?;
@@ -240,4 +247,45 @@ impl StreamingEventParser for LateFailure {
             Ok(())
         })
     }
+}
+
+#[test]
+fn a_failure_in_the_last_source_discards_every_earlier_provisional_artifact() {
+    let inputs = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let store = ParquetStore::open_precise(data.path()).unwrap();
+    let text = input_rows(false);
+    let paths = (0..4)
+        .map(|i| format!("source-{i}.json"))
+        .collect::<Vec<_>>();
+    for path in &paths {
+        std::fs::write(inputs.path().join(path), &text).unwrap();
+    }
+    let id = case();
+    let parser = LateFailure {
+        cancel: false,
+        only_last: true,
+    };
+    let mut req = request(inputs.path(), &id, &paths);
+    req.parser = &parser;
+    assert!(
+        store
+            .prepare_local_batch(req, &CancellationToken::new())
+            .is_err()
+    );
+    assert_eq!(regular_files(&store.case_dir(&id).unwrap()), 0);
+}
+
+fn regular_files(root: &Path) -> usize {
+    std::fs::read_dir(root)
+        .unwrap()
+        .map(|entry| {
+            let entry = entry.unwrap();
+            if entry.file_type().unwrap().is_dir() {
+                regular_files(&entry.path())
+            } else {
+                1
+            }
+        })
+        .sum()
 }
