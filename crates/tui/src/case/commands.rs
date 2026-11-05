@@ -428,9 +428,8 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             let workflow = self.workflow();
             let id = self.id;
             self.start_task("Verify", move |cancel| {
-                workflow
-                    .verify(id, &cancel)
-                    .map(|count| format!("Verified {count} audit entries"))
+                let count = workflow.verify(id, &cancel)?;
+                workflow.verification_message(id, format!("Verified {count} audit entries"))
             });
             return Ok(true);
         }

@@ -60,6 +60,7 @@ impl AutomationContext<'_, '_> {
             engine,
             store,
             cancel,
+            guard,
             ..
         } = self;
         let Command::Verify {
@@ -72,6 +73,9 @@ impl AutomationContext<'_, '_> {
         };
         let id = parse_id(&case_id)?;
         let entries = engine.verify_cancelable(&id, cancel)?;
+        if let Some(warning) = irmind_app::parser_extraction_warning(&store.entries(&id)?)? {
+            eprintln!("{}", warning.display(guard.as_ref())?);
+        }
         let has_sources = store.entries(&id)?.iter().any(|entry| {
             matches!(
                 entry.kind,

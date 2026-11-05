@@ -17,6 +17,21 @@ pub(crate) struct CaseWorkflow<'a, 'ports> {
 }
 
 impl CaseWorkflow<'_, '_> {
+    pub(crate) fn verification_message(
+        &self,
+        id: &CaseId,
+        message: String,
+    ) -> Result<String, AppError> {
+        let entries = self.engine.audit_log.entries(id)?;
+        match irmind_app::parser_extraction_warning(&entries)? {
+            Some(warning) => Ok(format!(
+                "{message}\n{}",
+                warning.display(self.engine.guard.as_ref())?
+            )),
+            None => Ok(message),
+        }
+    }
+
     pub(crate) fn create_case(
         &self,
         title: &str,
@@ -106,10 +121,13 @@ impl CaseWorkflow<'_, '_> {
                 report.missing_or_changed.len()
             )));
         }
-        Ok(format!(
-            "Verified {} of {} original sources; {} were not sampled",
-            report.checked, report.total, report.unchecked
-        ))
+        self.verification_message(
+            id,
+            format!(
+                "Verified {} of {} original sources; {} were not sampled",
+                report.checked, report.total, report.unchecked
+            ),
+        )
     }
 
     pub(crate) fn verify_parquet_rebuild(

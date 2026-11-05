@@ -84,6 +84,7 @@ Add local detections, evidence-linked reports, controlled extensions, and a head
 Stabilize signed formats, validate connectors, sign binaries, and complete external security review.
 
 - Stable signed formats for cases, manifests, skills, subagent records, and the engine protocol, with tested migrations.
+- Confirm a parser compatibility policy before 1.0: from 1.0 onward, retain an obsolete parser version for reconstruction and verification for at least two subsequent minor releases, or an equivalent support period. Announce retirement in the changelog in advance and provide a migration procedure. This proposed policy does not restore retired pre-1.0 readers.
 - An external security review.
 - At least three connectors validated against real test environments.
 - Signed release binaries on Linux, macOS, and Windows.
