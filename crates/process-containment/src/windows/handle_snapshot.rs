@@ -7,8 +7,9 @@ use windows_sys::Win32::{
         Diagnostics::ProcessSnapshotting::{
             HPSS, HPSSWALK, PSS_CAPTURE_HANDLE_BASIC_INFORMATION,
             PSS_CAPTURE_HANDLE_NAME_INFORMATION, PSS_CAPTURE_HANDLES, PSS_HANDLE_ENTRY,
-            PSS_HANDLE_HAVE_TYPE, PSS_WALK_HANDLES, PssCaptureSnapshot, PssFreeSnapshot,
-            PssWalkMarkerCreate, PssWalkMarkerFree, PssWalkSnapshot,
+            PSS_HANDLE_HAVE_BASIC_INFORMATION, PSS_HANDLE_HAVE_TYPE, PSS_OBJECT_TYPE_UNKNOWN,
+            PSS_WALK_HANDLES, PssCaptureSnapshot, PssFreeSnapshot, PssWalkMarkerCreate,
+            PssWalkMarkerFree, PssWalkSnapshot,
         },
         Threading::{GetCurrentProcess, GetProcessHandleCount},
     },
@@ -35,11 +36,13 @@ pub(super) fn inspect(
     let snapshot = capture()?;
     let mut raw = ptr::null_mut();
     // SAFETY: null requests the default allocator; raw is valid output storage.
-    if unsafe { PssWalkMarkerCreate(ptr::null(), &raw mut raw) } != 0 {
-        return Err(denied());
+    let status = unsafe { PssWalkMarkerCreate(ptr::null(), &raw mut raw) };
+    if status != 0 {
+        return Err(denied("marker", status));
     }
     let marker = Marker(raw);
-    let size = u32::try_from(std::mem::size_of::<PSS_HANDLE_ENTRY>()).map_err(|_| denied())?;
+    let size =
+        u32::try_from(std::mem::size_of::<PSS_HANDLE_ENTRY>()).map_err(|_| denied("size", 0))?;
     for _ in 0..=MAX_HANDLES {
         let mut entry = PSS_HANDLE_ENTRY::default();
         // SAFETY: snapshot and marker are live; aligned output and exact size match
@@ -56,19 +59,16 @@ pub(super) fn inspect(
         if status == ERROR_NO_MORE_ITEMS {
             return Ok(());
         }
-        if status != 0 || entry.Flags & PSS_HANDLE_HAVE_TYPE == 0 {
-            return Err(denied());
+        if status != 0 {
+            return Err(denied("walk", status));
         }
-        let file = if entry.TypeNameLength == 8 && !entry.TypeName.is_null() {
-            // SAFETY: the OS entry declares eight live bytes; the marker remains
-            // retained and no further walk occurs until this borrowed slice ends.
-            (unsafe { std::slice::from_raw_parts(entry.TypeName, 4) }) == [70, 105, 108, 101]
-        } else {
-            false
-        };
+        if entry.Flags & PSS_HANDLE_HAVE_BASIC_INFORMATION == 0 {
+            return Err(denied("basic-information", entry.Flags.cast_unsigned()));
+        }
+        let file = is_file(&entry)?;
         check(entry.Handle, file, entry.GrantedAccess)?;
     }
-    Err(denied())
+    Err(denied("walk-limit", MAX_HANDLES))
 }
 fn capture() -> io::Result<Snapshot> {
     let mut count = 0;
@@ -76,7 +76,7 @@ fn capture() -> io::Result<Snapshot> {
     if unsafe { GetProcessHandleCount(GetCurrentProcess(), &raw mut count) } == 0
         || count > MAX_HANDLES
     {
-        return Err(denied());
+        return Err(denied("count", count));
     }
     let mut raw = ptr::null_mut();
     let flags = PSS_CAPTURE_HANDLES
@@ -84,15 +84,36 @@ fn capture() -> io::Result<Snapshot> {
         | PSS_CAPTURE_HANDLE_BASIC_INFORMATION;
     // SAFETY: capture only this process's bounded handle metadata, never a VA
     // clone, child process or breakaway; raw is valid output storage.
-    if unsafe { PssCaptureSnapshot(GetCurrentProcess(), flags, 0, &raw mut raw) } != 0 {
-        return Err(denied());
+    let status = unsafe { PssCaptureSnapshot(GetCurrentProcess(), flags, 0, &raw mut raw) };
+    if status != 0 {
+        return Err(denied("capture", status));
     }
     Ok(Snapshot(raw))
 }
-fn denied() -> io::Error {
+fn is_file(entry: &PSS_HANDLE_ENTRY) -> io::Result<bool> {
+    // HAVE_TYPE validates ObjectType, not TypeName. Files have UNKNOWN enum type;
+    // their counted type name identifies them, including unnamed regular files.
+    if entry.Flags & PSS_HANDLE_HAVE_TYPE != 0 && entry.ObjectType != PSS_OBJECT_TYPE_UNKNOWN {
+        return Ok(false);
+    }
+    if entry.TypeName.is_null()
+        || entry.TypeNameLength == 0
+        || entry.TypeNameLength > 128
+        || !entry.TypeNameLength.is_multiple_of(2)
+    {
+        return Err(denied("type-name", u32::from(entry.TypeNameLength)));
+    }
+    if entry.TypeNameLength != 8 {
+        return Ok(false);
+    }
+    // SAFETY: the OS entry declares eight live bytes. The caller retains the
+    // walk marker and does not advance it until this borrowed slice ends.
+    Ok((unsafe { std::slice::from_raw_parts(entry.TypeName, 4) }) == [70, 105, 108, 101])
+}
+fn denied(stage: &'static str, status: u32) -> io::Error {
     io::Error::new(
         io::ErrorKind::PermissionDenied,
-        "EVTX Windows handle snapshot could not be verified",
+        format!("EVTX Windows handle snapshot could not be verified ({stage}, {status:#x})"),
     )
 }
 
