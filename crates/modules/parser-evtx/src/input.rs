@@ -192,6 +192,13 @@ fn isolation_reason(bytes: &[u8]) -> Option<&'static str> {
         Some(
             "EVTX unavailable: the native sandbox could not verify that child process creation is denied",
         )
+    } else if text.contains("EVTX Windows handle snapshot could not be verified")
+        || text.contains("EVTX handle type could not be verified")
+        || text.contains("invalid EVTX runtime directory")
+    {
+        Some(
+            "EVTX unavailable: Windows runtime handle verification failed; check the supported OS and filesystem requirements",
+        )
     } else if text.contains("EVTX requires an AppContainer token")
         || text.contains("EVTX inherited an unrelated file handle")
     {
@@ -200,5 +207,22 @@ fn isolation_reason(bytes: &[u8]) -> Option<&'static str> {
         )
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn runtime_failure_uses_a_fixed_reason_without_forwarding_helper_stderr() {
+        let result = super::isolation_reason(
+            b"EVTX Windows handle snapshot could not be verified (capture, 0x5) PRIVATE_SAMPLE",
+        );
+        assert_eq!(
+            result,
+            Some(
+                "EVTX unavailable: Windows runtime handle verification failed; check the supported OS and filesystem requirements"
+            )
+        );
+        assert!(!result.unwrap_or_default().contains("PRIVATE_SAMPLE"));
     }
 }

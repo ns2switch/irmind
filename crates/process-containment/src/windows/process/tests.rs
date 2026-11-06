@@ -16,10 +16,6 @@ fn unrelated_inheritable_file_is_excluded_and_job_terminates_child() {
     let foreign = root.path().join("unrelated-private-canary");
     std::fs::write(&foreign, b"not evidence").unwrap();
     let file = File::open(foreign).unwrap();
-    assert!(
-        (file.as_raw_handle() as usize) < 65_536,
-        "canary must be inside the bounded verification range"
-    );
     let extra_pipes = super::pipes::Pipes::new(&file).unwrap();
     // SAFETY: live file; only its inheritability flag changes for this test.
     assert_ne!(

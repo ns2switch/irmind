@@ -347,6 +347,6 @@ Consequences: the three-handle inheritance list is unchanged. Native tests cover
 
 Context: runtime handle values are not a contiguous public table. File queries on guessed numeric handles cannot distinguish loader/synchronization objects reliably.
 
-Decision: enumerate a bounded process snapshot using Microsoft's Pss APIs, requesting only handle metadata and names. Check the declared object type before any file query. Limit the initial and walked handle count to 512; reject missing type information and failed snapshots. Never request a memory clone, breakaway or new process. The explicit inherited handle list and exact-runtime-directory checks remain mandatory.
+Decision: enumerate a bounded process snapshot using Microsoft's Pss APIs, requesting only handle values. Query each still-live handle's bounded type name before any file query; do not require optional Pss metadata that Windows does not populate for every object. An explicitly closed handle has no usable capability and is ignored; other query errors fail closed. Limit the initial and walked handle count to 512; reject missing type information and failed snapshots. Never request a memory clone, breakaway or new process. The explicit inherited handle list and exact-runtime-directory checks remain mandatory.
 
 Consequences: native handle exclusion tests inspect actual handles without a low numeric-range assumption. Keep every pointer borrow within the live snapshot/walk-marker scope; expose only a safe internal visitor and preserve the single Windows unsafe boundary.

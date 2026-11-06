@@ -2,6 +2,7 @@
 pub mod filesystem;
 
 mod handle_snapshot;
+mod handle_type;
 mod handles;
 #[cfg(feature = "launcher")]
 pub(crate) mod process;

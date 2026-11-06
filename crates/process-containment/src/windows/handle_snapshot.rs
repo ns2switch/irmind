@@ -5,11 +5,9 @@ use windows_sys::Win32::{
     Foundation::{ERROR_NO_MORE_ITEMS, HANDLE},
     System::{
         Diagnostics::ProcessSnapshotting::{
-            HPSS, HPSSWALK, PSS_CAPTURE_HANDLE_BASIC_INFORMATION,
-            PSS_CAPTURE_HANDLE_NAME_INFORMATION, PSS_CAPTURE_HANDLES, PSS_HANDLE_ENTRY,
-            PSS_HANDLE_HAVE_BASIC_INFORMATION, PSS_HANDLE_HAVE_TYPE, PSS_OBJECT_TYPE_UNKNOWN,
-            PSS_WALK_HANDLES, PssCaptureSnapshot, PssFreeSnapshot, PssWalkMarkerCreate,
-            PssWalkMarkerFree, PssWalkSnapshot,
+            HPSS, HPSSWALK, PSS_CAPTURE_HANDLES, PSS_HANDLE_ENTRY, PSS_WALK_HANDLES,
+            PssCaptureSnapshot, PssFreeSnapshot, PssWalkMarkerCreate, PssWalkMarkerFree,
+            PssWalkSnapshot,
         },
         Threading::{GetCurrentProcess, GetProcessHandleCount},
     },
@@ -30,9 +28,7 @@ impl Drop for Marker {
     }
 }
 
-pub(super) fn inspect(
-    mut check: impl FnMut(HANDLE, bool, u32) -> io::Result<()>,
-) -> io::Result<()> {
+pub(super) fn inspect(mut check: impl FnMut(HANDLE, bool) -> io::Result<()>) -> io::Result<()> {
     let snapshot = capture()?;
     let mut raw = ptr::null_mut();
     // SAFETY: null requests the default allocator; raw is valid output storage.
@@ -62,11 +58,9 @@ pub(super) fn inspect(
         if status != 0 {
             return Err(denied("walk", status));
         }
-        if entry.Flags & PSS_HANDLE_HAVE_BASIC_INFORMATION == 0 {
-            return Err(denied("basic-information", entry.Flags.cast_unsigned()));
+        if let Some(file) = super::handle_type::file(entry.Handle)? {
+            check(entry.Handle, file)?;
         }
-        let file = is_file(&entry)?;
-        check(entry.Handle, file, entry.GrantedAccess)?;
     }
     Err(denied("walk-limit", MAX_HANDLES))
 }
@@ -79,9 +73,7 @@ fn capture() -> io::Result<Snapshot> {
         return Err(denied("count", count));
     }
     let mut raw = ptr::null_mut();
-    let flags = PSS_CAPTURE_HANDLES
-        | PSS_CAPTURE_HANDLE_NAME_INFORMATION
-        | PSS_CAPTURE_HANDLE_BASIC_INFORMATION;
+    let flags = PSS_CAPTURE_HANDLES;
     // SAFETY: capture only this process's bounded handle metadata, never a VA
     // clone, child process or breakaway; raw is valid output storage.
     let status = unsafe { PssCaptureSnapshot(GetCurrentProcess(), flags, 0, &raw mut raw) };
@@ -89,26 +81,6 @@ fn capture() -> io::Result<Snapshot> {
         return Err(denied("capture", status));
     }
     Ok(Snapshot(raw))
-}
-fn is_file(entry: &PSS_HANDLE_ENTRY) -> io::Result<bool> {
-    // HAVE_TYPE validates ObjectType, not TypeName. Files have UNKNOWN enum type;
-    // their counted type name identifies them, including unnamed regular files.
-    if entry.Flags & PSS_HANDLE_HAVE_TYPE != 0 && entry.ObjectType != PSS_OBJECT_TYPE_UNKNOWN {
-        return Ok(false);
-    }
-    if entry.TypeName.is_null()
-        || entry.TypeNameLength == 0
-        || entry.TypeNameLength > 128
-        || !entry.TypeNameLength.is_multiple_of(2)
-    {
-        return Err(denied("type-name", u32::from(entry.TypeNameLength)));
-    }
-    if entry.TypeNameLength != 8 {
-        return Ok(false);
-    }
-    // SAFETY: the OS entry declares eight live bytes. The caller retains the
-    // walk marker and does not advance it until this borrowed slice ends.
-    Ok((unsafe { std::slice::from_raw_parts(entry.TypeName, 4) }) == [70, 105, 108, 101])
 }
 fn denied(stage: &'static str, status: u32) -> io::Error {
     io::Error::new(
@@ -127,7 +99,7 @@ mod tests {
     fn snapshot_includes_a_real_file_without_guessing_handle_values() {
         let file = tempfile::tempfile().unwrap();
         let mut found = false;
-        inspect(|handle, kind_file, _access| {
+        inspect(|handle, kind_file| {
             if handle == file.as_raw_handle() {
                 assert!(kind_file);
                 found = true;
