@@ -8,7 +8,8 @@ use windows_sys::{
         Storage::FileSystem::{
             BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT,
             FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_EXECUTE,
-            FILE_GENERIC_READ, FILE_READ_ATTRIBUTES, GetFileInformationByHandle, SYNCHRONIZE,
+            FILE_GENERIC_READ, FILE_NAME_OPENED, FILE_READ_ATTRIBUTES, GetFileInformationByHandle,
+            GetFinalPathNameByHandleW, SYNCHRONIZE, VOLUME_NAME_NT,
         },
         System::WindowsProgramming::PUBLIC_OBJECT_BASIC_INFORMATION,
     },
@@ -18,6 +19,7 @@ pub(super) struct RuntimeDirectory {
     _file: File,
     identity: (u32, u32, u32),
     evidence: (u32, u32, u32),
+    opened_name: Vec<u16>,
 }
 impl RuntimeDirectory {
     pub(super) fn open(evidence: &File) -> io::Result<Self> {
@@ -33,8 +35,11 @@ impl RuntimeDirectory {
                 "invalid EVTX runtime directory",
             )
         })?;
+        let opened_name = opened_name(file.as_raw_handle())
+            .ok_or_else(|| io::Error::other("invalid EVTX runtime directory name"))?;
         Ok(Self {
             _file: file,
+            opened_name,
             identity,
             evidence: file_identity(evidence.as_raw_handle(), false)
                 .ok_or_else(|| io::Error::other("invalid EVTX evidence handle"))?,
@@ -45,18 +50,43 @@ impl RuntimeDirectory {
             return false;
         };
         (access & !(FILE_GENERIC_READ | FILE_GENERIC_EXECUTE) == 0
-            && file_identity(handle, true) == Some(self.identity))
+            && (file_identity(handle, true) == Some(self.identity)
+                || opened_name(handle).as_ref() == Some(&self.opened_name)))
             || (access & !FILE_GENERIC_READ == 0
                 && file_identity(handle, false) == Some(self.evidence))
     }
     pub(super) fn diagnostic(&self, handle: HANDLE) -> String {
         format!(
-            "access={:#x}, runtime_directory={}, evidence={}",
+            "access={:#x}, runtime_directory={}, evidence={}, runtime_name={}",
             access_mask(handle).unwrap_or(u32::MAX),
             file_identity(handle, true) == Some(self.identity),
-            file_identity(handle, false) == Some(self.evidence)
+            file_identity(handle, false) == Some(self.evidence),
+            opened_name(handle).as_ref() == Some(&self.opened_name)
         )
     }
+}
+
+fn opened_name(handle: HANDLE) -> Option<Vec<u16>> {
+    let mut name = vec![0u16; 32768];
+    // SAFETY: the borrowed live disk handle and initialized UTF-16 buffer are
+    // retained for this call. OPENED avoids component metadata reads; NT volume
+    // names avoid drive-letter aliases. No path is opened, logged or exposed.
+    let length = unsafe {
+        GetFinalPathNameByHandleW(
+            handle,
+            name.as_mut_ptr(),
+            32768,
+            FILE_NAME_OPENED | VOLUME_NAME_NT,
+        )
+    } as usize;
+    if length == 0 || length >= name.len() {
+        return None;
+    }
+    name.truncate(length);
+    while name.last() == Some(&u16::from(b'\\')) {
+        name.pop();
+    }
+    (!name.is_empty()).then_some(name)
 }
 
 fn access_mask(handle: HANDLE) -> Option<u32> {
@@ -101,7 +131,7 @@ mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
     use std::os::windows::io::AsRawHandle as _;
-    use windows_sys::Win32::Storage::FileSystem::FILE_ADD_FILE;
+    use windows_sys::Win32::Storage::FileSystem::{FILE_ADD_FILE, FILE_TRAVERSE};
 
     #[test]
     fn only_read_only_aliases_of_the_runtime_directory_or_evidence_are_accepted() {
@@ -114,6 +144,12 @@ mod tests {
             .open(".")
             .unwrap();
         assert!(runtime.matches(same.as_raw_handle()));
+        let traversal = std::fs::OpenOptions::new()
+            .access_mode(FILE_TRAVERSE | SYNCHRONIZE)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(".")
+            .unwrap();
+        assert!(runtime.matches(traversal.as_raw_handle()));
         let other = tempfile::tempdir().unwrap();
         let foreign = std::fs::OpenOptions::new()
             .access_mode(FILE_READ_ATTRIBUTES | SYNCHRONIZE)
@@ -121,6 +157,12 @@ mod tests {
             .open(other.path())
             .unwrap();
         assert!(!runtime.matches(foreign.as_raw_handle()));
+        let foreign_traversal = std::fs::OpenOptions::new()
+            .access_mode(FILE_TRAVERSE | SYNCHRONIZE)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(other.path())
+            .unwrap();
+        assert!(!runtime.matches(foreign_traversal.as_raw_handle()));
         let write = std::fs::OpenOptions::new()
             .access_mode(FILE_ADD_FILE | FILE_READ_ATTRIBUTES | SYNCHRONIZE)
             .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
