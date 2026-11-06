@@ -1,4 +1,4 @@
-Traducción de docs/security-model.md en el commit aacbe6481dec2d871b48017aa981d1d76f528146; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/security-model.md en el commit 33538a7c23dd529e1d786e5e41eef0426d593719; si hay diferencias, prevalece la versión en inglés.
 
 # Modelo de seguridad
 
@@ -46,3 +46,5 @@ Un paquete exportado contiene el log firmado, el sello y la clave pública. Los 
 ## Uso recomendado
 
 Empieza por el [ejemplo sintético](getting-started.md). Limita el alcance remoto, usa credenciales de servicio dedicadas de solo lectura y aprueba solo llamadas cuyos argumentos entiendas. Si sospechas una vulnerabilidad, usa el proceso privado de [SECURITY.md](../../SECURITY.md) en lugar de abrir un issue público.
+
+El decodificador EVTX se ejecuta en un proceso aislado por el sistema operativo, con un descriptor de evidencia de solo lectura, salida acotada y confirmación de finalización. El parser solo está disponible tras verificar el aislamiento al arrancar. No existe ejecución sin aislamiento. La salida conserva su procedencia no confiable y pasa por los controles habituales antes de mostrarse, enviarse al modelo o influir en llamadas. Consulta el [diseño de aislamiento EVTX](../development/evtx-helper-design.md).
