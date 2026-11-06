@@ -46,7 +46,7 @@ def main():
         shutil.copy2(executable, frozen)
         env['IRMIND_EVTX_HELPER_TEST'] = str(frozen)
         command = ['cargo', 'nextest', 'run', '--manifest-path', 'helpers/evtx/Cargo.toml',
-                   '--cargo-profile', args.profile, '--locked']
+                   '--cargo-profile', args.profile, '--locked', '--no-fail-fast']
         if args.test_threads:
             command.extend(['--test-threads', args.test_threads])
         try:

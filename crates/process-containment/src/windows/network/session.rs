@@ -62,7 +62,12 @@ impl Session {
         cancelled: &dyn Fn() -> bool,
     ) -> io::Result<Stamp> {
         let result = (|| {
-            let stamp = self.services.snapshot()?;
+            let stamp = self.services.snapshot().map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "EVTX WFP services are unavailable before the witness",
+                )
+            })?;
             if *self.verified.lock().map_err(|_| denied())? == Some(stamp) {
                 return Ok(stamp);
             }
@@ -75,8 +80,17 @@ impl Session {
                 Ordering::Relaxed,
             );
             result?;
-            if self.services.snapshot()? != stamp {
-                return Err(denied());
+            if self.services.snapshot().map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "EVTX WFP services are unavailable after the witness",
+                )
+            })? != stamp
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "EVTX WFP service stamp changed during the witness",
+                ));
             }
             *self.verified.lock().map_err(|_| denied())? = Some(stamp);
             Ok(stamp)
@@ -91,7 +105,10 @@ impl Session {
             Ok(())
         } else {
             self.invalidate();
-            Err(denied())
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "EVTX WFP service stamp changed before or after decoding",
+            ))
         }
     }
     pub(crate) fn invalidate(&self) {

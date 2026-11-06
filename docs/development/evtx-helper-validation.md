@@ -53,4 +53,7 @@ The native suite passed on the following configurations in [this CI run](https:/
 The Windows startup investigation is separate from the passing Linux/macOS evidence. The required native tests remain enabled. A failed probe makes EVTX unavailable; it does not select a weaker launcher.
 
 
-The [Windows network-probe proposal](evtx-windows-network-probe.md) distinguishes traffic isolation from socket creation and requires controlled live endpoints rather than treating an arbitrary connection timeout as proof. It is not implemented; the current strict native gate continues to fail closed.
+The [Windows network-probe proposal](evtx-windows-network-probe.md) distinguishes traffic isolation from socket creation and requires controlled live endpoints rather than treating an arbitrary connection timeout as proof. The implementation includes the memory-only session witness, service-change invalidation and per-launch token/handle checks. Native validation is still in progress; the required gates continue to fail closed.
+
+
+The [Windows 11 community check](https://github.com/ns2switch/irmind/issues/189) tracks client confirmation using the [manual candidate procedure](manual-validation.md#experimental-evtx-windows-11-candidate-check). No firewall settings, service configuration or loopback exemptions are changed by the tests.
