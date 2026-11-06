@@ -22,16 +22,15 @@ pub fn verify_entry() -> io::Result<()> {
     let ipv4 = blocked(TcpListener::bind((Ipv4Addr::LOCALHOST, 0)));
     let ipv6 = blocked(TcpListener::bind((Ipv6Addr::LOCALHOST, 0)));
     // Only loopback is probed; failure must be policy denial, never refusal/timeout.
-    let outbound = [
+    let connections = [
         SocketAddr::from((Ipv4Addr::LOCALHOST, 9)),
         SocketAddr::from((Ipv6Addr::LOCALHOST, 9)),
     ]
-    .into_iter()
-    .all(|address| {
-        blocked(TcpStream::connect_timeout(
-            &address,
-            Duration::from_millis(100),
-        ))
+    .map(|address| TcpStream::connect_timeout(&address, Duration::from_millis(100)));
+    let outbound = connections.iter().all(|result| {
+        result
+            .as_ref()
+            .is_err_and(|error| error.kind() == io::ErrorKind::PermissionDenied)
     });
     #[cfg(target_os = "linux")]
     {
@@ -53,9 +52,18 @@ pub fn verify_entry() -> io::Result<()> {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             format!(
-                "EVTX isolation verification failed: foreign_read_denied={file}, runtime_write_denied={write}, ipv4_bind_denied={ipv4}, ipv6_bind_denied={ipv6}, outbound_denied={outbound}"
+                "EVTX isolation verification failed: foreign_read_denied={file}, runtime_write_denied={write}, ipv4_bind_denied={ipv4}, ipv6_bind_denied={ipv6}, outbound_denied={outbound}, outbound_ipv4={}, outbound_ipv6={}",
+                connection_outcome(&connections[0]),
+                connection_outcome(&connections[1])
             ),
         ));
     }
     Ok(())
+}
+
+fn connection_outcome(result: &io::Result<TcpStream>) -> String {
+    match result {
+        Ok(_) => "connected".into(),
+        Err(error) => format!("{:?}/{}", error.kind(), error.raw_os_error().unwrap_or(0)),
+    }
 }
