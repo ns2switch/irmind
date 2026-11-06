@@ -176,7 +176,13 @@ fn running(service: &Service) -> io::Result<u32> {
             &raw mut needed,
         )
     };
-    if ok == 0 || status.dwCurrentState != SERVICE_RUNNING || status.dwProcessId == 0 {
+    if ok == 0 {
+        return Err(denied());
+    }
+    running_pid(&status)
+}
+fn running_pid(status: &SERVICE_STATUS_PROCESS) -> io::Result<u32> {
+    if status.dwCurrentState != SERVICE_RUNNING || status.dwProcessId == 0 {
         return Err(denied());
     }
     Ok(status.dwProcessId)
@@ -193,6 +199,17 @@ unsafe extern "system" fn changed(_: u32, context: *const std::ffi::c_void) {
 mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
+    #[test]
+    fn stopped_or_unidentified_services_never_supply_a_verified_stamp() {
+        let mut status = SERVICE_STATUS_PROCESS::default();
+        assert!(running_pid(&status).is_err());
+        status.dwCurrentState = SERVICE_RUNNING;
+        assert!(running_pid(&status).is_err());
+        status.dwProcessId = 42;
+        assert_eq!(running_pid(&status).unwrap(), 42);
+        status.dwCurrentState = windows_sys::Win32::System::Services::SERVICE_STOPPED;
+        assert!(running_pid(&status).is_err());
+    }
     #[test]
     fn notification_invalidates_a_stamp_even_when_both_services_are_running_again() {
         let watch = Watch::new().unwrap();

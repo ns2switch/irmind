@@ -30,7 +30,7 @@ impl Drop for Lease {
 impl Session {
     pub(crate) fn new() -> io::Result<Self> {
         Ok(Self {
-            services: Services::new()?,
+            services: Services::new().map_err(|_| io::Error::new(io::ErrorKind::PermissionDenied, "EVTX requires running BFE and MpsSvc services with query and notification access"))?,
             verified: Mutex::new(None),
             busy: Arc::new(AtomicBool::new(false)),
             poisoned: AtomicBool::new(false),
