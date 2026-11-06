@@ -1,6 +1,7 @@
 #![cfg(windows)]
 pub mod filesystem;
 
+mod handle_snapshot;
 mod handles;
 #[cfg(feature = "launcher")]
 pub(crate) mod process;
