@@ -35,3 +35,19 @@ The native Linux AST scan reports these used unsafe expressions in important dep
 ## Performance and platform evidence
 
 The [release benchmark](benchmarks.md#isolated-evtx-conversion) records conversion throughput and its scope. Platform support requires the actual helper's enforcement probe, not merely a successful build. A container validates its userspace on the host kernel; it cannot certify its distribution's stock kernel. Windows Server runners cannot certify Windows 10 or 11, and one macOS version cannot certify other releases.
+
+
+The native suite passed on the following configurations in [this CI run](https://github.com/ns2switch/irmind/actions/runs/42235137349). Availability still runs the enforcement probe on each installation.
+
+| Configuration | Evidence | Result |
+| --- | --- | --- |
+| Ubuntu 22.04.5, x86-64, kernel 6.8.0-1070-azure | Native helper probe and decoder | Passed; this does not certify the original 22.04 GA kernel |
+| Ubuntu 26.04.1, x86-64, kernel 7.0.0-1019-azure | Native helper tests and workspace suite | 10 helper and 626 workspace tests passed |
+| Debian 12, x86-64, kernel 6.1.0-53-amd64 | Native local helper tests | Passed |
+| Debian 12 and Fedora 44 userspace on the Ubuntu 22.04 host kernel above | Pinned containers, without network | Passed; distribution stock kernels remain untested |
+| macOS 26.6.2, arm64 | Native sandbox profile, helper tests and workspace suite | 10 helper and 626 workspace tests passed |
+| Ubuntu 24.04 | Release compatibility gate | Not yet executed |
+| Windows Server runner | Native launcher | Decoder startup is not yet passing; unavailable |
+| Windows 10 and Windows 11 clients | No native execution | Untested; no support claim |
+
+The Windows startup investigation is separate from the passing Linux/macOS evidence. The required native tests remain enabled. A failed probe makes EVTX unavailable; it does not select a weaker launcher.
