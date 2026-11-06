@@ -52,7 +52,9 @@ pub fn verify_entry() -> io::Result<()> {
     if !file || !write || !ipv4 || !ipv6 || !outbound {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "EVTX isolation verification failed: foreign reads, runtime writes or network access were not denied",
+            format!(
+                "EVTX isolation verification failed: foreign_read_denied={file}, runtime_write_denied={write}, ipv4_bind_denied={ipv4}, ipv6_bind_denied={ipv6}, outbound_denied={outbound}"
+            ),
         ));
     }
     Ok(())
