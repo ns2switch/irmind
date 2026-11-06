@@ -38,6 +38,7 @@ fn verify_inherited_files(input: &std::fs::File) -> io::Result<()> {
     // SAFETY: the standard error query has no input pointers and returns a borrowed handle.
     let errors = unsafe { GetStdHandle(STD_ERROR_HANDLE) };
     let evidence = input.as_raw_handle();
+    let runtime = super::runtime_directory::RuntimeDirectory::open()?;
     // Windows handle values are multiples of four. Check a bounded low range
     // including the inheritable-canary handles used by the native launch tests.
     for value in (4usize..65_536).step_by(4) {
@@ -49,8 +50,8 @@ fn verify_inherited_files(input: &std::fs::File) -> io::Result<()> {
         // SAFETY: query APIs validate arbitrary handle values; no pointer is dereferenced.
         if unsafe { GetHandleInformation(handle, &raw mut flags) } != 0 {
             // SAFETY: successful handle query established a live handle in this process.
-            if flags & HANDLE_FLAG_INHERIT != 0 || unsafe { GetFileType(handle) } == FILE_TYPE_DISK
-            {
+            let disk = unsafe { GetFileType(handle) } == FILE_TYPE_DISK;
+            if flags & HANDLE_FLAG_INHERIT != 0 || (disk && !runtime.matches(handle)) {
                 return Err(io::Error::new(
                     io::ErrorKind::PermissionDenied,
                     "EVTX inherited an unrelated file handle",

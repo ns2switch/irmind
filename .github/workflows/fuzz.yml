@@ -143,7 +143,9 @@ jobs:
           foreach ($event in $events) {
             [xml]$xml = $event.ToXml()
             $fields = @{}
-            foreach ($data in $xml.Event.EventData.Data) { $fields[$data.Name] = [string]$data.'#text' }
+            foreach ($data in $xml.Event.EventData.Data) {
+              if ($data.Name) { $fields[$data.Name] = [string]$data.'#text' }
+            }
             if ([IO.Path]::GetFileName($fields['AppName']) -eq 'irmind-evtx.exe') {
               @{event_id=$event.Id; module=[IO.Path]::GetFileName($fields['ModuleName']); exception=$fields['ExceptionCode']} | ConvertTo-Json -Compress
             }
