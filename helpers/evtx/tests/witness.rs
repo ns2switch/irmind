@@ -73,3 +73,31 @@ fn a_cancelled_launch_does_not_read_evidence_or_start_the_witness() {
     );
     assert_eq!(program.witness_stats().attempts, 0);
 }
+
+#[test]
+fn parser_reader_cleanup_retains_the_successful_session_witness() {
+    use irmind_app::{CancellationToken, StreamingEventParser};
+    let root = tempfile::tempdir().unwrap();
+    let parser = irmind_mod_parser_evtx::EvtxParser::new(&support::helper_path(), root.path());
+    assert!(
+        parser.unavailable_reason().is_none(),
+        "{:?}",
+        parser.unavailable_reason()
+    );
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../crates/testkit/fixtures/parser-evtx/source/Security.evtx");
+    for _ in 0..2 {
+        let mut file = File::open(&source).unwrap();
+        let report = parser
+            .parse_local_file_report(
+                "Security.evtx",
+                &mut file,
+                [1; 32],
+                &CancellationToken::new(),
+                &mut |_| Ok(()),
+            )
+            .unwrap();
+        assert_eq!(report.accepted, 14);
+        assert_eq!(parser.witness_stats().attempts, 1);
+    }
+}
