@@ -91,6 +91,13 @@ fn profile_directory(sid: PSID) -> io::Result<PathBuf> {
 }
 
 fn restrict_profile(sid: PSID) -> io::Result<PathBuf> {
+    // SAFETY: successful CreateAppContainerProfile returned this live, complete SID.
+    let length = unsafe { windows_sys::Win32::Security::GetLengthSid(sid) } as usize;
+    if !(8..=256).contains(&length) {
+        return Err(error("profile-SID-length"));
+    }
+    // SAFETY: GetLengthSid validated the byte extent of the retained SID allocation.
+    let sid_bytes = unsafe { std::slice::from_raw_parts(sid.cast::<u8>(), length) };
     let directory = profile_directory(sid)?;
     let root = directory.parent().ok_or_else(|| error("profile-parent"))?;
     let packages = root
@@ -115,7 +122,7 @@ fn restrict_profile(sid: PSID) -> io::Result<PathBuf> {
                 "Windows EVTX profile has unexpected entries",
             ));
         }
-        super::super::super::filesystem::private_windows(&path)?;
+        super::super::super::filesystem::helper_read_execute(&path, sid_bytes)?;
         if metadata.is_dir() {
             for entry in std::fs::read_dir(&path)? {
                 pending.push((entry?.path(), depth + 1));

@@ -302,7 +302,7 @@ Decision: use maintained safe Landlock and seccomp APIs in the single-threaded h
 
 Context: the decoder runs under a deny-default OS policy before reading evidence. Native loaders also need their own narrowly identified runtime resources.
 
-Decision: macOS permits read/map access to the OS Cryptex runtime paths, the system library paths, the exact helper and root-directory reads. It retains filesystem write, network and fork denial. Windows creates a unique zero-capability AppContainer profile, removes package access from its empty filesystem tree before launch, and deletes the profile when its child runtime is dropped. The environment contains only the OS-reported SystemRoot and LocalAppData paths required to establish the runtime and AppContainer namespace; it does not inherit process variables or credentials. Read/execute grants remain limited to the helper and its private launch directory.
+Decision: macOS permits read/map access to the OS Cryptex runtime paths, the system library paths, the exact helper and root-directory reads. It retains filesystem write, network and fork denial. Windows creates a unique zero-capability AppContainer profile, restricts its fresh filesystem tree to owner access and package read/execute before launch, and deletes the profile when its child runtime is dropped. The environment contains only the OS-reported SystemRoot and LocalAppData paths required to establish the runtime and AppContainer namespace; it does not inherit process variables or credentials. Read/execute grants remain limited to the helper and its private launch directory.
 
 Consequences: native launch and denial probes must pass together. A failed profile creation, loader startup or enforcement probe leaves EVTX unavailable. The release audit uses pinned prebuilt cargo-geiger 0.13.0 with source compilation disabled, verifies its executable digest, and publishes path-free AST metrics alongside the supplementary source inventory. Neither report is a memory-safety proof; macro expansion and platform coverage limits remain explicit.
 
@@ -314,3 +314,12 @@ Context: a Windows decoder runs inside an AppContainer, including on non-interac
 Decision: the containment crate keeps its safe broker API behind a default `launcher` feature. The independent decoder disables that feature and retains mandatory token/enforcement checks. Derive LocalAppData from the OS-created profile's validated Packages layout, avoiding Shell API imports. Integration tests build and preserve the normal decoder before resolving their parent harness's development features, execute that same production-feature binary under the native policy, and restore it for the main CLI tests.
 
 Consequences: keep a single first-party unsafe crate and unchanged source/protocol formats. Test-only dependency unification cannot determine the shipped decoder's native imports. CI retains launch, handle, network, file-access and termination assertions and prints imported DLL names when native startup fails.
+
+
+## Read-only AppContainer runtime profile
+
+Context: Windows creates private per-container runtime metadata as part of its profile. That fresh profile is distinct from case storage, evidence and analyst credentials.
+
+Decision: retain package read/execute access to the bounded OS-created profile tree while replacing its package-write grants. Keep owner-only case data and canary files, the explicit input/output handle list, zero network capabilities and the suspended Job Object start. Validate the profile layout before deriving its LocalAppData root; delete the profile after the child ends.
+
+Consequences: runtime initialization can read its own isolated metadata. The decoder receives no write access to that tree and no grants on the surrounding LocalAppData directory, user configuration, keys or evidence paths. Native denial tests remain mandatory.

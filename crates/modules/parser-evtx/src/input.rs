@@ -186,7 +186,7 @@ fn isolation_reason(bytes: &[u8]) -> Option<&'static str> {
         || text.contains("EVTX network-family isolation failed")
     {
         Some(
-            "EVTX unavailable: the native sandbox did not deny foreign reads or network access; check operating-system sandbox support",
+            "EVTX unavailable: the native sandbox did not deny foreign reads, runtime writes or network access; check operating-system sandbox support",
         )
     } else if text.contains("EVTX child process isolation") {
         Some(
