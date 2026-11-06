@@ -39,27 +39,30 @@ fn verify_inherited_files(input: &std::fs::File) -> io::Result<()> {
     let errors = unsafe { GetStdHandle(STD_ERROR_HANDLE) };
     let evidence = input.as_raw_handle();
     let runtime = super::runtime_directory::RuntimeDirectory::open()?;
-    // Windows handle values are multiples of four. Check a bounded low range
-    // including the inheritable-canary handles used by the native launch tests.
-    for value in (4usize..65_536).step_by(4) {
-        let handle = value as *mut std::ffi::c_void;
+    super::handle_snapshot::inspect(|handle, file, access| {
         if [stdin, output, errors, evidence].contains(&handle) {
-            continue;
+            return Ok(());
         }
         let mut flags = 0;
-        // SAFETY: query APIs validate arbitrary handle values; no pointer is dereferenced.
-        if unsafe { GetHandleInformation(handle, &raw mut flags) } != 0 {
-            // SAFETY: successful handle query established a live handle in this process.
-            let disk = unsafe { GetFileType(handle) } == FILE_TYPE_DISK;
-            if flags & HANDLE_FLAG_INHERIT != 0 || (disk && !runtime.matches(handle)) {
-                return Err(io::Error::new(
-                    io::ErrorKind::PermissionDenied,
-                    "EVTX inherited an unrelated file handle",
-                ));
-            }
+        // SAFETY: the snapshot supplies a real handle from this process; output
+        // points to initialized storage. A closed handle fails verification.
+        if unsafe { GetHandleInformation(handle, &raw mut flags) } == 0 {
+            return Err(error("snapshot-handle-query"));
         }
-    }
-    Ok(())
+        // SAFETY: snapshot type information identifies File objects; never call
+        // GetFileType on arbitrary process, synchronization or guessed handles.
+        let disk = file && unsafe { GetFileType(handle) } == FILE_TYPE_DISK;
+        let expected_runtime = disk && runtime.matches(handle);
+        if flags & HANDLE_FLAG_INHERIT != 0 || (disk && !expected_runtime) {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!(
+                    "EVTX inherited an unrelated file handle (flags={flags:#x}, access={access:#x}, runtime={expected_runtime})"
+                ),
+            ));
+        }
+        Ok(())
+    })
 }
 fn query(token: &Handle, class: TOKEN_INFORMATION_CLASS) -> io::Result<u32> {
     let mut size = 0;

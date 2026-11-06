@@ -341,3 +341,12 @@ Context: Windows supplies a current-directory handle as part of process initiali
 Decision: retain rejection of all additional inheritable handles and unrelated disk handles. Recognize only a non-inheritable directory handle whose volume/file identity equals the explicitly selected private runtime directory and whose granted access contains at most traversal, metadata reads and synchronization. Reject reparse points, different directories, regular files, data/list access and write rights. Query the official windows-sys object/file APIs inside the same dedicated Windows boundary.
 
 Consequences: the three-handle inheritance list is unchanged. Native tests cover the exact-directory metadata exception, foreign directory/file rejection, write-access rejection and exclusion of an unrelated inheritable file and pipes. The helper receives no additional evidence-path or credential access.
+
+
+## Typed Windows handle enumeration
+
+Context: runtime handle values are not a contiguous public table. File queries on guessed numeric handles cannot distinguish loader/synchronization objects reliably.
+
+Decision: enumerate a bounded process snapshot using Microsoft's Pss APIs, requesting only handle metadata and names. Check the declared object type before any file query. Limit the initial and walked handle count to 512; reject missing type information and failed snapshots. Never request a memory clone, breakaway or new process. The explicit inherited handle list and exact-runtime-directory checks remain mandatory.
+
+Consequences: native handle exclusion tests inspect actual handles without a low numeric-range assumption. Keep every pointer borrow within the live snapshot/walk-marker scope; expose only a safe internal visitor and preserve the single Windows unsafe boundary.
