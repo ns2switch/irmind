@@ -1,5 +1,7 @@
 {
   "synthetic": true,
+  "episode_id": "synthetic-windows-lateral-service-001",
+  "provider": "windows",
   "episodes": [
     {
       "source": "Security.evtx",
@@ -80,5 +82,37 @@
         "T1543.003"
       ]
     }
-  ]
+  ],
+  "malicious_events": [
+    "logon_success",
+    "service_install"
+  ],
+  "malicious_entities": [
+    "synthetic-endpoint",
+    "synthetic-user",
+    "203.0.113.77"
+  ],
+  "attack_path": [
+    {
+      "type": "ip",
+      "value": "203.0.113.77"
+    },
+    {
+      "type": "host",
+      "value": "synthetic-endpoint"
+    },
+    {
+      "type": "process",
+      "value": "C:\\Windows\\System32\\cmd.exe"
+    }
+  ],
+  "mitre_attack": [
+    "T1078",
+    "T1021.002",
+    "T1543.003"
+  ],
+  "acceptable_conclusions": [
+    "Synthetic network logon (4624, type 3) followed by service-install records (4697 and 7045). These records alone do not prove remote command execution or exfiltration."
+  ],
+  "private_marker": "IRMind-EVTX-synthetic-evaluator-only"
 }

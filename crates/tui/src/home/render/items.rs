@@ -53,12 +53,7 @@ pub(super) fn home_items(
                 )),
                 ListItem::new(format!("Theme: {}", state.theme_choice)),
             ];
-            if !state.parsers.is_empty() {
-                items.push(ListItem::new("Compiled parsers · experimental"));
-                items.extend(state.parsers.iter().map(|(name, version)| {
-                    ListItem::new(format!("  {name} · {version} · experimental"))
-                }));
-            }
+            items.extend(super::parser_status::items(state, modules));
             items
         }
         Mode::Keystore => keystore_items(state),

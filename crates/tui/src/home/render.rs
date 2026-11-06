@@ -502,6 +502,7 @@ fn home_list_state(state: &HomeState) -> ListState {
 }
 
 mod items;
+mod parser_status;
 use items::home_items;
 #[cfg(test)]
 pub(super) use items::model_items;

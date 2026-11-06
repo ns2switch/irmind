@@ -1,5 +1,6 @@
 #![cfg(windows)]
 mod attributes;
+mod environment;
 mod handles;
 mod identity;
 mod job;
@@ -59,7 +60,7 @@ pub(crate) fn spawn(program: &Prepared, input: &File, mode: Mode) -> io::Result<
     command.extend("\" ".encode_utf16());
     command.extend(mode.arg().encode_utf16());
     command.push(0);
-    let environment = environment()?;
+    let environment = environment::block()?;
     let mut info = PROCESS_INFORMATION::default();
     // SAFETY: every UTF-16 buffer is terminated and live; startup/attributes retain
     // their aligned buffers, SID and explicit handles until CreateProcess returns.
@@ -102,24 +103,6 @@ pub(crate) fn spawn(program: &Prepared, input: &File, mode: Mode) -> io::Result<
         return Err(failure);
     }
     Ok(child)
-}
-
-fn environment() -> io::Result<Vec<u16>> {
-    let mut directory = vec![0u16; 32768];
-    // SAFETY: the initialized output buffer has the declared capacity. No inherited environment is read.
-    let length = unsafe {
-        windows_sys::Win32::System::SystemInformation::GetWindowsDirectoryW(
-            directory.as_mut_ptr(),
-            32768,
-        )
-    } as usize;
-    if length == 0 || length >= directory.len() {
-        return Err(error("system-runtime-directory"));
-    }
-    let mut block = "SystemRoot=".encode_utf16().collect::<Vec<_>>();
-    block.extend_from_slice(&directory[..length]);
-    block.extend_from_slice(&[0, 0]);
-    Ok(block)
 }
 
 fn wide(value: &std::ffi::OsStr) -> io::Result<Vec<u16>> {
