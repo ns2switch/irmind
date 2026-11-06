@@ -1,4 +1,4 @@
-Traducción de docs/platforms.md en el commit 33538a7c23dd529e1d786e5e41eef0426d593719; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit d53c6d48aa90bb419fd5f54a3e7f585225e70a96; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
