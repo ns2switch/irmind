@@ -266,3 +266,20 @@ Context: the [complete optimized release matrix](benchmarks.md#final-v2-ingestio
 Decision: construct the existing precise store for TUI and offline-demo sessions. Retain the current automation construction and explicit migration path. Keep existing case history and V1 readers; use the existing automatic V5 export selection for cases containing V2 artifacts.
 
 Consequences: the default is 64 ordinary hosts with a hard ceiling of 1,024 and signed overflow. This selection changes no port, dependency, wire encoding or existing artifact. A same-source artifact-version replacement still requires explicit migration. Retain all measured failures and continue the disordered-ingestion work against 900 seconds.
+
+
+## Analyst-approved release and disordered-stress gates
+
+Context: the final paired release measurements convert 15 GB of cloud logs in 865.973 seconds and chronological endpoint logs in 488.131–561.596 seconds. Disordered endpoint controls take 1,007.507–1,120.179 seconds, with all sampled candidate queries meeting the existing targets.
+
+Decision (analyst): the v0.2.0 release gate remains strictly below 900 seconds for cloud and chronological endpoint ingestion. Treat disordered endpoint ingestion as a stress workload with a strict 1,350-second gate (1.5 times the release limit). Existing query targets, hash verification, budgets and truncation semantics do not change. This supersedes the earlier 900-second disordered acceptance decision; preserve historical measurements and workflow conclusions.
+
+Consequences: the measured candidate meets both workload gates. [Direct merge-to-writer optimization](https://github.com/ns2switch/irmind/issues/186) and reference-only co-observations are post-v0.2.0 work. The cloud `co_entities` column payload is about 4.04 GB and is a separate disk-size concern; see [the measured reference proposal](coobservation-reference-proposal.md) and [issue #37](https://github.com/ns2switch/irmind/issues/37).
+
+## One V2 ingestion default for every presentation
+
+Context: CLI automation, TUI and offline demo invoke the same ingestion use cases. Maintaining different default writers has no remaining compatibility or performance justification.
+
+Decision: all production composition paths select the existing precise V2 writer, including CLI ingestion. An explicit legacy constructor remains available for historical fixtures and compatibility tests, not as a presentation-specific default.
+
+Consequences: opening any V1 case never migrates its signed artifacts or history. New V2 sources may coexist with V1; replacing an already-indexed source still requires optional, attended, verified migration. Export selects V5 when required. Existing ports, signed encodings, parser identities and goldens remain unchanged. After step (e), the v0.2.0 order is the isolated EVTX helper, experimental Elastic and Chronicle, then release notes, optional-migration guidance and the existing signed distribution workflow.
