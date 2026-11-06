@@ -5,6 +5,10 @@ on:
     - cron: '47 4 * * 1-6'
   workflow_dispatch:
     inputs:
+      evtx_large:
+        description: Run only the release EVTX collection and memory benchmark
+        type: boolean
+        default: false
       native_windows:
         description: Run only the native Windows EVTX diagnostic suite
         type: boolean
@@ -24,7 +28,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   fuzz:
-    if: ${{ inputs.native_windows != true && inputs.linux_compatibility != true && (github.event_name != 'schedule' || github.event.schedule == '41 2 * * 0') }}
+    if: ${{ inputs.evtx_large != true && inputs.native_windows != true && inputs.linux_compatibility != true && (github.event_name != 'schedule' || github.event.schedule == '41 2 * * 0') }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -67,7 +71,7 @@ jobs:
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('.tools', 'fuzz/artifacts', 'fuzz/corpus')) if p.is_dir()]"
 
   evtx:
-    if: inputs.native_windows != true && inputs.linux_compatibility != true
+    if: inputs.evtx_large != true && inputs.native_windows != true && inputs.linux_compatibility != true
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -99,7 +103,7 @@ jobs:
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('.tools', 'helpers/evtx/fuzz/corpus', 'helpers/evtx/fuzz/artifacts')) if p.is_dir()]"
 
   evtx_windows:
-    if: github.event_name == 'workflow_dispatch' && inputs.native_windows == true
+    if: github.event_name == 'workflow_dispatch' && inputs.evtx_large != true && inputs.native_windows == true
     runs-on: windows-latest
     timeout-minutes: 45
     env:
@@ -160,7 +164,7 @@ jobs:
 
 
   evtx_linux_diagnostic:
-    if: github.event_name == 'workflow_dispatch' && inputs.linux_compatibility == true
+    if: github.event_name == 'workflow_dispatch' && inputs.evtx_large != true && inputs.linux_compatibility == true
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
@@ -173,3 +177,53 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --bin irmind-evtx --profile ci --locked
       - run: python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx
+
+  evtx_large:
+    if: github.event_name == 'workflow_dispatch' && inputs.evtx_large == true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux
+            target: x86_64-unknown-linux-gnu
+            suffix: ''
+          - os: windows-latest
+            platform: windows
+            target: x86_64-pc-windows-msvc
+            suffix: '.exe'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CARGO_BUILD_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: evtx-large-${{ matrix.platform }}-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build the release host and the normal-feature contained decoder
+        run: |
+          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --example large_collection
+          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx
+      - name: Run signed 100 MiB and 1 GiB synthetic collections
+        run: python3 -B scripts/benchmark_evtx_large.py target/${{ matrix.target }}/release/examples/large_collection${{ matrix.suffix }} --output evtx-large-${{ matrix.platform }}.json
+      - name: Check the record bound with one dense 1 GiB synthetic source
+        shell: bash
+        run: target/${{ matrix.target }}/release/examples/large_collection${{ matrix.suffix }} 1024 --record-limit-probe > evtx-large-limit-${{ matrix.platform }}.json
+      - name: Attach release measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evtx-large-${{ matrix.platform }}
+          path: |
+            evtx-large-${{ matrix.platform }}.json
+            evtx-large-limit-${{ matrix.platform }}.json
+          if-no-files-found: warn
+      - name: Remove temporary measurements
+        if: always()
+        run: python3 -c "from pathlib import Path; [p.unlink() for p in Path('.').glob('evtx-large-*.json')]"

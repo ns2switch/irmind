@@ -17,3 +17,4 @@
 **/fixtures/**/*.log text eol=lf
 **/seeds/**/*.log text eol=lf
 *.gz -text
+*.evtx -text

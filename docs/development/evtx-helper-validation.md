@@ -47,7 +47,7 @@ Linux/macOS baseline evidence comes from [this CI run](https://github.com/ns2swi
 | Debian 12, x86-64, kernel 6.1.0-53-amd64 | Native local helper tests | Passed |
 | Debian 12 and Fedora 44 userspace on the Ubuntu 22.04 host kernel above | Pinned containers, without network | Passed; distribution stock kernels remain untested |
 | macOS 26.6.2, arm64 | Native sandbox profile, helper tests and workspace suite | 10 helper and 626 workspace tests passed |
-| Ubuntu 24.04 | Release compatibility gate | Not yet executed |
+| Ubuntu 24.04.5, x86-64, kernel 7.0.0-1017-azure | Native helper probe and same released helper as Ubuntu 22.04 | Passed |
 | Windows Server 2025, x86-64, build 10.0.26100 | Native traffic witness, handle checks and session reuse | 6 targeted boundary checks and 13 helper tests passed; no firewall or service changes |
 | Windows 10 and Windows 11 clients | No native execution | Untested; no support claim |
 
@@ -58,3 +58,5 @@ The [Windows network-probe proposal](evtx-windows-network-probe.md) distinguishe
 
 
 The [Windows 11 community check](https://github.com/ns2switch/irmind/issues/189) tracks client confirmation using the [manual candidate procedure](manual-validation.md#experimental-evtx-windows-11-candidate-check). No firewall settings, service configuration or loopback exemptions are changed by the tests.
+
+The [completed signed candidate run](https://github.com/ns2switch/irmind/actions/runs/42273621946) passed 630 workspace tests on Linux and macOS and 636 on Windows, plus 10/10/13 separate helper tests. Native Ubuntu 24.04 ARM64 also passed the contained release probe and synthetic decode. Windows 10/11 client confirmation remains separate.
