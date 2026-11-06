@@ -1,4 +1,4 @@
-Traducción de docs/parsers.md en el commit c21dfa66ce9e0c2ae98db4afa6aa7027aba76bb6; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/parsers.md en el commit 3b4fe6eb69f4836150f2b35898ab31fce72c9af3; si hay diferencias, prevalece la versión en inglés.
 
 # Parsers de logs
 
@@ -16,6 +16,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | ECS | NDJSON | Versión de ECS e instante/campos característicos | Evento, host, usuario, origen, destino, proceso, archivo, URL | experimental |
 | OCSF | JSON/NDJSON o Parquet local | Clase, categoría y metadatos; Parquet requiere confirmación | Autenticación, API, red, procesos, archivos y hallazgos | experimental |
 | Herramientas DFIR | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Marcadores o cabecera CSV exacta | Instante, host, usuario, proceso, acción y entidades disponibles | experimental |
+| Windows EVTX | EVTX binario: Security, System, PowerShell y Sysmon | Cabecera EVTX y checksum válidos; 95 | UTC con precisión de 100 ns, host, usuario, proceso, IP/puerto y offsets reales | disponible; experimental |
 | Linux | auth.log/secure, auditd, journald JSON y HTTP common/combined | Etiquetas de autenticación, cabecera audit, campos de journald o cabecera HTTP completa | Tiempo, host, usuario, proceso, comando, IP/puertos, acción y resultado; grupos audit parciales | experimental |
 | Syslog | RFC 5424/RFC 3164, texto o gzip acotado | PRI y forma de cabecera/instante, no extensión | Host, aplicación, PID, facility, severity, mensaje y tiempo completo | experimental |
 | Declarativo | CSV, JSON, NDJSON o regex acotada | Cabecera exacta, campos JSON o regex; máximo 70 % | Mapeo explícito descrito abajo | experimental |
@@ -30,7 +31,7 @@ Hoy se investigan estos artefactos mediante exportaciones procesadas. Todos los 
 
 | Artefacto | Qué ayuda a responder | Cómo se ingiere hoy |
 | --- | --- | --- |
-| Logs de eventos de Windows, incluido Sysmon | ¿Qué inicios de sesión, procesos o servicios quedaron registrados y cómo se relacionan? | CSV/JSONL de Hayabusa → `parser-hayabusa`; CSV de EvtxECmd → `parser-eztools`. EVTX directo queda pendiente del auxiliar aislado. |
+| Logs de eventos de Windows, incluido Sysmon | ¿Qué inicios de sesión, procesos o servicios quedaron registrados y cómo se relacionan? | CSV/JSONL de Hayabusa → `parser-hayabusa`; CSV de EvtxECmd → `parser-eztools`. EVTX directo → `parser-evtx` con el auxiliar aislado; Hayabusa y EvtxECmd siguen siendo alternativas. |
 | Registro y sus logs de transacciones | ¿Qué claves y valores de cuentas, configuración o persistencia se registraron? | Procesar externamente con RECmd batch e ingerir su CSV mediante `parser-eztools`. |
 | Prefetch (`.pf`) | ¿Qué ejecutables, recuentos e instantes de ejecución aparecen? | CSV de PECmd → `parser-eztools`. |
 | Amcache | ¿Qué rutas, hashes y fechas del inventario de aplicaciones se registraron? | CSV de AmcacheParser → `parser-eztools`. |
@@ -78,8 +79,10 @@ Auth.log/secure clásico usa el mismo formulario temporal por ingesta que syslog
 
 ### Windows EVTX
 
-El módulo experimental `parser-evtx` utiliza el auxiliar independiente `irmind-evtx`. Reconoce la cabecera y su checksum, no la extensión. Recibe un único descriptor de solo lectura. Los archivos locales y los objetos descargados en el spool privado del caso siguen la misma ruta.
+EVTX está disponible al compilar desde el código y en los paquetes candidatos firmados; las releases anteriores no incluyen el auxiliar. El módulo experimental `parser-evtx` utiliza el auxiliar independiente `irmind-evtx`. Reconoce la cabecera y su checksum, no la extensión. Recibe un único descriptor de solo lectura. Los archivos locales y los objetos descargados en el spool privado del caso siguen la misma ruta.
 
-Linux requiere kernel 5.13 o posterior, Landlock ABI 1 habilitado y seccomp sin privilegios. Bubblewrap no es obligatorio. Windows utiliza un AppContainer sin capacidades, una lista explícita de handles y un Job Object que termina los procesos al cerrarse. macOS aplica un perfil restrictivo. Una prueba de arranque comprueba que se deniegan lecturas ajenas, red y creación de procesos. Si falla, Preferencias explica por qué EVTX no está disponible; nunca se ejecuta sin aislamiento.
+Linux requiere kernel 5.13 o posterior, Landlock ABI 1 habilitado y seccomp sin privilegios. Bubblewrap no es obligatorio. Windows requiere que los servicios de firewall BFE y MpsSvc estén activos. Utiliza un AppContainer sin capacidades, una lista explícita de handles y un Job Object que termina los procesos al cerrarse. macOS aplica un perfil restrictivo. Una prueba de arranque comprueba que se deniegan lecturas ajenas, red y creación de procesos. Si falla, Preferencias explica por qué EVTX no está disponible; nunca se ejecuta sin aislamiento.
 
 Security, System, PowerShell y Sysmon se normalizan al esquema común. Se conservan los campos no mapeados, la resolución temporal original de 100 ns y los offsets reales. Consulta el [diseño del auxiliar](../development/evtx-helper-design.md) para conocer los límites y las pruebas. Instala el auxiliar de la misma release verificada junto al ejecutable principal.
+
+Entornos nativos probados: Ubuntu 22.04 y 24.04, Debian 12 (kernel 6.1), macOS 26.6.2 arm64 y Windows Server 2025. Fedora 44 solo se probó como espacio de usuario en contenedor. Windows 10/11 siguen como experimentales y sin confirmación; consulta el [issue de validación en Windows 11](https://github.com/ns2switch/irmind/issues/189) y la [evidencia exacta por plataforma](../development/evtx-helper-validation.md). Cada instalación debe superar las pruebas de aislamiento.
