@@ -24,6 +24,7 @@ concurrency:
   cancel-in-progress: true
 env:
   CARGO_INCREMENTAL: 0
+  CARGO_TARGET_DIR: ${{ github.workspace }}/target
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
 jobs:
   dco:
@@ -66,7 +67,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         id: rust_cache
         with:
-          key: linux-mold-${{ hashFiles('Cargo.lock') }}
+          key: linux-mold-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
           add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -92,9 +93,19 @@ jobs:
         with: {name: linux-cargo-timings, path: target/cargo-timings/, if-no-files-found: error}
       - name: Clippy (CI profile)
         run: cargo clippy --workspace --all-targets --all-features --profile ci --locked -- -D warnings
+      - name: Check the first-party unsafe boundary
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_unsafe_boundary.py
+          python3 .github/scripts/check_unsafe_boundary.py
+      - name: Lint and test the separately resolved EVTX helper
+        run: |
+          cargo fmt --manifest-path helpers/evtx/Cargo.toml --all --check
+          cargo clippy --manifest-path helpers/evtx/Cargo.toml --all-targets --profile ci --locked -- -D warnings
+          cargo nextest run --manifest-path helpers/evtx/Cargo.toml --cargo-profile ci --locked
       - name: Nextest (CI profile)
         run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
       - run: cargo deny check --hide-inclusion-graph
+      - run: cargo deny --manifest-path helpers/evtx/Cargo.toml --config deny.toml check --hide-inclusion-graph
       - run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         if: github.event_name == 'schedule'
@@ -112,14 +123,16 @@ jobs:
         run: python .github/scripts/check_release_json_features.py
       - name: Build unsigned release binary for tag, nightly code change, or manual dry run
         if: needs.dco.outputs.release_build == 'true'
-        run: cargo build --release -p irmind --locked
+        run: |
+          cargo build --release -p irmind --locked
+          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
       - name: Check links and documented CLI commands against the built test binary
         run: python3 .github/scripts/check_docs.py --binary target/ci/irmind
       - name: Package unsigned binary and checksum
         if: needs.dco.outputs.release_build == 'true'
         run: |
           mkdir -p dist
-          cp target/release/irmind dist/irmind
+          cp target/release/irmind target/release/irmind-evtx dist/
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
           (cd dist && sha256sum irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
           (cd dist && sha256sum --check SHA256SUMS)
@@ -145,7 +158,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: json-formats-${{ hashFiles('Cargo.lock') }}
+          key: json-formats-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
           add-rust-environment-hash-key: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
@@ -154,6 +167,22 @@ jobs:
         env:
           IRMIND_EXPECT_PRESERVE_ORDER: '1'
         run: cargo nextest run -p irmind --test format_goldens --all-features --features serde_json/preserve_order --cargo-profile ci --locked
+  evtx_linux_compatibility:
+    needs: [dco, linux]
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: evtx-ubuntu22-${{ hashFiles('helpers/evtx/Cargo.lock') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo build --manifest-path helpers/evtx/Cargo.toml --bin irmind-evtx --profile ci --locked
+      - name: Test Ubuntu and pinned Debian/Fedora userspaces on the observed host kernel
+        run: python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx
   linux_arm64:
     needs: [linux, dco]
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.release_build == 'true' && inputs.profile_linux != true }}
@@ -166,16 +195,20 @@ jobs:
         with: {targets: aarch64-unknown-linux-gnu}
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: linux-arm64-${{ hashFiles('Cargo.lock') }}
+          key: linux-arm64-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Check shipped JSON feature isolation
         run: python .github/scripts/check_release_json_features.py
-      - run: cargo build --release -p irmind --locked
+      - run: |
+          cargo build --release -p irmind --locked
+          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
+      - name: Verify native ARM64 containment and inherited-file decoding
+        run: python3 .github/scripts/check_evtx_linux.py target/release/irmind-evtx native-only
       - name: Package ARM64 binary and checksum
         run: |
           mkdir -p dist
-          cp target/release/irmind dist/irmind
+          cp target/release/irmind target/release/irmind-evtx dist/
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
           (cd dist && sha256sum irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
           (cd dist && sha256sum --check SHA256SUMS)
@@ -191,6 +224,7 @@ jobs:
     timeout-minutes: 120
     env:
       CARGO_BUILD_TARGET: x86_64-pc-windows-msvc
+      IRMIND_EVTX_HELPER_TEST: ${{ github.workspace }}/target/x86_64-pc-windows-msvc/ci/irmind-evtx.exe
     defaults:
       run:
         shell: bash
@@ -198,7 +232,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
-        with: {targets: x86_64-pc-windows-msvc}
+        with: {targets: x86_64-pc-windows-msvc, components: clippy}
       - name: Keep only the pinned Rust toolchain for a stable cache key
         run: |
           rustup toolchain list | awk '{print $1}' | while read -r toolchain; do
@@ -206,12 +240,21 @@ jobs:
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: windows-msvc-${{ hashFiles('Cargo.lock') }}
+          key: windows-msvc-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
           add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
+      - name: Check the first-party unsafe boundary
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_unsafe_boundary.py
+          python3 .github/scripts/check_unsafe_boundary.py
+      - name: Lint the Windows native containment boundary
+        run: cargo clippy -p irmind-process-containment --all-targets --profile ci --locked -- -D warnings
+      - name: Build and test the separately resolved EVTX helper
+        run: |
+          cargo nextest run --manifest-path helpers/evtx/Cargo.toml --cargo-profile ci --locked
       - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
       - name: Parse the PowerShell installer without running it
         run: |
@@ -227,12 +270,14 @@ jobs:
         run: python .github/scripts/check_release_json_features.py
       - name: Build unsigned release binary for tag, nightly code change, or manual dry run
         if: needs.dco.outputs.release_build == 'true'
-        run: cargo build --release -p irmind --locked
+        run: |
+          cargo build --release -p irmind --locked
+          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
       - name: Package unsigned binary and checksum
         if: needs.dco.outputs.release_build == 'true'
         run: |
           mkdir -p dist
-          cp target/x86_64-pc-windows-msvc/release/irmind.exe dist/irmind.exe
+          cp target/x86_64-pc-windows-msvc/release/irmind.exe target/x86_64-pc-windows-msvc/release/irmind-evtx.exe dist/
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
           python -c "from pathlib import Path; import hashlib; root=Path('dist'); names=('irmind.exe','LICENSE-MIT','LICENSE-APACHE','THIRD_PARTY_NOTICES.md','install.sh','install.ps1'); (root/'SHA256SUMS').write_bytes(''.join(hashlib.sha256((root/name).read_bytes()).hexdigest()+'  '+name+'\n' for name in names).encode('ascii'))"
           python -c "from pathlib import Path; assert b'\r' not in Path('dist/SHA256SUMS').read_bytes()"
@@ -291,12 +336,19 @@ jobs:
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: macos-arm64-${{ hashFiles('Cargo.lock') }}
+          key: macos-arm64-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
           add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
+      - name: Check the first-party unsafe boundary
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_unsafe_boundary.py
+          python3 .github/scripts/check_unsafe_boundary.py
+      - name: Build and test the separately resolved EVTX helper
+        run: |
+          cargo nextest run --manifest-path helpers/evtx/Cargo.toml --cargo-profile ci --locked
       - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked --test-threads 4
       - name: Stage CLI test executable for cross-platform verification
         if: needs.dco.outputs.cross_verify == 'true'
@@ -309,12 +361,14 @@ jobs:
         run: python .github/scripts/check_release_json_features.py
       - name: Build unsigned release binary for tag, nightly code change, or manual dry run
         if: needs.dco.outputs.release_build == 'true'
-        run: cargo build --release -p irmind --locked
+        run: |
+          cargo build --release -p irmind --locked
+          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
       - name: Package unsigned binary and checksum
         if: needs.dco.outputs.release_build == 'true'
         run: |
           mkdir -p dist
-          cp target/aarch64-apple-darwin/release/irmind dist/irmind
+          cp target/aarch64-apple-darwin/release/irmind target/aarch64-apple-darwin/release/irmind-evtx dist/
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
           (cd dist && shasum -a 256 irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
           (cd dist && shasum -a 256 -c SHA256SUMS)
@@ -348,7 +402,7 @@ jobs:
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('bin', 'foreign-export')) if p.is_dir()]"
   release:
-    needs: [dco, linux, linux_arm64, windows, macos, linux_verify_windows, macos_verify_windows]
+    needs: [dco, linux, linux_arm64, windows, macos, evtx_linux_compatibility, linux_verify_windows, macos_verify_windows]
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.linux_arm64.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux_verify_windows.result == 'success' && needs.macos_verify_windows.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -372,9 +426,13 @@ jobs:
         run: |
           mkdir -p release
           cp artifacts/linux-x86_64/irmind release/irmind-linux-x86_64
+          cp artifacts/linux-x86_64/irmind-evtx release/irmind-evtx-linux-x86_64
           cp artifacts/linux-aarch64/irmind release/irmind-linux-aarch64
+          cp artifacts/linux-aarch64/irmind-evtx release/irmind-evtx-linux-aarch64
           cp artifacts/macos-aarch64/irmind release/irmind-macos-aarch64
+          cp artifacts/macos-aarch64/irmind-evtx release/irmind-evtx-macos-aarch64
           cp artifacts/windows-x86_64/irmind.exe release/irmind-windows-x86_64.exe
+          cp artifacts/windows-x86_64/irmind-evtx.exe release/irmind-evtx-windows-x86_64.exe
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 release/
       - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
@@ -384,26 +442,36 @@ jobs:
           syft-version: v1.55.0
           upload-artifact: false
           upload-release-assets: false
+      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: helpers/evtx
+          format: spdx-json
+          output-file: release/IRMind-EVTX-SBOM.spdx.json
+          syft-version: v1.55.0
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Inventory the separately locked helper native surface
+        run: python3 .github/scripts/report_evtx_unsafe.py > release/EVTX-UNSAFE-REPORT.json
       - name: Create and check the release checksum list
         run: |
-          (cd release && sha256sum irmind-linux-x86_64 irmind-linux-aarch64 irmind-macos-aarch64 irmind-windows-x86_64.exe install.sh install.ps1 IRMind-SBOM.spdx.json LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
+          (cd release && sha256sum irmind-linux-x86_64 irmind-linux-aarch64 irmind-macos-aarch64 irmind-windows-x86_64.exe irmind-evtx-linux-x86_64 irmind-evtx-linux-aarch64 irmind-evtx-macos-aarch64 irmind-evtx-windows-x86_64.exe install.sh install.ps1 IRMind-SBOM.spdx.json IRMind-EVTX-SBOM.spdx.json EVTX-UNSAFE-REPORT.json LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
           (cd release && sha256sum --check SHA256SUMS)
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with: {subject-path: 'release/irmind-*'}
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with: {subject-path: 'release/IRMind-SBOM.spdx.json'}
+        with: {subject-path: 'release/*SBOM.spdx.json'}
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with: {cosign-release: 'v3.1.4'} # fixes GHSA-fx35-mq7g-6g98 in the bundled default
       - name: Sign every binary and the checksum list with GitHub OIDC
         run: |
-          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-windows-x86_64.exe release/SHA256SUMS; do
+          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-windows-x86_64.exe release/irmind-evtx-linux-x86_64 release/irmind-evtx-linux-aarch64 release/irmind-evtx-macos-aarch64 release/irmind-evtx-windows-x86_64.exe release/SHA256SUMS; do
             cosign sign-blob --yes --bundle "$file.sigstore.json" "$file"
           done
       - name: Verify every Sigstore bundle against this exact workflow ref
         env:
           EXPECTED_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/ci.yml@${{ github.ref }}
         run: |
-          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-windows-x86_64.exe release/SHA256SUMS; do
+          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-windows-x86_64.exe release/irmind-evtx-linux-x86_64 release/irmind-evtx-linux-aarch64 release/irmind-evtx-macos-aarch64 release/irmind-evtx-windows-x86_64.exe release/SHA256SUMS; do
             cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "$EXPECTED_IDENTITY" --certificate-oidc-issuer https://token.actions.githubusercontent.com
           done
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

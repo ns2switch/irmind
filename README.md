@@ -95,6 +95,7 @@ The normal build includes every current product module and both keystores. None 
 | MISP | internal threat intel | `ti-misp` | experimental | [MISP](docs/modules.md#misp) |
 | VirusTotal | external enrichment | `ti-virustotal` | experimental | [VirusTotal](docs/modules.md#virustotal) |
 | Linux logs | local parser | `parser-linux` (default) | experimental | [Linux](docs/modules.md#linux-logs) |
+| Windows EVTX | isolated local parser | `parser-evtx` (default) | experimental | [EVTX](docs/modules.md#windows-evtx) |
 | Syslog parser | local parser | `parser-syslog` (default) | experimental | [Syslog](docs/modules.md#syslog-parser) |
 | JSON and exported cloud log parser | local parser | `parser-json` (default) | experimental | [Local parser](docs/modules.md#streaming-json-and-exported-cloud-log-parser) |
 | Elastic Common Schema parser | local parser | `parser-ecs` (default) | experimental | [ECS parser](docs/modules.md#elastic-common-schema-parser) |

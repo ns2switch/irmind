@@ -191,6 +191,7 @@ impl PreparedStartup {
             self.active.secret_backend.as_ref(),
             self.allow_environment,
             self.interactive,
+            &self.home,
         )?;
         #[cfg(feature = "parser-declarative")]
         let registry =

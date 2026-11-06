@@ -283,3 +283,16 @@ Context: CLI automation, TUI and offline demo invoke the same ingestion use case
 Decision: all production composition paths select the existing precise V2 writer, including CLI ingestion. An explicit legacy constructor remains available for historical fixtures and compatibility tests, not as a presentation-specific default.
 
 Consequences: opening any V1 case never migrates its signed artifacts or history. New V2 sources may coexist with V1; replacing an already-indexed source still requires optional, attended, verified migration. Export selects V5 when required. Existing ports, signed encodings, parser identities and goldens remain unchanged. After step (e), the v0.2.0 order is the isolated EVTX helper, experimental Elastic and Chronicle, then release notes, optional-migration guidance and the existing signed distribution workflow.
+
+
+## One native Windows boundary for EVTX containment
+
+Context: EVTX decoding must run in an isolated subprocess, while the existing filesystem helper already contains reviewed Win32 ACL and durable-write calls. A single source-policy gate must cover both uses.
+
+Decision: consolidate first-party unsafe code in irmind-process-containment, compiled only on Windows and using Microsoft's windows-sys. Keep a safe public API, deny unsafe_op_in_unsafe_fn and undocumented_unsafe_blocks, and document every minimal block's SAFETY invariants. Move the existing ACL/durable-write implementation without changing irmind-fs callers or guarantees. Domain, application, TUI, main executable and parser forbid unsafe. Non-Windows containment code also forbids it.
+
+Consequences: the direct Windows process/security APIs have unsafe signatures because Rust cannot validate their pointer lifetimes, buffer layouts and handle ownership. No standard-library safe API provides AppContainer plus explicit inherited handles and suspended Job Object assignment. Keep these invariants in one reviewed boundary, rather than exposing raw handles or hiding calls in parsing/protocol code. CI rejects unsafe elsewhere. Native containment tests remain required before integration.
+
+## Unprivileged Linux EVTX containment
+
+Decision: use maintained safe Landlock and seccomp APIs in the single-threaded helper before decoding. Require fully enforced Landlock ABI 1 filesystem denial and no_new_privs, plus a fail-closed seccomp allowlist that excludes sockets, execution, process creation, io_uring, truncation and access to unrelated descriptors. ABI 1 requires Linux 5.13 or newer with Landlock enabled; newer unhandled filesystem operations remain denied by seccomp. Missing support is module unavailability, never a downgraded sandbox. Bubblewrap is optional and not a requirement. macOS retains the tested deny-default sandbox-exec profile; unsupported versions fail closed. See [the containment design](evtx-helper-design.md).

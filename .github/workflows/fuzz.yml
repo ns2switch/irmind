@@ -2,6 +2,7 @@ name: Weekly fuzzing
 on:
   schedule:
     - cron: '41 2 * * 0'
+    - cron: '47 4 * * 1-6'
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   fuzz:
+    if: github.event_name != 'schedule' || github.event.schedule == '41 2 * * 0'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -50,3 +52,34 @@ jobs:
       - name: Delete fuzz artifacts and temporary corpora
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('.tools', 'fuzz/artifacts', 'fuzz/corpus')) if p.is_dir()]"
+
+  evtx:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@2c76c034f9e32a5d6e2c104dc4df23a22476db04 # nightly
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with: {key: evtx-asan-fuzz, workspaces: 'helpers/evtx/fuzz -> target'}
+      - name: Install the verified upstream cargo-fuzz binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .tools
+          gh release download 0.13.2 -R rust-fuzz/cargo-fuzz -p cargo-fuzz-0.13.2-x86_64-unknown-linux-musl.tar.gz -O .tools/cargo-fuzz.tar.gz
+          printf '%s  %s\n' b5b704018b63e0f151c17a057ac53b5111e1db545d1b9f72fee79f08a545931c .tools/cargo-fuzz.tar.gz | sha256sum --check
+          tar -xzf .tools/cargo-fuzz.tar.gz -C .tools
+          install -m 0755 .tools/cargo-fuzz "$HOME/.cargo/bin/cargo-fuzz"
+      - name: Fuzz isolated-workspace decoder and parent protocol with AddressSanitizer
+        run: |
+          mkdir -p helpers/evtx/fuzz/corpus/evtx_decode helpers/evtx/fuzz/corpus/evtx_protocol
+          cp helpers/evtx/fuzz/seeds/security.evtx helpers/evtx/fuzz/corpus/evtx_decode/
+          cp helpers/evtx/fuzz/seeds/protocol/* helpers/evtx/fuzz/corpus/evtx_protocol/
+          cargo fuzz run evtx_decode --fuzz-dir helpers/evtx/fuzz --sanitizer address -- -max_total_time=3600 -rss_limit_mb=1024 -timeout=30 -max_len=131072
+          cargo fuzz run evtx_protocol --fuzz-dir helpers/evtx/fuzz --sanitizer address -- -max_total_time=600 -rss_limit_mb=1024 -timeout=10 -max_len=4194304
+      - name: Remove temporary corpora and artifacts
+        if: always()
+        run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('.tools', 'helpers/evtx/fuzz/corpus', 'helpers/evtx/fuzz/artifacts')) if p.is_dir()]"

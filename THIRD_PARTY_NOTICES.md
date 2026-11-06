@@ -26,3 +26,7 @@ downloads and verifies it only when it runs.
 `option-ext` is licensed under [MPL-2.0](https://www.mozilla.org/en-US/MPL/2.0/). It is included in a larger work without changing the license of IRMind's own code. The source for the used version is available on [crates.io](https://crates.io/crates/option-ext/0.2.0) and in its [repository](https://github.com/soc/option-ext). Its files retain MPL-2.0 and are not relicensed under IRMind's license.
 
 Before a formal external binary release, generate and review complete third-party notices for the exact published version, including the bundled SQLite component. `cargo-deny` checks permitted license expressions but does not replace that notices review.
+
+## EVTX decoding helper
+
+The separately resolved `irmind-evtx` executable uses the official `evtx` 0.15.1 crate (MIT OR Apache-2.0), maintained at https://github.com/omerbenamram/evtx. Its dependencies and native-code audit are distributed with the helper SBOM. The small EVTX fixtures in `crates/testkit/fixtures/parser-evtx` are generated from synthetic events by `scripts/generate_evtx_fixture.py`; they contain no collected incident data.

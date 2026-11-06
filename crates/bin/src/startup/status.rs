@@ -54,6 +54,11 @@ pub(super) fn module_statuses(
 fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
     for (id, compiled, version) in [
         (
+            "parser-evtx",
+            cfg!(feature = "parser-evtx"),
+            "evtx-0.15.1-ndjson-v1",
+        ),
+        (
             "parser-json",
             cfg!(feature = "parser-json"),
             "json-stream-v3",

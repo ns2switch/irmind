@@ -265,3 +265,7 @@ For analysts importing line-oriented RFC 5424 or RFC 3164 logs, `parser-syslog` 
 ## Linux logs
 
 For analysts importing auth.log/secure, auditd, journald JSON or nginx/Apache common and combined exports, `parser-linux` is an experimental local module compiled by default. It needs read access to those files and no credentials. Classic authentication time is confirmed per ingestion using the same form as syslog. Audit grouping is bounded and unfinished events are marked partial. Original fractional timestamps remain available while the current index uses seconds. Custom log formats use a signed declarative definition. See [parser selection](parsers.md) and the [Linux contract and limits](development/linux-parser.md).
+
+## Windows EVTX
+
+The experimental `parser-evtx` module is compiled by default but requires the matching, separately installed helper and a working operating-system sandbox. It needs no credentials or network access. Ingest individual EVTX files or directories through the normal parser registry. See [Windows EVTX](parsers.md#windows-evtx) for supported channels, precise timestamps, limits and platform requirements.

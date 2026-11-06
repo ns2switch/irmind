@@ -8,7 +8,7 @@ license.workspace = true
 [features]
 default = [
     "keystore-os", "keystore-file",
-    "parser-json", "parser-syslog", "parser-linux",
+    "parser-json", "parser-syslog", "parser-linux", "parser-evtx",
     "parser-ecs", "parser-ocsf", "parser-declarative",
     "parser-velociraptor", "parser-hayabusa", "parser-chainsaw", "parser-plaso", "parser-eztools",
     "llm-anthropic", "llm-deepseek", "llm-openrouter",
@@ -18,6 +18,7 @@ default = [
 keystore-os = ["dep:irmind-mod-keystore-os"]
 keystore-file = ["dep:irmind-mod-keystore-file"]
 parser-syslog = ["dep:irmind-mod-parser-syslog"]
+parser-evtx = ["dep:irmind-mod-parser-evtx"]
 parser-linux = ["dep:irmind-mod-parser-linux"]
 parser-json = ["dep:irmind-mod-parser-json"]
 parser-declarative = ["dep:irmind-mod-parser-declarative"]
@@ -43,6 +44,7 @@ storage-gcs = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/gcs"]
 storage-azure = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/azure"]
 
 [dependencies]
+irmind-mod-parser-evtx = { path = "../modules/parser-evtx", version = "0.1.0", optional = true }
 irmind-app = { path = "../app", version = "0.1.0" }
 irmind-http = { path = "../http", version = "0.1.0" }
 irmind-tui = { path = "../tui", version = "0.1.6" }
