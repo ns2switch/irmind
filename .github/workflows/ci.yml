@@ -104,6 +104,7 @@ jobs:
           cargo fmt --manifest-path helpers/evtx/Cargo.toml --all --check
           cargo clippy --manifest-path helpers/evtx/Cargo.toml --all-targets --profile ci --locked -- -D warnings
           cargo nextest run --manifest-path helpers/evtx/Cargo.toml --cargo-profile ci --locked
+          python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx native-only
       - name: Nextest (CI profile)
         run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
       - run: cargo deny check --hide-inclusion-graph
@@ -136,7 +137,7 @@ jobs:
           mkdir -p dist
           cp target/release/irmind target/release/irmind-evtx dist/
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
-          (cd dist && sha256sum irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
+          (cd dist && sha256sum irmind irmind-evtx LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
           (cd dist && sha256sum --check SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.release_build == 'true'
@@ -183,8 +184,23 @@ jobs:
           key: evtx-ubuntu22-${{ hashFiles('helpers/evtx/Cargo.lock') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo build --manifest-path helpers/evtx/Cargo.toml --bin irmind-evtx --profile ci --locked
+        if: needs.dco.outputs.release_build != 'true'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.dco.outputs.release_build == 'true'
+        with: {name: irmind-linux, path: compatibility-bin}
       - name: Test Ubuntu and pinned Debian/Fedora userspaces on the observed host kernel
-        run: python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx
+        env:
+          RELEASE_BUILD: ${{ needs.dco.outputs.release_build }}
+        run: |
+          if [ "$RELEASE_BUILD" = true ]; then
+            chmod +x compatibility-bin/irmind-evtx
+            python3 .github/scripts/check_evtx_linux.py compatibility-bin/irmind-evtx
+          else
+            python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx
+          fi
+      - name: Remove downloaded compatibility binaries
+        if: always()
+        run: python3 -c "from pathlib import Path; from shutil import rmtree; p=Path('compatibility-bin'); p.is_dir() and rmtree(p)"
   linux_arm64:
     needs: [linux, dco]
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.release_build == 'true' && inputs.profile_linux != true }}
@@ -212,7 +228,7 @@ jobs:
           mkdir -p dist
           cp target/release/irmind target/release/irmind-evtx dist/
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
-          (cd dist && sha256sum irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
+          (cd dist && sha256sum irmind irmind-evtx LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
           (cd dist && sha256sum --check SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: {name: irmind-linux-arm64, path: dist/, if-no-files-found: error}
@@ -285,7 +301,7 @@ jobs:
           mkdir -p dist
           cp target/x86_64-pc-windows-msvc/release/irmind.exe target/x86_64-pc-windows-msvc/release/irmind-evtx.exe dist/
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
-          python -c "from pathlib import Path; import hashlib; root=Path('dist'); names=('irmind.exe','LICENSE-MIT','LICENSE-APACHE','THIRD_PARTY_NOTICES.md','install.sh','install.ps1'); (root/'SHA256SUMS').write_bytes(''.join(hashlib.sha256((root/name).read_bytes()).hexdigest()+'  '+name+'\n' for name in names).encode('ascii'))"
+          python -c "from pathlib import Path; import hashlib; root=Path('dist'); names=('irmind.exe','irmind-evtx.exe','LICENSE-MIT','LICENSE-APACHE','THIRD_PARTY_NOTICES.md','install.sh','install.ps1'); (root/'SHA256SUMS').write_bytes(''.join(hashlib.sha256((root/name).read_bytes()).hexdigest()+'  '+name+'\n' for name in names).encode('ascii'))"
           python -c "from pathlib import Path; assert b'\r' not in Path('dist/SHA256SUMS').read_bytes()"
           (cd dist && sha256sum --check SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -481,14 +497,14 @@ jobs:
               'dc13a40bc8bfefc8cef434b3b2c1be3f1d3cf90494615533074d62758c746f62',
           }, 'unrecognized cargo-geiger 0.13.0 prebuilt binary'
           PYTHON
+      - name: Inventory the separately locked helper native surface
+        run: python3 .github/scripts/report_evtx_unsafe.py > release/EVTX-UNSAFE-REPORT.json
       - name: Audit the separately locked helper with cargo-geiger
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_normalize_evtx_geiger.py
           cargo geiger --manifest-path "$PWD/helpers/evtx/Cargo.toml" --all-targets --locked --output-format Json > "$RUNNER_TEMP/evtx-geiger.json" 2> "$RUNNER_TEMP/evtx-geiger.log"
-          python3 .github/scripts/normalize_evtx_geiger.py < "$RUNNER_TEMP/evtx-geiger.json" > release/EVTX-GEIGER-REPORT.json
+          python3 .github/scripts/normalize_evtx_geiger.py --diagnostics "$RUNNER_TEMP/evtx-geiger.log" --inventory release/EVTX-UNSAFE-REPORT.json < "$RUNNER_TEMP/evtx-geiger.json" > release/EVTX-GEIGER-REPORT.json
           rm "$RUNNER_TEMP/evtx-geiger.json" "$RUNNER_TEMP/evtx-geiger.log"
-      - name: Inventory the separately locked helper native surface
-        run: python3 .github/scripts/report_evtx_unsafe.py > release/EVTX-UNSAFE-REPORT.json
       - name: Create and check the release checksum list
         run: |
           (cd release && sha256sum irmind-linux-x86_64 irmind-linux-aarch64 irmind-macos-aarch64 irmind-windows-x86_64.exe irmind-evtx-linux-x86_64 irmind-evtx-linux-aarch64 irmind-evtx-macos-aarch64 irmind-evtx-windows-x86_64.exe install.sh install.ps1 IRMind-SBOM.spdx.json IRMind-EVTX-SBOM.spdx.json EVTX-UNSAFE-REPORT.json EVTX-GEIGER-REPORT.json LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
@@ -545,8 +561,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           test ! -e "$HOME/.local/bin/irmind"
-          trap 'rm -f "$HOME/.local/bin/irmind"' EXIT
+          test ! -e "$HOME/.local/bin/irmind-evtx"
+          trap 'rm -f "$HOME/.local/bin/irmind" "$HOME/.local/bin/irmind-evtx"' EXIT
           sh install.sh "$GITHUB_REF_NAME"
+          test -x "$HOME/.local/bin/irmind-evtx"
           "$HOME/.local/bin/irmind" --version
   verify_install_windows:
     needs: release
@@ -567,11 +585,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $binary = Join-Path $env:LOCALAPPDATA 'IRMind\bin\irmind.exe'
+          $helper = Join-Path $env:LOCALAPPDATA 'IRMind\bin\irmind-evtx.exe'
+          if (Test-Path -LiteralPath $helper) { throw 'helper installer target is not clean' }
           if (Test-Path -LiteralPath $binary) { throw 'installer target is not clean' }
           try {
             ./install.ps1 -Version $env:GITHUB_REF_NAME
+            if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw 'verified helper is missing' }
             & $binary --version
             if ($LASTEXITCODE -ne 0) { throw 'verified binary did not start' }
           } finally {
-            Remove-Item -LiteralPath $binary -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $binary,$helper -Force -ErrorAction SilentlyContinue
           }

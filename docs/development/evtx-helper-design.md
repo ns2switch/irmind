@@ -71,6 +71,8 @@ Detection requires the bounded EVTX signature/header, not the extension alone. D
 7. Include the helper in every supported signed release package, SHA256SUMS, Sigstore bundles, GitHub provenance attestations and verified installers. A helper mismatch or missing asset fails installation; no tag is created during implementation.
 8. Request dependency and new-binary distribution review before merging. Elastic and Chronicle follow this work; they do not introduce credentials or JWT dependencies in the EVTX change.
 
+See the [validation evidence and coverage limits](evtx-helper-validation.md).
+
 Related: [approved work order](plan.md#approved-parser-and-precision-work-order), [precise artifact design](parquet-artifact-v2-design.md), [Windows coverage](../parsers.md#windows-coverage), and [EVTX tracking issue](https://github.com/ns2switch/irmind/issues/47).
 
 

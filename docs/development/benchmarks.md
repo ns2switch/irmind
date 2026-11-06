@@ -597,7 +597,7 @@ Next, measure splitting, merging, final copying and replay separately, then eval
 
 ## Isolated EVTX conversion
 
-A release build of the separate helper workspace converted a synthetic EVTX file of 1,073,680,384 bytes (approximately 1 GiB) in 18.15 seconds: 56.42 MiB/s, 229,362 records and three precise Parquet artifacts. This covers initial/source rehashing, contained decoding, normalization and Parquet conversion; audit signing is excluded. The fixture repeats the synthetic Security mapping chunk with chronological record-header times. It is not a compressed/template-heavy real-world EVTX corpus or a query benchmark. No original evidence copy is made. The release helper executable measured 1,479,504 bytes on Linux x86-64.
+A release build of the separate helper workspace converted a synthetic EVTX file of 1,073,680,384 bytes (approximately 1 GiB) in 13.33 seconds: 76.81 MiB/s, 229,362 records and three precise Parquet artifacts. This covers initial/source rehashing, contained decoding, normalization and Parquet conversion; audit signing is excluded. The fixture repeats the synthetic Security mapping chunk with chronological record-header times. It is not a compressed/template-heavy real-world EVTX corpus or a query benchmark. No original evidence copy is made. The release helper executable measured 1,483,856 bytes on Linux x86-64.
 
 Reproduce with the separately resolved workspace:
 
@@ -606,4 +606,4 @@ CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --re
 target/release/examples/benchmark
 ```
 
-The benchmark rejects unoptimized execution and removes its temporary source and artifacts on exit.
+The benchmark rejects unoptimized execution and removes its temporary source and artifacts on exit. Repeated local release runs took 13.33–18.15 seconds (56.42–76.81 MiB/s); filesystem-cache and background-load variation prevents interpreting this range as an optimization result.

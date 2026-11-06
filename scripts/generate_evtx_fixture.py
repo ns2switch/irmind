@@ -89,7 +89,16 @@ def main():
         name=channel.split('/')[0]+'.evtx'
         (root/"source"/name).write_bytes(make(channel,ids))
         expected.append({"source":name,"channel":channel,"events":ids,"host":"synthetic-endpoint","ip":"203.0.113.77","techniques":["T1078","T1021.002","T1543.003"]})
-    (root/"private/ground-truth.json").write_text(json.dumps({"synthetic":True,"episodes":expected},indent=2)+'\n')
+    (root/"private/ground-truth.json").write_text(json.dumps({
+        "synthetic":True,"episode_id":"synthetic-windows-lateral-service-001",
+        "provider":"windows","episodes":expected,
+        "malicious_events":["logon_success","service_install"],
+        "malicious_entities":["synthetic-endpoint","synthetic-user","203.0.113.77"],
+        "attack_path":[{"type":"ip","value":"203.0.113.77"},{"type":"host","value":"synthetic-endpoint"},{"type":"process","value":r"C:\Windows\System32\cmd.exe"}],
+        "mitre_attack":["T1078","T1021.002","T1543.003"],
+        "acceptable_conclusions":["Synthetic network logon (4624, type 3) followed by service-install records (4697 and 7045). These records alone do not prove remote command execution or exfiltration."],
+        "private_marker":"IRMind-EVTX-synthetic-evaluator-only",
+    },indent=2)+'\n')
     (ROOT/"helpers/evtx/fuzz/seeds/security.evtx").write_bytes(make('Security',[4624,4697]))
 
 if __name__=='__main__':main()

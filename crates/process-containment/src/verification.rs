@@ -1,6 +1,7 @@
 use std::{
     fs, io,
-    net::{Ipv4Addr, Ipv6Addr, TcpListener},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream},
+    time::Duration,
 };
 
 pub(crate) const CANARY: &str = "irmind-containment-canary";
@@ -14,6 +15,18 @@ pub fn verify_entry() -> io::Result<()> {
     let file = blocked(fs::read(CANARY));
     let ipv4 = blocked(TcpListener::bind((Ipv4Addr::LOCALHOST, 0)));
     let ipv6 = blocked(TcpListener::bind((Ipv6Addr::LOCALHOST, 0)));
+    // Only loopback is probed; failure must be policy denial, never refusal/timeout.
+    let outbound = [
+        SocketAddr::from((Ipv4Addr::LOCALHOST, 9)),
+        SocketAddr::from((Ipv6Addr::LOCALHOST, 9)),
+    ]
+    .into_iter()
+    .all(|address| {
+        blocked(TcpStream::connect_timeout(
+            &address,
+            Duration::from_millis(100),
+        ))
+    });
     #[cfg(target_os = "linux")]
     {
         let netlink = rustix::net::socket_with(
@@ -30,7 +43,7 @@ pub fn verify_entry() -> io::Result<()> {
             ));
         }
     }
-    if !file || !ipv4 || !ipv6 {
+    if !file || !ipv4 || !ipv6 || !outbound {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             "EVTX isolation verification failed: foreign reads or network access were not denied",
