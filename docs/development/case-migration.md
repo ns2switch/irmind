@@ -2,6 +2,10 @@
 
 This guide is for analysts and maintainers evaluating precise timestamps in an existing open case. Migration is optional. Existing V1 artifacts and sealed cases remain readable without migration.
 
+## When migration helps
+
+Migrate an open V1 case when the original logs contain subsecond timestamps or host-based queries would benefit from precise artifacts. Keep V1 when its current precision is sufficient; migration is not required to open, authenticate or export it. New ingestion uses V2 from either interface. Opening an existing case never migrates it.
+
 ## Before migration
 
 Keep the original logs available. IRMind can use a retained original, a local source directory, or a verified local copy of a cloud object. It does not download cloud originals during this operation. Missing or changed originals stop migration. Keep enough free space for both generations and bounded private staging.
@@ -30,4 +34,4 @@ Run `/verify-graph <original-source-root>` to reconstruct both generations and c
 
 Seal and export through the ordinary commands. Cases containing V2 artifacts or migration records use export V5 automatically. V5 carries both generations' signed metadata and hash-checked derived files, and can include originals. Public-key verification still accepts an expected analyst fingerprint and needs no keystore. V3 and V4 remain supported; a V4 package cannot carry V2 records.
 
-New TUI and demo ingestion writes precise V2 artifacts. Opening a V1 case does not migrate existing artifacts or change its signed history. New sources can coexist with V1 sources; changing the artifact version of an already indexed source still requires explicit migration. Automation retains its existing V1 writer and explicit migration command. The [migration contract](parquet-v2-migration-contracts.md) describes the wire commitment and application boundary.
+New CLI, TUI and demo ingestion writes precise V2 artifacts. Opening a V1 case does not migrate existing artifacts or change its signed history. New sources can coexist with V1 sources; changing the artifact version of an already indexed source still requires explicit migration. CLI automation uses the same V2 writer and retains the explicit migration command. The [migration contract](parquet-v2-migration-contracts.md) describes the wire commitment and application boundary.

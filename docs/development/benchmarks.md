@@ -1,5 +1,7 @@
 # Evidence scan benchmarks
 
+Current analyst-approved gates: 15 GB cloud and chronological endpoint ingestion must take less than 900 seconds; disordered endpoint stress ingestion must take less than 1,350 seconds. Existing query targets remain unchanged. See [the final measured gate](#final-v2-ingestion-and-query-gate). Earlier comparisons retain their historical acceptance criteria and workflow outcomes.
+
 This page is for maintainers comparing signed Parquet ingestion and bounded evidence queries. The [manual and weekly workflow](../../.github/workflows/graph-benchmark.yml) generates synthetic 1 GB and 15 GB corpora on a standard Linux runner. It uploads the raw output. No corpus or original evidence is kept as an artifact.
 
 ## Method
@@ -555,19 +557,19 @@ Counters average five samples and sum worker durations. Scan includes normalizat
 
 ### Final V2 ingestion and query gate
 
-| 15 GB V2 workload | Ingestion seconds | Under 900 seconds | Largest query p95 across scopes | Query errors / samples | Initial graph summary seconds |
-| --- | ---: | --- | ---: | ---: | ---: |
-| cloud-v2 | 865.973 | yes | 4.580 s | 0 / 25 | 3.351 |
-| endpoint-v2-1 | 1,120.179 | no | 4.567 s | 0 / 50 | 3.739 |
-| endpoint-v2-1-chronological | 508.475 | yes | 3.776 s | 0 / 50 | 3.295 |
-| endpoint-v2-1024 | 1,007.507 | no | 1.810 s | 0 / 75 | 4.493 |
-| endpoint-v2-1024-chronological | 488.131 | yes | 3.067 s | 0 / 75 | 3.110 |
-| endpoint-v2-1025 | 1,101.840 | no | 1.385 s | 0 / 75 | 3.620 |
-| endpoint-v2-1025-chronological | 559.978 | yes | 4.207 s | 0 / 75 | 5.234 |
-| endpoint-v2-64 | 1,071.745 | no | 1.275 s | 0 / 75 | 3.228 |
-| endpoint-v2-64-chronological | 561.596 | yes | 4.602 s | 0 / 75 | 4.927 |
+| 15 GB V2 workload | Ingestion seconds | Approved limit | Gate met | Largest query p95 across scopes | Query errors / samples | Initial graph summary seconds |
+| --- | ---: | ---: | --- | ---: | ---: | ---: |
+| cloud-v2 | 865.973 | 900 s | yes | 4.580 s | 0 / 25 | 3.351 |
+| endpoint-v2-1 | 1,120.179 | 1,350 s | yes | 4.567 s | 0 / 50 | 3.739 |
+| endpoint-v2-1-chronological | 508.475 | 900 s | yes | 3.776 s | 0 / 50 | 3.295 |
+| endpoint-v2-1024 | 1,007.507 | 1,350 s | yes | 1.810 s | 0 / 75 | 4.493 |
+| endpoint-v2-1024-chronological | 488.131 | 900 s | yes | 3.067 s | 0 / 75 | 3.110 |
+| endpoint-v2-1025 | 1,101.840 | 1,350 s | yes | 1.385 s | 0 / 75 | 3.620 |
+| endpoint-v2-1025-chronological | 559.978 | 900 s | yes | 4.207 s | 0 / 75 | 5.234 |
+| endpoint-v2-64 | 1,071.745 | 1,350 s | yes | 1.275 s | 0 / 75 | 3.228 |
+| endpoint-v2-64-chronological | 561.596 | 900 s | yes | 4.602 s | 0 / 75 | 4.927 |
 
-The final candidate meets the existing cloud and chronological activation gate, including ordinary and overflow host queries. The four disordered controls still miss the same 900-second ingestion target. The complete workflow remains failed where either revision misses an unchanged target; a successful candidate query is not evidence that an entire pair passed. V1 filtered query failures also remain in the JSON rather than being omitted. These measurements do not establish a speed guarantee for every runner or arbitrary evidence. Earlier pairs include slower cloud instances; use their matched deltas, not a favorable cross-run comparison.
+The analyst-approved release gate is strictly below 900 seconds for 15 GB cloud and chronological endpoint ingestion. The disordered endpoint corpus is a stress workload with a separately approved strict limit of 1,350 seconds (1.5 times the release limit). Query targets, including ordinary and overflow host queries, remain unchanged. All final candidate rows meet their current workload gate. This is an analyst decision about acceptance, not an additional measured optimization. Historical workflow conclusions and raw measurements are retained: those runs evaluated the former 900-second stress limit. The complete historical workflow remains failed where either revision missed its then-current target; a successful candidate query is not evidence that an entire pair passed. V1 filtered query failures also remain in the JSON rather than being omitted. These measurements do not establish a speed guarantee for every runner or arbitrary evidence. Earlier pairs include slower cloud instances; use their matched deltas, not a favorable cross-run comparison.
 
 The initial graph summary is the first summary after ingestion, not a measurement after evicting the operating-system page cache. Ingestion wall time includes source generation, signed custody and final compaction. Storage accounting and query sampling occur afterward. All inputs contain 1,000 files and about 15.68 decimal GB.
 
@@ -589,6 +591,6 @@ Both cloud writers preserve 19/19 malicious events, 10/10 entities and 14/14 pat
 
 ### Remaining disordered-ingestion work
 
-The final four disordered cases take 1,007.507–1,120.179 seconds. Sorting and replay/writing remain the largest measured sequential costs. Natural-run merging still writes an intermediate merged stream, copies it back into the normalized spool and parses that spool again before writing Parquet.
+The final four disordered cases take 1,007.507–1,120.179 seconds, below the analyst-approved 1,350-second stress limit. Further optimization is [tracked in issue #186](https://github.com/ns2switch/irmind/issues/186), after v0.2.0, and does not block that release. Sorting and replay/writing remain the largest measured sequential costs. Natural-run merging still writes an intermediate merged stream, copies it back into the normalized spool and parses that spool again before writing Parquet.
 
-Next, measure splitting, merging, final copying and replay separately, then evaluate feeding the bounded merge directly into the existing provisional Parquet writer. Retain every run count/size/hash check at EOF, full-source authentication, deterministic partition allocation, stable order, cancellation and whole-batch rollback. Keep the current external-sort fallback above the run/head bounds. Require byte-equivalence and failure-cleanup tests and repeat all 15 GB pairs. The present counters do not measure the potential saving of that fusion, so no estimated sub-900 result is claimed. The 900-second target for the disordered corpus remains unchanged and open.
+Next, measure splitting, merging, final copying and replay separately, then evaluate feeding the bounded merge directly into the existing provisional Parquet writer. Retain every run count/size/hash check at EOF, full-source authentication, deterministic partition allocation, stable order, cancellation and whole-batch rollback. Keep the current external-sort fallback above the run/head bounds. Require byte-equivalence and failure-cleanup tests and repeat all 15 GB pairs. The present counters do not measure the potential saving of that fusion, so no estimated sub-900 result is claimed. Keep the 900-second release gate for cloud and chronological sources and the 1,350-second stress gate for disordered sources. Query limits do not change.

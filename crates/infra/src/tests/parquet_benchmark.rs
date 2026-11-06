@@ -143,7 +143,12 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         parquet_time.as_secs_f64(),
         ingest_time.as_secs_f64()
     );
-    let ingest_target = ingest_time < std::time::Duration::from_mins(15);
+    let ingestion_limit = scenario.ingestion_limit(label);
+    let ingest_target = ingest_time < ingestion_limit;
+    println!(
+        "PARQUET_INGEST_LIMIT seconds={} met={ingest_target}",
+        ingestion_limit.as_secs()
+    );
     let [stage, sort, replay, source_verify, publish] = profile.partition_snapshot();
     println!(
         "PARQUET_V2_PHASE stage_seconds={:.3} sort_seconds={:.3} replay_seconds={:.3} source_verify_seconds={:.3} publish_seconds={:.3}",
@@ -188,7 +193,8 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     }
     assert!(
         ingest_target,
-        "Parquet ingestion exceeded the 15-minute benchmark target"
+        "Parquet ingestion exceeded the approved {}-second workload target",
+        ingestion_limit.as_secs()
     );
     assert!(cold_target, "cold graph summary failed");
     assert!(

@@ -36,6 +36,16 @@ impl Scenario {
         }
     }
 
+    pub(super) fn ingestion_limit(&self, size: &str) -> std::time::Duration {
+        std::time::Duration::from_secs(
+            if size == "15gb" && self.hosts.is_some() && !self.chronological {
+                1350
+            } else {
+                900
+            },
+        )
+    }
+
     pub(super) fn name(&self) -> String {
         let version = if self.precise { 2 } else { 1 };
         let mut name = self.hosts.map_or_else(
@@ -151,5 +161,31 @@ fn chronological_endpoint_sources_do_not_reset_their_timestamps() {
             .collect::<Vec<_>>();
         assert_eq!(times.windows(2).all(|w| w[0] <= w[1]), chronological);
         assert!(text.len() >= 2048 * 15);
+    }
+}
+
+#[test]
+fn release_and_stress_ingestion_gates_keep_distinct_approved_limits() {
+    for version in ["v1", "v2"] {
+        assert_eq!(
+            Scenario::named(&format!("cloud-{version}"))
+                .ingestion_limit("15gb")
+                .as_secs(),
+            900
+        );
+        for hosts in [1, 64, 1024, 1025] {
+            let base = format!("endpoint-{version}-{hosts}");
+            assert_eq!(
+                Scenario::named(&base).ingestion_limit("15gb").as_secs(),
+                1350
+            );
+            assert_eq!(Scenario::named(&base).ingestion_limit("1gb").as_secs(), 900);
+            assert_eq!(
+                Scenario::named(&format!("{base}-chronological"))
+                    .ingestion_limit("15gb")
+                    .as_secs(),
+                900
+            );
+        }
     }
 }

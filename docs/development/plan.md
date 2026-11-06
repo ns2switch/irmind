@@ -159,10 +159,12 @@ The [proposed parser retention policy](decisions.md#parser-retention-policy-for-
 
 Step (e) compares release-mode V1/V2 CloudTrail ingestion and queries at 1 GB and 15 GB, plus 15 GB endpoint corpora with 1, 64, 1,024 and 1,025 hosts. It records normalized staging disk peaks, signed partition/file counts, compressed column sizes and filtered/unfiltered latency. The [measured recommendation](benchmarks.md#host-cap-recommendation-and-remaining-gate) retains 64 hosts as a conservative initial cap, with a hard ceiling of 1,024. It does not establish an optimal cap because the run holds that cap fixed while varying source cardinality.
 
-The initial profiled run exceeded the 900-second V2 ingestion target and the unfiltered endpoint timeline deadline, so it retained V1 as the default. Later paired optimization results and the current interactive selection are recorded below. The disordered-corpus ingestion target remains unchanged and open.
+The initial profiled run exceeded the 900-second V2 ingestion target and the unfiltered endpoint timeline deadline, so it retained V1 as the default. Later paired optimization results and the current interactive selection are recorded below. The analyst subsequently approved a separate disordered stress gate, as recorded below.
 
 
 ### V2 optimization acceptance
+
+This records the historical optimization gate. The analyst-approved release/stress distinction in the current selection and step (e) closure below supersedes its disordered-ingestion threshold.
 
 The ordinary-host default is approved at **64 per case**, with an immutable ceiling of **1,024** and signed overflow. This is the selected operational default, not a claim that a fixed-cap cardinality experiment proved an optimum.
 
@@ -170,12 +172,19 @@ Before activation, optimize ordered-source writing, bounded natural-run merges, 
 
 [Event-reference co-observations](coobservation-reference-proposal.md) are an evaluation only. Any change to the signed schema requires its own decision before implementation.
 
-### Current interactive V2 selection
+### Current V2 selection for CLI, TUI and demo
 
 The [final paired release candidate](benchmarks.md#final-v2-ingestion-and-query-gate) meets the existing cloud and chronological activation gate: 15 GB cloud ingestion takes 865.973 seconds; chronological endpoint ingestion takes 488.131–561.596 seconds at 1, 64, 1,024 and 1,025 hosts. All sampled candidate queries, including ordinary and overflow filters, have zero errors and p95 below 4.7 seconds. The complete release matrices retain before/after data from the same runner for each pair; separate runner instances are not interchangeable speedup baselines.
 
-TUI and offline-demo sessions now select the existing V2 writer. Opening an existing V1 case does not migrate its artifacts or change signed history. New sources can coexist with V1 sources; replacing an indexed source's artifact version still requires explicit migration. Existing application export selects V5 whenever the signed case contains precise artifacts or a migration record. CLI automation retains its existing V1 writer and explicit migration command.
+CLI, TUI and offline-demo sessions now select the existing V2 writer. Opening an existing V1 case does not migrate its artifacts or change signed history. New sources can coexist with V1 sources; replacing an indexed source's artifact version still requires explicit migration. Existing application export selects V5 whenever the signed case contains precise artifacts or a migration record. CLI automation now selects the same V2 writer as the TUI and demo; migration of historical sources remains explicit.
 
-The four disordered controls still take 1,007.507–1,120.179 seconds against the same 900-second goal. That performance work remains open. Measure split/merge/copy/replay separately and evaluate a bounded merge feeding the provisional writer directly, with unchanged source/run authentication, ordering, allocation, cancellation and rollback. No smaller corpus or higher deadline replaces the goal.
+The four disordered controls take 1,007.507–1,120.179 seconds and meet the analyst-approved 1,350-second stress gate. The cloud and chronological release gate remains 900 seconds, with unchanged query targets. This supersedes the former disordered gate; further stress optimization is after v0.2.0. Measure split/merge/copy/replay separately and evaluate a bounded merge feeding the provisional writer directly, with unchanged source/run authentication, ordering, allocation, cancellation and rollback. No smaller corpus replaces either workload; query deadlines and custody checks stay unchanged.
 
 The event-reference co-observation proposal remains a design evaluation. Its measured payload budget is not an implemented disk saving. Changing its signed schema requires a separate compatibility decision and new goldens.
+
+
+### Step (e) closure and v0.2.0 sequence
+
+The [analyst-approved acceptance decision](decisions.md#analyst-approved-release-and-disordered-stress-gates) closes step (e): cloud and chronological ingestion remain below 900 seconds; disordered stress ingestion remains below 1,350 seconds; query targets are unchanged. Keep the 64 ordinary-host default and 1,024 hard ceiling. Co-observation references, cloud `co_entities` disk reduction and direct merge-to-writer optimization are after v0.2.0.
+
+Next, implement EVTX as an isolated official decoder helper and request dependency/distribution review before merging. Then implement experimental Elastic and Chronicle connectors, requesting review before introducing JWT dependencies or new credentials. Prepare v0.2.0 with a complete changelog, optional V1→V2 migration guidance and the existing signatures, attestations, SBOM and verified installers. Opening a case never performs an implicit migration.

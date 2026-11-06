@@ -432,7 +432,7 @@ fn open_local(
             .to_path_buf(),
     };
     let store = loop {
-        match storage::open(&home, interactive) {
+        match storage::open(&home) {
             Ok(store) => break Arc::new(store),
             Err(error) if interactive => {
                 let message = format!(

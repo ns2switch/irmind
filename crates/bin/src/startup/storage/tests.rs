@@ -11,8 +11,15 @@ use irmind_mod_parser_json::JsonParser;
 use irmind_security::MandatoryGuard;
 use std::{collections::BTreeMap, sync::Arc};
 
-fn setup(root: &Path, interactive: bool) -> (Arc<LocalStore>, Engine<'static>) {
-    let store = Arc::new(open(root, interactive).unwrap());
+fn setup(root: &Path, legacy: bool) -> (Arc<LocalStore>, Engine<'static>) {
+    let store = Arc::new(
+        if legacy {
+            LocalStore::open(root)
+        } else {
+            open(root)
+        }
+        .unwrap(),
+    );
     let backend = FileKeystore::ephemeral(root).unwrap();
     let signer = backend.create(Actor::Analyst).unwrap();
     let engine = Engine::new(
@@ -100,45 +107,45 @@ fn verify_and_export(
 }
 
 #[test]
-fn interactive_ingestion_writes_v2_while_automation_retains_v1() {
-    for interactive in [false, true] {
-        let root = tempfile::tempdir().unwrap();
-        let (store, engine) = setup(root.path(), interactive);
-        let id = engine
-            .create_case("Synthetic rollout", "local only")
-            .unwrap()
-            .id;
-        ingest(&store, &engine, &id, root.path(), "events.json");
-        let catalog = irmind_app::artifact_catalog(&store.entries(&id).unwrap()).unwrap();
-        assert_eq!(catalog.active.len(), 3);
-        assert!(
-            catalog
-                .active
-                .iter()
-                .all(|a| matches!(a, ParquetArtifact::V2(_)) == interactive)
-        );
-        verify_and_export(
-            &store,
-            &engine,
-            &id,
-            root.path(),
-            if interactive { 5 } else { 4 },
-            1,
-        );
-    }
+fn default_ingestion_writes_v2_and_exports_v5() {
+    let root = tempfile::tempdir().unwrap();
+    let (store, engine) = setup(root.path(), false);
+    let id = engine
+        .create_case("Synthetic rollout", "local only")
+        .unwrap()
+        .id;
+    ingest(&store, &engine, &id, root.path(), "events.json");
+    let catalog = irmind_app::artifact_catalog(&store.entries(&id).unwrap()).unwrap();
+    assert_eq!(catalog.active.len(), 3);
+    assert!(
+        catalog
+            .active
+            .iter()
+            .all(|a| matches!(a, ParquetArtifact::V2(_)))
+    );
+    verify_and_export(&store, &engine, &id, root.path(), 5, 1);
 }
 
 #[test]
-fn reopening_for_tui_keeps_legacy_history_and_exports_the_mixed_case_as_v5() {
+fn reopening_keeps_legacy_history_and_exports_the_mixed_case_as_v5() {
     let root = tempfile::tempdir().unwrap();
-    let (legacy, engine) = setup(root.path(), false);
+    let (legacy, engine) = setup(root.path(), true);
     let id = engine
         .create_case("Synthetic mixed case", "local only")
         .unwrap()
         .id;
     ingest(&legacy, &engine, &id, root.path(), "old.json");
     let before = legacy.entries(&id).unwrap();
-    let precise = open(root.path(), true).unwrap();
+    let precise = open(root.path()).unwrap();
+    assert_eq!(
+        before.iter().map(|e| e.hash).collect::<Vec<_>>(),
+        precise
+            .entries(&id)
+            .unwrap()
+            .iter()
+            .map(|e| e.hash)
+            .collect::<Vec<_>>()
+    );
     ingest(&precise, &engine, &id, root.path(), "new.json");
     let after = precise.entries(&id).unwrap();
     assert_eq!(
