@@ -617,12 +617,24 @@ The release-only `collection` example generates 300 distinct synthetic files of 
 | Native platform | Collection conversion | Full network witness | Witness executions |
 | --- | ---: | ---: | ---: |
 | Linux x86-64 | 10.58 s | Not applicable: per-child seccomp/Landlock checks | 0 |
-| Windows | Measurement pending native release dry run | Pending | Expected: 1 per session |
+| Windows Server 2025 x86-64 | 20.347 s | 1.040 s | 1 |
 
-This measures source hashing/re-verification, contained decoding, normalization and precise Parquet conversion. It excludes audit signing and fixture generation. Windows additionally measures the first full network witness separately; the collection uses the same parser session for all 300 files. Service changes or validation failures require a new witness rather than a cached success.
+This measures source hashing/re-verification, contained decoding, normalization and precise Parquet conversion. It excludes audit signing and fixture generation. The [signed candidate run](https://github.com/ns2switch/irmind/actions/runs/42273621946) contains the Windows measurement JSON. Windows parser startup takes 1.131 s, including the 1.040 s witness; do not add both figures. Windows additionally measures the first full network witness separately; the collection uses the same parser session for all 300 files. Service changes or validation failures require a new witness rather than a cached success.
 
 ```sh
 CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --example collection
 CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx
 target/release/examples/collection
 ```
+
+### Large Security EVTX collections
+
+The `large_collection` example uses a generated, entirely synthetic Security log with event-specific fields for 4624, 4625, 4688, 4634 and 4672. Each 64 KiB chunk holds 64 events. Record headers and XML record IDs agree, timestamps advance in 100 ms steps while retaining their 100 ns remainder, and user names rotate across 1,024 synthetic values. Host and documentation-range IP addresses are synthetic. This corpus exercises approximately 1 KiB per record; it does not claim coverage of every Windows template or real incident workload.
+
+The two collections contain 100 MiB and 1 GiB of chunks, plus file headers. The latter uses four sources of 256 MiB plus a 4 KiB header each. They use the application's signed V2 ingestion case of use, followed by a complete chain/artifact verification and an exact indexed-record count. Ingestion timing includes hashing, the contained decoder, normalization, Parquet and audit signatures. Fixture generation, initial sandbox setup and final verification are separate. The parent is the release ingestion host, not the interactive TUI or a model process. Its synthetic signing key is restricted to the temporary benchmark case.
+
+The manual **Weekly fuzzing** workflow input `evtx_large=true` runs only this benchmark on Linux and Windows. It builds the normal-feature decoder after the benchmark host so test-only broker features do not enter the auxiliary executable. No external provider is used. The Windows network witness still performs its approved local positive controls.
+
+Memory is the largest observed per-process OS high-water resident set (Linux) or peak working set (Windows), sampled every 20 ms. Auxiliary values are the maximum individual child, not the sum of concurrent children. Sampling can miss a short-lived process or a final spike; the harness refuses a successful result with no observed parent or decoder memory. Sources, provisional artifacts and runtime directories are removed after each collection.
+
+A separate in-process production-decoder check uses one dense 1 GiB source. It checks the exact record bound without changing it, consumes frames without retaining the stream and requires rejection without a completion trailer. Its time is not included in contained-ingestion throughput or memory measurements. The current bounds remain 1,000,000 records, at most 8 GiB of output (also limited to 32 times source size plus 1 MiB), a 4 MiB frame and 600 seconds per contained decoding invocation.

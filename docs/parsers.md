@@ -10,6 +10,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 
 | Parser | Input | Detection | Mapped fields | Status |
 | --- | --- | --- | --- | --- |
+| Windows EVTX | Binary EVTX: Security, System, PowerShell, Sysmon | Valid EVTX header and checksum; 95 | UTC time at 100 ns precision, host, user, process, IP/port and real record offsets | available; experimental |
 | Linux | auth.log/secure, auditd, journald JSON, HTTP common/combined | Authentication tags, audit headers, journal fields or HTTP header; 95 | UTC time, host, user, process, command, IP/port, action/result; bounded audit correlation | experimental |
 | Syslog | RFC 5424 / RFC 3164, plain or gzip | PRI and timestamp/header shape; 95 / 90 | UTC time, host, application, PID, facility, severity, message and raw data | experimental |
 | JSON and exported cloud logs | JSON/NDJSON; AWS, GCP, Azure and HuntEval | Recognized record fields | Time, identities, accounts, resources and IPs | experimental |
@@ -28,7 +29,7 @@ Use processed exports to investigate these artifacts today. All listed modules a
 
 | Artifact | What it helps answer | Current ingestion route |
 | --- | --- | --- |
-| Windows event logs, including Sysmon | Which logons, process or service events were recorded, and how do they correlate? | Hayabusa CSV/JSONL → `parser-hayabusa`; EvtxECmd CSV → `parser-eztools`. Direct EVTX ingestion awaits the isolated helper. |
+| Windows event logs, including Sysmon | Which logons, process or service events were recorded, and how do they correlate? | Hayabusa CSV/JSONL → `parser-hayabusa`; EvtxECmd CSV → `parser-eztools`. Direct `.evtx` → `parser-evtx` with the isolated helper; Hayabusa and EvtxECmd exports remain alternatives. |
 | Registry hives and related transaction logs | Which account, configuration or persistence-related keys and values were reported? | Process externally with RECmd batch; ingest its CSV with `parser-eztools`. |
 | Prefetch (`.pf`) | Which executables, run counts and reported run times appear? | PECmd CSV → `parser-eztools`. |
 | Amcache | Which application paths, hashes and inventory timestamps were recorded? | AmcacheParser CSV → `parser-eztools`. |
@@ -76,8 +77,10 @@ Classic auth.log/secure uses the same per-ingestion time form as syslog. Journal
 
 ### Windows EVTX
 
-The experimental `parser-evtx` module uses the separately installed `irmind-evtx` helper. It recognizes the EVTX header and checksum, not the file extension. The helper receives one read-only file handle; it cannot open the evidence by path. Both local files and downloaded, case-private object spools use that route.
+EVTX is available in source builds and signed candidate packages; older releases do not include its helper. The experimental `parser-evtx` module uses the separately installed `irmind-evtx` helper. It recognizes the EVTX header and checksum, not the file extension. The helper receives one read-only file handle; it cannot open the evidence by path. Both local files and downloaded, case-private object spools use that route.
 
-Linux requires kernel 5.13 or newer, Landlock ABI 1 enabled, and unprivileged seccomp. No Bubblewrap installation is required. Windows uses a capability-free AppContainer, an explicit standard-handle list and a kill-on-close Job Object. macOS uses a deny-default sandbox profile. A startup probe verifies denied foreign reads, denied networking and denied child creation. If the probe fails, Preferences reports why EVTX is unavailable; there is no unconfined mode.
+Linux requires kernel 5.13 or newer, Landlock ABI 1 enabled, and unprivileged seccomp. No Bubblewrap installation is required. Windows requires the BFE and MpsSvc firewall services to remain active. It uses a capability-free AppContainer, an explicit standard-handle list and a kill-on-close Job Object. macOS uses a deny-default sandbox profile. A startup probe verifies denied foreign reads, denied networking and denied child creation. If the probe fails, Preferences reports why EVTX is unavailable; there is no unconfined mode.
 
 Security, System, PowerShell and Sysmon events map to the common schema. Unmapped fields remain in the record. The original FILETIME timestamp retains its 100 ns resolution, and provenance records the actual file offset and record number. The [helper design](development/evtx-helper-design.md) documents limits, mappings and the platform test requirements. Use the matching helper from the same verified release beside the main executable.
+
+Tested native environments: Ubuntu 22.04 and 24.04, Debian 12 (kernel 6.1), macOS 26.6.2 arm64 and Windows Server 2025. Fedora 44 was tested as container userspace only. Windows 10/11 clients remain experimental and unconfirmed; see the [Windows 11 validation issue](https://github.com/ns2switch/irmind/issues/189) and the [exact platform evidence](development/evtx-helper-validation.md). Runtime isolation checks must pass on each installation.
