@@ -1,4 +1,4 @@
-Traducción de docs/platforms.md en el commit cca6df2f8ac78f6804cabb235ac7051e650479fa; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit 33538a7c23dd529e1d786e5e41eef0426d593719; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
@@ -11,7 +11,10 @@ La compilación desde el código es la vía recomendada para una evaluación int
 ```sh
 rustup toolchain install 1.95.0
 cargo build --release --locked -p irmind
+CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
 ```
+
+La segunda compilación genera el auxiliar EVTX junto al ejecutable principal. En PowerShell, define `$env:CARGO_TARGET_DIR = "target"` antes de ejecutar ese comando. EVTX permanece no disponible si falta el auxiliar o el aislamiento nativo.
 
 CI prueba Ubuntu Linux, macOS arm64 y Windows x64 con el toolchain MSVC. SQLite se compila desde fuentes incluidas. Arrow y Parquet usan crates de Rust. TLS usa rustls con las raíces de certificados nativas, incluidas las CA corporativas instaladas; IRMind no enlaza OpenSSL del sistema. Esta opción de raíces nativas puede diferir de las comprobaciones de política de un verificador específico de cada plataforma.
 
@@ -74,7 +77,7 @@ Usa un terminal compatible con xterm, como GNOME Terminal o Konsole. El backend 
 
 ## macOS
 
-Usa Terminal.app o iTerm2. `os` utiliza Keychain; `file` se puede elegir explícitamente por SSH. CI compila para Apple Silicon. Después de verificar la versión, Gatekeeper puede bloquear un binario descargado sin firma de código de Apple. Autoriza **solo ese binario** en Ajustes del Sistema → Privacidad y seguridad, o elimina únicamente su atributo de cuarentena con `xattr -d com.apple.quarantine ./irmind`. Nunca desactives Gatekeeper para todo el sistema.
+Usa Terminal.app o iTerm2. `os` utiliza Keychain; `file` se puede elegir explícitamente por SSH. CI compila para Apple Silicon. Después de verificar la versión, Gatekeeper puede bloquear un binario descargado sin firma de código de Apple. Autoriza **solo ese binario** en Ajustes del Sistema → Privacidad y seguridad, o elimina únicamente su atributo de cuarentena con `xattr -d com.apple.quarantine ./irmind`. Nunca desactives Gatekeeper para todo el sistema. Si has descargado el auxiliar por separado, verifícalo primero y elimina solo la cuarentena de `./irmind-evtx` si es necesario.
 
 ## Windows
 
