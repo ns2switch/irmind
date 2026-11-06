@@ -38,7 +38,7 @@ fn verify_inherited_files(input: &std::fs::File) -> io::Result<()> {
     // SAFETY: the standard error query has no input pointers and returns a borrowed handle.
     let errors = unsafe { GetStdHandle(STD_ERROR_HANDLE) };
     let evidence = input.as_raw_handle();
-    let runtime = super::runtime_directory::RuntimeDirectory::open()?;
+    let runtime = super::runtime_directory::RuntimeDirectory::open(input)?;
     super::handle_snapshot::inspect(|handle, file| {
         if [stdin, output, errors, evidence].contains(&handle) {
             return Ok(());
@@ -57,7 +57,8 @@ fn verify_inherited_files(input: &std::fs::File) -> io::Result<()> {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
                 format!(
-                    "EVTX inherited an unrelated file handle (flags={flags:#x}, runtime={expected_runtime})"
+                    "EVTX inherited an unrelated file handle (flags={flags:#x}, {})",
+                    runtime.diagnostic(handle)
                 ),
             ));
         }
