@@ -59,3 +59,20 @@ python3 scripts/hunteval_model_eval.py \
 | HuntEval episode / IRMind commit / model | Event P/R | Entity P/R | ATT&CK P/R | Evidence citation and notes |
 | --- | --- | --- | --- | --- |
 | | | | | |
+
+
+## Experimental EVTX: Windows 11 candidate check
+
+This check is for community testers with Windows 11. Automated Windows Server tests do not establish Windows client compatibility. Use only the synthetic fixture and run as a standard user. EVTX remains experimental until this check is confirmed.
+
+1. Download the matching `irmind.exe` and `irmind-evtx.exe` from the signed candidate dry-run artifact linked in the [EVTX PR](https://github.com/ns2switch/irmind/pull/188). Put both executables in the same directory. Check `SHA256SUMS`, the cosign bundles and the GitHub provenance as described in [platforms](../platforms.md). For this candidate, the expected signing identity is `https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/heads/feat/evtx-isolated-helper`, the issuer is `https://token.actions.githubusercontent.com`, and the provenance source digest must match the candidate commit. This is a branch candidate, not a published tag.
+2. Start the candidate in Windows Terminal using a fresh test data directory and the file keystore. Do not configure a model or remote connector. Starting IRMind automatically runs the EVTX enforcement self-test before enabling the parser. In `/settings preferences`, check that the experimental EVTX parser is available. If it is unavailable, record its displayed reason; do not disable the firewall, add loopback exemptions or run as administrator to bypass the check.
+3. Download `crates/testkit/fixtures/parser-evtx/source/Security.evtx` from the exact candidate commit. Create a synthetic case with `/new`, then use `/ingest` to select that file. Confirm detection of `parser-evtx`, completion with 14 records, and a visible source manifest. Inspect `/timeline` and `/evidence` and run `/verify` with the source still present.
+4. Close and reopen the candidate. Confirm the self-test runs for the new session and the synthetic case still verifies. Remove the disposable case data after the check.
+
+Publish only the Windows version/build, architecture, candidate commit, available/unavailable result, accepted record count and verification outcome. Do not publish personal paths, keys, credentials or real evidence. Report suspected security weaknesses privately through [SECURITY.md](../../SECURITY.md).
+
+| Windows client | Candidate commit | Native self-test | Synthetic records | Verification | Result |
+| --- | --- | --- | --- | --- | --- |
+| Windows 11 | Not yet confirmed | Pending | Expected: 14 | Pending | Experimental |
+| Windows 10 | Not yet tested | Pending | Expected: 14 | Pending | No compatibility claim |

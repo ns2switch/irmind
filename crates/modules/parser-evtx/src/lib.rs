@@ -211,6 +211,7 @@ impl StreamingEventParser for EvtxParser {
 
 #[cfg(feature = "fuzzing")]
 pub fn fuzz_protocol(bytes: &[u8]) {
+    irmind_process_containment::fuzz_witness_protocol(bytes);
     let _ = strict::decode(bytes);
     let _ = codec::detect(bytes);
     let mut state = codec::State::new("synthetic.evtx", [0; 32], 69632);

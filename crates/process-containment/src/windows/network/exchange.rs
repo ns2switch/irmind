@@ -108,36 +108,65 @@ impl Running {
         }
     }
 }
+fn stage<T>(name: &'static str, result: io::Result<T>) -> io::Result<T> {
+    result.map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "EVTX network witness {name} failed ({:?}/{})",
+                error.kind(),
+                error.raw_os_error().unwrap_or(0)
+            ),
+        )
+    })
+}
 pub(super) fn verify(program: &Arc<Prepared>, cancelled: &dyn Fn() -> bool) -> io::Result<()> {
-    let listeners = Listeners::bind()?;
-    listeners.positive_control()?;
-    let runtime = PreparedChild::new(program, true, listeners.ports()?, None)?;
+    let listeners = stage("bind", Listeners::bind())?;
+    stage("positive-before", listeners.positive_control())?;
+    let runtime = stage(
+        "runtime",
+        PreparedChild::new(program, true, listeners.ports()?, None),
+    )?;
     let input = program.probe_input()?;
-    let mut running = Running::start(&runtime, &input)?;
-    let ports = protocol::parse_ready(&running.line(cancelled)?, &runtime.ticket.nonce)?;
+    let mut running = stage("start", Running::start(&runtime, &input))?;
+    let ready = stage("ready-frame", running.line(cancelled))?;
+    let ports = stage(
+        "ready-content",
+        protocol::parse_ready(&ready, &runtime.ticket.nonce),
+    )?;
     let pid = running.child.id()?;
     if running.child.try_wait()?.is_some() {
-        return Err(denied());
+        return stage("early-exit", Err(denied()));
     }
-    super::listening::verify(pid, ports)?;
-    listeners.empty()?;
-    blocked_candidates(ports)?;
+    stage("listeners-before", super::listening::verify(pid, ports))?;
+    stage("outbound", listeners.empty())?;
+    stage("inbound", blocked_candidates(ports))?;
     if running.child.try_wait()?.is_some() {
-        return Err(denied());
+        return stage("exit-before-ack", Err(denied()));
     }
-    super::listening::verify(pid, ports)?;
-    listeners.positive_control()?;
+    stage("listeners-after", super::listening::verify(pid, ports))?;
+    stage("positive-after", listeners.positive_control())?;
     let temporary = runtime.work_dir().join("irmind-network-ack.tmp");
-    files::write(
-        &temporary,
-        protocol::receipt(&runtime.ticket.nonce, false).as_bytes(),
-        runtime.identity(),
+    stage(
+        "ack-write",
+        files::write(
+            &temporary,
+            protocol::receipt(&runtime.ticket.nonce, false).as_bytes(),
+            runtime.identity(),
+        ),
     )?;
-    std::fs::rename(temporary, runtime.work_dir().join(protocol::ACK))?;
-    protocol::check_receipt(&running.line(cancelled)?, &runtime.ticket.nonce, true)?;
+    stage(
+        "ack-rename",
+        std::fs::rename(temporary, runtime.work_dir().join(protocol::ACK)),
+    )?;
+    let complete = stage("complete-frame", running.line(cancelled))?;
+    stage(
+        "complete-content",
+        protocol::check_receipt(&complete, &runtime.ticket.nonce, true),
+    )?;
     if !running.line(cancelled)?.is_empty() {
-        return Err(denied());
+        return stage("trailing-data", Err(denied()));
     }
-    running.success(cancelled)?;
-    listeners.positive_control()
+    stage("exit", running.success(cancelled))?;
+    stage("positive-final", listeners.positive_control())
 }

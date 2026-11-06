@@ -6,7 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [features]
-fuzzing = []
+fuzzing = ["irmind-process-containment/fuzzing"]
 
 [dependencies]
 irmind-app = { path = "../../app", version = "0.1.0" }

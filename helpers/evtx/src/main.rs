@@ -65,10 +65,10 @@ fn run() -> io::Result<()> {
                     "EVTX child process isolation failed",
                 ));
             }
-            Err(_) => {
+            Err(error) => {
                 return Err(io::Error::new(
                     io::ErrorKind::PermissionDenied,
-                    "EVTX child process isolation could not be verified",
+                    format!("EVTX child process isolation could not be verified ({:?}/{})", error.kind(), error.raw_os_error().unwrap_or(0)),
                 ));
             }
         }
