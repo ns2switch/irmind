@@ -343,9 +343,17 @@ pub fn durable_replace(source: &Path, destination: &Path) -> io::Result<()> {
 /// Read/execute access only for this session's derived `AppContainer` SID.
 #[cfg(feature = "launcher")]
 pub(super) fn helper_read_execute(path: &Path, sandbox_sid: &[u8]) -> io::Result<()> {
+    grant(path, sandbox_sid, "GRGX")
+}
+#[cfg(feature = "launcher")]
+pub(super) fn helper_read_only(path: &Path, sandbox_sid: &[u8]) -> io::Result<()> {
+    grant(path, sandbox_sid, "GR")
+}
+#[cfg(feature = "launcher")]
+fn grant(path: &Path, sandbox_sid: &[u8], rights: &'static str) -> io::Result<()> {
     let owner = sid_text(&current_user_sid()?)?;
     let sandbox = sid_text(sandbox_sid)?;
-    let sddl: Vec<u16> = format!("D:P(A;;FA;;;{owner})(A;;GRGX;;;{sandbox})")
+    let sddl: Vec<u16> = format!("D:P(A;;FA;;;{owner})(A;;{rights};;;{sandbox})")
         .encode_utf16()
         .chain(Some(0))
         .collect();

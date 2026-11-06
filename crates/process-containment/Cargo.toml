@@ -7,7 +7,8 @@ license.workspace = true
 
 [features]
 default = ["launcher"]
-launcher = ["windows-sys/Win32_Security_Isolation", "windows-sys/Win32_System_Com", "windows-sys/Win32_System_SystemInformation", "windows-sys/Win32_System_JobObjects", "windows-sys/Win32_System_Pipes"]
+fuzzing = []
+launcher = ["windows-sys/Win32_System_Services", "windows-sys/Win32_Security_Cryptography","windows-sys/Win32_Security_Isolation", "windows-sys/Win32_System_Com", "windows-sys/Win32_System_SystemInformation", "windows-sys/Win32_System_JobObjects", "windows-sys/Win32_System_Pipes"]
 
 [dependencies]
 tempfile = "3"

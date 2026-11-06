@@ -122,7 +122,7 @@ jobs:
           (Get-Process -Id $PID).SessionId
           Get-Service -Name BFE,MpsSvc | ForEach-Object { "$($_.Name)=$($_.Status)" }
       - name: Check native handle metadata before compiling the decoder harness
-        run: cargo nextest run -p irmind-process-containment --cargo-profile ci --locked -E 'test(handle_snapshot) | test(runtime_directory)'
+        run: cargo nextest run -p irmind-process-containment --cargo-profile ci --locked -E 'test(handle_snapshot) | test(runtime_directory) | test(network)'
       - name: Run the production decoder under the unchanged native containment policy
         shell: pwsh
         env:

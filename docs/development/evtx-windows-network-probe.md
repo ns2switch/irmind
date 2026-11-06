@@ -1,6 +1,6 @@
 # Windows EVTX network probe proposal
 
-This proposal is for maintainers validating the experimental decoder's network boundary. It changes the measurement of isolation, not the permissions granted to the decoder. It is not implemented.
+This design is for maintainers validating the experimental decoder's network boundary. It changes the measurement of isolation, not the permissions granted to the decoder. The implementation remains experimental until native validation and the signed distribution dry run pass.
 
 ## Property to verify
 
@@ -31,3 +31,12 @@ The challenge, acknowledgement and containment frames are bounded internal runti
 - The witness cannot read ground truth, evidence or credentials and cannot publish a partial ingestion.
 
 If socket creation itself must be prohibited on Windows, this AppContainer proposal does not claim that guarantee. Keep Windows EVTX unavailable until a different reviewed mechanism meets it. Linux and macOS denial probes remain unchanged.
+
+
+## Session cache and per-launch checks
+
+The full witness runs once per parser session or on its first use. Its result and service stamp live only in memory. Read-only, short-lived runtime tickets identify the launch purpose, nonce, exact profile SID and fixed containment policy; they are not a persisted witness cache.
+
+One profile is retained for that session. Launches sharing its SID are serialized, so two decoders cannot exchange data through same-container loopback. Waiting for the lease is cancelable. The allowlist always has the same three roles and rights: read-only evidence, stdout and stderr. Their numeric handle values necessarily vary between files. The native constructor reapplies that explicit list and checks the created process's exact SID and empty capabilities before resuming it.
+
+A query-only service monitor subscribes to BFE and MpsSvc status changes. Every notification increments an in-memory epoch, including a stop/restart that ends in Running again. Each launch and successful completion requires both services Running and the same epoch/process IDs as the verified witness. A changed stamp or subsequent validation failure invalidates the cache. Failed process termination poisons the session rather than permitting another decoder to overlap it. No code enables services or changes firewall configuration.

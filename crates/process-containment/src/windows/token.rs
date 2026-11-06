@@ -3,25 +3,74 @@ use super::{error, handles::Handle};
 use std::{io, ptr};
 use windows_sys::Win32::{
     Security::{
-        GetTokenInformation, TOKEN_INFORMATION_CLASS, TOKEN_QUERY, TokenCapabilities,
-        TokenIsAppContainer,
+        GetTokenInformation, TOKEN_APPCONTAINER_INFORMATION, TOKEN_INFORMATION_CLASS, TOKEN_QUERY,
+        TokenAppContainerSid, TokenCapabilities, TokenIsAppContainer,
     },
     System::Threading::{GetCurrentProcess, OpenProcessToken},
 };
-pub(crate) fn verify_token(input: &std::fs::File) -> io::Result<()> {
+pub(crate) fn verify_token(input: &std::fs::File, expected: &[u8]) -> io::Result<()> {
+    // SAFETY: borrowed current-process pseudo-handle; no ownership is transferred.
+    verify_created(unsafe { GetCurrentProcess() }, expected)?;
+    verify_inherited_files(input)
+}
+pub(crate) fn verify_created(
+    process: windows_sys::Win32::Foundation::HANDLE,
+    expected: &[u8],
+) -> io::Result<()> {
     let mut raw = ptr::null_mut();
-    // SAFETY: current process is a borrowed pseudo-handle; output transfers one owned token handle.
-    if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &raw mut raw) } == 0 {
+    // SAFETY: borrowed live process handle and valid output; transfers one owned token.
+    if unsafe { OpenProcessToken(process, TOKEN_QUERY, &raw mut raw) } == 0 {
         return Err(error("token-open"));
     }
     let token = Handle::new(raw)?;
-    if query(&token, TokenIsAppContainer)? != 1 || query(&token, TokenCapabilities)? != 0 {
+    if query(&token, TokenIsAppContainer)? != 1
+        || query(&token, TokenCapabilities)? != 0
+        || !profile_matches(&token, expected)?
+    {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "EVTX requires an AppContainer token without network capabilities",
+            "EVTX requires the verified AppContainer profile without network capabilities",
         ));
     }
-    verify_inherited_files(input)
+    Ok(())
+}
+fn profile_matches(token: &Handle, expected: &[u8]) -> io::Result<bool> {
+    let mut words = vec![0usize; 64];
+    let mut returned = 0;
+    let capacity = u32::try_from(std::mem::size_of_val(words.as_slice()))
+        .map_err(|_| error("profile-size"))?;
+    // SAFETY: live token; aligned initialized output is large enough for the
+    // public pointer structure and the bounded SID; returned length is checked.
+    if unsafe {
+        GetTokenInformation(
+            token.raw(),
+            TokenAppContainerSid,
+            words.as_mut_ptr().cast(),
+            capacity,
+            &raw mut returned,
+        )
+    } == 0
+        || returned > capacity
+        || (returned as usize) < std::mem::size_of::<TOKEN_APPCONTAINER_INFORMATION>()
+    {
+        return Err(error("profile-query"));
+    }
+    // SAFETY: a successful query initialized the public structure in the checked aligned buffer.
+    let sid =
+        unsafe { (*words.as_ptr().cast::<TOKEN_APPCONTAINER_INFORMATION>()).TokenAppContainer };
+    let start = words.as_ptr() as usize;
+    let address = sid as usize;
+    if expected.len() < 8
+        || expected.len() > 68
+        || address < start
+        || address
+            .checked_add(expected.len())
+            .is_none_or(|end| end > start + returned as usize)
+    {
+        return Err(error("profile-SID-bound"));
+    }
+    // SAFETY: exact expected SID extent lies inside the live initialized query buffer.
+    Ok((unsafe { std::slice::from_raw_parts(sid.cast::<u8>(), expected.len()) }) == expected)
 }
 
 fn verify_inherited_files(input: &std::fs::File) -> io::Result<()> {

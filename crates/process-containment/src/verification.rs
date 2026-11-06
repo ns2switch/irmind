@@ -12,13 +12,7 @@ fn blocked<T>(result: io::Result<T>) -> bool {
 
 /// Invoked after native enforcement and before any decoder input is processed.
 pub fn verify_entry() -> io::Result<()> {
-    let file = blocked(fs::read(CANARY));
-    let write = blocked(
-        fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open("irmind-write-canary"),
-    );
+    verify_files()?;
     let ipv4 = blocked(TcpListener::bind((Ipv4Addr::LOCALHOST, 0)));
     let ipv6 = blocked(TcpListener::bind((Ipv6Addr::LOCALHOST, 0)));
     // Only loopback is probed; failure must be policy denial, never refusal/timeout.
@@ -48,11 +42,11 @@ pub fn verify_entry() -> io::Result<()> {
             ));
         }
     }
-    if !file || !write || !ipv4 || !ipv6 || !outbound {
+    if !ipv4 || !ipv6 || !outbound {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             format!(
-                "EVTX isolation verification failed: foreign_read_denied={file}, runtime_write_denied={write}, ipv4_bind_denied={ipv4}, ipv6_bind_denied={ipv6}, outbound_denied={outbound}, outbound_ipv4={}, outbound_ipv6={}",
+                "EVTX isolation verification failed: ipv4_bind_denied={ipv4}, ipv6_bind_denied={ipv6}, outbound_denied={outbound}, outbound_ipv4={}, outbound_ipv6={}",
                 connection_outcome(&connections[0]),
                 connection_outcome(&connections[1])
             ),
@@ -66,4 +60,21 @@ fn connection_outcome(result: &io::Result<TcpStream>) -> String {
         Ok(_) => "connected".into(),
         Err(error) => format!("{:?}/{}", error.kind(), error.raw_os_error().unwrap_or(0)),
     }
+}
+
+pub(crate) fn verify_files() -> io::Result<()> {
+    let file = blocked(fs::read(CANARY));
+    let write = blocked(
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open("irmind-write-canary"),
+    );
+    if !file || !write {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "EVTX file isolation verification failed",
+        ));
+    }
+    Ok(())
 }

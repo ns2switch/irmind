@@ -1,7 +1,9 @@
+#[cfg(unix)]
+use std::path::PathBuf;
 use std::{
     fs::{self, File},
     io::{self, Read},
-    path::{Path, PathBuf},
+    path::Path,
     sync::Arc,
 };
 #[cfg(unix)]
@@ -25,9 +27,25 @@ impl Mode {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct WitnessStats {
+    pub attempts: u64,
+    pub elapsed: std::time::Duration,
+}
 pub(crate) struct Prepared {
+    #[cfg(windows)]
+    identity: crate::windows::process::Identity,
+    #[cfg(windows)]
+    session: crate::windows::network::Session,
+    #[cfg(unix)]
     path: PathBuf,
     work: tempfile::TempDir,
+}
+#[cfg(windows)]
+impl Prepared {
+    pub(crate) fn probe_input(&self) -> io::Result<File> {
+        File::open(self.work.path().join(crate::verification::CANARY))
+    }
 }
 #[derive(Clone)]
 pub struct Program {
@@ -47,9 +65,19 @@ impl Program {
             .rand_bytes(16)
             .tempdir_in(fs::canonicalize(data_root)?)?;
         initialize_work(work.path())?;
+        let path = fs::canonicalize(path)?;
+        #[cfg(windows)]
+        let identity = crate::windows::process::Identity::new(&path, work.path())?;
+        #[cfg(windows)]
+        let session = crate::windows::network::Session::new()?;
         Ok(Self {
             inner: Arc::new(Prepared {
-                path: fs::canonicalize(path)?,
+                #[cfg(windows)]
+                identity,
+                #[cfg(windows)]
+                session,
+                #[cfg(unix)]
+                path,
                 work,
             }),
         })
@@ -61,6 +89,17 @@ impl Program {
         )
     }
     pub fn spawn(&self, input: &File, mode: Mode) -> io::Result<Child> {
+        self.spawn_cancelable(input, mode, &|| false)
+    }
+    pub fn spawn_cancelable(
+        &self,
+        input: &File,
+        mode: Mode,
+        cancelled: &dyn Fn() -> bool,
+    ) -> io::Result<Child> {
+        if cancelled() {
+            return Err(io::ErrorKind::Interrupted.into());
+        }
         if !input.metadata()?.is_file() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -68,25 +107,57 @@ impl Program {
             ));
         }
         #[cfg(unix)]
-        let native = native::spawn(&self.inner, input, mode)?;
+        {
+            Ok(Child {
+                native: native::spawn(&self.inner, input, mode)?,
+                program: self.clone(),
+            })
+        }
         #[cfg(windows)]
-        let runtime = PreparedChild::new(&self.inner)?;
+        {
+            let lease = self.inner.session.acquire(cancelled)?;
+            let result = (|| {
+                let stamp = self.inner.session.ensure(&self.inner, cancelled)?;
+                let mut runtime = PreparedChild::new(&self.inner, false, [0, 0], Some(lease))?;
+                self.inner.session.unchanged(stamp)?;
+                runtime.stamp = Some(stamp);
+                let native = native::spawn(&runtime, input, mode)?;
+                Ok(Child {
+                    native,
+                    runtime,
+                    program: self.clone(),
+                    finished: false,
+                })
+            })();
+            if result.is_err() {
+                self.invalidate();
+            }
+            result
+        }
+    }
+    pub fn invalidate(&self) {
         #[cfg(windows)]
-        let native = native::spawn(&runtime, input, mode)?;
-        Ok(Child {
-            native,
-            #[cfg(windows)]
-            _runtime: runtime,
-            _program: self.clone(),
-        })
+        self.inner.session.invalidate();
+    }
+    pub fn witness_stats(&self) -> WitnessStats {
+        #[cfg(windows)]
+        {
+            self.inner.session.stats()
+        }
+        #[cfg(not(windows))]
+        {
+            WitnessStats::default()
+        }
     }
 }
 
 pub struct Child {
     native: native::Child,
     #[cfg(windows)]
-    _runtime: PreparedChild,
-    _program: Program,
+    runtime: PreparedChild,
+    program: Program,
+    #[cfg(windows)]
+    finished: bool,
 }
 impl Child {
     pub fn take_stdout(&mut self) -> io::Result<Box<dyn Read + Send>> {
@@ -96,18 +167,43 @@ impl Child {
         self.native.stderr()
     }
     pub fn try_wait(&mut self) -> io::Result<Option<bool>> {
-        self.native.try_wait()
+        let status = self.native.try_wait()?;
+        #[cfg(windows)]
+        if status == Some(true) {
+            let stamp = self
+                .runtime
+                .stamp
+                .ok_or_else(crate::witness_protocol::denied)?;
+            if let Err(error) = self.program.inner.session.unchanged(stamp) {
+                self.program.invalidate();
+                return Err(error);
+            }
+            self.finished = true;
+        }
+        Ok(status)
     }
     pub fn exit_description(&mut self) -> io::Result<Option<String>> {
         self.native.exit_description()
     }
     pub fn terminate(&mut self) -> io::Result<()> {
+        self.program.invalidate();
         self.native.terminate()
     }
 }
 impl Drop for Child {
     fn drop(&mut self) {
-        let _ = self.native.terminate();
+        let result = self.native.terminate();
+        #[cfg(windows)]
+        {
+            if !self.finished {
+                self.program.invalidate();
+            }
+            if result.is_err() {
+                self.program.inner.session.poison();
+            }
+        }
+        #[cfg(not(windows))]
+        let _ = result;
     }
 }
 
@@ -135,26 +231,51 @@ fn private(path: &Path) -> io::Result<()> {
 #[cfg(windows)]
 pub(crate) struct PreparedChild {
     work: tempfile::TempDir,
-    identity: crate::windows::process::Identity,
+    program: Arc<Prepared>,
+    stamp: Option<crate::windows::network::ServiceStamp>,
+    pub(crate) ticket: crate::witness_protocol::Ticket,
+    _lease: Option<crate::windows::network::Lease>,
 }
 #[cfg(windows)]
 impl PreparedChild {
-    fn new(program: &Prepared) -> io::Result<Self> {
+    pub(crate) fn new(
+        program: &Arc<Prepared>,
+        witness: bool,
+        ports: [u16; 2],
+        lease: Option<crate::windows::network::Lease>,
+    ) -> io::Result<Self> {
         let work = tempfile::Builder::new()
             .prefix("evtx-child-")
             .rand_bytes(32)
             .tempdir_in(program.work.path())?;
         initialize_work(work.path())?;
-        let identity = crate::windows::process::Identity::new(&program.path, work.path())?;
-        Ok(Self { work, identity })
+        program.identity.grant_runtime(work.path())?;
+        let ticket = crate::witness_protocol::Ticket {
+            witness,
+            nonce: crate::windows::network::nonce()?,
+            sid: program.identity.bytes().to_vec(),
+            ports,
+        };
+        crate::windows::network::write_ticket(
+            &work.path().join(crate::witness_protocol::TICKET),
+            ticket.encode().as_bytes(),
+            &program.identity,
+        )?;
+        Ok(Self {
+            work,
+            program: program.clone(),
+            stamp: None,
+            ticket,
+            _lease: lease,
+        })
     }
     pub(crate) fn path(&self) -> &Path {
-        self.identity.executable()
+        self.program.identity.executable()
     }
     pub(crate) fn work_dir(&self) -> &Path {
         self.work.path()
     }
     pub(crate) fn identity(&self) -> &crate::windows::process::Identity {
-        &self.identity
+        &self.program.identity
     }
 }
