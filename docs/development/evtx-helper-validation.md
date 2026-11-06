@@ -47,7 +47,10 @@ The native suite passed on the following configurations in [this CI run](https:/
 | Debian 12 and Fedora 44 userspace on the Ubuntu 22.04 host kernel above | Pinned containers, without network | Passed; distribution stock kernels remain untested |
 | macOS 26.6.2, arm64 | Native sandbox profile, helper tests and workspace suite | 10 helper and 626 workspace tests passed |
 | Ubuntu 24.04 | Release compatibility gate | Not yet executed |
-| Windows Server runner | Native launcher | Decoder startup is not yet passing; unavailable |
+| Windows Server 2025, x86-64, build 10.0.26100 | Native launcher and handle metadata | Loader and handle checks now run; network denial probe does not pass, so EVTX remains unavailable |
 | Windows 10 and Windows 11 clients | No native execution | Untested; no support claim |
 
 The Windows startup investigation is separate from the passing Linux/macOS evidence. The required native tests remain enabled. A failed probe makes EVTX unavailable; it does not select a weaker launcher.
+
+
+The [Windows network-probe proposal](evtx-windows-network-probe.md) distinguishes traffic isolation from socket creation and requires controlled live endpoints rather than treating an arbitrary connection timeout as proof. It is not implemented; the current strict native gate continues to fail closed.

@@ -79,3 +79,5 @@ Related: [approved work order](plan.md#approved-parser-and-precision-work-order)
 ## Platform evidence
 
 Report observed userspace, kernel and Landlock ABI separately. A Debian or Fedora container uses the host kernel and does not validate its distribution's stock kernel. Include Ubuntu 22.04/24.04, Debian 12, a current Fedora image, native macOS and native Windows CI evidence; client Windows 10/11 and macOS versions without actual execution stay explicitly untested. An unsupported kernel, sandbox profile or native API makes the module unavailable with an actionable reason. Never infer support from a distribution name alone.
+
+The [separate Windows network-probe proposal](evtx-windows-network-probe.md) documents a possible traffic-based witness. It is not an implemented fallback and does not change current availability gates.
