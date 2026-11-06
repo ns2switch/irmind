@@ -9,7 +9,10 @@ A source build is the recommended path for internal evaluation:
 ```sh
 rustup toolchain install 1.95.0
 cargo build --release --locked -p irmind
+CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
 ```
+
+The second build produces the isolated EVTX helper beside the main executable. In PowerShell, set `$env:CARGO_TARGET_DIR = "target"` before running that helper build. EVTX stays unavailable if its matching helper or the required native sandbox is missing.
 
 CI tests Ubuntu Linux, macOS arm64, and Windows x64 with the MSVC toolchain. SQLite is built from bundled sources. Arrow and Parquet use Rust crates. Network TLS uses rustls with native certificate roots, including installed corporate CAs; IRMind does not link system OpenSSL. The native-root approach may differ from platform policy checks performed by a dedicated certificate verifier.
 
@@ -72,7 +75,7 @@ Use a terminal compatible with xterm, such as GNOME Terminal or Konsole. The `os
 
 ## macOS
 
-Use Terminal.app or iTerm2. The `os` backend uses Keychain; the `file` backend is available for explicit SSH use. CI targets Apple Silicon. After verifying the release, Gatekeeper may block a downloaded binary without Apple code signing. Allow **that binary only** in System Settings → Privacy & Security, or remove only its quarantine attribute with `xattr -d com.apple.quarantine ./irmind`. Never disable Gatekeeper system-wide.
+Use Terminal.app or iTerm2. The `os` backend uses Keychain; the `file` backend is available for explicit SSH use. CI targets Apple Silicon. After verifying the release, Gatekeeper may block a downloaded binary without Apple code signing. Allow **that binary only** in System Settings → Privacy & Security, or remove only its quarantine attribute with `xattr -d com.apple.quarantine ./irmind`. Never disable Gatekeeper system-wide. For a separately downloaded helper, verify it first and apply the same per-file quarantine removal to `./irmind-evtx` if needed.
 
 ## Windows
 

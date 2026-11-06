@@ -98,6 +98,9 @@ impl Child {
     pub fn try_wait(&mut self) -> io::Result<Option<bool>> {
         self.native.try_wait()
     }
+    pub fn exit_description(&mut self) -> io::Result<Option<String>> {
+        self.native.exit_description()
+    }
     pub fn terminate(&mut self) -> io::Result<()> {
         self.native.terminate()
     }

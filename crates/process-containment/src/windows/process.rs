@@ -111,6 +111,12 @@ fn wide(value: &std::ffi::OsStr) -> io::Result<Vec<u16>> {
             "invalid helper runtime path",
         ));
     }
+    // CreateProcess AppContainer paths use the DOS spelling, rather than the
+    // verbatim prefix returned by Rust filesystem canonicalization.
+    let prefix: Vec<u16> = r"\\?\".encode_utf16().collect();
+    if out.starts_with(&prefix) && out.get(5) == Some(&u16::from(b':')) {
+        out.drain(..4);
+    }
     out.push(0);
     Ok(out)
 }
@@ -128,17 +134,19 @@ impl Child {
             .map(|f| Box::new(f) as Box<dyn Read + Send>)
             .ok_or_else(|| io::Error::other("missing helper stderr"))
     }
-    pub(crate) fn try_wait(&mut self) -> io::Result<Option<bool>> {
+    fn exit_code(&self) -> io::Result<Option<u32>> {
         let mut exit = 0;
-        // SAFETY: owned process handle is live and the output points to initialized u32 storage.
+        // SAFETY: the owned process handle is live and output points to initialized u32 storage.
         if unsafe { GetExitCodeProcess(self.process.raw(), &raw mut exit) } == 0 {
             return Err(error("exit-code"));
         }
-        if exit == STILL_ACTIVE as u32 {
-            Ok(None)
-        } else {
-            Ok(Some(exit == 0))
-        }
+        Ok((exit != STILL_ACTIVE as u32).then_some(exit))
+    }
+    pub(crate) fn try_wait(&mut self) -> io::Result<Option<bool>> {
+        Ok(self.exit_code()?.map(|exit| exit == 0))
+    }
+    pub(crate) fn exit_description(&mut self) -> io::Result<Option<String>> {
+        Ok(self.exit_code()?.map(|exit| format!("code={exit:#x}")))
     }
     pub(crate) fn terminate(&mut self) -> io::Result<()> {
         if self.try_wait()?.is_none() {

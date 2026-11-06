@@ -82,3 +82,36 @@ fn detection_is_content_based_and_bounded() {
     assert!(!codec::detect(b"ElfFile\0"));
     assert!(!codec::detect(b"{\"event\":\"evtx\"}"));
 }
+
+#[test]
+fn unavailable_decoder_is_recognized_but_cannot_be_selected_or_rebuilt() {
+    use irmind_app::modules::{ParserChoice, ParserSelectionRequest};
+    let root = tempfile::tempdir().unwrap();
+    let parser = EvtxParser::new(&root.path().join("missing-helper"), root.path());
+    let reason = parser.unavailable_reason().unwrap().to_owned();
+    let mut registry = ModuleRegistry::new();
+    registry
+        .register(Box::new(parser), &ModuleConfig::new())
+        .unwrap();
+    registry
+        .mark_parser_unavailable("parser-evtx", reason)
+        .unwrap();
+    let sample =
+        &include_bytes!("../../../testkit/fixtures/parser-evtx/source/Security.evtx")[..65536];
+    let catalog = registry.parser_catalog();
+    assert!(matches!(
+        catalog.detect("arbitrary-name.bin", sample),
+        ParserChoice::Auto(_)
+    ));
+    assert!(catalog.available().is_empty());
+    let result = catalog.select_source(ParserSelectionRequest {
+        source: "arbitrary-name.bin",
+        sample,
+        parser_override: None,
+        forced: false,
+        time_context: None,
+    });
+    assert!(result.err().unwrap().to_string().contains("unavailable"));
+    assert!(catalog.get_version("parser-evtx", VERSION).is_err());
+    assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+}

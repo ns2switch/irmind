@@ -594,3 +594,16 @@ Both cloud writers preserve 19/19 malicious events, 10/10 entities and 14/14 pat
 The final four disordered cases take 1,007.507–1,120.179 seconds, below the analyst-approved 1,350-second stress limit. Further optimization is [tracked in issue #186](https://github.com/ns2switch/irmind/issues/186), after v0.2.0, and does not block that release. Sorting and replay/writing remain the largest measured sequential costs. Natural-run merging still writes an intermediate merged stream, copies it back into the normalized spool and parses that spool again before writing Parquet.
 
 Next, measure splitting, merging, final copying and replay separately, then evaluate feeding the bounded merge directly into the existing provisional Parquet writer. Retain every run count/size/hash check at EOF, full-source authentication, deterministic partition allocation, stable order, cancellation and whole-batch rollback. Keep the current external-sort fallback above the run/head bounds. Require byte-equivalence and failure-cleanup tests and repeat all 15 GB pairs. The present counters do not measure the potential saving of that fusion, so no estimated sub-900 result is claimed. Keep the 900-second release gate for cloud and chronological sources and the 1,350-second stress gate for disordered sources. Query limits do not change.
+
+## Isolated EVTX conversion
+
+A release build of the separate helper workspace converted a synthetic EVTX file of 1,073,680,384 bytes (approximately 1 GiB) in 18.15 seconds: 56.42 MiB/s, 229,362 records and three precise Parquet artifacts. This covers initial/source rehashing, contained decoding, normalization and Parquet conversion; audit signing is excluded. The fixture repeats the synthetic Security mapping chunk with chronological record-header times. It is not a compressed/template-heavy real-world EVTX corpus or a query benchmark. No original evidence copy is made. The release helper executable measured 1,479,504 bytes on Linux x86-64.
+
+Reproduce with the separately resolved workspace:
+
+```sh
+CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --release --bin irmind-evtx --example benchmark
+target/release/examples/benchmark
+```
+
+The benchmark rejects unoptimized execution and removes its temporary source and artifacts on exit.

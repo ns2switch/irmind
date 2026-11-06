@@ -33,8 +33,8 @@ impl EvtxParser {
         let prepared = (|| {
             let program=Program::new(helper,data_root).map_err(|_|bad("EVTX helper is missing or its private runtime cannot be created; install the matching irmind-evtx binary and check the data directory"))?;
             let mut probe = false;
-            let child = program.probe().map_err(|_| {
-                bad("EVTX native containment cannot start; inspect the platform requirements")
+            let child = program.probe().map_err(|error| {
+                AppError::Policy(format!("EVTX native containment cannot start ({error}); check the helper installation and platform sandbox requirements"))
             })?;
             input::run(
                 child,
@@ -118,7 +118,7 @@ impl Module for EvtxParser {
 }
 impl LogParser for EvtxParser {
     fn detect(&self, _: &str, sample: &[u8]) -> Option<ParserConfidence> {
-        if self.program.is_none() || !codec::detect(sample) {
+        if !codec::detect(sample) {
             return None;
         }
         ParserConfidence::new(95).ok()

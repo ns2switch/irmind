@@ -132,8 +132,23 @@ impl Fields {
             .pointer("/Event/EventData")
             .or_else(|| event.pointer("/Event/UserData"));
         let field = |names: &[&str]| names.iter().find_map(|name| lookup(fields, name));
-        let user = field(&["TargetUserName", "SubjectUserName", "User", "UserName"]);
-        let process = field(&["Image", "NewProcessName", "ProcessName", "Application"]);
+        let user = field(&[
+            "TargetUserName",
+            "SubjectUserName",
+            "User",
+            "UserName",
+            "TargetUserSid",
+            "SubjectUserSid",
+        ]);
+        let process = field(&[
+            "Image",
+            "NewProcessName",
+            "ProcessName",
+            "Application",
+            "ImagePath",
+            "ServiceFileName",
+            "SourceImage",
+        ]);
         let command = field(&["CommandLine", "ProcessCommandLine"]);
         let source_ip = field(&["SourceIp", "IpAddress", "SourceAddress"]);
         let destination_ip = field(&["DestinationIp", "DestinationAddress"]);

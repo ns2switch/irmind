@@ -27,25 +27,30 @@ pub(crate) fn verify_token(input: &std::fs::File) -> io::Result<()> {
 fn verify_inherited_files(input: &std::fs::File) -> io::Result<()> {
     use std::os::windows::io::AsRawHandle as _;
     use windows_sys::Win32::{
-        Foundation::GetHandleInformation,
+        Foundation::{GetHandleInformation, HANDLE_FLAG_INHERIT},
         Storage::FileSystem::{FILE_TYPE_DISK, GetFileType},
-        System::Console::{GetStdHandle, STD_INPUT_HANDLE},
+        System::Console::{GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE},
     };
     // SAFETY: queries the borrowed standard input handle; it is never closed here.
     let stdin = unsafe { GetStdHandle(STD_INPUT_HANDLE) };
+    // SAFETY: both are borrowed standard handles, queried without transferring ownership.
+    let output = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
+    // SAFETY: the standard error query has no input pointers and returns a borrowed handle.
+    let errors = unsafe { GetStdHandle(STD_ERROR_HANDLE) };
     let evidence = input.as_raw_handle();
     // Windows handle values are multiples of four. Check a bounded low range
     // including the inheritable-canary handles used by the native launch tests.
     for value in (4usize..65_536).step_by(4) {
         let handle = value as *mut std::ffi::c_void;
-        if handle == stdin || handle == evidence {
+        if [stdin, output, errors, evidence].contains(&handle) {
             continue;
         }
         let mut flags = 0;
         // SAFETY: query APIs validate arbitrary handle values; no pointer is dereferenced.
         if unsafe { GetHandleInformation(handle, &raw mut flags) } != 0 {
             // SAFETY: successful handle query established a live handle in this process.
-            if unsafe { GetFileType(handle) } == FILE_TYPE_DISK {
+            if flags & HANDLE_FLAG_INHERIT != 0 || unsafe { GetFileType(handle) } == FILE_TYPE_DISK
+            {
                 return Err(io::Error::new(
                     io::ErrorKind::PermissionDenied,
                     "EVTX inherited an unrelated file handle",

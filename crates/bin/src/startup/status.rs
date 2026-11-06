@@ -104,7 +104,9 @@ fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
         builder.out.push(ModuleStatus {
             id: id.into(),
             compiled,
-            enabled: compiled && builder.registry.manifest(id).is_some(),
+            enabled: compiled
+                && builder.registry.manifest(id).is_some()
+                && !builder.issues.contains_key(id),
             configuration: if let Some(issue) = builder.issues.get(id) {
                 issue.clone()
             } else if compiled {

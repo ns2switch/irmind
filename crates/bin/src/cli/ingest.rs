@@ -194,6 +194,12 @@ fn plan_ingest(input: IngestPlanInput<'_>) -> Result<Vec<(String, ResolvedParser
         });
         match selected {
             Ok(selection) => plan.push((source, selection)),
+            Err(error @ irmind_app::AppError::ParserUnavailable { .. }) => {
+                input
+                    .engine
+                    .record_parser_selection_required(input.id, "unsupported")?;
+                return Err(error.into());
+            }
             Err(error @ irmind_app::AppError::ParserTimeContextRequired { .. }) => {
                 input
                     .engine

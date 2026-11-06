@@ -101,9 +101,15 @@ pub(super) fn run(
             return if success {
                 Ok(())
             } else {
-                Err(bad(
-                    "EVTX helper rejected the source or isolation is unsupported; enable Landlock on Linux or inspect native sandbox support",
-                ))
+                Err(AppError::Policy(format!(
+                    "EVTX helper exited unsuccessfully ({}); no partial file was ingested; check native sandbox support",
+                    running
+                        .child
+                        .exit_description()
+                        .ok()
+                        .flatten()
+                        .unwrap_or_else(|| "exit status unavailable".into())
+                )))
             };
         }
         thread::sleep(Duration::from_millis(10));

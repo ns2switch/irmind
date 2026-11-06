@@ -26,6 +26,7 @@ pub enum ParserChoice {
 #[derive(Clone, Default)]
 pub struct ParserCatalog {
     pub(super) parsers: BTreeMap<String, Arc<dyn LogParser>>,
+    pub(super) unavailable: BTreeMap<String, String>,
     pub(super) resolver: Option<Arc<dyn ParserResolver>>,
 }
 
@@ -55,6 +56,7 @@ impl ParserCatalog {
     }
 
     pub fn get_version(&self, id: &str, version: &str) -> Result<Arc<dyn LogParser>, AppError> {
+        self.ensure_available(id)?;
         let parser = match self.get(id) {
             Ok(parser) if parser.identity().version == version => parser,
             _ => self
@@ -71,7 +73,18 @@ impl ParserCatalog {
         Ok(parser)
     }
 
+    pub(super) fn ensure_available(&self, id: &str) -> Result<(), AppError> {
+        if let Some(reason) = self.unavailable.get(id) {
+            return Err(AppError::ParserUnavailable {
+                parser_id: id.into(),
+                reason: reason.clone(),
+            });
+        }
+        Ok(())
+    }
+
     pub fn get(&self, id: &str) -> Result<Arc<dyn LogParser>, AppError> {
+        self.ensure_available(id)?;
         self.parsers.get(id).cloned().ok_or(AppError::Fixed(
             crate::FixedAppError::PolicyEventParserIsNotRegistered,
         ))
@@ -81,6 +94,7 @@ impl ParserCatalog {
     pub fn available(&self) -> Vec<(String, String)> {
         self.parsers
             .iter()
+            .filter(|(id, _)| !self.unavailable.contains_key(id.as_str()))
             .map(|(id, parser)| (id.clone(), parser.identity().version.to_owned()))
             .collect()
     }

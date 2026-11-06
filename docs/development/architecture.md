@@ -15,12 +15,12 @@ shared filesystem and protocol crates support adapters without depending on them
 | Domain | `irmind-domain` | Cases, typed IDs, taint, risk, policy, approval challenges, pure custody rules. Depends on `std` and `sha2` for pure hashing. |
 | Application | `irmind-app` | Use cases, remote and local ports, registry, dispatch, report, and audit orchestration. |
 | Adapters | `irmind-mod-*`, `irmind-infra` | Product APIs, SQLite, signed Parquet, evidence files, and signing backends. |
-| Shared support | `irmind-fs`, `irmind-keystore-transfer`, `irmind-llm-chat-completions` | Private file operations, encrypted key transfer, and common model protocol handling. No dependency on a product adapter. |
+| Shared support | `irmind-fs`, `irmind-process-containment`, `irmind-keystore-transfer`, `irmind-llm-chat-completions` | Private file operations, native process containment, encrypted key transfer, and common model protocol handling. No dependency on a product adapter. |
 | Mandatory security | `irmind-security` | Normalization, detection, redaction, and output screening. |
 | Presentation | `irmind-tui` | Analyst screens and commands; it calls application use cases. |
 | Composition | `irmind` | Selects signing and secret backends, injects credentials, registers compiled modules, starts TUI or CLI automation. |
 
-`irmind-testkit` contains fake ports and shared contracts. The workspace test built with `cargo_metadata` rejects reverse edges and production dependencies between adapters. Most crates forbid unsafe Rust; the reviewed Win32 ACL boundary in `irmind-fs` is the only explicit exception.
+`irmind-testkit` contains fake ports and shared contracts. The workspace test built with `cargo_metadata` rejects reverse edges and production dependencies between adapters. Most crates forbid unsafe Rust; the reviewed Windows process/ACL boundary in `irmind-process-containment` is the only explicit exception. `irmind-fs` exposes safe filesystem operations and forbids unsafe code. Linux containment also forbids unsafe first-party code.
 
 Remote ports are async and accept a `CancellationToken`. Local ports stay synchronous; a long local operation runs off the UI thread and checks cancellation between batches. Case locks and SQLite WAL coordinate concurrent activity for one case.
 
@@ -56,3 +56,5 @@ The audit log and case state share a SQLite transaction. Case sealing signs a pr
 7. Add recorded synthetic responses and run the relevant `irmind-testkit` contract. Add a Cargo feature and explicit selection in the binary, then document required privileges and limits in [modules](../modules.md).
 
 For Chat Completions providers, reuse `irmind-llm-chat-completions`. Anthropic uses a separate native Messages adapter. New modules remain frozen until the current structural and documentation work is reviewed.
+
+The EVTX decoder lives in the separate Cargo workspace `helpers/evtx`, with an independent lockfile. The main parser module validates bounded NDJSON and retains source provenance. Its feature graph cannot enable decoder features in the main executable. See the [containment design](evtx-helper-design.md).

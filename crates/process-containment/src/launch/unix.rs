@@ -48,7 +48,7 @@ fn command(program: &Prepared) -> io::Result<Command> {
         })?;
     let escaped = path.replace('\\', "\\\\").replace('"', "\\\"");
     let profile = format!(
-        r#"(version 1)(deny default)(allow process-exec (literal "{escaped}"))(deny process-fork)(allow sysctl-read)(allow file-read-metadata)(allow file-read-data (subpath "/System/Library") (subpath "/usr/lib") (literal "{escaped}") (literal "/dev/urandom") (literal "/dev/null"))"#
+        r#"(version 1)(deny default)(allow process-exec (literal "{escaped}"))(deny process-fork)(allow file-map-executable (subpath "/System/Library") (subpath "/usr/lib") (literal "{escaped}"))(allow sysctl-read)(allow file-read-metadata)(allow file-read-data (subpath "/System/Library") (subpath "/usr/lib") (literal "{escaped}") (literal "/dev/urandom") (literal "/dev/null"))"#
     );
     let mut command = Command::new("/usr/bin/sandbox-exec");
     command.args(["-p", &profile, "--"]).arg(&program.path);
@@ -72,6 +72,13 @@ impl Child {
     }
     pub(super) fn try_wait(&mut self) -> io::Result<Option<bool>> {
         Ok(self.0.try_wait()?.map(|status| status.success()))
+    }
+    pub(super) fn exit_description(&mut self) -> io::Result<Option<String>> {
+        use std::os::unix::process::ExitStatusExt as _;
+        Ok(self
+            .0
+            .try_wait()?
+            .map(|status| format!("code={:?}, signal={:?}", status.code(), status.signal())))
     }
     pub(super) fn terminate(&mut self) -> io::Result<()> {
         if self.0.try_wait()?.is_none() {
