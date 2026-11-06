@@ -15,6 +15,7 @@ pub struct ModuleRegistry {
     parser: Option<Arc<dyn LogParser>>,
     parsers: BTreeMap<String, Arc<dyn LogParser>>,
     parser_variants: Vec<Arc<dyn LogParser>>,
+    unavailable_parsers: BTreeMap<String, String>,
     siems: Vec<Box<dyn SiemPort>>,
     edrs: Vec<Box<dyn EdrPort>>,
     cloud_audits: Vec<Box<dyn CloudAuditPort>>,
@@ -206,6 +207,18 @@ impl ModuleRegistry {
             ))
     }
 
+    /// Retain format recognition while refusing selection after a failed startup probe.
+    /// The reason must be bounded, non-secret diagnostic text.
+    pub fn mark_parser_unavailable(&mut self, id: &str, reason: String) -> Result<(), AppError> {
+        if !self.parsers.contains_key(id) || reason.is_empty() || reason.len() > 512 {
+            return Err(AppError::Policy(
+                "invalid parser availability metadata".into(),
+            ));
+        }
+        self.unavailable_parsers.insert(id.to_owned(), reason);
+        Ok(())
+    }
+
     pub fn parser_by_id(&self, id: &str) -> Result<Arc<dyn LogParser>, AppError> {
         self.parser_catalog().get(id)
     }
@@ -219,6 +232,7 @@ impl ModuleRegistry {
     pub fn parser_catalog(&self) -> ParserCatalog {
         ParserCatalog {
             parsers: self.parsers.clone(),
+            unavailable: self.unavailable_parsers.clone(),
             resolver: None,
         }
     }

@@ -151,10 +151,11 @@ fn register_parsers(
             "irmind-evtx"
         });
         let parser = irmind_mod_parser_evtx::EvtxParser::new(&helper, data_root);
-        if let Some(reason) = parser.unavailable_reason() {
-            issues.insert("parser-evtx", reason.to_owned());
-        } else {
-            registry.register(Box::new(parser), &ModuleConfig::new())?;
+        let issue = parser.unavailable_reason().map(str::to_owned);
+        registry.register(Box::new(parser), &ModuleConfig::new())?;
+        if let Some(reason) = issue {
+            registry.mark_parser_unavailable("parser-evtx", reason.clone())?;
+            issues.insert("parser-evtx", reason);
         }
     }
     Ok(())

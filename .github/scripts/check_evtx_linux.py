@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 
 HELPER=Path(sys.argv[1]).resolve(strict=True)
@@ -46,10 +47,14 @@ def main():
     ):
         subprocess.run(['docker','pull',image],check=True)
         script='mkdir /work; chmod 700 /work; printf synthetic > /work/'+CANARY+'; chmod 600 /work/'+CANARY+'; cd /work; exec /opt/helper --probe-v1 < /opt/evidence.evtx'
-        result=subprocess.run(['docker','run','--rm','--network','none',
-            '--mount',f'type=bind,src={HELPER},dst=/opt/helper,readonly',
-            '--mount',f'type=bind,src={FIXTURE},dst=/opt/evidence.evtx,readonly',
-            '--entrypoint','/bin/sh',image,'-ec',script],capture_output=True,timeout=30,check=False)
+        name='irmind-evtx-'+uuid.uuid4().hex
+        try:
+            result=subprocess.run(['docker','run','--rm','--name',name,'--network','none',
+                '--mount',f'type=bind,src={HELPER},dst=/opt/helper,readonly',
+                '--mount',f'type=bind,src={FIXTURE},dst=/opt/evidence.evtx,readonly',
+                '--entrypoint','/bin/sh',image,'-ec',script],capture_output=True,timeout=30,check=False)
+        finally:
+            subprocess.run(['docker','rm','--force',name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
         if result.returncode != 0 or json.loads(result.stdout).get('isolated') is not True:
             raise SystemExit('EVTX container isolation failed for '+image)
         print(json.dumps({'userspace':image,'shared_host_kernel':os.uname().release,'probe':'passed'},sort_keys=True))

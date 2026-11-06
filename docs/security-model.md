@@ -44,3 +44,5 @@ A case export contains its signed log, seal, and public key. Streaming v4 export
 ## Operating guidance
 
 Start with the [synthetic example](getting-started.md). Keep remote scope narrow, use dedicated read-only service credentials, and approve only calls whose exact arguments you understand. For a suspected vulnerability, use the private process in [SECURITY.md](../SECURITY.md) rather than a public issue.
+
+The EVTX decoder runs as a separate, OS-contained process with a read-only evidence handle, bounded output and a completion handshake. A startup probe must verify isolation before the parser is available. There is no unconfined fallback. Decoder output remains tainted; the normal guard and policy still govern display, model context and tool calls. See the [EVTX containment design](development/evtx-helper-design.md).

@@ -16,6 +16,11 @@ fn unrelated_inheritable_file_is_excluded_and_job_terminates_child() {
     let foreign = root.path().join("unrelated-private-canary");
     std::fs::write(&foreign, b"not evidence").unwrap();
     let file = File::open(foreign).unwrap();
+    assert!(
+        (file.as_raw_handle() as usize) < 65_536,
+        "canary must be inside the bounded verification range"
+    );
+    let extra_pipes = super::pipes::Pipes::new(&file).unwrap();
     // SAFETY: live file; only its inheritability flag changes for this test.
     assert_ne!(
         // SAFETY: the live file owns the handle and only the documented inheritability flag changes.
@@ -46,6 +51,7 @@ fn unrelated_inheritable_file_is_excluded_and_job_terminates_child() {
     child.terminate().unwrap();
     drop(child);
     drop(program);
+    drop(extra_pipes);
     drop(file);
     std::fs::remove_file(root.path().join("unrelated-private-canary")).unwrap();
     assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
@@ -62,4 +68,13 @@ fn invalid_executable_cleans_up_private_child_runtime() {
     drop(program);
     std::fs::remove_file(executable).unwrap();
     assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn verbatim_local_paths_use_the_win32_process_spelling() {
+    let wide = super::wide(std::ffi::OsStr::new(r"\\?\C:\synthetic\helper.exe")).unwrap();
+    assert_eq!(
+        String::from_utf16(&wide[..wide.len() - 1]).unwrap(),
+        r"C:\synthetic\helper.exe"
+    );
 }

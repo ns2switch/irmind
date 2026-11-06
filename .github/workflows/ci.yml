@@ -93,6 +93,8 @@ jobs:
         with: {name: linux-cargo-timings, path: target/cargo-timings/, if-no-files-found: error}
       - name: Clippy (CI profile)
         run: cargo clippy --workspace --all-targets --all-features --profile ci --locked -- -D warnings
+      - name: Test verified installer behavior without network
+        run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_installers.py
       - name: Check the first-party unsafe boundary
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_unsafe_boundary.py
@@ -246,10 +248,14 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
+      - name: Test verified installer behavior without network
+        run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_installers.py
       - name: Check the first-party unsafe boundary
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_unsafe_boundary.py
           python3 .github/scripts/check_unsafe_boundary.py
+      - name: Record the native Windows version
+        run: python -c "import platform; print(platform.win32_ver())"
       - name: Lint the Windows native containment boundary
         run: cargo clippy -p irmind-process-containment --all-targets --profile ci --locked -- -D warnings
       - name: Build and test the separately resolved EVTX helper
@@ -342,13 +348,20 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
+      - name: Test verified installer behavior without network
+        run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_installers.py
       - name: Check the first-party unsafe boundary
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_unsafe_boundary.py
           python3 .github/scripts/check_unsafe_boundary.py
+      - name: Record the native macOS version
+        run: sw_vers -productVersion
       - name: Build and test the separately resolved EVTX helper
         run: |
           cargo nextest run --manifest-path helpers/evtx/Cargo.toml --cargo-profile ci --locked
+      - name: Inspect sandbox launch diagnostics after a native helper failure
+        if: failure()
+        run: /usr/bin/log show --last 2m --style compact --predicate '(process == "kernel" OR process == "sandboxd") AND eventMessage CONTAINS "irmind-evtx"'
       - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked --test-threads 4
       - name: Stage CLI test executable for cross-platform verification
         if: needs.dco.outputs.cross_verify == 'true'

@@ -21,6 +21,8 @@ pub enum AppError {
     Policy(String),
     #[error("analyst approval required: {0}")]
     PendingApproval(String),
+    #[error("parser {parser_id} is unavailable: {reason}")]
+    ParserUnavailable { parser_id: String, reason: String },
     #[error("analyst must choose a parser for the source")]
     ParserSelection {
         source_name: String,

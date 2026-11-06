@@ -24,6 +24,7 @@ impl ParserCatalog {
     ) -> Result<ResolvedParserSelection, AppError> {
         let choice = self.detect(request.source, request.sample);
         let (id, confidence, mode) = choose(request, choice, self)?;
+        self.ensure_available(&id)?;
         let original = self.get(&id)?;
         let requirement = original.time_context_requirement(request.source, request.sample)?;
         let required = requirement.as_ref().is_some_and(|value| value.required);

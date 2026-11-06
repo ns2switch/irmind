@@ -20,6 +20,7 @@ NON_IRMIND_FLAGS = {
     "--all-targets",
     "--amend",
     "--bundle",
+    "--bin",
     "--certificate-identity",
     "--certificate-oidc-issuer",
     "--check",

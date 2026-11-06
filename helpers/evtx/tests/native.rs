@@ -45,7 +45,10 @@ fn execute(mode: Mode) -> (bool, String, String) {
     };
     let out = receive.recv_timeout(Duration::from_secs(5)).unwrap();
     reader.join().unwrap();
-    let errors = err.join().unwrap();
+    let mut errors = err.join().unwrap();
+    if !success {
+        errors.push_str(&child.exit_description().unwrap().unwrap_or_default());
+    }
     drop(child);
     drop(program);
     assert_eq!(
@@ -111,16 +114,31 @@ fn parser_module_passes_seekable_contract_and_preserves_100ns_provenance() {
 fn termination_reaps_a_decoder_blocked_on_its_output_and_removes_runtime() {
     let root = tempfile::tempdir().unwrap();
     let program = Program::new(Path::new(env!("CARGO_BIN_EXE_irmind-evtx")), root.path()).unwrap();
-    let source = File::open(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../crates/testkit/fixtures/parser-evtx/source/Security.evtx"),
-    )
-    .unwrap();
+    let fixture =
+        include_bytes!("../../../crates/testkit/fixtures/parser-evtx/source/Security.evtx");
+    let mut bytes = fixture[..4096].to_vec();
+    bytes[16..24].copy_from_slice(&7u64.to_le_bytes());
+    bytes[42..44].copy_from_slice(&8u16.to_le_bytes());
+    let crc = evtx::checksum_ieee(&bytes[..120]);
+    bytes[124..128].copy_from_slice(&crc.to_le_bytes());
+    for _ in 0..8 {
+        bytes.extend_from_slice(&fixture[4096..]);
+    }
+    let path = root.path().join("synthetic-blocked-output.evtx");
+    std::fs::write(&path, bytes).unwrap();
+    let source = File::open(&path).unwrap();
     let mut child = program.spawn(&source, Mode::Decode).unwrap();
+    thread::sleep(Duration::from_millis(100));
+    assert!(
+        child.try_wait().unwrap().is_none(),
+        "the fixture must block on its undrained output pipe"
+    );
     child.terminate().unwrap();
-    assert!(child.try_wait().unwrap().is_some());
+    assert_eq!(child.try_wait().unwrap(), Some(false));
     drop(child);
     drop(program);
+    drop(source);
+    std::fs::remove_file(path).unwrap();
     assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
 }
 

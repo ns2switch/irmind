@@ -95,7 +95,7 @@ try {
             Fail 'cosign 3.1.3 or newer is required for safe identity verification'
         }
         $identity = "https://github.com/$repo/.github/workflows/ci.yml@refs/tags/$Version"
-        foreach ($file in @($assets) + @('SHA256SUMS')) {
+        foreach ($file in (@($assets) + @('SHA256SUMS'))) {
             $bundle = Join-Path $temporary "$file.sigstore.json"
             Download-Https "$base/$file.sigstore.json" $bundle 1048576
             & cosign verify-blob (Join-Path $temporary $file) --bundle $bundle --certificate-identity $identity --certificate-oidc-issuer $issuer | Out-Null
@@ -119,7 +119,7 @@ try {
     }
 
     [System.IO.Directory]::CreateDirectory($InstallDir) | Out-Null
-    foreach ($selectedAsset in @($assets | Sort-Object -Descending)) {
+    foreach ($selectedAsset in (@($assets | Where-Object { $_ -ne $asset }) + @($asset))) {
     $binary = Join-Path $temporary $selectedAsset
     $destination = if ($selectedAsset -eq $asset) { 'irmind.exe' } else { 'irmind-evtx.exe' }
     $stage = Join-Path $InstallDir ('.irmind-install-' + [System.Guid]::NewGuid().ToString('N') + '.exe')
