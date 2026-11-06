@@ -4,6 +4,15 @@ on:
     - cron: '41 2 * * 0'
     - cron: '47 4 * * 1-6'
   workflow_dispatch:
+    inputs:
+      native_windows:
+        description: Run only the native Windows EVTX diagnostic suite
+        type: boolean
+        default: false
+      static_crt:
+        description: Compare a static-CRT decoder with the normal broker harness
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -11,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   fuzz:
-    if: github.event_name != 'schedule' || github.event.schedule == '41 2 * * 0'
+    if: ${{ inputs.native_windows != true && (github.event_name != 'schedule' || github.event.schedule == '41 2 * * 0') }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -54,6 +63,7 @@ jobs:
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('.tools', 'fuzz/artifacts', 'fuzz/corpus')) if p.is_dir()]"
 
   evtx:
+    if: inputs.native_windows != true
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -83,3 +93,58 @@ jobs:
       - name: Remove temporary corpora and artifacts
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('.tools', 'helpers/evtx/fuzz/corpus', 'helpers/evtx/fuzz/artifacts')) if p.is_dir()]"
+
+  evtx_windows:
+    if: github.event_name == 'workflow_dispatch' && inputs.native_windows == true
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CARGO_BUILD_TARGET: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: windows-msvc-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
+          add-rust-environment-hash-key: false
+          cache-targets: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        with: {tool: cargo-nextest, fallback: none}
+      - name: Record native OS and session versions
+        shell: pwsh
+        run: |
+          (Get-CimInstance Win32_OperatingSystem).Version
+          (Get-Process -Id $PID).SessionId
+      - name: Run the production decoder under the unchanged native containment policy
+        shell: pwsh
+        env:
+          STATIC_CRT: ${{ inputs.static_crt }}
+        run: |
+          if ($env:STATIC_CRT -eq 'true') {
+            python helpers/evtx/test.py '--decoder-rustflags=-C target-feature=+crt-static'
+          } else {
+            python helpers/evtx/test.py
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'native EVTX containment suite failed' }
+      - name: Inspect only DLL names after a native failure
+        if: failure()
+        shell: pwsh
+        run: python .github/scripts/inspect_evtx_windows.py target/x86_64-pc-windows-msvc/ci/irmind-evtx.exe
+      - name: Inspect only the helper fault module and status
+        if: failure()
+        shell: pwsh
+        run: |
+          $events = Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-5)} -MaxEvents 64 -ErrorAction SilentlyContinue
+          foreach ($event in $events) {
+            [xml]$xml = $event.ToXml()
+            $fields = @{}
+            foreach ($data in $xml.Event.EventData.Data) { $fields[$data.Name] = [string]$data.'#text' }
+            if ([IO.Path]::GetFileName($fields['AppName']) -eq 'irmind-evtx.exe') {
+              @{event_id=$event.Id; module=[IO.Path]::GetFileName($fields['ModuleName']); exception=$fields['ExceptionCode']} | ConvertTo-Json -Compress
+            }
+          }

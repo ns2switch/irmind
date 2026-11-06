@@ -24,6 +24,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--profile', default='ci')
     parser.add_argument('--test-threads')
+    parser.add_argument('--decoder-rustflags', default='')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     env = dict(os.environ)
@@ -34,8 +35,12 @@ def main():
     executable /= 'irmind-evtx.exe' if os.name == 'nt' else 'irmind-evtx'
     command = ['cargo', 'build', '--manifest-path', 'helpers/evtx/Cargo.toml',
                '--bin', 'irmind-evtx', '--profile', args.profile, '--locked']
-    check_decoder_features(root, env)
-    subprocess.run(command, cwd=root, env=env, check=True)
+    decoder_env = dict(env)
+    if args.decoder_rustflags:
+        decoder_env.pop('CARGO_ENCODED_RUSTFLAGS', None)
+        decoder_env['RUSTFLAGS'] = (env.get('RUSTFLAGS', '') + ' ' + args.decoder_rustflags).strip()
+    check_decoder_features(root, decoder_env)
+    subprocess.run(command, cwd=root, env=decoder_env, check=True)
     with tempfile.TemporaryDirectory(prefix='evtx-tested-', dir=target) as temporary:
         frozen = Path(temporary) / executable.name
         shutil.copy2(executable, frozen)
