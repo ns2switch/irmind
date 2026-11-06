@@ -323,3 +323,12 @@ Context: Windows creates private per-container runtime metadata as part of its p
 Decision: retain package read/execute access to the bounded OS-created profile tree while replacing its package-write grants. Keep owner-only case data and canary files, the explicit input/output handle list, zero network capabilities and the suspended Job Object start. Validate the profile layout before deriving its LocalAppData root; delete the profile after the child ends.
 
 Consequences: runtime initialization can read its own isolated metadata. The decoder receives no write access to that tree and no grants on the surrounding LocalAppData directory, user configuration, keys or evidence paths. Native denial tests remain mandatory.
+
+
+## Pipe-only Windows decoder startup
+
+Context: the decoder has no interactive console and communicates through the explicit inherited evidence/stdout/stderr handles. Allocating a windowless console is unnecessary for this protocol and introduces additional runtime process requirements.
+
+Decision: start the suspended Windows decoder with DETACHED_PROCESS rather than CREATE_NO_WINDOW. Keep the explicit three-handle list, zero-capability AppContainer, child-process restriction, one-process Job Object, memory limit and pre-decode enforcement probes unchanged. This is console detachment, not Job Object breakaway.
+
+Consequences: no console host is requested by the launcher. Native decoder, denial, handle-inheritance and termination tests still determine availability; a successful cross-compilation cannot establish that the loader starts.

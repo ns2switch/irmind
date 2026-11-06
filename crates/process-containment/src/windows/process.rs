@@ -17,7 +17,7 @@ use std::{
 use windows_sys::Win32::{
     Foundation::{STILL_ACTIVE, WAIT_OBJECT_0},
     System::Threading::{
-        CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
+        CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW, DETACHED_PROCESS,
         EXTENDED_STARTUPINFO_PRESENT, GetExitCodeProcess, PROCESS_INFORMATION, ResumeThread,
         STARTF_USESTDHANDLES, STARTUPINFOEXW, WaitForSingleObject,
     },
@@ -53,6 +53,8 @@ pub(crate) fn spawn(program: &Prepared, input: &File, mode: Mode) -> io::Result<
     let mut info = PROCESS_INFORMATION::default();
     // SAFETY: every UTF-16 buffer is terminated and live; startup/attributes retain
     // their aligned buffers, SID and explicit handles until CreateProcess returns.
+    // The decoder communicates only through the three supplied handles. Do not
+    // allocate a console host inside its one-process Job Object.
     let created = unsafe {
         CreateProcessW(
             executable.as_ptr(),
@@ -61,7 +63,7 @@ pub(crate) fn spawn(program: &Prepared, input: &File, mode: Mode) -> io::Result<
             ptr::null(),
             1,
             CREATE_SUSPENDED
-                | CREATE_NO_WINDOW
+                | DETACHED_PROCESS
                 | CREATE_UNICODE_ENVIRONMENT
                 | EXTENDED_STARTUPINFO_PRESENT,
             environment.as_ptr().cast(),
