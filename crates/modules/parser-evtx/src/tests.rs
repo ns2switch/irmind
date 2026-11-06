@@ -115,3 +115,18 @@ fn unavailable_decoder_is_recognized_but_cannot_be_selected_or_rebuilt() {
     assert!(catalog.get_version("parser-evtx", VERSION).is_err());
     assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
 }
+
+#[test]
+fn initialization_errors_preserve_service_guidance_without_showing_source_paths() {
+    let root = tempfile::tempdir().unwrap();
+    let private_name = "synthetic-private-name-that-must-not-be-displayed";
+    let parser = EvtxParser::new(&root.path().join(private_name), root.path());
+    let reason = parser.unavailable_reason().unwrap();
+    assert!(!reason.contains(private_name));
+    let reason = super::initialization_error(&std::io::Error::new(
+        std::io::ErrorKind::PermissionDenied,
+        "EVTX requires running BFE and MpsSvc services with query and notification access",
+    ))
+    .to_string();
+    assert!(reason.contains("running BFE and MpsSvc services"));
+}

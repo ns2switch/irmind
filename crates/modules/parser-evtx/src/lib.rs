@@ -28,10 +28,16 @@ pub struct EvtxParser {
 fn bad(message: &'static str) -> AppError {
     AppError::Policy(message.into())
 }
+fn initialization_error(error: &std::io::Error) -> AppError {
+    AppError::Policy(format!(
+        "EVTX helper/runtime initialization failed ({error}); install the matching irmind-evtx binary, check the data directory, and on Windows check BFE/MpsSvc service availability"
+    ))
+}
 impl EvtxParser {
     pub fn new(helper: &Path, data_root: &Path) -> Self {
         let prepared = (|| {
-            let program=Program::new(helper,data_root).map_err(|_|bad("EVTX helper is missing or its private runtime cannot be created; install the matching irmind-evtx binary and check the data directory"))?;
+            let program =
+                Program::new(helper, data_root).map_err(|error| initialization_error(&error))?;
             let mut probe = false;
             let child = program.probe().map_err(|error| {
                 AppError::Policy(format!("EVTX native containment cannot start ({error}); check the helper installation and platform sandbox requirements"))
