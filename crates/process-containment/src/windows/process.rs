@@ -122,6 +122,15 @@ fn wide(value: &std::ffi::OsStr) -> io::Result<Vec<u16>> {
 }
 
 impl Child {
+    pub(crate) fn id(&self) -> io::Result<u32> {
+        // SAFETY: the live owned process handle identifies this exact child.
+        let id = unsafe { windows_sys::Win32::System::Threading::GetProcessId(self.process.raw()) };
+        if id == 0 {
+            Err(error("process-id"))
+        } else {
+            Ok(id)
+        }
+    }
     pub(crate) fn stdout(&mut self) -> io::Result<Box<dyn Read + Send>> {
         self.stdout
             .take()

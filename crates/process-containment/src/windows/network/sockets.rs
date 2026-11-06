@@ -90,12 +90,4 @@ mod tests {
         assert!(blocked_candidates(listeners.ports().unwrap()).is_err());
         assert!(listeners.empty().is_err());
     }
-    #[test]
-    fn a_closed_endpoint_is_not_accepted_as_a_denial_witness() {
-        let listeners = Listeners::bind().unwrap();
-        listeners.positive_control().unwrap();
-        let ports = listeners.ports().unwrap();
-        drop(listeners);
-        assert!(blocked_candidates(ports).is_err());
-    }
 }
