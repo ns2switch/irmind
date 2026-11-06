@@ -38,7 +38,7 @@ The native Linux AST scan reports these used unsafe expressions in important dep
 The [release benchmark](benchmarks.md#isolated-evtx-conversion) records conversion throughput and its scope. Platform support requires the actual helper's enforcement probe, not merely a successful build. A container validates its userspace on the host kernel; it cannot certify its distribution's stock kernel. Windows Server runners cannot certify Windows 10 or 11, and one macOS version cannot certify other releases.
 
 
-The native suite passed on the following configurations in [this CI run](https://github.com/ns2switch/irmind/actions/runs/42235137349). Availability still runs the enforcement probe on each installation.
+Linux/macOS baseline evidence comes from [this CI run](https://github.com/ns2switch/irmind/actions/runs/42235137349). The updated Windows witness and cache passed in [the native Windows run](https://github.com/ns2switch/irmind/actions/runs/42266599470). Availability still runs the enforcement probe on each installation.
 
 | Configuration | Evidence | Result |
 | --- | --- | --- |
@@ -48,13 +48,13 @@ The native suite passed on the following configurations in [this CI run](https:/
 | Debian 12 and Fedora 44 userspace on the Ubuntu 22.04 host kernel above | Pinned containers, without network | Passed; distribution stock kernels remain untested |
 | macOS 26.6.2, arm64 | Native sandbox profile, helper tests and workspace suite | 10 helper and 626 workspace tests passed |
 | Ubuntu 24.04 | Release compatibility gate | Not yet executed |
-| Windows Server 2025, x86-64, build 10.0.26100 | Native launcher and handle metadata | Loader and handle checks now run; network denial probe does not pass, so EVTX remains unavailable |
+| Windows Server 2025, x86-64, build 10.0.26100 | Native traffic witness, handle checks and session reuse | 6 targeted boundary checks and 13 helper tests passed; no firewall or service changes |
 | Windows 10 and Windows 11 clients | No native execution | Untested; no support claim |
 
-The Windows startup investigation is separate from the passing Linux/macOS evidence. The required native tests remain enabled. A failed probe makes EVTX unavailable; it does not select a weaker launcher.
+The required native tests remain enabled on each platform. A failed probe makes EVTX unavailable; it does not select a weaker launcher. Windows client confirmation remains separate from the passing Server tests.
 
 
-The [Windows network-probe proposal](evtx-windows-network-probe.md) distinguishes traffic isolation from socket creation and requires controlled live endpoints rather than treating an arbitrary connection timeout as proof. The implementation includes the memory-only session witness, service-change invalidation and per-launch token/handle checks. Native validation is still in progress; the required gates continue to fail closed.
+The [Windows network-probe proposal](evtx-windows-network-probe.md) distinguishes traffic isolation from socket creation and requires controlled live endpoints rather than treating an arbitrary connection timeout as proof. The implementation includes the memory-only session witness, service-change invalidation and per-launch token/handle checks. The full platform matrix and signed distribution dry run remain integration gates.
 
 
 The [Windows 11 community check](https://github.com/ns2switch/irmind/issues/189) tracks client confirmation using the [manual candidate procedure](manual-validation.md#experimental-evtx-windows-11-candidate-check). No firewall settings, service configuration or loopback exemptions are changed by the tests.

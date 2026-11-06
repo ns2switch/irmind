@@ -361,3 +361,12 @@ Decision: retain the zero-capability AppContainer and verify live IPv4/IPv6 endp
 Consequences: ordinary files pay launch checks rather than repeated network witnesses. Read-only private runtime tickets contain no evidence, credentials or persisted witness result. Signed custody encodings do not change. Windows remains experimental pending client validation; native tests and the signed distribution dry run gate integration. See [the network witness design](evtx-windows-network-probe.md).
 
 The monitor establishes a stable initial service snapshot before any witness result can exist. A change during the witness requires a complete retry, bounded to three attempts. Successful reader cleanup does not count as cancellation. Inbound endpoint liveness is checked independently through the bounded OS TCP listener tables for the exact child PID and ports; no host table is logged.
+
+
+## Linux x86-64 distribution ABI baseline
+
+Context: a helper compiled on a newer Linux userspace can require a libc version unavailable on an older supported system, even when native isolation passes on the build host.
+
+Decision: build and test Linux x86-64 on Ubuntu 22.04. Native Ubuntu 22.04 and Ubuntu 24.04 compatibility jobs execute the same produced helper, including the pinned Debian/Fedora container probes. Release compatibility uses the exact release helper rather than rebuilding it on the test host. Cache keys distinguish this build baseline.
+
+Consequences: distribution checks test one portable artifact across userspaces instead of mistaking a newer loader ABI requirement for an isolation failure. No sandbox probe or enforcement requirement is removed. ARM64 retains its separate native runner and requires separate compatibility evidence.

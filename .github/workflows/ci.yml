@@ -50,7 +50,7 @@ jobs:
   linux:
     needs: dco
     if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_ci == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 120
     env:
       RUSTFLAGS: -C link-arg=-fuse-ld=mold
@@ -67,7 +67,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         id: rust_cache
         with:
-          key: linux-mold-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
+          key: linux-ubuntu22-mold-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
           add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -105,6 +105,9 @@ jobs:
           cargo clippy --manifest-path helpers/evtx/Cargo.toml --all-targets --profile ci --locked -- -D warnings
           python3 helpers/evtx/test.py
           python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx native-only
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.dco.outputs.platforms == 'true' && needs.dco.outputs.release_build != 'true'
+        with: {name: evtx-linux-ci, path: target/ci/irmind-evtx, if-no-files-found: error}
       - name: Nextest (CI profile)
         run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
       - run: cargo deny check --hide-inclusion-graph
@@ -181,26 +184,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
-      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with:
-          key: evtx-${{ matrix.os }}-${{ hashFiles('helpers/evtx/Cargo.lock') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo build --manifest-path helpers/evtx/Cargo.toml --bin irmind-evtx --profile ci --locked
-        if: needs.dco.outputs.release_build != 'true'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: needs.dco.outputs.release_build == 'true'
         with: {name: irmind-linux, path: compatibility-bin}
-      - name: Test Ubuntu and pinned Debian/Fedora userspaces on the observed host kernel
-        env:
-          RELEASE_BUILD: ${{ needs.dco.outputs.release_build }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.dco.outputs.release_build != 'true'
+        with: {name: evtx-linux-ci, path: compatibility-bin}
+      - name: Test the same baseline binary on Ubuntu and pinned Debian/Fedora userspaces
         run: |
-          if [ "$RELEASE_BUILD" = true ]; then
-            chmod +x compatibility-bin/irmind-evtx
-            python3 .github/scripts/check_evtx_linux.py compatibility-bin/irmind-evtx
-          else
-            python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx
-          fi
+          chmod +x compatibility-bin/irmind-evtx
+          python3 .github/scripts/check_evtx_linux.py compatibility-bin/irmind-evtx
       - name: Remove downloaded compatibility binaries
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; p=Path('compatibility-bin'); p.is_dir() and rmtree(p)"

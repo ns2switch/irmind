@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the actual helper on Linux without privileged containers or network."""
 import json
+import hashlib
 import os
 import re
 import subprocess
@@ -39,7 +40,11 @@ def main():
     frames=[json.loads(line) for line in decoded.stdout.splitlines()]
     if frames[-1] != {'kind':'complete','accepted':14,'rejected':0}:
         raise SystemExit('EVTX native record counts differed')
-    print(json.dumps({'native_userspace':Path('/etc/os-release').read_text(),
+    digest=hashlib.sha256()
+    with HELPER.open('rb') as binary:
+        for block in iter(lambda:binary.read(1024*1024),b''): digest.update(block)
+    checksum=digest.hexdigest()
+    print(json.dumps({'helper_sha256':checksum,'native_userspace':Path('/etc/os-release').read_text(),
                       'native_kernel':os.uname().release,'probe':'passed'},sort_keys=True))
     if sys.argv[2:] == ['native-only']: return
     for image in (
@@ -65,6 +70,6 @@ def main():
                               'file_denial_failed':'file isolation verification failed' in errors,
                               'network_denial_failed':'network' in errors},sort_keys=True),flush=True)
             raise SystemExit('EVTX container isolation failed for '+image)
-        print(json.dumps({'userspace':image,'shared_host_kernel':os.uname().release,'probe':'passed'},sort_keys=True))
+        print(json.dumps({'helper_sha256':checksum,'userspace':image,'shared_host_kernel':os.uname().release,'probe':'passed'},sort_keys=True))
 
 if __name__=='__main__': main()

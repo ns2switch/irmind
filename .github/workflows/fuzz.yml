@@ -10,7 +10,7 @@ on:
         type: boolean
         default: false
       linux_compatibility:
-        description: Diagnose the native Ubuntu 24.04 helper and pinned container probes
+        description: Check the Ubuntu 22.04 baseline helper and pinned container probes
         type: boolean
         default: false
       static_crt:
@@ -161,7 +161,7 @@ jobs:
 
   evtx_linux_diagnostic:
     if: github.event_name == 'workflow_dispatch' && inputs.linux_compatibility == true
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -169,7 +169,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: evtx-ubuntu-24.04-${{ hashFiles('helpers/evtx/Cargo.lock') }}
+          key: evtx-ubuntu-22.04-${{ hashFiles('helpers/evtx/Cargo.lock') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --bin irmind-evtx --profile ci --locked
       - run: python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx
