@@ -115,8 +115,17 @@ pub(super) fn verify(program: &Arc<Prepared>, cancelled: &dyn Fn() -> bool) -> i
     let input = program.probe_input()?;
     let mut running = Running::start(&runtime, &input)?;
     let ports = protocol::parse_ready(&running.line(cancelled)?, &runtime.ticket.nonce)?;
+    let pid = running.child.id()?;
+    if running.child.try_wait()?.is_some() {
+        return Err(denied());
+    }
+    super::listening::verify(pid, ports)?;
     listeners.empty()?;
     blocked_candidates(ports)?;
+    if running.child.try_wait()?.is_some() {
+        return Err(denied());
+    }
+    super::listening::verify(pid, ports)?;
     listeners.positive_control()?;
     let temporary = runtime.work_dir().join("irmind-network-ack.tmp");
     files::write(

@@ -301,6 +301,16 @@ jobs:
         run: |
           cargo build --release -p irmind --locked
           cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
+      - name: Measure the release witness and 300 small distinct EVTX sources
+        if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true
+        run: |
+          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --example collection
+          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx
+          target/x86_64-pc-windows-msvc/release/examples/collection.exe > evtx-collection.json
+          cat evtx-collection.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true
+        with: {name: evtx-windows-collection, path: evtx-collection.json, if-no-files-found: error}
       - name: Package unsigned binary and checksum
         if: needs.dco.outputs.release_build == 'true'
         run: |
@@ -327,7 +337,7 @@ jobs:
         with: {name: portable-export-windows, path: portable-export/, if-no-files-found: error}
       - name: Clean staging
         if: always()
-        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export', 'portable-export', 'verify-bin')) if p.is_dir()]"
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export', 'portable-export', 'verify-bin')) if p.is_dir()]; Path('evtx-collection.json').unlink(missing_ok=True)"
   linux_verify_windows:
     if: ${{ !cancelled() && needs.windows.result == 'success' && needs.dco.outputs.cross_verify == 'true' }}
     needs: [windows, dco]

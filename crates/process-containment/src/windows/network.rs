@@ -4,6 +4,8 @@ mod child;
 mod exchange;
 mod files;
 #[cfg(feature = "launcher")]
+mod listening;
+#[cfg(feature = "launcher")]
 mod services;
 #[cfg(feature = "launcher")]
 mod session;
