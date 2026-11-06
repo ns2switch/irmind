@@ -1,0 +1,75 @@
+#![cfg(windows)]
+#![forbid(unsafe_code)]
+#![allow(clippy::unwrap_used)]
+mod support;
+use irmind_process_containment::Program;
+use std::{
+    fs::File,
+    io::Read as _,
+    sync::mpsc,
+    thread,
+    time::{Duration, Instant},
+};
+fn probe(program: &Program) {
+    let mut child = program.probe().unwrap();
+    let stdout = child.take_stdout().unwrap();
+    let stderr = child.take_stderr().unwrap();
+    let (send, receive) = mpsc::sync_channel(1);
+    let output = thread::spawn(move || {
+        let mut bytes = String::new();
+        stdout.take(4096).read_to_string(&mut bytes).unwrap();
+        send.send(bytes).unwrap();
+    });
+    let errors = thread::spawn(move || {
+        let mut bytes = String::new();
+        stderr.take(65536).read_to_string(&mut bytes).unwrap();
+        bytes
+    });
+    let start = Instant::now();
+    let success = loop {
+        if let Some(success) = child.try_wait().unwrap() {
+            break success;
+        }
+        assert!(start.elapsed() < Duration::from_secs(15));
+        thread::sleep(Duration::from_millis(10));
+    };
+    let bytes = receive.recv_timeout(Duration::from_secs(5)).unwrap();
+    output.join().unwrap();
+    assert!(success, "{}", errors.join().unwrap());
+    assert!(bytes.contains("\"isolated\":true"));
+}
+#[test]
+fn full_witness_is_cached_only_in_memory_and_repeated_after_invalidation() {
+    let root = tempfile::tempdir().unwrap();
+    let program = Program::new(&support::helper_path(), root.path()).unwrap();
+    assert_eq!(program.witness_stats().attempts, 0);
+    probe(&program);
+    probe(&program);
+    assert_eq!(program.witness_stats().attempts, 1);
+    program.invalidate();
+    probe(&program);
+    assert_eq!(program.witness_stats().attempts, 2);
+    drop(program);
+    assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+    let fresh = Program::new(&support::helper_path(), root.path()).unwrap();
+    assert_eq!(fresh.witness_stats().attempts, 0);
+}
+#[test]
+fn a_cancelled_launch_does_not_read_evidence_or_start_the_witness() {
+    let root = tempfile::tempdir().unwrap();
+    let program = Program::new(&support::helper_path(), root.path()).unwrap();
+    let source = File::open(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../crates/testkit/fixtures/parser-evtx/source/Security.evtx"),
+    )
+    .unwrap();
+    assert_eq!(
+        program
+            .spawn_cancelable(&source, irmind_process_containment::Mode::Decode, &|| true)
+            .err()
+            .unwrap()
+            .kind(),
+        std::io::ErrorKind::Interrupted
+    );
+    assert_eq!(program.witness_stats().attempts, 0);
+}

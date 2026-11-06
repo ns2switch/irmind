@@ -19,7 +19,18 @@ fn input() -> io::Result<File> {
 }
 fn run() -> io::Result<()> {
     let args = std::env::args_os().skip(1).collect::<Vec<_>>();
-    if args.len() != 1 || (args[0] != "--protocol-v1" && args[0] != "--probe-v1") {
+    if args.len() != 1
+        || (args[0] != "--protocol-v1"
+            && args[0] != "--probe-v1"
+            && args[0] != "--network-witness-v1")
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "unsupported helper arguments",
+        ));
+    }
+    #[cfg(not(windows))]
+    if args[0] == "--network-witness-v1" {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "unsupported helper arguments",
@@ -32,6 +43,10 @@ fn run() -> io::Result<()> {
             io::ErrorKind::InvalidInput,
             "EVTX requires a read-only regular input handle",
         ));
+    }
+    #[cfg(windows)]
+    if args[0] == "--network-witness-v1" {
+        return irmind_process_containment::network_witness(&file);
     }
     irmind_process_containment::enter(&file)?;
     if args[0] == "--probe-v1" {

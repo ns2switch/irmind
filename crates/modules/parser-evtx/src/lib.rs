@@ -68,6 +68,11 @@ impl EvtxParser {
             },
         }
     }
+    pub fn witness_stats(&self) -> irmind_process_containment::WitnessStats {
+        self.program
+            .as_ref()
+            .map_or_else(Default::default, Program::witness_stats)
+    }
     pub fn unavailable_reason(&self) -> Option<&str> {
         self.issue.as_deref()
     }
@@ -91,17 +96,21 @@ impl EvtxParser {
             return Err(bad("EVTX source must be between 4 KiB and 4 GiB"));
         }
         let child = program
-            .spawn(file, Mode::Decode)
-            .map_err(|_| bad("cannot start the contained EVTX decoder"))?;
+            .spawn_cancelable(file, Mode::Decode, &|| cancel.is_cancelled())
+            .map_err(|_| if cancel.is_cancelled() { AppError::Cancelled } else { bad("cannot start the contained EVTX decoder; check BFE/MpsSvc and the verified sandbox") })?;
         let mut state = codec::State::new(source, hash, size);
-        input::run(
+        let result = input::run(
             child,
             (size.saturating_mul(32) + (1 << 20)).min(8 << 30),
             Duration::from_mins(10),
             cancel,
             &mut |bytes| state.frame(&bytes, emit),
-        )?;
-        state.finish()
+        )
+        .and_then(|()| state.finish());
+        if result.is_err() {
+            program.invalidate();
+        }
+        result
     }
 }
 impl Module for EvtxParser {

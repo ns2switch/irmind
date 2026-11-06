@@ -59,10 +59,16 @@ impl Identity {
     pub(super) fn local_data(&self) -> &Path {
         self.profile.local_data()
     }
+    pub(crate) fn grant_read(&self, path: &Path) -> io::Result<()> {
+        super::super::filesystem::helper_read_only(path, self.bytes())
+    }
+    pub(crate) fn grant_runtime(&self, path: &Path) -> io::Result<()> {
+        super::super::filesystem::helper_read_execute(path, self.bytes())
+    }
     pub(super) fn raw(&self) -> PSID {
         self.words.as_ptr().cast_mut().cast()
     }
-    fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         // SAFETY: constructor bounds length by the initialized allocation; this immutable slice cannot outlive self.
         unsafe { std::slice::from_raw_parts(self.words.as_ptr().cast::<u8>(), self.length) }
     }

@@ -4,6 +4,7 @@ pub mod filesystem;
 mod handle_snapshot;
 mod handle_type;
 mod handles;
+pub(crate) mod network;
 #[cfg(feature = "launcher")]
 pub(crate) mod process;
 mod runtime_directory;

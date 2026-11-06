@@ -31,6 +31,12 @@ pub(crate) struct Child {
 }
 
 pub(crate) fn spawn(program: &Prepared, input: &File, mode: Mode) -> io::Result<Child> {
+    spawn_command(program, input, mode.arg())
+}
+pub(crate) fn spawn_witness(program: &Prepared, input: &File) -> io::Result<Child> {
+    spawn_command(program, input, "--network-witness-v1")
+}
+fn spawn_command(program: &Prepared, input: &File, argument: &'static str) -> io::Result<Child> {
     let pipes = pipes::Pipes::new(input)?;
     let job = job::create()?;
     let mut attributes = attributes::Attributes::new(program.identity(), &pipes)?;
@@ -47,7 +53,7 @@ pub(crate) fn spawn(program: &Prepared, input: &File, mode: Mode) -> io::Result<
     let mut command = vec![u16::from(b'"')];
     command.extend_from_slice(&executable[..executable.len() - 1]);
     command.extend("\" ".encode_utf16());
-    command.extend(mode.arg().encode_utf16());
+    command.extend(argument.encode_utf16());
     command.push(0);
     let environment = environment::block(program.identity().local_data())?;
     let mut info = PROCESS_INFORMATION::default();
@@ -87,6 +93,7 @@ pub(crate) fn spawn(program: &Prepared, input: &File, mode: Mode) -> io::Result<
         let _ = child.terminate();
         return Err(failure);
     }
+    super::token::verify_created(child.process.raw(), program.identity().bytes())?;
     // SAFETY: this is the live primary thread of our suspended, now job-bound child.
     if unsafe { ResumeThread(thread.raw()) } == u32::MAX {
         let failure = error("resume");

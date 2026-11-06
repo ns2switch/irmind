@@ -173,7 +173,10 @@ jobs:
   evtx_linux_compatibility:
     needs: [dco, linux]
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true }}
-    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -181,7 +184,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: evtx-ubuntu22-${{ hashFiles('helpers/evtx/Cargo.lock') }}
+          key: evtx-${{ matrix.os }}-${{ hashFiles('helpers/evtx/Cargo.lock') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo build --manifest-path helpers/evtx/Cargo.toml --bin irmind-evtx --profile ci --locked
         if: needs.dco.outputs.release_build != 'true'

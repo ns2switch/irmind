@@ -350,3 +350,12 @@ Context: runtime handle values are not a contiguous public table. File queries o
 Decision: enumerate a bounded process snapshot using Microsoft's Pss APIs, requesting only handle values. Query each still-live handle's bounded type name before any file query; do not require optional Pss metadata that Windows does not populate for every object. An explicitly closed handle has no usable capability and is ignored; other query errors fail closed. Limit the initial and walked handle count to 512; reject missing type information and failed snapshots. Never request a memory clone, breakaway or new process. The explicit inherited handle list and exact-runtime-directory checks remain mandatory.
 
 Consequences: native handle exclusion tests inspect actual handles without a low numeric-range assumption. Keep every pointer borrow within the live snapshot/walk-marker scope; expose only a safe internal visitor and preserve the single Windows unsafe boundary.
+
+
+## Session-scoped Windows EVTX traffic witness
+
+Context: Windows WFP filters traffic rather than necessarily rejecting socket creation or returning an immediate permission error. Repeating a full flow test for every small file would impose unnecessary collection overhead.
+
+Decision: retain the zero-capability AppContainer and verify live IPv4/IPv6 endpoints in both directions with positive controls and nonce-bound acknowledgement. A timeout alone is insufficient. Cache the successful witness only in memory, tied to a retained profile and immutable three-role handle policy. Serialize decoders sharing that SID; cancellation remains available while waiting. Subscribe to BFE/MpsSvc status notifications and check Running state, service process IDs and generation before launch and after completion. Any change or validation failure invalidates the cache.
+
+Consequences: ordinary files pay launch checks rather than repeated network witnesses. Read-only private runtime tickets contain no evidence, credentials or persisted witness result. Signed custody encodings do not change. Windows remains experimental pending client validation; native tests and the signed distribution dry run gate integration. See [the network witness design](evtx-windows-network-probe.md).
