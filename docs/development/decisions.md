@@ -305,3 +305,12 @@ Context: the decoder runs under a deny-default OS policy before reading evidence
 Decision: macOS permits read/map access to the OS Cryptex runtime paths, the system library paths, the exact helper and root-directory reads. It retains filesystem write, network and fork denial. Windows creates a unique zero-capability AppContainer profile, removes package access from its empty filesystem tree before launch, and deletes the profile when its child runtime is dropped. The environment contains only the OS-reported SystemRoot and LocalAppData paths required to establish the runtime and AppContainer namespace; it does not inherit process variables or credentials. Read/execute grants remain limited to the helper and its private launch directory.
 
 Consequences: native launch and denial probes must pass together. A failed profile creation, loader startup or enforcement probe leaves EVTX unavailable. The release audit uses pinned prebuilt cargo-geiger 0.13.0 with source compilation disabled, verifies its executable digest, and publishes path-free AST metrics alongside the supplementary source inventory. Neither report is a memory-safety proof; macro expansion and platform coverage limits remain explicit.
+
+
+## Separate broker and decoder native imports
+
+Context: a Windows decoder runs inside an AppContainer, including on non-interactive hosts. Parent-side profile and known-folder APIs can introduce DLL initialization requirements that the decoder does not need.
+
+Decision: the containment crate keeps its safe broker API behind a default `launcher` feature. The independent decoder disables that feature and retains mandatory token/enforcement checks. Derive LocalAppData from the OS-created profile's validated Packages layout, avoiding Shell API imports. Integration tests build and preserve the normal decoder before resolving their parent harness's development features, execute that same production-feature binary under the native policy, and restore it for the main CLI tests.
+
+Consequences: keep a single first-party unsafe crate and unchanged source/protocol formats. Test-only dependency unification cannot determine the shipped decoder's native imports. CI retains launch, handle, network, file-access and termination assertions and prints imported DLL names when native startup fails.

@@ -1,6 +1,5 @@
 #![cfg(windows)]
 use std::{
-    fs::File,
     io,
     os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
 };
@@ -17,7 +16,8 @@ impl Handle {
     pub(super) fn raw(&self) -> HANDLE {
         self.0.as_raw_handle().cast()
     }
-    pub(super) fn into_file(self) -> File {
-        File::from(self.0)
+    #[cfg(feature = "launcher")]
+    pub(super) fn into_file(self) -> std::fs::File {
+        std::fs::File::from(self.0)
     }
 }

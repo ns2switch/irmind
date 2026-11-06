@@ -1,5 +1,5 @@
 #![cfg(windows)]
-use super::{Handle, error};
+use super::{error, handles::Handle};
 use std::{io, ptr};
 use windows_sys::Win32::{
     Security::{

@@ -8,6 +8,12 @@ The independently resolved helper tests cover the 27 supported event IDs, real r
 
 A corrupt later chunk must roll back every provisional row and source/artifact manifest. Cancellation and termination of a decoder blocked on stdout must leave no successful completion trailer or private runtime directory. Native enforcement probes check unrelated-file reads, network access and process creation before decoding. Windows additionally tests explicit handle inheritance, private profile cleanup and failed executable startup.
 
+The normal decoder build disables the containment crate's broker-only `launcher` feature. This keeps parent-side profile/launch DLLs out of the Windows decoder. The helper retains mandatory token and enforcement checks. Integration-test dependencies enable the broker API for their parent harness, so the test driver preserves and executes the normal-feature decoder, then restores it beside the main CLI:
+
+```sh
+python3 helpers/evtx/test.py
+```
+
 ## Fuzzing
 
 Local AddressSanitizer runs used the separately locked fuzz workspace, versioned synthetic seeds and a 768 MiB RSS limit:

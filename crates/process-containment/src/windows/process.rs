@@ -1,14 +1,12 @@
 #![cfg(windows)]
 mod attributes;
 mod environment;
-mod handles;
 mod identity;
 mod job;
 mod pipes;
 mod profile;
-mod token;
+use super::{error, handles::Handle};
 use crate::launch::{Mode, PreparedChild as Prepared};
-use handles::Handle;
 pub(crate) use identity::Identity;
 use std::{
     fs::File,
@@ -16,23 +14,14 @@ use std::{
     os::windows::ffi::OsStrExt as _,
     ptr,
 };
-pub(crate) use token::verify_token;
 use windows_sys::Win32::{
-    Foundation::{GetLastError, STILL_ACTIVE, WAIT_OBJECT_0},
+    Foundation::{STILL_ACTIVE, WAIT_OBJECT_0},
     System::Threading::{
         CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
         EXTENDED_STARTUPINFO_PRESENT, GetExitCodeProcess, PROCESS_INFORMATION, ResumeThread,
         STARTF_USESTDHANDLES, STARTUPINFOEXW, WaitForSingleObject,
     },
 };
-
-fn error(stage: &'static str) -> io::Error {
-    // SAFETY: GetLastError takes no pointers and reads this thread's last-error value.
-    let code = unsafe { GetLastError() };
-    io::Error::other(format!(
-        "Windows EVTX containment failed at {stage} (error {code})"
-    ))
-}
 
 pub(crate) struct Child {
     process: Handle,
@@ -60,7 +49,7 @@ pub(crate) fn spawn(program: &Prepared, input: &File, mode: Mode) -> io::Result<
     command.extend("\" ".encode_utf16());
     command.extend(mode.arg().encode_utf16());
     command.push(0);
-    let environment = environment::block()?;
+    let environment = environment::block(program.identity().local_data())?;
     let mut info = PROCESS_INFORMATION::default();
     // SAFETY: every UTF-16 buffer is terminated and live; startup/attributes retain
     // their aligned buffers, SID and explicit handles until CreateProcess returns.
