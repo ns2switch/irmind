@@ -608,3 +608,21 @@ target/release/examples/benchmark
 ```
 
 The benchmark rejects unoptimized execution and removes its temporary source and artifacts on exit. Repeated local release runs took 13.01–19.64 seconds (52.12–78.73 MiB/s); filesystem-cache and background-load variation prevents interpreting this range as an optimization result.
+
+
+### Small EVTX collection and session witness
+
+The release-only `collection` example generates 300 distinct synthetic files of 69,632 bytes (20,889,600 bytes total). Each has a different authenticated record-header timestamp and valid chunk checksums, avoiding duplicate-source cache hits. The expected output is 4,200 records and 900 precise Parquet artifacts. It removes sources, runtime directories and artifacts on exit.
+
+| Native platform | Collection conversion | Full network witness | Witness executions |
+| --- | ---: | ---: | ---: |
+| Linux x86-64 | 10.58 s | Not applicable: per-child seccomp/Landlock checks | 0 |
+| Windows | Measurement pending native release dry run | Pending | Expected: 1 per session |
+
+This measures source hashing/re-verification, contained decoding, normalization and precise Parquet conversion. It excludes audit signing and fixture generation. Windows additionally measures the first full network witness separately; the collection uses the same parser session for all 300 files. Service changes or validation failures require a new witness rather than a cached success.
+
+```sh
+CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --example collection
+CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx
+target/release/examples/collection
+```

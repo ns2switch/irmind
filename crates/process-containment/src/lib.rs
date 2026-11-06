@@ -38,3 +38,19 @@ pub fn enter(input: &std::fs::File) -> std::io::Result<()> {
 pub fn network_witness(input: &std::fs::File) -> std::io::Result<()> {
     windows::network::witness(input)
 }
+
+/// Exercise the bounded witness message codec without invoking the platform sandbox.
+#[cfg(feature = "fuzzing")]
+pub fn fuzz_witness_protocol(bytes: &[u8]) {
+    use witness_protocol::{Ticket, check_receipt, parse_ready};
+    if let Ok(ticket) = Ticket::parse(bytes) {
+        let _ = Ticket::parse(ticket.encode().as_bytes());
+        let _ = parse_ready(
+            witness_protocol::ready(&ticket.nonce, ticket.ports).as_bytes(),
+            &ticket.nonce,
+        );
+    }
+    let _ = parse_ready(bytes, &[0; 32]);
+    let _ = check_receipt(bytes, &[0; 32], false);
+    let _ = check_receipt(bytes, &[0; 32], true);
+}

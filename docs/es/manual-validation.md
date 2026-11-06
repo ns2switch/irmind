@@ -61,3 +61,20 @@ python3 scripts/hunteval_model_eval.py \
 | Episodio / commit / modelo | P/R eventos | P/R entidades | P/R ATT&CK | Citas y notas |
 | --- | --- | --- | --- | --- |
 | | | | | |
+
+
+## EVTX experimental: prueba candidata en Windows 11
+
+Esta prueba es para colaboradores con Windows 11. Las pruebas automáticas en Windows Server no confirman la compatibilidad con Windows cliente. Usa solo la muestra sintética y una cuenta sin privilegios. EVTX sigue siendo experimental hasta confirmar esta prueba.
+
+1. Descarga los ejecutables coincidentes `irmind.exe` e `irmind-evtx.exe` del artefacto firmado de ensayo enlazado en la [PR de EVTX](https://github.com/ns2switch/irmind/pull/188). Colócalos juntos y comprueba `SHA256SUMS`, los bundles de cosign y la procedencia de GitHub según [plataformas](platforms.md). La identidad esperada de esta candidata es `https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/heads/feat/evtx-isolated-helper`, el emisor es `https://token.actions.githubusercontent.com` y el commit de procedencia debe coincidir con la candidata. No es una versión publicada mediante tag.
+2. Abre la candidata en Windows Terminal con un directorio de pruebas nuevo y el llavero file. No configures modelos ni conectores remotos. El arranque ejecuta el autotest de aislamiento de EVTX. En `/settings preferences`, comprueba que el parser experimental está disponible. Si no lo está, registra el motivo mostrado. No desactives el cortafuegos, no añadas excepciones de loopback ni eleves privilegios para saltar la comprobación.
+3. Descarga `crates/testkit/fixtures/parser-evtx/source/Security.evtx` del mismo commit. Crea un caso con `/new`, ingiere la muestra con `/ingest` y comprueba `parser-evtx`, 14 registros y el manifiesto visible. Inspecciona `/timeline` y `/evidence`; ejecuta `/verify` conservando el original.
+4. Cierra y abre de nuevo la candidata. Comprueba el autotest de la nueva sesión y la verificación del caso. Borra los datos de pruebas al terminar.
+
+Publica solo versión y compilación de Windows, arquitectura, commit candidato, disponibilidad, número de registros y resultado de verificación. No publiques rutas personales, claves, credenciales ni evidencia real. Comunica posibles debilidades de seguridad de forma privada según [SECURITY.md](../../SECURITY.md).
+
+| Cliente Windows | Commit candidato | Autotest nativo | Registros sintéticos | Verificación | Resultado |
+| --- | --- | --- | --- | --- | --- |
+| Windows 11 | Sin confirmar | Pendiente | Esperados: 14 | Pendiente | Experimental |
+| Windows 10 | Sin probar | Pendiente | Esperados: 14 | Pendiente | Sin afirmación de compatibilidad |
