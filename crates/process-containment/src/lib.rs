@@ -19,7 +19,7 @@ pub use launch::{Child, Mode, Program, WitnessStats};
 mod verification;
 #[cfg(any(windows, test, feature = "fuzzing"))]
 mod witness_protocol;
-pub use verification::verify_entry;
+pub use verification::{process_creation_denied, verify_entry};
 
 #[cfg(not(target_os = "linux"))]
 pub fn enter(input: &std::fs::File) -> std::io::Result<()> {

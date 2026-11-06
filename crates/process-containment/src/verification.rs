@@ -78,3 +78,38 @@ pub(crate) fn verify_files() -> io::Result<()> {
     }
     Ok(())
 }
+
+/// Recognize only an explicit operating-system child-process policy denial.
+pub fn process_creation_denied(error: &io::Error) -> bool {
+    if error.kind() == io::ErrorKind::PermissionDenied {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        error.raw_os_error()
+            == i32::try_from(windows_sys::Win32::Foundation::ERROR_CHILD_PROCESS_BLOCKED).ok()
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn process_denial_never_accepts_missing_files_timeouts_or_unknown_errors() {
+        assert!(process_creation_denied(
+            &io::ErrorKind::PermissionDenied.into()
+        ));
+        for kind in [
+            io::ErrorKind::NotFound,
+            io::ErrorKind::TimedOut,
+            io::ErrorKind::Other,
+        ] {
+            assert!(!process_creation_denied(&kind.into()));
+        }
+        let blocked = io::Error::from_raw_os_error(367);
+        assert_eq!(process_creation_denied(&blocked), cfg!(windows));
+    }
+}

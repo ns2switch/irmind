@@ -56,7 +56,7 @@ fn run() -> io::Result<()> {
             .arg("--probe-v1")
             .spawn()
         {
-            Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {}
+            Err(error) if irmind_process_containment::process_creation_denied(&error) => {}
             Ok(mut child) => {
                 let _ = child.kill();
                 let _ = child.wait();
@@ -68,7 +68,11 @@ fn run() -> io::Result<()> {
             Err(error) => {
                 return Err(io::Error::new(
                     io::ErrorKind::PermissionDenied,
-                    format!("EVTX child process isolation could not be verified ({:?}/{})", error.kind(), error.raw_os_error().unwrap_or(0)),
+                    format!(
+                        "EVTX child process isolation could not be verified ({:?}/{})",
+                        error.kind(),
+                        error.raw_os_error().unwrap_or(0)
+                    ),
                 ));
             }
         }
