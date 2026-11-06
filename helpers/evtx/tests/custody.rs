@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 #![allow(clippy::unwrap_used, clippy::too_many_lines)]
+mod support;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::StreamingEventParser as _;
 use irmind_app::modules::{ModuleConfig, ModuleRegistry, ParserChoice};
@@ -26,10 +27,7 @@ impl Signer for SyntheticSigner {
 }
 
 fn setup(root: &Path) -> (Engine<'_>, Arc<LocalStore>, Arc<EvtxParser>) {
-    let parser = Arc::new(EvtxParser::new(
-        Path::new(env!("CARGO_BIN_EXE_irmind-evtx")),
-        root,
-    ));
+    let parser = Arc::new(EvtxParser::new(&support::helper_path(), root));
     assert!(
         parser.unavailable_reason().is_none(),
         "{:?}",
@@ -73,7 +71,7 @@ fn detected_evtx_signs_v2_sources_and_rebuilds_without_ingesting_private_answers
         parser: parser.as_ref(),
     };
     let mut registry = ModuleRegistry::new();
-    let detector = EvtxParser::new(Path::new(env!("CARGO_BIN_EXE_irmind-evtx")), root.path());
+    let detector = EvtxParser::new(&support::helper_path(), root.path());
     registry
         .register(Box::new(detector), &ModuleConfig::new())
         .unwrap();

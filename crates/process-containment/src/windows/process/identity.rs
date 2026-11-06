@@ -11,7 +11,7 @@ pub(crate) struct Identity {
     words: Vec<usize>,
     length: usize,
     executable: PathBuf,
-    _profile: super::profile::Profile,
+    profile: super::profile::Profile,
 }
 struct Sid(PSID);
 impl Drop for Sid {
@@ -47,7 +47,7 @@ impl Identity {
             words,
             length,
             executable,
-            _profile: profile,
+            profile,
         };
         super::super::filesystem::helper_read_execute(work, identity.bytes())?;
         super::super::filesystem::helper_read_execute(&identity.executable, identity.bytes())?;
@@ -55,6 +55,9 @@ impl Identity {
     }
     pub(crate) fn executable(&self) -> &Path {
         &self.executable
+    }
+    pub(super) fn local_data(&self) -> &Path {
+        self.profile.local_data()
     }
     pub(super) fn raw(&self) -> PSID {
         self.words.as_ptr().cast_mut().cast()

@@ -341,6 +341,7 @@ pub fn durable_replace(source: &Path, destination: &Path) -> io::Result<()> {
 }
 
 /// Read/execute access only for this session's derived `AppContainer` SID.
+#[cfg(feature = "launcher")]
 pub(super) fn helper_read_execute(path: &Path, sandbox_sid: &[u8]) -> io::Result<()> {
     let owner = sid_text(&current_user_sid()?)?;
     let sandbox = sid_text(sandbox_sid)?;

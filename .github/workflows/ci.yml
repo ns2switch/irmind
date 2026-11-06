@@ -103,7 +103,7 @@ jobs:
         run: |
           cargo fmt --manifest-path helpers/evtx/Cargo.toml --all --check
           cargo clippy --manifest-path helpers/evtx/Cargo.toml --all-targets --profile ci --locked -- -D warnings
-          cargo nextest run --manifest-path helpers/evtx/Cargo.toml --cargo-profile ci --locked
+          python3 helpers/evtx/test.py
           python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx native-only
       - name: Nextest (CI profile)
         run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
@@ -276,7 +276,10 @@ jobs:
         run: cargo clippy -p irmind-process-containment --all-targets --profile ci --locked -- -D warnings
       - name: Build and test the separately resolved EVTX helper
         run: |
-          cargo nextest run --manifest-path helpers/evtx/Cargo.toml --cargo-profile ci --locked
+          python3 helpers/evtx/test.py
+      - name: Inspect helper DLL imports after native startup failure
+        if: failure()
+        run: python3 .github/scripts/inspect_evtx_windows.py target/x86_64-pc-windows-msvc/ci/irmind-evtx.exe
       - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
       - name: Parse the PowerShell installer without running it
         run: |
@@ -374,7 +377,7 @@ jobs:
         run: sw_vers -productVersion
       - name: Build and test the separately resolved EVTX helper
         run: |
-          cargo nextest run --manifest-path helpers/evtx/Cargo.toml --cargo-profile ci --locked
+          python3 helpers/evtx/test.py
       - name: Inspect sandbox launch diagnostics after a native helper failure
         if: failure()
         run: /usr/bin/log show --last 2m --style compact --predicate '(process == "kernel" OR process == "sandboxd") AND eventMessage CONTAINS "irmind-evtx"'

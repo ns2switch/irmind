@@ -12,7 +12,9 @@ mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::enter;
 
+#[cfg(feature = "launcher")]
 mod launch;
+#[cfg(feature = "launcher")]
 pub use launch::{Child, Mode, Program};
 mod verification;
 pub use verification::verify_entry;
@@ -20,7 +22,7 @@ pub use verification::verify_entry;
 #[cfg(not(target_os = "linux"))]
 pub fn enter(input: &std::fs::File) -> std::io::Result<()> {
     #[cfg(windows)]
-    windows::process::verify_token(input)?;
+    windows::token::verify_token(input)?;
     #[cfg(not(windows))]
     let _ = input;
     verify_entry()

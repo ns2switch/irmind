@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 #![allow(clippy::unwrap_used)]
+mod support;
 use irmind_process_containment::{Mode, Program};
 use std::{
     fs::File,
@@ -12,7 +13,7 @@ use std::{
 
 fn execute(mode: Mode) -> (bool, String, String) {
     let root = tempfile::tempdir().unwrap();
-    let program = Program::new(Path::new(env!("CARGO_BIN_EXE_irmind-evtx")), root.path()).unwrap();
+    let program = Program::new(&support::helper_path(), root.path()).unwrap();
     let source = File::open(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../crates/testkit/fixtures/parser-evtx/source/Security.evtx"),
@@ -79,10 +80,7 @@ fn native_contained_decoder_reads_inherited_input_without_filesystem_access() {
 #[test]
 fn parser_module_passes_seekable_contract_and_preserves_100ns_provenance() {
     let root = tempfile::tempdir().unwrap();
-    let parser = irmind_mod_parser_evtx::EvtxParser::new(
-        Path::new(env!("CARGO_BIN_EXE_irmind-evtx")),
-        root.path(),
-    );
+    let parser = irmind_mod_parser_evtx::EvtxParser::new(&support::helper_path(), root.path());
     assert!(
         parser.unavailable_reason().is_none(),
         "{:?}",
@@ -113,7 +111,7 @@ fn parser_module_passes_seekable_contract_and_preserves_100ns_provenance() {
 #[test]
 fn termination_reaps_a_decoder_blocked_on_its_output_and_removes_runtime() {
     let root = tempfile::tempdir().unwrap();
-    let program = Program::new(Path::new(env!("CARGO_BIN_EXE_irmind-evtx")), root.path()).unwrap();
+    let program = Program::new(&support::helper_path(), root.path()).unwrap();
     let fixture =
         include_bytes!("../../../crates/testkit/fixtures/parser-evtx/source/Security.evtx");
     let mut bytes = fixture[..4096].to_vec();
@@ -147,10 +145,7 @@ fn parent_cancellation_aborts_without_a_complete_report_and_cleans_up() {
     use irmind_app::CancellationToken;
     use irmind_app::StreamingEventParser as _;
     let root = tempfile::tempdir().unwrap();
-    let parser = irmind_mod_parser_evtx::EvtxParser::new(
-        Path::new(env!("CARGO_BIN_EXE_irmind-evtx")),
-        root.path(),
-    );
+    let parser = irmind_mod_parser_evtx::EvtxParser::new(&support::helper_path(), root.path());
     let mut source = File::open(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../crates/testkit/fixtures/parser-evtx/source/Security.evtx"),
@@ -179,10 +174,7 @@ fn parent_cancellation_aborts_without_a_complete_report_and_cleans_up() {
 fn normalized_eventdata_fields_are_entities_not_just_preserved_attributes() {
     use irmind_app::{CancellationToken, StreamingEventParser as _};
     let root = tempfile::tempdir().unwrap();
-    let parser = irmind_mod_parser_evtx::EvtxParser::new(
-        Path::new(env!("CARGO_BIN_EXE_irmind-evtx")),
-        root.path(),
-    );
+    let parser = irmind_mod_parser_evtx::EvtxParser::new(&support::helper_path(), root.path());
     let mut file = File::open(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../crates/testkit/fixtures/parser-evtx/source/Security.evtx"),

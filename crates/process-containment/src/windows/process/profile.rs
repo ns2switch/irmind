@@ -15,6 +15,7 @@ use windows_sys::Win32::{
 /// A unique, empty OS namespace. The child receives no write access to its profile.
 pub(super) struct Profile {
     name: Vec<u16>,
+    local_data: PathBuf,
 }
 impl Profile {
     pub(super) fn create(name: Vec<u16>) -> io::Result<(Self, PSID)> {
@@ -35,13 +36,21 @@ impl Profile {
                 "Windows EVTX profile creation failed ({status:#x})"
             )));
         }
-        let profile = Self { name };
-        if let Err(failure) = restrict_profile(sid) {
+        let mut profile = Self {
+            name,
+            local_data: PathBuf::new(),
+        };
+        let restricted = restrict_profile(sid);
+        if let Err(failure) = restricted {
             // SAFETY: successful CreateAppContainerProfile allocated this SID; ownership was not returned.
             unsafe { windows_sys::Win32::Security::FreeSid(sid) };
             return Err(failure);
         }
+        profile.local_data = restricted?;
         Ok((profile, sid))
+    }
+    pub(super) fn local_data(&self) -> &std::path::Path {
+        &self.local_data
     }
 }
 impl Drop for Profile {
@@ -81,9 +90,20 @@ fn profile_directory(sid: PSID) -> io::Result<PathBuf> {
     Ok(directory)
 }
 
-fn restrict_profile(sid: PSID) -> io::Result<()> {
+fn restrict_profile(sid: PSID) -> io::Result<PathBuf> {
     let directory = profile_directory(sid)?;
     let root = directory.parent().ok_or_else(|| error("profile-parent"))?;
+    let packages = root
+        .parent()
+        .filter(|path| {
+            path.file_name()
+                .is_some_and(|name| name.eq_ignore_ascii_case("Packages"))
+        })
+        .ok_or_else(|| io::Error::other("Windows EVTX profile location is unsupported"))?;
+    let local_data = packages
+        .parent()
+        .ok_or_else(|| error("profile-local-data"))?
+        .to_path_buf();
     // Remove package-write grants from every OS-created entry before the child exists.
     let mut pending = vec![(root.to_path_buf(), 0u8)];
     let mut count = 0;
@@ -102,7 +122,7 @@ fn restrict_profile(sid: PSID) -> io::Result<()> {
             }
         }
     }
-    Ok(())
+    Ok(local_data)
 }
 
 #[cfg(test)]
