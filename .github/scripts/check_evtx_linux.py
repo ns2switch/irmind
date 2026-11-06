@@ -2,6 +2,7 @@
 """Exercise the actual helper on Linux without privileged containers or network."""
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -56,6 +57,13 @@ def main():
         finally:
             subprocess.run(['docker','rm','--force',name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
         if result.returncode != 0 or json.loads(result.stdout).get('isolated') is not True:
+            # Only fixed diagnostic categories/version tokens, never arbitrary output.
+            errors=result.stderr.decode('utf-8',errors='replace')[:4096]
+            print(json.dumps({'container_exit':result.returncode,
+                              'required_glibc':sorted(set(re.findall(r'GLIBC_[0-9.]+',errors))),
+                              'landlock_required':'fully enforced Landlock' in errors,
+                              'file_denial_failed':'file isolation verification failed' in errors,
+                              'network_denial_failed':'network' in errors},sort_keys=True),flush=True)
             raise SystemExit('EVTX container isolation failed for '+image)
         print(json.dumps({'userspace':image,'shared_host_kernel':os.uname().release,'probe':'passed'},sort_keys=True))
 
