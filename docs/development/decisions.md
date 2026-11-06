@@ -332,3 +332,12 @@ Context: the decoder has no interactive console and communicates through the exp
 Decision: start the suspended Windows decoder with DETACHED_PROCESS rather than CREATE_NO_WINDOW. Keep the explicit three-handle list, zero-capability AppContainer, child-process restriction, one-process Job Object, memory limit and pre-decode enforcement probes unchanged. This is console detachment, not Job Object breakaway.
 
 Consequences: no console host is requested by the launcher. Native decoder, denial, handle-inheritance and termination tests still determine availability; a successful cross-compilation cannot establish that the loader starts.
+
+
+## Distinguish the Windows runtime directory from inherited evidence
+
+Context: Windows supplies a current-directory handle as part of process initialization, independently of the explicit inherited standard-handle list. Rejecting every additional disk handle also rejects that expected OS runtime handle.
+
+Decision: retain rejection of all additional inheritable handles and unrelated disk handles. Recognize only a non-inheritable directory handle whose volume/file identity equals the explicitly selected private runtime directory and whose granted access contains at most traversal, metadata reads and synchronization. Reject reparse points, different directories, regular files, data/list access and write rights. Query the official windows-sys object/file APIs inside the same dedicated Windows boundary.
+
+Consequences: the three-handle inheritance list is unchanged. Native tests cover the exact-directory metadata exception, foreign directory/file rejection, write-access rejection and exclusion of an unrelated inheritable file and pipes. The helper receives no additional evidence-path or credential access.

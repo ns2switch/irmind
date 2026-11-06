@@ -4,6 +4,7 @@ pub mod filesystem;
 mod handles;
 #[cfg(feature = "launcher")]
 pub(crate) mod process;
+mod runtime_directory;
 pub(crate) mod token;
 
 pub(super) fn error(stage: &'static str) -> std::io::Error {
