@@ -186,7 +186,11 @@ impl Child {
         self.native.exit_description()
     }
     pub fn terminate(&mut self) -> io::Result<()> {
-        self.program.invalidate();
+        // Normal reader cleanup also calls terminate after a verified successful exit.
+        // That is not a failed validation and must not invalidate the session witness.
+        if self.try_wait()? != Some(true) {
+            self.program.invalidate();
+        }
         self.native.terminate()
     }
 }

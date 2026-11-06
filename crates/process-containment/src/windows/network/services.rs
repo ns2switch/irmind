@@ -9,7 +9,7 @@ use std::{
         mpsc,
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use windows_sys::Win32::System::Services::{
     CloseServiceHandle, OpenSCManagerW, OpenServiceW, PSC_NOTIFICATION_REGISTRATION,
@@ -128,19 +128,39 @@ impl Watch {
             out.subscriptions.push(Subscription(subscription));
             out.services.push(service);
         }
-        out.snapshot()?;
+        out.settle()?;
         Ok(out)
     }
     fn snapshot(&self) -> io::Result<Stamp> {
-        let epoch = self.epoch.load(Ordering::SeqCst);
-        let mut pids = [0; 2];
-        for (index, service) in self.services.iter().enumerate() {
-            pids[index] = running(service)?;
+        for _ in 0..3 {
+            let epoch = self.epoch.load(Ordering::SeqCst);
+            let mut pids = [0; 2];
+            for (index, service) in self.services.iter().enumerate() {
+                pids[index] = running(service)?;
+            }
+            if epoch != u64::MAX && epoch == self.epoch.load(Ordering::SeqCst) {
+                return Ok(Stamp { epoch, pids });
+            }
         }
-        if epoch == u64::MAX || epoch != self.epoch.load(Ordering::SeqCst) {
-            return Err(denied());
+        Err(denied())
+    }
+    fn settle(&self) -> io::Result<()> {
+        // Subscription initialization can queue status callbacks before the
+        // first witness. Drain that initial activity; no result is cached yet.
+        let start = Instant::now();
+        let mut previous = self.snapshot()?;
+        let mut stable = Instant::now();
+        while start.elapsed() < Duration::from_secs(2) {
+            thread::sleep(Duration::from_millis(5));
+            let current = self.snapshot()?;
+            if current != previous {
+                previous = current;
+                stable = Instant::now();
+            } else if stable.elapsed() >= Duration::from_millis(50) {
+                return Ok(());
+            }
         }
-        Ok(Stamp { epoch, pids })
+        Err(denied())
     }
 }
 fn running(service: &Service) -> io::Result<u32> {

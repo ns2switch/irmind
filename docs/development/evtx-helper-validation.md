@@ -23,6 +23,7 @@ Local AddressSanitizer runs used the separately locked fuzz workspace, versioned
 | Decoder, initial run | 3,601 s | 20,737,363 | 0 |
 | Decoder, final run | 3,601 s | 18,798,606 | 0 |
 | Parent NDJSON protocol | 601 s | 5,842,132 | 0 |
+| Parent protocol plus Windows witness codec | 601 s | 6,472,865 | 0 |
 
 The decoder target calls the decoding library directly. It does not exercise OS containment or prove coverage of every EVTX template or SIMD branch. Native tests cover the launcher separately. The nightly workflow repeats one hour of decoder fuzzing and ten minutes of protocol fuzzing. Temporary corpora are removed after each run; seeds remain versioned.
 

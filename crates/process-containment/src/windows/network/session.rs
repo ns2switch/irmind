@@ -61,13 +61,24 @@ impl Session {
         program: &Arc<Prepared>,
         cancelled: &dyn Fn() -> bool,
     ) -> io::Result<Stamp> {
-        let result = (|| {
-            let stamp = self.services.snapshot().map_err(|_| {
-                io::Error::new(
-                    io::ErrorKind::PermissionDenied,
-                    "EVTX WFP services are unavailable before the witness",
-                )
-            })?;
+        let result = self.ensure_stable(program, cancelled);
+        if result.is_err() {
+            self.invalidate();
+        }
+        result
+    }
+    fn ensure_stable(
+        &self,
+        program: &Arc<Prepared>,
+        cancelled: &dyn Fn() -> bool,
+    ) -> io::Result<Stamp> {
+        // A service notification invalidates this attempt, never the invariant.
+        // Repeat the complete witness with the new stamp before allowing input.
+        for _ in 0..3 {
+            if cancelled() {
+                return Err(io::ErrorKind::Interrupted.into());
+            }
+            let stamp = self.services.snapshot()?;
             if *self.verified.lock().map_err(|_| denied())? == Some(stamp) {
                 return Ok(stamp);
             }
@@ -80,25 +91,16 @@ impl Session {
                 Ordering::Relaxed,
             );
             result?;
-            if self.services.snapshot().map_err(|_| {
-                io::Error::new(
-                    io::ErrorKind::PermissionDenied,
-                    "EVTX WFP services are unavailable after the witness",
-                )
-            })? != stamp
-            {
-                return Err(io::Error::new(
-                    io::ErrorKind::PermissionDenied,
-                    "EVTX WFP service stamp changed during the witness",
-                ));
+            if self.services.snapshot()? != stamp {
+                continue;
             }
             *self.verified.lock().map_err(|_| denied())? = Some(stamp);
-            Ok(stamp)
-        })();
-        if result.is_err() {
-            self.invalidate();
+            return Ok(stamp);
         }
-        result
+        Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "EVTX WFP service stamp did not stabilize across three complete witnesses",
+        ))
     }
     pub(crate) fn unchanged(&self, stamp: Stamp) -> io::Result<()> {
         if self.services.snapshot()? == stamp {
