@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 5d7a59b246db1e06bd67b6833a873b72a00e9ff2; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit c21dfa66ce9e0c2ae98db4afa6aa7027aba76bb6; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -237,3 +237,7 @@ Para ingerir logs RFC 5424 o RFC 3164, `parser-syslog` es un módulo local exper
 ## Logs de Linux
 
 Para ingerir auth.log/secure, auditd, journald JSON o exportaciones nginx/Apache common y combined, `parser-linux` es un módulo local experimental compilado por defecto. Necesita acceso de lectura a esos archivos y ninguna credencial. El tiempo de la autenticación clásica se confirma en cada ingesta con el mismo formulario de syslog. La agrupación de auditd está acotada y los eventos incompletos quedan marcados como parciales. Se conservan las fracciones del instante original; el índice actual usa segundos. Los formatos propios usan una definición declarativa firmada. Consulta [la selección de parsers](parsers.md) y [el contrato y los límites de Linux](../development/linux-parser.md).
+
+## Windows EVTX
+
+El módulo experimental `parser-evtx` se compila por defecto, pero requiere el auxiliar de la misma versión y un aislamiento nativo operativo. No utiliza credenciales ni red. Ingiere archivos EVTX o directorios con el registro habitual. Consulta [Windows EVTX](parsers.md#windows-evtx) para conocer canales, precisión temporal, límites y requisitos.

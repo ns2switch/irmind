@@ -1,4 +1,4 @@
-Traducción de docs/parsers.md en el commit cca6df2f8ac78f6804cabb235ac7051e650479fa; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/parsers.md en el commit c21dfa66ce9e0c2ae98db4afa6aa7027aba76bb6; si hay diferencias, prevalece la versión en inglés.
 
 # Parsers de logs
 
@@ -75,3 +75,11 @@ RFC 3164 abre un formulario temporal antes de ingerir. Confirma el año del prim
 ### Exportaciones de Linux
 
 Auth.log/secure clásico usa el mismo formulario temporal por ingesta que syslog. Journald conserva el instante original en microsegundos. Auditd agrupa registros acotados con el mismo nodo, instante y serial; los grupos incompletos se marcan como parciales. Los formatos de acceso HTTP estándar no incluyen el host del servidor: IRMind lo deja desconocido. Para formatos propios, adapta el [ejemplo declarativo de exportación HTTP](../examples/parsers/nginx-apache-custom.toml). El [contrato de Linux](../development/linux-parser.md) detalla los límites y los campos mapeados.
+
+### Windows EVTX
+
+El módulo experimental `parser-evtx` utiliza el auxiliar independiente `irmind-evtx`. Reconoce la cabecera y su checksum, no la extensión. Recibe un único descriptor de solo lectura. Los archivos locales y los objetos descargados en el spool privado del caso siguen la misma ruta.
+
+Linux requiere kernel 5.13 o posterior, Landlock ABI 1 habilitado y seccomp sin privilegios. Bubblewrap no es obligatorio. Windows utiliza un AppContainer sin capacidades, una lista explícita de handles y un Job Object que termina los procesos al cerrarse. macOS aplica un perfil restrictivo. Una prueba de arranque comprueba que se deniegan lecturas ajenas, red y creación de procesos. Si falla, Preferencias explica por qué EVTX no está disponible; nunca se ejecuta sin aislamiento.
+
+Security, System, PowerShell y Sysmon se normalizan al esquema común. Se conservan los campos no mapeados, la resolución temporal original de 100 ns y los offsets reales. Consulta el [diseño del auxiliar](../development/evtx-helper-design.md) para conocer los límites y las pruebas. Instala el auxiliar de la misma release verificada junto al ejecutable principal.

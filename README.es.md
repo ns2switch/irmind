@@ -1,4 +1,4 @@
-Traducción de README.md en el commit cca6df2f8ac78f6804cabb235ac7051e650479fa; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit c21dfa66ce9e0c2ae98db4afa6aa7027aba76bb6; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -104,6 +104,7 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Parser de plaso | parser local | `parser-plaso` (por defecto) | experimental | [plaso](docs/es/modules.md#parser-de-plaso) |
 | Parser declarativo | parser local | `parser-declarative` (por defecto) | experimental | [Formatos propios](docs/es/parsers.md) |
 | Logs de Linux | parser local | `parser-linux` (por defecto) | experimental | [Linux](docs/es/modules.md#logs-de-linux) |
+| Windows EVTX | parser local aislado | `parser-evtx` (por defecto) | experimental | [EVTX](docs/es/modules.md#windows-evtx) |
 | Parser Syslog | parser local | `parser-syslog` (por defecto) | experimental | [Syslog](docs/es/modules.md#parser-syslog) |
 | Parser de EZTools | parser local | `parser-eztools` (por defecto) | experimental | [EZTools](docs/es/modules.md#parser-de-eztools) |
 | Llavero del sistema | firma y secretos | `keystore-os` (por defecto) | experimental | [Módulos](docs/es/modules.md#llavero-del-sistema) |
