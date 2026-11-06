@@ -1,0 +1,33 @@
+[package]
+name = "irmind-evtx-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+members = ["."]
+resolver = "3"
+
+[dependencies]
+libfuzzer-sys = "0.4"
+irmind-mod-parser-evtx = { path = "../../../crates/modules/parser-evtx", version = "0.1.0", features = ["fuzzing"] }
+irmind-evtx = { path = "..", version = "0.2.0" }
+evtx = { version = "=0.15.1", default-features = false }
+
+[[bin]]
+name = "evtx_decode"
+path = "fuzz_targets/evtx_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "evtx_protocol"
+path = "fuzz_targets/evtx_protocol.rs"
+test = false
+doc = false
+bench = false

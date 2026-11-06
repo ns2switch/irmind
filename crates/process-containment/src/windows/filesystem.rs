@@ -1,4 +1,5 @@
-//! The only unsafe boundary in IRMind. All pointers and handles stay in this module.
+#![cfg(windows)]
+//! Native filesystem primitives shared by the launcher and safe filesystem adapter.
 
 use std::ffi::c_void;
 use std::fs;
@@ -61,17 +62,20 @@ fn sid_fits_ace(ace_size: usize, sid_offset: usize, subauthorities: u8) -> bool 
         .is_some_and(|end| end <= ace_size)
 }
 
-fn current_user_sid() -> io::Result<Vec<u8>> {
+pub(super) fn current_user_sid() -> io::Result<Vec<u8>> {
     let mut raw_token = ptr::null_mut();
     // SAFETY: out pointer is valid; GetCurrentProcess returns a borrowed pseudo-handle.
-    if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut raw_token) } == 0 {
+    if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &raw mut raw_token) } == 0 {
         return Err(io::Error::last_os_error());
     }
     let token = Token(raw_token);
     let mut required = 0u32;
     // SAFETY: null buffer is the documented size-query form.
-    unsafe { GetTokenInformation(token.0, TokenUser, ptr::null_mut(), 0, &mut required) };
-    if !(std::mem::size_of::<TOKEN_USER>() as u32..=4096).contains(&required) {
+    unsafe { GetTokenInformation(token.0, TokenUser, ptr::null_mut(), 0, &raw mut required) };
+    if !(u32::try_from(std::mem::size_of::<TOKEN_USER>())
+        .map_err(|_| denied("token size exceeds native limit"))?..=4096)
+        .contains(&required)
+    {
         return Err(denied("invalid user token size"));
     }
     let words = (required as usize).div_ceil(std::mem::size_of::<usize>());
@@ -85,7 +89,7 @@ fn current_user_sid() -> io::Result<Vec<u8>> {
             TokenUser,
             buffer.as_mut_ptr().cast(),
             capacity,
-            &mut required,
+            &raw mut required,
         )
     } == 0
     {
@@ -122,10 +126,10 @@ fn current_user_sid() -> io::Result<Vec<u8>> {
     Ok(unsafe { std::slice::from_raw_parts(sid.cast::<u8>(), length) }.to_vec())
 }
 
-fn sid_text(sid: &[u8]) -> io::Result<String> {
+pub(super) fn sid_text(sid: &[u8]) -> io::Result<String> {
     let mut raw = ptr::null_mut();
     // SAFETY: sid is a validated SID copied from the current process token; out pointer is valid.
-    if unsafe { ConvertSidToStringSidW(sid.as_ptr().cast_mut().cast(), &mut raw) } == 0 {
+    if unsafe { ConvertSidToStringSidW(sid.as_ptr().cast_mut().cast(), &raw mut raw) } == 0 {
         return Err(io::Error::last_os_error());
     }
     let allocation = LocalAllocation(raw.cast());
@@ -144,7 +148,7 @@ fn sid_text(sid: &[u8]) -> io::Result<String> {
     Ok(text)
 }
 
-pub(crate) fn private_windows(path: &Path) -> io::Result<()> {
+pub fn private_windows(path: &Path) -> io::Result<()> {
     // Win32 can expose an intermediate DACL while another thread updates the same path.
     let _acl_guard = ACL_UPDATE_LOCK
         .lock()
@@ -163,7 +167,7 @@ pub(crate) fn private_windows(path: &Path) -> io::Result<()> {
         ConvertStringSecurityDescriptorToSecurityDescriptorW(
             sddl.as_ptr(),
             SDDL_REVISION_1,
-            &mut descriptor,
+            &raw mut descriptor,
             ptr::null_mut(),
         )
     } == 0
@@ -175,7 +179,14 @@ pub(crate) fn private_windows(path: &Path) -> io::Result<()> {
     let mut defaulted = 0;
     let mut acl: *mut ACL = ptr::null_mut();
     // SAFETY: descriptor is a live Win32 security descriptor; out pointers are valid.
-    if unsafe { GetSecurityDescriptorDacl(descriptor, &mut present, &mut acl, &mut defaulted) } == 0
+    if unsafe {
+        GetSecurityDescriptorDacl(
+            descriptor,
+            &raw mut present,
+            &raw mut acl,
+            &raw mut defaulted,
+        )
+    } == 0
         || present == 0
         || acl.is_null()
     {
@@ -195,12 +206,12 @@ pub(crate) fn private_windows(path: &Path) -> io::Result<()> {
         )
     };
     if status != 0 {
-        return Err(io::Error::from_raw_os_error(status as i32));
+        return Err(io::Error::from_raw_os_error(status.cast_signed()));
     }
     verify_private(path)
 }
 
-pub(crate) fn verify_private(path: &Path) -> io::Result<()> {
+pub fn verify_private(path: &Path) -> io::Result<()> {
     let sid = current_user_sid()?;
     let metadata = fs::symlink_metadata(path)?;
     let path_wide = wide_path(path);
@@ -214,13 +225,13 @@ pub(crate) fn verify_private(path: &Path) -> io::Result<()> {
             DACL_SECURITY_INFORMATION,
             ptr::null_mut(),
             ptr::null_mut(),
-            &mut acl,
+            &raw mut acl,
             ptr::null_mut(),
-            &mut descriptor,
+            &raw mut descriptor,
         )
     };
     if status != 0 {
-        return Err(io::Error::from_raw_os_error(status as i32));
+        return Err(io::Error::from_raw_os_error(status.cast_signed()));
     }
     let _descriptor = LocalAllocation(descriptor);
     verify_acl(acl, descriptor, &sid, metadata.is_dir())
@@ -233,7 +244,7 @@ fn verify_acl(acl: *mut ACL, descriptor: *mut c_void, sid: &[u8], is_dir: bool) 
     let mut control = 0u16;
     let mut revision = 0u32;
     // SAFETY: descriptor is live; control and revision are valid out pointers.
-    if unsafe { GetSecurityDescriptorControl(descriptor, &mut control, &mut revision) } == 0
+    if unsafe { GetSecurityDescriptorControl(descriptor, &raw mut control, &raw mut revision) } == 0
         || control & SE_DACL_PROTECTED == 0
     {
         return Err(denied("Windows DACL is not protected"));
@@ -244,7 +255,7 @@ fn verify_acl(acl: *mut ACL, descriptor: *mut c_void, sid: &[u8], is_dir: bool) 
     }
     let mut raw_ace: *mut c_void = ptr::null_mut();
     // SAFETY: acl is live and index zero exists because AceCount is one.
-    if unsafe { GetAce(acl, 0, &mut raw_ace) } == 0 || raw_ace.is_null() {
+    if unsafe { GetAce(acl, 0, &raw mut raw_ace) } == 0 || raw_ace.is_null() {
         return Err(denied("Windows DACL has no user ACE"));
     }
     let ace = raw_ace.cast::<ACCESS_ALLOWED_ACE>();
@@ -256,7 +267,8 @@ fn verify_acl(acl: *mut ACL, descriptor: *mut c_void, sid: &[u8], is_dir: bool) 
         return Err(denied("Windows DACL ACE has an invalid type or size"));
     }
     let expected_flags = if is_dir {
-        (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE) as u8
+        u8::try_from(OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE)
+            .map_err(|_| denied("invalid inheritance flags"))?
     } else {
         0
     };
@@ -287,28 +299,7 @@ fn verify_acl(acl: *mut ACL, descriptor: *mut c_void, sid: &[u8], is_dir: bool) 
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{sid_fits_ace, sid_size};
-
-    #[test]
-    fn ace_sid_length_is_bounded_before_win32_reads_it() {
-        assert!(sid_fits_ace(20, 8, 1));
-        assert!(!sid_fits_ace(19, 8, 1));
-        assert!(!sid_fits_ace(200, 8, 16));
-    }
-
-    #[test]
-    fn token_sid_length_is_bounded_before_win32_reads_it() {
-        assert_eq!(sid_size(0), Some(8));
-        assert_eq!(sid_size(15), Some(68));
-        assert_eq!(sid_size(16), None);
-        assert!(sid_size(15).is_some_and(|size| size <= 68));
-        assert!(!sid_size(15).is_some_and(|size| size <= 67));
-    }
-}
-
-pub(crate) fn durable_rename(source: &Path, destination: &Path) -> io::Result<()> {
+pub fn durable_rename(source: &Path, destination: &Path) -> io::Result<()> {
     if destination.exists() {
         return Err(io::Error::new(
             io::ErrorKind::AlreadyExists,
@@ -331,7 +322,7 @@ pub(crate) fn durable_rename(source: &Path, destination: &Path) -> io::Result<()
     Ok(())
 }
 
-pub(crate) fn durable_replace(source: &Path, destination: &Path) -> io::Result<()> {
+pub fn durable_replace(source: &Path, destination: &Path) -> io::Result<()> {
     let source = wide_path(source);
     let destination = wide_path(destination);
     // SAFETY: both paths are terminated and live; replacement is confined to the caller's private directory.
@@ -347,4 +338,75 @@ pub(crate) fn durable_replace(source: &Path, destination: &Path) -> io::Result<(
         return Err(io::Error::last_os_error());
     }
     Ok(())
+}
+
+/// Read/execute access only for this session's derived `AppContainer` SID.
+pub(super) fn helper_read_execute(path: &Path, sandbox_sid: &[u8]) -> io::Result<()> {
+    let owner = sid_text(&current_user_sid()?)?;
+    let sandbox = sid_text(sandbox_sid)?;
+    let sddl: Vec<u16> = format!("D:P(A;;FA;;;{owner})(A;;GRGX;;;{sandbox})")
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
+    let mut raw = ptr::null_mut();
+    // SAFETY: terminated SDDL; output is a single owned LocalFree allocation.
+    if unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.as_ptr(),
+            SDDL_REVISION_1,
+            &raw mut raw,
+            ptr::null_mut(),
+        )
+    } == 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    let _allocation = LocalAllocation(raw);
+    let (mut present, mut defaulted, mut acl) = (0, 0, ptr::null_mut());
+    // SAFETY: descriptor is live and output pointers are initialized local storage.
+    if unsafe { GetSecurityDescriptorDacl(raw, &raw mut present, &raw mut acl, &raw mut defaulted) }
+        == 0
+        || present == 0
+        || acl.is_null()
+    {
+        return Err(denied("invalid sandbox DACL"));
+    }
+    let path = wide_path(path);
+    // SAFETY: path is terminated and ACL is retained by the live descriptor allocation.
+    let status = unsafe {
+        SetNamedSecurityInfoW(
+            path.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            acl,
+            ptr::null(),
+        )
+    };
+    if status != 0 {
+        return Err(io::Error::from_raw_os_error(status.cast_signed()));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{sid_fits_ace, sid_size};
+
+    #[test]
+    fn ace_sid_length_is_bounded_before_win32_reads_it() {
+        assert!(sid_fits_ace(20, 8, 1));
+        assert!(!sid_fits_ace(19, 8, 1));
+        assert!(!sid_fits_ace(200, 8, 16));
+    }
+
+    #[test]
+    fn token_sid_length_is_bounded_before_win32_reads_it() {
+        assert_eq!(sid_size(0), Some(8));
+        assert_eq!(sid_size(15), Some(68));
+        assert_eq!(sid_size(16), None);
+        assert!(sid_size(15).is_some_and(|size| size <= 68));
+        assert!(sid_size(15).is_none_or(|size| size > 67));
+    }
 }

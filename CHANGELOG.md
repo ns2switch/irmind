@@ -4,6 +4,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Add an experimental, separately contained EVTX decoding helper with bounded output, precise timestamps and file-offset provenance. Linux uses Landlock and seccomp; macOS and Windows require their native sandbox to pass a startup probe.
+
 ## 0.1.6 — Complete bounded JSON ingestion
 
 ### Known issue fixed

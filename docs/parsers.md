@@ -73,3 +73,11 @@ RFC 3164 opens a time-context form before ingestion. Confirm the first record’
 ### Linux exports
 
 Classic auth.log/secure uses the same per-ingestion time form as syslog. Journald keeps the original microsecond timestamp. Auditd groups bounded records with the same node, timestamp and serial; unfinished groups stay marked partial. Standard HTTP access formats provide no server-host field, so IRMind leaves it unknown. For custom log formats, adapt the [declarative HTTP export example](examples/parsers/nginx-apache-custom.toml). The [Linux contract](development/linux-parser.md) lists limits and mapping details.
+
+### Windows EVTX
+
+The experimental `parser-evtx` module uses the separately installed `irmind-evtx` helper. It recognizes the EVTX header and checksum, not the file extension. The helper receives one read-only file handle; it cannot open the evidence by path. Both local files and downloaded, case-private object spools use that route.
+
+Linux requires kernel 5.13 or newer, Landlock ABI 1 enabled, and unprivileged seccomp. No Bubblewrap installation is required. Windows uses a capability-free AppContainer, an explicit standard-handle list and a kill-on-close Job Object. macOS uses a deny-default sandbox profile. A startup probe verifies denied foreign reads, denied networking and denied child creation. If the probe fails, Preferences reports why EVTX is unavailable; there is no unconfined mode.
+
+Security, System, PowerShell and Sysmon events map to the common schema. Unmapped fields remain in the record. The original FILETIME timestamp retains its 100 ns resolution, and provenance records the actual file offset and record number. The [helper design](development/evtx-helper-design.md) documents limits, mappings and the platform test requirements. Use the matching helper from the same verified release beside the main executable.

@@ -7,6 +7,8 @@ pub(super) use overrides::{EgressOverride, collect_egress_overrides};
 
 pub(super) fn compiled_manifests() -> Vec<&'static ModuleManifest> {
     vec![
+        #[cfg(feature = "parser-evtx")]
+        &irmind_mod_parser_evtx::MANIFEST,
         #[cfg(feature = "parser-linux")]
         &irmind_mod_parser_linux::MANIFEST,
         #[cfg(feature = "parser-syslog")]

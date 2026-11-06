@@ -74,13 +74,18 @@ try {
     $binary = Join-Path $temporary $asset
     $checksums = Join-Path $temporary 'SHA256SUMS'
     Download-Https "$base/SHA256SUMS" $checksums 1048576
-    Download-Https "$base/$asset" $binary 262144000
+    $assets = @($asset)
+    if ($Version -notmatch '^v0\.[01]\.') { $assets += 'irmind-evtx-windows-x86_64.exe' }
+    foreach ($selectedAsset in $assets) {
+    $binary = Join-Path $temporary $selectedAsset
+    Download-Https "$base/$selectedAsset" $binary 262144000
 
-    $line = @([System.IO.File]::ReadAllLines($checksums) | Where-Object { $_ -cmatch ('^[0-9a-f]{64}  ' + [regex]::Escape($asset) + '$') })
+    $line = @([System.IO.File]::ReadAllLines($checksums) | Where-Object { $_ -cmatch ('^[0-9a-f]{64}  ' + [regex]::Escape($selectedAsset) + '$') })
     if ($line.Count -ne 1) { Fail 'missing or duplicate SHA-256 entry for the binary' }
     $expected = $line[0].Substring(0, 64)
     $actual = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actual -cne $expected) { Fail 'SHA-256 mismatch; nothing was installed' }
+    }
 
     if (Get-Command cosign -ErrorAction SilentlyContinue) {
         $cosignVersionOutput = & cosign version 2>$null
@@ -90,7 +95,7 @@ try {
             Fail 'cosign 3.1.3 or newer is required for safe identity verification'
         }
         $identity = "https://github.com/$repo/.github/workflows/ci.yml@refs/tags/$Version"
-        foreach ($file in @($asset, 'SHA256SUMS')) {
+        foreach ($file in @($assets) + @('SHA256SUMS')) {
             $bundle = Join-Path $temporary "$file.sigstore.json"
             Download-Https "$base/$file.sigstore.json" $bundle 1048576
             & cosign verify-blob (Join-Path $temporary $file) --bundle $bundle --certificate-identity $identity --certificate-oidc-issuer $issuer | Out-Null
@@ -105,19 +110,25 @@ try {
         $ghSupportsAttestations = $LASTEXITCODE -eq 0
     }
     if ($ghSupportsAttestations) {
-        & gh attestation verify $binary -R $repo | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail 'GitHub provenance verification failed; nothing was installed' }
+        foreach ($selectedAsset in $assets) {
+            & gh attestation verify (Join-Path $temporary $selectedAsset) -R $repo | Out-Null
+            if ($LASTEXITCODE -ne 0) { Fail 'GitHub provenance verification failed; nothing was installed' }
+        }
     } else {
         Write-Warning "gh attestation verify is unavailable; install a current GitHub CLI, then run gh attestation verify $asset -R $repo."
     }
 
     [System.IO.Directory]::CreateDirectory($InstallDir) | Out-Null
+    foreach ($selectedAsset in @($assets | Sort-Object -Descending)) {
+    $binary = Join-Path $temporary $selectedAsset
+    $destination = if ($selectedAsset -eq $asset) { 'irmind.exe' } else { 'irmind-evtx.exe' }
     $stage = Join-Path $InstallDir ('.irmind-install-' + [System.Guid]::NewGuid().ToString('N') + '.exe')
     try {
         Copy-Item -LiteralPath $binary -Destination $stage
-        Move-Item -LiteralPath $stage -Destination (Join-Path $InstallDir 'irmind.exe') -Force
+        Move-Item -LiteralPath $stage -Destination (Join-Path $InstallDir $destination) -Force
     } finally {
         if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Force }
+    }
     }
     Write-Host "Installed IRMind $Version at $InstallDir\irmind.exe"
     if (-not (($env:PATH -split ';') -contains $InstallDir)) {

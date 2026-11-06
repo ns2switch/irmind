@@ -1,9 +1,8 @@
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 mod private_fs;
 #[cfg(windows)]
-#[allow(unsafe_code)]
-mod windows_security;
+use irmind_process_containment::filesystem as windows_security;
 
 pub use private_fs::{private_dir, private_file};
 

@@ -48,21 +48,24 @@ fi
 
 base="https://github.com/$repo/releases/download/$version"
 download "$base/SHA256SUMS" "$temporary/SHA256SUMS"
-download "$base/$asset" "$temporary/$asset"
-
-expected=$(awk -v name="$asset" '$2 == name && NF == 2 { print $1 }' "$temporary/SHA256SUMS")
-case $expected in
-  *' '*|*'
-'*) fail 'duplicate checksum entries for the selected binary' ;;
-esac
-printf '%s' "$expected" | grep -Eq '^[0-9a-f]{64}$' || fail 'missing or invalid binary checksum'
-if command -v sha256sum >/dev/null 2>&1; then
-  actual=$(sha256sum "$temporary/$asset" | awk '{print $1}')
-else
-  command -v shasum >/dev/null 2>&1 || fail 'sha256sum or shasum is required'
-  actual=$(shasum -a 256 "$temporary/$asset" | awk '{print $1}')
-fi
-[ "$actual" = "$expected" ] || fail 'SHA-256 mismatch; nothing was installed'
+# Releases before 0.2 do not contain the isolated EVTX helper.
+helper=''
+case $version in v0.0.*|v0.1.*) ;; *) helper="irmind-evtx-${asset#irmind-}" ;; esac
+verify_checksum() {
+  file=$1
+  download "$base/$file" "$temporary/$file"
+  expected=$(awk -v name="$file" '$2 == name && NF == 2 { print $1 }' "$temporary/SHA256SUMS")
+  printf '%s' "$expected" | grep -Eq '^[0-9a-f]{64}$' || fail 'missing, duplicate or invalid binary checksum'
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual=$(sha256sum "$temporary/$file" | awk '{print $1}')
+  else
+    command -v shasum >/dev/null 2>&1 || fail 'sha256sum or shasum is required'
+    actual=$(shasum -a 256 "$temporary/$file" | awk '{print $1}')
+  fi
+  [ "$actual" = "$expected" ] || fail 'SHA-256 mismatch; nothing was installed'
+}
+verify_checksum "$asset"
+[ -z "$helper" ] || verify_checksum "$helper"
 
 if command -v cosign >/dev/null 2>&1; then
   cosign_version=$(cosign version 2>/dev/null | awk '$1 == "GitVersion:" { print $2; exit }')
@@ -74,7 +77,7 @@ if command -v cosign >/dev/null 2>&1; then
     { exit 1 }
   ' || fail 'cosign 3.1.3 or newer is required for safe identity verification'
   identity="https://github.com/$repo/.github/workflows/ci.yml@refs/tags/$version"
-  for file in "$asset" SHA256SUMS; do
+  for file in $asset $helper SHA256SUMS; do
     download "$base/$file.sigstore.json" "$temporary/$file.sigstore.json"
     cosign verify-blob "$temporary/$file" --bundle "$temporary/$file.sigstore.json" \
       --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" >/dev/null \
@@ -85,8 +88,10 @@ else
 fi
 
 if command -v gh >/dev/null 2>&1 && gh attestation verify --help >/dev/null 2>&1; then
-  gh attestation verify "$temporary/$asset" -R "$repo" >/dev/null \
-    || fail 'GitHub provenance verification failed; nothing was installed'
+  for file in $asset $helper; do
+    gh attestation verify "$temporary/$file" -R "$repo" >/dev/null \
+      || fail 'GitHub provenance verification failed; nothing was installed'
+  done
 else
   printf '%s\n' "gh attestation verify is unavailable: install a current GitHub CLI, then run gh attestation verify $asset -R $repo." >&2
 fi
@@ -94,6 +99,11 @@ fi
 mkdir -p "$install_dir" || fail 'cannot create the user installation directory'
 stage="$install_dir/.irmind-install-$$"
 trap 'test ! -e "$stage" || rm "$stage"; cleanup' 0
+if [ -n "$helper" ]; then
+  cp "$temporary/$helper" "$stage" || fail 'cannot stage the verified helper'
+  chmod 755 "$stage" || fail 'cannot set helper executable permissions'
+  mv -f "$stage" "$install_dir/irmind-evtx" || fail 'cannot install the verified helper'
+fi
 cp "$temporary/$asset" "$stage" || fail 'cannot stage the verified binary'
 chmod 755 "$stage" || fail 'cannot set executable permissions'
 mv -f "$stage" "$install_dir/irmind" || fail 'cannot install the verified binary'

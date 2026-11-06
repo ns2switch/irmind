@@ -1,0 +1,84 @@
+{
+  "synthetic": true,
+  "episodes": [
+    {
+      "source": "Security.evtx",
+      "channel": "Security",
+      "events": [
+        4624,
+        4625,
+        4634,
+        4648,
+        4672,
+        4688,
+        4697,
+        4698,
+        4720,
+        4732,
+        4768,
+        4769,
+        4776,
+        1102
+      ],
+      "host": "synthetic-endpoint",
+      "ip": "203.0.113.77",
+      "techniques": [
+        "T1078",
+        "T1021.002",
+        "T1543.003"
+      ]
+    },
+    {
+      "source": "System.evtx",
+      "channel": "System",
+      "events": [
+        7045
+      ],
+      "host": "synthetic-endpoint",
+      "ip": "203.0.113.77",
+      "techniques": [
+        "T1078",
+        "T1021.002",
+        "T1543.003"
+      ]
+    },
+    {
+      "source": "Microsoft-Windows-PowerShell.evtx",
+      "channel": "Microsoft-Windows-PowerShell/Operational",
+      "events": [
+        4103,
+        4104
+      ],
+      "host": "synthetic-endpoint",
+      "ip": "203.0.113.77",
+      "techniques": [
+        "T1078",
+        "T1021.002",
+        "T1543.003"
+      ]
+    },
+    {
+      "source": "Microsoft-Windows-Sysmon.evtx",
+      "channel": "Microsoft-Windows-Sysmon/Operational",
+      "events": [
+        1,
+        3,
+        7,
+        8,
+        10,
+        11,
+        12,
+        13,
+        22,
+        23
+      ],
+      "host": "synthetic-endpoint",
+      "ip": "203.0.113.77",
+      "techniques": [
+        "T1078",
+        "T1021.002",
+        "T1543.003"
+      ]
+    }
+  ]
+}

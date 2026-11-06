@@ -23,6 +23,7 @@ use super::{
     SecretBackend, anyhow, configuration_issue, load_module_config,
 };
 #[cfg(any(
+    feature = "parser-evtx",
     feature = "parser-json",
     feature = "parser-ecs",
     feature = "parser-ocsf",
@@ -63,36 +64,11 @@ pub(super) fn configured_registry(
     secrets: &dyn SecretBackend,
     allow_environment: bool,
     interactive: bool,
+    data_root: &std::path::Path,
 ) -> Result<(ModuleRegistry, BTreeMap<&'static str, String>)> {
     let mut registry = ModuleRegistry::new();
     let mut config_issues = BTreeMap::<&'static str, String>::new();
-    #[cfg(feature = "parser-json")]
-    registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
-    #[cfg(feature = "parser-ecs")]
-    registry.register(Box::new(EcsParser), &ModuleConfig::new())?;
-    #[cfg(feature = "parser-ocsf")]
-    registry.register(Box::new(OcsfParser), &ModuleConfig::new())?;
-    #[cfg(feature = "parser-velociraptor")]
-    registry.register(Box::new(VelociraptorParser), &ModuleConfig::new())?;
-    #[cfg(feature = "parser-hayabusa")]
-    registry.register(Box::new(HayabusaParser), &ModuleConfig::new())?;
-    #[cfg(feature = "parser-chainsaw")]
-    registry.register(Box::new(ChainsawParser), &ModuleConfig::new())?;
-    #[cfg(feature = "parser-plaso")]
-    registry.register(Box::new(PlasoParser), &ModuleConfig::new())?;
-    #[cfg(feature = "parser-eztools")]
-    registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
-
-    #[cfg(feature = "parser-linux")]
-    registry.register(
-        Box::new(irmind_mod_parser_linux::LinuxParser::default()),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(feature = "parser-syslog")]
-    registry.register(
-        Box::new(irmind_mod_parser_syslog::SyslogParser::default()),
-        &ModuleConfig::new(),
-    )?;
+    register_parsers(&mut registry, &mut config_issues, data_root)?;
 
     register_llm(
         cli,
@@ -131,6 +107,57 @@ pub(super) fn configured_registry(
         &mut config_issues,
     )?;
     Ok((registry, config_issues))
+}
+
+fn register_parsers(
+    registry: &mut ModuleRegistry,
+    issues: &mut BTreeMap<&'static str, String>,
+    data_root: &std::path::Path,
+) -> Result<()> {
+    let _ = (&issues, data_root);
+    #[cfg(feature = "parser-json")]
+    registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-ecs")]
+    registry.register(Box::new(EcsParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-ocsf")]
+    registry.register(Box::new(OcsfParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-velociraptor")]
+    registry.register(Box::new(VelociraptorParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-hayabusa")]
+    registry.register(Box::new(HayabusaParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-chainsaw")]
+    registry.register(Box::new(ChainsawParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-plaso")]
+    registry.register(Box::new(PlasoParser), &ModuleConfig::new())?;
+    #[cfg(feature = "parser-eztools")]
+    registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
+
+    #[cfg(feature = "parser-linux")]
+    registry.register(
+        Box::new(irmind_mod_parser_linux::LinuxParser::default()),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "parser-syslog")]
+    registry.register(
+        Box::new(irmind_mod_parser_syslog::SyslogParser::default()),
+        &ModuleConfig::new(),
+    )?;
+
+    #[cfg(feature = "parser-evtx")]
+    {
+        let helper = std::env::current_exe()?.with_file_name(if cfg!(windows) {
+            "irmind-evtx.exe"
+        } else {
+            "irmind-evtx"
+        });
+        let parser = irmind_mod_parser_evtx::EvtxParser::new(&helper, data_root);
+        if let Some(reason) = parser.unavailable_reason() {
+            issues.insert("parser-evtx", reason.to_owned());
+        } else {
+            registry.register(Box::new(parser), &ModuleConfig::new())?;
+        }
+    }
+    Ok(())
 }
 
 fn register_object_storage(

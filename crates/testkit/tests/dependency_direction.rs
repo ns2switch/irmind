@@ -22,6 +22,7 @@ fn check_edge(from: &str, to: &str) -> Result<(), String> {
         return Err(format!("reverse dependency: {from} -> {to}"));
     }
     let shared = [
+        "irmind-process-containment",
         "irmind-fs",
         "irmind-http",
         "irmind-keystore-transfer",
@@ -64,5 +65,7 @@ fn deliberate_reverse_edge_is_rejected() {
     assert!(check_edge("irmind-tui", "irmind-app").is_ok());
     assert!(check_edge("irmind-mod-keystore-file", "irmind-infra").is_err());
     assert!(check_edge("irmind-mod-keystore-file", "irmind-fs").is_ok());
+    assert!(check_edge("irmind-fs", "irmind-process-containment").is_ok());
+    assert!(check_edge("irmind-process-containment", "irmind-infra").is_err());
     assert!(check_edge("irmind-mod-siem-splunk", "irmind-http").is_ok());
 }

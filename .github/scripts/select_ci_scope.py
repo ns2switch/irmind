@@ -11,6 +11,9 @@ def platform_path(path: str) -> bool:
     parts = path.split("/")
     return (
         path.startswith("crates/fs/")
+        or path.startswith("crates/process-containment/")
+        or path.startswith("crates/modules/parser-evtx/")
+        or path.startswith("helpers/evtx/")
         or path.startswith("crates/modules/storage-object/")
         or (len(parts) >= 4 and parts[:2] == ["crates", "modules"]
             and parts[2].startswith("keystore-"))
@@ -22,7 +25,7 @@ def platform_path(path: str) -> bool:
 
 
 def release_source(path: str) -> bool:
-    return path.startswith("crates/") or path in {
+    return path.startswith(("crates/", "helpers/evtx/")) or path in {
         "Cargo.toml", "Cargo.lock", "rust-toolchain.toml",
     }
 

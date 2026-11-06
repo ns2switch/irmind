@@ -1,0 +1,3 @@
+{"kind":"ready","protocol":"irmind-evtx-ndjson-v1","decoder":"0.15.1"}
+{"kind":"record","record_id":1,"offset":4608,"timestamp":"2026-11-01T00:00:00.0000007Z","event":{"Event":{"System":{"EventID":4624,"Channel":"Security","Computer":"synthetic-endpoint"},"EventData":{"TargetUserName":"synthetic-user"}}}}
+{"kind":"complete","accepted":1,"rejected":0}
