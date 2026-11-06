@@ -39,7 +39,7 @@ fn verify_inherited_files(input: &std::fs::File) -> io::Result<()> {
     let errors = unsafe { GetStdHandle(STD_ERROR_HANDLE) };
     let evidence = input.as_raw_handle();
     let runtime = super::runtime_directory::RuntimeDirectory::open()?;
-    super::handle_snapshot::inspect(|handle, file, access| {
+    super::handle_snapshot::inspect(|handle, file| {
         if [stdin, output, errors, evidence].contains(&handle) {
             return Ok(());
         }
@@ -57,7 +57,7 @@ fn verify_inherited_files(input: &std::fs::File) -> io::Result<()> {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
                 format!(
-                    "EVTX inherited an unrelated file handle (flags={flags:#x}, access={access:#x}, runtime={expected_runtime})"
+                    "EVTX inherited an unrelated file handle (flags={flags:#x}, runtime={expected_runtime})"
                 ),
             ));
         }
