@@ -48,7 +48,7 @@ fn command(program: &Prepared) -> io::Result<Command> {
         })?;
     let escaped = path.replace('\\', "\\\\").replace('"', "\\\"");
     let profile = format!(
-        r#"(version 1)(deny default)(allow process-exec (literal "{escaped}"))(deny process-fork)(allow file-map-executable (subpath "/System/Library") (subpath "/usr/lib") (literal "{escaped}"))(allow sysctl-read)(allow file-read-metadata)(allow file-read-data (subpath "/System/Library") (subpath "/usr/lib") (literal "{escaped}") (literal "/dev/urandom") (literal "/dev/null"))"#
+        r#"(version 1)(deny default)(allow process-exec (literal "{escaped}"))(deny process-fork)(allow file-map-executable (subpath "/System/Library") (subpath "/System/Cryptexes/OS") (subpath "/System/Volumes/Preboot/Cryptexes/OS") (subpath "/usr/lib") (literal "{escaped}"))(allow sysctl-read)(allow file-read-metadata)(allow file-read-data (subpath "/System/Library") (subpath "/System/Cryptexes/OS") (subpath "/System/Volumes/Preboot/Cryptexes/OS") (subpath "/usr/lib") (literal "{escaped}") (literal "/") (literal "/dev/urandom") (literal "/dev/null"))"#
     );
     let mut command = Command::new("/usr/bin/sandbox-exec");
     command.args(["-p", &profile, "--"]).arg(&program.path);

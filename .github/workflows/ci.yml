@@ -383,7 +383,7 @@ jobs:
           mkdir -p dist
           cp target/aarch64-apple-darwin/release/irmind target/aarch64-apple-darwin/release/irmind-evtx dist/
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
-          (cd dist && shasum -a 256 irmind LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
+          (cd dist && shasum -a 256 irmind irmind-evtx LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
           (cd dist && shasum -a 256 -c SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.release_build == 'true'
@@ -463,11 +463,35 @@ jobs:
           syft-version: v1.55.0
           upload-artifact: false
           upload-release-assets: false
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        with: {tool: 'cargo-geiger@0.13.0', fallback: cargo-binstall}
+        env:
+          BINSTALL_STRATEGIES: quick-install
+          BINSTALL_DISABLE_STRATEGIES: compile
+          BINSTALL_NO_DISCOVER_GITHUB_TOKEN: 'true'
+          BINSTALL_DISABLE_TELEMETRY: 'true'
+      - name: Verify the prebuilt unsafe-audit tool before execution
+        run: |
+          python3 - <<'PYTHON'
+          import hashlib, shutil
+          from pathlib import Path
+          digest = hashlib.sha256(Path(shutil.which('cargo-geiger')).read_bytes()).hexdigest()
+          assert digest in {
+              '0c2c662ff98f3d206af915ba8a60cedb91eec7f75b856e80c6b8f6224176db16',
+              'dc13a40bc8bfefc8cef434b3b2c1be3f1d3cf90494615533074d62758c746f62',
+          }, 'unrecognized cargo-geiger 0.13.0 prebuilt binary'
+          PYTHON
+      - name: Audit the separately locked helper with cargo-geiger
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_normalize_evtx_geiger.py
+          cargo geiger --manifest-path "$PWD/helpers/evtx/Cargo.toml" --all-targets --locked --output-format Json > "$RUNNER_TEMP/evtx-geiger.json" 2> "$RUNNER_TEMP/evtx-geiger.log"
+          python3 .github/scripts/normalize_evtx_geiger.py < "$RUNNER_TEMP/evtx-geiger.json" > release/EVTX-GEIGER-REPORT.json
+          rm "$RUNNER_TEMP/evtx-geiger.json" "$RUNNER_TEMP/evtx-geiger.log"
       - name: Inventory the separately locked helper native surface
         run: python3 .github/scripts/report_evtx_unsafe.py > release/EVTX-UNSAFE-REPORT.json
       - name: Create and check the release checksum list
         run: |
-          (cd release && sha256sum irmind-linux-x86_64 irmind-linux-aarch64 irmind-macos-aarch64 irmind-windows-x86_64.exe irmind-evtx-linux-x86_64 irmind-evtx-linux-aarch64 irmind-evtx-macos-aarch64 irmind-evtx-windows-x86_64.exe install.sh install.ps1 IRMind-SBOM.spdx.json IRMind-EVTX-SBOM.spdx.json EVTX-UNSAFE-REPORT.json LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
+          (cd release && sha256sum irmind-linux-x86_64 irmind-linux-aarch64 irmind-macos-aarch64 irmind-windows-x86_64.exe irmind-evtx-linux-x86_64 irmind-evtx-linux-aarch64 irmind-evtx-macos-aarch64 irmind-evtx-windows-x86_64.exe install.sh install.ps1 IRMind-SBOM.spdx.json IRMind-EVTX-SBOM.spdx.json EVTX-UNSAFE-REPORT.json EVTX-GEIGER-REPORT.json LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
           (cd release && sha256sum --check SHA256SUMS)
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with: {subject-path: 'release/irmind-*'}

@@ -5,19 +5,18 @@ use std::{
     path::{Path, PathBuf},
     ptr,
 };
-use windows_sys::Win32::Security::{
-    FreeSid, GetLengthSid, Isolation::DeriveAppContainerSidFromAppContainerName, PSID,
-};
+use windows_sys::Win32::Security::{FreeSid, GetLengthSid, PSID};
 
 pub(crate) struct Identity {
     words: Vec<usize>,
     length: usize,
     executable: PathBuf,
+    _profile: super::profile::Profile,
 }
 struct Sid(PSID);
 impl Drop for Sid {
     fn drop(&mut self) {
-        // SAFETY: DeriveAppContainerSidFromAppContainerName allocated this SID; this guard frees it once.
+        // SAFETY: CreateAppContainerProfile allocated this SID; this guard frees it once.
         unsafe { FreeSid(self.0) };
     }
 }
@@ -30,13 +29,7 @@ impl Identity {
                 .ok_or_else(|| error("identity-name"))?
         );
         let name = name.encode_utf16().chain(Some(0)).collect::<Vec<_>>();
-        let mut raw = ptr::null_mut();
-        // SAFETY: terminated name and valid output pointer; the returned SID is owned by Sid.
-        if unsafe { DeriveAppContainerSidFromAppContainerName(name.as_ptr(), &raw mut raw) } < 0
-            || raw.is_null()
-        {
-            return Err(error("AppContainer-SID"));
-        }
+        let (profile, raw) = super::profile::Profile::create(name)?;
         let sid = Sid(raw);
         // SAFETY: the API returned a complete, valid SID, retained by the guard.
         let length = unsafe { GetLengthSid(sid.0) } as usize;
@@ -54,6 +47,7 @@ impl Identity {
             words,
             length,
             executable,
+            _profile: profile,
         };
         super::super::filesystem::helper_read_execute(work, identity.bytes())?;
         super::super::filesystem::helper_read_execute(&identity.executable, identity.bytes())?;

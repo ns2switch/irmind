@@ -296,3 +296,12 @@ Consequences: the direct Windows process/security APIs have unsafe signatures be
 ## Unprivileged Linux EVTX containment
 
 Decision: use maintained safe Landlock and seccomp APIs in the single-threaded helper before decoding. Require fully enforced Landlock ABI 1 filesystem denial and no_new_privs, plus a fail-closed seccomp allowlist that excludes sockets, execution, process creation, io_uring, truncation and access to unrelated descriptors. ABI 1 requires Linux 5.13 or newer with Landlock enabled; newer unhandled filesystem operations remain denied by seccomp. Missing support is module unavailability, never a downgraded sandbox. Bubblewrap is optional and not a requirement. macOS retains the tested deny-default sandbox-exec profile; unsupported versions fail closed. See [the containment design](evtx-helper-design.md).
+
+
+## EVTX native loader and audit boundaries
+
+Context: the decoder runs under a deny-default OS policy before reading evidence. Native loaders also need their own narrowly identified runtime resources.
+
+Decision: macOS permits read/map access to the OS Cryptex runtime paths, the system library paths, the exact helper and root-directory reads. It retains filesystem write, network and fork denial. Windows creates a unique zero-capability AppContainer profile, removes package access from its empty filesystem tree before launch, and deletes the profile when its child runtime is dropped. The environment contains only the OS-reported SystemRoot; it does not inherit process variables or credentials. Read/execute grants remain limited to the helper and its private launch directory.
+
+Consequences: native launch and denial probes must pass together. A failed profile creation, loader startup or enforcement probe leaves EVTX unavailable. The release audit uses pinned prebuilt cargo-geiger 0.13.0 with source compilation disabled, verifies its executable digest, and publishes path-free AST metrics alongside the supplementary source inventory. Neither report is a memory-safety proof; macro expansion and platform coverage limits remain explicit.
