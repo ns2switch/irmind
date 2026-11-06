@@ -13,6 +13,12 @@ fn blocked<T>(result: io::Result<T>) -> bool {
 /// Invoked after native enforcement and before any decoder input is processed.
 pub fn verify_entry() -> io::Result<()> {
     let file = blocked(fs::read(CANARY));
+    let write = blocked(
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open("irmind-write-canary"),
+    );
     let ipv4 = blocked(TcpListener::bind((Ipv4Addr::LOCALHOST, 0)));
     let ipv6 = blocked(TcpListener::bind((Ipv6Addr::LOCALHOST, 0)));
     // Only loopback is probed; failure must be policy denial, never refusal/timeout.
@@ -43,10 +49,10 @@ pub fn verify_entry() -> io::Result<()> {
             ));
         }
     }
-    if !file || !ipv4 || !ipv6 || !outbound {
+    if !file || !write || !ipv4 || !ipv6 || !outbound {
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
-            "EVTX isolation verification failed: foreign reads or network access were not denied",
+            "EVTX isolation verification failed: foreign reads, runtime writes or network access were not denied",
         ));
     }
     Ok(())

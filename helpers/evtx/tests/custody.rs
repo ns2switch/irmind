@@ -174,11 +174,11 @@ fn assert_episode_queries(parquet: &LocalStore, case: &irmind_app::CaseId) {
         ("host", "synthetic-endpoint"),
         ("user", "synthetic-user"),
     ] {
+        let result = parquet.entity_lookup(case, kind, value).unwrap();
+        assert!(result.contains(value));
         assert!(
-            parquet
-                .entity_lookup(case, kind, value)
-                .unwrap()
-                .contains(value)
+            result.contains("count=27;"),
+            "episode entity was lost: {result}"
         );
     }
     assert!(
