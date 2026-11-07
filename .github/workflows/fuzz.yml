@@ -65,12 +65,12 @@ jobs:
       - name: Fuzz guard, parser, canonical format and SPL
         run: |
           for target in guard parsers parser_syslog parser_linux parser_ecs parser_ocsf parser_velociraptor parser_hayabusa parser_chainsaw parser_plaso parser_eztools parser_declarative parser_zeek parser_suricata canonical spl; do
-            cargo fuzz run "$target" -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
+            cargo +nightly fuzz run "$target" --target x86_64-unknown-linux-gnu -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
           done
       - name: Fuzz exported packages within memory budget
         env:
           CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
-        run: cargo fuzz run export --features export --sanitizer none -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
+        run: cargo +nightly fuzz run export --target x86_64-unknown-linux-gnu --features export --sanitizer none -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
       - name: Delete fuzz artifacts and temporary corpora
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('.tools', 'fuzz/artifacts', 'fuzz/corpus')) if p.is_dir()]"
@@ -101,8 +101,8 @@ jobs:
           mkdir -p helpers/evtx/fuzz/corpus/evtx_decode helpers/evtx/fuzz/corpus/evtx_protocol
           cp helpers/evtx/fuzz/seeds/security.evtx helpers/evtx/fuzz/corpus/evtx_decode/
           cp helpers/evtx/fuzz/seeds/protocol/* helpers/evtx/fuzz/corpus/evtx_protocol/
-          cargo fuzz run evtx_decode --fuzz-dir helpers/evtx/fuzz --sanitizer address -- -max_total_time=3600 -rss_limit_mb=1024 -timeout=30 -max_len=131072
-          cargo fuzz run evtx_protocol --fuzz-dir helpers/evtx/fuzz --sanitizer address -- -max_total_time=600 -rss_limit_mb=1024 -timeout=10 -max_len=4194304
+          cargo +nightly fuzz run evtx_decode --target x86_64-unknown-linux-gnu --fuzz-dir helpers/evtx/fuzz --sanitizer address -- -max_total_time=3600 -rss_limit_mb=1024 -timeout=30 -max_len=131072
+          cargo +nightly fuzz run evtx_protocol --target x86_64-unknown-linux-gnu --fuzz-dir helpers/evtx/fuzz --sanitizer address -- -max_total_time=600 -rss_limit_mb=1024 -timeout=10 -max_len=4194304
       - name: Remove temporary corpora and artifacts
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('.tools', 'helpers/evtx/fuzz/corpus', 'helpers/evtx/fuzz/artifacts')) if p.is_dir()]"

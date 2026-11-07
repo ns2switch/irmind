@@ -4,9 +4,23 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
-- Add experimental Zeek TSV/JSON and Suricata EVE parser modules with bounded detection, exact indexed timestamps, endpoint-host partitions, source provenance and unconfirmed source detections. They are available after this change; v0.1.x did not ship these modules.
+## 0.2.0 — Modular parsers and precise evidence
 
-- Add an experimental, separately contained EVTX decoding helper with bounded output, precise timestamps and file-offset provenance. Linux uses Landlock and seccomp; macOS and Windows require their native sandbox to pass a startup probe.
+- Add experimental Zeek TSV/JSON and Suricata EVE modules with bounded detection, streaming parsing, precise timestamps, host-aware partitions, source provenance and synthetic contract fixtures. They were not distributed in v0.1.x. Source detections remain unconfirmed findings.
+- Write artifact V2 by default in the CLI, TUI and isolated demo. Preserve UTC microseconds, residual nanoseconds, source precision and stable source/record ordering. Bound host partition cardinality at 64 ordinary hosts by default, with a hard ceiling of 1,024 and signed overflow.
+- Keep existing V1 cases readable without migration. Offer explicit, verified precision migration for open cases, retain historical signed generations and use export V5 for V2/mixed cases. See the [V1 → V2 migration guide](docs/development/case-migration.md).
+- Improve ordered-source ingestion, bounded natural-run merging, authenticated global timeline pruning and entity extrema handling. Release-profile cloud/chronological benchmarks meet the 900-second 15 GB ingestion gate; the disordered stress corpus uses the separately approved 1,350-second gate, with unchanged query limits.
+- Ship the isolated `irmind-evtx` helper with the signed release packages, its own SBOM and unsafe inventory. Linux requires Landlock/seccomp; macOS and Windows require verified native containment. Windows uses one verified network witness per session and canonical serial source starts; hashing remains parallel. Each file is capped at 4 GiB, 8,000,000 records and a 600-second invocation deadline, with complete rejection on a limit.
+- Warn non-disruptively when a retired pre-0.1.6 parser may have omitted records. Existing signed bytes still authenticate; re-ingest verified originals into a new case to rebuild with current readers.
+- Publish Sigstore bundles, GitHub provenance, main/helper SBOMs, checksums and user-level installers for Linux x86-64/aarch64, macOS arm64 and Windows x64.
+
+### Migration notes
+
+Opening a V1 case never migrates it. Migrate only when source subsecond precision or host-aware queries are useful, verified originals and the pinned parser remain available, and the case is open. Keep space for both generations. Sealed cases stay immutable. This precision migration does not apply the proposed common event schema; semantic migration is deferred. The alternative for retired parsers is a new case with verified originals.
+
+### Known limitations
+
+This remains a pre-release for evaluation with synthetic data, not real incidents or sensitive evidence. H5 is accepted by analyst decision after a real DeepSeek greeting; investigation citations, follow-up, streaming and verification details remain unrecorded, and no connector has been validated against a real test environment. Windows 10/11 EVTX validation remains [community work](https://github.com/ns2switch/irmind/issues/189). The decoder streams with stable measured memory; the complete ingestion host does not yet have constant metadata memory. Co-observation disk use and worst-case query work remain tracked in [issue #37](https://github.com/ns2switch/irmind/issues/37) and the [bounded-metadata proposal](docs/development/parquet-bounded-metadata-design.md). Native Apple notarization and Windows Authenticode are not available. Elastic, Chronicle and the typed common event schema belong to v0.3 and are not included here. No model or connector is enabled by default.
 
 ## 0.1.6 — Complete bounded JSON ingestion
 

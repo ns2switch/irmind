@@ -1,4 +1,4 @@
-Traducción de docs/platforms.md en el commit 17f049d33c6cfa5f5812fdf9ef0485cfa5bc597d; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit 315b9cb3d42f5cb44f52073742b2cb2aff7179a6; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
@@ -59,12 +59,12 @@ El repositorio incluye [install.sh](../../install.sh) e [install.ps1](../../inst
 
 ```sh
 # Linux o macOS, después de comprobar install.sh con SHA256SUMS:
-sh ./install.sh v0.1.6
+sh ./install.sh v0.2.0
 ```
 
 ```powershell
 # Windows, después de comprobar install.ps1 con SHA256SUMS:
-& .\install.ps1 -Version v0.1.6
+& .\install.ps1 -Version v0.2.0
 ```
 
 Omite la versión para elegir la última publicada, incluida una preliminar. Un segundo argumento de POSIX o `-InstallDir` en PowerShell cambia el directorio del usuario. Por defecto se instala en `~/.local/bin` o `%LOCALAPPDATA%\IRMind\bin`. Si no está en `PATH`, el script indica cómo añadirlo manualmente.
