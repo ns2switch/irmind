@@ -44,13 +44,6 @@ impl<'a> View<'a> {
         }
     }
     fn visit(&mut self, batch: &RecordBatch) -> Result<ScanFlow, AppError> {
-        super::super::extrema::accumulate(
-            batch,
-            &mut self.count,
-            &mut self.first,
-            &mut self.last,
-            None,
-        )?;
         let scopes = batch
             .column_by_name("identity_scope")
             .and_then(|v| v.as_any().downcast_ref::<StringArray>())
@@ -63,6 +56,21 @@ impl<'a> View<'a> {
             .column_by_name("entity_field")
             .and_then(|v| v.as_any().downcast_ref::<UInt16Array>())
             .ok_or_else(invalid_source)?;
+        if let Some(key) = homogeneous(batch.num_rows(), scopes, roles, fields)
+            && self.retains(key.0)
+        {
+            self.span(batch, key)?;
+            self.count += u64::try_from(batch.num_rows()).map_err(storage)?;
+            self.include_group_extrema(key.0)?;
+            return Ok(ScanFlow::Continue);
+        }
+        super::super::extrema::accumulate(
+            batch,
+            &mut self.count,
+            &mut self.first,
+            &mut self.last,
+            None,
+        )?;
         let mut start = 0;
         while start < batch.num_rows() {
             if scopes.is_null(start) || roles.is_null(start) || fields.is_null(start) {
@@ -82,6 +90,38 @@ impl<'a> View<'a> {
             start = end;
         }
         Ok(ScanFlow::Continue)
+    }
+    fn retains(&self, scope: &str) -> bool {
+        self.groups.contains_key(scope)
+            || self.groups.len() < 20
+            || self
+                .groups
+                .last_key_value()
+                .is_some_and(|(last, _)| scope < last.as_str())
+    }
+    fn include_group_extrema(&mut self, scope: &str) -> Result<(), AppError> {
+        let group = self.groups.get(scope).ok_or_else(invalid_source)?;
+        if let Some(first) = &group.first
+            && self
+                .first
+                .as_ref()
+                .map(|old| first.compare(old, false))
+                .transpose()?
+                .is_none_or(std::cmp::Ordering::is_lt)
+        {
+            self.first = Some(first.clone());
+        }
+        if let Some(last) = &group.last
+            && self
+                .last
+                .as_ref()
+                .map(|old| last.compare(old, false))
+                .transpose()?
+                .is_none_or(std::cmp::Ordering::is_gt)
+        {
+            self.last = Some(last.clone());
+        }
+        Ok(())
     }
     fn span(
         &mut self,
@@ -156,6 +196,25 @@ impl<'a> View<'a> {
         }
         Ok(output)
     }
+}
+fn homogeneous<'a>(
+    count: usize,
+    scopes: &'a StringArray,
+    roles: &UInt8Array,
+    fields: &UInt16Array,
+) -> Option<(&'a str, u8, u16)> {
+    if count == 0 || scopes.is_null(0) || roles.is_null(0) || fields.is_null(0) {
+        return None;
+    }
+    let key = (scopes.value(0), roles.value(0), fields.value(0));
+    (1..count)
+        .all(|row| {
+            !scopes.is_null(row)
+                && !roles.is_null(row)
+                && !fields.is_null(row)
+                && (scopes.value(row), roles.value(row), fields.value(row)) == key
+        })
+        .then_some(key)
 }
 impl QueryStore<'_> {
     pub(in crate::parquet_store::query) fn scoped_entity(

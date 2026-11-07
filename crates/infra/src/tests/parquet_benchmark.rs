@@ -33,6 +33,12 @@ fn common_schema_smoke_1gib() {
     benchmark(1030, 1, "1gib");
 }
 
+#[test]
+#[ignore = "local release diagnostic: 750 MB with the full 15-run source shape"]
+fn common_schema_sort_profile_750mb() {
+    benchmark(50, 15, "750mb");
+}
+
 fn benchmark(files: usize, multiplier: usize, label: &str) {
     let scenario = Scenario::from_environment();
     run_benchmark(files, multiplier, label, &scenario);

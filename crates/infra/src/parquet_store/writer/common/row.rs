@@ -12,6 +12,7 @@ pub(super) struct ObservationRow {
     pub(super) value: String,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "super::spool::StoredCommonRow")]
 pub(in crate::parquet_store) struct CommonRow {
     pub(super) payload: String,
     pub(super) categories: u32,
@@ -20,6 +21,7 @@ pub(in crate::parquet_store) struct CommonRow {
     pub(super) kind: u8,
     pub(super) role_bits: u16,
     pub(super) observations: Vec<ObservationRow>,
+    #[serde(skip_serializing)]
     pub(super) co_observations: String,
 }
 impl CommonRow {
@@ -44,11 +46,14 @@ impl CommonRow {
         let role_bits = observations
             .iter()
             .fold(0u16, |bits, o| bits | (1u16 << o.role));
+        let mut seen = common
+            .observations()
+            .values()
+            .iter()
+            .map(|o| (o.entity().kind().as_str(), o.entity().value()))
+            .collect::<std::collections::BTreeSet<_>>();
         for (kind, value) in &record.indexed.record.entities {
-            if !observations
-                .iter()
-                .any(|o| &o.kind == kind && &o.value == value)
-            {
+            if seen.insert((kind.as_str(), value.as_str())) {
                 observations.push(ObservationRow {
                     kind: kind.clone(),
                     value: value.clone(),
@@ -102,14 +107,20 @@ impl RecordRow {
         let record = checked.record();
         let mut row = Self::from_partitioned(&record.indexed, hash)?;
         let projection = CommonRow::from_record(checked)?;
-        row.entity_pairs = projection
-            .observations
-            .iter()
-            .map(|o| (o.kind.clone(), o.value.clone()))
-            .collect();
-        row.entity_pairs.sort();
-        row.entity_pairs.dedup();
-        row.entities = serde_json::to_string(&row.entity_pairs).map_err(storage)?;
+        let unchanged = record.common.observations().values().is_empty()
+            && row.entity_pairs.windows(2).all(|pair| pair[0] < pair[1]);
+        if !unchanged {
+            row.entity_pairs
+                .extend(record.common.observations().values().iter().map(|o| {
+                    (
+                        o.entity().kind().as_str().to_owned(),
+                        o.entity().value().to_owned(),
+                    )
+                }));
+            row.entity_pairs.sort();
+            row.entity_pairs.dedup();
+            row.entities = serde_json::to_string(&row.entity_pairs).map_err(storage)?;
+        }
         let context = record.common.context();
         let scalar = |field| match context.get(field) {
             Some(CommonValue::Text(value)) => Some(value.as_str()),
