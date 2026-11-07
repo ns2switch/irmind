@@ -16,6 +16,8 @@ pub(super) struct ArtifactFrame {
     pub path: String,
     pub sha256: String,
     pub size: u64,
+    #[serde(skip)]
+    common_schema: Option<irmind_domain::ArtifactSchemaV2>,
 }
 impl ArtifactFrame {
     pub(super) fn from_artifact(artifact: &ParquetArtifact) -> Self {
@@ -23,6 +25,10 @@ impl ArtifactFrame {
             path: artifact.path().into(),
             sha256: artifact.sha256().as_str().into(),
             size: artifact.size(),
+            common_schema: match artifact {
+                ParquetArtifact::V2(v) if v.schema.is_common() => Some(v.schema),
+                _ => None,
+            },
         }
     }
 }
@@ -104,7 +110,11 @@ pub(super) fn verify_artifact_frames(
                 "derived-file frame differs from signed inventory order or metadata",
             ));
         }
-        verify_raw(input, frame.size, &frame.sha256)?;
+        if let Some(schema) = artifact.common_schema {
+            super::parquet_frame::verify_common(input, frame.size, &frame.sha256, schema)?;
+        } else {
+            verify_raw(input, frame.size, &frame.sha256)?;
+        }
     }
     let mut extra = [0u8; 1];
     if input.read(&mut extra).map_err(storage)? != 0 {

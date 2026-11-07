@@ -85,6 +85,7 @@ fn unclassified_bridge_writes_checked_common_schemas_and_rebuilds_exactly() {
     );
 }
 
+mod compaction;
 mod mapped;
 #[test]
 #[allow(clippy::too_many_lines)]

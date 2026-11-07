@@ -1,6 +1,6 @@
 use crate::parquet_store::{AppError, RecordRow, invalid_source, storage};
+use irmind_app::common_event::CheckedCommonRecord;
 use irmind_app::common_event::{CommonField, CommonValue, encode_identity_scope};
-use irmind_app::{CommonGraphRecord, encode_common_event};
 use irmind_domain::EvidenceHash;
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -23,7 +23,8 @@ pub(in crate::parquet_store) struct CommonRow {
     pub(super) co_observations: String,
 }
 impl CommonRow {
-    fn from_record(record: &CommonGraphRecord) -> Result<Self, AppError> {
+    fn from_record(checked: &CheckedCommonRecord<'_>) -> Result<Self, AppError> {
+        let record = checked.record();
         let common = &record.common;
         let header = common.event();
         let mut observations = common
@@ -70,7 +71,7 @@ impl CommonRow {
         });
         let co_observations = serde_json::to_string(&observations).map_err(storage)?;
         Ok(Self {
-            payload: encode_common_event(common)?,
+            payload: checked.encoded().to_owned(),
             categories: header.categories().bits(),
             types: header.types().bits(),
             outcome: u8::try_from(header.outcome().code()).map_err(|_| invalid_source())?,
@@ -95,11 +96,12 @@ impl CommonRow {
 }
 impl RecordRow {
     pub(in crate::parquet_store) fn from_common(
-        record: &CommonGraphRecord,
+        checked: &CheckedCommonRecord<'_>,
         hash: &EvidenceHash,
     ) -> Result<Self, AppError> {
+        let record = checked.record();
         let mut row = Self::from_partitioned(&record.indexed, hash)?;
-        let projection = CommonRow::from_record(record)?;
+        let projection = CommonRow::from_record(checked)?;
         row.entity_pairs = projection
             .observations
             .iter()

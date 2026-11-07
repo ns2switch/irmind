@@ -17,6 +17,13 @@ pub(in crate::parquet_store) enum Predicate {
 }
 
 impl Predicate {
+    pub(super) fn may_match_numeric_statistics(
+        &self,
+        stats: &parquet::file::statistics::Statistics,
+    ) -> bool {
+        numeric::may_match_statistics(self, stats)
+    }
+
     pub(super) fn column(&self) -> &'static str {
         match self {
             Self::Mask(column, _, _)

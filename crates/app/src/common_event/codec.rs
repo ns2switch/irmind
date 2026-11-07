@@ -17,38 +17,38 @@ use time::WireTime;
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WireOrigin {
-    source: String,
-    record: u64,
     offset: Option<u64>,
     parser: String,
     parser_version: String,
+    record: u64,
+    source: String,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WireHeader {
-    category: Vec<String>,
-    #[serde(rename = "type")]
-    event_type: Vec<String>,
-    outcome: String,
-    kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     action: Option<String>,
+    category: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     dataset: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    kind: String,
+    outcome: String,
+    #[serde(rename = "type")]
+    event_type: Vec<String>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WireCommon {
-    schema: String,
-    origin: WireOrigin,
-    timestamp: Option<WireTime>,
-    event: WireHeader,
     context: BTreeMap<String, Value>,
+    event: WireHeader,
     observations: Vec<WireObservation>,
+    origin: WireOrigin,
+    schema: String,
+    timestamp: Option<WireTime>,
 }
 
 /// Canonical keys are explicit, including when `serde_json/preserve_order` is enabled.
@@ -97,7 +97,7 @@ pub fn encode_common_event(event: &CommonEventV1) -> Result<String, AppError> {
         context: event
             .context()
             .fields()
-            .map(|(field, value)| (field.as_str().into(), values::encode(value)))
+            .map(|(field, value)| (field.as_str().into(), ordered(values::encode(value))))
             .collect(),
         observations: event
             .observations()
@@ -106,8 +106,9 @@ pub fn encode_common_event(event: &CommonEventV1) -> Result<String, AppError> {
             .map(WireObservation::from)
             .collect(),
     };
-    let value = serde_json::to_value(wire).map_err(|_| invalid())?;
-    let encoded = serde_json::to_string(&ordered(value)).map_err(|_| invalid())?;
+    // Wire struct fields are explicitly lexical. Only sparse context values
+    // and scope variants need recursive ordering, not a second whole-event tree.
+    let encoded = serde_json::to_string(&wire).map_err(|_| invalid())?;
     if encoded.len() > COMMON_EVENT_MAX_BYTES {
         return Err(invalid());
     }

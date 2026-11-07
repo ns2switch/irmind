@@ -14,6 +14,11 @@ for stage in baseline candidate; do
   output="common-schema-$stage.txt"
   echo "PAIRED_REVISION stage=$stage commit=$revision scenario=$IRMIND_BENCH_SCENARIO" | tee "$output"
   cargo test -p irmind-infra --release --locked --no-run
+  # Exercise the new metadata and scoped-identity compaction paths before
+  # spending time on large corpora. A functional rejection is not a latency.
+  if [[ "$stage" == candidate ]]; then
+    cargo test -p irmind-infra --lib parquet_store::tests::common --release --locked -- --test-threads 1 2>&1 | tee -a "$output"
+  fi
   # Candidate smoke is at least 1 GiB. The paired 15 GB corpus is identical.
   if [[ "$stage" == candidate && ( "$IRMIND_BENCH_SCENARIO" == cloud-v2 || "$IRMIND_BENCH_SCENARIO" == endpoint-v2-64-chronological ) ]]; then
     smoke=common_schema_smoke_1gib

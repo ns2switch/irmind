@@ -68,12 +68,36 @@ pub fn lift_unclassified_common(
     output.ok_or_else(invalid)?
 }
 
-/// A module cannot change which source/record its normalized event represents.
+/// Checked, canonical projection of an immutably borrowed event. Validation
+/// does not remove taint or authorize an action. Its constructor stays private.
+pub struct CheckedCommonRecord<'a> {
+    record: &'a CommonGraphRecord,
+    encoded: String,
+}
+impl CheckedCommonRecord<'_> {
+    pub const fn record(&self) -> &CommonGraphRecord {
+        self.record
+    }
+    pub fn encoded(&self) -> &str {
+        &self.encoded
+    }
+}
+
+/// Preserve the original validation API for parser contracts.
 pub fn validate_common_record(
     record: &CommonGraphRecord,
     provenance: &irmind_domain::Provenance,
     identity: crate::ParserIdentity<'_>,
 ) -> Result<(), AppError> {
+    check_common_record(record, provenance, identity).map(|_| ())
+}
+
+/// A module cannot change which source/record its normalized event represents.
+pub fn check_common_record<'a>(
+    record: &'a CommonGraphRecord,
+    provenance: &irmind_domain::Provenance,
+    identity: crate::ParserIdentity<'_>,
+) -> Result<CheckedCommonRecord<'a>, AppError> {
     let origin = record.common.origin();
     let hash =
         EvidenceHash::parse(&crate::hex(provenance.evidence_hash())).map_err(|_| invalid())?;
@@ -90,8 +114,8 @@ pub fn validate_common_record(
     {
         return Err(invalid());
     }
-    encode_common_event(&record.common)?;
-    Ok(())
+    let encoded = encode_common_event(&record.common)?;
+    Ok(CheckedCommonRecord { record, encoded })
 }
 
 #[cfg(test)]

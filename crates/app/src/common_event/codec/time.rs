@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(in crate::common_event) struct WireTime {
-    unix_micros: i64,
-    submicro_nanos: u16,
-    precision: u8,
     inferred: bool,
+    precision: u8,
+    submicro_nanos: u16,
+    unix_micros: i64,
 }
 impl From<IndexedTime> for WireTime {
     fn from(time: IndexedTime) -> Self {

@@ -106,6 +106,11 @@ pub(super) fn write_inputs(
         check.seek(SeekFrom::Start(0)).map_err(storage)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(check).map_err(storage)?;
         super::format::validate_schema(source, builder.schema().as_ref())?;
+        // Record-batch readers expose only column metadata. Keep the validated
+        // common schema metadata when constructing a replacement file; old
+        // builders retain their historical construction unchanged.
+        let common_schema = matches!(source, ParquetArtifact::V2(v) if v.schema.is_common())
+            .then(|| builder.schema().clone());
         let reader = builder.with_batch_size(8192).build().map_err(storage)?;
         for batch in reader {
             if cancel.is_cancelled() {
@@ -121,7 +126,7 @@ pub(super) fn write_inputs(
                 writer = Some(
                     ArrowWriter::try_new(
                         output.take().ok_or_else(invalid_source)?,
-                        batch.schema(),
+                        common_schema.clone().unwrap_or_else(|| batch.schema()),
                         Some(properties.clone()),
                     )
                     .map_err(storage)?,

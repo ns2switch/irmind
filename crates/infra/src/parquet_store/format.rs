@@ -41,44 +41,59 @@ pub(super) fn validate_schema(artifact: &ParquetArtifact, schema: &Schema) -> Re
             return Err(invalid_source());
         }
         super::common_format::validate_metadata(v.schema, schema, &v.builder_version)?;
-        let mut names = vec![
-            "source_hash",
-            "record_index",
-            "event_time",
-            "submicro_nanos",
-            "time_precision",
-            "time_inferred",
-            "source_offset",
-            "scope_account",
-            "scope_region",
-            "scope_host",
-        ];
-        match v.schema {
-            irmind_domain::ArtifactSchemaV2::Events
-            | irmind_domain::ArtifactSchemaV2::CommonEvents => {
-                names.extend(["event", "text", "entities", "relations"]);
-            }
-            irmind_domain::ArtifactSchemaV2::Entities
-            | irmind_domain::ArtifactSchemaV2::CommonEntities => {
-                names.extend(["event", "entity_kind", "entity_value"]);
-            }
-            irmind_domain::ArtifactSchemaV2::Coobservations
-            | irmind_domain::ArtifactSchemaV2::CommonCoobservations => {
-                names.extend(["entity_kind", "entity_value", "co_entities"]);
-            }
+        validate_columns(v.schema, schema)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_common_export_schema(
+    id: irmind_domain::ArtifactSchemaV2,
+    schema: &Schema,
+) -> Result<(), AppError> {
+    if !id.is_common() {
+        return Err(invalid_source());
+    }
+    super::common_format::validate_metadata(id, schema, super::common_format::BUILDER)?;
+    validate_columns(id, schema)
+}
+
+fn validate_columns(id: irmind_domain::ArtifactSchemaV2, schema: &Schema) -> Result<(), AppError> {
+    let mut names = vec![
+        "source_hash",
+        "record_index",
+        "event_time",
+        "submicro_nanos",
+        "time_precision",
+        "time_inferred",
+        "source_offset",
+        "scope_account",
+        "scope_region",
+        "scope_host",
+    ];
+    match id {
+        irmind_domain::ArtifactSchemaV2::Events | irmind_domain::ArtifactSchemaV2::CommonEvents => {
+            names.extend(["event", "text", "entities", "relations"]);
         }
-        names.extend(super::common_format::extra_columns(v.schema));
-        if names.len() != schema.fields().len() {
+        irmind_domain::ArtifactSchemaV2::Entities
+        | irmind_domain::ArtifactSchemaV2::CommonEntities => {
+            names.extend(["event", "entity_kind", "entity_value"]);
+        }
+        irmind_domain::ArtifactSchemaV2::Coobservations
+        | irmind_domain::ArtifactSchemaV2::CommonCoobservations => {
+            names.extend(["entity_kind", "entity_value", "co_entities"]);
+        }
+    }
+    names.extend(super::common_format::extra_columns(id));
+    if names.len() != schema.fields().len() {
+        return Err(invalid_source());
+    }
+    for name in names {
+        let field = schema.field_with_name(name).map_err(storage)?;
+        if field.data_type() != &expected_type(name, true)
+            || field.is_nullable()
+                != matches!(name, "event_time" | "submicro_nanos" | "source_offset")
+        {
             return Err(invalid_source());
-        }
-        for name in names {
-            let field = schema.field_with_name(name).map_err(storage)?;
-            if field.data_type() != &expected_type(name, true)
-                || field.is_nullable()
-                    != matches!(name, "event_time" | "submicro_nanos" | "source_offset")
-            {
-                return Err(invalid_source());
-            }
         }
     }
     Ok(())
