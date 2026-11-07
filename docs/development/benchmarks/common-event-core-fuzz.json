@@ -1,0 +1,20 @@
+{
+  "actual_runtime_seconds": 601,
+  "crashes": 0,
+  "exit_code": 0,
+  "maximum_input_bytes": 65536,
+  "metrics": {
+    "average_exec_per_sec": 38424,
+    "new_units_added": 40933,
+    "number_of_executed_units": 23092863,
+    "peak_rss_mb": 531,
+    "slowest_unit_time_sec": 0
+  },
+  "platform": "linux-x86_64-gnu",
+  "requested_runtime_seconds": 600,
+  "rss_limit_mib": 1024,
+  "sanitizer": "address",
+  "source_commit": "039b41035ad36f3037a933e2c4aff79b2d35c465",
+  "target": "canonical",
+  "timeouts": 0
+}
