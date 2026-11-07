@@ -80,16 +80,30 @@ impl StreamingEventParser for SuricataParser {
         cancel: &CancellationToken,
         emit: &mut dyn FnMut(Tainted<irmind_app::IndexedGraphRecord>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
-        irmind_app::parse_indexed_report(
-            |forward| self.parse_reader_report(source, reader, hash, cancel, forward),
-            |record| {
-                Ok((
-                    Some(irmind_app::indexed_rfc3339(&record.at, false, false)?),
-                    None,
-                ))
-            },
-            emit,
-        )
+        self.parse_reader_report(source, reader, hash, cancel, &mut |tainted| {
+            let mut indexed = None;
+            let offset = tainted
+                .provenance()
+                .parser_location()
+                .map(irmind_domain::ParserLocation::byte_offset);
+            tainted.inspect(|record| {
+                indexed = Some(
+                    irmind_app::indexed_rfc3339(&record.at, false, false).map(|time| {
+                        irmind_app::IndexedGraphRecord {
+                            record: record.clone(),
+                            time: Some(time),
+                            source_offset: offset,
+                        }
+                    }),
+                );
+            });
+            let indexed =
+                indexed.ok_or_else(|| AppError::Policy("missing network record".into()))??;
+            emit(Tainted::from_external(
+                indexed,
+                tainted.provenance().clone(),
+            ))
+        })
     }
 
     fn parser_name(&self) -> &'static str {

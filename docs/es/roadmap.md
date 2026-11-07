@@ -19,7 +19,7 @@ Las versiones preliminares incluyen la TUI para casos, conectores sujetos a pol�
 - Mantener instaladores que verifican checksums y el binario Linux aarch64. Homebrew, AUR, Nix, winget y Scoop quedan abiertos a empaquetadores de la comunidad.
 - Reducir el espacio del artefacto de co-observación, mejorar `entity_lookup` y acotar el peor caso de `path` de tres saltos ([issue #37](https://github.com/ns2switch/irmind/issues/37)).
 
-## v0.2: parsers y conectores
+## v0.2: parsers y artefactos precisos
 
 Syslog y las exportaciones de Linux están disponibles como módulos experimentales. Linux cubre autenticación, correlación acotada de auditd, journald JSON y logs HTTP common/combined. [La cobertura y selección de parsers](parsers.md) describe sus límites actuales.
 

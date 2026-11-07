@@ -75,10 +75,10 @@ pub(super) fn detect_json(sample: &[u8]) -> Option<u8> {
     }
 }
 
-pub(super) fn from_json(source: &str, line: &[u8], index: usize) -> Result<GraphRecord, AppError> {
+pub(super) fn from_json(_source: &str, line: &[u8], index: usize) -> Result<GraphRecord, AppError> {
     let row: JsonRow<'_> = serde_json::from_slice(line).map_err(|_| bad())?;
     let at = epoch_to_utc(row.ts.ok_or_else(bad)?.get())?;
-    let kind = infer_kind(source, &row);
+    let kind = infer_kind(&row);
     let orig_p = row.orig_p.as_ref().map(ToString::to_string);
     let resp_p = row.resp_p.as_ref().map(ToString::to_string);
     let fields = Fields {
@@ -168,18 +168,7 @@ pub(super) fn from_tsv(
     Ok(build_record(index, at, path, text, &fields))
 }
 
-fn infer_kind<'a>(source: &'a str, row: &JsonRow<'_>) -> &'a str {
-    for kind in [
-        "conn", "dns", "http", "ssl", "files", "x509", "notice", "weird",
-    ] {
-        if source
-            .rsplit('/')
-            .next()
-            .is_some_and(|name| name.starts_with(kind))
-        {
-            return kind;
-        }
-    }
+fn infer_kind(row: &JsonRow<'_>) -> &'static str {
     if row.query.is_some() {
         "dns"
     } else if row.method.is_some() || row.uri.is_some() {
