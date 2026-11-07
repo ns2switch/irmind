@@ -19,3 +19,6 @@
 **/seeds/**/*.log text eol=lf
 *.gz -text
 *.evtx -text
+
+# Canonical wire codebooks must keep identical bytes on every platform.
+*.tsv text eol=lf
