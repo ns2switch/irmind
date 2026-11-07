@@ -43,9 +43,61 @@ pub(super) fn matches(
     }
 }
 
+// Scalar enum intervals may prune. Multi-bit masks deliberately do not use
+// numeric min/max as a membership index. Unknown/null/inexact data is scanned.
+pub(super) fn may_match_statistics(
+    rule: &Predicate,
+    stats: &parquet::file::statistics::Statistics,
+) -> bool {
+    use parquet::file::statistics::Statistics;
+    let Predicate::SmallEqual(_, Some(expected), maximum) = rule else {
+        return true;
+    };
+    if !stats.min_is_exact() || !stats.max_is_exact() || stats.null_count_opt() != Some(0) {
+        return true;
+    }
+    let Statistics::Int32(values) = stats else {
+        return true;
+    };
+    let Some((first, last)) = values.min_opt().zip(values.max_opt()) else {
+        return true;
+    };
+    if *first < 0 || *last > i32::from(*maximum) || first > last {
+        return true;
+    }
+    *first <= i32::from(*expected) && *last >= i32::from(*expected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn scalar_enum_pruning_is_conservative_and_never_uses_mask_intervals() {
+        use parquet::file::statistics::Statistics;
+        let unknown = Statistics::int32(Some(0), Some(0), None, Some(0), false);
+        assert!(!may_match_statistics(
+            &Predicate::SmallEqual("outcome", Some(2), 2),
+            &unknown
+        ));
+        assert!(may_match_statistics(
+            &Predicate::SmallEqual("outcome", Some(0), 2),
+            &unknown
+        ));
+        assert!(may_match_statistics(
+            &Predicate::Mask("category", 1, 0x000f_ffff),
+            &unknown
+        ));
+        for stats in [
+            Statistics::int32(Some(3), Some(3), None, Some(0), false),
+            Statistics::int32(Some(0), Some(0), None, Some(1), false),
+            Statistics::int32(None, None, None, None, false),
+        ] {
+            assert!(may_match_statistics(
+                &Predicate::SmallEqual("outcome", Some(2), 2),
+                &stats
+            ));
+        }
+    }
     #[test]
     fn unknown_codes_and_nulls_never_become_unfiltered_queries() {
         let invalid_bits = UInt32Array::from(vec![1u32 << 20]);

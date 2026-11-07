@@ -8,7 +8,7 @@ This page is for parser and evidence-store maintainers. It describes the first i
 
 The context uses a closed `CommonField` map with checked `CommonValue` variants rather than arbitrary JSON paths. This provides sparse optional groups without exposing unvalidated field assignments. It preserves the field meanings in the design. Unknown source attributes remain in the bounded original record.
 
-The application pairs the projection with the existing indexed record and its tainted provenance. Before staging, it corroborates the source hash, record index, real offset, parser identity and timestamp. Canonical JSON orders every object recursively and uses checked integer timestamps. Enabling `serde_json/preserve_order` cannot change it.
+The application pairs the projection with the existing indexed record and its tainted provenance. Before staging, it corroborates the source hash, record index, real offset, parser identity and timestamp. An opaque checked view ties the canonical encoding to an immutable event borrow. The writer reuses those checked bytes instead of serializing the same event twice; provenance, time and size checks remain in place. Canonical JSON orders every object recursively and uses checked integer timestamps. Enabling `serde_json/preserve_order` cannot change it.
 
 Two additive parser methods emit common reader/local-file reports. Their defaults lift the unchanged historical indexed output. The bridge does not inspect field names or source words to infer classifications or roles: category/type sets are empty, outcome is unknown and old entity observations remain explicitly unspecified. Normalization never removes taint or extends permissions.
 
@@ -24,7 +24,9 @@ The V2 envelope and export V5 framing remain unchanged. New schema identifiers a
 
 The event role mask supports filtering an event by a reported occurrence without an unbounded join. The legacy entity-pair projection remains available; it does not replace role-bearing observations. Roles label occurrences, not extra global nodes or directed attack edges.
 
-Unknown codes, incompatible column types and schema/builder metadata mismatches fail validation. New envelope and payload goldens supplement historical fixtures; historical bytes are unchanged. Hash verification still precedes each Parquet read. Reconstruction chooses the builder recorded in the signed artifact and reproduces the complete artifact set.
+Unknown codes, incompatible column types and schema/builder metadata mismatches fail validation. New envelope and payload goldens supplement historical fixtures; historical bytes are unchanged. Hash verification still precedes each Parquet read. Compaction and consolidation retain the validated common-schema file metadata; record batches alone do not carry that file metadata. Reconstruction chooses the builder recorded in the signed artifact and reproduces the complete artifact set.
+
+V5 verification checks the common physical columns and file metadata after authenticating each derived frame's complete hash. A bounded file-range reader exposes only that frame to the Parquet reader; it neither extracts evidence to temporary storage nor reads neighboring frames. The direct `bytes` dependency supplies the return type required by Parquet's `ChunkReader` interface. The package is already present in the lockfile; no new package or feature is introduced.
 
 Old store constructors keep their historical writers. `open_common` selects the new writer for new batched ingestion. Merely opening a case does not reparse its sources or change its generation.
 

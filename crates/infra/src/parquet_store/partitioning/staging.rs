@@ -216,14 +216,14 @@ pub(super) fn parse_normalized(
             let mut result = None;
             record.inspect(|common| {
                 result = Some((|| {
-                    irmind_app::validate_common_record(
+                    let checked = irmind_app::common_event::check_common_record(
                         common,
                         record.provenance(),
                         parser.identity_for_source(source)?,
                     )?;
                     stream::validate_offset(&mut offset, common.indexed.source_offset, size)?;
                     validate_time(common.indexed.time)?;
-                    let mut row = RecordRow::from_common(common, hash)?;
+                    let mut row = RecordRow::from_common(&checked, hash)?;
                     row.profile = profile(parser, source, &common.indexed.record)?;
                     Ok(row)
                 })());

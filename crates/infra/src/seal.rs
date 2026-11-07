@@ -24,5 +24,6 @@ mod export;
 mod export_v4;
 mod frames;
 mod local;
+mod parquet_frame;
 mod verify_v4;
 pub use export::{LocalExportVerifier, verify_export, verify_export_expected};

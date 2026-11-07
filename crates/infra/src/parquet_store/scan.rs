@@ -341,6 +341,14 @@ fn row_group_matches(
             }
             return true;
         }
+        if matches!(rule, Predicate::SmallEqual(..) | Predicate::Mask(..)) {
+            return builder
+                .schema()
+                .index_of(rule.column())
+                .ok()
+                .and_then(|index| group.column(index).statistics())
+                .is_none_or(|stats| rule.may_match_numeric_statistics(stats));
+        }
         let (name, lower, upper) = match rule {
             Predicate::Equal(name, value) => (*name, value.as_bytes(), value.as_bytes()),
             Predicate::Range(name, first, last) => (*name, first.as_bytes(), last.as_bytes()),

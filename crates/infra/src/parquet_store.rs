@@ -23,6 +23,7 @@ use std::time::UNIX_EPOCH;
 mod common_format;
 mod compact;
 mod format;
+pub(crate) use format::validate_common_export_schema;
 mod local;
 mod migration;
 mod partitioning;

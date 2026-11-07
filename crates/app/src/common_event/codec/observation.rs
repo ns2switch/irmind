@@ -58,11 +58,19 @@ fn identifier(value: &str) -> Result<EventText, AppError> {
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct WireObservation {
-    kind: String,
-    value: String,
-    scope: WireScope,
-    role: u16,
     field: u16,
+    kind: String,
+    role: u16,
+    #[serde(serialize_with = "serialize_scope")]
+    scope: WireScope,
+    value: String,
+}
+fn serialize_scope<S: serde::Serializer>(
+    scope: &WireScope,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    let value = serde_json::to_value(scope).map_err(serde::ser::Error::custom)?;
+    super::ordered(value).serialize(serializer)
 }
 impl From<&EntityObservation> for WireObservation {
     fn from(value: &EntityObservation) -> Self {
