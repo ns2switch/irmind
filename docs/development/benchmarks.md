@@ -684,3 +684,16 @@ The decoder and parent validator now allow 8,000,000 records per file. Source si
 The extended release benchmark qualifies a four-source Windows request with one session witness, isolated one-file 1 GiB ingestion on both platforms, a near-4 GiB file on Linux, and a compact synthetic source with exactly 8,000,000 records on both platforms. The source cannot be exactly 4 GiB because an EVTX consists of a 4 KiB header and whole 64 KiB chunks; the maximum aligned source is 4,294,905,856 bytes. A separate in-process negative check has 8,000,128 records and requires rejection at the exact ceiling without a completion trailer. Its memory is not mixed with the contained ingestion measurement.
 
 The compact fixture uses valid, minimal Security event fields and 128 records per chunk. It is a streaming-resource stress corpus, distinct from the richer five-event Security corpus used for throughput. Its timestamps advance by 100 ns to hold date cardinality constant for the memory comparison. It is measured at 204,800, 2,097,152 and 8,000,000 records; the last source is 4,096,004,096 bytes. Results will distinguish the two corpora and retain the earlier measurements as baselines.
+
+#### Local streaming-memory reference
+
+[Raw release results](benchmarks/evtx-streaming-local.json), source `341c7184cb525d87ecc6c90e089cd0d796d1a681`. This is a local reference, separate from hosted Linux and Windows qualification. Every source completed signed V2 ingestion, full chain/artifact verification and the exact indexed-record count. Memory is the sampled process high-water value over the complete host lifetime, including final verification.
+
+| Corpus | Records | Ingestion | MiB/s | Host peak MiB | Decoder peak MiB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Rich Security, maximum aligned source below 4 GiB | 4,194,240 | 151.270 s | 27.08 | 714.66 | 3.05 |
+| Compact Security, 100 MiB | 204,800 | 4.614 s | 21.67 | 89.62 | 3.11 |
+| Compact Security, 1 GiB | 2,097,152 | 57.926 s | 17.68 | 245.00 | 3.06 |
+| Compact Security, 8,000,000 records | 8,000,000 | 183.048 s | 21.34 | 621.36 | 3.05 |
+
+The single near-4 GiB source fits the unchanged 8 GiB output budget and 600-second decoder deadline. The compact cases keep one date and host partition. Decoder memory is stable in these measurements; complete-host memory is not constant. The [bounded-metadata design](parquet-bounded-metadata-design.md) proposes profiling and a separately versioned, bounded-segment writer without changing existing signed generations. It is not implemented in these figures.
