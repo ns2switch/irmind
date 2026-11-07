@@ -19,7 +19,7 @@ Locate the helper adjacent to the running IRMind executable, never through a mod
 
 Local evidence is read without copying. Object-storage sources use the existing private case spool and random-access parser route. The application authenticates the complete source before publication, retaining version/ETag checks and normal source re-verification. No evidence is written to the system temporary directory.
 
-The initial bounds are explicit and testable: 4 GiB source, 4 MiB output record, 1,000,000 records, and 600 seconds wall time per helper invocation. Total output is bounded by the lesser of 8 GiB and 32 times the input size plus 1 MiB. Parent queues are byte-bounded; stderr is capped and never displayed verbatim. The process limit is independent of tool-query deadlines. Limits must be documented rather than silently truncating a file.
+The bounds are explicit and testable: 4 GiB source, 4 MiB output record, 8,000,000 records, and 600 seconds wall time per helper invocation. Total output is bounded by the lesser of 8 GiB and 32 times the input size plus 1 MiB. Parent queues are byte-bounded; stderr is capped and never displayed verbatim. The process limit is independent of tool-query deadlines. Limits must be documented rather than silently truncating a file.
 
 Crash, timeout, cancellation, unavailable containment or malformed output rejects the complete file. Provisional events never enter a signed batch before an authenticated source, complete protocol trailer and successful child exit. Kill, wait and join pipe readers on every path. Existing whole-batch rollback removes provisional Parquet files.
 

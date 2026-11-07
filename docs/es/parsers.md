@@ -79,6 +79,8 @@ Auth.log/secure clásico usa el mismo formulario temporal por ingesta que syslog
 
 ### Windows EVTX
 
+Cada fuente EVTX admite hasta 4 GiB y 8.000.000 de registros. El auxiliar tiene un límite de 600 segundos por invocación, 4 MiB por frame y hasta 8 GiB de salida total, también limitada a 32 veces los bytes de entrada más 1 MiB. Alcanzar un límite rechaza el fichero completo con un diagnóstico explícito; no se publica una fuente parcial. En Windows se parsean las fuentes en orden canónico y sus hashes iniciales siguen calculándose en paralelo.
+
 EVTX está disponible al compilar desde el código y en los paquetes candidatos firmados; las releases anteriores no incluyen el auxiliar. El módulo experimental `parser-evtx` utiliza el auxiliar independiente `irmind-evtx`. Reconoce la cabecera y su checksum, no la extensión. Recibe un único descriptor de solo lectura. Los archivos locales y los objetos descargados en el spool privado del caso siguen la misma ruta.
 
 Linux requiere kernel 5.13 o posterior, Landlock ABI 1 habilitado y seccomp sin privilegios. Bubblewrap no es obligatorio. Windows requiere que los servicios de firewall BFE y MpsSvc estén activos. Utiliza un AppContainer sin capacidades, una lista explícita de handles y un Job Object que termina los procesos al cerrarse. macOS aplica un perfil restrictivo. Una prueba de arranque comprueba que se deniegan lecturas ajenas, red y creación de procesos. Si falla, Preferencias explica por qué EVTX no está disponible; nunca se ejecuta sin aislamiento.

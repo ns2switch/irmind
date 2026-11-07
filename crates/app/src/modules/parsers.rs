@@ -153,6 +153,13 @@ pub struct RebuildParser {
 }
 
 impl StreamingEventParser for RebuildParser {
+    fn source_parallelism(&self, source: &str) -> Result<crate::SourceParallelism, AppError> {
+        self.sources
+            .get(source)
+            .ok_or_else(|| AppError::Policy("source has no signed parser selection".into()))?
+            .source_parallelism(source)
+    }
+
     fn partition_profile_for_source(
         &self,
         source: &str,

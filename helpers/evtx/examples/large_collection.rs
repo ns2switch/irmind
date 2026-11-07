@@ -59,6 +59,7 @@ fn ingest(
     bytes: u64,
     expected: u64,
     batch_files: usize,
+    dense: bool,
 ) -> Result<(), large_support::Error> {
     let startup = Instant::now();
     let parser = Arc::new(EvtxParser::new(&large_support::helper()?, root));
@@ -103,7 +104,7 @@ fn ingest(
         .map(|name| {
             let size = std::fs::metadata(sources.join(name))?.len();
             Ok(
-                serde_json::json!({"source_bytes":size, "expected_records":((size-4096)/65_536)*large_support::RECORDS_PER_CHUNK,
+                serde_json::json!({"source_bytes":size, "expected_records":((size-4096)/65_536)*if dense {128} else {large_support::RECORDS_PER_CHUNK},
             "output_budget_bytes":(size.saturating_mul(32)+(1_u64<<20)).min(8_u64<<30)}),
             )
         })
@@ -120,11 +121,11 @@ fn ingest(
         "{}",
         serde_json::json!({"phase":"complete", "profile":"release",
         "source_bytes":bytes, "files":names.len(), "records":expected, "artifacts":artifacts,
-        "batch_files":batch_files,
-        "seconds":seconds, "mib_per_second":f64::from(u32::try_from(bytes)?)/1_048_576.0/seconds,
+        "batch_files":batch_files, "dense_source":dense,
+        "seconds":seconds, "mib_per_second":f64::from(u32::try_from(bytes / 1024)?)/1024.0/seconds,
         "startup_seconds":startup_seconds, "verification_seconds":verification_seconds,
         "signed_entries":local.entries(&case.id)?.len(), "witness_runs":parser.witness_stats().attempts,
-        "limits_reached":false, "record_limit_per_file":1_000_000,
+        "limits_reached":false, "record_limit_per_file":irmind_evtx::MAX_RECORDS,
         "per_file_budgets":caps, "decode_timeout_seconds":600,
         "scope":"source hashing, contained decoding, normalization, V2 Parquet and signed custody; final full verification timed separately"})
     );
@@ -139,13 +140,14 @@ fn main() -> Result<(), large_support::Error> {
         .nth(1)
         .ok_or("specify corpus MiB")?
         .parse::<u32>()?;
-    if !matches!(mib, 1 | 16 | 100 | 1024) {
-        return Err("supported corpora: 1, 16, 100 or 1024 MiB".into());
+    if !matches!(mib, 1 | 16 | 100 | 1024 | 4096) {
+        return Err("supported corpora: 1, 16, 100, 1024 or 4096 MiB".into());
     }
     let root = tempfile::tempdir_in(std::env::current_dir()?)?;
     let probe = std::env::args().any(|arg| arg == "--record-limit-probe");
     let single = probe || std::env::args().any(|arg| arg == "--single-source");
-    let (names, bytes, expected) = large_support::corpus(root.path(), mib, single)?;
+    let dense = probe || std::env::args().any(|arg| arg == "--dense-source");
+    let (names, bytes, expected) = large_support::corpus(root.path(), mib, single, dense, probe)?;
     if probe {
         println!(
             "{}",
@@ -164,5 +166,5 @@ fn main() -> Result<(), large_support::Error> {
     if !matches!(batch_files, 1 | 4) {
         return Err("batch-files must be 1 or 4".into());
     }
-    ingest(root.path(), &names, bytes, expected, batch_files)
+    ingest(root.path(), &names, bytes, expected, batch_files, dense)
 }

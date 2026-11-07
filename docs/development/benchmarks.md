@@ -637,11 +637,11 @@ The manual **Weekly fuzzing** workflow input `evtx_large=true` runs only this be
 
 Memory is the largest observed per-process OS high-water resident set (Linux) or peak working set (Windows), sampled every 20 ms. Auxiliary values are the maximum individual child, not the sum of concurrent children. Sampling can miss a short-lived process or a final spike; the harness refuses a successful result with no observed parent or decoder memory. Sources, provisional artifacts and runtime directories are removed after each collection.
 
-A separate in-process production-decoder check uses one dense 1 GiB source. It checks the exact record bound without changing it, consumes frames without retaining the stream and requires rejection without a completion trailer. Its time is not included in contained-ingestion throughput or memory measurements. The current bounds remain 1,000,000 records, at most 8 GiB of output (also limited to 32 times source size plus 1 MiB), a 4 MiB frame and 600 seconds per contained decoding invocation.
+A separate in-process production-decoder check uses one dense 1 GiB source. It checks the exact record bound without changing it, consumes frames without retaining the stream and requires rejection without a completion trailer. Its time is not included in contained-ingestion throughput or memory measurements. The initial baseline used 1,000,000 records, at most 8 GiB of output (also limited to 32 times source size plus 1 MiB), a 4 MiB frame and 600 seconds per contained decoding invocation.
 
 The benchmark accepts a developer-only batch size of one or four sources (`evtx_batch_files` in the manual workflow). Every result records that size. A per-source run uses the same signed application case of use for each file in the existing case; it is a separate qualification from a four-source batch. Do not present its timings as default batch results. The parser's native isolation and all quotas remain identical.
 
-The [source-scheduling proposal](parser-source-scheduling.md) describes an optional parser capability. It does not implement a production scheduling change.
+[Source scheduling](parser-source-scheduling.md) describes the optional parser capability and the Windows serial contract. The baseline measurements below precede that implementation and the new 8,000,000-record ceiling.
 
 #### Native batch-of-four qualification
 
@@ -677,6 +677,10 @@ The separate dense single-file decoder check rejected at exactly 1,000,000 of 1,
 
 Data: [Linux collection and limit JSON](https://github.com/ns2switch/irmind/actions/runs/42320713853/artifacts/13552921558), [Windows collection and limit JSON](https://github.com/ns2switch/irmind/actions/runs/42320713853/artifacts/13552508622). Both native jobs used optimized release builds and removed their synthetic sources and artifacts. Differences between the two Linux run modes are not an optimization result: they are separate runner executions.
 
-#### Record-budget option
+#### Eight-million-record qualification
 
-A possible additive acceptance change is 2,000,000 records per file in both the decoder and its parent validator. Keep the current frame size, normalized-size bounds, output byte budget, 600-second invocation deadline and isolation. Before applying it, require a native one-file 1 GiB ingestion, rejection above the new bound, cancellation/rollback checks and byte-identical reconstruction of previously accepted sources. No record limit changes in this PR.
+The decoder and parent validator now allow 8,000,000 records per file. Source size remains at most 4 GiB, each protocol frame at most 4 MiB, output at most the smaller of 8 GiB and 32 times source bytes plus 1 MiB, and each invocation at most 600 seconds. Limit diagnostics name the bound and state that the complete source was rejected.
+
+The extended release benchmark qualifies a four-source Windows request with one session witness, isolated one-file 1 GiB ingestion on both platforms, a near-4 GiB file on Linux, and a compact synthetic source with exactly 8,000,000 records on both platforms. The source cannot be exactly 4 GiB because an EVTX consists of a 4 KiB header and whole 64 KiB chunks; the maximum aligned source is 4,294,905,856 bytes. A separate in-process negative check has 8,000,128 records and requires rejection at the exact ceiling without a completion trailer. Its memory is not mixed with the contained ingestion measurement.
+
+The compact fixture uses valid, minimal Security event fields and 128 records per chunk. It is a streaming-resource stress corpus, distinct from the richer five-event Security corpus used for throughput. Its timestamps advance by 100 ns to hold date cardinality constant for the memory comparison. It is measured at 204,800, 2,097,152 and 8,000,000 records; the last source is 4,096,004,096 bytes. Results will distinguish the two corpora and retain the earlier measurements as baselines.

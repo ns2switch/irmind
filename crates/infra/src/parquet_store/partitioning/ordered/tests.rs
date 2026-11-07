@@ -291,3 +291,5 @@ fn regular_files(root: &Path) -> usize {
 }
 
 mod restart;
+
+mod serial;

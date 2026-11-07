@@ -13,7 +13,7 @@ pub use local::{
     AuditLog, CaseExporter, CaseLock, CaseMutation, Clock, ContentGuard, EventParser,
     EvidenceGraph, EvidenceStore, ExportVerification, ExportVerifier, LargeCaseExporter,
     LargeCaseStore, LogParser, ParseReport, ParserConfidence, ParserIdentity, PreparedSource,
-    Repository, Screened, Signer, StreamingEventParser, Verifier, startup_check,
+    Repository, Screened, Signer, SourceParallelism, StreamingEventParser, Verifier, startup_check,
 };
 pub use model::{
     CompletionMessage, CompletionRequest, LlmPort, MessageRole, ModelEvent, ModelPricing,

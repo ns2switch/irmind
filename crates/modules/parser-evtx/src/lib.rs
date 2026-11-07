@@ -99,7 +99,9 @@ impl EvtxParser {
             .map_err(|_| bad("cannot inspect EVTX source"))?
             .len();
         if !(4096..=4 * 1024 * 1024 * 1024).contains(&size) {
-            return Err(bad("EVTX source must be between 4 KiB and 4 GiB"));
+            return Err(bad(
+                "EVTX source size limit reached (4096 to 4294967296 bytes); entire file rejected; no partial ingestion",
+            ));
         }
         let child = program
             .spawn_cancelable(file, Mode::Decode, &|| cancel.is_cancelled())
@@ -159,6 +161,14 @@ impl EventParser for EvtxParser {
     }
 }
 impl StreamingEventParser for EvtxParser {
+    fn source_parallelism(&self, _: &str) -> Result<irmind_app::SourceParallelism, AppError> {
+        Ok(if cfg!(windows) {
+            irmind_app::SourceParallelism::Serial
+        } else {
+            irmind_app::SourceParallelism::Concurrent
+        })
+    }
+
     fn parser_name(&self) -> &'static str {
         "parser-evtx"
     }

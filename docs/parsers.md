@@ -77,6 +77,8 @@ Classic auth.log/secure uses the same per-ingestion time form as syslog. Journal
 
 ### Windows EVTX
 
+Each EVTX source is limited to 4 GiB and 8,000,000 records. The helper has a 600-second invocation deadline, a 4 MiB frame limit and a total output budget of at most 8 GiB (also bounded by 32 times source bytes plus 1 MiB). Reaching a limit rejects the complete file with an explicit diagnostic; no partial source is published. Windows parses sources in canonical order while their initial hashes remain parallel.
+
 EVTX is available in source builds and signed candidate packages; older releases do not include its helper. The experimental `parser-evtx` module uses the separately installed `irmind-evtx` helper. It recognizes the EVTX header and checksum, not the file extension. The helper receives one read-only file handle; it cannot open the evidence by path. Both local files and downloaded, case-private object spools use that route.
 
 Linux requires kernel 5.13 or newer, Landlock ABI 1 enabled, and unprivileged seccomp. No Bubblewrap installation is required. Windows requires the BFE and MpsSvc firewall services to remain active. It uses a capability-free AppContainer, an explicit standard-handle list and a kill-on-close Job Object. macOS uses a deny-default sandbox profile. A startup probe verifies denied foreign reads, denied networking and denied child creation. If the probe fails, Preferences reports why EVTX is unavailable; there is no unconfined mode.

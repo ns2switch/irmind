@@ -370,3 +370,13 @@ Context: a helper compiled on a newer Linux userspace can require a libc version
 Decision: build and test Linux x86-64 on Ubuntu 22.04. Native Ubuntu 22.04 and Ubuntu 24.04 compatibility jobs execute the same produced helper, including the pinned Debian/Fedora container probes. Release compatibility uses the exact release helper rather than rebuilding it on the test host. Cache keys distinguish this build baseline.
 
 Consequences: distribution checks test one portable artifact across userspaces instead of mistaking a newer loader ABI requirement for an isolation failure. No sandbox probe or enforcement requirement is removed. ARM64 retains its separate native runner and requires separate compatibility evidence.
+
+## EVTX source scheduling and record budget
+
+Context: parsers can have different native concurrency contracts, while case publication must remain deterministic and resource-bounded.
+
+Decision: an optional closed `SourceParallelism` capability defaults to `Concurrent`. EVTX declares `Serial` on Windows. Initial source hashes remain parallel; serial parse-start permits follow canonical source order. Bounded queues and start waits check cancellation. An independent supervisor enforces the auxiliary deadline even while the record consumer waits.
+
+The per-file record ceiling is 8,000,000 in both the decoder and the protocol validator. The 4 GiB source ceiling, 4 MiB frame ceiling, existing output budget and 600-second invocation deadline remain unchanged. A limit rejects the complete file with its value in the diagnostic. Native containment, witness verification, signed ordering and custody formats do not change.
+
+Consequences: Windows can process a multi-file request with one verified session without adding native capabilities. Independent concurrent AppContainers remain [separate work](https://github.com/ns2switch/irmind/issues/191). Release measurements and their scope are recorded in [benchmarks](benchmarks.md#large-security-evtx-collections).

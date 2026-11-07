@@ -16,6 +16,9 @@ impl<'a> SourceParser<'a> {
     }
 }
 impl StreamingEventParser for SourceParser<'_> {
+    fn source_parallelism(&self, _: &str) -> Result<crate::SourceParallelism, AppError> {
+        self.inner.source_parallelism(self.logical)
+    }
     fn identity(&self) -> ParserIdentity<'_> {
         self.inner.identity()
     }

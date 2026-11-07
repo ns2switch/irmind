@@ -22,21 +22,23 @@ FIELDS = {
 }
 
 
-def generate():
+def generate(dense=False):
     file = bytearray(4096 + 65536)
     file[:8] = b'ElfFile\0'
     file[4096:4104] = b'ElfChnk\0'
     cursor, count, last = 512, 0, 512
     ids = (4624, 4625, 4688, 4634, 4672)
-    while True:
-        event = ids[count % len(ids)]
+    while not dense or count < 128:
+        event = ids[count % len(ids)] if not dense else 4624
         xml = Xml(cursor + 24)
         xml.start('Event'); xml.start('System')
-        for name, value in [('EventID', event), ('Channel', 'Security'),
-                            ('Computer', 'synthetic-endpoint'), ('EventRecordID', f'{count + 1:020}')]:
+        fields = [('EventID', event), ('Computer', 'synthetic-endpoint'), ('EventRecordID', f'{count + 1:020}')]
+        if not dense:
+            fields.insert(1, ('Channel', 'Security'))
+        for name, value in fields:
             xml.text(name, value)
         xml.end(); xml.start('EventData')
-        for name, value in FIELDS[event]:
+        for name, value in ([("TargetUserName", "synthetic-user")] if dense else FIELDS[event]):
             xml.data_field(name, value)
         xml.end(); xml.end(); xml.data += b'\x00'
         size = 24 + len(xml.data) + 4
@@ -65,7 +67,10 @@ def generate():
 
 
 if __name__ == '__main__':
-    fixture = Path(__file__).resolve().parents[1] / 'helpers/evtx/examples/large_support/Security.evtx'
-    data, records = generate()
-    fixture.write_bytes(data)
-    print(f'synthetic Security fixture: {len(data)} bytes; {records} records per chunk')
+    root = Path(__file__).resolve().parents[1] / 'helpers/evtx/examples/large_support'
+    for dense, name in [(False, 'Security.evtx'), (True, 'SecurityDense.evtx')]:
+        data, records = generate(dense)
+        if dense and records != 128:
+            raise ValueError('dense fixture must fit exactly 128 records per chunk')
+        (root / name).write_bytes(data)
+        print(f'{name}: {len(data)} bytes; {records} records per chunk')

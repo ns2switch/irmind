@@ -1,3 +1,4 @@
+mod supervisor;
 use super::bad;
 use irmind_app::{AppError, CancellationToken};
 use irmind_process_containment::Child;
@@ -5,7 +6,7 @@ use std::{
     io::{BufRead, BufReader, Read},
     sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender},
     thread::{self, JoinHandle},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 enum Message {
@@ -14,15 +15,16 @@ enum Message {
     ErrorEnd,
     Isolation(&'static str),
     Failure,
+    Limit(String),
 }
 struct Running {
-    child: Child,
+    supervisor: supervisor::Supervisor,
     receive: Option<Receiver<Message>>,
     threads: Vec<JoinHandle<()>>,
 }
 impl Drop for Running {
     fn drop(&mut self) {
-        let _ = self.child.terminate();
+        let _ = self.supervisor.finish(false);
         self.receive.take();
         for thread in self.threads.drain(..) {
             let _ = thread.join();
@@ -44,7 +46,7 @@ pub(super) fn run(
         .map_err(|_| bad("EVTX stderr unavailable"))?;
     let (send, receive) = mpsc::sync_channel(2);
     let mut running = Running {
-        child,
+        supervisor: supervisor::Supervisor::new(child, deadline, cancel)?,
         receive: Some(receive),
         threads: Vec::new(),
     };
@@ -61,14 +63,19 @@ pub(super) fn run(
             .spawn(move || drain(stderr, &send))
             .map_err(|_| bad("EVTX error reader cannot start"))?,
     );
-    let start = Instant::now();
+    let result = consume(&running, cancel, on_line);
+    running.supervisor.finish(result.is_ok())?;
+    result
+}
+fn consume(
+    running: &Running,
+    cancel: &CancellationToken,
+    on_line: &mut dyn FnMut(Vec<u8>) -> Result<(), AppError>,
+) -> Result<(), AppError> {
     let (mut output_done, mut error_done) = (false, false);
     while !output_done || !error_done {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
-        }
-        if start.elapsed() > deadline {
-            return Err(bad("EVTX helper timed out; no partial file was ingested"));
         }
         match running
             .receive
@@ -80,42 +87,20 @@ pub(super) fn run(
             Ok(Message::OutputEnd) => output_done = true,
             Ok(Message::ErrorEnd) => error_done = true,
             Ok(Message::Isolation(message)) => return Err(bad(message)),
+            Ok(Message::Limit(message)) => return Err(AppError::Policy(message)),
             Ok(Message::Failure) | Err(RecvTimeoutError::Disconnected) => {
-                return Err(bad("EVTX helper output failed or exceeded its limit"));
+                return Err(bad(
+                    "EVTX helper output failed; entire file rejected; no partial ingestion",
+                ));
             }
             Err(RecvTimeoutError::Timeout) => {}
         }
     }
-    loop {
-        if cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        if start.elapsed() > deadline {
-            return Err(bad("EVTX helper did not exit within its time limit"));
-        }
-        if let Some(success) = running
-            .child
-            .try_wait()
-            .map_err(|_| bad("cannot inspect EVTX helper exit"))?
-        {
-            return if success {
-                Ok(())
-            } else {
-                Err(AppError::Policy(format!(
-                    "EVTX helper exited unsuccessfully ({}); no partial file was ingested; check native sandbox support",
-                    running
-                        .child
-                        .exit_description()
-                        .ok()
-                        .flatten()
-                        .unwrap_or_else(|| "exit status unavailable".into())
-                )))
-            };
-        }
-        thread::sleep(Duration::from_millis(10));
-    }
+    Ok(())
 }
+
 fn pump(reader: Box<dyn Read + Send>, mut budget: u64, send: &SyncSender<Message>) {
+    let total_budget = budget;
     let mut reader = BufReader::new(reader);
     let mut line = Vec::new();
     loop {
@@ -135,8 +120,12 @@ fn pump(reader: Box<dyn Read + Send>, mut budget: u64, send: &SyncSender<Message
             .iter()
             .position(|b| *b == b'\n')
             .map_or(available.len(), |n| n + 1);
-        if count as u64 > budget || line.len().saturating_add(count) > 4 * 1024 * 1024 {
-            let _ = send.send(Message::Failure);
+        if count as u64 > budget {
+            let _ = send.send(Message::Limit(format!("EVTX output byte limit reached ({total_budget} bytes); entire file rejected; no partial ingestion")));
+            return;
+        }
+        if line.len().saturating_add(count) > 4 * 1024 * 1024 {
+            let _ = send.send(Message::Limit("EVTX frame byte limit reached (4194304 bytes); entire file rejected; no partial ingestion".into()));
             return;
         }
         budget -= count as u64;
@@ -178,7 +167,19 @@ fn drain(mut reader: Box<dyn Read + Send>, send: &SyncSender<Message>) {
 
 fn isolation_reason(bytes: &[u8]) -> Option<&'static str> {
     let text = std::str::from_utf8(bytes).ok()?;
-    if text.contains("EVTX requires fully enforced Landlock ABI 1") {
+    if text.contains("EVTX record limit reached (8000000 records)") {
+        Some(
+            "EVTX record limit reached (8000000 records); entire file rejected; no partial ingestion",
+        )
+    } else if text.contains("EVTX output byte limit reached") {
+        Some(
+            "EVTX output byte limit reached (min(8589934592 bytes, 32 times source size plus 1048576 bytes)); entire file rejected; no partial ingestion",
+        )
+    } else if text.contains("EVTX frame byte limit reached") {
+        Some(
+            "EVTX frame byte limit reached (4194304 bytes); entire file rejected; no partial ingestion",
+        )
+    } else if text.contains("EVTX requires fully enforced Landlock ABI 1") {
         Some(
             "EVTX unavailable: enable Landlock ABI 1 and unprivileged seccomp on Linux 5.13 or newer; Bubblewrap is not required",
         )
@@ -212,6 +213,21 @@ fn isolation_reason(bytes: &[u8]) -> Option<&'static str> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn every_resource_diagnostic_names_the_bound_without_echoing_stderr() {
+        for marker in [
+            "EVTX record limit reached (8000000 records)",
+            "EVTX output byte limit reached",
+            "EVTX frame byte limit reached",
+        ] {
+            let stderr = format!("{marker} PRIVATE_SAMPLE");
+            let message = super::isolation_reason(stderr.as_bytes()).unwrap_or_default();
+            assert!(message.contains("entire file rejected"));
+            assert!(message.contains("no partial ingestion"));
+            assert!(message.chars().any(|c| c.is_ascii_digit()));
+            assert!(!message.contains("PRIVATE_SAMPLE"));
+        }
+    }
     #[test]
     fn runtime_failure_uses_a_fixed_reason_without_forwarding_helper_stderr() {
         let result = super::isolation_reason(

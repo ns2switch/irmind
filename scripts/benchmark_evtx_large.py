@@ -5,19 +5,23 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import subprocess
 import tempfile
 import time
 from evtx_memory import processes
 
 
-def measure(executable, mib, work, batch_files):
+def measure(executable, mib, work, batch_files, single=False, dense=False):
+    initial_free = shutil.disk_usage(work).free
     with tempfile.TemporaryDirectory(prefix='evtx-large-', dir=work) as directory:
         output = Path(directory) / 'result.jsonl'
         error = Path(directory) / 'error.txt'
         with output.open('wb') as stdout, error.open('wb') as stderr:
-            process = subprocess.Popen([str(executable), str(mib), '--batch-files', str(batch_files)], cwd=directory,
-                                       stdout=stdout, stderr=stderr)
+            command = [str(executable), str(mib), '--batch-files', str(batch_files)]
+            if single: command.append('--single-source')
+            if dense: command.append('--dense-source')
+            process = subprocess.Popen(command, cwd=directory, stdout=stdout, stderr=stderr)
         peaks = {'parent': 0, 'helper': 0}
         child_peaks = {}
         deadline = time.monotonic() + 3600
@@ -41,10 +45,10 @@ def measure(executable, mib, work, batch_files):
                 result = next(row for row in results if row.get('phase') == 'complete')
             if process.returncode == 0 and not all(peaks.values()):
                 raise RuntimeError('benchmark memory could not be measured for both processes')
-            result.update({'corpus_mib': mib, 'parent_peak_bytes': peaks['parent'],
+            result.update({'corpus_mib': mib, 'single_source': single, 'dense_source': dense, 'parent_peak_bytes': peaks['parent'],
                            'helper_peak_bytes': peaks['helper'], 'observed_children': len(child_peaks),
                            'memory_method': '20 ms sampling of OS process high-water resident/working-set counters; per-process maximum, not sum',
-                           'os': platform.system(), 'architecture': platform.machine()})
+                           'initial_free_disk_bytes': initial_free, 'os': platform.system(), 'architecture': platform.machine()})
             return result
         finally:
             if process.poll() is None:
@@ -57,14 +61,20 @@ def main():
     parser.add_argument('executable', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--smoke', action='store_true')
+    parser.add_argument('--extended', action='store_true')
     parser.add_argument('--batch-files', type=int, choices=(1, 4), default=int(os.environ.get('EVTX_BATCH_FILES', '4')))
     args = parser.parse_args()
     if args.batch_files not in (1, 4):
         parser.error('batch-files must be 1 or 4')
     executable = args.executable.resolve(strict=True)
     results = []
-    for mib in ([16] if args.smoke else [100, 1024]):
-        result = measure(executable, mib, Path.cwd(), args.batch_files)
+    corpora = [(16, False, False)] if args.smoke else [(100, False, False), (1024, False, False)]
+    if args.extended:
+        corpora.append((1024, True, False))
+        if platform.system() == 'Linux': corpora.append((4096, True, False))
+        corpora.extend([(100, True, True), (1024, True, True), (4096, True, True)])
+    for mib, single, dense in corpora:
+        result = measure(executable, mib, Path.cwd(), args.batch_files, single, dense)
         print(json.dumps(result, sort_keys=True), flush=True)
         results.append(result)
         args.output.write_text(json.dumps({'results': results}, indent=2) + '\n')
