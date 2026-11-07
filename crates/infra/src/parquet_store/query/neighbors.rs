@@ -16,6 +16,10 @@ impl QueryStore<'_> {
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        if super::scoped::available(artifacts) {
+            return self.scoped_neighbors(id, artifacts, filter, entity, limit, cancel);
+        }
+
         if coobservation_available(artifacts, filter) {
             return self
                 .neighbors_from_coobservations(id, artifacts, filter, entity, limit, cancel);

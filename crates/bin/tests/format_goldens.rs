@@ -27,6 +27,8 @@ type Goldens = BTreeMap<String, String>;
 
 #[path = "support/artifact_v2_goldens.rs"]
 mod artifact_v2_goldens;
+#[path = "support/common_event_goldens.rs"]
+mod common_event_goldens;
 
 struct FixedClock;
 impl Clock for FixedClock {

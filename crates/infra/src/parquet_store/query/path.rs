@@ -27,6 +27,10 @@ impl QueryStore<'_> {
         to: (&str, &str),
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        if super::scoped::available(artifacts) {
+            return self.scoped_path(id, artifacts, filter, from, to, cancel);
+        }
+
         let start = (from.0.to_owned(), from.1.to_owned());
         let goal = (to.0.to_owned(), to.1.to_owned());
         if start == goal {

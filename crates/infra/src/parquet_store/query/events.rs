@@ -116,18 +116,32 @@ impl QueryStore<'_> {
             None::<super::super::time_cell::TimeCell>,
             None::<super::super::time_cell::TimeCell>,
         );
+        let (mut common_records, mut classified_records, mut known_outcomes) = (0u64, 0u64, 0u64);
         let status = self.scan_artifacts(
             ScanSpec {
                 id,
                 artifacts,
                 filter: &GraphQueryFilter::default(),
                 schema: "irmind-events-v2",
-                columns: &["event_time"],
+                columns: &["event_time", "event_category_bits", "event_outcome"],
                 predicates: &[],
                 deadline: Instant::now() + QUERY_DEADLINE,
                 cancel,
             },
             |batch| {
+                if let (Some(categories), Some(outcomes)) = (
+                    batch
+                        .column_by_name("event_category_bits")
+                        .and_then(|v| v.as_any().downcast_ref::<arrow::array::UInt32Array>()),
+                    batch
+                        .column_by_name("event_outcome")
+                        .and_then(|v| v.as_any().downcast_ref::<arrow::array::UInt8Array>()),
+                ) {
+                    common_records += batch.num_rows() as u64;
+                    classified_records +=
+                        categories.values().iter().filter(|v| **v != 0).count() as u64;
+                    known_outcomes += outcomes.values().iter().filter(|v| **v != 0).count() as u64;
+                }
                 super::extrema::accumulate(
                     batch,
                     &mut count,
@@ -146,6 +160,10 @@ impl QueryStore<'_> {
         );
         if artifacts.iter().any(|a| matches!(a, ParquetArtifact::V2(v) if v.builder_version == crate::parquet_store::partitioning::BUILDER)) {
             summary.push_str(&partition_coverage(artifacts));
+        }
+        if super::scoped::available(artifacts) {
+            use std::fmt::Write as _;
+            write!(summary, "; common records={common_records}/{count}; categorized={classified_records}/{count}; known outcomes={known_outcomes}/{count}; other records remain unclassified").map_err(super::super::storage)?;
         }
         Ok(summary)
     }

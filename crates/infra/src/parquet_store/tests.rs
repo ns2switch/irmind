@@ -507,3 +507,5 @@ fn parquet_queries_preserve_the_previous_corpus_results() {
 }
 
 mod precise;
+
+mod common;

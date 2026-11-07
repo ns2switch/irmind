@@ -27,6 +27,12 @@ fn parquet_benchmark_50mb() {
     benchmark(50, 1, "50mb");
 }
 
+#[test]
+#[ignore = "manual common-schema smoke: at least 1 GiB, run three times per representative source"]
+fn common_schema_smoke_1gib() {
+    benchmark(1030, 1, "1gib");
+}
+
 fn benchmark(files: usize, multiplier: usize, label: &str) {
     let scenario = Scenario::from_environment();
     run_benchmark(files, multiplier, label, &scenario);
@@ -38,9 +44,14 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     let source_root = root.path().join("sources");
     fs::create_dir(&source_root).unwrap();
     let mut store = LocalStore::open(&root.path().join("case")).unwrap();
-    if scenario.precise {
+    let common = std::env::var("IRMIND_BENCH_COMMON_EVENT").as_deref() == Ok("1");
+    if common {
+        assert!(scenario.precise, "common schemas use V2");
+        store.parquet = crate::ParquetStore::open_common(&root.path().join("case")).unwrap();
+    } else if scenario.precise {
         store.parquet = crate::ParquetStore::open_precise(&root.path().join("case")).unwrap();
     }
+    println!("PARQUET_COMMON_EVENT enabled={common}");
     let profile = Arc::new(ParquetProfile::default());
     store.parquet.attach_profile(profile.clone());
     let store = Arc::new(store);

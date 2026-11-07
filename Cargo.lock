@@ -2518,6 +2518,7 @@ dependencies = [
  "irmind-mod-ti-misp",
  "irmind-mod-ti-virustotal",
  "irmind-security",
+ "irmind-testkit",
  "irmind-tui",
  "libc",
  "parquet",

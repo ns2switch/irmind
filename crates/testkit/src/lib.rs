@@ -25,7 +25,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod common_event_contract;
 mod contract_support;
+pub use common_event_contract::run_common_event_contract;
 mod edr_contract;
 mod fakes;
 mod keystore_contract;

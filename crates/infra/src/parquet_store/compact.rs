@@ -84,6 +84,8 @@ pub(super) fn write_inputs(
             | "irmind-coobservations-v1"
             | "irmind-entities-v3"
             | "irmind-coobservations-v2"
+            | "irmind-entities-v4"
+            | "irmind-coobservations-v3"
     );
     let properties = compact_properties(optimized);
     let mut output = Some(output);

@@ -5,20 +5,26 @@ use super::{
 
 impl LocalStore {
     pub fn open(root: &Path) -> Result<Self, AppError> {
-        Self::open_store(root, false)
+        Self::open_store(root, false, false)
     }
 
     /// Precise artifact construction with compatible reads of existing V1 cases.
     pub fn open_precise(root: &Path) -> Result<Self, AppError> {
-        Self::open_store(root, true)
+        Self::open_store(root, true, false)
     }
 
-    fn open_store(root: &Path, precise: bool) -> Result<Self, AppError> {
+    pub fn open_common(root: &Path) -> Result<Self, AppError> {
+        Self::open_store(root, true, true)
+    }
+
+    fn open_store(root: &Path, precise: bool, common: bool) -> Result<Self, AppError> {
         let (evidence_dir, seal_dir, lock_dir) = Self::prepare_directories(root)?;
         let db = Self::open_database(root)?;
         let store = Self {
             db: Mutex::new(db),
-            parquet: if precise {
+            parquet: if common {
+                ParquetStore::open_common(root)?
+            } else if precise {
                 ParquetStore::open_precise(root)?
             } else {
                 ParquetStore::open(root)?

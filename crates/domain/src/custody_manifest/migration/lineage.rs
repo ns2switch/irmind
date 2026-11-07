@@ -50,9 +50,18 @@ impl ArtifactLineage {
 
     pub fn artifact(&mut self, artifact: ParquetArtifact) -> Result<(), DomainError> {
         artifact.validate()?;
-        if matches!(&artifact,ParquetArtifact::V2(v) if !matches!(v.builder_version.as_str(),"parquet-builder-v2"|"parquet-builder-v3"))
-        {
-            return Err(invalid());
+        if let ParquetArtifact::V2(v) = &artifact {
+            let supported = if v.schema.is_common() {
+                v.builder_version == crate::COMMON_EVENT_BUILDER && v.superseded_hashes.is_empty()
+            } else {
+                matches!(
+                    v.builder_version.as_str(),
+                    "parquet-builder-v2" | "parquet-builder-v3"
+                )
+            };
+            if !supported {
+                return Err(invalid());
+            }
         }
         if self.paths.contains(artifact.path())
             || artifact
@@ -214,6 +223,8 @@ fn validate_references(a: &ParquetArtifact, old: &[ParquetArtifact]) -> Result<(
     Ok(())
 }
 
+// This table is deliberately limited to the precision-only migration.
+// Common-event classifications and roles require a separate semantic contract.
 pub(super) fn same_family(a: &str, b: &str) -> bool {
     fn family(v: &str) -> Option<u8> {
         match v {

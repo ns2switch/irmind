@@ -39,12 +39,12 @@ impl ParquetStore {
             .map_err(storage)?;
         super::super::format::validate_schema(artifact, builder.schema().as_ref())?;
         let precise = matches!(artifact, super::ParquetArtifact::V2(_));
-        let rules = rules_for_artifact(&spec, precise)?;
+        let rules = rules_for_artifact(&spec, precise, artifact)?;
         let groups = ordered_groups(&builder, &rules, newest)?;
         let metadata =
             ArrowReaderMetadata::try_new(builder.metadata().clone(), ArrowReaderOptions::default())
                 .map_err(storage)?;
-        let columns = super::required_columns(&spec, precise);
+        let columns = super::required_columns(&spec, precise, super::common::supported(artifact));
         for (bound, group) in groups {
             if cutoff.as_ref().is_some_and(|c| {
                 bound.cannot_beat(c.0.time.map(irmind_app::IndexedTime::instant), newest)
@@ -82,6 +82,7 @@ impl ParquetStore {
                     names,
                     spec.columns != ["event_time"],
                 )?;
+                let batch = super::common::projection_defaults(batch, &spec, artifact)?;
                 drop(normalize);
                 let (batch, status) = self.filter_legacy_host(spec, names, batch)?;
                 if status == ScanStatus::Deadline {

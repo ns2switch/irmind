@@ -16,6 +16,28 @@ impl<'a> SourceParser<'a> {
     }
 }
 impl StreamingEventParser for SourceParser<'_> {
+    fn parse_common_reader_report(
+        &self,
+        _: &str,
+        reader: &mut dyn Read,
+        hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<crate::CommonGraphRecord>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        self.inner
+            .parse_common_reader_report(self.logical, reader, hash, cancel, emit)
+    }
+    fn parse_common_local_file_report(
+        &self,
+        _: &str,
+        reader: &mut File,
+        hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<crate::CommonGraphRecord>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        self.inner
+            .parse_common_local_file_report(self.logical, reader, hash, cancel, emit)
+    }
     fn source_parallelism(&self, _: &str) -> Result<crate::SourceParallelism, AppError> {
         self.inner.source_parallelism(self.logical)
     }

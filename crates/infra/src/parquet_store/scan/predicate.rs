@@ -1,4 +1,5 @@
 use super::RecordBatch;
+mod numeric;
 use arrow::{
     array::{Array, StringArray, UInt64Array},
     error::ArrowError,
@@ -7,6 +8,8 @@ use memchr::{memchr, memchr2};
 #[derive(Clone)]
 pub(in crate::parquet_store) enum Predicate {
     Equal(&'static str, String),
+    Mask(&'static str, u32, u32),
+    SmallEqual(&'static str, Option<u16>, u8),
     Range(&'static str, String, String),
     ContainsIgnoreCase(&'static str, String),
     Index(u64),
@@ -16,7 +19,9 @@ pub(in crate::parquet_store) enum Predicate {
 impl Predicate {
     pub(super) fn column(&self) -> &'static str {
         match self {
-            Self::Equal(column, _)
+            Self::Mask(column, _, _)
+            | Self::SmallEqual(column, _, _)
+            | Self::Equal(column, _)
             | Self::Range(column, _, _)
             | Self::ContainsIgnoreCase(column, _) => column,
             Self::Index(_) => "record_index",
@@ -28,6 +33,9 @@ impl Predicate {
         let column = batch
             .column_by_name(self.column())
             .ok_or_else(|| ArrowError::SchemaError("missing Parquet predicate column".into()))?;
+        if matches!(self, Self::Mask(..) | Self::SmallEqual(..)) {
+            return numeric::matches(self, column.as_ref(), row);
+        }
         if let Self::TimeRange(from, to) = self {
             if let Some(times) = column.as_any().downcast_ref::<StringArray>() {
                 if times.is_null(row) || times.value(row).is_empty() {
@@ -74,7 +82,9 @@ impl Predicate {
                 Self::Equal(_, expected) => value == expected,
                 Self::Range(_, first, last) => value >= first.as_str() && value <= last.as_str(),
                 Self::ContainsIgnoreCase(_, needle) => contains_ignore_case(value, needle),
-                Self::Index(_) | Self::TimeRange(..) => false,
+                Self::Index(_) | Self::TimeRange(..) | Self::Mask(..) | Self::SmallEqual(..) => {
+                    false
+                }
             })
         }
     }
