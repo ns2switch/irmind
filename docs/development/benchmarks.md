@@ -631,10 +631,31 @@ target/release/examples/collection
 
 The `large_collection` example uses a generated, entirely synthetic Security log with event-specific fields for 4624, 4625, 4688, 4634 and 4672. Each 64 KiB chunk holds 64 events. Record headers and XML record IDs agree, timestamps advance in 100 ms steps while retaining their 100 ns remainder, and user names rotate across 1,024 synthetic values. Host and documentation-range IP addresses are synthetic. This corpus exercises approximately 1 KiB per record; it does not claim coverage of every Windows template or real incident workload.
 
-The two collections contain 100 MiB and 1 GiB of chunks, plus file headers. The latter uses four sources of 256 MiB plus a 4 KiB header each. They use the application's signed V2 ingestion case of use, followed by a complete chain/artifact verification and an exact indexed-record count. Ingestion timing includes hashing, the contained decoder, normalization, Parquet and audit signatures. Fixture generation, initial sandbox setup and final verification are separate. The parent is the release ingestion host, not the interactive TUI or a model process. Its synthetic signing key is restricted to the temporary benchmark case.
+The two collections contain 100 MiB and 1 GiB of chunks, plus file headers. The latter uses four sources of 256 MiB plus a 4 KiB header each. They use the application's signed V2 ingestion use case, followed by a complete chain/artifact verification and an exact indexed-record count. Ingestion timing includes hashing, the contained decoder, normalization, Parquet and audit signatures. Fixture generation, initial sandbox setup and final verification are separate. The parent is the release ingestion host, not the interactive TUI or a model process. Its synthetic signing key is restricted to the temporary benchmark case.
 
 The manual **Weekly fuzzing** workflow input `evtx_large=true` runs only this benchmark on Linux and Windows. It builds the normal-feature decoder after the benchmark host so test-only broker features do not enter the auxiliary executable. No external provider is used. The Windows network witness still performs its approved local positive controls.
 
 Memory is the largest observed per-process OS high-water resident set (Linux) or peak working set (Windows), sampled every 20 ms. Auxiliary values are the maximum individual child, not the sum of concurrent children. Sampling can miss a short-lived process or a final spike; the harness refuses a successful result with no observed parent or decoder memory. Sources, provisional artifacts and runtime directories are removed after each collection.
 
 A separate in-process production-decoder check uses one dense 1 GiB source. It checks the exact record bound without changing it, consumes frames without retaining the stream and requires rejection without a completion trailer. Its time is not included in contained-ingestion throughput or memory measurements. The current bounds remain 1,000,000 records, at most 8 GiB of output (also limited to 32 times source size plus 1 MiB), a 4 MiB frame and 600 seconds per contained decoding invocation.
+
+The benchmark accepts a developer-only batch size of one or four sources (`evtx_batch_files` in the manual workflow). Every result records that size. A per-source run uses the same signed application case of use for each file in the existing case; it is a separate qualification from a four-source batch. Do not present its timings as default batch results. The parser's native isolation and all quotas remain identical.
+
+The [source-scheduling proposal](parser-source-scheduling.md) describes an optional parser capability. It does not implement a production scheduling change.
+
+#### Native batch-of-four qualification
+
+[Native run](https://github.com/ns2switch/irmind/actions/runs/42314854568), release source `e7511f43fdcea85fff7862c4ab1f66498eb73f20`. MiB/s uses actual authenticated source bytes including headers. Memory is observed MiB under the sampling method above.
+
+| Platform | Corpus | Sources | Records verified | Ingestion | MiB/s | Parent peak MiB | Helper peak MiB |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Linux x86-64 | 100 MiB + header | 1 | 102,400 | 6.357 s | 15.73 | 89.18 | 3.20 |
+| Linux x86-64 | 1 GiB + headers | 4 | 1,048,576 | 61.988 s | 16.52 | 209.45 | 3.27 |
+| Windows x86-64 | 100 MiB + header | 1 | 102,400 | 5.490 s | 18.21 | 72.93 | 5.55 |
+| Windows x86-64 | 1 GiB + headers | 4 | Not qualified in this run | — | — | — | — |
+
+The Windows partial artifact contains only the completed 100 MiB case. It does not establish a 1 GiB batch result. The completed collections reached no record, output or invocation-time limit. Windows startup took 1.121 s and used one full session witness. Each 256 MiB source contains 262,144 records; each has the unchanged 8 GiB output cap. The 100 MiB source has a 3,356,622,848-byte output budget. Final verification is separate: 0.055/0.493 s on Linux and 0.053 s for Windows 100 MiB.
+
+The separate Linux in-process decoder check uses a single source of 1,073,745,920 bytes containing 1,048,576 events. It emits exactly 1,000,000 records and rejects the remainder without a completion trailer, taking 16.348 s. This is an intentional record-bound qualification, not a successful ingestion or a contained-worker memory measurement.
+
+Data: [Linux collection and limit JSON](https://github.com/ns2switch/irmind/actions/runs/42314854568/artifacts/13550257924), [completed Windows 100 MiB JSON](https://github.com/ns2switch/irmind/actions/runs/42314854568/artifacts/13552457222). Per-source measurements with batch size one are a separate qualification.
