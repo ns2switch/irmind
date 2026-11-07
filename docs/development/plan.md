@@ -198,3 +198,9 @@ For v0.3, implement the [common event schema](https://github.com/ns2switch/irmin
 CommonEventMigrationV1 is deferred: existing cases remain readable, with no automatic semantic migration. Re-ingest verified originals into a new case when new classifications are needed. Benchmark 1 GiB representative sources three times and the complete 15 GB matrix once, in release builds on the same runner class. Keep current targets.
 
 Skills move to v0.4, subagents to v0.5, public launch follows subagents, source-side queries move to v0.6 and detection/reports/engine API to v0.7.
+
+## v0.2.0 release scope
+
+The release includes precise artifact V2 in the CLI/TUI/demo, optional explicit V1 precision migration, mixed-generation export V5, isolated EVTX and the restored experimental Zeek/Suricata modules. It does not include Elastic, Chronicle or the new common event schemas. Existing cases stay readable and never migrate on open. Semantic migration remains deferred; re-ingestion into a new case is available.
+
+Keep the evaluation-only warning: H5 is accepted by analyst decision after the recorded DeepSeek greeting, while the remaining procedure observations and a real-connector validation are still pending. Signed release assets use the existing tag workflow with main/helper SBOMs, Sigstore, provenance and clean installer checks. Native signing/notarization and the recorded post-release performance work remain separate.
