@@ -4,6 +4,9 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Add an experimental typed common-event core, frozen category/outcome/role codes and new physical schemas within artifact V2. Existing parsers use an unclassified compatibility bridge; source mappings follow separately. Historical cases remain readable and no semantic migration runs automatically.
+- Add bounded category, type, outcome and entity-role selectors to existing evidence tools, with explicit schema-coverage notices and identity scopes that distinguish PID reuse.
+
 ## 0.2.0 — Modular parsers and precise evidence
 
 - Add experimental Zeek TSV/JSON and Suricata EVE modules with bounded detection, streaming parsing, precise timestamps, host-aware partitions, source provenance and synthetic contract fixtures. They were not distributed in v0.1.x. Source detections remain unconfirmed findings.

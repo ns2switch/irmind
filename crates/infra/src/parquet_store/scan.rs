@@ -14,6 +14,9 @@ use std::time::Instant;
 pub(super) const MAX_QUERY_FILES: usize = 8192;
 const FILE_WORKERS: usize = 4;
 mod common;
+mod selection;
+pub(super) use selection::partition_matches;
+use selection::{required_columns, rules_for_artifact};
 mod host;
 mod predicate;
 mod time_bounds;
@@ -356,111 +359,5 @@ fn row_group_matches(
     })
 }
 
-pub(super) fn partition_matches(artifact: &ParquetArtifact, filter: &GraphQueryFilter) -> bool {
-    if !filter.common().is_empty() && !common::supported(artifact) {
-        return false;
-    }
-    if let ParquetArtifact::V2(v) = artifact {
-        return scope_partition_matches(&v.partition, filter)
-            && filter.time_range().is_none_or(|(from, to)| {
-                artifact.partition_date() == "unknown"
-                    || (artifact.partition_date() >= &from[..10]
-                        && artifact.partition_date() <= &to[..10])
-            });
-    }
-    filter.time_range().is_none_or(|(from, to)| {
-        artifact.partition_date().len() == 10
-            && artifact.partition_date() >= &from[..10]
-            && artifact.partition_date() <= &to[..10]
-    }) && filter
-        .account_or_project()
-        .is_none_or(|value| artifact.partition_account() == super::writer::safe_partition(value))
-        && filter
-            .region()
-            .is_none_or(|value| artifact.partition_region() == super::writer::safe_partition(value))
-}
-
 #[cfg(test)]
 mod tests;
-
-fn rules_for_artifact(
-    spec: &ScanSpec<'_>,
-    precise: bool,
-    artifact: &ParquetArtifact,
-) -> Result<Vec<Predicate>, AppError> {
-    let mut rules = Vec::new();
-    for rule in spec.predicates {
-        if let Predicate::Range("event_time", from, to) = rule {
-            let first = irmind_app::IndexedTime::from_rfc3339(from, false)
-                .map_err(|_| super::invalid_source())?
-                .instant();
-            let last = irmind_app::IndexedTime::from_rfc3339(to, false)
-                .map_err(|_| super::invalid_source())?
-                .instant();
-            rules.push(Predicate::TimeRange(first, last));
-            continue;
-        }
-        rules.push(rule.clone());
-    }
-    if precise {
-        if let Some(host) = spec.filter.host() {
-            rules.push(Predicate::Equal("scope_host", host.into()));
-        }
-        if let Some(account) = spec.filter.account_or_project() {
-            rules.push(Predicate::Equal("scope_account", account.into()));
-        }
-        if let Some(region) = spec.filter.region() {
-            rules.push(Predicate::Equal("scope_region", region.into()));
-        }
-    }
-    rules.extend(common::rules(artifact, spec.filter));
-    Ok(rules)
-}
-
-fn scope_partition_matches(
-    partition: &irmind_domain::ArtifactPartitionV2,
-    filter: &GraphQueryFilter,
-) -> bool {
-    use irmind_domain::{ScopePartitionKey as Key, ScopePartitionValue as Value};
-    [
-        (Key::Account, filter.account_or_project()),
-        (Key::Region, filter.region()),
-        (Key::Host, filter.host()),
-    ]
-    .iter()
-    .all(|(key, raw)| {
-        let Some(expected) = raw else {
-            return true;
-        };
-        let Some(scope) = partition.scopes.iter().find(|s| s.key == *key) else {
-            return true;
-        };
-        match &scope.value {
-            Value::Overflow(_) => true,
-            Value::Ordinary(value) => {
-                super::partitioning::normalize(expected).is_none_or(|n| n == *value)
-            }
-        }
-    })
-}
-
-fn required_columns<'a>(spec: &ScanSpec<'a>, precise: bool, common: bool) -> Vec<&'a str> {
-    let mut columns = spec
-        .columns
-        .iter()
-        .copied()
-        .filter(|name| common || !self::common::is_extra(name))
-        .collect::<Vec<_>>();
-    columns.extend(["source_hash", "record_index", "event_time"]);
-    if precise {
-        columns.extend([
-            "submicro_nanos",
-            "time_precision",
-            "time_inferred",
-            "source_offset",
-        ]);
-    }
-    columns.sort_unstable();
-    columns.dedup();
-    columns
-}

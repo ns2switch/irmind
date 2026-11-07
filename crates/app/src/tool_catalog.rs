@@ -84,23 +84,7 @@ fn add_graph_filters(spec: &mut ToolSpec) {
     let Some(properties) = spec.parameters["properties"].as_object_mut() else {
         return;
     };
-    let kinds = irmind_domain::ObservedEntityKind::ALL
-        .iter()
-        .map(|kind| kind.as_str())
-        .chain([
-            "identity",
-            "principal",
-            "user_agent",
-            "event_id",
-            "uid",
-            "finding",
-        ])
-        .collect::<std::collections::BTreeSet<_>>();
-    for key in ["kind", "from_kind", "to_kind"] {
-        if let Some(field) = properties.get_mut(key) {
-            field["enum"] = json!(kinds);
-        }
-    }
+    add_entity_kinds(properties);
     for (name, description) in [
         (
             "from",
@@ -161,6 +145,26 @@ fn add_graph_filters(spec: &mut ToolSpec) {
             schema["enum"] = json!(choices);
         }
         properties.insert(name.into(), schema);
+    }
+}
+
+fn add_entity_kinds(properties: &mut serde_json::Map<String, Value>) {
+    let kinds = irmind_domain::ObservedEntityKind::ALL
+        .iter()
+        .map(|kind| kind.as_str())
+        .chain([
+            "identity",
+            "principal",
+            "user_agent",
+            "event_id",
+            "uid",
+            "finding",
+        ])
+        .collect::<std::collections::BTreeSet<_>>();
+    for key in ["kind", "from_kind", "to_kind"] {
+        if let Some(field) = properties.get_mut(key) {
+            field["enum"] = json!(kinds);
+        }
     }
 }
 
