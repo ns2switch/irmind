@@ -104,3 +104,96 @@ fn cancellation_stops_before_consuming_input() {
             .parse_reader_report("eve.jsonl", &mut input, [8; 32], &cancel, &mut |_| Ok(()));
     assert!(matches!(result, Err(AppError::Cancelled)));
 }
+
+#[test]
+fn oversized_whitespace_first_lines_are_counted_without_losing_later_records()
+-> Result<(), AppError> {
+    use std::io::Read as _;
+    for mib in [5_u64, 50, 200] {
+        let mut reader = std::io::repeat(b' ')
+            .take(mib * 1024 * 1024)
+            .chain(std::io::Cursor::new(b"\n"))
+            .chain(std::io::Cursor::new(EVE));
+        let mut indexes = Vec::new();
+        let report = SuricataParser.parse_reader_report(
+            "source.log",
+            &mut reader,
+            [6; 32],
+            &CancellationToken::new(),
+            &mut |record| {
+                record.inspect(|row| indexes.push(row.index));
+                Ok(())
+            },
+        )?;
+        assert_eq!(report.rejected, 1);
+        assert_eq!(indexes[0], 1);
+        assert!(report.accepted > 0);
+    }
+    Ok(())
+}
+
+#[test]
+#[allow(clippy::unwrap_used)]
+fn indexed_events_keep_microseconds_and_request_host_partitioning() -> Result<(), AppError> {
+    let parser = SuricataParser;
+    assert_eq!(
+        parser.source_parallelism("source.log")?,
+        irmind_app::SourceParallelism::Concurrent
+    );
+    let mut count = 0;
+    parser.parse_indexed_reader_report(
+        "source.log",
+        &mut std::io::Cursor::new(EVE),
+        [7; 32],
+        &CancellationToken::new(),
+        &mut |record| {
+            record.inspect(|row| {
+                let time = row.time.as_ref().unwrap();
+                assert_eq!(time.precision(), irmind_app::TimePrecision::Microsecond);
+                assert_ne!(time.instant().unix_micros().rem_euclid(1_000_000), 0);
+                assert_eq!(
+                    parser.partition_profile(&row.record),
+                    irmind_app::PartitionProfile::EndpointHost
+                );
+                count += 1;
+            });
+            assert!(record.provenance().parser_location().is_some());
+            Ok(())
+        },
+    )?;
+    assert!(count > 0);
+    Ok(())
+}
+
+#[test]
+fn shared_streaming_contract() -> Result<(), AppError> {
+    irmind_testkit::run_log_parser_contract(&SuricataParser, "source.log", EVE, 2)
+}
+
+#[test]
+fn escaped_json_strings_are_valid_bounded_data() -> Result<(), AppError> {
+    let mut value: serde_json::Value =
+        serde_json::from_slice(EVE.split(|b| *b == b'\n').next().unwrap_or(EVE))
+            .map_err(|_| AppError::Policy("invalid fixture".into()))?;
+    value["host"] = serde_json::Value::String("synthetic \"quoted\"".into());
+    let bytes =
+        serde_json::to_vec(&value).map_err(|_| AppError::Policy("invalid fixture".into()))?;
+    let (report, rows) = records(&bytes)?;
+    assert_eq!(report.accepted, 1);
+    assert_eq!(report.rejected, 0);
+    assert!(!rows.is_empty());
+    Ok(())
+}
+
+#[test]
+fn explicitly_zero_microseconds_are_not_downgraded() -> Result<(), AppError> {
+    let input =
+        br#"{"timestamp":"2026-10-23T00:00:00.000000+0000","flow_id":1,"event_type":"flow"}"#;
+    let (_, rows) = records(input)?;
+    assert!(rows[0].at.ends_with(".000000Z"));
+    assert_eq!(
+        irmind_app::indexed_rfc3339(&rows[0].at, false, false)?.precision(),
+        irmind_app::TimePrecision::Microsecond
+    );
+    Ok(())
+}

@@ -124,12 +124,13 @@ Read [security-model.md](docs/security-model.md) before connecting a provider.
 ## Roadmap
 
 - **v0.1.x:** Stabilize the pre-release, validate a model and connector, and add native platform signing.
-- **v0.2:** Add modular log parsers and structured-query SIEM connectors.
-- **v0.3:** Add signed, progressively loaded forensic skills.
-- **v0.4:** Add bounded parallel subagents and streamed engine events.
+- **v0.2:** Add modular log parsers, precise V2 artifacts and optional precision migration.
+- **v0.3:** Add the typed common event schema and structured-query SIEM connectors.
+- **v0.4:** Add signed, progressively loaded forensic skills.
+- **v0.5:** Add bounded parallel subagents and streamed engine events.
 - **Public launch:** Publish the demo, benchmark, and initial community skills catalog.
-- **v0.5:** Add budgeted source-side cloud queries.
-- **v0.6:** Add local detections, exportable reports, controlled extensions, and a headless engine API.
+- **v0.6:** Add budgeted source-side cloud queries.
+- **v0.7:** Add local detections, exportable reports, controlled extensions, and a headless engine API.
 - **1.0:** Stabilize signed formats and complete external security and connector validation.
 
 See the [public roadmap](docs/development/roadmap.md) for scope and limits; these are intentions, not release commitments.

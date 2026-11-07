@@ -64,6 +64,34 @@ impl EventParser for SuricataParser {
 }
 
 impl StreamingEventParser for SuricataParser {
+    fn partition_profile(&self, _record: &GraphRecord) -> irmind_app::PartitionProfile {
+        irmind_app::PartitionProfile::EndpointHost
+    }
+
+    fn source_parallelism(&self, _source: &str) -> Result<irmind_app::SourceParallelism, AppError> {
+        Ok(irmind_app::SourceParallelism::Concurrent)
+    }
+
+    fn parse_indexed_reader_report(
+        &self,
+        source: &str,
+        reader: &mut dyn Read,
+        hash: [u8; 32],
+        cancel: &CancellationToken,
+        emit: &mut dyn FnMut(Tainted<irmind_app::IndexedGraphRecord>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        irmind_app::parse_indexed_report(
+            |forward| self.parse_reader_report(source, reader, hash, cancel, forward),
+            |record| {
+                Ok((
+                    Some(irmind_app::indexed_rfc3339(&record.at, false, false)?),
+                    None,
+                ))
+            },
+            emit,
+        )
+    }
+
     fn parser_name(&self) -> &'static str {
         "parser-suricata"
     }

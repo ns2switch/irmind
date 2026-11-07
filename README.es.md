@@ -102,6 +102,8 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Parser de Hayabusa | parser local | `parser-hayabusa` (por defecto) | experimental | [Hayabusa](docs/es/modules.md#parser-de-hayabusa) |
 | Parser de Chainsaw | parser local | `parser-chainsaw` (por defecto) | experimental | [Chainsaw](docs/es/modules.md#parser-de-chainsaw) |
 | Parser de plaso | parser local | `parser-plaso` (por defecto) | experimental | [plaso](docs/es/modules.md#parser-de-plaso) |
+| Zeek | Parser | `parser-zeek` | experimental | [Configuración](docs/es/modules.md#parser-de-zeek) |
+| Suricata EVE | Parser | `parser-suricata` | experimental | [Configuración](docs/es/modules.md#parser-de-suricata-eve) |
 | Parser declarativo | parser local | `parser-declarative` (por defecto) | experimental | [Formatos propios](docs/es/parsers.md) |
 | Logs de Linux | parser local | `parser-linux` (por defecto) | experimental | [Linux](docs/es/modules.md#logs-de-linux) |
 | Windows EVTX | parser local aislado | `parser-evtx` (por defecto) | experimental | [EVTX](docs/es/modules.md#windows-evtx) |
@@ -123,12 +125,13 @@ Lee [security-model.md](docs/es/security-model.md) antes de conectar un proveedo
 ## Hoja de ruta
 
 - **v0.1.x:** Estabilizar la versión preliminar, validar un modelo y un conector, y añadir firma nativa por plataforma.
-- **v0.2:** Añadir parsers modulares y conectores SIEM con consultas estructuradas.
-- **v0.3:** Añadir skills forenses firmadas y de carga progresiva.
-- **v0.4:** Añadir subagentes paralelos acotados y eventos en streaming.
+- **v0.2:** Añadir parsers modulares, artefactos V2 precisos y migración de precisión opcional.
+- **v0.3:** Añadir el esquema común tipado y conectores SIEM con consultas estructuradas.
+- **v0.4:** Añadir skills forenses firmadas y de carga progresiva.
+- **v0.5:** Añadir subagentes paralelos acotados y eventos en streaming.
 - **Lanzamiento público:** Publicar la demo, el benchmark y el catálogo inicial de skills.
-- **v0.5:** Añadir consultas en origen con presupuestos.
-- **v0.6:** Añadir detecciones locales, informes exportables, extensiones controladas y una API del motor.
+- **v0.6:** Añadir consultas en origen con presupuestos.
+- **v0.7:** Añadir detecciones locales, informes exportables, extensiones controladas y una API del motor.
 - **1.0:** Estabilizar formatos firmados y completar revisiones externas de seguridad y conectores.
 
 La [hoja de ruta pública](docs/es/roadmap.md) describe intenciones, sin compromisos de publicación.

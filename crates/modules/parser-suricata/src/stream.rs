@@ -39,15 +39,15 @@ pub(super) fn parse(
         if offset > MAX_SOURCE_BYTES {
             return Err(policy("parser source exceeds 50 GiB"));
         }
-        if line.iter().all(u8::is_ascii_whitespace) {
-            continue;
-        }
         if index >= MAX_RECORDS {
             return Err(policy("parser record limit exceeded"));
         }
         if line.len() > MAX_RECORD_BYTES || !bounded_json_shape(&line) {
             reject(&mut report, &line);
             index += 1;
+            continue;
+        }
+        if line.iter().all(u8::is_ascii_whitespace) {
             continue;
         }
         match mapping::parse(&line, index) {

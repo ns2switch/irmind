@@ -2509,8 +2509,10 @@ dependencies = [
  "irmind-mod-parser-linux",
  "irmind-mod-parser-ocsf",
  "irmind-mod-parser-plaso",
+ "irmind-mod-parser-suricata",
  "irmind-mod-parser-syslog",
  "irmind-mod-parser-velociraptor",
+ "irmind-mod-parser-zeek",
  "irmind-mod-siem-splunk",
  "irmind-mod-storage-object",
  "irmind-mod-ti-misp",
@@ -2900,6 +2902,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-parser-suricata"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "irmind-mod-parser-syslog"
 version = "0.1.0"
 dependencies = [
@@ -2919,6 +2933,17 @@ dependencies = [
  "chrono",
  "irmind-app",
  "irmind-domain",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-zeek"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
  "serde",
  "serde_json",
 ]

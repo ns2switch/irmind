@@ -383,3 +383,11 @@ The per-file record ceiling is 8,000,000 in both the decoder and the protocol va
 Consequences: Windows can process a multi-file request with one verified session without adding native capabilities. Independent concurrent AppContainers remain [separate work](https://github.com/ns2switch/irmind/issues/191). Release measurements and their scope are recorded in [benchmarks](benchmarks.md#large-security-evtx-collections).
 
 The complete ingestion host's memory is not constant in the dense-source measurements. Bounded-metadata writer work is separate from the EVTX scheduling and record-budget change and requires its own reviewed builder contract. See the [design](parquet-bounded-metadata-design.md) and [native release measurements](benchmarks.md#native-scheduling-and-eight-million-record-results). No existing signed builder is changed by this work.
+
+## Common event schema delivery
+
+Context: parsers need one validated classification and role contract before additional SIEM mappings. Decision: deliver the approved ECS 9.5-derived common schema as a reviewed core, initial native mappings and community mapping follow-ups; defer CommonEventMigrationV1. Consequences: new physical schema IDs are explicitly supported inside V2; old cases remain readable and never migrate on open. Re-ingestion into a new case is available. Smoke benchmarks use three 1 GiB repetitions; the full 15 GB matrix uses one repetition. Elastic and Chronicle follow the core. Skills, subagents and later releases shift to the public roadmap's new numbering.
+
+## Preserve unmerged parser work
+
+Before deleting a branch, confirm that its PR is merged and check its ancestry with Git’s merge-base ancestor check. An open or closed-unmerged PR is not grounds for deletion. If rebasing changed commit identities and ancestry is not established, retain the branch until its integration can be reconciled; never discard unmerged work silently.

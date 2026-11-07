@@ -25,12 +25,23 @@ Syslog y las exportaciones de Linux están disponibles como módulos experimenta
 
 - Ampliar el registro de detección: cada parser es un módulo Cargo que se activa cuando reconoce el log. Una coincidencia ambigua requiere que el analista elija; una elección forzada queda auditada.
 - Añadir parsers experimentales de EVTX; syslog; autenticación, auditd, journald, nginx y Apache en Linux; ECS; OCSF; Velociraptor; Hayabusa; Chainsaw; plaso; EZTools; Zeek; Suricata EVE; y un formato declarativo definido por el usuario.
-- Añadir conectores experimentales `siem-elastic` y `siem-chronicle`, con consultas estructuradas, permisos mínimos de lectura, contratos sintéticos y evidencia firmada.
 - Mantener los formatos restantes como [issues de entrada](https://github.com/ns2switch/irmind/issues?q=is%3Aissue+label%3A%22good+first+issue%22).
 
 Los artefactos binarios de Windows (registro, `$MFT`, Prefetch, LNK, SRUM y Amcache) se cubren mediante las exportaciones procesadas de EZTools, Velociraptor y plaso. Consulta [la cobertura actual de Windows](parsers.md#cobertura-de-windows) para los formatos admitidos. Los [futuros parsers nativos de registro y `$MFT`](https://github.com/ns2switch/irmind/issues/159) dependerán de la demanda y deberán seguir el mismo modelo de proceso auxiliar aislado aprobado para EVTX, sin incorporar decodificadores binarios al proceso principal.
 
-## v0.3: skills forenses
+Zeek y Suricata no se distribuyeron en v0.1.x. Los módulos recuperados conservan microsegundos y usan particiones por host en V2. La migración de precisión V1 → V2 es explícita y opcional; abrir un caso no lo migra.
+
+## v0.3: Esquema común de eventos y conectores SIEM
+
+Adoptar el [esquema común tipado](https://github.com/ns2switch/irmind/blob/6dfa5ef620f044892dbf1cfac9f27d5ffed22bbb/docs/development/common-event-schema.md) y mapear a él los resultados de los conectores SIEM de lectura.
+
+- Núcleo: tipos de dominio validados, códigos golden, entidades con rol y columnas Parquet tipadas dentro del sobre V2 ampliado. Las herramientas, la verificación y la exportación V5 leen los esquemas nuevos. Los parsers aún sin mapear emiten eventos válidos sin clasificar.
+- Primeros mapeos: EVTX, autenticación/auditd de Linux, CloudTrail, ECS, OCSF, Zeek y Suricata, con pruebas de roles, resultados y reutilización de PID.
+- Mapeos de comunidad: DFIR, syslog, journald, nginx/Apache y declarativo. Los casos existentes se leen sin migrar; se aplaza la migración semántica. La alternativa es reingerir originales verificados en un caso nuevo.
+- Elastic y Chronicle llegan después del núcleo, con consultas estructuradas, credenciales revisadas, contratos sintéticos y evidencia firmada.
+- Smoke de 1 GiB con tres repeticiones por fuente representativa y matriz completa de 15 GB con una repetición, en release y en la misma clase de runner, sin relajar objetivos.
+
+## v0.4: skills forenses
 
 - Aprobar `docs/development/skills-design.md` antes de implementar: formato, carga progresiva, instalación firmada, confianza y relación con la política.
 - Una skill es una carpeta con `SKILL.md` que describe una metodología, más plantillas de consulta, reglas Sigma o mapeos opcionales. Los métodos iniciales también cubren ransomware en Windows, persistencia en Linux y BEC en M365.
@@ -40,7 +51,7 @@ Los artefactos binarios de Windows (registro, `$MFT`, Prefetch, LNK, SRUM y Amca
 - La instalación se firma y el caso registra el hash de la versión usada. Una skill declara herramientas necesarias, pero no amplía permisos. El contenido de terceros sigue sin ser de confianza hasta que lo firma el analista.
 - `/skills` permite listar, instalar, inspeccionar y deshabilitar. Las skills invocables aparecen como comandos. El catálogo comunitario vive en otro repositorio.
 
-## v0.4: subagentes y trabajo paralelo
+## v0.5: subagentes y trabajo paralelo
 
 - Aprobar `docs/development/subagents-design.md` antes de implementar: tipos, límites, clave Agent, aprobaciones, ramas de eventos y fusión determinista.
 - El agente principal delega tareas acotadas a subagentes paralelos con contexto propio. Habrá tipos de triage, nube, endpoint, red e inteligencia de amenazas, y tipos comunitarios definidos en archivo.
@@ -50,13 +61,13 @@ Los artefactos binarios de Windows (registro, `$MFT`, Prefetch, LNK, SRUM y Amca
 
 ## Lanzamiento público
 
-Publicar un artículo, un vídeo de demostración con datos sintéticos, publicaciones comunitarias, un benchmark público de modelos con HuntEval y un catálogo inicial de skills. El lanzamiento sigue a v0.4 e incluye el repositorio comunitario de skills.
+Publicar un artículo, un vídeo de demostración con datos sintéticos, publicaciones comunitarias, un benchmark público de modelos con HuntEval y un catálogo inicial de skills. El lanzamiento sigue a v0.5 e incluye el repositorio comunitario de skills.
 
-## v0.5: consultas en origen
+## v0.6: consultas en origen
 
 Consultas estructuradas y con presupuesto en Athena, CloudTrail Lake, Security Lake, BigQuery, Cloud Logging Log Analytics, Azure Data Explorer y Azure Log Analytics. Los resultados se firman y las fuentes originales en la nube se pueden volver a verificar tras sellar. Consulta el [diseño](../development/cloud-query-design.md).
 
-## v0.6: detección, informes, extensibilidad y API del motor
+## v0.7: detección, informes, extensibilidad y API del motor
 
 - Ejecutar reglas Sigma sobre Parquet local sin LLM.
 - Exportar informes Markdown y PDF que citan solo evidencia confirmada.

@@ -1,43 +1,45 @@
-use chrono::{DateTime, SecondsFormat, Utc};
 use irmind_app::{AppError, GraphRecord, GraphRelation};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
 #[derive(Deserialize)]
 struct JsonRow<'a> {
-    ts: Option<serde_json::Number>,
     #[serde(borrow)]
-    uid: Option<&'a str>,
+    ts: Option<&'a serde_json::value::RawValue>,
+    #[serde(borrow)]
+    uid: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow, rename = "id.orig_h")]
-    orig_h: Option<&'a str>,
+    orig_h: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow, rename = "id.resp_h")]
-    resp_h: Option<&'a str>,
+    resp_h: Option<std::borrow::Cow<'a, str>>,
     #[serde(rename = "id.orig_p")]
     orig_p: Option<serde_json::Number>,
     #[serde(rename = "id.resp_p")]
     resp_p: Option<serde_json::Number>,
     #[serde(borrow)]
-    query: Option<&'a str>,
+    query: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow)]
-    host: Option<&'a str>,
+    host: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow)]
-    method: Option<&'a str>,
+    method: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow)]
-    uri: Option<&'a str>,
+    sensor_host: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow)]
-    server_name: Option<&'a str>,
+    uri: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow)]
-    fuid: Option<&'a str>,
+    server_name: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow)]
-    filename: Option<&'a str>,
+    fuid: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow)]
-    fingerprint: Option<&'a str>,
+    filename: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow)]
-    note: Option<&'a str>,
+    fingerprint: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow)]
-    name: Option<&'a str>,
+    note: Option<std::borrow::Cow<'a, str>>,
     #[serde(borrow)]
-    user_agent: Option<&'a str>,
+    name: Option<std::borrow::Cow<'a, str>>,
+    #[serde(borrow)]
+    user_agent: Option<std::borrow::Cow<'a, str>>,
 }
 
 #[derive(Default)]
@@ -75,30 +77,37 @@ pub(super) fn detect_json(sample: &[u8]) -> Option<u8> {
 
 pub(super) fn from_json(source: &str, line: &[u8], index: usize) -> Result<GraphRecord, AppError> {
     let row: JsonRow<'_> = serde_json::from_slice(line).map_err(|_| bad())?;
-    let at = epoch_to_utc(&row.ts.as_ref().ok_or_else(bad)?.to_string())?;
+    let at = epoch_to_utc(row.ts.ok_or_else(bad)?.get())?;
     let kind = infer_kind(source, &row);
     let orig_p = row.orig_p.as_ref().map(ToString::to_string);
     let resp_p = row.resp_p.as_ref().map(ToString::to_string);
     let fields = Fields {
-        uid: row.uid,
-        orig_h: row.orig_h,
-        resp_h: row.resp_h,
+        uid: row.uid.as_deref(),
+        orig_h: row.orig_h.as_deref(),
+        resp_h: row.resp_h.as_deref(),
         orig_p: orig_p.as_deref(),
         resp_p: resp_p.as_deref(),
-        query: row.query,
-        host: row.host,
-        server_name: row.server_name,
-        fuid: row.fuid,
-        filename: row.filename,
-        fingerprint: row.fingerprint,
-        note: row.note,
-        name: row.name,
-        user_agent: row.user_agent,
+        query: row.query.as_deref().or(row.host.as_deref()),
+        host: row.sensor_host.as_deref(),
+        server_name: row.server_name.as_deref(),
+        fuid: row.fuid.as_deref(),
+        filename: row.filename.as_deref(),
+        fingerprint: row.fingerprint.as_deref(),
+        note: row.note.as_deref(),
+        name: row.name.as_deref(),
+        user_agent: row.user_agent.as_deref(),
     };
-    let text = std::str::from_utf8(line)
-        .map_err(|_| bad())?
-        .trim_end()
-        .to_owned();
+    let raw = std::str::from_utf8(line).map_err(|_| bad())?.trim_end();
+    let normalized = BTreeMap::from([
+        (
+            "host",
+            row.sensor_host
+                .as_deref()
+                .map_or(serde_json::Value::Null, Into::into),
+        ),
+        ("raw", serde_json::Value::String(raw.into())),
+    ]);
+    let text = serde_json::to_string(&normalized).map_err(|_| bad())?;
     Ok(build_record(index, at, kind, text, &fields))
 }
 
@@ -133,7 +142,7 @@ pub(super) fn from_tsv(
         orig_p: field("id.orig_p"),
         resp_p: field("id.resp_p"),
         query: field("query"),
-        host: field("host"),
+        host: field("sensor_host"),
         server_name: field("server_name"),
         fuid: field("fuid"),
         filename: field("filename"),
@@ -146,6 +155,12 @@ pub(super) fn from_tsv(
         .iter()
         .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
         .collect::<BTreeMap<_, _>>();
+    if let Some(http_host) = normalized.remove("host") {
+        normalized.insert("http_host".into(), http_host);
+    }
+    if let Some(host) = field("sensor_host") {
+        normalized.insert("host".into(), host.into());
+    }
     normalized.insert("provider".into(), "zeek".into());
     normalized.insert("log_type".into(), path.into());
     normalized.insert("source_timestamp".into(), raw_time.into());
@@ -185,24 +200,9 @@ fn infer_kind<'a>(source: &'a str, row: &JsonRow<'_>) -> &'a str {
 }
 
 fn epoch_to_utc(raw: &str) -> Result<String, AppError> {
-    let (seconds, fraction) = raw.split_once('.').unwrap_or((raw, ""));
-    if seconds.is_empty()
-        || !seconds.bytes().all(|byte| byte.is_ascii_digit())
-        || fraction.len() > 9
-        || !fraction.bytes().all(|byte| byte.is_ascii_digit())
-    {
-        return Err(bad());
-    }
-    let seconds = seconds.parse::<i64>().map_err(|_| bad())?;
-    let nanos = if fraction.is_empty() {
-        0
-    } else {
-        let mut padded = fraction.to_owned();
-        padded.extend(std::iter::repeat_n('0', 9 - fraction.len()));
-        padded.parse::<u32>().map_err(|_| bad())?
-    };
-    let at = DateTime::<Utc>::from_timestamp(seconds, nanos).ok_or_else(bad)?;
-    Ok(at.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+    irmind_app::IndexedTime::from_epoch_decimal(raw, false)
+        .map(irmind_app::IndexedTime::to_rfc3339)
+        .map_err(|_| bad())
 }
 
 fn build_record(
