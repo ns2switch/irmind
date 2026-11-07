@@ -1,6 +1,6 @@
 # Legacy peers in common co-observations
 
-This proposal is for evidence-store maintainers reviewing the new common schemas. It concerns only the unmerged `irmind-coobservations-v3` implementation; it does not change historical V1/V2 artifacts.
+This design is for evidence-store maintainers reviewing the new common schemas. It concerns only `irmind-coobservations-v3`; it does not change historical V1/V2 artifacts.
 
 ## Measured duplication
 
@@ -8,7 +8,7 @@ The [initial paired release run](benchmarks/common-core-initial-run.json) ingest
 
 This candidate took 1,374.256 seconds against the unchanged 900-second ingestion gate. The matched baseline also missed that gate at 947.159 seconds. Candidate cloud entity lookup reached its deadline in all five samples. The other completed pairs and failures remain in the results; these measurements do not establish a complete matrix or a default-writer gate.
 
-## Proposed representation
+## Adopted representation
 
 - Keep the physical columns, V2 envelope, logical common-event encoding, code table, seal and V5 framing.
 - Keep every role-free `(kind, value)` pair in `co_entities`.
@@ -20,7 +20,7 @@ This removes a redundant encoding, not evidence or a permission check. The measu
 
 ## Compatibility and validation
 
-The new common physical goldens would change. Historical goldens, parser output, logical common JSON and code-table goldens stay frozen. The common builder has not shipped in a release or been enabled in normal ingestion. The proposal is not implemented by the current writer.
+Only the new common co-observation physical goldens change. Historical goldens, parser output, logical common JSON and code-table goldens stay frozen. The common builder has not shipped in a release or been enabled in normal ingestion. Both the initial complete descriptor lists and the new sparse lists remain readable. Reconstruction for the reviewed common builder uses the sparse representation.
 
 Required tests compare the complete logical peer sets before/after encoding for legacy-only records, mixed typed/legacy records, same-value roles, namespace collisions and PID reuse. Retain field/role validation, event deduplication, the 4,096-record sample, neighbor/hop/expansion/deadline limits, partial markers, hash-before-read, cancellation and rollback. Verify exact reconstruction and V5 exports. Repeat the three-repetition 1 GiB smoke and full 15 GB matrix with unchanged gates before changing a default.
 

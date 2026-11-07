@@ -1,7 +1,7 @@
 //! Store each peer vector once in the unsigned normalized spool. Recreate its
 //! JSON cache before memory accounting and before any physical batch is built.
-use super::row::{CommonRow, ObservationRow};
-use crate::parquet_store::{AppError, storage};
+use super::row::{CommonRow, ObservationRow, typed_peers};
+use crate::parquet_store::AppError;
 
 #[derive(serde::Deserialize)]
 pub(super) struct StoredCommonRow {
@@ -16,7 +16,7 @@ pub(super) struct StoredCommonRow {
 impl TryFrom<StoredCommonRow> for CommonRow {
     type Error = AppError;
     fn try_from(value: StoredCommonRow) -> Result<Self, Self::Error> {
-        let co_observations = serde_json::to_string(&value.observations).map_err(storage)?;
+        let co_observations = typed_peers(&value.observations)?;
         Ok(Self {
             payload: value.payload,
             categories: value.categories,

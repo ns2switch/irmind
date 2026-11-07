@@ -1,7 +1,8 @@
-use super::{Node, Peer};
+use super::Node;
+use super::peers::read_peers;
 use crate::parquet_store::query::{MAX_NEIGHBOR_RECORDS, QueryStore, number, text, time_rules};
 use crate::parquet_store::scan::{Predicate, ScanFlow, ScanSpec, ScanStatus};
-use crate::parquet_store::{AppError, invalid_source, storage};
+use crate::parquet_store::{AppError, invalid_source};
 use arrow::{
     array::{Array, UInt8Array, UInt16Array},
     record_batch::RecordBatch,
@@ -70,7 +71,7 @@ impl QueryStore<'_> {
                     }
                     let source = format!("{hash}#{index}");
                     let time = crate::parquet_store::time_cell::TimeCell::from_batch(batch, row)?;
-                    for peer in peers(batch, row)? {
+                    for peer in read_peers(batch, row)? {
                         if peer == subject || !seen.insert((peer.clone(), hash.to_owned(), index)) {
                             continue;
                         }
@@ -118,25 +119,4 @@ pub(super) fn subject(batch: &RecordBatch, row: usize) -> Result<Node, AppError>
         role.value(row),
         field.value(row),
     )
-}
-fn peers(batch: &RecordBatch, row: usize) -> Result<Vec<Node>, AppError> {
-    if batch.column_by_name("co_observations").is_some() {
-        let raw = text(batch, "co_observations", row)?;
-        if raw.len() > 64 * 1024 * 1024 {
-            return Err(invalid_source());
-        }
-        let peers: Vec<Peer<'_>> = serde_json::from_str(raw).map_err(storage)?;
-        peers.iter().map(Peer::node).collect()
-    } else {
-        let raw = text(batch, "co_entities", row)?;
-        if raw.len() > 64 * 1024 * 1024 {
-            return Err(invalid_source());
-        }
-        let peers: Vec<(std::borrow::Cow<'_, str>, std::borrow::Cow<'_, str>)> =
-            serde_json::from_str(raw).map_err(storage)?;
-        Ok(peers
-            .into_iter()
-            .map(|(kind, value)| Node::legacy(&kind, &value))
-            .collect())
-    }
 }

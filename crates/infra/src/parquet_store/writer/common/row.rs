@@ -74,7 +74,7 @@ impl CommonRow {
                 && a.role == b.role
                 && a.field == b.field
         });
-        let co_observations = serde_json::to_string(&observations).map_err(storage)?;
+        let co_observations = typed_peers(&observations)?;
         Ok(Self {
             payload: checked.encoded().to_owned(),
             categories: header.categories().bits(),
@@ -99,12 +99,24 @@ impl CommonRow {
                 .sum::<usize>()
     }
 }
+
+pub(super) fn typed_peers(observations: &[ObservationRow]) -> Result<String, AppError> {
+    let typed = observations
+        .iter()
+        .filter(|o| o.role != 0)
+        .collect::<Vec<_>>();
+    serde_json::to_string(&typed).map_err(storage)
+}
+
 impl RecordRow {
     pub(in crate::parquet_store) fn from_common(
         checked: &CheckedCommonRecord<'_>,
         hash: &EvidenceHash,
     ) -> Result<Self, AppError> {
         let record = checked.record();
+        if record.common.origin().source() != hash {
+            return Err(invalid_source());
+        }
         let mut row = Self::from_partitioned(&record.indexed, hash)?;
         let projection = CommonRow::from_record(checked)?;
         let unchanged = record.common.observations().values().is_empty()

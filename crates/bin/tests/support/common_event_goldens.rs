@@ -39,6 +39,25 @@ fn every_existing_parser_keeps_a_valid_unclassified_bridge() {
 
 #[test]
 fn common_parquet_physical_bytes_are_feature_independent() {
+    let actual = physical_fixture();
+    let expected: BTreeMap<String, serde_json::Value> =
+        serde_json::from_str(include_str!("../fixtures/formats-common-event-v1.json")).unwrap();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+#[ignore = "manual generator for the new common physical fixture"]
+fn regenerate_new_common_physical_goldens() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/formats-common-event-v1.json");
+    fs::write(
+        path,
+        serde_json::to_string_pretty(&physical_fixture()).unwrap() + "\n",
+    )
+    .unwrap();
+}
+
+fn physical_fixture() -> BTreeMap<String, serde_json::Value> {
     use irmind_app::{LocalBatchRequest, PartitionLimits};
     let root = tempfile::tempdir().unwrap();
     let bytes = br#"{"Records":[{"eventTime":"2026-11-01T00:00:00.123456789Z","eventName":"Observe","sourceIPAddress":"203.0.113.77"},{"eventName":"Unknown","userIdentity":{"userName":"alice"}}]}"#;
@@ -60,8 +79,5 @@ fn common_parquet_physical_bytes_are_feature_independent() {
             &CancellationToken::new(),
         )
         .unwrap();
-    let actual = prepared.into_iter().flat_map(|p|p.artifacts).map(|a|(a.path().to_owned(),serde_json::json!({"size":a.size(),"sha256":a.sha256().as_str(),"envelope":a.encode().unwrap()}))).collect::<BTreeMap<_,_>>();
-    let expected: BTreeMap<String, serde_json::Value> =
-        serde_json::from_str(include_str!("../fixtures/formats-common-event-v1.json")).unwrap();
-    assert_eq!(actual, expected);
+    prepared.into_iter().flat_map(|p|p.artifacts).map(|a|(a.path().to_owned(),serde_json::json!({"size":a.size(),"sha256":a.sha256().as_str(),"envelope":a.encode().unwrap()}))).collect()
 }

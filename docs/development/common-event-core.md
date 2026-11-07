@@ -26,6 +26,8 @@ The V2 envelope and export V5 framing remain unchanged. New schema identifiers a
 
 The event role mask supports filtering an event by a reported occurrence without an unbounded join. The legacy entity-pair projection remains available; it does not replace role-bearing observations. Roles label occurrences, not extra global nodes or directed attack edges.
 
+`co_observations` stores typed descriptors only. Role-free pairs remain in `co_entities`; the reader combines them while suppressing an unspecified duplicate of an explicitly typed `(kind, value)` key. It also accepts complete descriptor lists. Invalid descriptors fail validation before any legacy merge. Same-value roles, scoped identities and PID lifetimes keep their original meanings. See the [peer-layout design](common-event-peer-layout.md).
+
 Unknown codes, incompatible column types and schema/builder metadata mismatches fail validation. New envelope and payload goldens supplement historical fixtures; historical bytes are unchanged. Hash verification still precedes each Parquet read. Compaction and consolidation retain the validated common-schema file metadata; record batches alone do not carry that file metadata. Reconstruction chooses the builder recorded in the signed artifact and reproduces the complete artifact set.
 
 V5 verification checks the common physical columns and file metadata after authenticating each derived frame's complete hash. A bounded file-range reader exposes only that frame to the Parquet reader; it neither extracts evidence to temporary storage nor reads neighboring frames. The direct `bytes` dependency supplies the return type required by Parquet's `ChunkReader` interface. The package is already present in the lockfile; no new package or feature is introduced.
@@ -58,4 +60,4 @@ Format tests exercise every closed context-field type and all identity-scope enc
 
 The manual graph benchmark supports a paired common-schema run against a pinned baseline: three smoke repetitions for representative cloud and endpoint sources, then one 15 GB pass per cloud/endpoint scenario on the same runner class. Builds use release optimization. The existing ingestion/query gates are unchanged. The bridge benchmark measures the core; it does not claim the cost or classification coverage of future source-specific mappings.
 
-The [initial measured iteration](benchmarks.md#common-schema-core-initial-iteration) misses the existing gates. The writer remains opt-in. The [legacy-peer layout proposal](common-event-peer-layout.md) addresses a measured source of duplication without changing the logical observations or historical layouts.
+The [initial measured iteration](benchmarks.md#common-schema-core-initial-iteration) misses the existing gates. The writer remains opt-in. The adopted sparse peer layout addresses a measured source of duplication without changing the logical observations or historical layouts. The full matrix must be repeated for this representation.

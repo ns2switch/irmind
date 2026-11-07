@@ -112,3 +112,36 @@ fn parquet_bytes(batch: &arrow::record_batch::RecordBatch) -> Vec<u8> {
     writer.close().unwrap();
     bytes
 }
+
+#[test]
+fn common_origin_is_bound_to_the_verified_file_identity() {
+    let row = row();
+    let common = decode_common_event(&row.common.as_ref().unwrap().payload).unwrap();
+    let record = CommonGraphRecord {
+        common,
+        indexed: IndexedGraphRecord {
+            record: GraphRecord {
+                index: usize::try_from(row.index).unwrap(),
+                at: row.at,
+                event: row.event,
+                text: row.text,
+                entities: row.entity_pairs,
+                relations: Vec::new(),
+            },
+            time: row.time,
+            source_offset: row.source_offset,
+        },
+    };
+    let identity = ParserIdentity {
+        name: "parser-test",
+        version: "test-v1",
+    };
+    let checked = check_common_record(
+        &record,
+        &Provenance::new([0xab; 32], Some(7), SourceKind::File),
+        identity,
+    )
+    .unwrap();
+    let other = EvidenceHash::parse(&"cd".repeat(32)).unwrap();
+    assert!(RecordRow::from_common(&checked, &other).is_err());
+}
