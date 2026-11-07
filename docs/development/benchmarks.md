@@ -697,3 +697,38 @@ The compact fixture uses valid, minimal Security event fields and 128 records pe
 | Compact Security, 8,000,000 records | 8,000,000 | 183.048 s | 21.34 | 621.36 | 3.05 |
 
 The single near-4 GiB source fits the unchanged 8 GiB output budget and 600-second decoder deadline. The compact cases keep one date and host partition. Decoder memory is stable in these measurements; complete-host memory is not constant. The [bounded-metadata design](parquet-bounded-metadata-design.md) proposes profiling and a separately versioned, bounded-segment writer without changing existing signed generations. It is not implemented in these figures.
+
+#### Native scheduling and eight-million-record results
+
+[Release run](https://github.com/ns2switch/irmind/actions/runs/42353376005), source `341c7184cb525d87ecc6c90e089cd0d796d1a681`. Both native jobs passed: Linux in 21 min 12 s and Windows in 23 min 35 s, including compilation, corpus creation, verification and the independent negative probe. This is a new runner execution, not a controlled before/after optimization comparison.
+
+Every collection uses `batch_files=4`. The four-source cases are one application request. Single-file cases are distinct and validate the complete source. Windows uses one network witness per collection's parser session. All counts are verified through signed V2 ingestion, chain/artifact verification and the graph summary.
+
+| Platform | Security corpus | Records verified | Ingestion | MiB/s | Host peak MiB | Decoder peak MiB | Witnesses |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Linux | 100 MiB | 102,400 | 6.573 s | 15.22 | 92.04 | 3.17 | 0 |
+| Linux | 1 GiB, four files | 1,048,576 | 63.111 s | 16.23 | 213.54 | 3.42 | 0 |
+| Linux | 1 GiB, one file | 1,048,576 | 65.010 s | 15.75 | 244.91 | 3.19 | 0 |
+| Linux | near 4 GiB, one file | 4,194,240 | 258.868 s | 15.82 | 749.23 | 3.28 | 0 |
+| Windows | 100 MiB | 102,400 | 9.460 s | 10.57 | 73.18 | 5.74 | 1 |
+| Windows | 1 GiB, four files | 1,048,576 | 76.852 s | 13.32 | 91.23 | 6.03 | 1 |
+| Windows | 1 GiB, one file | 1,048,576 | 75.889 s | 13.49 | 154.97 | 5.95 | 1 |
+
+The Linux near-4 GiB source is the maximum aligned EVTX size, 4,294,905,856 bytes. It verifies 18 artifacts and 20 signed entries. Both four-file 1 GiB cases verify 15 artifacts and 20 signed entries; both single-file 1 GiB cases verify six artifacts and eight entries. None reaches its record, frame, output-byte or 600-second invocation limit. The measured whole-ingestion times of the single-file cases are also below 600 seconds. Acceptance applies to these versioned synthetic fixtures, not every Windows template or possible expansion ratio.
+
+The compact corpus holds host/date cardinality constant while increasing record count:
+
+| Platform | Records verified | Ingestion | MiB/s | Host peak MiB | Decoder peak MiB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Linux | 204,800 | 9.677 s | 10.33 | 80.38 | 3.20 |
+| Linux | 2,097,152 | 100.843 s | 10.15 | 234.65 | 3.18 |
+| Linux | 8,000,000 | 383.448 s | 10.19 | 690.90 | 3.21 |
+| Windows | 204,800 | 11.908 s | 8.40 | 74.13 | 5.39 |
+| Windows | 2,097,152 | 123.741 s | 8.28 | 176.45 | 5.83 |
+| Windows | 8,000,000 | 462.807 s | 8.44 | 465.57 | 5.87 |
+
+Both 8,000,000-record sources complete with three artifacts and five signed entries. Decoder memory remains approximately stable; the complete host's memory grows, so these measurements do not close a constant-host-memory criterion. [Bounded Parquet metadata](parquet-bounded-metadata-design.md) is separate work, with a reviewed builder contract required before implementation. This EVTX change does not implement it or change existing builder identities.
+
+The separate in-process negative probe uses 8,000,128 records and rejects at exactly 8,000,000 with no completion trailer: 70.373 s on Linux and 77.939 s on Windows. It qualifies the production library's exact record bound; it is not a contained-ingestion memory or wall-deadline measurement.
+
+Raw JSON: [Linux](https://github.com/ns2switch/irmind/actions/runs/42353376005/artifacts/13567156971), [Windows](https://github.com/ns2switch/irmind/actions/runs/42353376005/artifacts/13566834546). Sources, provisional data and native runtime directories are removed after each collection. No external model or provider is used; Windows retains its approved local network-witness positive controls.
