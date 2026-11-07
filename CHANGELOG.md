@@ -4,6 +4,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Add experimental Zeek TSV/JSON and Suricata EVE parser modules with bounded detection, exact indexed timestamps, endpoint-host partitions, source provenance and unconfirmed source detections. They are available after this change; v0.1.x did not ship these modules.
+
 - Add an experimental, separately contained EVTX decoding helper with bounded output, precise timestamps and file-offset provenance. Linux uses Landlock and seccomp; macOS and Windows require their native sandbox to pass a startup probe.
 
 ## 0.1.6 — Complete bounded JSON ingestion

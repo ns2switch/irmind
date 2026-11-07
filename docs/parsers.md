@@ -17,6 +17,8 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | ECS | NDJSON | ECS version and timestamp/characteristic fields | Event, host, user, source, destination, process, file, URL | experimental |
 | OCSF | JSON/NDJSON or local Parquet | Class, category and schema metadata; Parquet needs confirmation | Authentication, API, network, process, file and findings | experimental |
 | DFIR tools | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Format markers or exact CSV headers | Time, host, user, process, action and available entities | experimental |
+| Zeek | TSV headers or JSON for conn, dns, http, ssl, files, x509, notice and weird | Bounded header/field match; 95 for conn/DNS fixtures | Precise V2 time, source/destination endpoints, UID correlation, explicit sensor host | experimental |
+| Suricata EVE | alert, flow, dns, http, tls, fileinfo and anomaly JSONL | Supported event type, timestamp and flow ID; 95 | Precise V2 time, flow correlation, endpoints, unconfirmed detections and explicit host | experimental |
 | Declarative | CSV, JSON, NDJSON or bounded regex | Exact header, required JSON pointers or sample regex; at most 70% | Explicit mapping described below | experimental |
 
 ## Current readers and existing cases
@@ -40,7 +42,7 @@ Use processed exports to investigate these artifacts today. All listed modules a
 
 For these artifacts, another supported route is a timestamped Velociraptor JSONL artifact result through `parser-velociraptor`, or a plaso `psort` `json_line` export through `parser-plaso`. Export schemas must match the [module contracts](modules.md#velociraptor-parser): arbitrary collector output is not automatically supported. EZTools detection requires the exact recognized column names and a usable timestamp; unmapped fields remain in the record. Start with event timelines, then correlate execution, persistence, lateral movement and possible exfiltration rather than treating one artifact as proof.
 
-[KAPE targets and modules](https://github.com/EricZimmerman/KapeFiles), [EZTools](https://ericzimmerman.github.io/) and [Velociraptor artifacts](https://docs.velociraptor.app/docs/artifacts/) describe collection and external processing. Keep originals and select the processed export files for ingestion. Native registry and `$MFT` parsing remain demand-driven future work under the isolated-helper model used in the [roadmap](development/roadmap.md#v02-parsers-and-connectors). [A Volatility 3 JSON parser](https://github.com/ns2switch/irmind/issues/158) is planned; direct memory-image parsing is not available.
+[KAPE targets and modules](https://github.com/EricZimmerman/KapeFiles), [EZTools](https://ericzimmerman.github.io/) and [Velociraptor artifacts](https://docs.velociraptor.app/docs/artifacts/) describe collection and external processing. Keep originals and select the processed export files for ingestion. Native registry and `$MFT` parsing remain demand-driven future work under the isolated-helper model used in the [roadmap](development/roadmap.md#v02-parsers-and-precise-evidence-artifacts). [A Volatility 3 JSON parser](https://github.com/ns2switch/irmind/issues/158) is planned; direct memory-image parsing is not available.
 
 ## A custom format without Rust
 
@@ -88,3 +90,7 @@ Security, System, PowerShell and Sysmon events map to the common schema. Unmappe
 Tested native environments: Ubuntu 22.04 and 24.04, Debian 12 (kernel 6.1), macOS 26.6.2 arm64 and Windows Server 2025. Fedora 44 was tested as container userspace only. Windows 10/11 clients remain experimental and unconfirmed; see the [Windows 11 validation issue](https://github.com/ns2switch/irmind/issues/189) and the [exact platform evidence](development/evtx-helper-validation.md). Runtime isolation checks must pass on each installation.
 
 For a source build, build the main executable normally, set `CARGO_TARGET_DIR` to `target` in your shell and run `cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked` from the repository root. Use the same target directory for both workspace builds. Keep `irmind-evtx` (or `irmind-evtx.exe`) beside the main executable. The automatic native self-test decides availability; installing a helper never bypasses it.
+
+### Network exports
+
+Zeek and Suricata are experimental modules compiled by default. Artifact V2 preserves subsecond time and uses the endpoint-host partition profile. Zeek's explicit `sensor_host` supplies the collector host; its HTTP `host` remains a domain. A missing sensor host is never inferred from an IP or filename. Correlation IDs are source observations, not confirmed attack paths. See [Zeek](modules.md#zeek-parser) and [Suricata](modules.md#suricata-eve-parser) for supported records and limits. Both readers count oversized lines, retain bounded rejected samples and continue with subsequent well-framed records.

@@ -241,3 +241,15 @@ Para ingerir auth.log/secure, auditd, journald JSON o exportaciones nginx/Apache
 ## Windows EVTX
 
 El módulo experimental `parser-evtx` se compila por defecto, pero requiere el auxiliar de la misma versión y un aislamiento nativo operativo. No utiliza credenciales ni red. Ingiere archivos EVTX o directorios con el registro habitual. Consulta [Windows EVTX](parsers.md#windows-evtx) para conocer canales, precisión temporal, límites y requisitos.
+
+## Parser de Zeek
+
+Lee logs TSV de Zeek con `#path`, `#fields` y `#types`, y logs JSON de Zeek. Mapea conn, dns, http, ssl, files, x509, notice y weird; la entidad `uid` enlaza registros de distintos logs. Solo requiere lectura del archivo local. Viene compilado por defecto con `parser-zeek` y es experimental, probado solo con datos sintéticos. Los artefactos V2 conservan microsegundos y el resto en nanosegundos. La marca temporal original se conserva en el registro.
+
+Limita cada registro a 4 MiB, 1.024 campos y 64 niveles JSON, y cada fuente a diez millones de registros y 50 GiB. Cuenta los registros malformados y guarda muestras acotadas y escapadas. Solo admite el separador de campos tabulado predeterminado. El host se indexa como entidad; el esquema firmado actual particiona por fecha, cuenta y región. [Formato de Zeek](https://docs.zeek.org/en/current/tutorial/logs.html).
+
+## Parser de Suricata EVE
+
+Lee EVE JSONL para alert, flow, dns, http, tls, fileinfo y anomaly. Relaciona registros mediante `flow_id`. Una firma de alerta se conserva como hallazgo de origen sin confirmar; nunca confirma automáticamente un hallazgo del caso. Solo requiere lectura del archivo local. Viene compilado por defecto con `parser-suricata` y es experimental, probado solo con datos sintéticos.
+
+Aplica los mismos límites de tamaño, estructura JSON y recuento que Zeek. Rechaza marcas temporales sin zona explícita. Conserva en el registro local la marca original y su zona; la timeline V2 conserva la precisión fraccionaria. Un `host` explícito usa el perfil de partición por host; no se deduce a partir de direcciones de red. [Formato EVE](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).

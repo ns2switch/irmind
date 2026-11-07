@@ -112,20 +112,20 @@ pub(super) fn parse(
         if offset > MAX_SOURCE_BYTES {
             return Err(policy("parser source exceeds 50 GiB"));
         }
-        if line.iter().all(u8::is_ascii_whitespace) {
-            continue;
+        if record_index >= MAX_RECORDS {
+            return Err(policy("parser record limit exceeded"));
         }
         if line.len() > MAX_RECORD_BYTES {
             reject(&mut report, &line);
-            record_index = record_index.saturating_add(1);
+            record_index += 1;
+            continue;
+        }
+        if line.iter().all(u8::is_ascii_whitespace) {
             continue;
         }
         let tsv = *is_tsv.get_or_insert_with(|| line.starts_with(b"#"));
         if tsv && header.metadata(&line)? {
             continue;
-        }
-        if record_index >= MAX_RECORDS {
-            return Err(policy("parser record limit exceeded"));
         }
         let record = if tsv && header.ready() {
             mapping::from_tsv(

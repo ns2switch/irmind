@@ -188,3 +188,13 @@ The event-reference co-observation proposal remains a design evaluation. Its mea
 The [analyst-approved acceptance decision](decisions.md#analyst-approved-release-and-disordered-stress-gates) closes step (e): cloud and chronological ingestion remain below 900 seconds; disordered stress ingestion remains below 1,350 seconds; query targets are unchanged. Keep the 64 ordinary-host default and 1,024 hard ceiling. Co-observation references, cloud `co_entities` disk reduction and direct merge-to-writer optimization are after v0.2.0.
 
 Next, implement EVTX as an isolated official decoder helper and request dependency/distribution review before merging. Then implement experimental Elastic and Chronicle connectors, requesting review before introducing JWT dependencies or new credentials. Prepare v0.2.0 with a complete changelog, optional V1→V2 migration guidance and the existing signatures, attestations, SBOM and verified installers. Opening a case never performs an implicit migration.
+
+## Current release and common-schema sequence
+
+The [public roadmap](roadmap.md) defines the current order; earlier milestone and phase notes are historical where they differ. Finish the restored Zeek/Suricata modules and publish v0.2.0 with artifact V2, optional explicit precision migration, export V5 and the isolated EVTX helper. No schema-common implementation or new SIEM connector is part of that release.
+
+For v0.3, implement the [common event schema](https://github.com/ns2switch/irmind/blob/6dfa5ef620f044892dbf1cfac9f27d5ffed22bbb/docs/development/common-event-schema.md) in separate core and mapping changes. The core covers types, fixed codes, physical schemas, writer/readers, bounded typed filters and verify/export; unconverted parsers use an unclassified bridge. Review the core before merging it. Initial mappings cover EVTX, Linux authentication/auditd, CloudTrail, ECS, OCSF, Zeek and Suricata. Community issues cover remaining mappings. Elastic and Chronicle follow the core and still require credential/dependency review.
+
+CommonEventMigrationV1 is deferred: existing cases remain readable, with no automatic semantic migration. Re-ingest verified originals into a new case when new classifications are needed. Benchmark 1 GiB representative sources three times and the complete 15 GB matrix once, in release builds on the same runner class. Keep current targets.
+
+Skills move to v0.4, subagents to v0.5, public launch follows subagents, source-side queries move to v0.6 and detection/reports/engine API to v0.7.

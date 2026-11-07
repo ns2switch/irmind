@@ -272,20 +272,20 @@ The experimental `parser-evtx` module is compiled by default but requires the ma
 
 ## Zeek parser
 
-**Does:** Reads Zeek's tab-separated logs with `#path`, `#fields` and `#types`, and Zeek JSON logs. It maps conn, dns, http, ssl, files, x509, notice and weird records. The `uid` entity connects records from different logs. The original fractional epoch timestamp stays in the local record; the current signed Parquet timeline still indexes UTC seconds.
+**Does:** Reads Zeek's tab-separated logs with `#path`, `#fields` and `#types`, and Zeek JSON logs. It maps conn, dns, http, ssl, files, x509, notice and weird records. The `uid` entity connects records from different logs. Fractional epoch timestamps are indexed with microsecond precision and residual nanoseconds in artifact V2. The original source timestamp is retained.
 
 **Permission:** Read access to the selected export only. The parser does not run Zeek or open a network connection.
 
 **Configure:** Compiled by default with `parser-zeek`. A unique high-confidence content match selects it automatically; `/ingest` asks when detection is ambiguous. The parser and choice enter the signed source manifest.
 
-**Limits:** Experimental and validated only with synthetic data. A record is limited to 4 MiB, 1,024 fields and 64 JSON nesting levels; a source is limited to ten million records and 50 GiB. Malformed records are counted and sampled in bounded, escaped form. Only the default tab field separator is supported. The current signed partition scheme is date/account/region; host is indexed as an entity. [Zeek log format](https://docs.zeek.org/en/current/tutorial/logs.html) and [log types](https://docs.zeek.org/en/current/reference/zeekscript/log-files.html).
+**Limits:** Experimental and validated only with synthetic data. A record is limited to 4 MiB, 1,024 fields and 64 JSON nesting levels; a source is limited to ten million records and 50 GiB. Malformed records are counted and sampled in bounded, escaped form. Only the default tab field separator is supported. V2 uses the endpoint-host partition profile. An explicit `sensor_host` identifies the sensor; an HTTP `host` is a domain, not the sensor hostname. Missing hosts remain unpartitioned by host. [Zeek log format](https://docs.zeek.org/en/current/tutorial/logs.html) and [log types](https://docs.zeek.org/en/current/reference/zeekscript/log-files.html).
 
 ## Suricata EVE parser
 
-**Does:** Reads EVE JSONL for alert, flow, dns, http, tls, fileinfo and anomaly events. It links records through `flow_id`. Alert signatures are unconfirmed source findings for analyst review, never confirmed case findings. The original timestamp and offset stay in the local record; the current signed Parquet timeline indexes UTC seconds.
+**Does:** Reads EVE JSONL for alert, flow, dns, http, tls, fileinfo and anomaly events. It links records through `flow_id`. Alert signatures are unconfirmed source findings for analyst review, never confirmed case findings. The original timestamp and offset stay in the local record; artifact V2 preserves its indexed fractional precision.
 
 **Permission:** Read access to the selected export only. The parser does not run Suricata or open a network connection.
 
 **Configure:** Compiled by default with `parser-suricata`. Detection requires a supported `event_type`, a timestamp and `flow_id` in the sample; ambiguous inputs require analyst selection. The choice is signed.
 
-**Limits:** Experimental and validated only with synthetic data. It applies the same record, JSON shape, source and rejection limits as the Zeek parser. Timestamps without an explicit offset are rejected. Host is indexed as an entity within the current date/account/region partition scheme. [Suricata EVE format](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).
+**Limits:** Experimental and validated only with synthetic data. It applies the same record, JSON shape, source and rejection limits as the Zeek parser. Timestamps without an explicit offset are rejected. An explicitly supplied collector `host` uses the V2 endpoint-host partition profile; a missing host is not inferred from network addresses. [Suricata EVE format](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).

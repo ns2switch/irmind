@@ -50,12 +50,12 @@ use irmind_mod_parser_hayabusa::HayabusaParser;
 use irmind_mod_parser_ocsf::OcsfParser;
 #[cfg(feature = "parser-plaso")]
 use irmind_mod_parser_plaso::PlasoParser;
+#[cfg(feature = "parser-suricata")]
+use irmind_mod_parser_suricata::SuricataParser;
 #[cfg(feature = "parser-velociraptor")]
 use irmind_mod_parser_velociraptor::VelociraptorParser;
 #[cfg(feature = "parser-zeek")]
 use irmind_mod_parser_zeek::ZeekParser;
-#[cfg(feature = "parser-suricata")]
-use irmind_mod_parser_suricata::SuricataParser;
 
 #[cfg(any(
     feature = "storage-s3",

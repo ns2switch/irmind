@@ -500,3 +500,26 @@ fn historical_envelope_codecs_and_normalized_rows_remain_unchanged() {
         }
     }
 }
+
+#[cfg(all(feature = "parser-zeek", feature = "parser-suricata"))]
+#[test]
+fn network_normalization_is_independent_of_json_map_features() {
+    for (name, parser, bytes, expected) in [
+        (
+            "zeek",
+            &irmind_mod_parser_zeek::ZeekParser as &dyn StreamingEventParser,
+            include_bytes!("../../testkit/fixtures/parser-zeek/source/dns.jsonl").as_slice(),
+            "544f20aaadd59aa0d6391265a2ee6b46b0d2f725e4e6e5cc4003718e5e25d97e",
+        ),
+        (
+            "suricata",
+            &irmind_mod_parser_suricata::SuricataParser as &dyn StreamingEventParser,
+            include_bytes!("../../testkit/fixtures/parser-suricata/source/eve.jsonl").as_slice(),
+            "3d0c0fb9ce7281db84155bbd92d040deb39723c62e1670a81978c4e6a36afbef",
+        ),
+    ] {
+        let rows = normalized_rows(parser, "source.log", bytes, &CancellationToken::new());
+        let encoded = serde_json::to_vec(&rows).unwrap();
+        assert_eq!(hex(&sha256(&encoded)), expected, "{name}");
+    }
+}

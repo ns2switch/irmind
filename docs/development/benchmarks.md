@@ -733,7 +733,7 @@ The separate in-process negative probe uses 8,000,128 records and rejects at exa
 
 Raw JSON: [Linux](https://github.com/ns2switch/irmind/actions/runs/42353376005/artifacts/13567156971), [Windows](https://github.com/ns2switch/irmind/actions/runs/42353376005/artifacts/13566834546). Sources, provisional data and native runtime directories are removed after each collection. No external model or provider is used; Windows retains its approved local network-witness positive controls.
 
-## Experimental network parser ingest
+## Historical network parser prototype
 
 The same local release-profile, single-file harness measured the network parsers. The timed interval includes source hashing, parsing, entity extraction, Parquet conversion with co-observations, and signed custody. Fixture generation and the final explicit `verify` are excluded. These measurements are local and do not establish throughput on a standard runner.
 
@@ -742,4 +742,4 @@ The same local release-profile, single-file harness measured the network parsers
 | Zeek | TSV | 1,073,742,288 | 18.419 s | 55.59 MiB/s |
 | Suricata | EVE JSONL | 1,073,743,067 | 30.054 s | 34.07 MiB/s |
 
-Both benchmarks used one Cargo job and one test thread, with private temporary case directories removed after the run. The full fractional source timestamps remain in the original records, while the current signed Parquet index still stores seconds. [Issue #143](https://github.com/ns2switch/irmind/issues/143) tracks a versioned microsecond index and stable tie ordering; it requires an approved design before implementation.
+Both benchmarks used one Cargo job and one test thread, with private temporary case directories removed after the run. These figures belong to the unmerged pre-V2 prototype and its legacy second-resolution writer. That prototype was not distributed in v0.1.x. Current V2 qualification is recorded separately below; do not treat the old figures as current-module throughput.

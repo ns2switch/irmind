@@ -51,6 +51,11 @@ mod matrix {
     use irmind_mod_parser_plaso::PlasoParser;
     use irmind_mod_parser_velociraptor::VelociraptorParser;
 
+    #[cfg(feature = "parser-suricata")]
+    use irmind_mod_parser_suricata::SuricataParser;
+    #[cfg(feature = "parser-zeek")]
+    use irmind_mod_parser_zeek::ZeekParser;
+
     const JSON: &[u8] =
         include_bytes!("../../modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json");
     const ECS: &[u8] = include_bytes!("../../testkit/fixtures/parser-ecs/source/events.ndjson");
@@ -69,6 +74,10 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-zeek")]
+        registry.register(Box::new(ZeekParser), &ModuleConfig::new())?;
+        #[cfg(feature = "parser-suricata")]
+        registry.register(Box::new(SuricataParser), &ModuleConfig::new())?;
         registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
         registry.register(Box::new(EcsParser), &ModuleConfig::new())?;
         registry.register(Box::new(OcsfParser), &ModuleConfig::new())?;
@@ -127,6 +136,25 @@ mod matrix {
                 include_bytes!("../../testkit/fixtures/parser-linux/source/access.log").as_slice(),
                 "parser-linux",
             ),
+            #[cfg(feature = "parser-zeek")]
+            (
+                "events.log",
+                include_bytes!("../../testkit/fixtures/parser-zeek/source/events.log").as_slice(),
+                "parser-zeek",
+            ),
+            #[cfg(feature = "parser-zeek")]
+            (
+                "dns.jsonl",
+                include_bytes!("../../testkit/fixtures/parser-zeek/source/dns.jsonl").as_slice(),
+                "parser-zeek",
+            ),
+            #[cfg(feature = "parser-suricata")]
+            (
+                "eve.jsonl",
+                include_bytes!("../../testkit/fixtures/parser-suricata/source/eve.jsonl")
+                    .as_slice(),
+                "parser-suricata",
+            ),
             ("cloud.json", JSON, "parser-json"),
             ("ecs.ndjson", ECS, "parser-ecs"),
             ("ocsf.ndjson", OCSF, "parser-ocsf"),
@@ -181,31 +209,10 @@ mod matrix {
             ("parser-plaso", PlasoParser.detect(name, sample)),
             ("parser-eztools", EztoolsParser.detect(name, sample)),
         ];
-        #[cfg(feature = "parser-syslog")]
-        assert_eq!(
-            irmind_mod_parser_syslog::SyslogParser::default()
-                .detect(name, sample)
-                .map(irmind_app::ParserConfidence::value),
-            if expected == "parser-syslog" {
-                Some(95)
-            } else {
-                None
-            }
-        );
-        #[cfg(feature = "parser-linux")]
-        assert_eq!(
-            irmind_mod_parser_linux::LinuxParser::default()
-                .detect(name, sample)
-                .map(irmind_app::ParserConfidence::value),
-            if expected == "parser-linux" {
-                Some(95)
-            } else {
-                None
-            }
-        );
+        assert_additional_scores(name, sample, expected);
         let expected_scores: [Option<u8>; 8] = match expected {
             "parser-syslog" => [None; 8],
-            "parser-linux" => [
+            "parser-linux" | "parser-zeek" | "parser-suricata" => [
                 if sample.first() == Some(&b'{') {
                     Some(45)
                 } else {
@@ -240,6 +247,44 @@ mod matrix {
             }
         }
         Ok(())
+    }
+    fn assert_additional_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-syslog")]
+        assert_eq!(
+            irmind_mod_parser_syslog::SyslogParser::default()
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            if expected == "parser-syslog" {
+                Some(95)
+            } else {
+                None
+            }
+        );
+        #[cfg(feature = "parser-linux")]
+        assert_eq!(
+            irmind_mod_parser_linux::LinuxParser::default()
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            if expected == "parser-linux" {
+                Some(95)
+            } else {
+                None
+            }
+        );
+        #[cfg(feature = "parser-zeek")]
+        assert_eq!(
+            ZeekParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-zeek").then_some(95)
+        );
+        #[cfg(feature = "parser-suricata")]
+        assert_eq!(
+            SuricataParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-suricata").then_some(95)
+        );
     }
     #[cfg(feature = "parser-declarative")]
     fn custom_parsers() -> Result<Vec<std::sync::Arc<dyn LogParser>>, irmind_app::AppError> {

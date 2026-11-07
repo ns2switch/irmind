@@ -371,7 +371,10 @@ fn check_ground_truth(
 #[test]
 #[ignore = "manual 1 GiB benchmark; not part of pull-request CI"]
 #[allow(clippy::too_many_lines)]
-fn benchmark_one_gib_synthetic_ingest_per_parser() {
+fn benchmark_one_gib_synthetic_ingest_per_parser() -> Result<(), Box<dyn std::error::Error>> {
+    if cfg!(debug_assertions) {
+        return Err("benchmark requires an optimized release build".into());
+    }
     for (name, line, parser) in [
         (
             "ecs.ndjson",
@@ -496,7 +499,13 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() {
             .unwrap()
             .read(&mut sample)
             .unwrap();
-        let store = Arc::new(LocalStore::open(&root.path().join("data")).unwrap());
+        let store = Arc::new(
+            if matches!(parser.parser_name(), "parser-zeek" | "parser-suricata") {
+                LocalStore::open_precise(&root.path().join("data")).unwrap()
+            } else {
+                LocalStore::open(&root.path().join("data")).unwrap()
+            },
+        );
         let signer = Arc::new(SyntheticSigner(SigningKey::from_bytes(&[43; 32])));
         let engine = Engine::new(
             EnginePorts::new(
@@ -551,4 +560,5 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() {
         );
         assert!(engine.verify(&case.id).is_ok());
     }
+    Ok(())
 }
