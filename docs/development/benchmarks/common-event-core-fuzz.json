@@ -1,20 +1,20 @@
 {
-  "actual_runtime_seconds": 601,
-  "crashes": 0,
-  "exit_code": 0,
-  "maximum_input_bytes": 65536,
-  "metrics": {
-    "average_exec_per_sec": 38424,
-    "new_units_added": 40933,
-    "number_of_executed_units": 23092863,
-    "peak_rss_mb": 531,
-    "slowest_unit_time_sec": 0
-  },
+  "target": "canonical",
+  "source_commit": "31e57eb20f0432418704501afb75a712014839a0",
+  "sanitizer": "address",
   "platform": "linux-x86_64-gnu",
   "requested_runtime_seconds": 600,
+  "actual_runtime_seconds": 601,
   "rss_limit_mib": 1024,
-  "sanitizer": "address",
-  "source_commit": "039b41035ad36f3037a933e2c4aff79b2d35c465",
-  "target": "canonical",
+  "maximum_input_bytes": 65536,
+  "exit_code": 0,
+  "metrics": {
+    "number_of_executed_units": 20865430,
+    "average_exec_per_sec": 34717,
+    "new_units_added": 43665,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 526
+  },
+  "crashes": 0,
   "timeouts": 0
 }

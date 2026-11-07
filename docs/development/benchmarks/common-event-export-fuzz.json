@@ -1,0 +1,20 @@
+{
+  "target": "export",
+  "source_commit": "31e57eb20f0432418704501afb75a712014839a0",
+  "sanitizer": "address",
+  "platform": "linux-x86_64-gnu",
+  "requested_runtime_seconds": 600,
+  "actual_runtime_seconds": 601,
+  "rss_limit_mib": 1024,
+  "maximum_input_bytes": 262144,
+  "exit_code": 0,
+  "metrics": {
+    "number_of_executed_units": 6148019,
+    "average_exec_per_sec": 10229,
+    "new_units_added": 20957,
+    "slowest_unit_time_sec": 0,
+    "peak_rss_mb": 502
+  },
+  "crashes": 0,
+  "timeouts": 0
+}
