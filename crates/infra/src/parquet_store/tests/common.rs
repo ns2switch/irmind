@@ -197,6 +197,7 @@ fn common_queries_keep_roles_pid_scopes_and_closed_filters() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn mixed_legacy_and_common_queries_keep_old_data_and_explicit_coverage() {
     let root = tempfile::tempdir().unwrap();
     let old = ParquetStore::open(root.path()).unwrap();
