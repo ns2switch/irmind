@@ -1,0 +1,146 @@
+{
+  "results": [
+    {
+      "architecture": "x86_64",
+      "artifacts": 18,
+      "batch_files": 4,
+      "corpus_mib": 4096,
+      "decode_timeout_seconds": 600,
+      "dense_source": false,
+      "files": 1,
+      "helper_peak_bytes": 3203072,
+      "limits_reached": false,
+      "memory_method": "20 ms sampling of OS process high-water resident/working-set counters; per-process maximum, not sum",
+      "mib_per_second": 27.077006254234846,
+      "observed_children": 1,
+      "os": "Linux",
+      "parent_peak_bytes": 749375488,
+      "per_file_budgets": [
+        {
+          "expected_records": 4194240,
+          "output_budget_bytes": 8589934592,
+          "source_bytes": 4294905856
+        }
+      ],
+      "phase": "complete",
+      "profile": "release",
+      "record_limit_per_file": 8000000,
+      "records": 4194240,
+      "scope": "source hashing, contained decoding, normalization, V2 Parquet and signed custody; final full verification timed separately",
+      "seconds": 151.270098614,
+      "signed_entries": 20,
+      "single_source": true,
+      "source_bytes": 4294905856,
+      "startup_seconds": 0.504401282,
+      "verification_seconds": 1.221823385,
+      "witness_runs": 0
+    },
+    {
+      "architecture": "x86_64",
+      "artifacts": 3,
+      "batch_files": 4,
+      "corpus_mib": 100,
+      "decode_timeout_seconds": 600,
+      "dense_source": true,
+      "files": 1,
+      "helper_peak_bytes": 3264512,
+      "limits_reached": false,
+      "memory_method": "20 ms sampling of OS process high-water resident/working-set counters; per-process maximum, not sum",
+      "mib_per_second": 21.671942328071957,
+      "observed_children": 1,
+      "os": "Linux",
+      "parent_peak_bytes": 93974528,
+      "per_file_budgets": [
+        {
+          "expected_records": 204800,
+          "output_budget_bytes": 3356622848,
+          "source_bytes": 104861696
+        }
+      ],
+      "phase": "complete",
+      "profile": "release",
+      "record_limit_per_file": 8000000,
+      "records": 204800,
+      "scope": "source hashing, contained decoding, normalization, V2 Parquet and signed custody; final full verification timed separately",
+      "seconds": 4.6144413239999995,
+      "signed_entries": 5,
+      "single_source": true,
+      "source_bytes": 104861696,
+      "startup_seconds": 0.001836955,
+      "verification_seconds": 0.051288771,
+      "witness_runs": 0
+    },
+    {
+      "architecture": "x86_64",
+      "artifacts": 3,
+      "batch_files": 4,
+      "corpus_mib": 1024,
+      "decode_timeout_seconds": 600,
+      "dense_source": true,
+      "files": 1,
+      "helper_peak_bytes": 3207168,
+      "limits_reached": false,
+      "memory_method": "20 ms sampling of OS process high-water resident/working-set counters; per-process maximum, not sum",
+      "mib_per_second": 17.677677953912635,
+      "observed_children": 1,
+      "os": "Linux",
+      "parent_peak_bytes": 256905216,
+      "per_file_budgets": [
+        {
+          "expected_records": 2097152,
+          "output_budget_bytes": 8589934592,
+          "source_bytes": 1073745920
+        }
+      ],
+      "phase": "complete",
+      "profile": "release",
+      "record_limit_per_file": 8000000,
+      "records": 2097152,
+      "scope": "source hashing, contained decoding, normalization, V2 Parquet and signed custody; final full verification timed separately",
+      "seconds": 57.926380881,
+      "signed_entries": 5,
+      "single_source": true,
+      "source_bytes": 1073745920,
+      "startup_seconds": 0.001633066,
+      "verification_seconds": 0.499223374,
+      "witness_runs": 0
+    },
+    {
+      "architecture": "x86_64",
+      "artifacts": 3,
+      "batch_files": 4,
+      "corpus_mib": 4096,
+      "decode_timeout_seconds": 600,
+      "dense_source": true,
+      "files": 1,
+      "helper_peak_bytes": 3203072,
+      "limits_reached": false,
+      "memory_method": "20 ms sampling of OS process high-water resident/working-set counters; per-process maximum, not sum",
+      "mib_per_second": 21.34010321004102,
+      "observed_children": 1,
+      "os": "Linux",
+      "parent_peak_bytes": 651542528,
+      "per_file_budgets": [
+        {
+          "expected_records": 8000000,
+          "output_budget_bytes": 8589934592,
+          "source_bytes": 4096004096
+        }
+      ],
+      "phase": "complete",
+      "profile": "release",
+      "record_limit_per_file": 8000000,
+      "records": 8000000,
+      "scope": "source hashing, contained decoding, normalization, V2 Parquet and signed custody; final full verification timed separately",
+      "seconds": 183.047563913,
+      "signed_entries": 5,
+      "single_source": true,
+      "source_bytes": 4096004096,
+      "startup_seconds": 0.001433875,
+      "verification_seconds": 1.8871097639999999,
+      "witness_runs": 0
+    }
+  ],
+  "scope": "local release reference; separate from hosted-runner results",
+  "source_commit": "341c7184cb525d87ecc6c90e089cd0d796d1a681"
+}
