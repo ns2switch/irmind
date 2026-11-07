@@ -9,6 +9,11 @@ on:
         description: Run only the release EVTX collection and memory benchmark
         type: boolean
         default: false
+      evtx_batch_files:
+        description: Sources per signed ingestion request in the EVTX benchmark
+        type: choice
+        options: ['4', '1']
+        default: '4'
       native_windows:
         description: Run only the native Windows EVTX diagnostic suite
         type: boolean
@@ -198,6 +203,7 @@ jobs:
       CARGO_INCREMENTAL: 0
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CARGO_BUILD_TARGET: ${{ matrix.target }}
+      EVTX_BATCH_FILES: ${{ inputs.evtx_batch_files || '4' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}

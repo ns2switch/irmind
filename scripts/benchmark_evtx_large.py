@@ -2,6 +2,7 @@
 """Measure the release ingestion host and its actual contained decoder children."""
 import argparse
 import json
+import os
 from pathlib import Path
 import platform
 import subprocess
@@ -10,12 +11,12 @@ import time
 from evtx_memory import processes
 
 
-def measure(executable, mib, work):
+def measure(executable, mib, work, batch_files):
     with tempfile.TemporaryDirectory(prefix='evtx-large-', dir=work) as directory:
         output = Path(directory) / 'result.jsonl'
         error = Path(directory) / 'error.txt'
         with output.open('wb') as stdout, error.open('wb') as stderr:
-            process = subprocess.Popen([str(executable), str(mib)], cwd=directory,
+            process = subprocess.Popen([str(executable), str(mib), '--batch-files', str(batch_files)], cwd=directory,
                                        stdout=stdout, stderr=stderr)
         peaks = {'parent': 0, 'helper': 0}
         child_peaks = {}
@@ -56,11 +57,14 @@ def main():
     parser.add_argument('executable', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--smoke', action='store_true')
+    parser.add_argument('--batch-files', type=int, choices=(1, 4), default=int(os.environ.get('EVTX_BATCH_FILES', '4')))
     args = parser.parse_args()
+    if args.batch_files not in (1, 4):
+        parser.error('batch-files must be 1 or 4')
     executable = args.executable.resolve(strict=True)
     results = []
     for mib in ([16] if args.smoke else [100, 1024]):
-        result = measure(executable, mib, Path.cwd())
+        result = measure(executable, mib, Path.cwd(), args.batch_files)
         print(json.dumps(result, sort_keys=True), flush=True)
         results.append(result)
         args.output.write_text(json.dumps({'results': results}, indent=2) + '\n')

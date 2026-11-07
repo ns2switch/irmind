@@ -58,6 +58,7 @@ fn ingest(
     names: &[String],
     bytes: u64,
     expected: u64,
+    batch_files: usize,
 ) -> Result<(), large_support::Error> {
     let startup = Instant::now();
     let parser = Arc::new(EvtxParser::new(&large_support::helper()?, root));
@@ -86,14 +87,16 @@ fn ingest(
         serde_json::json!({"phase":"ingest", "source_bytes":bytes, "files":names.len()})
     );
     let start = Instant::now();
-    use_cases.ingest_local_batch_selected(
-        &case.id,
-        &sources,
-        names,
-        false,
-        &selections,
-        &CancellationToken::new(),
-    )?;
+    for batch in names.chunks(batch_files) {
+        use_cases.ingest_local_batch_selected(
+            &case.id,
+            &sources,
+            batch,
+            false,
+            &selections,
+            &CancellationToken::new(),
+        )?;
+    }
     let seconds = start.elapsed().as_secs_f64();
     let caps = names
         .iter()
@@ -117,6 +120,7 @@ fn ingest(
         "{}",
         serde_json::json!({"phase":"complete", "profile":"release",
         "source_bytes":bytes, "files":names.len(), "records":expected, "artifacts":artifacts,
+        "batch_files":batch_files,
         "seconds":seconds, "mib_per_second":f64::from(u32::try_from(bytes)?)/1_048_576.0/seconds,
         "startup_seconds":startup_seconds, "verification_seconds":verification_seconds,
         "signed_entries":local.entries(&case.id)?.len(), "witness_runs":parser.witness_stats().attempts,
@@ -152,5 +156,13 @@ fn main() -> Result<(), large_support::Error> {
         );
         return Ok(());
     }
-    ingest(root.path(), &names, bytes, expected)
+    let args = std::env::args().collect::<Vec<_>>();
+    let batch_files = args
+        .windows(2)
+        .find(|args| args[0] == "--batch-files")
+        .map_or(Ok(4), |args| args[1].parse::<usize>())?;
+    if !matches!(batch_files, 1 | 4) {
+        return Err("batch-files must be 1 or 4".into());
+    }
+    ingest(root.path(), &names, bytes, expected, batch_files)
 }
