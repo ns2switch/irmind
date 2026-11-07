@@ -32,6 +32,8 @@ V5 verification checks the common physical columns and file metadata after authe
 
 Old store constructors keep their historical writers. `open_common` selects the new writer for new batched ingestion. Merely opening a case does not reparse its sources or change its generation.
 
+The unsigned normalized spool stores each observation vector once. Deserialization recreates its JSON cache before memory accounting or batch construction; final schemas, batch inputs and golden bytes remain unchanged. The writer also reuses already sorted legacy entity pairs. These changes do not implement co-observation by reference or the separate bounded-metadata proposal.
+
 ## Queries and coverage
 
 Existing tools accept optional `event_category`, `event_type`, `event_outcome` and `entity_role` selectors. Values come from closed enums; selectors combine with AND. CLI flags use hyphens; TUI graph commands accept `--event-category=authentication --event-outcome=failure`. Time, host and organization ceilings remain independent constraints.
@@ -39,6 +41,8 @@ Existing tools accept optional `event_category`, `event_type`, `event_outcome` a
 Unclassified or historical records cannot match a classification or role they do not have. Filtered results explain incomplete schema coverage. A graph summary reports common, categorized and known-outcome counts. Absence of classified matches is not proof that the activity did not occur.
 
 Entity lookup separates identity scopes and reports per-role observation counts. A PID without a lifetime identifier is source/record scoped; its reuse cannot bridge unrelated events. Same-value source and destination occurrences remain distinguishable, while event timelines deduplicate the source/record reference. Neighbor/path searches retain the existing 4,096-record sample, 3-hop, 200-expansion, 50-neighbor and 10-second budgets. Historical entity-only artifacts retain a bounded fallback.
+
+A retained homogeneous scope/role/field batch computes timestamp extrema once and combines that group's extrema into the total. Mixed batches and scopes beyond the 20-detail cap retain the general path. Counts, precision markers, invalid-code rejection and the scope-detail limit are unchanged.
 
 ## Compatibility boundary
 
@@ -53,3 +57,5 @@ Tests cover the codebook, canonical payload/envelope goldens, invalid typed valu
 Format tests exercise every closed context-field type and all identity-scope encodings in both JSON map modes. AddressSanitizer runs record their source revision, duration and execution counts for the [canonical codec](benchmarks/common-event-core-fuzz.json) and [export verifier](benchmarks/common-event-export-fuzz.json).
 
 The manual graph benchmark supports a paired common-schema run against a pinned baseline: three smoke repetitions for representative cloud and endpoint sources, then one 15 GB pass per cloud/endpoint scenario on the same runner class. Builds use release optimization. The existing ingestion/query gates are unchanged. The bridge benchmark measures the core; it does not claim the cost or classification coverage of future source-specific mappings.
+
+The [initial measured iteration](benchmarks.md#common-schema-core-initial-iteration) misses the existing gates. The writer remains opt-in. The [legacy-peer layout proposal](common-event-peer-layout.md) addresses a measured source of duplication without changing the logical observations or historical layouts.
