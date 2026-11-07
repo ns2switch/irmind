@@ -52,7 +52,10 @@ impl Allocator {
                     }
                     continue;
                 }
-                if v.builder_version != BUILDER {
+                if !matches!(
+                    v.builder_version.as_str(),
+                    BUILDER | super::common_format::BUILDER
+                ) {
                     return Err(invalid_source());
                 }
                 out.observe(&v.partition)?;

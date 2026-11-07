@@ -16,6 +16,8 @@ pub(in crate::parquet_store) struct RecordRow {
     pub(super) time: Option<irmind_app::IndexedTime>,
     pub(super) source_offset: Option<u64>,
     pub(super) precise: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(in crate::parquet_store) common: Option<super::common::CommonRow>,
     pub(in crate::parquet_store) profile: u8,
     pub(in crate::parquet_store) scope_account: String,
     pub(in crate::parquet_store) scope_region: String,
@@ -94,6 +96,7 @@ impl RecordRow {
             time: None,
             source_offset: None,
             precise: false,
+            common: None,
             profile: 0,
             scope_account: account.into(),
             scope_region: region.into(),
@@ -112,7 +115,10 @@ impl RecordRow {
     }
 
     pub(in crate::parquet_store) fn estimated_bytes(&self) -> usize {
-        self.text.len()
+        self.common
+            .as_ref()
+            .map_or(0, super::common::CommonRow::estimated_bytes)
+            + self.text.len()
             + self.entities.len()
             + self.relations.len()
             + self.event.len()

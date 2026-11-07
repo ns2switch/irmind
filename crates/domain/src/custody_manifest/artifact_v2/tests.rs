@@ -261,3 +261,35 @@ fn independent_overflow_goldens_bind_discriminators_caps_reasons_and_supersessio
         assert_eq!(ParquetArtifactV2::decode(golden.trim()), Ok(expected));
     }
 }
+
+#[test]
+fn common_schema_envelopes_match_independent_golden_bytes() {
+    for (schema, golden, expected_hash) in [
+        (
+            ArtifactSchemaV2::CommonEvents,
+            include_str!("../../../tests/fixtures/common-artifact-events-v2.hex"),
+            include_str!("../../../tests/fixtures/common-artifact-events-v2.sha256"),
+        ),
+        (
+            ArtifactSchemaV2::CommonEntities,
+            include_str!("../../../tests/fixtures/common-artifact-entities-v2.hex"),
+            include_str!("../../../tests/fixtures/common-artifact-entities-v2.sha256"),
+        ),
+        (
+            ArtifactSchemaV2::CommonCoobservations,
+            include_str!("../../../tests/fixtures/common-artifact-coobservations-v2.hex"),
+            include_str!("../../../tests/fixtures/common-artifact-coobservations-v2.sha256"),
+        ),
+    ] {
+        let mut value = artifact();
+        value.schema = schema;
+        value.builder_version = "parquet-builder-common-event-v1".into();
+        assert_eq!(value.encode().unwrap(), golden.trim());
+        assert_eq!(ParquetArtifactV2::decode(golden.trim()).unwrap(), value);
+        let bytes = decode_payload(golden.trim(), TAG).unwrap();
+        assert_eq!(
+            encode_payload(&Sha256::digest(bytes)).unwrap(),
+            expected_hash.trim()
+        );
+    }
+}

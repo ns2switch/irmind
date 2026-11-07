@@ -72,6 +72,10 @@ impl QueryStore<'_> {
         value: &str,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        if super::scoped::available(artifacts) {
+            return self.scoped_entity(id, artifacts, filter, kind, value, cancel);
+        }
+
         let mut rules = time_rules(filter);
         rules.extend([
             Predicate::Equal("entity_kind", kind.into()),
