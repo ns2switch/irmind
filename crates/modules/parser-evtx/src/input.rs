@@ -60,7 +60,7 @@ pub(super) fn run(
     running.threads.push(
         thread::Builder::new()
             .name("evtx-errors".into())
-            .spawn(move || drain(stderr, &send))
+            .spawn(move || drain(stderr, &send, budget))
             .map_err(|_| bad("EVTX error reader cannot start"))?,
     );
     let result = consume(&running, cancel, on_line);
@@ -138,21 +138,28 @@ fn pump(reader: Box<dyn Read + Send>, mut budget: u64, send: &SyncSender<Message
         }
     }
 }
-fn drain(mut reader: Box<dyn Read + Send>, send: &SyncSender<Message>) {
+fn drain(mut reader: Box<dyn Read + Send>, send: &SyncSender<Message>, budget: u64) {
     let mut buffer = [0u8; 4096];
     let mut captured = Vec::new();
     loop {
         match reader.read(&mut buffer) {
             Ok(0) => {
                 if let Some(reason) = isolation_reason(&captured) {
-                    let _ = send.send(Message::Isolation(reason));
+                    let diagnostic = if reason.starts_with("EVTX output byte limit reached") {
+                        Message::Limit(format!(
+                            "EVTX output byte limit reached ({budget} bytes); entire file rejected; no partial ingestion"
+                        ))
+                    } else {
+                        Message::Isolation(reason)
+                    };
+                    let _ = send.send(diagnostic);
                 }
                 let _ = send.send(Message::ErrorEnd);
                 return;
             }
             Ok(n) => {
                 if captured.len().saturating_add(n) > 65536 {
-                    let _ = send.send(Message::Failure);
+                    let _ = send.send(Message::Limit("EVTX stderr byte limit reached (65536 bytes); entire file rejected; no partial ingestion".into()));
                     return;
                 }
                 captured.extend_from_slice(&buffer[..n]);
@@ -213,6 +220,37 @@ fn isolation_reason(bytes: &[u8]) -> Option<&'static str> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn byte_diagnostics_keep_the_exact_budget_without_echoing_stderr()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (send, receive) = std::sync::mpsc::sync_channel(2);
+        super::drain(
+            Box::new(std::io::Cursor::new(
+                b"EVTX output byte limit reached (123 bytes) PRIVATE_SAMPLE",
+            )),
+            &send,
+            345,
+        );
+        let super::Message::Limit(message) = receive.try_recv()? else {
+            return Err("missing output-byte diagnostic".into());
+        };
+        assert!(message.contains("345 bytes"));
+        assert!(!message.contains("123 bytes"));
+        assert!(!message.contains("PRIVATE_SAMPLE"));
+        let (send, receive) = std::sync::mpsc::sync_channel(2);
+        super::drain(
+            Box::new(std::io::Cursor::new(vec![b'x'; 65_537])),
+            &send,
+            345,
+        );
+        let super::Message::Limit(message) = receive.try_recv()? else {
+            return Err("missing stderr-byte diagnostic".into());
+        };
+        assert!(message.contains("65536 bytes"));
+        assert!(message.contains("entire file rejected"));
+        assert!(message.contains("no partial ingestion"));
+        Ok(())
+    }
     #[test]
     fn every_resource_diagnostic_names_the_bound_without_echoing_stderr() {
         for marker in [
