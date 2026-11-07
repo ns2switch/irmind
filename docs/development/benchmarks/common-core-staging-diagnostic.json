@@ -1,0 +1,880 @@
+{
+  "profile": "release",
+  "query_scope_note": "The reduced corpus does not contain endpoint-0063; its empty-result timings are not latency claims for populated host filters.",
+  "repetitions_per_revision": 3,
+  "results": [
+    {
+      "ingest": {
+        "bytes": 783804000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 38289257,
+        "files": 50,
+        "hash_seconds": 0.452,
+        "parquet_bytes": 101058989,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 79.598
+      },
+      "mode": "before",
+      "parallel_phase_seconds": {
+        "publish_seconds": 5.478,
+        "replay_seconds": 42.043,
+        "sort_seconds": 26.027,
+        "source_verify_seconds": 0.442,
+        "stage_seconds": 21.156
+      },
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.08,
+          "p95_seconds": 0.087,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.033,
+          "p95_seconds": 0.034,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.028,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.015,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.027,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.005,
+          "p95_seconds": 0.006,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.015,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.026,
+          "p95_seconds": 0.026,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.006,
+          "p95_seconds": 0.007,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.028,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        }
+      ],
+      "repetition": 1,
+      "source_commit": "51aa808226dcbe8394b53dd63e49c7cdd4c3d2ea"
+    },
+    {
+      "ingest": {
+        "bytes": 783804000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 38289257,
+        "files": 50,
+        "hash_seconds": 0.463,
+        "parquet_bytes": 101058989,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 68.801
+      },
+      "mode": "before",
+      "parallel_phase_seconds": {
+        "publish_seconds": 6.26,
+        "replay_seconds": 30.927,
+        "sort_seconds": 26.261,
+        "source_verify_seconds": 0.442,
+        "stage_seconds": 21.581
+      },
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.08,
+          "p95_seconds": 0.094,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.032,
+          "p95_seconds": 0.034,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.026,
+          "p95_seconds": 0.027,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.015,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.026,
+          "p95_seconds": 0.029,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.005,
+          "p95_seconds": 0.005,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.014,
+          "p95_seconds": 0.014,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.028,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.006,
+          "p95_seconds": 0.007,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.028,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        }
+      ],
+      "repetition": 2,
+      "source_commit": "51aa808226dcbe8394b53dd63e49c7cdd4c3d2ea"
+    },
+    {
+      "ingest": {
+        "bytes": 783804000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 38289257,
+        "files": 50,
+        "hash_seconds": 0.47,
+        "parquet_bytes": 101058989,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 79.22
+      },
+      "mode": "before",
+      "parallel_phase_seconds": {
+        "publish_seconds": 0.676,
+        "replay_seconds": 43.889,
+        "sort_seconds": 26.663,
+        "source_verify_seconds": 0.44,
+        "stage_seconds": 21.695
+      },
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.082,
+          "p95_seconds": 0.084,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.033,
+          "p95_seconds": 0.033,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.027,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.015,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.028,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.006,
+          "p95_seconds": 0.006,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.014,
+          "p95_seconds": 0.015,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.028,
+          "p95_seconds": 0.028,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.006,
+          "p95_seconds": 0.007,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.028,
+          "p95_seconds": 0.029,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        }
+      ],
+      "repetition": 3,
+      "source_commit": "51aa808226dcbe8394b53dd63e49c7cdd4c3d2ea"
+    },
+    {
+      "ingest": {
+        "bytes": 783804000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 38289257,
+        "files": 50,
+        "hash_seconds": 0.468,
+        "parquet_bytes": 101058989,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 54.696
+      },
+      "mode": "after",
+      "parallel_phase_seconds": {
+        "publish_seconds": 0.684,
+        "replay_seconds": 25.065,
+        "sort_seconds": 23.674,
+        "source_verify_seconds": 0.445,
+        "stage_seconds": 19.779
+      },
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.085,
+          "p95_seconds": 0.087,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.031,
+          "p95_seconds": 0.032,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.026,
+          "p95_seconds": 0.027,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.014,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.029,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.006,
+          "p95_seconds": 0.006,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.014,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.026,
+          "p95_seconds": 0.027,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.006,
+          "p95_seconds": 0.007,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.027,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        }
+      ],
+      "repetition": 1,
+      "source_commit": "075b506ef1350648fd42a570d0b3c878e19cf96e"
+    },
+    {
+      "ingest": {
+        "bytes": 783804000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 38289257,
+        "files": 50,
+        "hash_seconds": 0.466,
+        "parquet_bytes": 101058989,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 58.471
+      },
+      "mode": "after",
+      "parallel_phase_seconds": {
+        "publish_seconds": 4.029,
+        "replay_seconds": 25.867,
+        "sort_seconds": 23.856,
+        "source_verify_seconds": 0.442,
+        "stage_seconds": 20.058
+      },
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.094,
+          "p95_seconds": 0.097,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.033,
+          "p95_seconds": 0.033,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.028,
+          "p95_seconds": 0.033,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.014,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.028,
+          "p95_seconds": 0.029,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.006,
+          "p95_seconds": 0.007,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.014,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.027,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.006,
+          "p95_seconds": 0.007,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.027,
+          "p95_seconds": 0.028,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        }
+      ],
+      "repetition": 2,
+      "source_commit": "075b506ef1350648fd42a570d0b3c878e19cf96e"
+    },
+    {
+      "ingest": {
+        "bytes": 783804000,
+        "conversion_seconds": 0.0,
+        "coobservation_bytes": 38289257,
+        "files": 50,
+        "hash_seconds": 0.458,
+        "parquet_bytes": 101058989,
+        "parquet_seconds": 0.0,
+        "row_seconds": 0.0,
+        "wall_seconds": 54.989
+      },
+      "mode": "after",
+      "parallel_phase_seconds": {
+        "publish_seconds": 5.473,
+        "replay_seconds": 21.331,
+        "sort_seconds": 23.391,
+        "source_verify_seconds": 0.441,
+        "stage_seconds": 19.786
+      },
+      "queries": [
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.085,
+          "p95_seconds": 0.089,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.031,
+          "p95_seconds": 0.031,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.026,
+          "p95_seconds": 0.027,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.013,
+          "p95_seconds": 0.014,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.026,
+          "p95_seconds": 0.026,
+          "scenario": "endpoint-v2-64",
+          "scope": "all"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.005,
+          "p95_seconds": 0.006,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.012,
+          "p95_seconds": 0.012,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.026,
+          "p95_seconds": 0.026,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.006,
+          "p95_seconds": 0.007,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.026,
+          "p95_seconds": 0.027,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0000"
+        },
+        {
+          "errors": 0,
+          "name": "term",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "entity",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "neighbors",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "timeline",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        },
+        {
+          "errors": 0,
+          "name": "path",
+          "p50_seconds": 0.0,
+          "p95_seconds": 0.0,
+          "scenario": "endpoint-v2-64",
+          "scope": "endpoint-0063"
+        }
+      ],
+      "repetition": 3,
+      "source_commit": "075b506ef1350648fd42a570d0b3c878e19cf96e"
+    }
+  ],
+  "scenario": "endpoint-v2-64",
+  "scope": "Local diagnostic on the same execution host, not a GitHub-runner gate or a 15 GB projection.",
+  "source_shape": "50 files and 50 represented hosts under the 64-host cap; 15 ordered runs per file"
+}

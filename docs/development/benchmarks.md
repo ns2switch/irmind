@@ -764,3 +764,30 @@ The [complete captured confidence matrix](benchmarks/network-detection-matrix.js
 ### Network parser fuzzing
 
 Both detection and parsing entry points completed 600-second AddressSanitizer runs on synthetic/mutated seeds with no crash or timeout. The input bound was 64 KiB, the per-case timeout 30 seconds and the process RSS limit 512 MiB. These runs cover bounded in-memory fuzz inputs; the separate streaming regressions cover oversized first lines. [Run settings and exit status](benchmarks/network-v2-fuzz.json) record both completed runs. Quiet libFuzzer output did not report execution counts. Temporary mutation corpora were removed.
+
+## Common-schema core: initial iteration
+
+The opt-in unclassified common bridge was compared with `d13ce8b` in [paired release jobs](https://github.com/ns2switch/irmind/actions/runs/42389530821). Candidate `31e57eb` uses the new schema IDs. Each completed pair uses the same GitHub-hosted Ubuntu runner. These are intermediate results, not a passing common-writer gate.
+
+| Synthetic 15 GB scenario | Baseline seconds | Common seconds | Existing limit | Candidate meets ingestion limit |
+| --- | ---: | ---: | ---: | --- |
+| Cloud | 947.159 | 1,374.256 | 900 | no |
+| Disordered endpoint, 1 host | 1,154.095 | 1,664.101 | 1,350 | no |
+| Disordered endpoint, 64 hosts | 1,003.102 | 1,509.744 | 1,350 | no |
+
+The matched cloud baseline also exceeded 900 seconds. Its successful entity-query p95 was 5.629 seconds; the common candidate reached its deadline in all five entity samples (elapsed p95 10.058 seconds, **no successful result**). Candidate cloud neighbors/path p95 were 1.754/1.665 seconds. Cold summaries succeeded. The deliberately expansive worst-case path remained marked as truncated by its time budget. HuntEval probes retained full event/entity/path recall for all three providers, with no parse error.
+
+The cloud smoke used 1,077,119,172 bytes in each of three repetitions: 120.728, 120.837 and 121.021 seconds. Six further full-matrix scenarios were cancelled after the completed pairs demonstrated the regression. The endpoint smoke and complete matrix are not established by this iteration. [Machine-readable results](benchmarks/common-core-initial-run.json) retain failures, query counts, profiles, column sizes and smoke repetitions. Parallel phase intervals overlap; do not sum them as wall time. The current CLI/TUI writer and existing gates are unchanged.
+
+### Byte-preserving staging diagnostic
+
+The following diagnostic uses optimized release builds on the same local execution host, three repetitions per revision. It is **not** a GitHub-runner result or a projection of 15 GB performance. Fifty files represent 50 hosts under the 64-host cap, with the full 15-run disordered source shape: 783,804,000 bytes per repetition.
+
+| Revision | Wall-time samples, seconds | Median seconds | Total Parquet bytes | Co-observation bytes |
+| --- | --- | ---: | ---: | ---: |
+| `51aa808`, repeated staging cache | 79.598 / 68.801 / 79.220 | 79.220 | 101,058,989 | 38,289,257 |
+| `075b506`, derived cache restored on read | 54.696 / 58.471 / 54.989 | 54.989 | 101,058,989 | 38,289,257 |
+
+The median is 30.6% lower in this reduced diagnostic. The change omits a redundant peer-JSON cache from the unsigned spool, restores it before memory accounting and batch construction, reuses canonical legacy entity pairs, and avoids a second timestamp-extrema pass for a retained homogeneous scope. Memory budgets and final schemas stay fixed. The dedicated round-trip test compares all three Arrow batches and their Parquet bytes; existing physical goldens remain unchanged. Equal total sizes in this diagnostic alone are not a full-corpus hash-equality proof. The absent `endpoint-0063` filter is retained in [raw numeric results](benchmarks/common-core-staging-diagnostic.json) but its empty-result timings are not populated-host latency measurements.
+
+The initial cloud co-observation layout additionally stores role-free peers twice. A [separate representation proposal](common-event-peer-layout.md) describes the measured duplication and the required equivalence tests. It is not implemented by these byte-preserving changes. A complete 15 GB remeasurement is required before changing a default writer.
