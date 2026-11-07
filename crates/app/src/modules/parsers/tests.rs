@@ -62,6 +62,14 @@ mod parser_router_tests {
         }
     }
     impl StreamingEventParser for FakeParser {
+        fn source_parallelism(&self, _: &str) -> Result<crate::SourceParallelism, AppError> {
+            Ok(if self.0 == "parser-json" {
+                crate::SourceParallelism::Concurrent
+            } else {
+                crate::SourceParallelism::Serial
+            })
+        }
+
         fn partition_profile(&self, _: &GraphRecord) -> crate::PartitionProfile {
             if self.0 == "parser-json" {
                 crate::PartitionProfile::CloudAccountRegion
@@ -91,6 +99,30 @@ mod parser_router_tests {
         fn detect(&self, _: &str, _: &[u8]) -> Option<ParserConfidence> {
             None
         }
+    }
+
+    #[test]
+    fn scheduling_uses_the_selected_source_and_unknown_sources_fail() {
+        let concurrent: Arc<dyn LogParser> = Arc::new(FakeParser("parser-json", "v1"));
+        let serial: Arc<dyn LogParser> = Arc::new(FakeParser("parser-endpoint", "v1"));
+        let router = RebuildParser {
+            sources: BTreeMap::from([("a".into(), concurrent), ("b".into(), serial)]),
+        };
+        assert_eq!(
+            router.source_parallelism("a").unwrap(),
+            crate::SourceParallelism::Concurrent
+        );
+        assert_eq!(
+            router.source_parallelism("b").unwrap(),
+            crate::SourceParallelism::Serial
+        );
+        assert!(router.source_parallelism("unknown").is_err());
+        assert_eq!(
+            crate::SourceParser::new(&router, "b")
+                .source_parallelism("physical-spool")
+                .unwrap(),
+            crate::SourceParallelism::Serial
+        );
     }
 
     fn entry(kind: AuditEventKind, payload: String) -> SignedEntry {

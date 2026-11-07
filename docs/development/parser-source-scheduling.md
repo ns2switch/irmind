@@ -1,10 +1,10 @@
-# Parser source scheduling proposal
+# Parser source scheduling
 
-This proposal is for module authors and maintainers. It describes an additive local-parser capability, without changing source manifests, artifact schemas or custody formats.
+This page is for module authors and maintainers. It describes the optional local-parser scheduling capability. Source manifests, artifact schemas and custody formats remain unchanged.
 
 ## Port
 
-Add a closed `SourceParallelism` type to `irmind-app` with two values: `Concurrent` and `Serial`. Add this optional method to `StreamingEventParser`:
+`irmind-app` exposes a closed `SourceParallelism` type with two values: `Concurrent` and `Serial`. `StreamingEventParser` provides this optional method:
 
 ```rust
 fn source_parallelism(&self, _source: &str) -> Result<SourceParallelism, AppError> {
@@ -32,4 +32,4 @@ This metadata controls scheduling, not authorization. It cannot add native capab
 - Native Windows ingestion completes multiple EVTX files in one request with one session witness.
 - Repeat the release collection benchmark with batches of one and four, retaining the 600-second invocation bound and all byte/record limits.
 
-No production port or scheduling implementation is changed by the benchmark PR.
+The scheduling capability never grants native permissions or changes the order of signed entries. A dedicated supervisor enforces the decoder deadline independently of record delivery. Bounded producer waits check operation cancellation.

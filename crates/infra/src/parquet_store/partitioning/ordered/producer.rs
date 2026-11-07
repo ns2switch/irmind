@@ -9,7 +9,8 @@ use super::super::staging::{Input, MAX_STAGED_ROW, no_space, normalized_row, sou
 use irmind_app::LocalBatchRequest;
 use std::io::{Seek as _, SeekFrom, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::SyncSender;
+use std::sync::mpsc::{SyncSender, TrySendError};
+use std::time::Duration;
 
 pub(in crate::parquet_store::partitioning) struct ParsedSource {
     pub(in crate::parquet_store::partitioning) source: File,
@@ -68,10 +69,12 @@ impl ParquetStore {
         cancel: &CancellationToken,
         sender: &SyncSender<RowBatch>,
         restart: &AtomicBool,
+        start: super::scheduling::Start,
     ) -> Result<ProducedSource, AppError> {
         let copied = request.copy_original;
         let (metadata, hash, size) =
             stream::initial_hash(&mut input.file, cancel, self.profile.as_deref())?;
+        start.wait(cancel)?;
         let stage = self
             .profile
             .as_ref()
@@ -79,7 +82,7 @@ impl ParquetStore {
         let value = irmind_domain::EvidenceHash::parse(&irmind_app::hex(&hash))
             .map_err(|_| invalid_source())?;
         let sample = source_sample(&mut input.file)?;
-        let mut rows = RowBuffer::new(sender, input.budget, value.clone());
+        let mut rows = RowBuffer::new(sender, input.budget, value.clone(), cancel, restart);
         let mut offset_mode = None;
         let mut stopped_for_restart = false;
         let result = stream::parse_and_verify(
@@ -165,6 +168,8 @@ fn completed_report(
 
 struct RowBuffer<'a> {
     sender: &'a SyncSender<RowBatch>,
+    cancel: &'a CancellationToken,
+    restart: &'a AtomicBool,
     rows: Vec<RecordRow>,
     bytes: usize,
     encoded: u64,
@@ -180,9 +185,13 @@ impl<'a> RowBuffer<'a> {
         sender: &'a SyncSender<RowBatch>,
         budget: u64,
         hash: irmind_domain::EvidenceHash,
+        cancel: &'a CancellationToken,
+        restart: &'a AtomicBool,
     ) -> Self {
         Self {
             sender,
+            cancel,
+            restart,
             rows: Vec::new(),
             bytes: 0,
             encoded: 0,
@@ -224,12 +233,23 @@ impl<'a> RowBuffer<'a> {
 
     fn finish(&mut self) -> Result<(), AppError> {
         if !self.rows.is_empty() {
-            self.sender
-                .send(RowBatch {
-                    rows: std::mem::take(&mut self.rows),
-                    hash: self.hash.clone(),
-                })
-                .map_err(|_| AppError::Cancelled)?;
+            let mut batch = RowBatch {
+                rows: std::mem::take(&mut self.rows),
+                hash: self.hash.clone(),
+            };
+            loop {
+                if self.cancel.is_cancelled() || self.restart.load(Ordering::Acquire) {
+                    return Err(AppError::Cancelled);
+                }
+                match self.sender.try_send(batch) {
+                    Ok(()) => break,
+                    Err(TrySendError::Disconnected(_)) => return Err(AppError::Cancelled),
+                    Err(TrySendError::Full(value)) => {
+                        batch = value;
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                }
+            }
         }
         self.bytes = 0;
         Ok(())
@@ -298,7 +318,9 @@ mod tests {
             &hash,
         )
         .unwrap();
-        let mut buffer = RowBuffer::new(&sender, 0, hash);
+        let cancel = CancellationToken::new();
+        let restart = AtomicBool::new(false);
+        let mut buffer = RowBuffer::new(&sender, 0, hash, &cancel, &restart);
         assert!(matches!(
             buffer.push(row),
             Err(AppError::Fixed(

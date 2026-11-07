@@ -96,11 +96,16 @@ fn record_layout(chunk: &[u8], end: usize) -> Result<Vec<(usize, usize)>, Error>
     Ok(layout)
 }
 
-fn source(path: &Path, chunks: u16, first: u64) -> Result<u64, Error> {
-    let fixture = FIXTURE;
+fn source(path: &Path, chunks: u16, first: u64, dense: bool) -> Result<u64, Error> {
+    let fixture: &[u8] = if dense {
+        include_bytes!("SecurityDense.evtx")
+    } else {
+        FIXTURE
+    };
+    let records_per_chunk = if dense { 128 } else { RECORDS_PER_CHUNK };
     let mut header = fixture[..4096].to_vec();
     header[16..24].copy_from_slice(&(u64::from(chunks) - 1).to_le_bytes());
-    header[24..32].copy_from_slice(&(first + u64::from(chunks) * RECORDS_PER_CHUNK).to_le_bytes());
+    header[24..32].copy_from_slice(&(first + u64::from(chunks) * records_per_chunk).to_le_bytes());
     header[42..44].copy_from_slice(&chunks.to_le_bytes());
     let crc = evtx::checksum_ieee(&header[..120]);
     header[124..128].copy_from_slice(&crc.to_le_bytes());
@@ -112,13 +117,14 @@ fn source(path: &Path, chunks: u16, first: u64) -> Result<u64, Error> {
     let layout = record_layout(&chunk, end)?;
     let base = u64::from_le_bytes(chunk[528..536].try_into()?);
     let mut ordinal = first;
+    let time_step = if dense { 1 } else { 1_000_000 };
     for _ in 0..chunks {
         let start = ordinal;
-        users(&mut chunk, &offsets, ordinal / RECORDS_PER_CHUNK);
+        users(&mut chunk, &offsets, ordinal / records_per_chunk);
         for &(cursor, xml_id) in &layout {
             chunk[cursor + 8..cursor + 16].copy_from_slice(&ordinal.to_le_bytes());
             chunk[cursor + 16..cursor + 24]
-                .copy_from_slice(&(base + ordinal * 1_000_000).to_le_bytes());
+                .copy_from_slice(&(base + ordinal * time_step).to_le_bytes());
             let id = format!("{ordinal:020}")
                 .encode_utf16()
                 .flat_map(u16::to_le_bytes)
@@ -137,22 +143,29 @@ pub(super) fn corpus(
     root: &Path,
     mib: u32,
     single: bool,
+    dense: bool,
+    over_limit: bool,
 ) -> Result<(Vec<String>, u64, u64), Error> {
     let sources = root.join("sources");
     fs::create_dir(&sources)?;
-    let mut remaining = u64::from(mib) * 16;
+    let mut remaining = if dense && mib == 4096 {
+        irmind_evtx::MAX_RECORDS / 128 + u64::from(over_limit)
+    } else {
+        (u64::from(mib) * 16).min(u64::from(u16::MAX))
+    };
+    let records_per_chunk = if dense { 128 } else { RECORDS_PER_CHUNK };
     let mut names = Vec::new();
     let (mut bytes, mut records) = (0, 0);
     while remaining > 0 {
-        let chunks = u16::try_from(remaining.min(if single { 16_384 } else { 4096 }))?;
+        let chunks = u16::try_from(remaining.min(if single { u64::from(u16::MAX) } else { 4096 }))?;
         if chunks == 0 {
             break;
         }
         let name = format!("synthetic-security-{:03}.evtx", names.len());
-        let size = source(&sources.join(&name), chunks, records + 1)?;
+        let size = source(&sources.join(&name), chunks, records + 1, dense)?;
         names.push(name);
         bytes += size;
-        records += u64::from(chunks) * RECORDS_PER_CHUNK;
+        records += u64::from(chunks) * records_per_chunk;
         remaining -= u64::from(chunks);
     }
     Ok((names, bytes, records))
@@ -163,7 +176,7 @@ mod tests {
     #[test]
     fn corpus_has_valid_chunk_checksums_and_distinct_source_records() -> Result<(), super::Error> {
         let root = tempfile::tempdir()?;
-        let (names, bytes, records) = super::corpus(root.path(), 1, false)?;
+        let (names, bytes, records) = super::corpus(root.path(), 1, false, false, false)?;
         assert_eq!(names.len(), 1);
         assert_eq!(bytes, 1_048_576 + 4096);
         assert_eq!(records, 16 * super::RECORDS_PER_CHUNK);

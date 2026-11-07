@@ -149,8 +149,10 @@ impl<'a> State<'a> {
     }
     fn next(&mut self) -> Result<(), AppError> {
         self.seen += 1;
-        if self.seen > 1_000_000 {
-            return Err(bad("EVTX source exceeds record limit"));
+        if self.seen > 8_000_000 {
+            return Err(bad(
+                "EVTX record limit reached (8000000 records); entire file rejected; no partial ingestion",
+            ));
         }
         Ok(())
     }
@@ -184,4 +186,20 @@ pub(super) fn detect(sample: &[u8]) -> bool {
         }
     }
     !crc == u32::from_le_bytes([sample[124], sample[125], sample[126], sample[127]])
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod budget_tests {
+    use super::*;
+    #[test]
+    fn exact_record_ceiling_is_accepted_and_the_next_record_is_an_error() {
+        let mut state = State::new("source.evtx", [0; 32], 69632);
+        state.seen = 7_999_999;
+        state.next().unwrap();
+        let message = state.next().unwrap_err().to_string();
+        assert!(message.contains("8000000 records"));
+        assert!(message.contains("entire file rejected"));
+        assert!(message.contains("no partial ingestion"));
+    }
 }

@@ -4,12 +4,14 @@ use std::io::{self, Write};
 pub(super) struct Output<'a> {
     sink: &'a mut dyn Write,
     remaining: u64,
+    budget: u64,
 }
 impl<'a> Output<'a> {
     pub(super) fn new(sink: &'a mut dyn Write, size: u64) -> Self {
         Self {
             sink,
             remaining: (size.saturating_mul(32).saturating_add(1 << 20)).min(8 << 30),
+            budget: (size.saturating_mul(32).saturating_add(1 << 20)).min(8 << 30),
         }
     }
     pub(super) fn frame(&mut self, frame: &serde_json::Value) -> io::Result<()> {
@@ -19,7 +21,7 @@ impl<'a> Output<'a> {
         self.remaining = self
             .remaining
             .checked_sub(bytes.0.len() as u64)
-            .ok_or_else(limit)?;
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("EVTX output byte limit reached ({} bytes); entire file rejected; no partial ingestion", self.budget)))?;
         self.sink.write_all(&bytes.0)
     }
     pub(super) fn rejected(&mut self, record: Option<u64>, offset: Option<u64>) -> io::Result<()> {
@@ -30,7 +32,10 @@ impl<'a> Output<'a> {
     }
 }
 fn limit() -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, "EVTX output exceeds its limit")
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        "EVTX frame byte limit reached (4194304 bytes); entire file rejected; no partial ingestion",
+    )
 }
 struct Frame(Vec<u8>);
 impl Write for Frame {

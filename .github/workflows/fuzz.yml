@@ -216,11 +216,11 @@ jobs:
         run: |
           cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --example large_collection
           cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx
-      - name: Run signed 100 MiB and 1 GiB synthetic collections
-        run: python3 -B scripts/benchmark_evtx_large.py target/${{ matrix.target }}/release/examples/large_collection${{ matrix.suffix }} --output evtx-large-${{ matrix.platform }}.json
-      - name: Check the record bound with one dense 1 GiB synthetic source
+      - name: Run signed collections, isolated single files and eight-million-record streaming
+        run: python3 -B scripts/benchmark_evtx_large.py target/${{ matrix.target }}/release/examples/large_collection${{ matrix.suffix }} --extended --output evtx-large-${{ matrix.platform }}.json
+      - name: Check the record bound above eight million synthetic records
         shell: bash
-        run: target/${{ matrix.target }}/release/examples/large_collection${{ matrix.suffix }} 1024 --record-limit-probe > evtx-large-limit-${{ matrix.platform }}.json
+        run: target/${{ matrix.target }}/release/examples/large_collection${{ matrix.suffix }} 4096 --record-limit-probe > evtx-large-limit-${{ matrix.platform }}.json
       - name: Attach release measurements
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -9,7 +9,7 @@ use std::{
 pub const PROTOCOL: &str = "irmind-evtx-ndjson-v1";
 pub const MAX_SOURCE: u64 = 4 * 1024 * 1024 * 1024;
 pub const MAX_RECORD: usize = 4 * 1024 * 1024;
-pub const MAX_RECORDS: u64 = 1_000_000;
+pub const MAX_RECORDS: u64 = 8_000_000;
 
 fn invalid() -> io::Error {
     io::Error::new(
@@ -54,7 +54,10 @@ pub fn decode<R: Read + Seek + Send>(mut input: R, output: &mut dyn Write) -> io
         let mut parsed = chunk.parse(settings.clone()).map_err(|_| invalid())?;
         for record in parsed.iter() {
             if accepted + rejected >= MAX_RECORDS {
-                return Err(invalid());
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "EVTX record limit reached (8000000 records); entire file rejected; no partial ingestion",
+                ));
             }
             if let Ok(record) = record {
                 let offset = base

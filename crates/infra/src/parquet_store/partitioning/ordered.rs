@@ -1,5 +1,6 @@
 //! Speculative direct writing. Publication waits for the complete source hash.
 mod producer;
+mod scheduling;
 use super::super::{AppError, CancellationToken, ParquetStore, PreparedSource, invalid_source};
 use super::Allocator;
 use super::batch::{PreparedPartition, Writing};
@@ -7,11 +8,12 @@ use super::staging::Input;
 use irmind_app::LocalBatchRequest;
 pub(super) use producer::ParsedSource;
 use producer::{ProducedSource, RowBatch};
-use std::sync::mpsc::{Receiver, sync_channel};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, sync_channel};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
+use std::time::Duration;
 
 impl ParquetStore {
     pub(super) fn prepare_ordered_sources(
@@ -21,7 +23,14 @@ impl ParquetStore {
         allocator: &mut Allocator,
         cancel: &CancellationToken,
     ) -> Result<Vec<PreparedSource>, AppError> {
+        let serial = inputs.iter().try_fold(false, |serial, input| {
+            let capability = request.parser.source_parallelism(&input.path)?;
+            Ok::<_, AppError>(serial || capability == irmind_app::SourceParallelism::Serial)
+        })?;
+        let operation = cancel.child_token();
+        let cancel = &operation;
         let prepared = std::thread::scope(|scope| {
+            let mut abort = scheduling::Abort(operation.clone());
             let workers = inputs
                 .into_iter()
                 .map(|input| {
@@ -30,27 +39,47 @@ impl ParquetStore {
                     let path = input.path.clone();
                     let restart = Arc::new(AtomicBool::new(false));
                     let worker_restart = Arc::clone(&restart);
+                    let (start, permit) = scheduling::permit(serial);
                     let worker = scope.spawn(move || {
-                        self.produce_ordered_rows(input, request, cancel, &sender, &worker_restart)
+                        let mut abort = scheduling::Abort(cancel.clone());
+                        let result = self.produce_ordered_rows(
+                            input,
+                            request,
+                            cancel,
+                            &sender,
+                            &worker_restart,
+                            start,
+                        );
+                        if result.is_ok() {
+                            abort.0 = CancellationToken::new();
+                        }
+                        result
                     });
-                    (receiver, worker, path, restart)
+                    (receiver, worker, path, restart, permit)
                 })
                 .collect::<Vec<_>>();
             let mut prepared = Ok(Vec::new());
-            for (receiver, worker, path, restart) in workers {
+            for (receiver, worker, path, restart, permit) in workers {
                 if prepared.is_err() {
                     // Unblock and join every producer before returning an error.
                     drop(receiver);
-                    let _ = worker.join();
+                    if let Ok(Err(error)) = worker.join()
+                        && matches!(prepared, Err(AppError::Cancelled))
+                    {
+                        prepared = Err(error);
+                    }
                     continue;
                 }
                 let mut trial = allocator.clone();
-                let state = self
-                    .consume_ordered_rows(request, &path, &receiver, &mut trial, cancel, &restart);
+                let state = permit.release().and_then(|()| {
+                    self.consume_ordered_rows(
+                        request, &path, &receiver, &mut trial, cancel, &restart,
+                    )
+                });
                 drop(receiver);
                 let parsed = worker.join().map_err(|_| invalid_source()).and_then(|v| v);
                 let next = match (state, parsed) {
-                    (Err(error), _) | (_, Err(error)) => Err(error),
+                    (_, Err(error)) | (Err(error), _) => Err(error),
                     (Ok(state), Ok(source)) => {
                         self.finish_ordered_source(request, source, state, trial, allocator, cancel)
                     }
@@ -61,11 +90,26 @@ impl ParquetStore {
                             out.push(source);
                         }
                     }
-                    Err(error) => prepared = Err(error),
+                    Err(error) => {
+                        cancel.cancel();
+                        prepared = Err(error);
+                    }
                 }
+            }
+            if prepared.is_ok() {
+                abort.0 = CancellationToken::new();
             }
             prepared
         })?;
+        self.publish_prepared_sources(request, prepared, cancel)
+    }
+
+    fn publish_prepared_sources(
+        &self,
+        request: &LocalBatchRequest<'_>,
+        prepared: Vec<PreparedPartition>,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<PreparedSource>, AppError> {
         // Preserve all-or-nothing parser preparation: no durable artifact is
         // published until every source has completed parsing and hash checks.
         prepared
@@ -108,7 +152,15 @@ impl ParquetStore {
         let parser = request.parser.identity_for_source(source_name)?;
         let mut writing = Writing::default();
         let mut previous = None;
-        while let Ok(batch) = receiver.recv() {
+        loop {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let batch = match receiver.recv_timeout(Duration::from_millis(10)) {
+                Ok(batch) => batch,
+                Err(RecvTimeoutError::Timeout) => continue,
+                Err(RecvTimeoutError::Disconnected) => break,
+            };
             for row in batch.rows {
                 if cancel.is_cancelled() {
                     return Err(AppError::Cancelled);

@@ -194,9 +194,20 @@ pub struct ParserIdentity<'a> {
     pub version: &'a str,
 }
 
+/// Scheduling capability; it grants no permissions or extra resources.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SourceParallelism {
+    Concurrent,
+    Serial,
+}
+
 /// Parser for large, pre-hashed sources. The caller verifies the same reader
 /// again while parsing before it commits any signed manifest entry.
 pub trait StreamingEventParser: Send + Sync {
+    fn source_parallelism(&self, _source: &str) -> Result<SourceParallelism, AppError> {
+        Ok(SourceParallelism::Concurrent)
+    }
+
     fn streaming_version(&self) -> &'static str;
     fn parser_name(&self) -> &'static str;
     fn identity(&self) -> ParserIdentity<'_> {
