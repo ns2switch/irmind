@@ -659,3 +659,24 @@ The Windows partial artifact contains only the completed 100 MiB case. It does n
 The separate Linux in-process decoder check uses a single source of 1,073,745,920 bytes containing 1,048,576 events. It emits exactly 1,000,000 records and rejects the remainder without a completion trailer, taking 16.348 s. This is an intentional record-bound qualification, not a successful ingestion or a contained-worker memory measurement.
 
 Data: [Linux collection and limit JSON](https://github.com/ns2switch/irmind/actions/runs/42314854568/artifacts/13550257924), [completed Windows 100 MiB JSON](https://github.com/ns2switch/irmind/actions/runs/42314854568/artifacts/13552457222). Per-source measurements with batch size one are a separate qualification.
+
+#### Native per-source qualification
+
+[Per-source native run](https://github.com/ns2switch/irmind/actions/runs/42320713853), release source `7dd4698a775e6ac35fe469afbfa032ec63e64837`, passed on both platforms. Each application request contains one source (`batch_files=1`); the four-source 1 GiB corpus still uses one case and one parser session. This characterizes the supported per-file workflow. It does not qualify the Windows batch-of-four path above.
+
+| Platform | Corpus | Sources | Records verified | Ingestion | MiB/s | Parent peak MiB | Helper peak MiB |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Linux x86-64 | 100 MiB + header | 1 | 102,400 | 6.565 s | 15.23 | 91.21 | 3.16 |
+| Linux x86-64 | 1 GiB + headers | 4 | 1,048,576 | 64.884 s | 15.78 | 133.28 | 3.53 |
+| Windows x86-64 | 100 MiB + header | 1 | 102,400 | 5.650 s | 17.70 | 74.93 | 5.70 |
+| Windows x86-64 | 1 GiB + headers | 4 | 1,048,576 | 54.634 s | 18.74 | 93.09 | 6.17 |
+
+Both 1 GiB cases verified 15 artifacts and 20 signed entries. No collection reached its per-file record, output or 600-second invocation bound. Windows used one witness per parser session: startup, including the witness, took 1.132 s for 100 MiB and 1.700 s for 1 GiB. Final verification took 0.051/0.470 s on Windows and 0.054/0.478 s on Linux. Peak memory covers each process lifetime, including setup/probes and verification; it excludes the compiler and the independent Python sampler.
+
+The separate dense single-file decoder check rejected at exactly 1,000,000 of 1,048,576 records, without a completion trailer, on Linux (16.075 s) and Windows (13.018 s). These checks call the production decoding library in-process. They do not constitute a successful whole-file ingestion or test the contained worker's wall deadline.
+
+Data: [Linux collection and limit JSON](https://github.com/ns2switch/irmind/actions/runs/42320713853/artifacts/13552921558), [Windows collection and limit JSON](https://github.com/ns2switch/irmind/actions/runs/42320713853/artifacts/13552508622). Both native jobs used optimized release builds and removed their synthetic sources and artifacts. Differences between the two Linux run modes are not an optimization result: they are separate runner executions.
+
+#### Record-budget option
+
+A possible additive acceptance change is 2,000,000 records per file in both the decoder and its parent validator. Keep the current frame size, normalized-size bounds, output byte budget, 600-second invocation deadline and isolation. Before applying it, require a native one-file 1 GiB ingestion, rejection above the new bound, cancellation/rollback checks and byte-identical reconstruction of previously accepted sources. No record limit changes in this PR.
