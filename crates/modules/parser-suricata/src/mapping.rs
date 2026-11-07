@@ -145,69 +145,16 @@ fn graph_fields(row: &EveRow<'_>) -> (Vec<(String, String)>, Vec<GraphRelation>)
         .as_ref()
         .and_then(|alert| alert.signature_id)
         .map(|id| id.to_string());
-    for (kind, value) in [
+    let base = [
         ("flow", flow.as_deref()),
         ("ip", row.src_ip.as_deref()),
         ("ip", row.dest_ip.as_deref()),
         ("port", src_port.as_deref()),
         ("port", dst_port.as_deref()),
         ("host", row.host.as_deref()),
-        (
-            "finding",
-            row.alert
-                .as_ref()
-                .and_then(|alert| alert.signature.as_deref()),
-        ),
-        (
-            "category",
-            row.alert
-                .as_ref()
-                .and_then(|alert| alert.category.as_deref()),
-        ),
-        (
-            "action",
-            row.alert.as_ref().and_then(|alert| alert.action.as_deref()),
-        ),
         ("rule_id", signature_id.as_deref()),
-        (
-            "domain",
-            row.dns.as_ref().and_then(|dns| dns.rrname.as_deref()),
-        ),
-        (
-            "domain",
-            row.http.as_ref().and_then(|http| http.hostname.as_deref()),
-        ),
-        (
-            "url",
-            row.http.as_ref().and_then(|http| http.url.as_deref()),
-        ),
-        (
-            "method",
-            row.http.as_ref().and_then(|http| http.method.as_deref()),
-        ),
-        (
-            "user_agent",
-            row.http
-                .as_ref()
-                .and_then(|http| http.user_agent.as_deref()),
-        ),
-        (
-            "domain",
-            row.tls.as_ref().and_then(|tls| tls.sni.as_deref()),
-        ),
-        (
-            "file",
-            row.fileinfo
-                .as_ref()
-                .and_then(|file| file.filename.as_deref()),
-        ),
-        (
-            "finding",
-            row.anomaly
-                .as_ref()
-                .and_then(|anomaly| anomaly.event.as_deref()),
-        ),
-    ] {
+    ];
+    for (kind, value) in base.into_iter().chain(content_fields(row)) {
         if let Some(value) = value.filter(|value| !value.is_empty() && value.len() <= 4096) {
             entities.push((kind.into(), value.into()));
         }
@@ -255,6 +202,30 @@ fn graph_fields(row: &EveRow<'_>) -> (Vec<(String, String)>, Vec<GraphRelation>)
         );
     }
     (entities, relations)
+}
+
+fn content_fields<'a>(row: &'a EveRow<'_>) -> [(&'static str, Option<&'a str>); 11] {
+    let alert = row.alert.as_ref();
+    let http = row.http.as_ref();
+    [
+        ("finding", alert.and_then(|v| v.signature.as_deref())),
+        ("category", alert.and_then(|v| v.category.as_deref())),
+        ("action", alert.and_then(|v| v.action.as_deref())),
+        ("domain", row.dns.as_ref().and_then(|v| v.rrname.as_deref())),
+        ("domain", http.and_then(|v| v.hostname.as_deref())),
+        ("url", http.and_then(|v| v.url.as_deref())),
+        ("method", http.and_then(|v| v.method.as_deref())),
+        ("user_agent", http.and_then(|v| v.user_agent.as_deref())),
+        ("domain", row.tls.as_ref().and_then(|v| v.sni.as_deref())),
+        (
+            "file",
+            row.fileinfo.as_ref().and_then(|v| v.filename.as_deref()),
+        ),
+        (
+            "finding",
+            row.anomaly.as_ref().and_then(|v| v.event.as_deref()),
+        ),
+    ]
 }
 
 fn add_relation(

@@ -487,13 +487,16 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() -> Result<(), Box<dyn std::er
         }
         let target = 1024_u64 * 1024 * 1024;
         let mut written = 0_u64;
+        let mut expected_records = 0_u64;
         while written < target {
             writer.write_all(encoded.as_bytes()).unwrap();
             writer.write_all(b"\n").unwrap();
             written += encoded.len() as u64 + 1;
+            expected_records += 1;
         }
         writer.flush().unwrap();
         drop(writer);
+        let source_size = fs::metadata(&source_path).unwrap().len();
         let mut sample = vec![0u8; 64 * 1024];
         let sample_size = fs::File::open(&source_path)
             .unwrap()
@@ -554,11 +557,29 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() -> Result<(), Box<dyn std::er
         )
         .unwrap();
         let seconds = started.elapsed().as_secs_f64();
-        println!(
-            "{name}: {written} bytes in {seconds:.3} s ({:.2} MiB/s)",
-            f64::from(u32::try_from(written / 1024 / 1024).unwrap()) / seconds
+        let mib_per_second = f64::from(u32::try_from(source_size).unwrap()) / 1_048_576.0 / seconds;
+        println!("{name}: {source_size} bytes in {seconds:.3} s ({mib_per_second:.2} MiB/s)");
+        let artifacts = LargeCaseUseCases {
+            engine: &engine,
+            store: store.as_ref(),
+            parser,
+        }
+        .verify_parquet(&case.id, &CancellationToken::new())
+        .unwrap();
+        assert!(artifacts > 0);
+        assert!(
+            store
+                .graph_summary(&case.id)
+                .unwrap()
+                .starts_with(&format!("Parquet records={expected_records};"))
         );
-        assert!(engine.verify(&case.id).is_ok());
+        println!(
+            "NETWORK_BENCH {}",
+            serde_json::json!({"parser":parser.parser_name(),
+            "source_bytes":source_size,"records":expected_records,"seconds":seconds,
+            "mib_per_second":mib_per_second,"artifacts_verified":artifacts,
+            "precise_v2":matches!(parser.parser_name(),"parser-zeek"|"parser-suricata")})
+        );
     }
     Ok(())
 }

@@ -172,6 +172,7 @@ fn indexed_events_keep_microseconds_and_request_host_partitioning() -> Result<()
         &CancellationToken::new(),
         &mut |record| {
             record.inspect(|row| {
+                assert!(row.source_offset.is_some());
                 let time = row.time.as_ref().unwrap();
                 assert_eq!(time.precision(), irmind_app::TimePrecision::Microsecond);
                 assert_ne!(time.instant().unix_micros().rem_euclid(1_000_000), 0);
@@ -228,5 +229,12 @@ fn escaped_json_strings_are_valid_bounded_data() -> Result<(), AppError> {
     assert_eq!(report.accepted, 1);
     assert_eq!(report.rejected, 0);
     assert!(!rows.is_empty());
+    Ok(())
+}
+
+#[test]
+fn filename_does_not_override_json_record_shape() -> Result<(), AppError> {
+    let (_, rows) = records("ssl.log", JSON)?;
+    assert_eq!(rows[0].event, "zeek_dns");
     Ok(())
 }

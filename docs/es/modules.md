@@ -246,7 +246,7 @@ El módulo experimental `parser-evtx` se compila por defecto, pero requiere el a
 
 Lee logs TSV de Zeek con `#path`, `#fields` y `#types`, y logs JSON de Zeek. Mapea conn, dns, http, ssl, files, x509, notice y weird; la entidad `uid` enlaza registros de distintos logs. Solo requiere lectura del archivo local. Viene compilado por defecto con `parser-zeek` y es experimental, probado solo con datos sintéticos. Los artefactos V2 conservan microsegundos y el resto en nanosegundos. La marca temporal original se conserva en el registro.
 
-Limita cada registro a 4 MiB, 1.024 campos y 64 niveles JSON, y cada fuente a diez millones de registros y 50 GiB. Cuenta los registros malformados y guarda muestras acotadas y escapadas. Solo admite el separador de campos tabulado predeterminado. El host se indexa como entidad; el esquema firmado actual particiona por fecha, cuenta y región. [Formato de Zeek](https://docs.zeek.org/en/current/tutorial/logs.html).
+Limita cada registro a 4 MiB, 1.024 campos y 64 niveles JSON, y cada fuente a diez millones de registros y 50 GiB. Cuenta los registros malformados y guarda muestras acotadas y escapadas. Solo admite el separador de campos tabulado predeterminado. V2 usa el perfil de host: `sensor_host` identifica explícitamente el sensor; `host` de HTTP es un dominio. Si falta el sensor, no se inventa su nombre. [Formato de Zeek](https://docs.zeek.org/en/current/tutorial/logs.html).
 
 ## Parser de Suricata EVE
 

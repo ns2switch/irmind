@@ -148,6 +148,7 @@ fn indexed_events_keep_microseconds_and_request_host_partitioning() -> Result<()
         &CancellationToken::new(),
         &mut |record| {
             record.inspect(|row| {
+                assert!(row.source_offset.is_some());
                 let time = row.time.as_ref().unwrap();
                 assert_eq!(time.precision(), irmind_app::TimePrecision::Microsecond);
                 assert_ne!(time.instant().unix_micros().rem_euclid(1_000_000), 0);

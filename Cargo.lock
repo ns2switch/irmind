@@ -2905,7 +2905,6 @@ dependencies = [
 name = "irmind-mod-parser-suricata"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "irmind-app",
  "irmind-domain",
  "irmind-testkit",
