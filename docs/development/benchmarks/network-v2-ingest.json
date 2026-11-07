@@ -1,0 +1,70 @@
+{
+  "source_commit": "e090bb6a42f1b11a3100ec7b36cee2a34bca23ed",
+  "profile": "release",
+  "scope": "local Linux; one selected source per case; synthetic repeated records; warm source cache; generation and final verification excluded",
+  "binary_sha256": "3870572bef47f889006bdc97b9ba49cff4bb9ce669018c83add2759664a04828",
+  "results": [
+    {
+      "artifacts_verified": 3,
+      "mib_per_second": 48.75052741969755,
+      "parser": "parser-zeek",
+      "precise_v2": true,
+      "records": 1097896,
+      "seconds": 21.004914943,
+      "source_bytes": 1073742539,
+      "repetition": 1
+    },
+    {
+      "artifacts_verified": 3,
+      "mib_per_second": 43.09386752854344,
+      "parser": "parser-suricata",
+      "precise_v2": true,
+      "records": 861061,
+      "seconds": 23.762109185,
+      "source_bytes": 1073743067,
+      "repetition": 1
+    },
+    {
+      "artifacts_verified": 3,
+      "mib_per_second": 27.974838004049385,
+      "parser": "parser-zeek",
+      "precise_v2": true,
+      "records": 1097896,
+      "seconds": 36.604347154,
+      "source_bytes": 1073742539,
+      "repetition": 2
+    },
+    {
+      "artifacts_verified": 3,
+      "mib_per_second": 40.45823378959629,
+      "parser": "parser-suricata",
+      "precise_v2": true,
+      "records": 861061,
+      "seconds": 25.310081274,
+      "source_bytes": 1073743067,
+      "repetition": 2
+    },
+    {
+      "artifacts_verified": 3,
+      "mib_per_second": 42.1530682475287,
+      "parser": "parser-zeek",
+      "precise_v2": true,
+      "records": 1097896,
+      "seconds": 24.292435271,
+      "source_bytes": 1073742539,
+      "repetition": 3
+    },
+    {
+      "artifacts_verified": 3,
+      "mib_per_second": 42.036484580671704,
+      "parser": "parser-suricata",
+      "precise_v2": true,
+      "records": 861061,
+      "seconds": 24.359819705,
+      "source_bytes": 1073743067,
+      "repetition": 3
+    }
+  ],
+  "features": "all features; preserve_order absent",
+  "toolchain": "1.95.0"
+}

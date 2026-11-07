@@ -104,6 +104,7 @@ mod matrix {
             )?),
             &ModuleConfig::new(),
         )?;
+        let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
             #[cfg(feature = "parser-syslog")]
             (
@@ -182,14 +183,46 @@ mod matrix {
             assert_eq!(found.id, expected);
             assert!(found.confidence.is_high());
             assert_scores(name, sample, expected)?;
+            matrix.insert(
+                format!("{expected}/{name}"),
+                capture_scores(&registry, name, sample)?,
+            );
         }
         #[cfg(feature = "parser-declarative")]
-        assert_custom_matrix(&registry)?;
+        assert_custom_matrix(&registry, &mut matrix)?;
+        if let Ok(path) = std::env::var("IRMIND_DETECTION_MATRIX_OUT") {
+            let bytes = serde_json::to_vec_pretty(&matrix).map_err(|_| {
+                irmind_app::AppError::Policy("cannot encode detection matrix".into())
+            })?;
+            std::fs::write(path, bytes).map_err(|_| {
+                irmind_app::AppError::Policy("cannot write detection matrix".into())
+            })?;
+        }
         assert!(matches!(
             registry.detect_parser("security-lake.parquet", b"PAR1synthetic-header"),
             ParserChoice::NeedsAnalyst(_)
         ));
         Ok(())
+    }
+    type Matrix =
+        std::collections::BTreeMap<String, std::collections::BTreeMap<String, Option<u8>>>;
+    fn capture_scores(
+        registry: &ModuleRegistry,
+        name: &str,
+        sample: &[u8],
+    ) -> Result<std::collections::BTreeMap<String, Option<u8>>, irmind_app::AppError> {
+        registry
+            .parser_catalog()
+            .available()
+            .into_iter()
+            .map(|(id, _)| {
+                let score = registry
+                    .parser_by_id(&id)?
+                    .detect(name, sample)
+                    .map(irmind_app::ParserConfidence::value);
+                Ok((id, score))
+            })
+            .collect()
     }
     fn assert_scores(
         name: &str,
@@ -305,7 +338,10 @@ mod matrix {
     }
 
     #[cfg(feature = "parser-declarative")]
-    fn assert_custom_matrix(registry: &ModuleRegistry) -> Result<(), irmind_app::AppError> {
+    fn assert_custom_matrix(
+        registry: &ModuleRegistry,
+        matrix: &mut Matrix,
+    ) -> Result<(), irmind_app::AppError> {
         let custom = custom_parsers()?;
         for (index, (name, sample)) in [
             (
@@ -327,6 +363,10 @@ mod matrix {
         .into_iter()
         .enumerate()
         {
+            matrix.insert(
+                format!("parser-declarative/{name}"),
+                capture_scores(registry, name, sample)?,
+            );
             let ParserChoice::NeedsAnalyst(candidates) = registry.detect_parser(name, sample)
             else {
                 return Err(irmind_app::AppError::Policy(
