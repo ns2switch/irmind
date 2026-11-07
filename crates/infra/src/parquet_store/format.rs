@@ -8,9 +8,12 @@ use std::{collections::BTreeMap, sync::Arc};
 pub(super) fn same_family(actual: &str, requested: &str) -> bool {
     fn family(value: &str) -> Option<u8> {
         match value {
-            "irmind-events-v2" | "irmind-events-v3" => Some(0),
-            "irmind-entities-v1" | "irmind-entities-v2" | "irmind-entities-v3" => Some(1),
-            "irmind-coobservations-v1" | "irmind-coobservations-v2" => Some(2),
+            "irmind-events-v2" | "irmind-events-v3" | "irmind-events-v4" => Some(0),
+            "irmind-entities-v1" | "irmind-entities-v2" | "irmind-entities-v3"
+            | "irmind-entities-v4" => Some(1),
+            "irmind-coobservations-v1"
+            | "irmind-coobservations-v2"
+            | "irmind-coobservations-v3" => Some(2),
             _ => None,
         }
     }
@@ -20,8 +23,9 @@ pub(super) fn same_family(actual: &str, requested: &str) -> bool {
 pub(super) fn expected_type(name: &str, precise: bool) -> DataType {
     match name {
         "record_index" | "source_offset" => DataType::UInt64,
-        "submicro_nanos" => DataType::UInt16,
-        "time_precision" => DataType::UInt8,
+        "submicro_nanos" | "entity_field" | "event_role_bits" => DataType::UInt16,
+        "event_category_bits" | "event_type_bits" => DataType::UInt32,
+        "event_outcome" | "event_kind" | "entity_role" | "time_precision" => DataType::UInt8,
         "time_inferred" => DataType::Boolean,
         "event_time" if precise => DataType::Timestamp(TimeUnit::Microsecond, Some("UTC".into())),
         _ => DataType::Utf8,
@@ -36,6 +40,7 @@ pub(super) fn validate_schema(artifact: &ParquetArtifact, schema: &Schema) -> Re
         {
             return Err(invalid_source());
         }
+        super::common_format::validate_metadata(v.schema, schema, &v.builder_version)?;
         let mut names = vec![
             "source_hash",
             "record_index",
@@ -49,16 +54,20 @@ pub(super) fn validate_schema(artifact: &ParquetArtifact, schema: &Schema) -> Re
             "scope_host",
         ];
         match v.schema {
-            irmind_domain::ArtifactSchemaV2::Events => {
+            irmind_domain::ArtifactSchemaV2::Events
+            | irmind_domain::ArtifactSchemaV2::CommonEvents => {
                 names.extend(["event", "text", "entities", "relations"]);
             }
-            irmind_domain::ArtifactSchemaV2::Entities => {
+            irmind_domain::ArtifactSchemaV2::Entities
+            | irmind_domain::ArtifactSchemaV2::CommonEntities => {
                 names.extend(["event", "entity_kind", "entity_value"]);
             }
-            irmind_domain::ArtifactSchemaV2::Coobservations => {
+            irmind_domain::ArtifactSchemaV2::Coobservations
+            | irmind_domain::ArtifactSchemaV2::CommonCoobservations => {
                 names.extend(["entity_kind", "entity_value", "co_entities"]);
             }
         }
+        names.extend(super::common_format::extra_columns(v.schema));
         if names.len() != schema.fields().len() {
             return Err(invalid_source());
         }

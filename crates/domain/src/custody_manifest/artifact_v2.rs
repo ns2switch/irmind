@@ -14,6 +14,9 @@ pub enum ArtifactSchemaV2 {
     Events,
     Entities,
     Coobservations,
+    CommonEvents,
+    CommonEntities,
+    CommonCoobservations,
 }
 
 impl ArtifactSchemaV2 {
@@ -22,7 +25,17 @@ impl ArtifactSchemaV2 {
             Self::Events => "irmind-events-v3",
             Self::Entities => "irmind-entities-v3",
             Self::Coobservations => "irmind-coobservations-v2",
+            Self::CommonEvents => "irmind-events-v4",
+            Self::CommonEntities => "irmind-entities-v4",
+            Self::CommonCoobservations => "irmind-coobservations-v3",
         }
+    }
+
+    pub const fn is_common(self) -> bool {
+        matches!(
+            self,
+            Self::CommonEvents | Self::CommonEntities | Self::CommonCoobservations
+        )
     }
 
     pub fn parse(value: &str) -> Result<Self, DomainError> {
@@ -30,6 +43,9 @@ impl ArtifactSchemaV2 {
             "irmind-events-v3" => Ok(Self::Events),
             "irmind-entities-v3" => Ok(Self::Entities),
             "irmind-coobservations-v2" => Ok(Self::Coobservations),
+            "irmind-events-v4" => Ok(Self::CommonEvents),
+            "irmind-entities-v4" => Ok(Self::CommonEntities),
+            "irmind-coobservations-v3" => Ok(Self::CommonCoobservations),
             _ => Err(DomainError::InvalidManifest),
         }
     }

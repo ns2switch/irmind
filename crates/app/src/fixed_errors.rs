@@ -7,6 +7,8 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum FixedAppError {
+    #[error("policy denied: common event projection is invalid or inconsistent with its source")]
+    PolicyInvalidCommonEvent,
     #[error("policy denied: explicit artifact migration is unavailable")]
     PolicyArtifactMigrationUnavailable,
     #[error("policy denied: export V5 is unavailable")]

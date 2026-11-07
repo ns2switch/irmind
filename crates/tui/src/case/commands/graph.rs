@@ -80,9 +80,16 @@ fn run_graph_action(
         GraphAction::Timeline(filter) => {
             let events = graph.timeline_filtered(id, filter, 100)?;
             if events.is_empty() {
-                return Ok("No timeline events in the selected partitions".into());
+                return Ok(filter.coverage_notice().map_or_else(
+                    || "No timeline events in the selected partitions".into(),
+                    |notice| {
+                        format!(
+                            "{notice}\nNo matching classified events in the selected partitions"
+                        )
+                    },
+                ));
             }
-            Ok(events
+            let output = events
                 .into_iter()
                 .map(|event| {
                     format!(
@@ -91,7 +98,11 @@ fn run_graph_action(
                     )
                 })
                 .collect::<Vec<_>>()
-                .join("\n"))
+                .join("\n");
+            Ok(match filter.coverage_notice() {
+                Some(notice) => format!("{notice}\n{output}"),
+                None => output,
+            })
         }
         GraphAction::Raw(hash, index) => graph.raw_record(id, hash, *index),
         GraphAction::Query(command, query, filter) => match command.as_str() {
@@ -124,24 +135,18 @@ fn parse_graph_options(
     input: &str,
     require_query: bool,
 ) -> Result<(String, GraphQueryFilter), AppError> {
-    let (mut from, mut to, mut account, mut project, mut region, mut host) =
-        (None, None, None, None, None, None);
+    let mut args = std::collections::BTreeMap::new();
     let mut query = Vec::new();
     for token in input.split_whitespace() {
-        if let Some(value) = token.strip_prefix("--from=") {
-            set_once(&mut from, value)?;
-        } else if let Some(value) = token.strip_prefix("--to=") {
-            set_once(&mut to, value)?;
-        } else if let Some(value) = token.strip_prefix("--account=") {
-            set_once(&mut account, value)?;
-        } else if let Some(value) = token.strip_prefix("--project=") {
-            set_once(&mut project, value)?;
-        } else if let Some(value) = token.strip_prefix("--region=") {
-            set_once(&mut region, value)?;
-        } else if let Some(value) = token.strip_prefix("--host=") {
-            set_once(&mut host, value)?;
-        } else if token.starts_with("--") {
-            return Err(invalid_graph_arguments());
+        if let Some(option) = token.strip_prefix("--") {
+            let (name, value) = option.split_once('=').ok_or_else(invalid_graph_arguments)?;
+            let name = name.replace('-', "_");
+            if !GraphQueryFilter::ARGUMENTS.contains(&name.as_str())
+                || value.is_empty()
+                || args.insert(name, value.into()).is_some()
+            {
+                return Err(invalid_graph_arguments());
+            }
         } else {
             query.push(token);
         }
@@ -149,24 +154,8 @@ fn parse_graph_options(
     if query.is_empty() == require_query {
         return Err(invalid_graph_arguments());
     }
-    let filter = GraphQueryFilter::parse_with_host(
-        from.as_deref(),
-        to.as_deref(),
-        account.as_deref(),
-        project.as_deref(),
-        region.as_deref(),
-        host.as_deref(),
-    )
-    .map_err(|_| invalid_graph_arguments())?;
+    let filter = GraphQueryFilter::from_args(&args).map_err(|_| invalid_graph_arguments())?;
     Ok((query.join(" "), filter))
-}
-
-fn set_once(slot: &mut Option<String>, value: &str) -> Result<(), AppError> {
-    if slot.is_some() || value.is_empty() {
-        return Err(invalid_graph_arguments());
-    }
-    *slot = Some(value.into());
-    Ok(())
 }
 
 fn invalid_graph_arguments() -> AppError {
@@ -206,5 +195,16 @@ mod tests {
         assert!(parse_graph_options("", false).is_ok());
         assert!(parse_graph_options("--region=eu-west-1", false).is_ok());
         assert!(parse_graph_options("unexpected", false).is_err());
+        let (text, typed) = parse_graph_input(
+            "Login --event-category=authentication --event-outcome=failure --entity-role=actor",
+        )
+        .unwrap();
+        assert_eq!(text, "Login");
+        assert_eq!(
+            typed.common().outcome,
+            Some(irmind_app::common_event::EventOutcome::Failure)
+        );
+        assert!(parse_graph_input("Login --event-outcome=maybe").is_err());
+        assert!(parse_graph_input("Login --entity-role=actor --entity-role=target").is_err());
     }
 }

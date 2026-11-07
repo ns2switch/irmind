@@ -51,6 +51,7 @@ pub fn run_log_parser_contract(
     {
         return Err(contract_error());
     }
+    crate::run_common_event_contract(parser, source, fixture, expected)?;
     Ok(())
 }
 

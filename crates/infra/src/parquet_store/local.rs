@@ -314,6 +314,7 @@ pub(super) fn verify_source_unchanged(
 
 impl ParquetStore {
     pub(super) fn replay_mode(&mut self, source: &SourceManifestV1, artifacts: &[ParquetArtifact]) {
+        self.common_events=artifacts.iter().any(|a|matches!(a,ParquetArtifact::V2(v) if v.schema.is_common() && v.source_hashes.contains(&source.sha256)));
         self.precise_time = artifacts.iter().any(|a| {
             matches!(a, ParquetArtifact::V2(_)) && a.source_hashes().contains(&source.sha256)
         });
@@ -332,7 +333,7 @@ impl ParquetStore {
         cancel: &CancellationToken,
     ) -> Result<PreparedSource, AppError> {
         let partitioned = signed.iter().any(|a| matches!(a, ParquetArtifact::V2(v)
-            if v.builder_version == super::partitioning::BUILDER && v.source_hashes.contains(&source.sha256)));
+            if matches!(v.builder_version.as_str(),super::partitioning::BUILDER|super::common_format::BUILDER) && v.source_hashes.contains(&source.sha256)));
         if partitioned {
             self.prepare_local_batch(request, cancel)?
                 .pop()

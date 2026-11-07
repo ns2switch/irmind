@@ -2,6 +2,10 @@
 
 This design is for parser, connector and evidence-store maintainers. It proposes a typed event contract so analysts can ask the same question across cloud, endpoint and network evidence. It does not implement a parser, change signed formats, authorize credentials or enable a provider.
 
+## Delivery sequence
+
+The typed core is delivered separately from parser mappings. The first mapping group covers EVTX, Linux authentication/auditd, CloudTrail, ECS, OCSF, Zeek and Suricata. Remaining mappings are community tasks. Semantic migration (`CommonEventMigrationV1`) is deferred: existing cases remain readable and re-ingestion into a new case is the current alternative. The migration section below records a future design, not an implemented transformation.
+
 ## Recommendation and scope
 
 Adopt **`irmind-common-event-v1`**, a bounded subset of [ECS 9.5.0](https://github.com/elastic/ecs/tree/v9.5.0/schemas), with explicit provenance, time precision and entity roles. ECS names describe the logical view; Rust types enforce its invariants. This is an IRMind schema inspired by ECS, not a claim of complete ECS compatibility. Future ECS releases do not change this contract automatically.

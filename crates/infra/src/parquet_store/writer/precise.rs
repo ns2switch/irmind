@@ -203,11 +203,14 @@ pub(super) fn manifest(
     size: u64,
     digest: &[u8; 32],
 ) -> Result<ParquetArtifact, AppError> {
-    let schema = match sink.kind {
-        ArtifactKind::Events => ArtifactSchemaV2::Events,
-        ArtifactKind::Entities => ArtifactSchemaV2::Entities,
-        ArtifactKind::Coobservations => ArtifactSchemaV2::Coobservations,
-        ArtifactKind::LegacyEntities => return Err(invalid_source()),
+    let schema = match (sink.kind, sink.common) {
+        (ArtifactKind::Events, false) => ArtifactSchemaV2::Events,
+        (ArtifactKind::Entities, false) => ArtifactSchemaV2::Entities,
+        (ArtifactKind::Coobservations, false) => ArtifactSchemaV2::Coobservations,
+        (ArtifactKind::Events, true) => ArtifactSchemaV2::CommonEvents,
+        (ArtifactKind::Entities, true) => ArtifactSchemaV2::CommonEntities,
+        (ArtifactKind::Coobservations, true) => ArtifactSchemaV2::CommonCoobservations,
+        (ArtifactKind::LegacyEntities, _) => return Err(invalid_source()),
     };
     Ok(ParquetArtifactV2 {
         path: sink.relative_path.clone(),
@@ -231,7 +234,9 @@ pub(super) fn manifest(
         source_hashes: vec![hash.clone()],
         time_semantics: ARTIFACT_V2_TIME_SEMANTICS.into(),
         stable_order: ARTIFACT_V2_STABLE_ORDER.into(),
-        builder_version: if sink.partition.scope.is_some() {
+        builder_version: if sink.common {
+            crate::parquet_store::common_format::BUILDER.into()
+        } else if sink.partition.scope.is_some() {
             crate::parquet_store::partitioning::BUILDER.into()
         } else {
             BUILDER.into()

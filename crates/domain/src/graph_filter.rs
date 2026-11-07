@@ -1,4 +1,6 @@
-use crate::{BTreeMap, CaseScope, DomainError, IndexedInstant, IndexedTime};
+mod common;
+
+use crate::{CaseScope, DomainError, IndexedInstant, IndexedTime};
 
 /// A bounded, optional partition and timestamp filter for local graph queries.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -9,6 +11,7 @@ pub struct GraphQueryFilter {
     project: Option<String>,
     region: Option<String>,
     host: Option<String>,
+    common: crate::CommonEventFilter,
 }
 
 impl GraphQueryFilter {
@@ -56,18 +59,8 @@ impl GraphQueryFilter {
             project: project.map(str::to_owned),
             region: region.map(str::to_owned),
             host: host.map(str::to_owned),
+            common: crate::CommonEventFilter::default(),
         })
-    }
-
-    pub fn from_args(args: &BTreeMap<String, String>) -> Result<Self, DomainError> {
-        Self::parse_with_host(
-            args.get("from").map(String::as_str),
-            args.get("to").map(String::as_str),
-            args.get("account").map(String::as_str),
-            args.get("project").map(String::as_str),
-            args.get("region").map(String::as_str),
-            args.get("host").map(String::as_str),
-        )
     }
 
     pub fn is_empty(&self) -> bool {
@@ -76,6 +69,7 @@ impl GraphQueryFilter {
             && self.project.is_none()
             && self.region.is_none()
             && self.host.is_none()
+            && self.common.is_empty()
     }
 
     pub fn time_range(&self) -> Option<(&str, &str)> {
@@ -169,6 +163,7 @@ mod tests {
         Case, CaseId, CaseScope, Decision, ExecutionMode, PolicyRules, ProposedCall, Severity,
         Tool, evaluate, evaluate_with_rules,
     };
+    use std::collections::BTreeMap;
 
     #[test]
     fn malicious_host_selectors_fail_closed_in_constructors_and_policy() {

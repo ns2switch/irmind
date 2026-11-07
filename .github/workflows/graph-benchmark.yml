@@ -6,6 +6,10 @@ on:
         description: Optional 40-character baseline commit for paired release measurements
         type: string
         default: ""
+      common_schema:
+        description: Compare the typed common-schema bridge with the pinned baseline
+        type: boolean
+        default: false
       scenario:
         description: Release benchmark workload
         type: choice
@@ -35,7 +39,7 @@ env:
   HUNTEVAL_COMMIT: 4cbb555a56bc17cb03b988ad2f15b1374eecf183
 jobs:
   graph_benchmark:
-    if: ${{ !inputs.compare_base }}
+    if: ${{ !inputs.compare_base && !inputs.common_schema }}
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -114,7 +118,7 @@ jobs:
           fi
 
   paired_v2:
-    if: ${{ inputs.compare_base != '' }}
+    if: ${{ inputs.compare_base != '' && !inputs.common_schema }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -155,6 +159,56 @@ jobs:
         with:
           name: parquet-pair-${{ matrix.scenario }}
           path: benchmark-pair-*.txt
+          if-no-files-found: warn
+      - name: Remove downloaded HuntEval files
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${IRMIND_HUNTEVAL_ROOT:-}" && "$IRMIND_HUNTEVAL_ROOT" == "$RUNNER_TEMP"/hunteval.* ]]; then
+            rm -rf -- "$IRMIND_HUNTEVAL_ROOT"
+          fi
+
+  common_schema:
+    if: ${{ inputs.common_schema && inputs.compare_base != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        scenario: [cloud-v2, endpoint-v2-1, endpoint-v2-64, endpoint-v2-1024, endpoint-v2-1025, endpoint-v2-1-chronological, endpoint-v2-64-chronological, endpoint-v2-1024-chronological, endpoint-v2-1025-chronological]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false, fetch-depth: 0}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: common-schema-benchmark-linux
+          save-if: ${{ github.ref_name == 'main' }}
+      - run: sudo apt-get update && sudo apt-get install -y mold
+      - name: Fetch and verify pinned HuntEval public sources and private answers
+        shell: bash
+        run: |
+          set -euo pipefail
+          dataset_root=$(mktemp -d "$RUNNER_TEMP/hunteval.XXXXXXXX")
+          trap 'rm -rf "$dataset_root"' ERR
+          git -C "$dataset_root" init -q
+          git -C "$dataset_root" remote add origin https://github.com/ns2switch/HuntEval.git
+          git -C "$dataset_root" fetch -q --depth 1 origin "$HUNTEVAL_COMMIT"
+          git -C "$dataset_root" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$dataset_root" rev-parse HEAD)" = "$HUNTEVAL_COMMIT"
+          (cd "$dataset_root" && sha256sum -c "$GITHUB_WORKSPACE/scripts/hunteval.sha256")
+          echo "IRMIND_HUNTEVAL_ROOT=$dataset_root" >> "$GITHUB_ENV"
+      - name: Compare release schemas on the same runner
+        env:
+          BASE_REF: ${{ inputs.compare_base }}
+          IRMIND_BENCH_SCENARIO: ${{ matrix.scenario }}
+        run: bash .github/scripts/benchmark_common_schema.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: common-schema-${{ matrix.scenario }}
+          path: common-schema-*.txt
           if-no-files-found: warn
       - name: Remove downloaded HuntEval files
         if: always()

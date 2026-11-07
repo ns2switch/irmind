@@ -37,6 +37,7 @@ mod events;
 mod extrema;
 mod neighbors;
 mod path;
+mod scoped;
 mod timeline;
 use coobservations::coobservation_available;
 
@@ -136,6 +137,7 @@ fn ordered(rows: &mut Vec<EventHit>, limit: usize, newest: bool) -> Result<(), A
     if let Some(error) = error {
         return Err(error);
     }
+    rows.dedup_by(|a, b| a.hash == b.hash && a.index == b.index);
     rows.truncate(limit);
     Ok(())
 }

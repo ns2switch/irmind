@@ -84,6 +84,7 @@ fn add_graph_filters(spec: &mut ToolSpec) {
     let Some(properties) = spec.parameters["properties"].as_object_mut() else {
         return;
     };
+    add_entity_kinds(properties);
     for (name, description) in [
         (
             "from",
@@ -103,14 +104,67 @@ fn add_graph_filters(spec: &mut ToolSpec) {
         ),
         ("region", "Optional region partition"),
         (
+            "event_category",
+            "Optional common-event category; only classified coverage is returned",
+        ),
+        ("event_type", "Optional common-event type"),
+        (
+            "event_outcome",
+            "Optional explicit common outcome: success, failure or unknown",
+        ),
+        (
+            "entity_role",
+            "Optional explicit entity role; legacy unspecified roles do not match",
+        ),
+        (
             "host",
             "Optional exact host within case and organization scope",
         ),
     ] {
-        properties.insert(
-            name.into(),
-            json!({"type":"string","description":description}),
-        );
+        let mut schema = json!({"type":"string","description":description});
+        let choices: Vec<&str> = match name {
+            "event_category" => irmind_domain::EventCategory::ALL
+                .iter()
+                .map(|v| v.as_str())
+                .collect(),
+            "event_type" => irmind_domain::EventType::ALL
+                .iter()
+                .map(|v| v.as_str())
+                .collect(),
+            "event_outcome" => irmind_domain::EventOutcome::ALL
+                .iter()
+                .map(|v| v.as_str())
+                .collect(),
+            "entity_role" => irmind_domain::EntityRole::ALL
+                .iter()
+                .map(|v| v.as_str())
+                .collect(),
+            _ => Vec::new(),
+        };
+        if !choices.is_empty() {
+            schema["enum"] = json!(choices);
+        }
+        properties.insert(name.into(), schema);
+    }
+}
+
+fn add_entity_kinds(properties: &mut serde_json::Map<String, Value>) {
+    let kinds = irmind_domain::ObservedEntityKind::ALL
+        .iter()
+        .map(|kind| kind.as_str())
+        .chain([
+            "identity",
+            "principal",
+            "user_agent",
+            "event_id",
+            "uid",
+            "finding",
+        ])
+        .collect::<std::collections::BTreeSet<_>>();
+    for key in ["kind", "from_kind", "to_kind"] {
+        if let Some(field) = properties.get_mut(key) {
+            field["enum"] = json!(kinds);
+        }
     }
 }
 
