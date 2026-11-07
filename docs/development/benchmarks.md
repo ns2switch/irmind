@@ -743,3 +743,20 @@ The same local release-profile, single-file harness measured the network parsers
 | Suricata | EVE JSONL | 1,073,743,067 | 30.054 s | 34.07 MiB/s |
 
 Both benchmarks used one Cargo job and one test thread, with private temporary case directories removed after the run. These figures belong to the unmerged pre-V2 prototype and its legacy second-resolution writer. That prototype was not distributed in v0.1.x. Current V2 qualification is recorded separately below; do not treat the old figures as current-module throughput.
+
+## Network parsers with precise V2 artifacts
+
+[Raw optimized results](benchmarks/network-v2-ingest.json), source `e090bb6a42f1b11a3100ec7b36cee2a34bca23ed`. The same local Linux release build ran three repetitions per selected parser, with one source and a fresh case per repetition. Sources repeat synthetic records with padding to at least 1 GiB. They are generated immediately before ingestion, so their source cache is warm. These are local measurements, not standard GitHub-runner gates and not a controlled optimization comparison with the unmerged historical prototype.
+
+Timing includes source hashing, bounded parsing/entity extraction, precise V2 Parquet with real record offsets and co-observations, and signed custody. Generation and final verification are excluded. Every run verifies all three artifact hashes and the exact indexed count; sources, cases and private temporary directories are removed. No model or remote service is used.
+
+| Parser | Source bytes | Records per run | Repetition times, s | Median, s | Median MiB/s | MiB/s range |
+| --- | ---: | ---: | --- | ---: | ---: | --- |
+| parser-zeek | 1,073,742,539 | 1,097,896 | 21.005, 36.604, 24.292 | 24.292 | 42.15 | 27.97–48.75 |
+| parser-suricata | 1,073,743,067 | 861,061 | 23.762, 25.310, 24.360 | 24.360 | 42.04 | 40.46–43.09 |
+
+Zeek's larger spread is retained rather than selecting its fastest run. The corpus is repetitive and compresses well; this does not predict heterogeneous incident throughput. Reproduce with the ignored `benchmark_one_gib_synthetic_ingest_per_parser` test in `crates/bin/tests/parser_ingest.rs`, an optimized release build and the nonsecret development selector `IRMIND_BENCH_PARSER` set to `zeek` or `suricata`. The harness refuses an unoptimized run.
+
+### Network detection coverage
+
+The [complete captured confidence matrix](benchmarks/network-detection-matrix.json) has 19 public text fixtures and 16 registered detectors, including the declarative holder and three signed example definitions. Every native fixture has exactly one high-confidence winner; the generic JSON fallback is 45 where applicable. Declarative fixtures remain at 70 and require analyst choice; no unexpected high-confidence match was observed. The EVTX binary/native-readiness suite is separate, and the existing OCSF Parquet header check remains an analyst-choice case. The matrix is captured from the same registry test used in CI, not hand-written detector expectations.
