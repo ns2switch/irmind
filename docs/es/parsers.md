@@ -1,4 +1,4 @@
-Traducción de docs/parsers.md en el commit 63a9c6145c92979eddb225168d67931ecc8f8096; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/parsers.md en el commit 25cb01a0c1349a224b7870daa60e00f2e4f6b704; si hay diferencias, prevalece la versión en inglés.
 
 # Parsers de logs
 
@@ -87,4 +87,4 @@ Security, System, PowerShell y Sysmon se normalizan al esquema común. Se conser
 
 Entornos nativos probados: Ubuntu 22.04 y 24.04, Debian 12 (kernel 6.1), macOS 26.6.2 arm64 y Windows Server 2025. Fedora 44 solo se probó como espacio de usuario en contenedor. Windows 10/11 siguen como experimentales y sin confirmación; consulta el [issue de validación en Windows 11](https://github.com/ns2switch/irmind/issues/189) y la [evidencia exacta por plataforma](../development/evtx-helper-validation.md). Cada instalación debe superar las pruebas de aislamiento.
 
-Al compilar desde el código, compila el ejecutable principal y ejecuta `cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --target-dir target` desde la raíz del repositorio. Mantén `irmind-evtx` (o `irmind-evtx.exe`) junto al ejecutable principal. El autotest nativo decide la disponibilidad; instalar el auxiliar nunca evita esa comprobación.
+Al compilar desde el código, compila el ejecutable principal y fija `CARGO_TARGET_DIR` a `target` en la terminal y ejecuta `cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked` desde la raíz del repositorio. Usa el mismo directorio de destino para ambos workspaces. Mantén `irmind-evtx` (o `irmind-evtx.exe`) junto al ejecutable principal. El autotest nativo decide la disponibilidad; instalar el auxiliar nunca evita esa comprobación.
