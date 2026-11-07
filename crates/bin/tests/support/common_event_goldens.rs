@@ -1,4 +1,6 @@
 use super::*;
+#[path = "common_event_values.rs"]
+mod values;
 
 #[test]
 fn typed_common_payload_and_new_envelopes_are_feature_independent() {

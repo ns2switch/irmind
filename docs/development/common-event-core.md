@@ -12,6 +12,8 @@ The application pairs the projection with the existing indexed record and its ta
 
 Two additive parser methods emit common reader/local-file reports. Their defaults lift the unchanged historical indexed output. The bridge does not inspect field names or source words to infer classifications or roles: category/type sets are empty, outcome is unknown and old entity observations remain explicitly unspecified. Normalization never removes taint or extends permissions.
 
+A module can override `StreamingEventParser::parse_common_reader_report` and `parse_common_local_file_report`. Build an `EventOrigin` from the supplied source hash and real record reference, insert checked fields into `EventContextV1`, and construct `EntityObservation` values with explicit roles and identity scopes. `CommonEventV1::try_new` checks that observations match the typed context. Emit the complete `CommonGraphRecord` inside its original `Tainted` provenance. The storage boundary independently corroborates that identity before writing. The [synthetic mapped parser](../../crates/infra/src/parquet_store/tests/common/mapped.rs) demonstrates this contract; it is not a production source mapping.
+
 ## Physical schemas and reconstruction
 
 The V2 envelope and export V5 framing remain unchanged. New schema identifiers and the new builder `parquet-builder-common-event-v1` select the typed layout:
@@ -47,5 +49,7 @@ Parser mappings, declarative mapping definitions and the Elastic/Chronicle conne
 ## Validation and measurement
 
 Tests cover the codebook, canonical payload/envelope goldens, invalid typed values, same-value roles, PID reuse, the unclassified bridge, mixed readers, custody, public-key-only V5 verification and deterministic reconstruction. The shared parser contract checks deterministic common emission and cancellation. The preserve-order job also runs common goldens and bridge contracts.
+
+Format tests exercise every closed context-field type and all identity-scope encodings in both JSON map modes. AddressSanitizer runs record their source revision, duration and execution counts for the [canonical codec](benchmarks/common-event-core-fuzz.json) and [export verifier](benchmarks/common-event-export-fuzz.json).
 
 The manual graph benchmark supports a paired common-schema run against a pinned baseline: three smoke repetitions for representative cloud and endpoint sources, then one 15 GB pass per cloud/endpoint scenario on the same runner class. Builds use release optimization. The existing ingestion/query gates are unchanged. The bridge benchmark measures the core; it does not claim the cost or classification coverage of future source-specific mappings.
