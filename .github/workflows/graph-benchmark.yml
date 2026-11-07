@@ -186,6 +186,19 @@ jobs:
           key: common-schema-benchmark-linux
           save-if: ${{ github.ref_name == 'main' }}
       - run: sudo apt-get update && sudo apt-get install -y mold
+      - name: Fetch and verify pinned HuntEval public sources and private answers
+        shell: bash
+        run: |
+          set -euo pipefail
+          dataset_root=$(mktemp -d "$RUNNER_TEMP/hunteval.XXXXXXXX")
+          trap 'rm -rf "$dataset_root"' ERR
+          git -C "$dataset_root" init -q
+          git -C "$dataset_root" remote add origin https://github.com/ns2switch/HuntEval.git
+          git -C "$dataset_root" fetch -q --depth 1 origin "$HUNTEVAL_COMMIT"
+          git -C "$dataset_root" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$dataset_root" rev-parse HEAD)" = "$HUNTEVAL_COMMIT"
+          (cd "$dataset_root" && sha256sum -c "$GITHUB_WORKSPACE/scripts/hunteval.sha256")
+          echo "IRMIND_HUNTEVAL_ROOT=$dataset_root" >> "$GITHUB_ENV"
       - name: Compare release schemas on the same runner
         env:
           BASE_REF: ${{ inputs.compare_base }}
@@ -197,3 +210,10 @@ jobs:
           name: common-schema-${{ matrix.scenario }}
           path: common-schema-*.txt
           if-no-files-found: warn
+      - name: Remove downloaded HuntEval files
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${IRMIND_HUNTEVAL_ROOT:-}" && "$IRMIND_HUNTEVAL_ROOT" == "$RUNNER_TEMP"/hunteval.* ]]; then
+            rm -rf -- "$IRMIND_HUNTEVAL_ROOT"
+          fi

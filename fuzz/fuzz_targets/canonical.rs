@@ -7,6 +7,12 @@ fuzz_target!(|bytes: &[u8]| {
         return;
     }
     if let Ok(text) = std::str::from_utf8(bytes) {
+        if let Ok(common) = irmind_app::decode_common_event(text) {
+            let canonical = irmind_app::encode_common_event(&common).unwrap();
+            assert_eq!(canonical, text);
+            assert_eq!(irmind_app::decode_common_event(&canonical).unwrap(), common);
+            assert!(irmind_app::decode_common_event(&(canonical + " ")).is_err());
+        }
         if let Ok(inventory) = irmind_domain::SealInventoryV2::decode(text.trim()) {
             let wire = inventory.encode().unwrap();
             assert_eq!(
