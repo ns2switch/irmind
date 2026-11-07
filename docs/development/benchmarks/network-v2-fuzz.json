@@ -1,0 +1,30 @@
+{
+  "source": "e090bb6a42f1b11a3100ec7b36cee2a34bca23ed",
+  "execution_count_note": "The quiet libFuzzer output did not report execution counts; no count is inferred.",
+  "runs": [
+    {
+      "parser": "parser-zeek",
+      "sanitizer": "address",
+      "budget_seconds": 600,
+      "elapsed_including_build_seconds": 669.7825824579922,
+      "executions": null,
+      "exit_code": 0,
+      "crashes": 0,
+      "max_input_bytes": 65536,
+      "rss_limit_mib": 512,
+      "case_timeout_seconds": 30
+    },
+    {
+      "parser": "parser-suricata",
+      "sanitizer": "address",
+      "budget_seconds": 600,
+      "elapsed_including_build_seconds": 602.0340007999912,
+      "executions": null,
+      "exit_code": 0,
+      "crashes": 0,
+      "max_input_bytes": 65536,
+      "rss_limit_mib": 512,
+      "case_timeout_seconds": 30
+    }
+  ]
+}

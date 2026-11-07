@@ -760,3 +760,7 @@ Zeek's larger spread is retained rather than selecting its fastest run. The corp
 ### Network detection coverage
 
 The [complete captured confidence matrix](benchmarks/network-detection-matrix.json) has 19 public text fixtures and 16 registered detectors, including the declarative holder and three signed example definitions. Every native fixture has exactly one high-confidence winner; the generic JSON fallback is 45 where applicable. Declarative fixtures remain at 70 and require analyst choice; no unexpected high-confidence match was observed. The EVTX binary/native-readiness suite is separate, and the existing OCSF Parquet header check remains an analyst-choice case. The matrix is captured from the same registry test used in CI, not hand-written detector expectations.
+
+### Network parser fuzzing
+
+Both detection and parsing entry points completed 600-second AddressSanitizer runs on synthetic/mutated seeds with no crash or timeout. The input bound was 64 KiB, the per-case timeout 30 seconds and the process RSS limit 512 MiB. These runs cover bounded in-memory fuzz inputs; the separate streaming regressions cover oversized first lines. [Run settings and exit status](benchmarks/network-v2-fuzz.json) record both completed runs. Quiet libFuzzer output did not report execution counts. Temporary mutation corpora were removed.
