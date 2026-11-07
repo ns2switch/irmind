@@ -791,3 +791,36 @@ The following diagnostic uses optimized release builds on the same local executi
 The median is 30.6% lower in this reduced diagnostic. The change omits a redundant peer-JSON cache from the unsigned spool, restores it before memory accounting and batch construction, reuses canonical legacy entity pairs, and avoids a second timestamp-extrema pass for a retained homogeneous scope. Memory budgets and final schemas stay fixed. The dedicated round-trip test compares all three Arrow batches and their Parquet bytes; existing physical goldens remain unchanged. Equal total sizes in this diagnostic alone are not a full-corpus hash-equality proof. The absent `endpoint-0063` filter is retained in [raw numeric results](benchmarks/common-core-staging-diagnostic.json) but its empty-result timings are not populated-host latency measurements.
 
 The initial cloud co-observation layout additionally stores role-free peers twice. The [adopted sparse representation](common-event-peer-layout.md) is a separate change from these byte-preserving staging optimizations. It retains the same logical peers and historical layouts, while updating only the new common co-observation physical goldens. A complete 15 GB remeasurement is required before changing a default writer.
+
+## Common-schema core: sparse peer matrix
+
+The [complete paired release run](https://github.com/ns2switch/irmind/actions/runs/42398461520) compares common candidate `60823af` with baseline `d13ce8b`. Every pair uses the same GitHub-hosted Ubuntu runner; different pairs use separate VMs. The 64 ordinary-host cap and 1,024 hard ceiling stay fixed. Only the unclassified bridge is measured; these figures do not establish the cost or coverage of future parser mappings. [Numeric results, profiles and column sizes](benchmarks/common-core-sparse-run.json) retain every completed pair and failed sample.
+
+The wall timer includes corpus generation/writes, signed ingestion, source cleanup, HuntEval source staging where applicable and final compaction. Builds and the subsequent query measurements are excluded. Sources are written immediately before ingestion; no OS cache flush is claimed. Query p95 is the largest of five samples for each label/scope. Failed samples are errors, not successful ten-second responses. The first summary is labelled cold by the harness; this is not a cold-page-cache experiment.
+
+| Synthetic 15 GB corpus | Baseline, s | Common, s | Ingest limit, s | Ingest meets limit | Failed common query samples |
+| --- | ---: | ---: | ---: | --- | ---: |
+| cloud-v2 | 950.500 | 1155.245 | 900 | no | 5 |
+| endpoint-v2-1 | 1021.145 | 1258.894 | 1350 | yes | 0 |
+| endpoint-v2-64 | 1180.877 | 1533.259 | 1350 | no | 0 |
+| endpoint-v2-1024 | 1019.924 | 1300.330 | 1350 | yes | 0 |
+| endpoint-v2-1025 | 999.898 | 1350.493 | 1350 | no | 0 |
+| endpoint-v2-1-chronological | 565.661 | 769.969 | 900 | yes | 10 |
+| endpoint-v2-64-chronological | 593.437 | 739.811 | 900 | yes | 0 |
+| endpoint-v2-1024-chronological | 599.495 | 767.924 | 900 | yes | 0 |
+| endpoint-v2-1025-chronological | 553.663 | 756.066 | 900 | yes | 0 |
+
+Overall, ingestion passes in 6/9 scenarios, sampled-query checks in 7/9, and the combined benchmark in 5/9. Of 575 labelled full-corpus query samples, 560 return without error and 15 reach the deadline. This count excludes the separately reported HuntEval probes and deliberately expansive path.
+
+Three candidate smoke repetitions use at least 1 GiB per run:
+
+| Source shape | Bytes per repetition | Wall-time samples, s |
+| --- | ---: | --- |
+| cloud-v2 | 1,077,119,172 | 102.507 / 101.470 / 101.444 |
+| endpoint-v2-64-chronological | 1,076,450,200 | 82.625 / 72.341 / 66.406 |
+
+The candidate remains opt-in and does **not** meet the unchanged complete-matrix gate. Cloud ingestion exceeds 900 seconds; the matched cloud baseline also exceeds that threshold. Common entity lookup reaches its deadline in cloud and the one-host chronological corpus. The disordered 64-host and 1,025-host ingests also exceed their 1,350-second limit; the latter misses by 0.493 seconds and is not rounded into a pass. Normal CLI/TUI/demo writing remains on the existing V2 builder.
+
+For cloud, total retained Parquet is 10,146,332,714 bytes versus the matched baseline's 8,924,960,490. Common co-observations occupy 6,349,418,440 bytes; the initial complete-descriptor iteration occupied 12,712,715,750. This storage comparison does not turn timings from different runner instances into a controlled speedup. The raw JSON records active/historical file counts, all five query labels and host filters, per-column compressed bytes, HuntEval recall and bounded worst-case-path markers.
+
+Tracked normalized-staging peaks are 19,500,830 bytes for common cloud, 286,019,970 for disordered endpoint and 15,667,791 for the one-host chronological endpoint in the measured run. These are tracked staging bytes, not total process memory or total temporary disk usage. Parallel phase timers overlap; scan timers include backpressure. Scoped aggregation is not separately timed, so its zero aggregate counter cannot establish zero CPU cost. Full reconstruction, custody and typed-role correctness also have separate functional tests; the performance harness deletes generated sources batch by batch.

@@ -16,7 +16,7 @@ This candidate took 1,374.256 seconds against the unchanged 900-second ingestion
 - A reader combines typed descriptors with legacy pairs not represented by a typed `(kind, value)` key. Legacy peers retain the current unspecified-identity rules. Same-value observations with different typed roles or scopes remain distinct before node deduplication.
 - Continue reading a complete descriptor list as well as the sparse representation. Reject invalid descriptors rather than falling back around an error.
 
-This removes a redundant encoding, not evidence or a permission check. The measured 6.636 GB column is an upper bound on avoidable compressed payload in this unclassified corpus; replacement pages, metadata and changed batch packing have not been measured. No ingestion-time or latency saving is claimed before implementation and remeasurement. Typed source mappings will have their own descriptor costs.
+This removes a redundant encoding, not evidence or a permission check. The measured 6.636 GB column is an upper bound on avoidable compressed payload in this unclassified corpus; replacement pages, metadata and changed batch packing also contribute to the final size. At design time, no ingestion-time or latency saving was established. The [complete implementation measurements](benchmarks.md#common-schema-core-sparse-peer-matrix) now record all nine release pairs, including the remaining failures; the common writer stays opt-in. Typed source mappings will have their own descriptor costs.
 
 ## Compatibility and validation
 
