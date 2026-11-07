@@ -3,13 +3,14 @@ mod entity;
 mod legacy;
 mod node;
 mod path;
+mod peers;
 mod scan;
 use super::{
     AppError, CancellationToken, CaseId, GraphQueryFilter, ParquetArtifact, QUERY_DEADLINE,
     QueryStore,
 };
 use crate::parquet_store::scan::{ScanSpec, ScanStatus};
-use node::{Node, Peer};
+use node::Node;
 use scan::Selection;
 use std::time::Instant;
 
