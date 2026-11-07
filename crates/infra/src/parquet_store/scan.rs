@@ -13,6 +13,7 @@ use std::time::Instant;
 
 pub(super) const MAX_QUERY_FILES: usize = 8192;
 const FILE_WORKERS: usize = 4;
+mod common;
 mod host;
 mod predicate;
 mod time_bounds;
@@ -141,11 +142,11 @@ impl ParquetStore {
             .as_ref()
             .map(|p| p.query_timer(super::profile::QueryPhase::Scan));
         let precise = matches!(artifact, ParquetArtifact::V2(_));
-        let rules = rules_for_artifact(spec, precise)?;
+        let rules = rules_for_artifact(spec, precise, artifact)?;
         let bloom = bloom_reader(&file, artifact, &rules)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).map_err(storage)?;
         super::format::validate_schema(artifact, builder.schema().as_ref())?;
-        let columns = required_columns(spec, precise);
+        let columns = required_columns(spec, precise, common::supported(artifact));
         let required = projection(&builder, &columns)?;
         let mut groups = Vec::new();
         for (index, group) in builder.metadata().row_groups().iter().enumerate() {
@@ -183,6 +184,7 @@ impl ParquetStore {
                 source_names,
                 spec.columns != ["event_time"],
             )?;
+            let normalized = common::projection_defaults(normalized, spec, artifact)?;
             drop(normalize);
             if sender.send(Ok(ScanMessage::Batch(normalized))).is_err() {
                 return Ok(ScanStatus::Stopped);
@@ -204,8 +206,10 @@ fn bloom_reader(
             artifact.schema_version(),
             "irmind-entities-v2"
                 | "irmind-entities-v3"
+                | "irmind-entities-v4"
                 | "irmind-coobservations-v1"
                 | "irmind-coobservations-v2"
+                | "irmind-coobservations-v3"
         )
     {
         return Ok(None);
@@ -353,6 +357,9 @@ fn row_group_matches(
 }
 
 pub(super) fn partition_matches(artifact: &ParquetArtifact, filter: &GraphQueryFilter) -> bool {
+    if !filter.common().is_empty() && !common::supported(artifact) {
+        return false;
+    }
     if let ParquetArtifact::V2(v) = artifact {
         return scope_partition_matches(&v.partition, filter)
             && filter.time_range().is_none_or(|(from, to)| {
@@ -376,7 +383,11 @@ pub(super) fn partition_matches(artifact: &ParquetArtifact, filter: &GraphQueryF
 #[cfg(test)]
 mod tests;
 
-fn rules_for_artifact(spec: &ScanSpec<'_>, precise: bool) -> Result<Vec<Predicate>, AppError> {
+fn rules_for_artifact(
+    spec: &ScanSpec<'_>,
+    precise: bool,
+    artifact: &ParquetArtifact,
+) -> Result<Vec<Predicate>, AppError> {
     let mut rules = Vec::new();
     for rule in spec.predicates {
         if let Predicate::Range("event_time", from, to) = rule {
@@ -402,6 +413,7 @@ fn rules_for_artifact(spec: &ScanSpec<'_>, precise: bool) -> Result<Vec<Predicat
             rules.push(Predicate::Equal("scope_region", region.into()));
         }
     }
+    rules.extend(common::rules(artifact, spec.filter));
     Ok(rules)
 }
 
@@ -432,8 +444,13 @@ fn scope_partition_matches(
     })
 }
 
-fn required_columns<'a>(spec: &ScanSpec<'a>, precise: bool) -> Vec<&'a str> {
-    let mut columns = spec.columns.to_vec();
+fn required_columns<'a>(spec: &ScanSpec<'a>, precise: bool, common: bool) -> Vec<&'a str> {
+    let mut columns = spec
+        .columns
+        .iter()
+        .copied()
+        .filter(|name| common || !self::common::is_extra(name))
+        .collect::<Vec<_>>();
     columns.extend(["source_hash", "record_index", "event_time"]);
     if precise {
         columns.extend([

@@ -73,14 +73,17 @@ impl EvidenceGraph for LocalStore {
     ) -> Result<String, AppError> {
         self.check_entity_query(id, kind, value, 1)?;
         let artifacts = self.query_artifacts(id, filter)?;
-        self.parquet.queries(&artifacts.source_names).entity_native(
-            id,
-            &artifacts,
-            filter,
-            kind,
-            value,
-            &CancellationToken::new(),
-        )
+        self.parquet
+            .queries(&artifacts.source_names)
+            .entity_native(
+                id,
+                &artifacts,
+                filter,
+                kind,
+                value,
+                &CancellationToken::new(),
+            )
+            .map(|output| with_coverage(filter, output))
     }
 
     fn neighbors_filtered(
@@ -103,6 +106,7 @@ impl EvidenceGraph for LocalStore {
                 limit,
                 &CancellationToken::new(),
             )
+            .map(|output| with_coverage(filter, output))
     }
 
     fn entity_timeline_filtered(
@@ -125,6 +129,7 @@ impl EvidenceGraph for LocalStore {
                 limit,
                 &CancellationToken::new(),
             )
+            .map(|output| with_coverage(filter, output))
     }
 
     fn graph_path_filtered(
@@ -137,14 +142,10 @@ impl EvidenceGraph for LocalStore {
         self.check_entity_query(id, from.0, from.1, 1)?;
         self.check_entity_query(id, to.0, to.1, 1)?;
         let artifacts = self.query_artifacts(id, filter)?;
-        self.parquet.queries(&artifacts.source_names).path_native(
-            id,
-            &artifacts,
-            filter,
-            from,
-            to,
-            &CancellationToken::new(),
-        )
+        self.parquet
+            .queries(&artifacts.source_names)
+            .path_native(id, &artifacts, filter, from, to, &CancellationToken::new())
+            .map(|output| with_coverage(filter, output))
     }
 
     fn text_search_filtered(
@@ -161,14 +162,17 @@ impl EvidenceGraph for LocalStore {
             )));
         }
         let artifacts = self.query_artifacts(id, filter)?;
-        self.parquet.queries(&artifacts.source_names).search_native(
-            id,
-            &artifacts,
-            filter,
-            query,
-            limit,
-            &CancellationToken::new(),
-        )
+        self.parquet
+            .queries(&artifacts.source_names)
+            .search_native(
+                id,
+                &artifacts,
+                filter,
+                query,
+                limit,
+                &CancellationToken::new(),
+            )
+            .map(|output| with_coverage(filter, output))
     }
 
     fn raw_record(&self, id: &CaseId, hash: &str, index: usize) -> Result<String, AppError> {
@@ -264,5 +268,12 @@ impl LocalStore {
             )));
         }
         Ok(())
+    }
+}
+
+fn with_coverage(filter: &GraphQueryFilter, output: String) -> String {
+    match filter.coverage_notice() {
+        Some(notice) => format!("{notice}\n{output}"),
+        None => output,
     }
 }

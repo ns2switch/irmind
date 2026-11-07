@@ -7,6 +7,7 @@ use irmind_domain::ParquetArtifactV1;
 use std::sync::Arc;
 
 mod batch;
+pub(super) mod common;
 pub(super) mod precise;
 mod staged_time;
 use batch::{coobservation_batch, entity_batch, record_batch};
@@ -51,6 +52,7 @@ pub(super) struct ArtifactSink {
     writer: Option<ArrowWriter<File>>,
     kind: ArtifactKind,
     precise: bool,
+    common: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -110,7 +112,12 @@ impl ArtifactSink {
                 .map(arrow::datatypes::Field::data_type),
             Ok(arrow::datatypes::DataType::Timestamp(_, _))
         );
-        let (part, name) = Self::location(&partition, hash, kind, precise)?;
+        let common = batch
+            .schema()
+            .metadata()
+            .get("irmind.common.schema")
+            .is_some_and(|id| id == irmind_domain::COMMON_EVENT_V1);
+        let (part, name) = Self::location(&partition, hash, kind, precise, common)?;
         let dir = case_dir.join(&part);
         fs::create_dir_all(&dir).map_err(storage)?;
         irmind_fs::private_dir(&dir).map_err(storage)?;
@@ -149,6 +156,7 @@ impl ArtifactSink {
                 writer: Some(writer),
                 kind,
                 precise,
+                common,
             })
         })();
         if result.is_err() {
@@ -162,6 +170,7 @@ impl ArtifactSink {
         hash: &EvidenceHash,
         kind: ArtifactKind,
         precise: bool,
+        common: bool,
     ) -> Result<(String, String), AppError> {
         let part = if let Some(scope) = &partition.scope {
             scope
@@ -194,6 +203,13 @@ impl ArtifactSink {
             )
         } else {
             format!("{}.{}.parquet", hash.as_str(), kind.suffix())
+        };
+        let name = if common {
+            name.strip_suffix(".parquet")
+                .map(|prefix| format!("{prefix}.common.parquet"))
+                .ok_or_else(invalid_source)?
+        } else {
+            name
         };
         Ok((part, name))
     }
@@ -267,22 +283,7 @@ pub(super) fn batch_to_parquet(
         if rows.is_empty() {
             continue;
         }
-        let mut events = record_batch(&rows)?;
-        let mut entities = entity_batch(&rows, !legacy_entities)?;
-        let mut coobservations = (!legacy_entities)
-            .then(|| coobservation_batch(&rows))
-            .transpose()?;
-        if rows[0].precise {
-            events = precise::columns(&events, &rows, &(0..rows.len()).collect::<Vec<_>>())?;
-            let pairs = batch::pairs(&rows, true)
-                .into_iter()
-                .map(|(row, _)| row)
-                .collect::<Vec<_>>();
-            entities = precise::columns(&entities, &rows, &pairs)?;
-            coobservations = coobservations
-                .map(|batch| precise::columns(&batch, &rows, &pairs))
-                .transpose()?;
-        }
+        let (events, entities, coobservations) = table_batches(&rows, legacy_entities)?;
         if !open.contains_key(&partition) {
             if open.len() >= 64 {
                 return Err(AppError::Policy(
@@ -349,4 +350,41 @@ pub(super) fn finish_parquet(
         }
     }
     Ok(artifacts)
+}
+
+fn table_batches(
+    rows: &[RecordRow],
+    legacy_entities: bool,
+) -> Result<(RecordBatch, RecordBatch, Option<RecordBatch>), AppError> {
+    let common = rows.first().is_some_and(|row| row.common.is_some());
+    if rows.iter().any(|row| row.common.is_some() != common) {
+        return Err(invalid_source());
+    }
+    if common {
+        if legacy_entities {
+            return Err(invalid_source());
+        }
+        return Ok((
+            common::events(rows)?,
+            common::entities(rows, false)?,
+            Some(common::entities(rows, true)?),
+        ));
+    }
+    let mut events = record_batch(rows)?;
+    let mut entities = entity_batch(rows, !legacy_entities)?;
+    let mut coobservations = (!legacy_entities)
+        .then(|| coobservation_batch(rows))
+        .transpose()?;
+    if rows[0].precise {
+        events = precise::columns(&events, rows, &(0..rows.len()).collect::<Vec<_>>())?;
+        let pairs = batch::pairs(rows, true)
+            .into_iter()
+            .map(|(row, _)| row)
+            .collect::<Vec<_>>();
+        entities = precise::columns(&entities, rows, &pairs)?;
+        coobservations = coobservations
+            .map(|batch| precise::columns(&batch, rows, &pairs))
+            .transpose()?;
+    }
+    Ok((events, entities, coobservations))
 }

@@ -20,6 +20,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::time::UNIX_EPOCH;
 
+mod common_format;
 mod compact;
 mod format;
 mod local;
@@ -69,9 +70,16 @@ pub struct ParquetStore {
     profile: Option<Arc<ParquetProfile>>,
     legacy_entities: bool,
     precise_time: bool,
+    common_events: bool,
 }
 
 impl ParquetStore {
+    pub fn open_common(data_root: &Path) -> Result<Self, AppError> {
+        let mut store = Self::open_precise(data_root)?;
+        store.common_events = true;
+        Ok(store)
+    }
+
     pub fn open_precise(data_root: &Path) -> Result<Self, AppError> {
         let mut store = Self::open(data_root)?;
         store.precise_time = true;
@@ -90,6 +98,7 @@ impl ParquetStore {
             profile: None,
             legacy_entities: false,
             precise_time: false,
+            common_events: false,
         })
     }
 

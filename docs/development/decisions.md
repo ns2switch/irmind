@@ -391,3 +391,12 @@ Context: parsers need one validated classification and role contract before addi
 ## Preserve unmerged parser work
 
 Before deleting a branch, confirm that its PR is merged and check its ancestry with Git’s merge-base ancestor check. An open or closed-unmerged PR is not grounds for deletion. If rebasing changed commit identities and ancestry is not established, retain the branch until its integration can be reconciled; never discard unmerged work silently.
+
+
+## Typed common-event core and staged mappings
+
+**Context:** Cross-source investigations need explicit classifications and entity roles without changing historical interpretation.
+
+**Decision:** Freeze `irmind-common-event-v1` codes in goldens; use checked domain types and new physical schema IDs inside the existing V2 envelope. A closed, validated field map represents sparse context. An additive parser bridge emits unclassified events until a module has a reviewed mapping. Scoped identities distinguish PID reuse and account/host namespaces. Event role membership is a typed event column; peer descriptors retain scope, field and role.
+
+**Consequences:** Historical builders and goldens stay intact. Existing tools gain closed category/type/outcome/role filters and report schema coverage. Semantic migration is deferred; existing cases can be read without migration and re-ingested into a new case for new interpretation. The separate writer-metadata proposal remains independent. See [the implementation contract](common-event-core.md).

@@ -168,7 +168,11 @@ impl AutomationContext<'_, '_> {
             Command::Timeline { case_id, filter } => {
                 let id = parse_id(&case_id)?;
                 let _case_lock = store.lock_case(&id)?;
-                for event in store.timeline_filtered(&id, &filter.parse()?, 100)? {
+                let filter = filter.parse()?;
+                if let Some(notice) = filter.coverage_notice() {
+                    println!("{notice}");
+                }
+                for event in store.timeline_filtered(&id, &filter, 100)? {
                     let line = format!(
                         "{} {} [{}#{}]",
                         event.at, event.event, event.evidence_hash, event.record_index

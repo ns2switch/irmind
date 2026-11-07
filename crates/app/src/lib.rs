@@ -31,6 +31,11 @@ pub use definitions::{
     ApprovedDefinitions, DefinitionCompiler, DefinitionError, DefinitionStatus,
     MAX_DEFINITION_BYTES, ParserDefinitionStore,
 };
+pub mod common_event;
+pub use common_event::{
+    CommonGraphRecord, decode_common_event, encode_common_event, lift_unclassified_common,
+    validate_common_record,
+};
 mod custody;
 mod diagnostics;
 mod dispatch;

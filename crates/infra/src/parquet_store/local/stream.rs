@@ -115,11 +115,28 @@ pub(in crate::parquet_store) struct VerifiedInput<'a> {
     pub(in crate::parquet_store) precise_time: bool,
 }
 
+mod emission;
 pub(in crate::parquet_store) fn parse_and_verify(
     input: VerifiedInput<'_>,
     emit: &mut dyn FnMut(
         irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
     ) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
+    parse_verified::<emission::Indexed>(input, emit)
+}
+
+pub(in crate::parquet_store) fn parse_common_and_verify(
+    input: VerifiedInput<'_>,
+    emit: &mut dyn FnMut(
+        irmind_domain::Tainted<irmind_app::CommonGraphRecord>,
+    ) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
+    parse_verified::<emission::Common>(input, emit)
+}
+
+fn parse_verified<E: emission::Emission>(
+    input: VerifiedInput<'_>,
+    emit: &mut dyn FnMut(irmind_domain::Tainted<E::Record>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
     let VerifiedInput {
         source,
@@ -134,13 +151,17 @@ pub(in crate::parquet_store) fn parse_and_verify(
     } = input;
     source.seek(SeekFrom::Start(0)).map_err(storage)?;
     if parser.prefers_local_file(relative_path, sample) {
-        let report = if precise_time {
-            parser.parse_indexed_local_file_report(relative_path, source, hash, cancel, emit)
-        } else {
-            parser.parse_local_file_report(relative_path, source, hash, cancel, &mut |row| {
-                emit(wrap_replay(&row)?)
-            })
-        }
+        let report = E::file(
+            emission::Input {
+                source: relative_path,
+                parser,
+                hash,
+                cancel,
+                precise: precise_time,
+            },
+            source,
+            emit,
+        )
         .map_err(|error| {
             storage_phase(
                 error,
@@ -155,13 +176,17 @@ pub(in crate::parquet_store) fn parse_and_verify(
         return Ok(report);
     }
     let mut second_pass = HashingReader::new(source);
-    let report = if precise_time {
-        parser.parse_indexed_reader_report(relative_path, &mut second_pass, hash, cancel, emit)
-    } else {
-        parser.parse_reader_report(relative_path, &mut second_pass, hash, cancel, &mut |row| {
-            emit(wrap_replay(&row)?)
-        })
-    }
+    let report = E::reader(
+        emission::Input {
+            source: relative_path,
+            parser,
+            hash,
+            cancel,
+            precise: precise_time,
+        },
+        &mut second_pass,
+        emit,
+    )
     .map_err(|error| {
         storage_phase(
             error,
