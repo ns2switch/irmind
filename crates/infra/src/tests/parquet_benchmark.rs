@@ -148,10 +148,15 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
             }
             episodes
         });
+    let layout_started = Instant::now();
     let bundles = ingest
         .compact_case(&case.id, &CancellationToken::new())
         .unwrap();
     println!("PARQUET_COMPACTION bundles={bundles}");
+    println!(
+        "PARQUET_LAYOUT_TIME seconds={:.6}",
+        layout_started.elapsed().as_secs_f64()
+    );
     let ingest_time = started.elapsed();
     custody.report();
     if let Some((_, timings)) = &mapping {

@@ -22,3 +22,6 @@
 
 # Canonical wire codebooks must keep identical bytes on every platform.
 *.tsv text eol=lf
+
+# Mapping wire fixtures also participate in native build identities.
+*.hex text eol=lf

@@ -10,35 +10,7 @@ use irmind_mod_parser_json::JsonSourceDecoder;
 #[allow(clippy::too_many_lines)]
 fn mapped_pipeline_binds_raw_inputs_and_maps_before_writing_and_exporting() {
     let root = tempfile::tempdir().unwrap();
-    let catalog = Arc::new(
-        MappingCatalog::freeze(
-            vec![Arc::new(JsonSourceDecoder)],
-            vec![Arc::new(JsonCompatibilityMapping::new().unwrap())],
-        )
-        .unwrap(),
-    );
-    let store = Arc::new(LocalStore::open_mapped(root.path(), catalog.clone()).unwrap());
-    let signer = Arc::new(LocalSigner {
-        key: SigningKey::from_bytes(&[88; 32]),
-        actor: Actor::Analyst,
-    });
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(
-                signer.clone(),
-                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-            ),
-            Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
+    let (store, engine, catalog) = fixture(root.path());
     let case = engine
         .create_case("Source mapping pipeline", "local only")
         .unwrap();
@@ -151,6 +123,8 @@ fn mapped_store_preserves_the_published_route_without_a_registered_raw_decoder()
         br#"{"eventTime":"2026-11-01T00:00:00Z","user":"synthetic"}"#,
     )
     .unwrap();
+    fs::create_dir(root.path().join("mapped")).unwrap();
+    fs::create_dir(root.path().join("legacy")).unwrap();
     let mapped = ParquetStore::open_mapped(
         &root.path().join("mapped"),
         Arc::new(MappingCatalog::default()),
@@ -182,3 +156,40 @@ fn mapped_store_preserves_the_published_route_without_a_registered_raw_decoder()
     assert!(first.mapping.is_none());
     assert!(second.mapping.is_none());
 }
+
+fn fixture<'a>(root: &Path) -> (Arc<LocalStore>, Engine<'a>, Arc<MappingCatalog>) {
+    let catalog = Arc::new(
+        MappingCatalog::freeze(
+            vec![Arc::new(JsonSourceDecoder)],
+            vec![Arc::new(JsonCompatibilityMapping::new().unwrap())],
+        )
+        .unwrap(),
+    );
+    let store = Arc::new(LocalStore::open_mapped(root, catalog.clone()).unwrap());
+    let signer = Arc::new(LocalSigner {
+        key: SigningKey::from_bytes(&[88; 32]),
+        actor: Actor::Analyst,
+    });
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(
+                signer.clone(),
+                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            ),
+            Arc::new(MandatoryGuard::new().unwrap()),
+            Arc::new(JsonParser),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )
+    .unwrap();
+    (store, engine, catalog)
+}
+
+mod repeat;
+
+mod guard;

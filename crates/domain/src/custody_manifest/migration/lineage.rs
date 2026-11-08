@@ -56,14 +56,11 @@ impl ArtifactLineage {
         }
         artifact.validate()?;
         if let ParquetArtifact::V2(v) = &artifact {
-            let supported = if v.schema.is_common() {
-                v.builder_version == crate::COMMON_EVENT_BUILDER && v.superseded_hashes.is_empty()
-            } else {
-                matches!(
+            let supported = !v.schema.is_common()
+                && matches!(
                     v.builder_version.as_str(),
                     "parquet-builder-v2" | "parquet-builder-v3"
-                )
-            };
+                );
             if !supported {
                 return Err(invalid());
             }

@@ -64,3 +64,21 @@ pub(super) fn bind(
         .collect();
     Ok(MappedEvents { before, after })
 }
+
+/// One source hash has one mapped generation until an explicit remap contract exists.
+pub(super) fn ensure_new_source(
+    prepared: &crate::PreparedSource,
+    known: &BTreeMap<String, ParquetArtifact>,
+) -> Result<(), AppError> {
+    if prepared.mapping.is_some()
+        && known.values().any(|artifact| {
+            matches!(artifact, ParquetArtifact::V3(_))
+                && artifact.source_hashes().contains(&prepared.manifest.sha256)
+        })
+    {
+        return Err(AppError::Fixed(
+            crate::FixedAppError::PolicyMappedSourceAlreadyIndexed,
+        ));
+    }
+    Ok(())
+}

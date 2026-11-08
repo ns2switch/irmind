@@ -112,3 +112,18 @@ fn mapped_catalog_preserves_signed_order_and_receipt_gated_parent_retention() {
     altered.remove(3);
     assert!(artifact_catalog(&altered).is_err());
 }
+
+#[test]
+fn common_physical_schemas_require_the_mapped_envelope_and_receipts() {
+    let (entries, parents) = mapped_history();
+    let mut catalog = ArtifactCatalogBuilder::default();
+    catalog.accept(&entries[0]).unwrap();
+    for parent in parents {
+        let bare = entry(
+            AuditEventKind::ParquetArtifactV2,
+            parent.core().encode().unwrap(),
+        );
+        assert!(catalog.accept(&bare).is_err());
+    }
+    assert!(artifact_catalog(&entries).is_ok());
+}
