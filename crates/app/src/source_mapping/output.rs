@@ -1,3 +1,4 @@
+mod time;
 use super::{MappingError, SourceRecordV1};
 use crate::{CommonGraphRecord, IndexedGraphRecord};
 use irmind_domain::{BoundedObservations, CommonEventV1, EventContextV1, EventHeaderV1};
@@ -108,6 +109,8 @@ impl MappingOutput {
             || indexed.time != source.timestamp()
             || indexed.source_offset != source.origin().offset()
             || u64::try_from(indexed.record.index).ok() != Some(source.origin().record())
+            || !time::valid_display_time(&indexed.record.at, source.timestamp())
+            || !valid_projection(&indexed.record)
             || !partition.valid()
             || diagnostics.len() > 8
         {
@@ -139,4 +142,33 @@ impl MappingOutput {
     pub fn diagnostics(&self) -> &[MappingDiagnostic] {
         &self.diagnostics
     }
+}
+
+fn valid_projection(record: &crate::GraphRecord) -> bool {
+    let entity = |kind: &str, value: &str| {
+        !kind.is_empty()
+            && kind.len() <= 64
+            && kind
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"_-".contains(&b))
+            && !value.is_empty()
+            && value.len() <= 4096
+    };
+    record.event.len() <= irmind_domain::SOURCE_MAX_BYTES
+        && record.text.len() <= irmind_domain::SOURCE_MAX_BYTES
+        && record.entities.len() <= 128
+        && record.relations.len() <= 256
+        && record
+            .entities
+            .iter()
+            .all(|(kind, value)| entity(kind, value))
+        && record.relations.iter().all(|r| {
+            entity(&r.from_kind, &r.from_value)
+                && entity(&r.to_kind, &r.to_value)
+                && !r.relation.is_empty()
+                && r.relation.len() <= 64
+                && r.relation
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"_-".contains(&b))
+        })
 }

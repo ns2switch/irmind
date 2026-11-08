@@ -35,22 +35,29 @@ fn manifest(root: &Path, module: &Path, mut features: Vec<String>) -> io::Result
     }
     files.push(root.join("Cargo.toml"));
     files.push(root.join("Cargo.lock"));
-    files.sort();
-    files.dedup();
+    let mut files = files
+        .into_iter()
+        .map(|file| {
+            let relative = file.strip_prefix(root).map_err(|_| invalid())?;
+            let logical = relative
+                .components()
+                .map(|c| c.as_os_str().to_str().ok_or_else(invalid))
+                .collect::<io::Result<Vec<_>>>()?
+                .join("/");
+            Ok((logical, file))
+        })
+        .collect::<io::Result<Vec<_>>>()?;
+    files.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+    files.dedup_by(|a, b| a.0 == b.0);
     features.sort();
+    features.dedup();
     let mut bytes = b"irmind-native-mapping-build-v1\0".to_vec();
     bytes.extend_from_slice(&(features.len() as u64).to_be_bytes());
     for feature in features {
         put(&mut bytes, feature.as_bytes());
     }
     bytes.extend_from_slice(&(files.len() as u64).to_be_bytes());
-    for file in files {
-        let relative = file.strip_prefix(root).map_err(|_| invalid())?;
-        let relative = relative
-            .components()
-            .map(|c| c.as_os_str().to_str().ok_or_else(invalid))
-            .collect::<io::Result<Vec<_>>>()?
-            .join("/");
+    for (relative, file) in files {
         put(&mut bytes, relative.as_bytes());
         bytes.extend_from_slice(&hash_file(&file)?);
         println!("cargo:rerun-if-changed={}", file.display());

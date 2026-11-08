@@ -48,13 +48,15 @@ def contracts():
     return source, target
 
 
-def source_set(letter, path):
+def source_set(letter, path, context=None):
+    snapshot_time = (f"source-time-v1;year={context[0]:04};offset={context[1]};rollover={int(context[2])};basis={context[3]}" if context else "normalized-utc")
+    wire_time = (b"\1" + u64(context[0]) + struct.pack(">q", context[1]) + bytes([int(context[2])]) + field(context[3]) if context else b"\0")
     original = (b'irmind-source-manifest-v1\0' + field(path) + u64(4200)
                 + b'\0\0\0' + field(letter * 64) + b'\0')
     manifest = (b'irmind-source-manifest-v2\0' + fields(original.hex(), 'parser-json', 'json-source-v1')
-                + bytes([90, 0, 1]) + field('normalized-utc') + u64(1) + b'\0')
+                + bytes([90, 0, 1]) + field(snapshot_time) + u64(1) + b'\0')
     return (b'irmind-source-record-set-v1\0' + fields(letter * 64, sha(manifest), path)
-            + b'\0\0' + fields('parser-json', 'json-source-v1', SOURCE, contracts()[0])
+            + b'\0\0' + fields('parser-json', 'json-source-v1') + wire_time + fields(SOURCE, contracts()[0])
             + u64(1) + fields('json', 'source-json-v1') + u64(2) + u64(1) + field('b' * 64))
 
 
@@ -121,7 +123,7 @@ def fixtures():
     run = (b'irmind-mapping-run-v1\0' + fields(sha(pa), catalog()) + u64(1)
            + field('a' * 64) + b'\1' + fields(*MAPPER) + u64(2) + u64(0) * 3
            + commitment(b'irmind-mapping-outputs-v1\0', [first]))
-    return {'source-set-v1': a, 'snapshot-v1': snapshot(), 'profile-v1': pa,
+    return {'source-set-v1': a, 'source-set-time-v1': source_set('a', 'logs/synthetic.json', (2026, -210, True, 'command')), 'snapshot-v1': snapshot(), 'profile-v1': pa,
             'mapped-v3': first, 'layout-v3': child, 'layout-receipt-v1': layout, 'mapping-run-v1': run}
 
 
@@ -136,7 +138,7 @@ def main():
             path.write_text(text)
         elif path.read_text() != text:
             raise SystemExit('mapping fixture differs: ' + name)
-    print('Checked 7 independent mapping/layout wire fixtures')
+    print('Checked 8 independent mapping/layout wire fixtures')
 
 
 if __name__ == '__main__':

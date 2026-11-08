@@ -43,3 +43,45 @@ fn logical_paths_features_and_input_hashes_are_independent_of_directory_order() 
         manifest(second.path(), &two, vec!["a".into(), "b".into()]).unwrap()
     );
 }
+
+#[test]
+fn serialized_paths_use_utf8_slash_order_including_nested_and_numbered_names() {
+    let root = tempfile::tempdir().unwrap();
+    let module = fixture(root.path(), false);
+    fs::create_dir_all(module.join("src/fragment")).unwrap();
+    fs::write(module.join("src/fragment/inner.rs"), "// nested\n").unwrap();
+    fs::write(module.join("src/fragment2.rs"), "// numbered\n").unwrap();
+    let bytes = manifest(root.path(), &module, vec![]).unwrap();
+    let mut cursor = b"irmind-native-mapping-build-v1\0".len();
+    let u64_at = |offset: &mut usize| {
+        let value = usize::try_from(u64::from_be_bytes(
+            bytes[*offset..*offset + 8].try_into().unwrap(),
+        ))
+        .unwrap();
+        *offset += 8;
+        value
+    };
+    assert_eq!(u64_at(&mut cursor), 0);
+    let count = u64_at(&mut cursor);
+    let mut paths = Vec::new();
+    for _ in 0..count {
+        let len = u64_at(&mut cursor);
+        paths.push(
+            std::str::from_utf8(&bytes[cursor..cursor + len])
+                .unwrap()
+                .to_owned(),
+        );
+        cursor += len + 32;
+    }
+    assert_eq!(cursor, bytes.len());
+    assert!(paths.windows(2).all(|p| p[0].as_bytes() < p[1].as_bytes()));
+    let nested = paths
+        .iter()
+        .position(|p| p.ends_with("/fragment/inner.rs"))
+        .unwrap();
+    let numbered = paths
+        .iter()
+        .position(|p| p.ends_with("/fragment2.rs"))
+        .unwrap();
+    assert!(nested < numbered);
+}
