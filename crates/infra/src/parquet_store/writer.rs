@@ -46,6 +46,7 @@ impl Partition {
 mod row;
 pub(super) use row::{RecordRow, raw_host, safe_partition};
 pub(super) struct StagedArtifact {
+    pub rows: Option<u64>,
     pub temporary: PathBuf,
     pub manifest: ParquetArtifact,
 }
@@ -252,7 +253,7 @@ impl ArtifactSink {
         parser: irmind_app::ParserIdentity<'_>,
     ) -> Result<StagedArtifact, AppError> {
         let writer = self.writer.take().ok_or_else(invalid_source)?;
-        writer.close().map_err(storage)?;
+        let metadata = writer.close().map_err(storage)?;
         let temporary = self.temporary.as_ref().ok_or_else(invalid_source)?;
         // Windows FlushFileBuffers requires a writable handle.
         let mut file = OpenOptions::new()
@@ -263,6 +264,7 @@ impl ArtifactSink {
         file.sync_all().map_err(storage)?;
         let (digest, size) = ParquetStore::hash_reader(&mut file, &CancellationToken::new())?;
         Ok(StagedArtifact {
+            rows: Some(u64::try_from(metadata.file_metadata().num_rows()).map_err(storage)?),
             temporary: self.temporary.take().ok_or_else(invalid_source)?,
             manifest: if self.precise {
                 precise::manifest(&self, hash, parser, size, &digest)?

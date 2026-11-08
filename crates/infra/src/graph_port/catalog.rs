@@ -84,7 +84,11 @@ impl LocalStore {
             artifacts: selected,
             has_legacy,
             source_names,
-        } = collect_signed_artifacts(&self.entries(id)?, operations, seal_hash, id, &last)?;
+        } = {
+            let entries = self.entries(id)?;
+            self.verify_installed_mapping_metadata(&entries)?;
+            collect_signed_artifacts(&entries, operations, seal_hash, id, &last)?
+        };
         self.graph_catalog.lock().map_err(storage)?.insert(
             id.clone(),
             CachedCatalog {

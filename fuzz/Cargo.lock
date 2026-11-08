@@ -1225,6 +1225,7 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "irmind-infra",
+ "irmind-mod-mapping-tables",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
@@ -1270,6 +1271,17 @@ dependencies = [
  "tempfile",
  "toml",
  "unicode-normalization",
+]
+
+[[package]]
+name = "irmind-mod-mapping-tables"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

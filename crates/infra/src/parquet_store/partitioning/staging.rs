@@ -214,7 +214,12 @@ impl ParquetStore {
         ),
         AppError,
     > {
-        if self.mapping_catalog.is_some() {
+        let id = input.parser.identity_for_source(input.relative_path)?;
+        if self
+            .mapping_catalog
+            .as_ref()
+            .is_some_and(|catalog| catalog.supports_decoder(id.name, id.version))
+        {
             let (report, mapped) = self.decode_mapped(case, &mut input, emit)?;
             return Ok((report, Some(mapped)));
         }

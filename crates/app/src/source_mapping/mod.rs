@@ -2,10 +2,14 @@
 mod catalog;
 mod decoder_selection;
 mod error;
+mod installation;
 pub mod json;
 mod manifest;
+pub use installation::{ApprovedMappingDefinition, verify_mapping_installation};
 mod output;
 mod ports;
+mod proofs;
+pub use proofs::{mapping_installation_proofs, required_mapping_installations};
 mod prepared;
 mod selector;
 mod snapshot;

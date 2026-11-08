@@ -106,6 +106,9 @@ fn merge_parts(
     let (file, path) = temporary.keep().map_err(storage)?;
     drop(file);
     Ok(StagedArtifact {
+        rows: parts
+            .iter()
+            .try_fold(0u64, |sum, part| sum.checked_add(part.rows?)),
         temporary: path,
         manifest: manifest.into(),
     })

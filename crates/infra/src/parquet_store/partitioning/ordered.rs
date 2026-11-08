@@ -21,8 +21,10 @@ impl ParquetStore {
         parser: &dyn irmind_app::StreamingEventParser,
         source: &str,
     ) -> Result<irmind_app::SourceParallelism, AppError> {
-        if let Some(catalog) = &self.mapping_catalog {
-            let id = parser.identity_for_source(source)?;
+        let id = parser.identity_for_source(source)?;
+        if let Some(catalog) = &self.mapping_catalog
+            && catalog.supports_decoder(id.name, id.version)
+        {
             Ok(catalog
                 .decoder(id.name, id.version)
                 .map_err(irmind_app::source_mapping::MappingError::into_app)?

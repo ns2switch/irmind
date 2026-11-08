@@ -2613,6 +2613,7 @@ dependencies = [
  "irmind-fs",
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
+ "irmind-mod-mapping-tables",
  "irmind-mod-parser-json",
  "irmind-mod-parser-linux",
  "irmind-security",
@@ -2818,6 +2819,19 @@ dependencies = [
  "irmind-domain",
  "irmind-mod-parser-json",
  "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-mapping-tables"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mod-parser-json",
+ "irmind-testkit",
+ "serde",
+ "serde_json",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]

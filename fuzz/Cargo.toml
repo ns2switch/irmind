@@ -12,6 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-mapping-tables = { path = "../crates/modules/mapping-tables", version = "0.1.0" }
 irmind-mod-parser-suricata = { path = "../crates/modules/parser-suricata", version = "0.1.0" }
 irmind-mod-parser-zeek = { path = "../crates/modules/parser-zeek", version = "0.1.0" }
 libfuzzer-sys = "0.4"
@@ -152,6 +153,13 @@ bench = false
 [[bin]]
 name = "parser_suricata"
 path = "fuzz_targets/parser_suricata.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "source_mapping"
+path = "fuzz_targets/source_mapping.rs"
 test = false
 doc = false
 bench = false

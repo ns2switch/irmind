@@ -45,6 +45,7 @@ pub(super) fn stage(
         .ok_or_else(invalid_source)?;
     let temporary = directory.join(format!(".{name}.{}.tmp", rand::random::<u64>()));
     Ok(StagedArtifact {
+        rows: None,
         temporary,
         manifest: metadata.into(),
     })

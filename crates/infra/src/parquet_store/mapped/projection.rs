@@ -66,3 +66,21 @@ pub(in crate::parquet_store) fn route_from_path(path: &str) -> Result<Option<&st
     }
     Ok(Some(route))
 }
+
+/// Empty derived families have no V3 envelope. Drop them while still staged,
+/// before publication. Counts come from writer-close metadata, not a new scan.
+pub(in crate::parquet_store) fn nonempty_staging(
+    staged: Vec<super::super::StagedArtifact>,
+    cancel: &irmind_app::CancellationToken,
+) -> Result<Vec<super::super::StagedArtifact>, AppError> {
+    let mut retained = Vec::new();
+    for artifact in staged {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        if artifact.rows.ok_or_else(invalid_source)? > 0 {
+            retained.push(artifact);
+        }
+    }
+    Ok(retained)
+}

@@ -137,6 +137,11 @@ impl ParquetStore {
             self.profile.as_deref(),
             normalized_bytes,
         )?;
+        let staged = if source.mapping.is_some() {
+            super::super::mapped::nonempty_staging(staged, cancel)?
+        } else {
+            staged
+        };
         let artifacts = self.finish_artifacts(request.case_id, staged)?;
         let mapping =
             self.prepare_mapping_projection(source.mapping.take(), &artifacts, request.case_id)?;

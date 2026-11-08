@@ -2,7 +2,7 @@ use super::{MappingError, MappingIdentityV1, SourceSelector};
 use irmind_domain::EvidenceHash;
 
 /// Trust material is retained with the profile, not inferred from a file path.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum MappingProvenance {
     NativeBuild {
         manifest: Vec<u8>,
@@ -18,7 +18,7 @@ pub enum MappingProvenance {
     },
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct MappingManifest {
     identity: MappingIdentityV1,
     selectors: Vec<SourceSelector>,
@@ -80,5 +80,18 @@ impl MappingManifest {
     }
     pub const fn compatibility_projection(&self) -> bool {
         self.compatibility_projection
+    }
+}
+
+impl std::fmt::Debug for MappingProvenance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("MappingProvenance(<redacted>)")
+    }
+}
+impl std::fmt::Debug for MappingManifest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MappingManifest")
+            .field("identity", &self.identity)
+            .finish_non_exhaustive()
     }
 }
