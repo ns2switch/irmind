@@ -30,6 +30,22 @@
         "slowest_unit_time_sec": 0,
         "peak_rss_mb": 486
       }
+    },
+    {
+      "target": "source_mapping",
+      "source_revision": "783da1cc67f0a8867ead3eaf0f1349640132926c",
+      "sanitizer": "address",
+      "requested_seconds": 600,
+      "elapsed_seconds_including_build": 669.34,
+      "exit_code": 0,
+      "stats": {
+        "number_of_executed_units": 8427493,
+        "average_exec_per_sec": 14022,
+        "new_units_added": 46337,
+        "slowest_unit_time_sec": 0,
+        "peak_rss_mb": 616
+      },
+      "crashes": 0
     }
   ]
 }

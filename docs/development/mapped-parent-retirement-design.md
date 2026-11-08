@@ -4,14 +4,21 @@ This proposal is for custody, storage and export maintainers. It describes a fut
 
 ## Measured motivation
 
-The [paired release run](https://github.com/ns2switch/irmind/actions/runs/42507683653) measures retained parents separately. Its candidate is `43558055bfa5a1387e1001d5765aa2301748ad7e`, compared with `3acb485bb56b01a4e19b0e04c659c3f0c0edc4db` on each same Linux runner.
+The [paired release run](https://github.com/ns2switch/irmind/actions/runs/42514919987) measures retained parents separately. Its candidate is `783da1cc67f0a8867ead3eaf0f1349640132926c`, compared with `3acb485bb56b01a4e19b0e04c659c3f0c0edc4db` on each same Linux runner.
 
 | 15 GB scenario | Inactive parent bytes | Active artifact bytes | Inactive / active | Inactive / retained case |
-| --- | ---: | ---: | ---: | ---: |
-| Endpoint, disordered, 1 host | 2,995,574,001 | 2,965,277,588 | 101.02% | 50.00% |
-| Endpoint, disordered, 64 hosts | 2,875,824,016 | 2,966,572,824 | 96.94% | 48.97% |
+| --- | --- | --- | --- | --- |
+| Cloud | 6,135,910,385 | 6,522,385,165 | 94.07% | 48.33% |
+| Endpoint, stress, 1 host | 2,995,574,001 | 2,965,277,588 | 101.02% | 50.00% |
+| Endpoint, stress, 64 hosts | 2,875,824,016 | 2,966,572,824 | 96.94% | 48.97% |
+| Endpoint, stress, 1,024 hosts | 2,875,862,669 | 2,965,965,163 | 96.96% | 48.98% |
+| Endpoint, stress, 1,025 hosts | 2,875,862,525 | 2,965,928,470 | 96.96% | 48.98% |
+| Endpoint, chronological, 1 host | 4,922,069,070 | 4,873,908,475 | 100.99% | 50.09% |
+| Endpoint, chronological, 64 hosts | 4,726,692,007 | 4,877,472,867 | 96.91% | 49.06% |
+| Endpoint, chronological, 1,024 hosts | 4,726,767,799 | 4,877,088,217 | 96.92% | 49.06% |
+| Endpoint, chronological, 1,025 hosts | 4,726,768,809 | 4,877,063,371 | 96.92% | 49.06% |
 
-The complete matrix and phase measurements belong in [benchmarks](benchmarks.md). This first completed scenario already exceeds the 20% planning threshold. Reclaiming these bytes must be a custody operation, not an unrecorded retention policy.
+The complete matrix and phase measurements belong in [benchmarks](benchmarks.md). The completed scenarios already exceed the 20% planning threshold. Reclaiming these bytes must be a custody operation, not an unrecorded retention policy.
 
 ## Scope and invariants
 
