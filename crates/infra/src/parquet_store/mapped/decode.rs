@@ -16,7 +16,9 @@ impl ParquetStore {
         emit: &mut dyn FnMut(RecordRow) -> Result<(), AppError>,
     ) -> Result<(irmind_app::ParseReport, DecodedSourceCommitmentV1), AppError> {
         let catalog = self.mapping_catalog.as_deref().ok_or_else(invalid_source)?;
-        let logical = input.parser.logical_source(input.relative_path);
+        let parser = input.parser;
+        let logical = parser.logical_source(input.relative_path);
+        let hash_value = input.hash_value;
         let reference = SourceReferenceV1::file(logical).map_err(|_| invalid_source())?;
         let time = decode_source_time_context(input.parser.timestamp_context())?;
         let metadata = SourceMetadata {
@@ -25,7 +27,7 @@ impl ParquetStore {
             time_context: time.as_ref(),
             cancel: input.cancel,
         };
-        let id = input.parser.identity_for_source(input.relative_path)?;
+        let id = parser.identity_for_source(input.relative_path)?;
         let decoder = catalog
             .decoder(id.name, id.version)
             .map_err(irmind_app::source_mapping::MappingError::into_app)?;
@@ -41,7 +43,17 @@ impl ParquetStore {
         let mut acc = SourceRecordAccumulator::new(metadata, id, input.size, catalog)?;
         let mut tuple_writer = std::io::BufWriter::new(tuples.as_file_mut());
         let mut callback = |source| {
-            let mapped = acc.accept(&source, &mut tuple_writer)?;
+            let mapped = {
+                let _timer = self
+                    .profile
+                    .as_ref()
+                    .map(|p| p.mapping_timer(super::super::profile::MappingPhase::ValidateAndMap));
+                acc.accept(&source, &mut tuple_writer)?
+            };
+            let timer = self
+                .profile
+                .as_ref()
+                .map(|p| p.mapping_timer(super::super::profile::MappingPhase::Project));
             let mut row = None;
             let route = routes
                 .get(&mapped.identity)
@@ -52,43 +64,61 @@ impl ParquetStore {
                     output,
                     mapped.output.provenance(),
                     id,
-                    input.hash_value,
+                    hash_value,
                     route,
                 ));
             });
-            emit(row.ok_or_else(invalid_source)??)
+            let row = row.ok_or_else(invalid_source)??;
+            drop(timer);
+            emit(row)
         };
-        input.source.seek(SeekFrom::Start(0)).map_err(storage)?;
-        let report = if decoder.needs_random_access(logical, input.sample) {
-            let report = decoder.decode_local_file(
-                SourceFileInput {
-                    metadata,
-                    file: input.source,
-                },
-                &mut callback,
-            )?;
-            let (hash, size) = Self::hash_reader(input.source, input.cancel)?;
-            check_hash(hash, size, input)?;
-            report
-        } else {
-            let mut reader = HashingReader::new(&mut *input.source);
-            let report = decoder.decode_reader(
-                SourceInput {
-                    metadata,
-                    reader: &mut reader,
-                },
-                &mut callback,
-            )?;
-            reader.drain(input.cancel)?;
-            let size = reader.bytes;
-            check_hash(reader.finish(), size, input)?;
-            report
-        };
+        let report = decode_source(input, decoder, metadata, &mut callback)?;
         tuple_writer.flush().map_err(storage)?;
         drop(tuple_writer);
+        let _timer = self
+            .profile
+            .as_ref()
+            .map(|p| p.mapping_timer(super::super::profile::MappingPhase::InputCommit));
         let commitment = acc.finish(tuples.as_file_mut(), &report)?;
         Ok((report, commitment))
     }
+}
+fn decode_source(
+    input: &mut VerifiedInput<'_>,
+    decoder: &dyn irmind_app::SourceDecoder,
+    metadata: SourceMetadata<'_>,
+    emit: &mut dyn FnMut(
+        irmind_domain::Tainted<irmind_domain::SourceRecordV1>,
+    ) -> Result<(), AppError>,
+) -> Result<irmind_app::ParseReport, AppError> {
+    let logical = metadata.source.reference();
+    input.source.seek(SeekFrom::Start(0)).map_err(storage)?;
+    let report = if decoder.needs_random_access(logical, input.sample) {
+        let report = decoder.decode_local_file(
+            SourceFileInput {
+                metadata,
+                file: input.source,
+            },
+            emit,
+        )?;
+        let (hash, size) = ParquetStore::hash_reader(input.source, input.cancel)?;
+        check_hash(hash, size, input)?;
+        report
+    } else {
+        let mut reader = HashingReader::new(&mut *input.source);
+        let report = decoder.decode_reader(
+            SourceInput {
+                metadata,
+                reader: &mut reader,
+            },
+            emit,
+        )?;
+        reader.drain(input.cancel)?;
+        let size = reader.bytes;
+        check_hash(reader.finish(), size, input)?;
+        report
+    };
+    Ok(report)
 }
 fn check_hash(hash: [u8; 32], size: u64, input: &VerifiedInput<'_>) -> Result<(), AppError> {
     if hash != input.hash || size != input.size {

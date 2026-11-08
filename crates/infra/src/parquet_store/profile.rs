@@ -15,6 +15,7 @@ pub(crate) struct ParquetProfile {
     staging_peak: AtomicU64,
     pub(super) staging_live: AtomicU64,
     partition_phases: [AtomicU64; 5],
+    mapping_phases: [AtomicU64; 3],
 }
 
 impl ParquetProfile {
@@ -59,6 +60,20 @@ impl ParquetProfile {
     pub(super) fn record_query_aggregate(&self, duration: Duration) {
         self.query_aggregate
             .fetch_add(Self::nanos(duration), Ordering::Relaxed);
+    }
+
+    pub(super) fn mapping_timer(&self, phase: MappingPhase) -> MappingTimer<'_> {
+        MappingTimer {
+            profile: self,
+            phase,
+            started: Instant::now(),
+        }
+    }
+    #[cfg(test)]
+    pub(crate) fn mapping_snapshot(&self) -> [Duration; 3] {
+        std::array::from_fn(|i| {
+            Duration::from_nanos(self.mapping_phases[i].load(Ordering::Relaxed))
+        })
     }
 
     #[cfg(test)]
@@ -161,5 +176,25 @@ impl Drop for QueryTimer<'_> {
             QueryPhase::Normalize => self.profile.record_query_normalize(elapsed),
             QueryPhase::Aggregate => self.profile.record_query_aggregate(elapsed),
         }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum MappingPhase {
+    ValidateAndMap,
+    Project,
+    InputCommit,
+}
+pub(super) struct MappingTimer<'a> {
+    profile: &'a ParquetProfile,
+    phase: MappingPhase,
+    started: Instant,
+}
+impl Drop for MappingTimer<'_> {
+    fn drop(&mut self) {
+        self.profile.mapping_phases[self.phase as usize].fetch_add(
+            ParquetProfile::nanos(self.started.elapsed()),
+            Ordering::Relaxed,
+        );
     }
 }

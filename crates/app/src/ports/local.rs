@@ -212,36 +212,6 @@ pub trait StreamingEventParser: Send + Sync {
         Ok(SourceParallelism::Concurrent)
     }
 
-    /// Additive logical projection; the default retains the exact indexed reader
-    /// and emits a validated, unclassified event without JSON heuristics.
-    fn parse_common_reader_report(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<crate::CommonGraphRecord>) -> Result<(), AppError>,
-    ) -> Result<ParseReport, AppError> {
-        let identity = self.identity_for_source(source)?;
-        self.parse_indexed_reader_report(source, reader, evidence_hash, cancel, &mut |record| {
-            emit(crate::lift_unclassified_common(&record, identity)?)
-        })
-    }
-
-    fn parse_common_local_file_report(
-        &self,
-        source: &str,
-        file: &mut File,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<crate::CommonGraphRecord>) -> Result<(), AppError>,
-    ) -> Result<ParseReport, AppError> {
-        let identity = self.identity_for_source(source)?;
-        self.parse_indexed_local_file_report(source, file, evidence_hash, cancel, &mut |record| {
-            emit(crate::lift_unclassified_common(&record, identity)?)
-        })
-    }
-
     fn streaming_version(&self) -> &'static str;
     fn parser_name(&self) -> &'static str;
     fn identity(&self) -> ParserIdentity<'_> {

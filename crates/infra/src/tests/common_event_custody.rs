@@ -4,9 +4,9 @@ use irmind_domain::{ParquetArtifact, ParserSelectionMode};
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn common_bridge_has_signed_lineage_public_v5_verification_and_reconstruction() {
+fn mapped_source_has_signed_lineage_public_v6_verification_and_reconstruction() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open_common(root.path()).unwrap());
+    let store = Arc::new(LocalStore::open_mapped(root.path(), mapping_catalog()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[88; 32]),
         actor: Actor::Analyst,
@@ -29,22 +29,25 @@ fn common_bridge_has_signed_lineage_public_v5_verification_and_reconstruction() 
     )
     .unwrap();
     let case = engine
-        .create_case("Common event bridge", "local only")
+        .create_case("Common source mapping", "local only")
         .unwrap();
     let raw = br#"{"eventTime":"2026-11-01T00:00:00.123456789Z","eventName":"Failed is original text","sourceIPAddress":"203.0.113.77"}"#;
     fs::write(root.path().join("events.json"), raw).unwrap();
     let selection = ParserSelection {
         parser_id: "parser-json".into(),
-        parser_version: "json-stream-v3".into(),
+        parser_version: "json-source-v1".into(),
         confidence: 90,
         mode: ParserSelectionMode::Automatic,
         timestamp_context: None,
         format_sample_sha256: sha256(raw),
     };
+    let parser = mapping_catalog()
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap();
     let large = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: &JsonParser,
+        parser: &parser,
     };
     large
         .ingest_local_batch_selected(
@@ -62,7 +65,7 @@ fn common_bridge_has_signed_lineage_public_v5_verification_and_reconstruction() 
         catalog
             .active
             .iter()
-            .all(|a| matches!(a,ParquetArtifact::V2(v) if v.schema.is_common()))
+            .all(|a| matches!(a,ParquetArtifact::V3(v) if v.core().schema.is_common()))
     );
     assert!(engine.verify(&case.id).is_ok());
     assert_eq!(
@@ -106,12 +109,12 @@ fn common_bridge_has_signed_lineage_public_v5_verification_and_reconstruction() 
         .unwrap();
     let verified =
         irmind_app::verify_export_details(&LocalExportVerifier, &path, Some(&key)).unwrap();
-    assert_eq!(verified.format_version, 5);
+    assert_eq!(verified.format_version, 6);
     assert!(
         irmind_app::verify_export_details(&LocalExportVerifier, &path, Some(&"00".repeat(32)))
             .is_err()
     );
-    let artifact = catalog.active.iter().find(|a| matches!(a,ParquetArtifact::V2(v) if v.schema == irmind_domain::ArtifactSchemaV2::CommonEvents)).unwrap();
+    let artifact = catalog.active.iter().find(|a| matches!(a,ParquetArtifact::V3(v) if v.core().schema == irmind_domain::ArtifactSchemaV2::CommonEvents)).unwrap();
     let file = root
         .path()
         .join("parquet")
@@ -127,4 +130,16 @@ fn common_bridge_has_signed_lineage_public_v5_verification_and_reconstruction() 
             .is_err()
     );
     assert!(store.timeline(&case.id, 10).is_err());
+}
+
+fn mapping_catalog() -> Arc<irmind_app::source_mapping::MappingCatalog> {
+    Arc::new(
+        irmind_app::source_mapping::MappingCatalog::freeze(
+            vec![Arc::new(irmind_mod_parser_json::JsonSourceDecoder)],
+            vec![Arc::new(
+                irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap(),
+            )],
+        )
+        .unwrap(),
+    )
 }

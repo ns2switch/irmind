@@ -16,6 +16,22 @@ use std::sync::{
 use std::time::Duration;
 
 impl ParquetStore {
+    fn source_parallelism(
+        &self,
+        parser: &dyn irmind_app::StreamingEventParser,
+        source: &str,
+    ) -> Result<irmind_app::SourceParallelism, AppError> {
+        if let Some(catalog) = &self.mapping_catalog {
+            let id = parser.identity_for_source(source)?;
+            Ok(catalog
+                .decoder(id.name, id.version)
+                .map_err(irmind_app::source_mapping::MappingError::into_app)?
+                .source_parallelism())
+        } else {
+            parser.source_parallelism(source)
+        }
+    }
+
     pub(super) fn prepare_ordered_sources(
         &self,
         request: &LocalBatchRequest<'_>,
@@ -24,7 +40,7 @@ impl ParquetStore {
         cancel: &CancellationToken,
     ) -> Result<Vec<PreparedSource>, AppError> {
         let serial = inputs.iter().try_fold(false, |serial, input| {
-            let capability = request.parser.source_parallelism(&input.path)?;
+            let capability = self.source_parallelism(request.parser, &input.path)?;
             Ok::<_, AppError>(serial || capability == irmind_app::SourceParallelism::Serial)
         })?;
         let operation = cancel.child_token();

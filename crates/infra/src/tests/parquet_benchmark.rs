@@ -4,6 +4,8 @@ use crate::parquet_store::ParquetProfile;
 use irmind_app::LargeCaseUseCases;
 use std::time::Instant;
 mod corpus;
+mod custody;
+mod mapped;
 mod measurements;
 mod scenario;
 use corpus::{directory_bytes, representative_records, stage_worst_case_path};
@@ -51,9 +53,11 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     fs::create_dir(&source_root).unwrap();
     let mut store = LocalStore::open(&root.path().join("case")).unwrap();
     let common = std::env::var("IRMIND_BENCH_COMMON_EVENT").as_deref() == Ok("1");
-    if common {
-        assert!(scenario.precise, "common schemas use V2");
-        store.parquet = crate::ParquetStore::open_common(&root.path().join("case")).unwrap();
+    let mapping = common.then(mapped::catalog);
+    if let Some((catalog, _)) = &mapping {
+        assert!(scenario.precise, "mapped schemas preserve precise V2 time");
+        store.parquet =
+            crate::ParquetStore::open_mapped(&root.path().join("case"), catalog.clone()).unwrap();
     } else if scenario.precise {
         store.parquet = crate::ParquetStore::open_precise(&root.path().join("case")).unwrap();
     }
@@ -66,28 +70,37 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         actor: Actor::Analyst,
     });
     let parser = Arc::new(JsonParser);
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(
-                signer.clone(),
-                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-            ),
-            Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
+    let mut ports = EnginePorts::new(
+        store.clone(),
+        store.clone(),
+        store.clone(),
+        store.clone(),
+        CryptoPorts::new(
+            signer.clone(),
+            Arc::new(LocalVerifier::from_signer(signer.as_ref())),
         ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
+        Arc::new(MandatoryGuard::new().unwrap()),
+        parser.clone(),
+    );
+    let custody = custody::attach(&mut ports);
+    let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock)).unwrap();
     let case = engine
         .create_case("Synthetic Parquet benchmark", "local synthetic sources")
         .unwrap();
     let endpoint_parser = irmind_mod_parser_linux::LinuxParser::default();
-    let source_parser: &dyn irmind_app::StreamingEventParser = if scenario.hosts.is_some() {
+    let mapped_parser = mapping.as_ref().map(|(catalog, _)| {
+        use irmind_app::SourceDecoder as _;
+        let id = if scenario.hosts.is_some() {
+            irmind_mod_parser_linux::JournalSourceDecoder.identity()
+        } else {
+            irmind_mod_parser_json::JsonSourceDecoder.identity()
+        };
+        catalog.decoder_selection(id.name, id.version).unwrap()
+    });
+    let source_parser: &dyn irmind_app::StreamingEventParser = if let Some(parser) = &mapped_parser
+    {
+        parser
+    } else if scenario.hosts.is_some() {
         &endpoint_parser
     } else {
         parser.as_ref()
@@ -98,6 +111,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         parser: source_parser,
     };
     let mut total_bytes = 0u64;
+    custody.reset();
     let started = Instant::now();
     for start in (0..files).step_by(4) {
         let names = (start..(start + 4).min(files))
@@ -139,6 +153,17 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         .unwrap();
     println!("PARQUET_COMPACTION bundles={bundles}");
     let ingest_time = started.elapsed();
+    custody.report();
+    if let Some((_, timings)) = &mapping {
+        timings.report();
+        let [combined, projection, commitment] = profile.mapping_snapshot();
+        println!(
+            "MAPPING_ADAPTER_PHASE select_validate_commit_and_map_seconds={:.6} projection_seconds={:.6} input_commit_finalize_seconds={:.6}",
+            combined.as_secs_f64(),
+            projection.as_secs_f64(),
+            commitment.as_secs_f64()
+        );
+    }
     let [hash_time, conversion_time, row_time, parquet_time, _, _] = profile.snapshot();
     let disk_bytes = directory_bytes(&root.path().join("case/parquet"));
     let coobservation_bytes = measurements::report_storage(

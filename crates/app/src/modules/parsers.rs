@@ -153,36 +153,6 @@ pub struct RebuildParser {
 }
 
 impl StreamingEventParser for RebuildParser {
-    fn parse_common_reader_report(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<crate::CommonGraphRecord>) -> Result<(), AppError>,
-    ) -> Result<crate::ParseReport, AppError> {
-        self.sources
-            .get(source)
-            .ok_or(AppError::Fixed(
-                crate::FixedAppError::PolicyMissingSignedParserSelection,
-            ))?
-            .parse_common_reader_report(source, reader, hash, cancel, emit)
-    }
-    fn parse_common_local_file_report(
-        &self,
-        source: &str,
-        reader: &mut std::fs::File,
-        hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<crate::CommonGraphRecord>) -> Result<(), AppError>,
-    ) -> Result<crate::ParseReport, AppError> {
-        self.sources
-            .get(source)
-            .ok_or(AppError::Fixed(
-                crate::FixedAppError::PolicyMissingSignedParserSelection,
-            ))?
-            .parse_common_local_file_report(source, reader, hash, cancel, emit)
-    }
     fn source_parallelism(&self, source: &str) -> Result<crate::SourceParallelism, AppError> {
         self.sources
             .get(source)

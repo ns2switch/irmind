@@ -74,38 +74,42 @@ fn projection_rejects_unknown_fields_codes_duplicates_and_noncanonical_bytes() {
     assert!(decode_common_event(&json.replace("\"source.ip\"", "\"arbitrary.path\"")).is_err());
 }
 #[test]
-fn compatibility_bridge_never_classifies_evidence_text() {
-    let indexed = IndexedGraphRecord {
-        record: crate::GraphRecord {
-            index: 7,
-            at: String::new(),
-            event: "failed attack".into(),
-            text: r#"{"event":{"category":["authentication"],"outcome":"failure"},"user":"actor"}"#
-                .into(),
-            entities: vec![("user".into(), "actor".into())],
-            relations: Vec::new(),
-        },
-        time: None,
-        source_offset: None,
+fn unmapped_source_never_classifies_evidence_text() {
+    use crate::source_mapping::{
+        DecodeAnnotationsV1, MappingDiagnostic, MappingOutput, SourceFormatV1, SourceRecordV1,
     };
-    let tainted = Tainted::from_external(
-        indexed.clone(),
-        Provenance::new([0xab; 32], Some(7), SourceKind::File),
+    let source = SourceRecordV1::try_new(
+        EventOrigin::try_new(
+            irmind_domain::EvidenceHash::from_bytes([0xab; 32]),
+            7,
+            None,
+            "parser-test",
+            "test-v1",
+        )
+        .unwrap(),
+        "synthetic.json",
+        None,
+        SourceFormatV1::try_new("json", "source-json-v1", std::collections::BTreeMap::new())
+            .unwrap(),
+        crate::source_mapping::json::decode_json_fields(
+            br#"{"event":{"category":["authentication"],"outcome":"failure"},"user":"actor"}"#,
+            crate::source_mapping::json::SourceJsonLimits::default(),
+        )
+        .unwrap(),
+        DecodeAnnotationsV1::default(),
+    )
+    .unwrap();
+    let output = MappingOutput::unclassified(&source, MappingDiagnostic::Unclassified).unwrap();
+    assert_eq!(output.record().common.origin(), source.origin());
+    assert_eq!(output.record().common.event().categories().bits(), 0);
+    assert_eq!(
+        output.record().common.event().outcome(),
+        EventOutcome::Unknown
     );
-    let identity = crate::ParserIdentity {
-        name: "parser-test",
-        version: "test-v1",
-    };
-    let common = lift_unclassified_common(&tainted, identity).unwrap();
-    assert_eq!(common.provenance(), tainted.provenance());
-    common.inspect(|record| {
-        assert_eq!(record.indexed, indexed);
-        assert_eq!(record.common.event().categories().bits(), 0);
-        assert_eq!(record.common.event().outcome(), EventOutcome::Unknown);
-        assert!(record.common.observations().values().is_empty());
-        validate_common_record(record, common.provenance(), identity).unwrap();
-    });
+    assert!(output.record().common.observations().values().is_empty());
+    assert!(output.record().indexed.record.text.contains("failure"));
 }
+
 #[test]
 fn boundary_rejects_changed_source_identity_or_time() {
     let common = projection();

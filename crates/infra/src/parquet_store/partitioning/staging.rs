@@ -218,16 +218,12 @@ impl ParquetStore {
             let (report, mapped) = self.decode_mapped(case, &mut input, emit)?;
             return Ok((report, Some(mapped)));
         }
-        Ok((
-            parse_legacy_normalized(input, self.common_events, emit)?,
-            None,
-        ))
+        Ok((parse_legacy_normalized(input, emit)?, None))
     }
 }
 
 fn parse_legacy_normalized(
     input: stream::VerifiedInput<'_>,
-    common: bool,
     emit: &mut dyn FnMut(RecordRow) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
     let (parser, source, hash, size) = (
@@ -237,38 +233,18 @@ fn parse_legacy_normalized(
         input.size,
     );
     let mut offset = None;
-    if common {
-        stream::parse_common_and_verify(input, &mut |record| {
-            let mut result = None;
-            record.inspect(|common| {
-                result = Some((|| {
-                    let checked = irmind_app::common_event::check_common_record(
-                        common,
-                        record.provenance(),
-                        parser.identity_for_source(source)?,
-                    )?;
-                    stream::validate_offset(&mut offset, common.indexed.source_offset, size)?;
-                    validate_time(common.indexed.time)?;
-                    let mut row = RecordRow::from_common(&checked, hash)?;
-                    row.profile = profile(parser, source, &common.indexed.record)?;
-                    Ok(row)
-                })());
-            });
-            emit(result.ok_or_else(invalid_source)??)
-        })
-    } else {
-        stream::parse_and_verify(input, &mut |record| {
-            emit(normalized_row(
-                &record,
-                parser,
-                source,
-                hash,
-                &mut offset,
-                size,
-            )?)
-        })
-    }
+    stream::parse_and_verify(input, &mut |record| {
+        emit(normalized_row(
+            &record,
+            parser,
+            source,
+            hash,
+            &mut offset,
+            size,
+        )?)
+    })
 }
+
 fn validate_time(time: Option<irmind_app::IndexedTime>) -> Result<(), AppError> {
     if time.is_some_and(|time| time.precision() == irmind_app::TimePrecision::Unknown) {
         return Err(AppError::Fixed(

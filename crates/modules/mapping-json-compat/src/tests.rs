@@ -47,3 +47,15 @@ fn build_identity_is_content_addressed_and_versioned_without_absolute_paths() {
     assert!(!BUILD.windows(6).any(|bytes| bytes == b"/home/"));
     assert!(!BUILD.windows(3).any(|bytes| bytes == b"C:\\"));
 }
+
+#[test]
+fn shared_source_mapping_contract() {
+    irmind_testkit::run_source_mapping_contract(
+        Arc::new(irmind_mod_parser_json::JsonSourceDecoder),
+        Arc::new(JsonCompatibilityMapping::new().unwrap()),
+        "source.json",
+        br#"{"eventTime":"2026-11-01T00:00:00Z","sourceIPAddress":"203.0.113.77"}"#,
+        1,
+    )
+    .unwrap();
+}
