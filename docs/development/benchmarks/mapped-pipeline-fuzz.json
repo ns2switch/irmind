@@ -1,0 +1,35 @@
+{
+  "method": "Sequential libFuzzer AddressSanitizer runs; elapsed_seconds includes target compilation. Each target requested 600 seconds of fuzzing.",
+  "runs": [
+    {
+      "target": "canonical",
+      "source_revision": "6e9c3a942a9fe880571721db4782c7f2431d3adf",
+      "sanitizer": "address",
+      "requested_seconds": 600,
+      "exit_code": 0,
+      "elapsed_seconds": 602.321,
+      "stats": {
+        "number_of_executed_units": 5542630,
+        "average_exec_per_sec": 9222,
+        "new_units_added": 44843,
+        "slowest_unit_time_sec": 0,
+        "peak_rss_mb": 544
+      }
+    },
+    {
+      "target": "export",
+      "source_revision": "6e9c3a942a9fe880571721db4782c7f2431d3adf",
+      "sanitizer": "address",
+      "requested_seconds": 600,
+      "exit_code": 0,
+      "elapsed_seconds": 1009.181,
+      "stats": {
+        "number_of_executed_units": 3140406,
+        "average_exec_per_sec": 5225,
+        "new_units_added": 13220,
+        "slowest_unit_time_sec": 0,
+        "peak_rss_mb": 486
+      }
+    }
+  ]
+}

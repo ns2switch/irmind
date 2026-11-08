@@ -111,6 +111,10 @@ pub enum FixedAppError {
         "policy denied: source already has another artifact version; explicit migration is required"
     )]
     PolicyArtifactVersionRequiresMigration,
+    #[error(
+        "source already has a mapped generation in this case; reuse its evidence or ingest into a new case"
+    )]
+    PolicyMappedSourceAlreadyIndexed,
     #[error("policy denied: invalid local tool")]
     PolicyInvalidLocalTool,
     #[error("policy denied: invalid module fingerprint")]

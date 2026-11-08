@@ -386,6 +386,8 @@ The complete ingestion host's memory is not constant in the dense-source measure
 
 ## Common event schema delivery
 
+Historical planning entry: the independent mapping and layout decision below supersedes the proposed V2 embedding and native-only mapping boundary.
+
 Context: parsers need one validated classification and role contract before additional SIEM mappings. Decision: deliver the approved ECS 9.5-derived common schema as a reviewed core, initial native mappings and community mapping follow-ups; defer CommonEventMigrationV1. Consequences: new physical schema IDs are explicitly supported inside V2; old cases remain readable and never migrate on open. Re-ingestion into a new case is available. Smoke benchmarks use three 1 GiB repetitions; the full 15 GB matrix uses one repetition. Elastic and Chronicle follow the core. Skills, subagents and later releases shift to the public roadmap's new numbering.
 
 ## Preserve unmerged parser work
@@ -394,6 +396,8 @@ Before deleting a branch, confirm that its PR is merged and check its ancestry w
 
 
 ## Typed common-event core and staged mappings
+
+Historical prototype entry: the independent mapping and layout decision below replaces the parser bridge and V2/V5 publication path with mapped V3/V6. The unpublished prototype was never a default writer.
 
 **Context:** Cross-source investigations need explicit classifications and entity roles without changing historical interpretation.
 

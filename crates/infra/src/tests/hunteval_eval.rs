@@ -72,8 +72,12 @@ pub(super) fn load_episodes(root: &Path) -> Vec<Episode> {
 }
 
 pub(super) fn stage_sources(root: &Path, episodes: &[Episode]) -> Vec<String> {
+    // Distinct questions may share identical public telemetry. The graph's
+    // source/ordinal identity indexes those bytes once; all episodes are scored.
+    let mut hashes = std::collections::BTreeSet::new();
     episodes
         .iter()
+        .filter(|episode| hashes.insert(episode.hash.clone()))
         .map(|episode| {
             let name = format!("{}.json", episode.truth.episode_id);
             fs::copy(&episode.source, root.join(&name)).unwrap();
@@ -350,3 +354,6 @@ fn private_answers_are_never_ingested_or_displayed() {
     assert!(partitions.contains(&"111122223333".to_owned()));
     assert!(partitions.contains(&"444455556666".to_owned()));
 }
+
+#[cfg(test)]
+mod source_staging;

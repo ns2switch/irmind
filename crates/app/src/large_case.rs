@@ -285,6 +285,7 @@ impl LargeCaseUseCases<'_, '_> {
                 "source produced no Parquet records".into(),
             ));
         }
+        mapped_source::ensure_new_source(&prepared, known_artifacts)?;
         let source_event = self.source_event(&prepared, selection)?;
         let mapped = mapped_source::bind(&mut prepared, &source_event, known_artifacts)?;
         self.engine.verify_mapping_events(

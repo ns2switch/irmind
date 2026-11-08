@@ -1,3 +1,5 @@
+#[cfg(any(feature = "mapping-json-compat", feature = "mapping-journald-compat"))]
+mod mapping;
 #[cfg(feature = "llm-anthropic")]
 use super::Anthropic;
 #[cfg(feature = "cloud-aws")]
@@ -121,6 +123,8 @@ fn register_parsers(
     data_root: &std::path::Path,
 ) -> Result<()> {
     let _ = (&issues, data_root);
+    #[cfg(any(feature = "mapping-json-compat", feature = "mapping-journald-compat"))]
+    mapping::register(registry)?;
     #[cfg(feature = "parser-zeek")]
     registry.register(Box::new(ZeekParser), &ModuleConfig::new())?;
     #[cfg(feature = "parser-suricata")]
