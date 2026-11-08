@@ -287,6 +287,12 @@ impl LargeCaseUseCases<'_, '_> {
         }
         let source_event = self.source_event(&prepared, selection)?;
         let mapped = mapped_source::bind(&mut prepared, &source_event, known_artifacts)?;
+        self.engine.verify_mapping_events(
+            mapped
+                .before
+                .iter()
+                .map(|(_, kind, payload)| (*kind, payload.as_str())),
+        )?;
         let source_hash = prepared.manifest.sha256.clone();
         for artifact in &prepared.artifacts {
             if artifact.source_hashes() != [source_hash.clone()] {

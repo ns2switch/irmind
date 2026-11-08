@@ -139,3 +139,46 @@ fn mapped_pipeline_binds_raw_inputs_and_maps_before_writing_and_exporting() {
     let spool = store.parquet.case_dir(&case.id).unwrap().join("spool");
     assert_eq!(fs::read_dir(spool).unwrap().count(), 0);
 }
+
+#[test]
+fn mapped_store_preserves_the_published_route_without_a_registered_raw_decoder() {
+    use irmind_app::{LargeCaseStore, LocalBatchRequest};
+    let root = tempfile::tempdir().unwrap();
+    let source = root.path().join("source");
+    fs::create_dir(&source).unwrap();
+    fs::write(
+        source.join("event.json"),
+        br#"{"eventTime":"2026-11-01T00:00:00Z","user":"synthetic"}"#,
+    )
+    .unwrap();
+    let mapped = ParquetStore::open_mapped(
+        &root.path().join("mapped"),
+        Arc::new(MappingCatalog::default()),
+    )
+    .unwrap();
+    let legacy = ParquetStore::open_precise(&root.path().join("legacy")).unwrap();
+    let id = CaseId::parse("22222222-2222-2222-2222-222222222222").unwrap();
+    let run = |store: &ParquetStore| {
+        store
+            .prepare_local_batch(
+                LocalBatchRequest {
+                    case_id: &id,
+                    source_root: &source,
+                    relative_paths: &["event.json".into()],
+                    copy_original: false,
+                    parser: &JsonParser,
+                    committed_artifacts: &[],
+                    limits: irmind_app::PartitionLimits::default(),
+                },
+                &CancellationToken::new(),
+            )
+            .unwrap()
+            .pop()
+            .unwrap()
+    };
+    let first = run(&mapped);
+    let second = run(&legacy);
+    assert_eq!(first.artifacts, second.artifacts);
+    assert!(first.mapping.is_none());
+    assert!(second.mapping.is_none());
+}

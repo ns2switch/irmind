@@ -213,6 +213,7 @@ impl Engine<'_> {
             }
             prev = self.verify_chain_entry(id, index, prev, entry)?;
         }
+        self.verify_mapping_events(entries.iter().map(|e| (e.kind, e.payload.as_str())))?;
         let manifest = crate::large_case::read_manifest_index(&entries)?;
         let source_hashes = manifest
             .sources

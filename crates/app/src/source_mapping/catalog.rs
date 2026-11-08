@@ -8,12 +8,29 @@ use std::{collections::BTreeMap, sync::Arc};
 pub struct MappingCatalog {
     decoders: BTreeMap<(String, String), Arc<dyn SourceDecoder>>,
     mappings: BTreeMap<String, Arc<dyn SourceMapper>>,
+    proofs: BTreeMap<irmind_domain::EvidenceHash, crate::SignedOperation>,
 }
 
 impl MappingCatalog {
     pub fn freeze(
         decoders: Vec<Arc<dyn SourceDecoder>>,
         mappings: Vec<Arc<dyn SourceMapper>>,
+    ) -> Result<Self, MappingError> {
+        if mappings.iter().any(|m| {
+            matches!(
+                m.manifest().provenance(),
+                super::MappingProvenance::InstalledDefinition { .. }
+            )
+        }) {
+            return Err(MappingError::InvalidDefinition);
+        }
+        Self::freeze_verified(decoders, mappings, BTreeMap::new())
+    }
+
+    fn freeze_verified(
+        decoders: Vec<Arc<dyn SourceDecoder>>,
+        mappings: Vec<Arc<dyn SourceMapper>>,
+        proofs: BTreeMap<irmind_domain::EvidenceHash, crate::SignedOperation>,
     ) -> Result<Self, MappingError> {
         if decoders.len() > 256 || mappings.len() > 64 {
             return Err(MappingError::InvalidManifest);
@@ -32,6 +49,7 @@ impl MappingCatalog {
                 .mappings
                 .insert(mapper.manifest().identity().id().into(), mapper);
         }
+        result.proofs = proofs;
         Ok(result)
     }
 
@@ -45,6 +63,12 @@ impl MappingCatalog {
         let mut candidate = self.clone();
         candidate.mappings.remove(id);
         if let Some(mapper) = replacement {
+            if matches!(
+                mapper.manifest().provenance(),
+                super::MappingProvenance::InstalledDefinition { .. }
+            ) {
+                return Err(MappingError::InvalidDefinition);
+            }
             if mapper.manifest().identity().id() != id {
                 return Err(MappingError::InvalidManifest);
             }
@@ -80,6 +104,10 @@ impl MappingCatalog {
             }
         }
         Ok(())
+    }
+
+    pub fn supports_decoder(&self, id: &str, version: &str) -> bool {
+        self.decoders.contains_key(&(id.into(), version.into()))
     }
 
     pub fn decoder(&self, id: &str, version: &str) -> Result<&dyn SourceDecoder, MappingError> {
@@ -128,7 +156,11 @@ impl MappingCatalog {
             }
             mappings.push(Arc::clone(mapper));
         }
-        Self::freeze(self.decoders.values().cloned().collect(), mappings)
+        Self::freeze_verified(
+            self.decoders.values().cloned().collect(),
+            mappings,
+            self.proofs.clone(),
+        )
     }
 
     pub fn decoder_selection(
@@ -199,6 +231,7 @@ impl MappingCatalog {
     }
 }
 
+mod authenticated;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;

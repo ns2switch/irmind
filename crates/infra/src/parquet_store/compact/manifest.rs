@@ -123,6 +123,7 @@ pub(super) fn stage(
         }
     };
     Ok(StagedArtifact {
+        rows: None,
         temporary,
         manifest,
     })

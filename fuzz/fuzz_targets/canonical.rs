@@ -7,6 +7,14 @@ fuzz_target!(|bytes: &[u8]| {
         return;
     }
     if let Ok(text) = std::str::from_utf8(bytes) {
+        if let Ok(manifest) = irmind_mod_mapping_tables::TableMapping::review(text) {
+            let mapping = irmind_mod_mapping_tables::TableMapping::bundled(
+                text,
+                manifest.identity().implementation(),
+            )
+            .unwrap();
+            assert_eq!(irmind_app::SourceMapper::manifest(&mapping), &manifest);
+        }
         if let Ok(common) = irmind_app::decode_common_event(text) {
             let canonical = irmind_app::encode_common_event(&common).unwrap();
             assert_eq!(canonical, text);
@@ -32,6 +40,7 @@ fuzz_target!(|bytes: &[u8]| {
         for kind in [
             irmind_domain::AuditEventKind::ParquetArtifactV1,
             irmind_domain::AuditEventKind::ParquetArtifactV2,
+            irmind_domain::AuditEventKind::ParquetArtifactV3,
         ] {
             if let Ok(artifact) = irmind_domain::ParquetArtifact::decode(kind, text.trim()) {
                 let wire = artifact
@@ -43,6 +52,29 @@ fuzz_target!(|bytes: &[u8]| {
                     artifact
                 );
                 assert!(irmind_domain::ParquetArtifact::decode(kind, &(wire + "00")).is_err());
+            }
+        }
+        macro_rules! check_mapping_codec {
+            ($type:ty) => {
+                if let Ok(record) = <$type>::decode(text) {
+                    let wire = record.encode().unwrap();
+                    assert_eq!(wire, text);
+                    assert_eq!(<$type>::decode(&wire).unwrap(), record);
+                    assert!(<$type>::decode(&(wire + "00")).is_err());
+                }
+            };
+        }
+        check_mapping_codec!(irmind_domain::SourceRecordSetV1);
+        check_mapping_codec!(irmind_domain::MappingProfileRecordV1);
+        check_mapping_codec!(irmind_domain::MappingRunV1);
+        check_mapping_codec!(irmind_domain::ParquetLayoutV1);
+        if let Ok(irmind_domain::MappingProfileRecordV1::Snapshot(snapshot)) =
+            irmind_domain::MappingProfileRecordV1::decode(text)
+        {
+            if let Ok(manifest) =
+                irmind_app::source_mapping::MappingManifest::from_snapshot(&snapshot)
+            {
+                assert_eq!(manifest.snapshot().unwrap(), snapshot);
             }
         }
         for parsed in [

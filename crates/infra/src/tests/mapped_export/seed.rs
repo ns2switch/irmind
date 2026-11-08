@@ -53,6 +53,7 @@ fn frame(out: &mut Vec<u8>, value: &impl Serialize) {
 }
 fn source(
     root: &std::path::Path,
+    catalog: Arc<MappingCatalog>,
 ) -> (
     crate::ParquetStore,
     SourceManifestV2,
@@ -63,13 +64,6 @@ fn source(
         br#"{"source_ip":"203.0.113.77"}"#,
     )
     .unwrap();
-    let catalog = Arc::new(
-        MappingCatalog::freeze(
-            vec![Arc::new(irmind_mod_parser_json::JsonSourceDecoder)],
-            vec![],
-        )
-        .unwrap(),
-    );
     let parser = catalog
         .decoder_selection("parser-json", "json-source-v1")
         .unwrap();
@@ -131,6 +125,16 @@ fn entries(
         AuditEventKind::SourceRecordSetV1,
         bound.input().encode().unwrap(),
     );
+    for snapshot in bound.snapshots() {
+        append(
+            &mut entries,
+            signer,
+            AuditEventKind::MappingProfileV1,
+            irmind_domain::MappingProfileRecordV1::Snapshot(snapshot.clone())
+                .encode()
+                .unwrap(),
+        );
+    }
     append(
         &mut entries,
         signer,
@@ -183,8 +187,18 @@ fn header(signer: &LocalSigner, entries: &[SignedEntry]) -> Header {
 }
 
 fn fixture() -> Vec<u8> {
+    let catalog = Arc::new(
+        MappingCatalog::freeze(
+            vec![Arc::new(irmind_mod_parser_json::JsonSourceDecoder)],
+            vec![],
+        )
+        .unwrap(),
+    );
+    package(catalog, &[])
+}
+fn package(catalog: Arc<MappingCatalog>, proofs: &[SignedOperation]) -> Vec<u8> {
     let root = tempfile::tempdir().unwrap();
-    let (store, manifest, bound) = source(root.path());
+    let (store, manifest, bound) = source(root.path(), catalog);
     let signer = LocalSigner {
         key: SigningKey::from_bytes(&[43; 32]),
         actor: Actor::Analyst,
@@ -198,7 +212,11 @@ fn fixture() -> Vec<u8> {
     for entry in &entries {
         frame(&mut out, entry);
     }
-    out.extend_from_slice(&[0; 24]); // No copied blobs, originals or operational entries.
+    out.extend_from_slice(&[0; 24]); // No blobs, originals or case operations.
+    out.extend_from_slice(&(proofs.len() as u64).to_be_bytes());
+    for proof in proofs {
+        frame(&mut out, proof);
+    }
     out.extend_from_slice(&(bound.artifacts().len() as u64).to_be_bytes());
     for artifact in bound.artifacts() {
         let a = artifact.core();
@@ -246,4 +264,77 @@ fn synthetic_v6_package_golden_authenticates_without_any_keystore() {
     changed[last] ^= 1;
     fs::write(&package, changed).unwrap();
     assert!(verify_export(&package).is_err());
+}
+
+struct ZeroClock;
+impl irmind_app::Clock for ZeroClock {
+    fn now(&self) -> Result<u64, AppError> {
+        Ok(0)
+    }
+}
+fn installed_catalog() -> (Arc<MappingCatalog>, SignedOperation) {
+    use irmind_mod_mapping_tables::TableMapping;
+    let root = tempfile::tempdir().unwrap();
+    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let signer = Arc::new(LocalSigner {
+        key: SigningKey::from_bytes(&[43; 32]),
+        actor: Actor::Analyst,
+    });
+    let verifier = Arc::new(LocalVerifier::from_signer(signer.as_ref()));
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store,
+            CryptoPorts::new(signer.clone(), verifier.clone()),
+            Arc::new(MandatoryGuard::new().unwrap()),
+            Arc::new(JsonParser),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(ZeroClock),
+    )
+    .unwrap();
+    let reviewed = TableMapping::review(include_str!(
+        "../../../../modules/mapping-tables/tests/fixtures/synthetic-status.toml"
+    ))
+    .unwrap();
+    let base = MappingCatalog::freeze(
+        vec![Arc::new(irmind_mod_parser_json::JsonSourceDecoder)],
+        vec![],
+    )
+    .unwrap();
+    let approved = engine
+        .change_mapping_definition(&base, &reviewed, true)
+        .unwrap();
+    let catalog = MappingCatalog::freeze_authenticated(
+        vec![Arc::new(irmind_mod_parser_json::JsonSourceDecoder)],
+        vec![Arc::new(TableMapping::installed(&approved).unwrap())],
+        &[approved.operation().clone()],
+        verifier.as_ref(),
+        &signer.public_key(),
+    )
+    .unwrap();
+    (Arc::new(catalog), approved.operation().clone())
+}
+#[test]
+fn synthetic_installed_v6_golden_authenticates_portable_global_authorization() {
+    let (catalog, proof) = installed_catalog();
+    let actual = package(catalog, &[proof]);
+    let golden = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fuzz/seeds/export/valid-v6-installed.irmind");
+    if std::env::var_os("IRMIND_REGENERATE_MAPPED_EXPORT_FIXTURE").is_some() {
+        fs::write(&golden, &actual).unwrap();
+    }
+    assert_eq!(fs::read(golden).unwrap(), actual);
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("installed.irmind");
+    fs::write(&path, actual).unwrap();
+    let key = hex(&sha256(
+        &SigningKey::from_bytes(&[43; 32]).verifying_key().to_bytes(),
+    ));
+    let verified = LocalExportVerifier
+        .verify_export_details(&path, Some(&key))
+        .unwrap();
+    assert_eq!((verified.format_version, verified.entries), (6, 8));
 }

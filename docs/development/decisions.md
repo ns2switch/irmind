@@ -406,3 +406,12 @@ V5 common-schema validation reads each authenticated frame through a range-limit
 ## Sparse peers in the new common schemas
 
 Context: the initial common bridge repeats role-free peers in two columns and misses the existing performance gates. Decision: retain legacy pairs in `co_entities`, write only typed descriptors in `co_observations`, and merge them without inventing roles or identity scopes. Complete descriptor lists remain readable; invalid descriptors cannot trigger fallback. Only the new common co-observation physical goldens change. Historical artifacts, logical common JSON, code tables, V2 envelopes, seals and V5 frames remain unchanged. The analyst approved this representation and the direct, already locked `bytes` dependency. The [complete release remeasurement](benchmarks.md#common-schema-core-sparse-peer-matrix) still misses the unchanged ingestion and entity-query gates, so the common writer remains opt-in. See the [design and measured duplication](common-event-peer-layout.md).
+
+
+## Independent mapping and layout custody
+
+Context: forensic interpretation must evolve independently of source framing, and physical compaction must preserve its original commitments.
+
+Decision: replace the unpublished parser bridge with `SourceDecoder` and pure `SourceMapper` modules. Signed source sets, mapping snapshots/profiles and complete mapping receipts bind V3 outputs. The table interpreter accepts only closed, bounded primitives. Analyst-signed global operations authorize installed definitions; overlap preflight precedes any operation, and exact historical authorizations remain available for replay. Full canonical definition content lives in immutable signed operations, with no unsigned loose file used as an authority.
+
+Consequences: historical parser routes, V1/V2 bytes, seal inventory V2 and export V5 stay unchanged. New export V6 carries required installation proof frames, all retained parents/children and receipts; authentication executes no downloaded mapping code. `ParquetLayoutV1` binds compatible physical replacements without replacing mapping receipts. Inactive-parent disk is measured separately in every 15 GB release benchmark. Any future parent retirement needs a separate reviewed contract. No common writer is enabled by default while its acceptance gates are unmet.

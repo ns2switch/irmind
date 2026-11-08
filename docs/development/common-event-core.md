@@ -10,13 +10,13 @@ The context uses a closed `CommonField` map with checked `CommonValue` variants 
 
 The application pairs the projection with the existing indexed record and its tainted provenance. Before staging, it corroborates the source hash, record index, real offset, parser identity and timestamp. An opaque checked view ties the canonical encoding to an immutable event borrow. The writer reuses those checked bytes instead of serializing the same event twice; provenance, time and size checks remain in place. Canonical JSON orders every object recursively and uses checked integer timestamps. Enabling `serde_json/preserve_order` cannot change it.
 
-Two additive parser methods emit common reader/local-file reports. Their defaults lift the unchanged historical indexed output. The bridge does not inspect field names or source words to infer classifications or roles: category/type sets are empty, outcome is unknown and old entity observations remain explicitly unspecified. Normalization never removes taint or extends permissions.
+New ingestion follows the [source/mapping boundary](source-mapping-design.md): a registered `SourceDecoder` emits bounded `Tainted<SourceRecordV1>` values from original fields; a frozen `MappingCatalog` selects a pure `SourceMapper`; the writer validates origin, time, projection and role-bearing observations. No `parse_common_*` method or normalization bridge remains in `StreamingEventParser`.
 
-A module can override `StreamingEventParser::parse_common_reader_report` and `parse_common_local_file_report`. Build an `EventOrigin` from the supplied source hash and real record reference, insert checked fields into `EventContextV1`, and construct `EntityObservation` values with explicit roles and identity scopes. `CommonEventV1::try_new` checks that observations match the typed context. Emit the complete `CommonGraphRecord` inside its original `Tainted` provenance. The storage boundary independently corroborates that identity before writing. The [synthetic mapped parser](../../crates/infra/src/parquet_store/tests/common/mapped.rs) demonstrates this contract; it is not a production source mapping.
+`mapping-json-compat` and `mapping-journald-compat` are independent extraction-only native modules. Their recursive historical projections cannot be expressed by finite tables. Their identities include content-addressed source/build manifests. They preserve role-free search identities without inventing classifications. The new [table interpreter](mapping-tables.md) supports bounded declarative mappings and shares the same contracts. Missing mappings produce an explicit unclassified event. Parsers without a registered raw decoder retain their unchanged historical route.
 
 ## Physical schemas and reconstruction
 
-The V2 envelope and export V5 framing remain unchanged. New schema identifiers and the new builder `parquet-builder-common-event-v1` select the typed layout:
+Historical V1/V2 envelopes and export V5 remain unchanged. New mapped artifacts use `ParquetArtifactV3`, authenticated profiles and receipts, and export V6. New schema identifiers and the new builder `parquet-builder-common-event-v1` select the typed layout:
 
 | Schema | Additional columns |
 | --- | --- |
@@ -30,9 +30,9 @@ The event role mask supports filtering an event by a reported occurrence without
 
 Unknown codes, incompatible column types and schema/builder metadata mismatches fail validation. New envelope and payload goldens supplement historical fixtures; historical bytes are unchanged. Hash verification still precedes each Parquet read. Compaction and consolidation retain the validated common-schema file metadata; record batches alone do not carry that file metadata. Reconstruction chooses the builder recorded in the signed artifact and reproduces the complete artifact set.
 
-V5 verification checks the common physical columns and file metadata after authenticating each derived frame's complete hash. A bounded file-range reader exposes only that frame to the Parquet reader; it neither extracts evidence to temporary storage nor reads neighboring frames. The direct `bytes` dependency supplies the return type required by Parquet's `ChunkReader` interface. The package is already present in the lockfile; no new package or feature is introduced.
+V6 verification checks the common physical columns and file metadata after authenticating each derived frame's complete hash. A bounded file-range reader exposes only that frame to the Parquet reader; it neither extracts evidence to temporary storage nor reads neighboring frames. The direct `bytes` dependency supplies the return type required by Parquet's `ChunkReader` interface. The package is already present in the lockfile; no new package or feature is introduced.
 
-Old store constructors keep their historical writers. `open_common` selects the new writer for new batched ingestion. Merely opening a case does not reparse its sources or change its generation.
+Old store constructors keep their historical writers. `open_mapped` explicitly selects the new decoder/mapping writer for supported sources in new batched ingestion. Merely opening a case does not reparse its sources or change its generation.
 
 The unsigned normalized spool stores each observation vector once. Deserialization recreates its JSON cache before memory accounting or batch construction; final schemas, batch inputs and golden bytes remain unchanged. The writer also reuses already sorted legacy entity pairs. These changes do not implement co-observation by reference or the separate bounded-metadata proposal.
 
@@ -50,14 +50,22 @@ A retained homogeneous scope/role/field batch computes timestamp extrema once an
 
 No semantic migration is implemented. `CommonEventMigrationV1` is deferred. V1/V2 cases remain readable without migration; new semantic interpretation requires re-ingestion into a new case. The existing precision-only migration cannot activate a common-schema replacement.
 
-Parser mappings, declarative mapping definitions and the Elastic/Chronicle connectors follow separately. A source alert never becomes a confirmed report finding automatically. Model-facing and terminal-facing projections still pass through the existing guard and redaction paths.
+Source-specific semantic mappings and the Elastic/Chronicle connectors follow the core separately. A source alert never becomes a confirmed report finding automatically. Model-facing and terminal-facing projections still pass through the existing guard and redaction paths.
 
 ## Validation and measurement
 
-Tests cover the codebook, canonical payload/envelope goldens, invalid typed values, same-value roles, PID reuse, the unclassified bridge, mixed readers, custody, public-key-only V5 verification and deterministic reconstruction. The shared parser contract checks deterministic common emission and cancellation. The preserve-order job also runs common goldens and bridge contracts.
+Tests cover the codebook, canonical payload/envelope goldens, invalid typed values, same-value roles, PID reuse, unmapped records, mixed readers, custody, public-key-only V6 verification and deterministic reconstruction. The shared decoder/mapping contract checks deterministic repeated and parallel projection, taint and cancellation. The preserve-order job runs common goldens and table-interpreter contracts.
 
 Format tests exercise every closed context-field type and all identity-scope encodings in both JSON map modes. AddressSanitizer runs record their source revision, duration and execution counts for the [canonical codec](benchmarks/common-event-core-fuzz.json) and [export verifier](benchmarks/common-event-export-fuzz.json).
 
-The manual graph benchmark supports a paired common-schema run against a pinned baseline: three smoke repetitions for representative cloud and endpoint sources, then one 15 GB pass per cloud/endpoint scenario on the same runner class. Builds use release optimization. The existing ingestion/query gates are unchanged. The bridge benchmark measures the core; it does not claim the cost or classification coverage of future source-specific mappings.
+The manual graph benchmark supports a paired common-schema run against a pinned baseline: three smoke repetitions for representative cloud and endpoint sources, then one 15 GB pass per cloud/endpoint scenario on the same runner class. Builds use release optimization. The existing ingestion/query gates are unchanged. The mapped benchmark uses the real extraction-only cloud and journald modules; it never substitutes an empty graph. It measures decoder, pure mapping, checked projection, input commitment, Parquet, compaction and custody costs separately. It does not claim semantic coverage of future source-specific mappings.
 
 The [initial measured iteration](benchmarks.md#common-schema-core-initial-iteration) misses the existing gates. The adopted sparse peer layout addresses a measured source of duplication without changing logical observations or historical layouts. The [complete sparse-layout matrix](benchmarks.md#common-schema-core-sparse-peer-matrix) retains all nine release pairs and both three-repetition 1 GiB smokes. It still misses ingestion and entity-query gates, so the common writer remains opt-in. Normal CLI/TUI/demo writing stays on the existing V2 builder.
+
+## Signed derivations and retained layout parents
+
+`SourceRecordSetV1` binds the complete final source manifest, exact decoder and temporal context, rejected count and ordered source-record commitment. `MappingProfileV1` freezes input-set references and immutable mapping snapshots without a circular output reference. A complete `MappingRunV1` activates its complete output inventory atomically.
+
+Physical compaction uses the [approved layout receipt](mapped-artifact-layout.md). A V3 `layout` artifact preserves every original binding and names earlier compatible parents. The application signs the replacement and `ParquetLayoutV1` together. Parent files and the original profiles/receipts remain retained. Authentication checks the complete graph and every file hash; full reconstruction reruns exact locally available implementations and then replays physical layouts.
+
+Export V6 adds an ordered list of the analyst-signed global operations needed to authenticate installed mapping definitions, after case operational entries and before artifact frames. A count and bounded frame encode each proof. No unrelated global configuration or credentials are exported. The verifier requires exactly the referenced proofs, validates their analyst key and contents without executing a mapping, then checks every retained parent/child file. V1/V2, seal-inventory V2 and export V5 golden bytes are unchanged.

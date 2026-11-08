@@ -84,6 +84,14 @@ fn verify_versioned(
     verify_legacy_blobs(&mut input, &mut chain)?;
     let provided_count = verify_source_frames(&mut input, &mut chain)?;
     verify_operation_frames(&mut input, &mut chain, &header)?;
+    if version >= 6 {
+        super::mapping_proofs::read(
+            &mut input,
+            &chain.mapping_installations,
+            &chain.verifier,
+            &header.seal.public_key,
+        )?;
+    }
     if version >= 5 {
         super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
     } else {
@@ -227,6 +235,8 @@ fn verify_source_frames(input: &mut File, chain: &mut ChainState) -> Result<usiz
 
 struct ChainState {
     version: u32,
+    mapping_installations:
+        BTreeMap<irmind_domain::EvidenceHash, irmind_app::source_mapping::MappingManifest>,
     catalog: irmind_app::ArtifactCatalogBuilder,
     inventory: irmind_app::SealInventoryBuilder,
     artifacts: BTreeMap<String, super::artifact_frames::ArtifactFrame>,
@@ -246,6 +256,7 @@ impl ChainState {
     fn new(version: u32) -> Self {
         Self {
             version,
+            mapping_installations: BTreeMap::new(),
             catalog: irmind_app::ArtifactCatalogBuilder::default(),
             inventory: irmind_app::SealInventoryBuilder::default(),
             artifacts: BTreeMap::new(),
@@ -296,6 +307,7 @@ impl ChainState {
             self.catalog.accept(&entry)?;
             self.inventory.accept(&entry)?;
         }
+        super::mapping_proofs::collect(&entry, &mut self.mapping_installations)?;
         self.accept_metadata(&entry)?;
         if let Some(hash) = &entry.evidence {
             self.referenced_evidence.insert(hash.clone());

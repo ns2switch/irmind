@@ -120,3 +120,4 @@ mod common_event_custody;
 mod mapped_export;
 
 mod mapped_pipeline;
+mod mapping_installation;
