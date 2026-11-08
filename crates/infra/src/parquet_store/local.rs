@@ -326,7 +326,6 @@ pub(super) fn verify_source_unchanged(
 
 impl ParquetStore {
     pub(super) fn replay_mode(&mut self, source: &SourceManifestV1, artifacts: &[ParquetArtifact]) {
-        self.common_events=artifacts.iter().any(|a|matches!(a,ParquetArtifact::V2(v) if v.schema.is_common() && v.source_hashes.contains(&source.sha256)));
         self.precise_time = artifacts.iter().any(|a| {
             matches!(a, ParquetArtifact::V2(_)) && a.source_hashes().contains(&source.sha256)
         });

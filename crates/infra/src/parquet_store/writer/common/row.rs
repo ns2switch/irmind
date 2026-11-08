@@ -1,6 +1,6 @@
 use crate::parquet_store::{AppError, RecordRow, invalid_source, storage};
 use irmind_app::common_event::CheckedCommonRecord;
-use irmind_app::common_event::{CommonField, CommonValue, encode_identity_scope};
+use irmind_app::common_event::encode_identity_scope;
 use irmind_domain::EvidenceHash;
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -106,55 +106,6 @@ pub(super) fn typed_peers(observations: &[ObservationRow]) -> Result<String, App
         .filter(|o| o.role != 0)
         .collect::<Vec<_>>();
     serde_json::to_string(&typed).map_err(storage)
-}
-
-impl RecordRow {
-    pub(in crate::parquet_store) fn from_common(
-        checked: &CheckedCommonRecord<'_>,
-        hash: &EvidenceHash,
-    ) -> Result<Self, AppError> {
-        let record = checked.record();
-        if record.common.origin().source() != hash {
-            return Err(invalid_source());
-        }
-        let mut row = Self::from_partitioned(&record.indexed, hash)?;
-        let projection = CommonRow::from_record(checked)?;
-        let unchanged = record.common.observations().values().is_empty()
-            && row.entity_pairs.windows(2).all(|pair| pair[0] < pair[1]);
-        if !unchanged {
-            row.entity_pairs
-                .extend(record.common.observations().values().iter().map(|o| {
-                    (
-                        o.entity().kind().as_str().to_owned(),
-                        o.entity().value().to_owned(),
-                    )
-                }));
-            row.entity_pairs.sort();
-            row.entity_pairs.dedup();
-            row.entities = serde_json::to_string(&row.entity_pairs).map_err(storage)?;
-        }
-        let context = record.common.context();
-        let scalar = |field| match context.get(field) {
-            Some(CommonValue::Text(value)) => Some(value.as_str()),
-            _ => None,
-        };
-        if let Some(account) =
-            scalar(CommonField::CloudAccountId).or_else(|| scalar(CommonField::CloudProjectId))
-        {
-            row.scope_account = account.into();
-        }
-        if let Some(region) = scalar(CommonField::CloudRegion) {
-            row.scope_region = region.into();
-        }
-        if let Some(host) = scalar(CommonField::HostName)
-            .or_else(|| scalar(CommonField::HostHostname))
-            .or_else(|| scalar(CommonField::HostId))
-        {
-            row.scope_host = host.into();
-        }
-        row.common = Some(projection);
-        Ok(row)
-    }
 }
 
 impl RecordRow {

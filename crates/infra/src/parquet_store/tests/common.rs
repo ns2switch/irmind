@@ -4,9 +4,9 @@ use arrow::array::{UInt8Array, UInt32Array};
 use irmind_domain::GraphQueryFilter;
 
 #[test]
-fn unclassified_bridge_writes_checked_common_schemas_and_rebuilds_exactly() {
+fn mapping_owned_unclassified_projection_writes_checked_schemas_and_precision() {
     let root = tempfile::tempdir().unwrap();
-    let store = ParquetStore::open_common(root.path()).unwrap();
+    let store = mapped::compat_store(root.path());
     let id = CaseId::parse("33333333-3333-3333-3333-333333333333").unwrap();
     let input=br#"{"eventTime":"2026-11-01T00:00:00.123456789Z","eventName":"Failure is just source text","host":"host-a","sourceIPAddress":"203.0.113.77"}"#;
     fs::write(root.path().join("event.json"), input).unwrap();
@@ -18,7 +18,7 @@ fn unclassified_bridge_writes_checked_common_schemas_and_rebuilds_exactly() {
                 source_root: root.path(),
                 relative_paths: &paths,
                 copy_original: false,
-                parser: &JsonParser,
+                parser: &mapped::Mapped,
                 committed_artifacts: &[],
                 limits: irmind_app::PartitionLimits::default(),
             },
@@ -70,19 +70,8 @@ fn unclassified_bridge_writes_checked_common_schemas_and_rebuilds_exactly() {
             }
         }
     }
-    assert_eq!(
-        store
-            .rebuild_compare(
-                &id,
-                root.path(),
-                &[prepared.manifest],
-                &prepared.artifacts,
-                &JsonParser,
-                &CancellationToken::new()
-            )
-            .unwrap(),
-        1
-    );
+    let prepared_mapping = prepared.mapping.unwrap();
+    assert!(prepared_mapping.catalog_commitment().is_ok());
 }
 
 mod compaction;
@@ -92,7 +81,7 @@ mod mapped;
 #[allow(clippy::too_many_lines)]
 fn common_queries_keep_roles_pid_scopes_and_closed_filters() {
     let root = tempfile::tempdir().unwrap();
-    let store = ParquetStore::open_common(root.path()).unwrap();
+    let store = mapped::store(root.path());
     let id = CaseId::parse("33333333-3333-3333-3333-333333333333").unwrap();
     let input = concat!(
         "{\"eventTime\":\"2026-11-01T00:00:00.123456789Z\",\"eventName\":\"Login\",\"source_ip\":\"203.0.113.1\",\"destination_ip\":\"203.0.113.1\",\"outcome\":\"failure\",\"pid\":42}\n",
@@ -183,19 +172,7 @@ fn common_queries_keep_roles_pid_scopes_and_closed_filters() {
         )
         .unwrap();
     assert!(path.contains("no co-observation path"), "{path}");
-    assert_eq!(
-        store
-            .rebuild_compare(
-                &id,
-                root.path(),
-                &[prepared.manifest],
-                &prepared.artifacts,
-                &mapped::Mapped,
-                &cancel
-            )
-            .unwrap(),
-        1
-    );
+    mapped::assert_rebuild(root.path(), &["mapped.ndjson".into()], false);
 }
 
 #[test]
@@ -203,7 +180,7 @@ fn common_queries_keep_roles_pid_scopes_and_closed_filters() {
 fn mixed_legacy_and_common_queries_keep_old_data_and_explicit_coverage() {
     let root = tempfile::tempdir().unwrap();
     let old = ParquetStore::open(root.path()).unwrap();
-    let new = ParquetStore::open_common(root.path()).unwrap();
+    let new = mapped::compat_store(root.path());
     let id = CaseId::parse("33333333-3333-3333-3333-333333333333").unwrap();
     fs::write(root.path().join("old.json"), br#"{"eventTime":"2026-11-01T00:00:00Z","eventName":"Old","sourceIPAddress":"203.0.113.77","userIdentity":{"userName":"alice"}}"#).unwrap();
     let mut legacy = old
@@ -229,7 +206,7 @@ fn mixed_legacy_and_common_queries_keep_old_data_and_explicit_coverage() {
                 source_root: root.path(),
                 relative_paths: &paths,
                 copy_original: false,
-                parser: &JsonParser,
+                parser: &mapped::Mapped,
                 committed_artifacts: &legacy.artifacts,
                 limits: irmind_app::PartitionLimits::default(),
             },

@@ -33,8 +33,7 @@ pub use definitions::{
 };
 pub mod common_event;
 pub use common_event::{
-    CommonGraphRecord, decode_common_event, encode_common_event, lift_unclassified_common,
-    validate_common_record,
+    CommonGraphRecord, decode_common_event, encode_common_event, validate_common_record,
 };
 mod custody;
 mod diagnostics;

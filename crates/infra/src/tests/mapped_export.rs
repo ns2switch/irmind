@@ -38,7 +38,7 @@ fn append(
     store.append(&entry).unwrap();
 }
 fn setup(root: &std::path::Path) -> (Arc<LocalStore>, Engine<'static>, Arc<LocalSigner>) {
-    let store = Arc::new(LocalStore::open_common(root).unwrap());
+    let store = Arc::new(LocalStore::open_mapped(root, mapping_catalog()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[88; 32]),
         actor: Actor::Analyst,
@@ -71,6 +71,9 @@ fn ingest(
     root: &std::path::Path,
     name: &str,
 ) {
+    let parser = mapping_catalog()
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap();
     let prepared = store
         .prepare_local_batch(
             irmind_app::LocalBatchRequest {
@@ -78,7 +81,7 @@ fn ingest(
                 source_root: root,
                 relative_paths: &[name.into()],
                 copy_original: true,
-                parser: &JsonParser,
+                parser: &parser,
                 committed_artifacts: &[],
                 limits: irmind_app::PartitionLimits::default(),
             },
@@ -90,7 +93,7 @@ fn ingest(
     let manifest = SourceManifestV2 {
         source: prepared.manifest,
         parser_id: "parser-json".into(),
-        parser_version: "json-stream-v3".into(),
+        parser_version: "json-source-v1".into(),
         confidence: 90,
         selection: ParserSelectionMode::Automatic,
         timestamp_context: None,
@@ -259,3 +262,17 @@ fn v6_export_authenticates_retained_parents_receipts_schema_and_public_key() {
         .is_err()
     );
 }
+
+fn mapping_catalog() -> Arc<irmind_app::source_mapping::MappingCatalog> {
+    Arc::new(
+        irmind_app::source_mapping::MappingCatalog::freeze(
+            vec![Arc::new(irmind_mod_parser_json::JsonSourceDecoder)],
+            vec![Arc::new(
+                irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap(),
+            )],
+        )
+        .unwrap(),
+    )
+}
+
+mod seed;

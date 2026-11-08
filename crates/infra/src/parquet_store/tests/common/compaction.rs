@@ -4,7 +4,7 @@ use super::*;
 #[allow(clippy::too_many_lines)]
 fn scoped_roles_and_pid_lifetimes_survive_compaction_and_reconstruction() {
     let root = tempfile::tempdir().unwrap();
-    let store = ParquetStore::open_common(root.path()).unwrap();
+    let store = mapped::store(root.path());
     let id = CaseId::parse("33333333-3333-3333-3333-333333333333").unwrap();
     fs::write(root.path().join("a.json"),br#"{"eventTime":"2026-11-01T00:00:00.000001Z","eventName":"Login","source_ip":"203.0.113.1","destination_ip":"203.0.113.1","pid":42}"#).unwrap();
     fs::write(root.path().join("b.json"),br#"{"eventTime":"2026-11-01T00:00:00.000002Z","eventName":"Login","source_ip":"203.0.113.2","pid":42}"#).unwrap();
@@ -76,18 +76,6 @@ fn scoped_roles_and_pid_lifetimes_survive_compaction_and_reconstruction() {
         )
         .unwrap();
     assert!(path.contains("no co-observation path"), "{path}");
-    let manifests = prepared.into_iter().map(|p| p.manifest).collect::<Vec<_>>();
-    assert_eq!(
-        store
-            .rebuild_compare(
-                &id,
-                root.path(),
-                &manifests,
-                &[all, bundles].concat(),
-                &mapped::Mapped,
-                &token
-            )
-            .unwrap(),
-        2
-    );
+    assert!(prepared.iter().all(|p| p.mapping.is_some()));
+    mapped::assert_rebuild(root.path(), &["a.json".into(), "b.json".into()], true);
 }

@@ -32,7 +32,7 @@ fn wrap(store: &ParquetStore, id: &CaseId, artifact: &ParquetArtifact) -> Parque
 #[allow(clippy::too_many_lines)]
 fn v3_readers_and_layout_keep_exact_query_results_and_parent_files() {
     let root = tempfile::tempdir().unwrap();
-    let store = ParquetStore::open_common(root.path()).unwrap();
+    let store = mapped::store(root.path());
     let id = CaseId::parse("33333333-3333-3333-3333-333333333333").unwrap();
     for (name, second) in [("a.json", "01"), ("b.json", "02")] {
         fs::write(root.path().join(name), format!(

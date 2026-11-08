@@ -15,6 +15,7 @@ serde_json = "1"
 irmind-build-manifest = { path = "../../build-manifest", version = "0.1.0" }
 
 [dev-dependencies]
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
 irmind-mod-parser-linux = { path = "../parser-linux", version = "0.1.0" }
 
 [lints]

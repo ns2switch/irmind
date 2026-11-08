@@ -4,7 +4,13 @@ set -euo pipefail
 [[ "$BASE_REF" =~ ^[0-9a-f]{40}$ ]]
 candidate=$(git rev-parse HEAD)
 git merge-base --is-ancestor "$BASE_REF" "$candidate"
-trap 'git checkout --detach "$candidate" >/dev/null' EXIT
+cleanup() {
+  if [[ "${stage:-}" == baseline ]]; then
+    git restore --source="$BASE_REF" -- crates/infra/src/tests/parquet_benchmark.rs
+  fi
+  git checkout --detach "$candidate" >/dev/null
+}
+trap cleanup EXIT
 failed=0
 for stage in baseline candidate; do
   revision=$candidate
@@ -18,9 +24,24 @@ for stage in baseline candidate; do
   # spending time on large corpora. A functional rejection is not a latency.
   if [[ "$stage" == candidate ]]; then
     cargo test -p irmind-infra --lib parquet_store::tests::common --release --locked -- --test-threads 1 2>&1 | tee -a "$output"
+    cargo test -p irmind-infra --lib tests::mapped_ --release --locked -- --test-threads 1 2>&1 | tee -a "$output"
   fi
-  # Candidate smoke is at least 1 GiB. The paired 15 GB corpus is identical.
-  if [[ "$stage" == candidate && ( "$IRMIND_BENCH_SCENARIO" == cloud-v2 || "$IRMIND_BENCH_SCENARIO" == endpoint-v2-64-chronological ) ]]; then
+  # Add only the larger test harness to older baselines. Production source,
+  # parsing, schemas, queries and limits remain those of the pinned commit.
+  if [[ "$stage" == baseline ]]; then
+    python3 - <<'PY_SMOKE'
+from pathlib import Path
+path = Path("crates/infra/src/tests/parquet_benchmark.rs")
+source = path.read_text()
+if "fn common_schema_smoke_1gib()" not in source:
+    assert "fn benchmark(files: usize, multiplier: usize, label: &str)" in source
+    source += '\n#[test]\n#[ignore = "paired release measurement: 1 GiB"]\nfn common_schema_smoke_1gib() { benchmark(1030, 1, "1gib"); }\n'
+    path.write_text(source)
+PY_SMOKE
+    echo 'PAIRED_HARNESS smoke_files=1030 production_unchanged=true' | tee -a "$output"
+  fi
+  # Both sides run three >=1 GiB repetitions per representative source.
+  if [[ "$IRMIND_BENCH_SCENARIO" == cloud-v2 || "$IRMIND_BENCH_SCENARIO" == endpoint-v2-64-chronological ]]; then
     smoke=common_schema_smoke_1gib
     for repetition in 1 2 3; do
       echo "SMOKE_REPETITION=$repetition" | tee -a "$output"
@@ -28,5 +49,8 @@ for stage in baseline candidate; do
     done
   fi
   if ! cargo test -p irmind-infra parquet_benchmark_15gb --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee -a "$output"; then failed=1; fi
+  if [[ "$stage" == baseline ]]; then
+    git restore --source="$BASE_REF" -- crates/infra/src/tests/parquet_benchmark.rs
+  fi
 done
 exit "$failed"

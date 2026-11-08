@@ -99,6 +99,8 @@ futures-util = { version = "0.3", default-features = false, features = ["std"] }
 workspace = true
 
 [dev-dependencies]
+irmind-mod-mapping-json-compat = { path = "../modules/mapping-json-compat", version = "0.1.0" }
+irmind-mod-mapping-journald-compat = { path = "../modules/mapping-journald-compat", version = "0.1.0" }
 irmind-testkit = { path = "../testkit", version = "0.1.0" }
 ed25519-dalek = "2"
 arrow = { version = "=59.3.0", default-features = false }

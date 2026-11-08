@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn homogeneous_and_many_scope_batches_keep_exact_counts_and_extrema() {
     let root = tempfile::tempdir().unwrap();
-    let store = ParquetStore::open_common(root.path()).unwrap();
+    let store = mapped::store(root.path());
     let id = CaseId::parse("33333333-3333-3333-3333-333333333333").unwrap();
     let records = (0..64)
         .rev()

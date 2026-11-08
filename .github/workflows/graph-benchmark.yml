@@ -7,7 +7,7 @@ on:
         type: string
         default: ""
       common_schema:
-        description: Compare the typed common-schema bridge with the pinned baseline
+        description: Compare the source decoder and mapping pipeline with the pinned baseline
         type: boolean
         default: false
       scenario:

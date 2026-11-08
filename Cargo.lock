@@ -2499,6 +2499,8 @@ dependencies = [
  "irmind-mod-llm-deepseek",
  "irmind-mod-llm-openai-compatible",
  "irmind-mod-llm-openrouter",
+ "irmind-mod-mapping-journald-compat",
+ "irmind-mod-mapping-json-compat",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
@@ -2802,6 +2804,7 @@ dependencies = [
  "irmind-build-manifest",
  "irmind-domain",
  "irmind-mod-parser-linux",
+ "irmind-testkit",
  "serde",
  "serde_json",
 ]
@@ -2814,6 +2817,7 @@ dependencies = [
  "irmind-build-manifest",
  "irmind-domain",
  "irmind-mod-parser-json",
+ "irmind-testkit",
 ]
 
 [[package]]

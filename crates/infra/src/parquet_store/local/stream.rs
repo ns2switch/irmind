@@ -122,21 +122,14 @@ pub(in crate::parquet_store) fn parse_and_verify(
         irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
     ) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
-    parse_verified::<emission::Indexed>(input, emit)
+    parse_verified(input, emit)
 }
 
-pub(in crate::parquet_store) fn parse_common_and_verify(
+fn parse_verified(
     input: VerifiedInput<'_>,
     emit: &mut dyn FnMut(
-        irmind_domain::Tainted<irmind_app::CommonGraphRecord>,
+        irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
     ) -> Result<(), AppError>,
-) -> Result<ParseReport, AppError> {
-    parse_verified::<emission::Common>(input, emit)
-}
-
-fn parse_verified<E: emission::Emission>(
-    input: VerifiedInput<'_>,
-    emit: &mut dyn FnMut(irmind_domain::Tainted<E::Record>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
     let VerifiedInput {
         source,
@@ -151,7 +144,7 @@ fn parse_verified<E: emission::Emission>(
     } = input;
     source.seek(SeekFrom::Start(0)).map_err(storage)?;
     if parser.prefers_local_file(relative_path, sample) {
-        let report = E::file(
+        let report = emission::file(
             emission::Input {
                 source: relative_path,
                 parser,
@@ -176,7 +169,7 @@ fn parse_verified<E: emission::Emission>(
         return Ok(report);
     }
     let mut second_pass = HashingReader::new(source);
-    let report = E::reader(
+    let report = emission::reader(
         emission::Input {
             source: relative_path,
             parser,

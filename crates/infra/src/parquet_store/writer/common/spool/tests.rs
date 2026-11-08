@@ -66,7 +66,14 @@ fn row() -> RecordRow {
         identity,
     )
     .unwrap();
-    RecordRow::from_common(&checked, &hash).unwrap()
+    RecordRow::from_mapping(
+        &mapping(checked.record()),
+        &Provenance::new([0xab; 32], Some(7), SourceKind::File),
+        identity,
+        &hash,
+        "0".repeat(64),
+    )
+    .unwrap()
 }
 
 #[test]
@@ -143,5 +150,43 @@ fn common_origin_is_bound_to_the_verified_file_identity() {
     )
     .unwrap();
     let other = EvidenceHash::parse(&"cd".repeat(32)).unwrap();
-    assert!(RecordRow::from_common(&checked, &other).is_err());
+    assert!(
+        RecordRow::from_mapping(
+            &mapping(checked.record()),
+            &Provenance::new([0xab; 32], Some(7), SourceKind::File),
+            identity,
+            &other,
+            "0".repeat(64)
+        )
+        .is_err()
+    );
+}
+
+fn mapping(record: &CommonGraphRecord) -> irmind_app::source_mapping::MappingOutput {
+    use irmind_app::source_mapping::{
+        DecodeAnnotationsV1, MappingOutput, MappingPartition, SourceFormatV1, SourceRecordV1,
+        json::{SourceJsonLimits, decode_json_fields},
+    };
+    let source = SourceRecordV1::try_new(
+        record.common.origin().clone(),
+        "synthetic.json",
+        record.common.timestamp(),
+        SourceFormatV1::try_new("json", "source-json-v1", std::collections::BTreeMap::new())
+            .unwrap(),
+        decode_json_fields(
+            record.indexed.record.text.as_bytes(),
+            SourceJsonLimits::default(),
+        )
+        .unwrap(),
+        DecodeAnnotationsV1::default(),
+    )
+    .unwrap();
+    MappingOutput::try_new(
+        &source,
+        record.indexed.clone(),
+        record.common.clone(),
+        MappingPartition::default(),
+        vec![],
+    )
+    .unwrap()
 }
