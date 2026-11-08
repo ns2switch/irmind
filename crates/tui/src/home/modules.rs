@@ -4,35 +4,8 @@ use super::{
 };
 
 pub(super) fn update_module_screen(state: &mut HomeState, key: KeyCode) -> HomeAction {
-    if let Some(change) = state.pending_module_change.clone() {
-        match key {
-            KeyCode::Esc => {
-                state.pending_module_change = None;
-                state.input.clear();
-            }
-            KeyCode::Up | KeyCode::Down => state.selected_option = 1 - state.selected_option,
-            KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4 => state.input.push(ch),
-            KeyCode::Backspace => {
-                state.input.pop();
-            }
-            KeyCode::Enter if state.input == "2" => {
-                state.input.clear();
-                state.pending_module_change = None;
-                return HomeAction::ChangeModule(change, true);
-            }
-            KeyCode::Enter if state.input == "1" => {
-                state.input.clear();
-                state.pending_module_change = None;
-            }
-            KeyCode::Enter if state.input.is_empty() && state.selected_option == 1 => {
-                state.input.clear();
-                state.pending_module_change = None;
-                return HomeAction::ChangeModule(change, true);
-            }
-            KeyCode::Enter if state.input.is_empty() => state.pending_module_change = None,
-            _ => {}
-        }
-        return HomeAction::None;
+    if state.pending_module_change.is_some() {
+        return confirm_pending_change(state, key);
     }
     if state.module_edit.is_some() {
         return update_edit(state, key);
@@ -205,4 +178,38 @@ fn toggle_selected(state: &mut HomeState) -> HomeAction {
         }
         ModuleKind::Local => HomeAction::None,
     }
+}
+
+pub(super) fn confirm_pending_change(state: &mut HomeState, key: KeyCode) -> HomeAction {
+    if let Some(change) = state.pending_module_change.clone() {
+        match key {
+            KeyCode::Esc => {
+                state.pending_module_change = None;
+                state.input.clear();
+            }
+            KeyCode::Up | KeyCode::Down => state.selected_option = 1 - state.selected_option,
+            KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4 => state.input.push(ch),
+            KeyCode::Backspace => {
+                state.input.pop();
+            }
+            KeyCode::Enter if state.input == "2" => {
+                state.input.clear();
+                state.pending_module_change = None;
+                return HomeAction::ChangeModule(change, true);
+            }
+            KeyCode::Enter if state.input == "1" => {
+                state.input.clear();
+                state.pending_module_change = None;
+            }
+            KeyCode::Enter if state.input.is_empty() && state.selected_option == 1 => {
+                state.input.clear();
+                state.pending_module_change = None;
+                return HomeAction::ChangeModule(change, true);
+            }
+            KeyCode::Enter if state.input.is_empty() => state.pending_module_change = None,
+            _ => {}
+        }
+        return HomeAction::None;
+    }
+    HomeAction::None
 }

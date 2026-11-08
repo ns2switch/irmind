@@ -162,13 +162,15 @@ impl PreparedStartup {
         }))
     }
 
-    fn parser_catalog(&self, registry: &ModuleRegistry) -> irmind_app::modules::ParserCatalog {
+    fn parser_catalog(
+        registry: &ModuleRegistry,
+        #[cfg(feature = "parser-declarative")] definitions: &irmind_app::ApprovedDefinitions,
+    ) -> irmind_app::modules::ParserCatalog {
         #[cfg(not(feature = "parser-declarative"))]
         let resolver: Option<Arc<dyn irmind_app::modules::ParserResolver>> = None;
         #[cfg(feature = "parser-declarative")]
         let resolver = Some(
-            self.definitions
-                .resolver(Arc::new(irmind_mod_parser_declarative::DeclarativeCompiler)),
+            definitions.resolver(Arc::new(irmind_mod_parser_declarative::DeclarativeCompiler)),
         );
         #[cfg(feature = "parser-linux")]
         let resolver: Option<Arc<dyn irmind_app::modules::ParserResolver>> = Some(Arc::new(
@@ -184,7 +186,23 @@ impl PreparedStartup {
         )
     }
 
-    fn run(self, cancel: &CancellationToken) -> Result<bool> {
+    fn prepare_catalog(
+        &mut self,
+        registry: &ModuleRegistry,
+    ) -> Result<irmind_app::modules::ParserCatalog> {
+        let catalog = Self::parser_catalog(
+            registry,
+            #[cfg(feature = "parser-declarative")]
+            &self.definitions,
+        );
+        let catalog = storage::experimental_parsers(catalog, &self.saved)?;
+        if let Some(store) = storage::experimental(&self.home, &self.saved, registry)? {
+            self.store = Arc::new(store);
+        }
+        Ok(catalog)
+    }
+
+    fn run(mut self, cancel: &CancellationToken) -> Result<bool> {
         let (registry, config_issues) = configured_registry(
             &self.cli,
             &self.saved,
@@ -196,7 +214,7 @@ impl PreparedStartup {
         #[cfg(feature = "parser-declarative")]
         let registry =
             super::parser_definitions::register(registry, &self.definitions, &self.home)?;
-        let catalog = self.parser_catalog(&registry);
+        let catalog = self.prepare_catalog(&registry)?;
         let engine = self.compose_engine(&registry, catalog.clone())?;
         let Self {
             cli,
@@ -230,6 +248,7 @@ impl PreparedStartup {
             manifests,
             module_overrides,
             allow_environment,
+            experimental_common_writer: saved.experimental_common_writer == Some(true),
             signer_id: active.signer_id,
             secrets_id: active.secrets_id,
             #[cfg(feature = "keystore-file")]

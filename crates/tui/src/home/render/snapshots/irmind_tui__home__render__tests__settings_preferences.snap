@@ -1,15 +1,15 @@
 ---
 source: crates/tui/src/home/render/tests.rs
-expression: "snapshot_screen(&state,\nvec![ListItem::new(\"Resume last case: on\"),\nListItem::new(\"Mouse capture: on\"), ListItem::new(\"Theme: auto\"),])"
+expression: "snapshot_screen(&state, items::preference_items(&state, &state.modules))"
 ---
 IRMind v0.1.0
 
   ╭ Preferences ─────────────────────────────────────────────────────────────╮
   │Resume last case: on                                                      │
   │Mouse capture: on                                                         │
+  │Context hints: on                                                         │
   │Theme: auto                                                               │
-  │                                                                          │
-  │                                                                          │
+  │Common writer (experimental): not compiled                                │
   │                                                                          │
   │                                                                          │
   │                                                                          │

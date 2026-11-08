@@ -382,6 +382,9 @@ fn update_new_case(state: &mut HomeState, key: KeyCode) -> HomeAction {
 }
 
 fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
+    if state.pending_module_change.is_some() {
+        return modules::confirm_pending_change(state, key);
+    }
     match key {
         KeyCode::Esc => {
             state.mode = state.settings_return;
@@ -392,7 +395,7 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
             HomeAction::None
         }
         KeyCode::Down => {
-            state.preference_selected = (state.preference_selected + 1).min(3);
+            state.preference_selected = (state.preference_selected + 1).min(4);
             HomeAction::None
         }
         KeyCode::Enter => {
@@ -400,7 +403,7 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
                 0 => ConfigChange::SetResumeLastCase(!state.resume_last_case.enabled()),
                 1 => ConfigChange::SetMouseCapture(!state.ui_selection.mouse_capture),
                 2 => ConfigChange::SetShowHints(!state.show_hints.enabled()),
-                _ => ConfigChange::SetTheme(
+                3 => ConfigChange::SetTheme(
                     match state.theme_choice.as_str() {
                         "auto" => "light",
                         "light" => "dark",
@@ -408,6 +411,21 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
                     }
                     .into(),
                 ),
+                _ => {
+                    if state.common_writer == super::CommonWriterState::Unavailable {
+                        state.notice =
+                            "Common writer unavailable: rebuild with mapping features".into();
+                        return HomeAction::None;
+                    }
+                    if state.common_writer != super::CommonWriterState::Enabled {
+                        state.pending_module_change =
+                            Some(ConfigChange::SetExperimentalCommonWriter(true));
+                        state.selected_option = 0;
+                        state.input.clear();
+                        return HomeAction::None;
+                    }
+                    ConfigChange::SetExperimentalCommonWriter(false)
+                }
             };
             HomeAction::ChangeModule(change, true)
         }

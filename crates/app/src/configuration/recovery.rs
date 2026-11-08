@@ -121,6 +121,9 @@ fn fields(config: &PersistentConfig) -> BTreeMap<String, String> {
     if let Some(value) = config.resume_last_case {
         out.insert("resume_last_case".into(), value.to_string());
     }
+    if let Some(value) = config.experimental_common_writer {
+        out.insert("experimental_common_writer".into(), value.to_string());
+    }
     for (id, settings) in &config.modules {
         out.insert(
             format!("modules.{id}.enabled"),
@@ -246,7 +249,11 @@ impl Engine<'_> {
         let current = review.current.ok_or_else(invalid)?;
         let approved = review.approved.unwrap_or_default();
         let egress = approved.active_egress_changed(&current) || review.file_missing;
-        if egress && !confirmed {
+        if (egress
+            || (current.experimental_common_writer == Some(true)
+                && approved.experimental_common_writer != Some(true)))
+            && !confirmed
+        {
             return Err(AppError::Fixed(
                 FixedAppError::PolicyConfigurationConfirmationRequired,
             ));
@@ -272,7 +279,11 @@ impl Engine<'_> {
             return Ok(false);
         }
         let egress = current.active_egress_changed(&next);
-        if egress && !confirmed {
+        if (egress
+            || (next.experimental_common_writer == Some(true)
+                && current.experimental_common_writer != Some(true)))
+            && !confirmed
+        {
             return Err(AppError::Fixed(
                 FixedAppError::PolicyConfigurationConfirmationRequired,
             ));

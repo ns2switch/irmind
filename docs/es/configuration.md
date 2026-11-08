@@ -145,3 +145,9 @@ Un servicio local sin clave puede usar HTTP solo en loopback; también admite HT
 ## Tiempo de fuentes syslog clásicas
 
 El contexto temporal de RFC 3164 pertenece a cada ingesta, no a config.toml. Confirma el año, el desplazamiento UTC fijo y el cambio de año en el formulario de ingesta. Puedes aplicar la elección confirmada a todos los ficheros o elegir por separado. Los campos globales retirados necesitan una eliminación explícita y firmada al arrancar. Las fuentes ya firmadas mantienen su interpretación registrada. Consulta [parsers](parsers.md) y la [referencia para automatización](../development/cli.md).
+
+## Escritor común experimental
+
+V2 sigue siendo el valor por defecto. En /settings preferences, activa Common writer (experimental) y confirma el aviso. La configuración aprobada completa queda en la cadena operativa global firmada antes de reiniciar la sesión. El campo de config.toml es experimental_common_writer = true; una edición manual requiere la revisión firmada habitual. Esta opción no habilita modelos ni conectores remotos.
+
+Los decodificadores iniciales admiten JSON de nube o genérico y journald. Los demás formatos conservan la ruta V2. La ingesta muestra un aviso persistente. ParquetArtifactV3, export V6 y ParquetLayoutV1 son inestables hasta su activación por defecto: pueden cambiar sin migración. Conserva los originales y usa casos sintéticos. Los formatos históricos V1/V2 y sus bytes derivados por defecto no cambian.

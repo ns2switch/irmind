@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "mapping-json-compat", "mapping-journald-compat",
     "keystore-os", "keystore-file",
     "parser-json", "parser-syslog", "parser-linux", "parser-evtx",
     "parser-ecs", "parser-ocsf", "parser-declarative",

@@ -10,6 +10,10 @@ on:
         description: Compare the source decoder and mapping pipeline with the pinned baseline
         type: boolean
         default: false
+      mapped_candidate:
+        description: Enable mapped V3 for the candidate; false checks unchanged default V2
+        type: boolean
+        default: true
       scenario:
         description: Release benchmark workload
         type: choice
@@ -201,6 +205,7 @@ jobs:
           echo "IRMIND_HUNTEVAL_ROOT=$dataset_root" >> "$GITHUB_ENV"
       - name: Compare release schemas on the same runner
         env:
+          MAPPED_CANDIDATE: ${{ inputs.mapped_candidate }}
           BASE_REF: ${{ inputs.compare_base }}
           IRMIND_BENCH_SCENARIO: ${{ matrix.scenario }}
         run: bash .github/scripts/benchmark_common_schema.sh

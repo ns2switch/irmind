@@ -27,10 +27,27 @@ pub enum ParserChoice {
 pub struct ParserCatalog {
     pub(super) parsers: BTreeMap<String, Arc<dyn LogParser>>,
     pub(super) unavailable: BTreeMap<String, String>,
+    pub(super) experimental: BTreeMap<String, Arc<dyn LogParser>>,
     pub(super) resolver: Option<Arc<dyn ParserResolver>>,
 }
 
 impl ParserCatalog {
+    /// Prefer a recognized raw decoder only for new, explicitly experimental ingestion.
+    pub fn with_experimental_parser(
+        mut self,
+        parser: Arc<dyn LogParser>,
+    ) -> Result<Self, AppError> {
+        let id = parser.identity().name.to_owned();
+        self.ensure_available(&id)?;
+        if !self.parsers.contains_key(&id) || self.experimental.contains_key(&id) {
+            return Err(AppError::Policy(
+                "invalid experimental parser registration".into(),
+            ));
+        }
+        self.experimental.insert(id, parser);
+        Ok(self)
+    }
+
     #[must_use]
     pub fn detect(&self, source_name: &str, sample: &[u8]) -> ParserChoice {
         let sample = &sample[..sample.len().min(64 * 1024)];
@@ -57,6 +74,11 @@ impl ParserCatalog {
 
     pub fn get_version(&self, id: &str, version: &str) -> Result<Arc<dyn LogParser>, AppError> {
         self.ensure_available(id)?;
+        if let Some(parser) = self.experimental.get(id)
+            && parser.identity().version == version
+        {
+            return Ok(parser.clone());
+        }
         let parser = match self.get(id) {
             Ok(parser) if parser.identity().version == version => parser,
             _ => self

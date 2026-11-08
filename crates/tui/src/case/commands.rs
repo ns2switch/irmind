@@ -419,7 +419,14 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                         let _ = progress.send(format!("Ingested {done}/{count}: {source}"));
                     },
                 )
-                .map(|count| format!("Ingested {count} files"))
+                .map(|count| {
+                    let warning = if workflow.io_ops.experimental_common_writer() {
+                        " · Experimental V3/V6/layout: unstable, no migration guarantee"
+                    } else {
+                        ""
+                    };
+                    format!("Ingested {count} files{warning}")
+                })
         });
     }
 

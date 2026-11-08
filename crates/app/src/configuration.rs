@@ -31,6 +31,9 @@ pub struct PersistentConfig {
     /// Presentation-only setting; absence keeps existing signed configuration bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub show_hints: Option<bool>,
+    /// Opt-in unstable V3 custody; absence preserves historical configuration bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub experimental_common_writer: Option<bool>,
     #[serde(default)]
     pub modules: BTreeMap<String, ProductSettings>,
 }
@@ -66,6 +69,7 @@ pub enum ConfigChange {
     SetShowHints(bool),
     SetMouseCapture(bool),
     SetTheme(String),
+    SetExperimentalCommonWriter(bool),
 }
 
 pub trait ConfigurationStore: Send + Sync {
@@ -89,6 +93,7 @@ impl Default for PersistentConfig {
             theme: None,
             resume_last_case: None,
             show_hints: None,
+            experimental_common_writer: None,
             modules: BTreeMap::new(),
         }
     }
@@ -238,6 +243,9 @@ impl PersistentConfig {
             ConfigChange::SetShowHints(enabled) => next.show_hints = Some(enabled),
             ConfigChange::SetMouseCapture(enabled) => next.mouse_capture = Some(enabled),
             ConfigChange::SetTheme(theme) => next.theme = Some(theme),
+            ConfigChange::SetExperimentalCommonWriter(enabled) => {
+                next.experimental_common_writer = Some(enabled);
+            }
         }
         next.validate(manifests)?;
         Ok(next)

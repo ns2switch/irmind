@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: "snapshot_screen(&state, items::preference_items(&state, &state.modules))"
+---
+IRMind v0.1.0
+
+  ╭ Preferences ─────────────────────────────────────────────────────────────╮
+  │Resume last case: on                                                      │
+  │Mouse capture: on                                                         │
+  │Context hints: on                                                         │
+  │Theme: auto                                                               │
+  │Common writer (experimental): off (V2 default)                            │
+  │Experimental V3 / export V6 / ParquetLayoutV1 are unstable.               │
+  │Updates can break these cases without migration. Synthetic data only.     │
+  │> 1. Cancel     2. Enable and sign                                        │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+
+↑/↓ choose · Enter change · Esc back

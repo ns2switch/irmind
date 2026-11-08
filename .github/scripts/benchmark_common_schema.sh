@@ -15,7 +15,11 @@ failed=0
 for stage in baseline candidate; do
   revision=$candidate
   unset IRMIND_BENCH_COMMON_EVENT
-  if [[ "$stage" == baseline ]]; then revision=$BASE_REF; else export IRMIND_BENCH_COMMON_EVENT=1; fi
+  if [[ "$stage" == baseline ]]; then
+    revision=$BASE_REF
+  elif [[ "${MAPPED_CANDIDATE:-true}" == true ]]; then
+    export IRMIND_BENCH_COMMON_EVENT=1
+  fi
   git checkout --detach "$revision"
   output="common-schema-$stage.txt"
   echo "PAIRED_REVISION stage=$stage commit=$revision scenario=$IRMIND_BENCH_SCENARIO" | tee "$output"

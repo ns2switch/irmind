@@ -172,3 +172,20 @@ mod tests;
 
 #[cfg(test)]
 mod completeness_tests;
+
+/// Experimental raw decoding preserves the normal detector and historical parser.
+pub fn source_log_parser() -> std::sync::Arc<dyn irmind_app::LogParser> {
+    fn detect(source: &str, sample: &[u8]) -> Option<irmind_app::ParserConfidence> {
+        let _ = source;
+        std::str::from_utf8(sample.split(|b| *b == b'\n').next()?)
+            .ok()
+            .filter(|line| journal::detect(line))
+            .and_then(|_| ParserConfidence::new(95).ok())
+    }
+    std::sync::Arc::new(
+        irmind_app::source_mapping::SourceDecoderSelection::new(std::sync::Arc::new(
+            JournalSourceDecoder,
+        ))
+        .with_detector(detect),
+    )
+}
