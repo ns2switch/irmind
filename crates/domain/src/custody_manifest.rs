@@ -8,6 +8,8 @@ mod artifact_v2;
 pub use artifact_v2::*;
 mod versioned_artifact;
 pub use versioned_artifact::ParquetArtifact;
+mod mapping;
+pub use mapping::*;
 
 const SOURCE_TAG: &[u8] = b"irmind-source-manifest-v1\0";
 const SOURCE_V2_TAG: &[u8] = b"irmind-source-manifest-v2\0";
@@ -427,6 +429,16 @@ impl<'a> Reader<'a> {
             .ok_or(DomainError::InvalidManifest)?;
         self.rest = &self.rest[length..];
         String::from_utf8(bytes.to_vec()).map_err(|_| DomainError::InvalidManifest)
+    }
+
+    fn bytes_limit(&mut self, limit: usize) -> Result<&[u8], DomainError> {
+        let length = usize::try_from(self.u64()?).map_err(|_| DomainError::InvalidManifest)?;
+        if length > limit || length > self.rest.len() {
+            return Err(DomainError::InvalidManifest);
+        }
+        let value = &self.rest[..length];
+        self.rest = &self.rest[length..];
+        Ok(value)
     }
 
     fn byte(&mut self) -> Result<u8, DomainError> {

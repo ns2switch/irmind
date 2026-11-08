@@ -173,7 +173,7 @@ impl ArtifactPartitionV2 {
         }
     }
 
-    pub(super) fn read(reader: &mut Reader<'_>) -> Result<Self, DomainError> {
+    pub(in crate::custody_manifest) fn read(reader: &mut Reader<'_>) -> Result<Self, DomainError> {
         let date = reader.string_limit(10)?;
         let key_set = reader.string_limit(128)?;
         let policy = reader.string_limit(128)?;
