@@ -2,7 +2,7 @@
 
 This design is for parser, mapping, connector and evidence-store maintainers. It separates faithful source decoding from forensic interpretation, so a new mapping or target schema does not require changing a parser.
 
-**Status: proposal, not an implementation.** The [common-schema core PR](https://github.com/ns2switch/irmind/pull/205) remains separate. This document proposes new ports and signed records for review; it does not register them, change historical bytes, enable a provider or activate a writer.
+**Status: approved phase-A design, not an implementation.** This work targets v0.3; v0.2.0 remains unchanged. Phase A includes SourceDecoder/SourceMapper, bounded SourceRecordV1, mapping-owned compatibility projections, mapped-stage ParquetArtifactV3, SourceRecordSetV1/MappingProfileV1/MappingRunV1, export V6 and byte-identical seal-inventory V2. The decoded-record cache, its physical schema/SourceRecordStore port and RemapCommitV1 are deferred. Until those exist, reclassification means ingesting verified originals into a new case. The [common-schema core PR](https://github.com/ns2switch/irmind/pull/205) will implement the approved boundary separately and stays opt-in until its gates pass.
 
 ## 1. Two stages, one explicit boundary
 
@@ -97,6 +97,25 @@ Native modules live in independent crates such as `crates/modules/mapping-cloudt
 
 Declarative mappings are TOML data interpreted by one optional mapping-module crate. They allow only checked field copies/renames, closed constants, finite typed equality/status tables, role assignments to the closed common-field list and a small versioned list of checked primitive conversions. No arbitrary expressions, scripting, regex, filesystem references, queries, templates, network operations, loops or model prompts are permitted. Interpretation has no dependencies beyond crates already used by the workspace; any implementation needing another dependency requires separate review.
 
+### Bundled declarative definitions and closed primitives
+
+Use bundled TOML for finite tables: EVTX by exact provider/channel/EventID; auth.log, sudo and su result tables; CloudTrail operation lists; and nginx/Apache HTTP status tables. Embed their bytes and a fixed SHA-256 manifest in the binary and check the digest before registration. These definitions inherit the signed release/build trust and require no analyst installation. The usual analyst-signed operations can disable them or atomically replace them; a replacement has no silent precedence over a bundled mapping.
+
+The following closed, bounded specification records the required table primitives before implementation. Further extensions require another documented proposal:
+
+| Primitive | Bound and purpose |
+| --- | --- |
+| Typed exact tuple | At most eight named source paths, exact provider/channel/event-code/message-kind values. EVTX IDs alone never match another provider. |
+| Finite value table | At most 256 typed keys with constant closed category/type/outcome/field assignments. Absent and null are distinct explicit keys; otherwise outcome stays unknown. |
+| Presence | Missing/null/present-non-null only. No truthiness, expressions or inferred success from arbitrary text. |
+| Integer interval | Closed checked integer endpoints, at most 256 disjoint intervals, for a supported HTTP status table. Overlapping intervals are a definition error. |
+| Checked field copy | One original segmented field path to one allowed CommonField, with an explicit EntityRole and approved identity-scope constructor where applicable. No arbitrary concatenation or coalescing precedence. |
+| Checked scalar conversion | A fixed versioned set: decimal/hex integer, IP, domain and known-length hash validation. Source timestamps remain the decoder's responsibility. |
+
+Text grammar extraction of sshd/sudo/su tokens remains decoding. It supplies original discriminator/token values to finite tables; it does not assign outcome or actor roles. Grouping auditd records by serial also remains format framing. Its native mapper handles bounded cross-member projection/validation after that grouping; it cannot keep mutable grouping state or read a clock.
+
+Native Rust mappings require an individual justification where those primitives are insufficient. ECS/OCSF structural and cross-field validation, auditd grouped-member projection, network correlation identifiers and the frozen recursive extraction-only cloud/journald baseline are candidates. Merely being a table is not a justification. No new primitive is added silently: document its closed semantics, bounds and tests before implementing it.
+
 An illustrative rule, not an installed definition:
 
 ```toml
@@ -141,6 +160,16 @@ At startup, validate configured definitions against their signed copies. A manip
 
 Extraction-only and semantic versions of the same route cannot both be active. A semantic mapping replaces the selected route explicitly; it does not silently outrank a generic mapping. Catalog selection is frozen for the ingestion, so an installation in another session cannot change half a file.
 
+### Reject overlaps before changing the catalog
+
+Installation, activation and replacement first build the complete proposed active selection profile. Compare every candidate with active mappings for the same parser and any common supported parser version. Dataset/provider/channel/native-type selectors use only exact values, bounded finite sets or an explicit unconstrained discriminator. Resolve parser-version ranges to registered concrete versions before this check.
+
+Two selector products overlap exactly when every dimension has a nonempty intersection. Produce a deterministic bounded witness: the first common registered parser version and lexical first common value for each constrained dimension; show an unconstrained marker where neither restricts it. Reject the operation before persisting its signed entry, definition or active snapshot. The error identifies both trusted mapping IDs/versions and that common selector, never an evidence value. Definitions remain tainted when displayed.
+
+A replacement validates the post-operation profile, with only its explicitly replaced old route removed; removal and activation commit together. Historical read-only versions are not active candidates. A new target-schema version may be installed historically, but does not create a priority exception in the active profile. Different target generations already in a case remain queryable. Startup checks the effective signed/bundled profile too. The record-time ambiguity error remains the last defense; it never selects a winner silently.
+
+The contract suite covers exact overlap, finite-set/version intersections, wildcard intersections, disjoint channels/providers/versions, bundled replacements, atomic failure and stable witness diagnostics.
+
 ### Shared contracts
 
 Every native and declarative mapper passes one suite: exact output/golden codes; bounded execution/allocation; deterministic repeated/parallel execution; map-order independence; origin/time preservation; taint retention; missing/unknown outcomes; same-value source/destination; distinct actor/target; account collisions; PID reuse; invalid values and definitions; no-match behavior; ambiguity; tamper disabling; exact historical replay; cancellation/rollback at the wrapper; and no content-bearing Debug/errors. Native and declarative versions of a synthetic rule must produce identical canonical events.
@@ -167,7 +196,7 @@ The [V2 envelope](parquet-artifact-v2-wire.md) has seven closed groups and no ex
 
 | New field | Binding |
 | --- | --- |
-| Stage | Decoded-source cache or mapped projection. |
+| Stage | Mapped projection in phase A. Decoded-source artifacts are reserved for a separate future cache design/implementation. |
 | Source contract | Exact `irmind-source-record-v1`/format-contract identity and digest. |
 | Target schema | Explicit logical schema ID and contract/code-table digest; absent for decoded-source artifacts. |
 | Mapping identity | ID, exact version, implementation/definition hash; an explicit unmapped discriminator when no mapping ran. |
@@ -201,7 +230,9 @@ Retain the current published parser+legacy-normalizer implementations for their 
 
 The new raw-source API is separate and explicitly versioned. A parser without that capability keeps its published legacy route and reports no new-source-contract coverage; it is never adapted by reading normalized JSON. On the new route, a raw decoder must exist before the unmapped constructor can run. Adding it may share framing code, but cannot reconstruct a SourceRecord by reparsing the lossy normalized `GraphRecord.text`. Source-contract/framing changes get a new decoder identity; mapping-only changes do not. Opening a case never reclassifies it.
 
-### Cache decoded records or reread originals?
+### Deferred: cache decoded records or reread originals?
+
+**Future work only.** Do not implement `irmind-source-records-v1`, SourceRecordStore or cache controls in phase A. The following evaluation is retained for later review. Phase A replays verified originals and signs input-set commitments without a persistent decoded cache.
 
 Recommend an **optional decoded-record cache, off by default**, especially useful for version-pinned cloud objects. Offer it per case/ingestion with a signed choice, a visible disk estimate and explicit analyst confirmation. It is additional local evidence-derived content, not an original-byte copy and not a substitute for the original source manifest. It may contain sensitive original fields; use the same private permissions, taint, guard/redaction and retention controls as other case artifacts. Do not enable it silently.
 
@@ -223,7 +254,9 @@ Measure the actual codec before enabling a default: total/active cache bytes, by
 
 Check free space and quotas before staging, write provisional files only inside the case, check cancellation between batches and remove them on cancellation/error. Publish cache, mapping run and derived manifests using the existing atomic signed-batch mechanism and crash reconciliation. Preserve the previous generation until the complete replacement commits.
 
-### RemapCommitV1
+### Deferred: RemapCommitV1
+
+**Future work only.** Do not register this signed kind, port or command in phase A. For now, use a new case to apply another mapping; opening or verifying an existing case never reclassifies it.
 
 Propose a narrow, analyst-signed operation for **open cases**, not the deferred general `CommonEventMigrationV1`:
 
@@ -263,27 +296,27 @@ pub trait SourceMapper: Send + Sync {
 
 `SourceInput` carries the bounded existing handle, logical source, signed hash/context and cancellation token. Add an optional local-file/random-access route with the same case-local spool rules. The pure mapper takes a borrow, not a serialized JSON round trip; `MappingOutput` wraps the checked CommonEvent, bounded diagnostics and any explicitly declared compatibility projection. The orchestrator retains taint around both input and output. A registry/catalog supplies selection, not a second execution path.
 
-An optional `SourceRecordStore` local port provides bounded cache writing/reading and exact signed-set verification. Preparation should extend the existing case-local prepared-publication workflow additively. `AuditLog::append_batch`, remote `execute` methods, Signer and Verifier need no signature change. These new ports and any preparation additions require approval; none are added by this PR.
+SourceDecoder and SourceMapper are approved for phase A. SourceRecordStore and persistent cache preparation remain deferred. Use the existing case-local provisional workflow and atomic `AuditLog::append_batch` for source sets, profiles, artifacts and the final run receipt. Remote `execute` methods, Signer and Verifier keep their signatures. This document changes no implementation.
 
 | Delivery | Revised scope |
 | --- | --- |
-| Design | Approve this boundary, signed bindings, remap constraints, optional cache and ports before adapting #205. |
+| Design | Approved phase-A boundary and bindings; deferred cache/remap evaluation stays documented. Merge the design before adapting #205. |
 | A: core | Reuse #205's domain types/codes, logical codec, three common physical schemas, typed filters, scoped identity queries, sparse peer reader and bounded file-range reader. Replace `parse_common_*` methods/lifting from StreamingEventParser with SourceDecoder -> selected mapping -> validated writer. Add custody/canonical goldens, no-match handling and contracts. No source interpretation stays in a new parser route. |
 | A: comparison baseline | Extract the current role-free projections needed by the cloud and journald benchmark into explicitly identified mapping modules, with unchanged search identities and empty common classifications. They are not a hidden parser bridge. Do not run graph benchmarks against an empty unmapped projection. Existing historical parser paths stay frozen. |
-| B: high-value semantics | Native mappings for EVTX; Linux auth.log/secure and auditd; CloudTrail; ECS; OCSF; Zeek and Suricata. Cover success/failure/absence, same value in two roles, actor/target separation, namespaces and PID reuse. Mapping versions change independently of decoder versions. |
-| C: community mappings | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools, syslog application mappings, journald, nginx and Apache, plus declarative mapping examples. Until present, these have explicit extraction-only/unclassified coverage, not fabricated classifications. |
+| B: high-value semantics | Bundled declarative tables for EVTX, Linux auth.log/secure/sudo/su and CloudTrail; justified native logic for auditd, ECS, OCSF and network cases that exceed the closed language. Cover Zeek and Suricata as well. Cover success/failure/absence, same value in two roles, actor/target separation, namespaces and PID reuse. Mapping versions change independently of decoder versions. |
+| C: community mappings | Reuse issues #194–#203 for Velociraptor, Hayabusa, Chainsaw, plaso, EZTools, syslog application mappings, journald, nginx and Apache, plus declarative mapping examples. HTTP tables use bundled declarative definitions when that mapping lands. Until present, these have explicit extraction-only/unclassified coverage, not fabricated classifications. |
 | Connectors | Elastic ECS and Chronicle UDM after A, using SourceDecoder and separately versioned mapping modules. Credential/JWT review remains separate. |
 
 Reuse the existing common-mapping issues rather than create duplicates: [Velociraptor #194](https://github.com/ns2switch/irmind/issues/194), [Hayabusa #195](https://github.com/ns2switch/irmind/issues/195), [Chainsaw #196](https://github.com/ns2switch/irmind/issues/196), [plaso #197](https://github.com/ns2switch/irmind/issues/197), [EZTools #198](https://github.com/ns2switch/irmind/issues/198), [syslog #199](https://github.com/ns2switch/irmind/issues/199), [journald #200](https://github.com/ns2switch/irmind/issues/200), [nginx #201](https://github.com/ns2switch/irmind/issues/201), [Apache #202](https://github.com/ns2switch/irmind/issues/202) and [declarative #203](https://github.com/ns2switch/irmind/issues/203). Each mapping issue needs `good first issue`, `help wanted` and `area/parser`, with the source-field table, synthetic SourceRecord fixture, exact expected common event and shared contracts as acceptance criteria. Broader generic JSON and cloud-export mapping coverage remains explicit future work, not a claim of automatic classification.
 
 ## 9. Performance and approval gates
 
-The extra boundary does not inherently require another parse, full JSON tree, record copy or spool. Decode once into a bounded borrowed view; select from indexed immutable manifests; compile declarative paths/status tables once; map directly through the domain constructors; optionally write the decoded cache alongside the mapped stream. Do not construct a legacy JSON projection merely to parse it back into common fields.
+The extra boundary does not inherently require another parse, full JSON tree, record copy or spool. Decode once into a bounded borrowed view; select from indexed immutable manifests; compile declarative paths/status tables once; map directly through the domain constructors; keep decoded values in bounded transient case-local staging only. Persistent decoded caching is deferred. Do not construct a legacy JSON projection merely to parse it back into common fields.
 
-As a planning budget, allow roughly 5–10% for selection/mapping/validation over decoding, and measure cache writing separately; these are estimates, not observed overhead or relaxed thresholds. The earlier common bridge's failed matrix cannot establish the cost of this architecture. The optional full decoded cache may have a larger cost and must be measured with its actual all-field codec.
+As a planning budget, allow roughly 5–10% for selection/mapping/validation over decoding; these are estimates, not observed overhead or relaxed thresholds. The earlier common bridge's failed matrix cannot establish the cost of this architecture. Any future decoded cache needs its own all-field codec measurements; it is not part of phase A.
 
-After design approval and adaptation, measure optimized release builds on the same runner class: three >=1 GiB repetitions per representative source; one complete 15 GB cloud/endpoint matrix with 1, 64, 1,024 and 1,025 hosts, chronological and disordered; cache off/on reported separately. Record decoding, selection/mapping, hashing, staging, Parquet and custody time, disk and query p50/p95. Timers must identify overlap and include both successful and failed samples. Repeat deterministic HuntEval/needle checks with private answers isolated from every decoder, mapper, tool and model.
+After design approval and adaptation, measure optimized release builds on the same runner class: three >=1 GiB repetitions per representative source; one complete 15 GB cloud/endpoint matrix with 1, 64, 1,024 and 1,025 hosts, chronological and disordered, without a decoded cache. Record decoding, selection/mapping, hashing, staging, Parquet and custody time, disk and query p50/p95. Timers must identify overlap and include both successful and failed samples. Repeat deterministic HuntEval/needle checks with private answers isolated from every decoder, mapper, tool and model.
 
 Keep **900 seconds** for cloud/chronological and **1,350 seconds** for stress, with the existing query deadlines, sample/hop/expansion/token limits, rollback and hash verification. No mode becomes a default by passing a smaller corpus or disabling a check. Check mixed-target coverage and duplicate-event suppression as well as speed.
 
-The design approval must explicitly cover: new SourceDecoder/SourceMapper/cache ports; the application-level compatibility projection boundary; V3 envelope and the acyclic signed decoding/profile/receipt records; export V6 and unchanged historical seal bytes; the narrow remap/adoption constraints; and the optional full decoded cache. Implementation, new golden bytes, native mappings and performance changes follow separately. #205 remains a draft until that review.
+The approved phase A covers SourceDecoder/SourceMapper, SourceRecordV1 limits, mapping-owned compatibility projections, V3 and acyclic source-set/profile/run receipts, export V6, byte-identical seal-inventory V2, frozen selection and pre-activation overlap rejection. Bundled finite tables inherit release trust; installed overrides retain signed operations. Cache/remap and their schema/ports remain future work. Adapt #205 and publish its new golden bytes and complete release measurements before merging it; keep the common writer opt-in while any gate fails. Do not begin phase B or the new SIEM connectors before phase A is merged.
