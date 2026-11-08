@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 mod indexed;
+mod source_decode;
+pub use source_decode::JsonSourceDecoder;
 
 use irmind_app::{
     AppError, EventParser, GraphRecord, GraphRelation, LogParser, ParserConfidence,
@@ -162,7 +164,7 @@ impl ProfiledJsonParser {
 static MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-json",
     version: "0.1.0",
-    ports: &[ModulePort::EventParser],
+    ports: &[ModulePort::EventParser, ModulePort::SourceDecoder],
     tools: &[],
     config: &[],
 };
@@ -177,6 +179,7 @@ impl Module for JsonParser {
         registry: &mut ModuleRegistry,
         _config: &ModuleConfig,
     ) -> Result<(), AppError> {
+        registry.add_source_decoder(Arc::new(JsonSourceDecoder))?;
         registry.add_parser(self)
     }
 }

@@ -7,6 +7,7 @@ use crate::{
 use irmind_domain::Tool;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+mod mapping;
 
 #[derive(Default)]
 pub struct ModuleRegistry {
@@ -22,6 +23,8 @@ pub struct ModuleRegistry {
     internal_intel: Vec<Box<dyn InternalIntelPort>>,
     threat_intel: Option<Box<dyn ThreatIntelPort>>,
     object_sources: Vec<Box<dyn ObjectSource>>,
+    source_decoders: Vec<Arc<dyn crate::SourceDecoder>>,
+    source_mappers: Vec<Arc<dyn crate::SourceMapper>>,
 }
 
 impl ModuleRegistry {
@@ -46,6 +49,8 @@ impl ModuleRegistry {
         let mut staged = Self::new();
         module.register(&mut staged, config)?;
         self.validate_staged(manifest, &staged)?;
+        self.source_decoders.extend(staged.source_decoders);
+        self.source_mappers.extend(staged.source_mappers);
         self.llms.extend(staged.llms);
         self.siems.extend(staged.siems);
         self.edrs.extend(staged.edrs);
@@ -69,6 +74,7 @@ impl ModuleRegistry {
     }
 
     fn validate_staged(&self, manifest: &ModuleManifest, staged: &Self) -> Result<(), AppError> {
+        self.validate_mapping_registration(manifest, staged)?;
         let actual = staged.counts();
         for port in [
             ModulePort::Llm,
@@ -79,6 +85,8 @@ impl ModuleRegistry {
             ModulePort::ThreatIntel,
             ModulePort::EventParser,
             ModulePort::ObjectSource,
+            ModulePort::SourceDecoder,
+            ModulePort::SourceMapper,
         ] {
             let expected = usize::from(manifest.ports.contains(&port));
             if actual[&port] != expected {
@@ -391,6 +399,8 @@ impl ModuleRegistry {
                 usize::from(self.parser.is_some() || !self.parser_variants.is_empty()),
             ),
             (ModulePort::ObjectSource, self.object_sources.len()),
+            (ModulePort::SourceDecoder, self.source_decoders.len()),
+            (ModulePort::SourceMapper, self.source_mappers.len()),
         ])
     }
 }

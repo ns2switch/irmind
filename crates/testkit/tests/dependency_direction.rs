@@ -15,6 +15,11 @@ fn layer(name: &str) -> Result<u8, String> {
 }
 
 fn check_edge(from: &str, to: &str) -> Result<(), String> {
+    if from == "irmind-build-manifest" {
+        return Err(format!(
+            "build manifest utility must not depend on runtime crates: {from} -> {to}"
+        ));
+    }
     if from == "irmind-tui" && to != "irmind-app" {
         return Err(format!("TUI may depend only on irmind-app: {from} -> {to}"));
     }
@@ -27,6 +32,7 @@ fn check_edge(from: &str, to: &str) -> Result<(), String> {
         "irmind-http",
         "irmind-keystore-transfer",
         "irmind-llm-chat-completions",
+        "irmind-build-manifest",
     ];
     if layer(from)? == 2 && layer(to)? == 2 && !shared.contains(&to) {
         return Err(format!(
@@ -50,6 +56,11 @@ fn workspace_dependencies_point_inward() -> Result<(), Box<dyn std::error::Error
             if dependency.kind != DependencyKind::Development
                 && members.contains(dependency.name.as_str())
             {
+                if dependency.name == "irmind-build-manifest"
+                    && dependency.kind != DependencyKind::Build
+                {
+                    return Err("native mapping manifest utility is build-time only".into());
+                }
                 check_edge(package.name.as_str(), dependency.name.as_str())?;
             }
         }

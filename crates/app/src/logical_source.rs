@@ -16,6 +16,9 @@ impl<'a> SourceParser<'a> {
     }
 }
 impl StreamingEventParser for SourceParser<'_> {
+    fn logical_source<'a>(&'a self, _: &'a str) -> &'a str {
+        self.inner.logical_source(self.logical)
+    }
     fn parse_common_reader_report(
         &self,
         _: &str,

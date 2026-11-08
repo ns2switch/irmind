@@ -71,6 +71,8 @@ pub use parser_warnings::{ParserExtractionWarning, parser_extraction_warning};
 mod ports;
 pub use fixed_errors::FixedAppError;
 mod report;
+pub mod source_mapping;
+pub use source_mapping::{SourceDecoder, SourceMapper};
 
 pub use approvals::{ApprovalRequest, ApprovalSource};
 use audit_origin::AuditOrigin;
