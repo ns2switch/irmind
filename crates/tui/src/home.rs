@@ -131,6 +131,13 @@ impl From<bool> for HintMode {
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum CommonWriterState {
+    Unavailable,
+    Disabled,
+    Enabled,
+}
+
 pub(crate) struct HomeState {
     rows: Vec<CaseRow>,
     pub(crate) mode: Mode,
@@ -173,6 +180,7 @@ pub(crate) struct HomeState {
     pub(crate) pending_module_change: Option<ConfigChange>,
     resume_last_case: crate::ResumeMode,
     show_hints: HintMode,
+    common_writer: CommonWriterState,
 }
 
 struct UiSelection {
@@ -246,6 +254,7 @@ impl HomeState {
             pending_module_change: None,
             resume_last_case: crate::ResumeMode::Enabled,
             show_hints: HintMode::Enabled,
+            common_writer: CommonWriterState::Unavailable,
         }
     }
 
@@ -454,6 +463,13 @@ fn prepare_home_state(
     }
     state.resume_last_case = launch.resume_last_case;
     state.show_hints = io_ops.show_hints().into();
+    state.common_writer = if !io_ops.common_writer_available() {
+        CommonWriterState::Unavailable
+    } else if io_ops.experimental_common_writer() {
+        CommonWriterState::Enabled
+    } else {
+        CommonWriterState::Disabled
+    };
     state.ui_selection.mouse_capture = launch.mouse_capture;
     state.theme_choice = launch.theme.unwrap_or("auto").into();
     state.overrides_active = launch.overrides_active;

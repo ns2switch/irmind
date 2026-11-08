@@ -174,3 +174,6 @@ fn reopening_keeps_legacy_history_and_exports_the_mixed_case_as_v5() {
     );
     verify_and_export(&precise, &engine, &id, root.path(), 5, 2);
 }
+
+#[cfg(all(feature = "mapping-json-compat", feature = "mapping-journald-compat"))]
+mod experimental;

@@ -143,3 +143,9 @@ A keyless local service may use HTTP only on loopback; HTTPS works there too. Re
 ## Source time for classic syslog
 
 RFC 3164 time settings belong to an ingestion, not config.toml. Confirm the year, fixed UTC offset and rollover choice in the ingestion form. You may apply one confirmed choice to all files or choose separately. Retired global time fields require explicit signed removal at startup. Previously signed sources keep their recorded interpretation. See [parsers](parsers.md#legacy-syslog-time) and the [automation reference](development/cli.md).
+
+## Experimental common writer
+
+V2 remains the default. In /settings preferences, explicitly enable Common writer (experimental) and confirm the warning. The complete approved configuration is recorded in the signed global operational chain before the session restarts. The setting is experimental_common_writer = true in config.toml; editing the file manually still requires the normal signed configuration review. No model or remote connector is enabled by this choice.
+
+The initial supported raw decoders are JSON/cloud JSON and journald. Other parser formats keep their existing V2 route. Ingestion shows a persistent experimental notice. ParquetArtifactV3, export V6 and ParquetLayoutV1 are unstable until default activation: updates may break experimental derived data without a migration. Retain originals and use synthetic cases. Historical V1/V2 formats and default derived bytes do not change.

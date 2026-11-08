@@ -25,7 +25,12 @@ impl ParserCatalog {
         let choice = self.detect(request.source, request.sample);
         let (id, confidence, mode) = choose(request, choice, self)?;
         self.ensure_available(&id)?;
-        let original = self.get(&id)?;
+        let original = self
+            .experimental
+            .get(&id)
+            .filter(|parser| parser.detect(request.source, request.sample).is_some())
+            .cloned()
+            .map_or_else(|| self.get(&id), Ok)?;
         let requirement = original.time_context_requirement(request.source, request.sample)?;
         let required = requirement.as_ref().is_some_and(|value| value.required);
         if required && request.time_context.is_none() {

@@ -468,3 +468,16 @@ fn collect(value: &Value, entities: &mut Vec<(String, String)>, depth: usize) {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::wildcard_imports)]
 mod tests;
+
+/// Experimental raw decoding preserves the normal detector and historical parser.
+pub fn source_log_parser() -> std::sync::Arc<dyn irmind_app::LogParser> {
+    fn detect(source: &str, sample: &[u8]) -> Option<irmind_app::ParserConfidence> {
+        JsonParser.detect(source, sample)
+    }
+    std::sync::Arc::new(
+        irmind_app::source_mapping::SourceDecoderSelection::new(std::sync::Arc::new(
+            JsonSourceDecoder,
+        ))
+        .with_detector(detect),
+    )
+}

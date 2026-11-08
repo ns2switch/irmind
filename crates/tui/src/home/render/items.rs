@@ -25,37 +25,7 @@ pub(super) fn home_items(
         Mode::New => Vec::new(),
         Mode::Model => model_items(state, &escaped)?,
         Mode::Modules => module_items(state, modules, &escaped)?,
-        Mode::Config => {
-            let mut items = vec![
-                ListItem::new(format!(
-                    "Resume last case: {}",
-                    if state.resume_last_case.enabled() {
-                        "on"
-                    } else {
-                        "off"
-                    }
-                )),
-                ListItem::new(format!(
-                    "Mouse capture: {}",
-                    if state.ui_selection.mouse_capture {
-                        "on"
-                    } else {
-                        "off"
-                    }
-                )),
-                ListItem::new(format!(
-                    "Context hints: {}",
-                    if state.show_hints.enabled() {
-                        "on"
-                    } else {
-                        "off"
-                    }
-                )),
-                ListItem::new(format!("Theme: {}", state.theme_choice)),
-            ];
-            items.extend(super::parser_status::items(state, modules));
-            items
-        }
+        Mode::Config => preference_items(state, modules),
         Mode::Keystore => keystore_items(state),
         Mode::VerifyExport => ["Package path", "Expected analyst key fingerprint"]
             .iter()
@@ -351,6 +321,9 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
         irmind_app::ConfigChange::SetShowHints(enabled) => format!("context hints={enabled}"),
         irmind_app::ConfigChange::SetMouseCapture(enabled) => format!("mouse capture={enabled}"),
         irmind_app::ConfigChange::SetTheme(theme) => format!("theme={theme}"),
+        irmind_app::ConfigChange::SetExperimentalCommonWriter(enabled) => {
+            format!("experimental common writer={enabled}")
+        }
     }
 }
 
@@ -607,4 +580,68 @@ fn model_review_rows(setup: &model::ModelSetup) -> Vec<String> {
         ));
     }
     rows
+}
+
+pub(super) fn preference_items(
+    state: &HomeState,
+    modules: &[ModuleStatus],
+) -> Vec<ListItem<'static>> {
+    let mut items = vec![
+        ListItem::new(format!(
+            "Resume last case: {}",
+            if state.resume_last_case.enabled() {
+                "on"
+            } else {
+                "off"
+            }
+        )),
+        ListItem::new(format!(
+            "Mouse capture: {}",
+            if state.ui_selection.mouse_capture {
+                "on"
+            } else {
+                "off"
+            }
+        )),
+        ListItem::new(format!(
+            "Context hints: {}",
+            if state.show_hints.enabled() {
+                "on"
+            } else {
+                "off"
+            }
+        )),
+        ListItem::new(format!("Theme: {}", state.theme_choice)),
+    ];
+    let theme = Theme::detect();
+    items.push(
+        ListItem::new(format!(
+            "Common writer (experimental): {}",
+            if state.common_writer == crate::home::CommonWriterState::Unavailable {
+                "not compiled"
+            } else if state.common_writer == crate::home::CommonWriterState::Enabled {
+                "on"
+            } else {
+                "off (V2 default)"
+            }
+        ))
+        .style(theme.warning()),
+    );
+    if state.pending_module_change.is_some() {
+        items.push(
+            ListItem::new("Experimental V3 / export V6 / ParquetLayoutV1 are unstable.")
+                .style(theme.warning()),
+        );
+        items.push(
+            ListItem::new("Updates can break these cases without migration. Synthetic data only.")
+                .style(theme.warning()),
+        );
+        items.push(ListItem::new(format!(
+            "{} 1. Cancel   {} 2. Enable and sign",
+            if state.selected_option == 0 { ">" } else { " " },
+            if state.selected_option == 1 { ">" } else { " " }
+        )));
+    }
+    items.extend(super::parser_status::items(state, modules));
+    items
 }

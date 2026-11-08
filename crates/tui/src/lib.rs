@@ -137,6 +137,12 @@ impl From<bool> for ResumeMode {
 /// Filesystem selection is presentation I/O. The composition root supplies the
 /// same bounded, no-follow reader used by the noninteractive ingest command.
 pub trait WorkspaceIo: Send + Sync {
+    fn experimental_common_writer(&self) -> bool {
+        false
+    }
+    fn common_writer_available(&self) -> bool {
+        false
+    }
     fn show_hints(&self) -> bool {
         true
     }

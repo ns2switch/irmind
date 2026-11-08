@@ -62,7 +62,15 @@ impl AutomationContext<'_, '_> {
                     path.parent()
                         .ok_or_else(|| anyhow!("source has no parent"))?
                 };
-                let catalog = registry.parser_catalog();
+                if workspace_io.experimental_common_writer() {
+                    eprintln!(
+                        "Experimental V3, export V6 and ParquetLayoutV1 are unstable; updates may break them without migration"
+                    );
+                }
+                let catalog = workspace_io
+                    .parser_catalog()
+                    .cloned()
+                    .unwrap_or_else(|| registry.parser_catalog());
                 for file in &files {
                     let source = audit_source_name(&path, file)?;
                     if let Some(existing) = indexed.get(&source) {

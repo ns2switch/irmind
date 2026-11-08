@@ -112,6 +112,7 @@ struct RootWorkspaceIo {
     manifests: Vec<&'static ModuleManifest>,
     module_overrides: HashSet<String>,
     allow_environment: bool,
+    experimental_common_writer: bool,
     signer_id: String,
     secrets_id: String,
     #[cfg(feature = "keystore-file")]
@@ -162,6 +163,12 @@ fn compiled_credential_fields() -> Vec<&'static str> {
 }
 
 impl WorkspaceIo for RootWorkspaceIo {
+    fn experimental_common_writer(&self) -> bool {
+        self.experimental_common_writer
+    }
+    fn common_writer_available(&self) -> bool {
+        cfg!(feature = "mapping-json-compat") || cfg!(feature = "mapping-journald-compat")
+    }
     fn definition_store(&self) -> Option<&dyn irmind_app::ParserDefinitionStore> {
         Some(&self.definition_store)
     }
@@ -372,7 +379,8 @@ impl WorkspaceIo for RootWorkspaceIo {
             ConfigChange::SetResumeLastCase(_)
             | ConfigChange::SetShowHints(_)
             | ConfigChange::SetMouseCapture(_)
-            | ConfigChange::SetTheme(_) => false,
+            | ConfigChange::SetTheme(_)
+            | ConfigChange::SetExperimentalCommonWriter(_) => false,
             ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
             ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
             ConfigChange::SetValue { module, field, .. } => {

@@ -319,3 +319,19 @@ fn egress_confirmation_covers_selection_and_active_parameter_changes() {
         .unwrap();
     assert!(enabled.active_egress_changed(&changed));
 }
+
+#[test]
+fn experimental_writer_is_opt_in_and_does_not_change_historical_default_bytes() {
+    let original = PersistentConfig::default();
+    let bytes = serde_json::to_vec(&original).unwrap();
+    assert!(!String::from_utf8_lossy(&bytes).contains("experimental_common_writer"));
+    let enabled = original
+        .changed(ConfigChange::SetExperimentalCommonWriter(true), &[])
+        .unwrap();
+    assert_eq!(enabled.experimental_common_writer, Some(true));
+    assert!(serde_json::from_slice::<PersistentConfig>(&bytes).unwrap() == original);
+    assert_ne!(
+        enabled.fingerprint().unwrap(),
+        original.fingerprint().unwrap()
+    );
+}

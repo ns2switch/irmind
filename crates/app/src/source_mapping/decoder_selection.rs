@@ -6,16 +6,27 @@ use crate::{
 use irmind_domain::Tainted;
 use std::{io::Read, sync::Arc};
 
+type Detector = fn(&str, &[u8]) -> Option<ParserConfidence>;
+
 pub struct SourceDecoderSelection {
     decoder: Arc<dyn SourceDecoder>,
     context: Option<String>,
+    detector: Option<Detector>,
 }
 impl SourceDecoderSelection {
     pub fn new(decoder: Arc<dyn SourceDecoder>) -> Self {
         Self {
             decoder,
             context: None,
+            detector: None,
         }
+    }
+}
+impl SourceDecoderSelection {
+    #[must_use]
+    pub fn with_detector(mut self, detector: fn(&str, &[u8]) -> Option<ParserConfidence>) -> Self {
+        self.detector = Some(detector);
+        self
     }
 }
 impl StreamingEventParser for SourceDecoderSelection {
@@ -73,11 +84,13 @@ impl LogParser for SourceDecoderSelection {
         Ok(Arc::new(Self {
             decoder: Arc::clone(&self.decoder),
             context: Some(super::source_time_snapshot(context)?),
+            detector: self.detector,
         }))
     }
 
-    fn detect(&self, _: &str, _: &[u8]) -> Option<ParserConfidence> {
-        None
+    fn detect(&self, source: &str, sample: &[u8]) -> Option<ParserConfidence> {
+        self.detector
+            .and_then(|detect| detect(source, &sample[..sample.len().min(65_536)]))
     }
 }
 fn unsupported() -> AppError {

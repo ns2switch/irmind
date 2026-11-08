@@ -931,3 +931,13 @@ All 18 HuntEval episodes retain 19/19 malicious events, 10/10 malicious entities
 The new pipeline still misses acceptance gates. Dense entity lookup is a query blocker: five accumulated cloud entity scans rise from 12.190 s to 26.456 s, and normalization from 0.136 s to 4.791 s. For chronological one-host input the corresponding counters are 13.390 → 27.301 s and 0.165 → 5.372 s, with timed-out samples. These are component counters across five queries, not per-query latency or a complete CPU profile.
 
 The common writer therefore remains opt-in. Default CLI/TUI/demo writing stays on the historical V2 builder. Fix ingestion overhead and dense scoped-identity lookup before reconsidering default activation; preserve the retained-parent/authentication boundary and every existing query gate. The [ASan summaries](benchmarks/mapped-pipeline-fuzz.json) and the [full code CI](https://github.com/ns2switch/irmind/actions/runs/42514914270) are separate from release-performance acceptance.
+
+## Analyst decision: common-writer default activation
+
+The absolute ingestion targets remain 900 seconds for 15 GB of cloud or chronological endpoint input and 1,350 seconds for stress input. No query may reach its deadline, including the expansive-path check; a time-truncated response does not satisfy this condition. Existing result, sample, hop, expansion, token and scope limits stay unchanged.
+
+Each candidate/reference pair must run in the same release job on the same corpus. Every candidate scenario must take at most 1.10 times its reference ingestion time, and every comparable query p95 must be at most 1.10 times the reference p95. Evaluate the ratios from unrounded timings; rounding cannot turn a failure into a pass.
+
+Default activation requires the relative gate and no query deadline in every scenario. It also requires the absolute gate unless that same scenario's reference misses its absolute target in that same job. Only then can the paired relative gate substitute for the absolute gate. A reference timeout never permits a candidate timeout. Previous combined benchmark pass counts did not evaluate this new relative gate and cannot authorize default activation.
+
+The work order is direct final-file writing, dense entity lookup, then a separate default-activation PR after the complete matrix meets these conditions. Initial direct ingestion must leave zero inactive parents. Later compatible small-file compaction remains available behind a configured count threshold; signed parent retirement remains a [separate future proposal](mapped-parent-retirement-design.md).

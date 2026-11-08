@@ -241,6 +241,7 @@ impl ModuleRegistry {
         ParserCatalog {
             parsers: self.parsers.clone(),
             unavailable: self.unavailable_parsers.clone(),
+            experimental: BTreeMap::new(),
             resolver: None,
         }
     }

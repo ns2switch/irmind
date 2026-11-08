@@ -79,6 +79,13 @@ impl CaseWorkflow<'_, '_> {
             cancel,
             ..
         } = request;
+        if self.io_ops.experimental_common_writer() {
+            progress(
+                0,
+                0,
+                "Experimental V3: custody, export V6 and layout receipts are unstable; no migration guarantee",
+            );
+        }
         let files = self.io_ops.input_files(path).map_err(|_| {
             AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
                 irmind_app::AdapterStorageError::CannotListSelectedEvidence,

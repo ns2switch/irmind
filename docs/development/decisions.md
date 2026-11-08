@@ -421,3 +421,15 @@ Decision: replace the unpublished parser bridge with `SourceDecoder` and pure `S
 Consequences: historical parser routes, V1/V2 bytes, seal inventory V2 and export V5 stay unchanged. New export V6 carries required installation proof frames, all retained parents/children and receipts; authentication executes no downloaded mapping code. `ParquetLayoutV1` binds compatible physical replacements without replacing mapping receipts. Inactive-parent disk is measured separately in every 15 GB release benchmark. Any future parent retirement needs a separate reviewed contract. No common writer is enabled by default while its acceptance gates are unmet.
 
 Measured mapped-parent retention exceeds the planning threshold in every 15 GB workload. Preserve all parent files in the current implementation; the separate [retirement proposal](mapped-parent-retirement-design.md) requires an explicit future contract and makes the unavailable direct file authentication clear. The [complete measurements](benchmarks.md#source-decoding-mapped-v3-and-retained-layout-parents) keep the common writer opt-in because its gates remain unmet.
+
+## Analyst decision: common-writer default activation
+
+The absolute ingestion targets remain 900 seconds for 15 GB of cloud or chronological endpoint input and 1,350 seconds for stress input. No query may reach its deadline, including the expansive-path check; a time-truncated response does not satisfy this condition. Existing result, sample, hop, expansion, token and scope limits stay unchanged.
+
+Each candidate/reference pair must run in the same release job on the same corpus. Every candidate scenario must take at most 1.10 times its reference ingestion time, and every comparable query p95 must be at most 1.10 times the reference p95. Evaluate the ratios from unrounded timings; rounding cannot turn a failure into a pass.
+
+Default activation requires the relative gate and no query deadline in every scenario. It also requires the absolute gate unless that same scenario's reference misses its absolute target in that same job. Only then can the paired relative gate substitute for the absolute gate. A reference timeout never permits a candidate timeout. Previous combined benchmark pass counts did not evaluate this new relative gate and cannot authorize default activation.
+
+The work order is direct final-file writing, dense entity lookup, then a separate default-activation PR after the complete matrix meets these conditions. Initial direct ingestion must leave zero inactive parents. Later compatible small-file compaction remains available behind a configured count threshold; signed parent retirement remains a [separate future proposal](mapped-parent-retirement-design.md).
+
+Inactive-parent retirement remains a design-only future operation. No parent files are removed by this implementation.
