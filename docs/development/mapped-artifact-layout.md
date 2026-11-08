@@ -2,7 +2,7 @@
 
 This proposal is for evidence-store and verifier maintainers. It preserves the original decoding and mapping commitments when several mapped Parquet files are physically compacted.
 
-**Status: proposed.** The source/mapping contracts remain those of [the approved design](source-mapping-design.md). This document proposes an additional `ParquetLayoutV1` receipt and an explicit layout variant in the new V3 pipeline block. It changes no published V1/V2 envelope, seal-inventory V2 byte, physical common-event column or export V5 byte.
+**Status: accepted.** The source/mapping contracts remain those of [the approved design](source-mapping-design.md). This design adds a `ParquetLayoutV1` receipt and an explicit layout variant in the new V3 pipeline block. It changes no published V1/V2 envelope, seal-inventory V2 byte, physical common-event column or export V5 byte.
 
 ## Separate interpretation from physical layout
 
@@ -88,6 +88,8 @@ Shared contracts must cover:
 - New layout/envelope goldens alongside unchanged historical goldens and seal challenges.
 
 Repeat the release benchmark matrix with compaction enabled for both sides: three representative 1 GiB repetitions and the complete 15 GB cloud/endpoint matrix. Keep the existing time, query, sample, hop, expansion and token gates. Measure layout time and retained/staging disk use separately from decoding and mapping.
+
+For every 15 GB scenario, report inactive-parent bytes separately, their percentage of total retained case bytes, and their ratio to active-artifact bytes. If retained parents exceed approximately 20% of active-artifact bytes, prepare a separate design for an analyst-signed retirement operation; do not implement it in this change. That design must preserve envelopes and receipts, explain which original files are needed for regeneration, and distinguish the loss of direct file authentication from full reconstruction that regenerates the missing parents.
 
 ## Alternative
 
