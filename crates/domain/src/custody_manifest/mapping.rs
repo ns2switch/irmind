@@ -17,6 +17,8 @@ pub use artifact::{
 pub use binding::MappingBindingV1;
 pub use run::{MappingCountsV1, MappingRouteV1, MappingRunV1};
 mod source_set;
+mod time;
+pub use time::{SourceTimeBasisV1, SourceTimeContextV1};
 mod wire;
 pub use profile::{
     MAPPING_SELECTION_V1, MappingInputRefV1, MappingProfileRecordV1, MappingProfileV1,

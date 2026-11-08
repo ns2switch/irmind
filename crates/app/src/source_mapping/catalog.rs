@@ -88,6 +88,22 @@ impl MappingCatalog {
             .map(AsRef::as_ref)
             .ok_or(MappingError::UnsupportedDecoder)
     }
+    pub fn snapshots(&self) -> Result<Vec<irmind_domain::MappingSnapshotV1>, MappingError> {
+        self.mappings
+            .values()
+            .map(|mapper| mapper.manifest().snapshot())
+            .collect()
+    }
+    pub fn exact_mapper(
+        &self,
+        identity: &MappingIdentityV1,
+    ) -> Result<&dyn SourceMapper, MappingError> {
+        self.mappings
+            .get(identity.id())
+            .filter(|mapper| mapper.manifest().identity() == identity)
+            .map(AsRef::as_ref)
+            .ok_or(MappingError::UnsupportedVersion)
+    }
     pub fn decoder_selection(
         &self,
         id: &str,

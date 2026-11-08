@@ -64,3 +64,57 @@ fn unmapped_counts_cannot_claim_mapped_events_and_diagnostic_counts_are_bounded(
         .is_ok()
     );
 }
+
+#[test]
+fn confirmed_time_context_is_typed_bounded_and_bound_to_the_manifest() {
+    let context =
+        SourceTimeContextV1::try_new(2026, -210, true, SourceTimeBasisV1::Command).unwrap();
+    assert_eq!(
+        SourceTimeContextV1::parse(&context.snapshot()).unwrap(),
+        context
+    );
+    let mut manifest = super::source_manifest();
+    assert!(
+        SourceRecordSetV1::from_manifest_with_time(
+            &manifest,
+            super::source().reference().clone(),
+            super::source().formats().to_vec(),
+            2,
+            hash('b'),
+            Some(context)
+        )
+        .is_err()
+    );
+    manifest.timestamp_context = Some(context.snapshot());
+    let value = SourceRecordSetV1::from_manifest_with_time(
+        &manifest,
+        super::source().reference().clone(),
+        super::source().formats().to_vec(),
+        2,
+        hash('b'),
+        Some(context),
+    )
+    .unwrap();
+    assert_eq!(value.time_context(), Some(context));
+    assert_eq!(
+        value.encode().unwrap(),
+        include_str!("../goldens/source-set-time-v1.hex").trim()
+    );
+    assert_eq!(
+        SourceRecordSetV1::decode(&value.encode().unwrap()).unwrap(),
+        value
+    );
+    value.validate_manifest(&manifest).unwrap();
+    for (year, offset) in [(0, 0), (10000, 0), (2026, -1440), (2026, 1440)] {
+        assert!(
+            SourceTimeContextV1::try_new(year, offset, true, SourceTimeBasisV1::Analyst).is_err()
+        );
+    }
+    for text in [
+        "source-time-v1;year=2026;offset=+0;rollover=1;basis=command",
+        "source-time-v1;year=2026;offset=0;rollover=2;basis=command",
+        "source-time-v1;year=2026;offset=0;rollover=1;basis=unknown",
+    ] {
+        assert!(SourceTimeContextV1::parse(text).is_err());
+    }
+}

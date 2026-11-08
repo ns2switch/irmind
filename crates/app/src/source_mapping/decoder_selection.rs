@@ -8,13 +8,20 @@ use std::{io::Read, sync::Arc};
 
 pub struct SourceDecoderSelection {
     decoder: Arc<dyn SourceDecoder>,
+    context: Option<String>,
 }
 impl SourceDecoderSelection {
     pub fn new(decoder: Arc<dyn SourceDecoder>) -> Self {
-        Self { decoder }
+        Self {
+            decoder,
+            context: None,
+        }
     }
 }
 impl StreamingEventParser for SourceDecoderSelection {
+    fn timestamp_context(&self) -> Option<&str> {
+        self.context.as_deref()
+    }
     fn parser_name(&self) -> &'static str {
         "source-decoder-selection"
     }
@@ -59,6 +66,16 @@ impl EventParser for SourceDecoderSelection {
     }
 }
 impl LogParser for SourceDecoderSelection {
+    fn with_time_context(
+        &self,
+        context: &crate::ParserTimeContext,
+    ) -> Result<Arc<dyn LogParser>, AppError> {
+        Ok(Arc::new(Self {
+            decoder: Arc::clone(&self.decoder),
+            context: Some(super::source_time_snapshot(context)?),
+        }))
+    }
+
     fn detect(&self, _: &str, _: &[u8]) -> Option<ParserConfidence> {
         None
     }

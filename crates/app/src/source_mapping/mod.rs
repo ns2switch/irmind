@@ -7,6 +7,9 @@ mod manifest;
 mod output;
 mod ports;
 mod selector;
+mod snapshot;
+mod stream;
+mod time;
 
 pub use catalog::MappingCatalog;
 pub use decoder_selection::SourceDecoderSelection;
@@ -20,3 +23,7 @@ pub use manifest::{MappingManifest, MappingProvenance};
 pub use output::{MappingDiagnostic, MappingOutput, MappingPartition};
 pub use ports::{SourceDecoder, SourceFileInput, SourceInput, SourceMapper, SourceMetadata};
 pub use selector::{SelectorCondition, SelectorPredicate, SelectorScalar, SourceSelector};
+
+pub use stream::{DecodedSourceCommitmentV1, MappedSourceRecord, SourceRecordAccumulator};
+
+pub use time::{decode_source_time_context, parser_time_context, source_time_snapshot};
