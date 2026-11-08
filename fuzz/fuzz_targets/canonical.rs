@@ -59,7 +59,7 @@ fuzz_target!(|bytes: &[u8]| {
                 if let Ok(record) = <$type>::decode(text) {
                     let wire = record.encode().unwrap();
                     assert_eq!(wire, text);
-                    assert_eq!(<$type>::decode(&wire).unwrap(), record);
+                    assert!(<$type>::decode(&wire).unwrap() == record);
                     assert!(<$type>::decode(&(wire + "00")).is_err());
                 }
             };
@@ -74,7 +74,7 @@ fuzz_target!(|bytes: &[u8]| {
             if let Ok(manifest) =
                 irmind_app::source_mapping::MappingManifest::from_snapshot(&snapshot)
             {
-                assert_eq!(manifest.snapshot().unwrap(), snapshot);
+                assert!(manifest.snapshot().unwrap() == snapshot);
             }
         }
         for parsed in [
