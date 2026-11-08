@@ -2557,6 +2557,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-build-manifest"
+version = "0.1.0"
+dependencies = [
+ "sha2 0.10.9",
+ "tempfile",
+]
+
+[[package]]
 name = "irmind-domain"
 version = "0.1.0"
 dependencies = [
@@ -2782,6 +2790,28 @@ dependencies = [
  "irmind-llm-chat-completions",
  "irmind-testkit",
  "secrecy",
+]
+
+[[package]]
+name = "irmind-mod-mapping-journald-compat"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mod-parser-linux",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-mapping-json-compat"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mod-parser-json",
 ]
 
 [[package]]

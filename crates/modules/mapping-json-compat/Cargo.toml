@@ -1,0 +1,19 @@
+[package]
+name = "irmind-mod-mapping-json-compat"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+
+[build-dependencies]
+irmind-build-manifest = { path = "../../build-manifest", version = "0.1.0" }
+
+[dev-dependencies]
+irmind-mod-parser-json = { path = "../parser-json", version = "0.1.0" }
+
+[lints]
+workspace = true
