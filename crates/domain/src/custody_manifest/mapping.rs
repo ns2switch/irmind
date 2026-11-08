@@ -22,7 +22,7 @@ pub use time::{SourceTimeBasisV1, SourceTimeContextV1};
 mod wire;
 pub use profile::{
     MAPPING_SELECTION_V1, MappingInputRefV1, MappingProfileRecordV1, MappingProfileV1,
-    MappingSnapshotRefV1, MappingSnapshotV1,
+    MappingSnapshotRefV1, MappingSnapshotV1, mapping_catalog_commitment,
 };
 pub use source_set::{SourceDecoderIdentityV1, SourceFormatIdentityV1, SourceRecordSetV1};
 

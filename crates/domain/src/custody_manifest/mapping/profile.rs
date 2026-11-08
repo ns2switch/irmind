@@ -118,15 +118,32 @@ impl MappingProfileV1 {
         hash_payload(&self.encode()?, TAG)
     }
     pub fn catalog_identity(&self) -> EvidenceHash {
-        use sha2::{Digest, Sha256};
-        let mut bytes = b"irmind-mapping-catalog-v1\0".to_vec();
-        bytes.extend_from_slice(&(self.catalog.len() as u64).to_be_bytes());
-        for entry in &self.catalog {
-            super::wire::write_mapping(&mut bytes, entry.mapping());
-            crate::custody_manifest::put(&mut bytes, entry.snapshot().as_str().as_bytes());
-        }
-        EvidenceHash::from_bytes(Sha256::digest(&bytes).into())
+        catalog_identity(&self.catalog)
     }
+}
+
+/// The catalog is known before any source manifest, profile or output exists.
+pub fn mapping_catalog_commitment(
+    catalog: &[MappingSnapshotRefV1],
+) -> Result<EvidenceHash, DomainError> {
+    if catalog.len() > 64
+        || !catalog
+            .windows(2)
+            .all(|p| p[0].mapping.id() < p[1].mapping.id())
+    {
+        return Err(invalid());
+    }
+    Ok(catalog_identity(catalog))
+}
+fn catalog_identity(catalog: &[MappingSnapshotRefV1]) -> EvidenceHash {
+    use sha2::{Digest, Sha256};
+    let mut bytes = b"irmind-mapping-catalog-v1\0".to_vec();
+    bytes.extend_from_slice(&(catalog.len() as u64).to_be_bytes());
+    for entry in catalog {
+        super::wire::write_mapping(&mut bytes, entry.mapping());
+        crate::custody_manifest::put(&mut bytes, entry.snapshot().as_str().as_bytes());
+    }
+    EvidenceHash::from_bytes(Sha256::digest(&bytes).into())
 }
 
 /// Explicit domains share an audit kind while retaining strict wire dispatch.
