@@ -6,6 +6,7 @@ pub mod json;
 mod manifest;
 mod output;
 mod ports;
+mod prepared;
 mod selector;
 mod snapshot;
 mod stream;
@@ -22,6 +23,7 @@ pub use irmind_domain::{
 pub use manifest::{MappingManifest, MappingProvenance};
 pub use output::{MappingDiagnostic, MappingOutput, MappingPartition};
 pub use ports::{SourceDecoder, SourceFileInput, SourceInput, SourceMapper, SourceMetadata};
+pub use prepared::{BoundMappingSource, MappedArtifactProjection, PreparedMappingSource};
 pub use selector::{SelectorCondition, SelectorPredicate, SelectorScalar, SourceSelector};
 
 pub use stream::{DecodedSourceCommitmentV1, MappedSourceRecord, SourceRecordAccumulator};

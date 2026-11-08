@@ -255,3 +255,81 @@ fn confirmed_time_inputs_survive_the_decoder_selection_and_input_commitment() {
         time
     );
 }
+
+#[test]
+fn prepared_outputs_bind_only_after_complete_source_manifest_and_row_accounting() {
+    use crate::source_mapping::{MappedArtifactProjection, PreparedMappingSource};
+    use irmind_domain::{
+        ARTIFACT_V2_MAX_DATE_TUPLES, ARTIFACT_V2_PARTITION_POLICY, ARTIFACT_V2_SCOPE_KEYS,
+        ARTIFACT_V2_STABLE_ORDER, ARTIFACT_V2_TIME_SEMANTICS, ArtifactPartitionV2,
+        ArtifactSchemaV2, COMMON_EVENT_BUILDER, ParquetArtifactV2,
+    };
+    let source = SourceReferenceV1::file("logs/record.json").unwrap();
+    let cancel = CancellationToken::new();
+    let catalog = MappingCatalog::freeze(vec![Arc::new(Decoder)], vec![]).unwrap();
+    let mut acc = accumulator(&source, &cancel, &catalog);
+    let mut spool = Cursor::new(Vec::new());
+    acc.accept(&record(0, 0), &mut spool).unwrap();
+    acc.accept(&record(1, 20), &mut spool).unwrap();
+    let decoded = acc.finish(&mut spool, &report(2)).unwrap();
+    let manifest = irmind_domain::SourceManifestV2 {
+        source: irmind_domain::SourceManifestV1 {
+            source: "logs/record.json".into(),
+            size: 100,
+            modified_unix_seconds: None,
+            version: None,
+            provider_checksum: None,
+            sha256: EvidenceHash::from_bytes([7; 32]),
+            copied: false,
+        },
+        parser_id: "parser-json".into(),
+        parser_version: "json-source-v1".into(),
+        confidence: 90,
+        selection: irmind_domain::ParserSelectionMode::Automatic,
+        timestamp_context: Some("normalized-utc".into()),
+        rejected_records: 0,
+        rejected_sample: vec![],
+    };
+    let core = ParquetArtifactV2 {
+        path: "date=unknown/part.parquet".into(),
+        size: 123,
+        sha256: EvidenceHash::from_bytes([8; 32]),
+        parser_id: "parser-json".into(),
+        parser_version: "json-source-v1".into(),
+        schema: ArtifactSchemaV2::CommonEvents,
+        partition: ArtifactPartitionV2 {
+            date: "unknown".into(),
+            key_set: ARTIFACT_V2_SCOPE_KEYS.into(),
+            policy: ARTIFACT_V2_PARTITION_POLICY.into(),
+            tuple_cap: ARTIFACT_V2_MAX_DATE_TUPLES,
+            all_scope_overflow: false,
+            scopes: vec![],
+        },
+        source_hashes: vec![EvidenceHash::from_bytes([7; 32])],
+        time_semantics: ARTIFACT_V2_TIME_SEMANTICS.into(),
+        stable_order: ARTIFACT_V2_STABLE_ORDER.into(),
+        builder_version: COMMON_EVENT_BUILDER.into(),
+        superseded_hashes: vec![],
+    };
+    let prepare = |rows| {
+        PreparedMappingSource::try_new(
+            decoded.clone(),
+            catalog.snapshots().unwrap(),
+            vec![MappedArtifactProjection::try_new(core.clone(), None, rows).unwrap()],
+        )
+        .unwrap()
+    };
+    let prepared = prepare(2);
+    let catalog_id = prepared.catalog_commitment().unwrap();
+    let bound = prepared.bind(&manifest).unwrap();
+    assert_eq!(bound.profile().catalog_identity(), catalog_id);
+    bound
+        .receipt()
+        .verify(bound.profile(), bound.artifacts())
+        .unwrap();
+    assert_eq!(bound.artifacts()[0].pipeline().rows(), 2);
+    assert!(prepare(1).bind(&manifest).is_err());
+    let mut bad = manifest;
+    bad.source.size += 1;
+    assert!(prepare(2).bind(&bad).is_err());
+}
