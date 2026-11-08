@@ -1,7 +1,9 @@
 use super::Predicate;
 use irmind_domain::{ArtifactSchemaV2, GraphQueryFilter, ParquetArtifact};
 pub(super) fn supported(artifact: &ParquetArtifact) -> bool {
-    matches!(artifact,ParquetArtifact::V2(value) if value.schema.is_common())
+    artifact
+        .precise_metadata()
+        .is_some_and(|v| v.schema.is_common())
 }
 pub(super) fn rules(artifact: &ParquetArtifact, filter: &GraphQueryFilter) -> Vec<Predicate> {
     if !supported(artifact) {
@@ -26,7 +28,10 @@ pub(super) fn rules(artifact: &ParquetArtifact, filter: &GraphQueryFilter) -> Ve
         ),
         Predicate::SmallEqual("event_kind", None, 2),
     ];
-    if matches!(artifact,ParquetArtifact::V2(v) if v.schema==ArtifactSchemaV2::CommonEvents) {
+    if artifact
+        .precise_metadata()
+        .is_some_and(|v| v.schema == ArtifactSchemaV2::CommonEvents)
+    {
         rules.push(Predicate::Mask(
             "event_role_bits",
             selected.role.map_or(0, |role| 1u32 << role.code()),

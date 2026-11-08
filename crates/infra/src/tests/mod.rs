@@ -116,3 +116,7 @@ mod seal_recovery;
 mod siem_alert;
 
 mod common_event_custody;
+
+mod mapped_export;
+
+mod mapped_pipeline;

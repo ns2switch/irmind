@@ -15,6 +15,15 @@ impl ParquetStore {
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
+        if artifacts
+            .iter()
+            .any(|a| matches!(a, ParquetArtifact::V3(_)))
+        {
+            return Err(AppError::Policy(
+                "mapped reconstruction requires the exact signed source and mapping pipeline"
+                    .into(),
+            ));
+        }
         let workspace = TempWorkspace::new(&self.spool_dir(case)?)?;
         let mut fresh = Self::open(&workspace.path)?;
         let groups = generations(artifacts);

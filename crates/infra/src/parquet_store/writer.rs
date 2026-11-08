@@ -21,9 +21,14 @@ pub(super) struct Partition {
     #[serde(skip)]
     scope: Option<irmind_domain::ArtifactPartitionV2>,
     segment: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    mapping_route: Option<String>,
 }
 
 impl Partition {
+    pub(in crate::parquet_store) fn mapping_route(&self) -> Option<&str> {
+        self.mapping_route.as_deref()
+    }
     pub(in crate::parquet_store) fn utc_date(&self) -> &str {
         &self.date
     }
@@ -207,6 +212,20 @@ impl ArtifactSink {
         let name = if common {
             name.strip_suffix(".parquet")
                 .map(|prefix| format!("{prefix}.common.parquet"))
+                .ok_or_else(invalid_source)?
+        } else {
+            name
+        };
+        let name = if let Some(route) = &partition.mapping_route {
+            if route.len() != 64
+                || !route
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            {
+                return Err(invalid_source());
+            }
+            name.strip_suffix(".parquet")
+                .map(|n| format!("{n}.map-{route}.parquet"))
                 .ok_or_else(invalid_source)?
         } else {
             name

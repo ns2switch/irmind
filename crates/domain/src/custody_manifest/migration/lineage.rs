@@ -49,6 +49,11 @@ impl ArtifactLineage {
     }
 
     pub fn artifact(&mut self, artifact: ParquetArtifact) -> Result<(), DomainError> {
+        // Mapped artifacts require profiles, complete run receipts and layout
+        // activation. They cannot enter the historical file-hash lineage.
+        if matches!(&artifact, ParquetArtifact::V3(_)) {
+            return Err(invalid());
+        }
         artifact.validate()?;
         if let ParquetArtifact::V2(v) = &artifact {
             let supported = if v.schema.is_common() {

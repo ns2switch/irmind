@@ -30,7 +30,9 @@ impl ExportVerifier for LocalExportVerifier {
         path: &Path,
         expected_key: Option<&str>,
     ) -> Result<irmind_app::ExportVerification, AppError> {
-        if archive_version(path)? == 5 {
+        if archive_version(path)? == 6 {
+            super::verify_v4::verify_export_v6(path, expected_key)
+        } else if archive_version(path)? == 5 {
             super::verify_v4::verify_export_v5(path, expected_key)
         } else if archive_version(path)? == 4 {
             super::verify_v4::verify_export_v4(path, expected_key)
@@ -52,6 +54,10 @@ pub fn verify_export_expected(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<(String, usize), AppError> {
+    if archive_version(path)? == 6 {
+        let result = super::verify_v4::verify_export_v6(path, expected_key)?;
+        return Ok((result.analyst_key_fingerprint, result.entries));
+    }
     if archive_version(path)? == 5 {
         let result = super::verify_v4::verify_export_v5(path, expected_key)?;
         return Ok((result.analyst_key_fingerprint, result.entries));
@@ -88,7 +94,9 @@ fn archive_version(path: &Path) -> Result<u32, AppError> {
     let mut file = fs::File::open(path).map_err(storage)?;
     let mut prefix = [0u8; super::export_v4::MAGIC_V4.len()];
     file.read_exact(&mut prefix).map_err(storage)?;
-    Ok(if prefix == super::export_v4::MAGIC_V5 {
+    Ok(if prefix == super::export_v4::MAGIC_V6 {
+        6
+    } else if prefix == super::export_v4::MAGIC_V5 {
         5
     } else if prefix == super::export_v4::MAGIC_V4 {
         4

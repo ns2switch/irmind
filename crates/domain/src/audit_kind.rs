@@ -42,10 +42,15 @@ pub enum AuditEventKind {
     ToolDispatch,
     ToolError,
     ToolResult,
+    SourceRecordSetV1,
+    MappingProfileV1,
+    MappingRunV1,
+    ParquetArtifactV3,
+    ParquetLayoutV1,
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 39] = [
+    pub const ALL: [Self; 44] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -85,6 +90,11 @@ impl AuditEventKind {
         Self::ToolDispatch,
         Self::ToolError,
         Self::ToolResult,
+        Self::SourceRecordSetV1,
+        Self::MappingProfileV1,
+        Self::MappingRunV1,
+        Self::ParquetArtifactV3,
+        Self::ParquetLayoutV1,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -128,7 +138,23 @@ impl AuditEventKind {
             Self::ToolDispatch => "ToolDispatch",
             Self::ToolError => "ToolError",
             Self::ToolResult => "ToolResult",
+            Self::SourceRecordSetV1 => "SourceRecordSetV1",
+            Self::MappingProfileV1 => "MappingProfileV1",
+            Self::MappingRunV1 => "MappingRunV1",
+            Self::ParquetArtifactV3 => "ParquetArtifactV3",
+            Self::ParquetLayoutV1 => "ParquetLayoutV1",
         }
+    }
+
+    pub const fn is_mapped_custody(self) -> bool {
+        matches!(
+            self,
+            Self::SourceRecordSetV1
+                | Self::MappingProfileV1
+                | Self::MappingRunV1
+                | Self::ParquetArtifactV3
+                | Self::ParquetLayoutV1
+        )
     }
 
     pub fn parse(value: &str) -> Result<Self, DomainError> {
@@ -152,7 +178,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 39] = [
+        const EXPECTED: [&str; 44] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -192,6 +218,11 @@ mod tests {
             "ToolDispatch",
             "ToolError",
             "ToolResult",
+            "SourceRecordSetV1",
+            "MappingProfileV1",
+            "MappingRunV1",
+            "ParquetArtifactV3",
+            "ParquetLayoutV1",
         ];
         for (kind, expected) in AuditEventKind::ALL.into_iter().zip(EXPECTED) {
             assert_eq!(kind.as_str(), expected);

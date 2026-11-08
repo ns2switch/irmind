@@ -113,6 +113,10 @@ def fixtures():
     path_a, path_b, path_c = ['date=2026-01-02/part-' + x + '.parquet' for x in 'abc']
     first = artifact(path_a, 'e' * 64, ['a' * 64], [ba], 2)
     second = artifact(path_b, 'f' * 64, ['d' * 64], [bd], 2)
+    parent_commitment = commitment(b'irmind-layout-parents-v1\0', [first, second])
+    seed = (b'irmind-layout-path-v1\0' + field(LAYOUT) + parent_commitment
+            + field('irmind-events-v4') + partition() + u64(0))
+    path_c = 'date=2026-01-02/layout-' + sha(seed) + '.parquet'
     child = artifact(path_c, '1' * 64, ['a' * 64, 'd' * 64], [ba, bd], 4,
                      [(path_a, first), (path_b, second)])
     layout = (b'irmind-parquet-layout-v1\0' + field(LAYOUT)

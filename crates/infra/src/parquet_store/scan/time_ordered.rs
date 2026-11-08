@@ -38,7 +38,11 @@ impl ParquetStore {
         let builder = ParquetRecordBatchReaderBuilder::try_new(file.try_clone().map_err(storage)?)
             .map_err(storage)?;
         super::super::format::validate_schema(artifact, builder.schema().as_ref())?;
-        let precise = matches!(artifact, super::ParquetArtifact::V2(_));
+        super::super::format::validate_row_count(
+            artifact,
+            builder.metadata().file_metadata().num_rows(),
+        )?;
+        let precise = artifact.precise_metadata().is_some();
         let rules = rules_for_artifact(&spec, precise, artifact)?;
         let groups = ordered_groups(&builder, &rules, newest)?;
         let metadata =

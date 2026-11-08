@@ -7,7 +7,7 @@ pub(in crate::parquet_store) fn partition_matches(
     if !filter.common().is_empty() && !common::supported(artifact) {
         return false;
     }
-    if let ParquetArtifact::V2(v) = artifact {
+    if let Some(v) = artifact.precise_metadata() {
         return scope_partition_matches(&v.partition, filter)
             && filter.time_range().is_none_or(|(from, to)| {
                 artifact.partition_date() == "unknown"

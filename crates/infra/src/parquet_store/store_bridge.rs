@@ -116,6 +116,41 @@ impl LargeCaseStore for crate::LocalStore {
         parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
+        if artifacts
+            .iter()
+            .any(|a| matches!(a, ParquetArtifact::V3(_)))
+        {
+            use irmind_app::AuditLog as _;
+            let mapped = self.parquet.rebuild_mapped_history(
+                case_id,
+                source_root,
+                &self.entries(case_id)?,
+                cancel,
+            )?;
+            let old = artifacts
+                .iter()
+                .filter(|a| !matches!(a, ParquetArtifact::V3(_)))
+                .cloned()
+                .collect::<Vec<_>>();
+            let old_hashes = old
+                .iter()
+                .flat_map(ParquetArtifact::source_hashes)
+                .collect::<std::collections::BTreeSet<_>>();
+            let old_sources = sources
+                .iter()
+                .filter(|s| old_hashes.contains(&s.sha256))
+                .cloned()
+                .collect::<Vec<_>>();
+            return Ok(mapped
+                + self.parquet.rebuild_compare(
+                    case_id,
+                    source_root,
+                    &old_sources,
+                    &old,
+                    parser,
+                    cancel,
+                )?);
+        }
         self.parquet
             .rebuild_compare(case_id, source_root, sources, artifacts, parser, cancel)
     }

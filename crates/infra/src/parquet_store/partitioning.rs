@@ -45,7 +45,7 @@ impl Allocator {
         };
         for artifact in artifacts {
             artifact.validate().map_err(|_| invalid_source())?;
-            if let ParquetArtifact::V2(v) = artifact {
+            if let Some(v) = artifact.precise_metadata() {
                 if v.builder_version == super::writer::precise::BUILDER {
                     if !v.partition.scopes.is_empty() || v.partition.all_scope_overflow {
                         return Err(invalid_source());
@@ -54,7 +54,9 @@ impl Allocator {
                 }
                 if !matches!(
                     v.builder_version.as_str(),
-                    BUILDER | super::common_format::BUILDER
+                    BUILDER
+                        | super::common_format::BUILDER
+                        | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
                 ) {
                     return Err(invalid_source());
                 }

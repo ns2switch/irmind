@@ -5,7 +5,7 @@ use super::super::super::{
     RecordRow, SourceManifestV1, invalid_source, storage,
 };
 use super::super::staging::StagedSource;
-use super::super::staging::{Input, MAX_STAGED_ROW, no_space, parse_normalized, source_sample};
+use super::super::staging::{Input, MAX_STAGED_ROW, no_space, source_sample};
 use irmind_app::LocalBatchRequest;
 use std::io::{Seek as _, SeekFrom, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -13,6 +13,8 @@ use std::sync::mpsc::{SyncSender, TrySendError};
 use std::time::Duration;
 
 pub(in crate::parquet_store::partitioning) struct ParsedSource {
+    pub(in crate::parquet_store::partitioning) mapping:
+        Option<irmind_app::source_mapping::DecodedSourceCommitmentV1>,
     pub(in crate::parquet_store::partitioning) source: File,
     pub(in crate::parquet_store::partitioning) manifest: SourceManifestV1,
     pub(in crate::parquet_store::partitioning) report: Option<ParseReport>,
@@ -84,58 +86,62 @@ impl ParquetStore {
         let sample = source_sample(&mut input.file)?;
         let mut rows = RowBuffer::new(sender, input.budget, value.clone(), cancel, restart);
         let mut stopped_for_restart = false;
-        let result = parse_normalized(
-            stream::VerifiedInput {
-                source: &mut input.file,
-                sample: &sample,
-                relative_path: &input.path,
-                hash,
-                hash_value: &value,
-                size,
-                cancel,
-                parser: request.parser,
-                precise_time: true,
-            },
-            self.common_events,
-            &mut |row| {
-                if cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
-                }
-                if restart.load(Ordering::Acquire) {
+        let mut mapping = None;
+        let result = self
+            .parse_normalized(
+                request.case_id,
+                stream::VerifiedInput {
+                    source: &mut input.file,
+                    sample: &sample,
+                    relative_path: &input.path,
+                    hash,
+                    hash_value: &value,
+                    size,
+                    cancel,
+                    parser: request.parser,
+                    precise_time: true,
+                },
+                &mut |row| {
+                    if cancel.is_cancelled() {
+                        return Err(AppError::Cancelled);
+                    }
+                    if restart.load(Ordering::Acquire) {
+                        stopped_for_restart = true;
+                        return Err(AppError::Cancelled);
+                    }
+                    let result = rows.push(row);
+                    if rows.disordered {
+                        restart.store(true, Ordering::Release);
+                    }
+                    if result
+                        .as_ref()
+                        .is_err_and(|e| matches!(e, AppError::Cancelled))
+                        && restart.load(Ordering::Acquire)
+                        && !cancel.is_cancelled()
+                    {
+                        stopped_for_restart = true;
+                    }
+                    result
+                },
+            )
+            .and_then(|(report, decoded)| {
+                mapping = decoded;
+                let finished = rows.finish();
+                if finished.is_err() && restart.load(Ordering::Acquire) && !cancel.is_cancelled() {
                     stopped_for_restart = true;
-                    return Err(AppError::Cancelled);
                 }
-                let result = rows.push(row);
-                if rows.disordered {
-                    restart.store(true, Ordering::Release);
+                finished?;
+                if report.accepted == 0 || report.accepted != rows.accepted {
+                    return Err(invalid_source());
                 }
-                if result
-                    .as_ref()
-                    .is_err_and(|e| matches!(e, AppError::Cancelled))
-                    && restart.load(Ordering::Acquire)
-                    && !cancel.is_cancelled()
-                {
-                    stopped_for_restart = true;
-                }
-                result
-            },
-        )
-        .and_then(|report| {
-            let finished = rows.finish();
-            if finished.is_err() && restart.load(Ordering::Acquire) && !cancel.is_cancelled() {
-                stopped_for_restart = true;
-            }
-            finished?;
-            if report.accepted == 0 || report.accepted != rows.accepted {
-                return Err(invalid_source());
-            }
-            verify_source_unchanged(&input.file, &metadata, &value)?;
-            Ok(report)
-        });
+                verify_source_unchanged(&input.file, &metadata, &value)?;
+                Ok(report)
+            });
         let report = completed_report(result, stopped_for_restart, cancel)?;
         drop(rows);
         drop(stage);
         ParsedSource {
+            mapping,
             source: input.file,
             manifest: Self::source_manifest(&input.path, &metadata, size, value, copied)?,
             report,

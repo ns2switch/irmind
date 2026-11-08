@@ -65,7 +65,7 @@ pub struct SourceRecordSetV1 {
 }
 impl std::fmt::Debug for SourceRecordSetV1 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SourceRecordSetV1")
+        f.debug_struct(crate::AuditEventKind::SourceRecordSetV1.as_str())
             .field("source", &self.source)
             .field("decoder", &self.decoder)
             .field("records", &self.records)

@@ -10,6 +10,7 @@ use std::io::{Read, Write};
 
 pub(super) const MAGIC_V4: &[u8] = b"IRMIND-EXPORT-V4\0";
 pub(super) const MAGIC_V5: &[u8] = b"IRMIND-EXPORT-V5\0";
+pub(super) const MAGIC_V6: &[u8] = b"IRMIND-EXPORT-V6\0";
 pub(super) const MAX_FRAME_BYTES: u64 = 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
@@ -36,6 +37,17 @@ struct ExportV4Request<'a> {
 }
 
 impl LargeCaseExporter for LocalStore {
+    fn export_case_v6(
+        &self,
+        id: &CaseId,
+        path: &Path,
+        source_root: Option<&Path>,
+        include_originals: bool,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        self.export_versioned(id, path, source_root, include_originals, cancel, 6)
+    }
+
     fn export_case_v5(
         &self,
         id: &CaseId,
@@ -82,7 +94,7 @@ impl LocalStore {
         self.export_versioned(id, path, source_root, include_originals, cancel, 5)
     }
 
-    fn export_versioned(
+    pub(super) fn export_versioned(
         &self,
         id: &CaseId,
         path: &Path,
@@ -91,6 +103,9 @@ impl LocalStore {
         cancel: &CancellationToken,
         version: u32,
     ) -> Result<String, AppError> {
+        if version < 6 && self.entries(id)?.iter().any(|e| e.kind.is_mapped_custody()) {
+            return Err(storage_reason("mapped custody requires export V6"));
+        }
         if version == 4
             && self.entries(id)?.iter().any(|e| {
                 matches!(
@@ -178,10 +193,11 @@ impl LocalStore {
         let mut out = options.open(path).map_err(storage)?;
         *created = true;
         private_file(path).map_err(storage)?;
-        out.write_all(if header.version == 5 {
-            MAGIC_V5
-        } else {
-            MAGIC_V4
+        out.write_all(match header.version {
+            4 => MAGIC_V4,
+            5 => MAGIC_V5,
+            6 => MAGIC_V6,
+            _ => return Err(storage_reason("unsupported export version")),
         })
         .map_err(storage)?;
         write_frame(&mut out, &serde_json::to_vec(&header).map_err(storage)?)?;
@@ -221,7 +237,7 @@ impl LocalStore {
             }
             write_frame(&mut out, &serde_json::to_vec(&operation).map_err(storage)?)?;
         }
-        if header.version == 5 {
+        if header.version >= 5 {
             self.write_artifact_frames(id, &mut out, cancel)?;
         }
         out.sync_all().map_err(storage)?;

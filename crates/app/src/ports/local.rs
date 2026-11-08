@@ -397,6 +397,7 @@ pub trait LogParser: EventParser + StreamingEventParser {
 }
 
 pub struct PreparedSource {
+    pub mapping: Option<crate::source_mapping::PreparedMappingSource>,
     pub manifest: SourceManifestV1,
     pub artifacts: Vec<ParquetArtifact>,
     pub records: usize,
@@ -570,6 +571,17 @@ pub struct ExportVerification {
 }
 
 pub trait LargeCaseExporter: Send + Sync {
+    fn export_case_v6(
+        &self,
+        _id: &CaseId,
+        _path: &Path,
+        _source_root: Option<&Path>,
+        _include_originals: bool,
+        _cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        Err(AppError::Policy("export V6 is unavailable".into()))
+    }
+
     fn export_case_v5(
         &self,
         _id: &CaseId,

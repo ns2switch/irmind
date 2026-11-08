@@ -113,3 +113,5 @@ fn explicit_reference(entries: &[SignedEntry], legacy: &[String]) -> Vec<String>
 }
 
 mod scale;
+
+mod mapped;

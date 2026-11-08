@@ -17,6 +17,7 @@ pub(super) fn verify_common(
     size: u64,
     expected: &str,
     schema: ArtifactSchemaV2,
+    rows: Option<u64>,
 ) -> Result<(), AppError> {
     let start = input.stream_position().map_err(storage)?;
     let end = start
@@ -31,7 +32,15 @@ pub(super) fn verify_common(
     let validated = ParquetRecordBatchReaderBuilder::try_new(source)
         .map_err(storage)
         .and_then(|reader| {
-            crate::parquet_store::validate_common_export_schema(schema, reader.schema())
+            crate::parquet_store::validate_common_export_schema(schema, reader.schema())?;
+            if rows.is_some_and(|expected| {
+                u64::try_from(reader.metadata().file_metadata().num_rows()).ok() != Some(expected)
+            }) {
+                return Err(storage_reason(
+                    "derived-file row count differs from signed envelope",
+                ));
+            }
+            Ok(())
         });
     // File clones share a cursor. Metadata reads must not consume another frame.
     input.seek(SeekFrom::Start(end)).map_err(storage)?;

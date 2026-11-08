@@ -58,28 +58,9 @@ pub(super) fn parents() -> Vec<ParquetArtifactV3> {
     ]
 }
 pub(super) fn compact(parents: &[ParquetArtifactV3]) -> ParquetArtifactV3 {
-    let bindings = ParquetLayoutV1::preserved_bindings(parents).unwrap();
-    let mut core = parents[0].core().clone();
-    core.path = "date=2026-01-02/part-c.parquet".into();
-    core.size = 150;
-    core.sha256 = hash('1');
-    core.builder_version = PARQUET_LAYOUT_BUILDER_V1.into();
-    core.source_hashes = bindings
-        .iter()
-        .map(|b| b.input().source().clone())
-        .collect();
-    let mut references = parents
-        .iter()
-        .map(|a| ArtifactParentV1::from_artifact(a).unwrap())
-        .collect::<Vec<_>>();
-    references.sort_by(|a, b| a.path().cmp(b.path()));
-    let rows = parents.iter().map(|a| a.pipeline().rows()).sum();
-    ParquetArtifactV3::try_new(
-        core,
-        ArtifactPipelineV1::layout(bindings, rows, references).unwrap(),
-    )
-    .unwrap()
+    ParquetLayoutV1::replacement(parents, 150, hash('1')).unwrap()
 }
+
 pub(super) fn profile() -> MappingProfileV1 {
     MappingProfileV1::try_new(
         vec![MappingInputRefV1::from_set(&super::source()).unwrap()],

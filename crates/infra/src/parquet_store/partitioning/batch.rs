@@ -87,6 +87,7 @@ impl ParquetStore {
         state.finish(&dir, &source.manifest.sha256, parser)?;
         drop(replay);
         let parsed = super::ordered::ParsedSource {
+            mapping: source.mapping,
             source: source.source,
             manifest: source.manifest,
             report: Some(source.report),
@@ -137,7 +138,10 @@ impl ParquetStore {
             normalized_bytes,
         )?;
         let artifacts = self.finish_artifacts(request.case_id, staged)?;
+        let mapping =
+            self.prepare_mapping_projection(source.mapping.take(), &artifacts, request.case_id)?;
         Ok(PreparedSource {
+            mapping,
             manifest: source.manifest,
             artifacts,
             records: report.accepted,
@@ -202,7 +206,10 @@ impl Writing {
             profile,
             [&row.scope_account, &row.scope_region, &row.scope_host],
         )?;
-        let key = scope.path_prefix().map_err(|_| invalid_source())?;
+        let mut key = scope.path_prefix().map_err(|_| invalid_source())?;
+        if let Some(route) = row.partition.mapping_route() {
+            key.push_str(route);
+        }
         if self.keys.len() == WRITER_PARTITIONS && !self.keys.contains(&key) {
             self.finish(dir, hash, parser)?;
         }

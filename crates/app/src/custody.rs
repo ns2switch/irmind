@@ -59,7 +59,10 @@ pub fn export_case_v4(
             crate::FixedAppError::PolicySealTheCaseBeforeExport,
         ));
     }
-    if engine.audit_log.entries(id)?.iter().any(|e| {
+    let entries = engine.audit_log.entries(id)?;
+    if entries.iter().any(|e| e.kind.is_mapped_custody()) {
+        exporter.export_case_v6(id, path, source_root, include_originals, cancel)
+    } else if entries.iter().any(|e| {
         matches!(
             e.kind,
             irmind_domain::AuditEventKind::ParquetArtifactV2

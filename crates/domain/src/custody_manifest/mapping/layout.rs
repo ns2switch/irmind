@@ -22,10 +22,65 @@ pub struct ParquetLayoutV1 {
     rows: u64,
 }
 impl ParquetLayoutV1 {
+    /// Deterministic metadata for preflight and the physical writer. The path
+    /// depends on earlier parent envelopes, never on the child's own hash.
+    pub fn replacement(
+        parents: &[ParquetArtifactV3],
+        size: u64,
+        file_hash: super::EvidenceHash,
+    ) -> Result<ParquetArtifactV3, DomainError> {
+        use crate::custody_manifest::put;
+        use crate::{ArtifactPipelineV1, PARQUET_LAYOUT_BUILDER_V1};
+        use sha2::{Digest, Sha256};
+        let bindings = Self::preserved_bindings(parents)?;
+        let commitment = commitments::artifacts(parents, PARENTS)?;
+        let first = parents.first().ok_or_else(invalid)?;
+        let mut seed = b"irmind-layout-path-v1\0".to_vec();
+        put(&mut seed, PARQUET_LAYOUT_BUILDER_V1.as_bytes());
+        seed.extend_from_slice(&commitment.count.to_be_bytes());
+        put(&mut seed, commitment.sha256.as_str().as_bytes());
+        put(&mut seed, first.core().schema.as_str().as_bytes());
+        first.core().partition.write(&mut seed);
+        seed.extend_from_slice(&0u64.to_be_bytes());
+        let digest = super::EvidenceHash::from_bytes(Sha256::digest(seed).into());
+        let mut core = first.core().clone();
+        core.path = format!(
+            "{}layout-{}.parquet",
+            core.partition.path_prefix()?,
+            digest.as_str()
+        );
+        core.size = size;
+        core.sha256 = file_hash;
+        core.builder_version = PARQUET_LAYOUT_BUILDER_V1.into();
+        core.source_hashes = bindings
+            .iter()
+            .map(|b| b.input().source().clone())
+            .collect();
+        let rows = parents.iter().try_fold(0u64, |n, p| {
+            n.checked_add(p.pipeline().rows()).ok_or_else(invalid)
+        })?;
+        let mut references = parents
+            .iter()
+            .map(ArtifactParentV1::from_artifact)
+            .collect::<Result<Vec<_>, _>>()?;
+        references.sort_by(|a, b| a.path().cmp(b.path()));
+        ParquetArtifactV3::try_new(
+            core,
+            ArtifactPipelineV1::layout(bindings, rows, references)?,
+        )
+    }
     pub fn between(
         parents: &[ParquetArtifactV3],
         replacement: &ParquetArtifactV3,
     ) -> Result<Self, DomainError> {
+        let expected = Self::replacement(
+            parents,
+            replacement.core().size,
+            replacement.core().sha256.clone(),
+        )?;
+        if expected != *replacement {
+            return Err(invalid());
+        }
         let preserved = Self::preserved_bindings(parents)?;
         let first = parents.first().ok_or_else(invalid)?;
         let rows = parents.iter().try_fold(0u64, |sum, a| {

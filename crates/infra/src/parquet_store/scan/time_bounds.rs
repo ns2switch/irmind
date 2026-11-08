@@ -89,6 +89,10 @@ impl ParquetStore {
                                 artifact,
                                 builder.schema().as_ref(),
                             )?;
+                            super::super::format::validate_row_count(
+                                artifact,
+                                builder.metadata().file_metadata().num_rows(),
+                            )?;
                             let index = builder.schema().index_of("event_time").map_err(storage)?;
                             Ok::<_, AppError>((
                                 file_bound(builder.metadata(), index, newest),

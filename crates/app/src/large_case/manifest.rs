@@ -47,7 +47,9 @@ pub(crate) fn read_manifest_index(
                     &mut parser_selections,
                 )?;
             }
-            AuditEventKind::ParquetArtifactV1 | AuditEventKind::ParquetArtifactV2 => {
+            AuditEventKind::ParquetArtifactV1
+            | AuditEventKind::ParquetArtifactV2
+            | AuditEventKind::ParquetArtifactV3 => {
                 if entry.evidence.is_some() {
                     return Err(AppError::InvalidChain(entry.seq));
                 }

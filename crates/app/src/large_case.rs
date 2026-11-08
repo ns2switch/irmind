@@ -4,6 +4,8 @@ use crate::{
 };
 
 mod manifest;
+mod mapped_compaction;
+mod mapped_source;
 mod migrate_v2;
 mod migration;
 mod source_event;
@@ -78,7 +80,8 @@ impl LargeCaseUseCases<'_, '_> {
             .collect::<BTreeSet<_>>();
         let mut groups: BTreeMap<Vec<u8>, Vec<ParquetArtifact>> = BTreeMap::new();
         for artifact in index {
-            if !matches!(&artifact, ParquetArtifact::V2(v) if !v.superseded_hashes.is_empty())
+            if !matches!(&artifact, ParquetArtifact::V3(_))
+                && !matches!(&artifact, ParquetArtifact::V2(v) if !v.superseded_hashes.is_empty())
                 && artifact.source_hashes().len() == 1
                 && (artifact.parser_version() == "json-stream-v3"
                     || matches!(artifact, ParquetArtifact::V2(_)))
@@ -93,7 +96,7 @@ impl LargeCaseUseCases<'_, '_> {
                     .push(artifact);
             }
         }
-        let mut compacted = 0usize;
+        let mut compacted = self.compact_mapped(id, &known, cancel)?;
         for artifacts in groups.values_mut() {
             artifacts.sort_by(|left, right| left.source_hashes()[0].cmp(&right.source_hashes()[0]));
             for chunk in artifacts.chunks(128) {
@@ -262,7 +265,7 @@ impl LargeCaseUseCases<'_, '_> {
     pub(crate) fn sign_prepared_with_selection(
         &self,
         id: &CaseId,
-        prepared: crate::PreparedSource,
+        mut prepared: crate::PreparedSource,
         selection: Option<&ParserSelection>,
         cancel: &CancellationToken,
         known_artifacts: &mut BTreeMap<String, ParquetArtifact>,
@@ -282,6 +285,8 @@ impl LargeCaseUseCases<'_, '_> {
                 "source produced no Parquet records".into(),
             ));
         }
+        let source_event = self.source_event(&prepared, selection)?;
+        let mapped = mapped_source::bind(&mut prepared, &source_event, known_artifacts)?;
         let source_hash = prepared.manifest.sha256.clone();
         for artifact in &prepared.artifacts {
             if artifact.source_hashes() != [source_hash.clone()] {
@@ -300,8 +305,8 @@ impl LargeCaseUseCases<'_, '_> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let source_event = self.source_event(&prepared, selection)?;
         let mut events = vec![(AuditOrigin::System, source_event.0, source_event.1)];
+        events.extend(mapped.before);
         let mut new_artifacts = Vec::new();
         let mut new_paths = BTreeSet::new();
         for artifact in prepared.artifacts {
@@ -321,6 +326,7 @@ impl LargeCaseUseCases<'_, '_> {
             ));
             new_artifacts.push(artifact);
         }
+        events.extend(mapped.after);
         self.engine.audit_batch(id, &events)?;
         known_artifacts.extend(
             new_artifacts

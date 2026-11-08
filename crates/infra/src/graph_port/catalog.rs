@@ -130,7 +130,7 @@ fn collect_signed_artifacts(
     state.artifacts = irmind_app::artifact_catalog(entries)?.active;
     // Copied sources predating manifests retain their signed hash identity.
     for artifact in &state.artifacts {
-        if matches!(artifact, ParquetArtifact::V2(_)) {
+        if artifact.precise_metadata().is_some() {
             for hash in artifact.source_hashes() {
                 state
                     .source_names
@@ -257,7 +257,8 @@ fn select_active_artifacts(
         })
         .collect::<std::collections::BTreeSet<_>>();
     artifacts.retain(|artifact| {
-        artifact.source_hashes().len() > 1
+        matches!(artifact, ParquetArtifact::V3(_))
+            || artifact.source_hashes().len() > 1
             || !covered.contains(&(
                 artifact.compaction_key(),
                 artifact.source_hashes()[0].clone(),

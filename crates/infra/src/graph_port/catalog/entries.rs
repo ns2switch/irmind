@@ -29,7 +29,9 @@ impl SignedSources {
             AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2 => {
                 self.source(entry)?;
             }
-            AuditEventKind::ParquetArtifactV1 | AuditEventKind::ParquetArtifactV2 => {
+            AuditEventKind::ParquetArtifactV1
+            | AuditEventKind::ParquetArtifactV2
+            | AuditEventKind::ParquetArtifactV3 => {
                 self.artifact(entry)?;
             }
             _ => {}

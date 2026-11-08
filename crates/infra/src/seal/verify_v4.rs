@@ -1,4 +1,4 @@
-use super::export_v4::{HeaderV4, MAGIC_V4, MAGIC_V5, v4_result};
+use super::export_v4::{HeaderV4, MAGIC_V4, MAGIC_V5, MAGIC_V6, v4_result};
 use super::frames::{read_frame, read_hash, read_u64, verify_raw};
 use super::{
     AppError, CaseId, LocalVerifier, Path, Severity, hex, seal_challenge, sha256, storage,
@@ -28,6 +28,13 @@ pub(super) fn verify_export_v5(
     verify_versioned(path, expected_key, 5)
 }
 
+pub(super) fn verify_export_v6(
+    path: &Path,
+    expected_key: Option<&str>,
+) -> Result<ExportVerification, AppError> {
+    verify_versioned(path, expected_key, 6)
+}
+
 fn verify_versioned(
     path: &Path,
     expected_key: Option<&str>,
@@ -39,7 +46,14 @@ fn verify_versioned(
     }
     let mut magic = [0u8; MAGIC_V4.len()];
     input.read_exact(&mut magic).map_err(storage)?;
-    if magic != if version == 5 { MAGIC_V5 } else { MAGIC_V4 } {
+    if magic
+        != match version {
+            4 => MAGIC_V4,
+            5 => MAGIC_V5,
+            6 => MAGIC_V6,
+            _ => return Err(storage_reason("unsupported export version")),
+        }
+    {
         return Err(storage_reason("unsupported export version"));
     }
     let header: HeaderV4 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
@@ -70,7 +84,7 @@ fn verify_versioned(
     verify_legacy_blobs(&mut input, &mut chain)?;
     let provided_count = verify_source_frames(&mut input, &mut chain)?;
     verify_operation_frames(&mut input, &mut chain, &header)?;
-    if version == 5 {
+    if version >= 5 {
         super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
     } else {
         let mut trailer = [0u8; 1];
@@ -157,7 +171,7 @@ fn verify_legacy_blobs(input: &mut File, chain: &mut ChainState) -> Result<(), A
         verify_raw(input, size, &hash)?;
     }
     let last = chain.last.as_ref().ok_or(AppError::InvalidChain(0))?;
-    let matches = if chain.version == 5 && chain.inventory.has_v2() {
+    let matches = if chain.version >= 5 && chain.inventory.has_v2() {
         for hash in &evidence_hashes {
             chain.inventory.add_evidence(hash)?;
         }
@@ -252,6 +266,7 @@ impl ChainState {
 
     fn accept(&mut self, id: &CaseId, index: u64, entry: SignedEntry) -> Result<(), AppError> {
         if entry.case_id != id.as_str()
+            || (self.version < 6 && entry.kind.is_mapped_custody())
             || entry.seq != index + 1
             || entry.prev != self.previous
             || sha256(&entry.canonical()) != entry.hash
@@ -277,7 +292,7 @@ impl ChainState {
             .clone()
             .with_trusted_key(&entry.actor, &entry.public_key)
             .map_err(|_| AppError::InvalidChain(entry.seq))?;
-        if self.version == 5 {
+        if self.version >= 5 {
             self.catalog.accept(&entry)?;
             self.inventory.accept(&entry)?;
         }
@@ -318,7 +333,9 @@ impl ChainState {
                     .entry((source.sha256.as_str().into(), source.size))
                     .or_default() += 1;
             }
-            AuditEventKind::ParquetArtifactV1 | AuditEventKind::ParquetArtifactV2 => {
+            AuditEventKind::ParquetArtifactV1
+            | AuditEventKind::ParquetArtifactV2
+            | AuditEventKind::ParquetArtifactV3 => {
                 let artifact = irmind_domain::ParquetArtifact::decode(entry.kind, &entry.payload)
                     .map_err(|_| AppError::InvalidChain(entry.seq))?;
                 self.artifacts.insert(
@@ -347,7 +364,7 @@ impl ChainState {
     }
 
     fn verify_seal(&self, id: &CaseId, header: &HeaderV4) -> Result<(), AppError> {
-        if self.version == 5 {
+        if self.version >= 5 {
             self.catalog.validate()?;
         }
         let severity = Severity::parse(&header.severity).map_err(|_| AppError::InvalidChain(1))?;
