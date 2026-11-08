@@ -36,9 +36,7 @@ impl QueryStore<'_> {
                     hits.push(EventHit::from_batch(
                         batch,
                         row,
-                        artifacts
-                            .iter()
-                            .any(|a| matches!(a, ParquetArtifact::V2(_))),
+                        artifacts.iter().any(|a| a.precise_metadata().is_some()),
                     )?);
                 }
                 recent(&mut hits, limit)?;

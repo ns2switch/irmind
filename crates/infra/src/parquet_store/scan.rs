@@ -144,11 +144,12 @@ impl ParquetStore {
             .profile
             .as_ref()
             .map(|p| p.query_timer(super::profile::QueryPhase::Scan));
-        let precise = matches!(artifact, ParquetArtifact::V2(_));
+        let precise = artifact.precise_metadata().is_some();
         let rules = rules_for_artifact(spec, precise, artifact)?;
         let bloom = bloom_reader(&file, artifact, &rules)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).map_err(storage)?;
         super::format::validate_schema(artifact, builder.schema().as_ref())?;
+        super::format::validate_row_count(artifact, builder.metadata().file_metadata().num_rows())?;
         let columns = required_columns(spec, precise, common::supported(artifact));
         let required = projection(&builder, &columns)?;
         let mut groups = Vec::new();

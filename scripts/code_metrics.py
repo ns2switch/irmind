@@ -130,7 +130,7 @@ def main() -> None:
     root = args.root.resolve()
     files = sorted((root / "crates").rglob("*.rs"))
     audit_wire = (root / "crates/domain/src/audit_kind.rs").read_text(encoding="utf-8")
-    event_names = set(re.findall(r'Self::([A-Za-z]+) => "[A-Za-z]+"', audit_wire))
+    event_names = set(re.findall(r'Self::[A-Za-z][A-Za-z0-9]* => "([A-Za-z][A-Za-z0-9]*)"', audit_wire))
     audit_literals = []
     for path in files:
         if path == root / "crates/domain/src/audit_kind.rs" or "tests" in path.parts:

@@ -58,7 +58,8 @@ fn signed_hash_does_not_replace_validation_of_common_physical_columns() {
                 &mut file,
                 bytes.len() as u64,
                 &hash,
-                ArtifactSchemaV2::CommonEvents
+                ArtifactSchemaV2::CommonEvents,
+                None
             )
             .is_err()
         );

@@ -1,4 +1,5 @@
 mod codec;
+mod group;
 mod pipeline;
 use super::{DomainError, EvidenceHash, MappingBindingV1, hash_payload, invalid};
 use crate::ParquetArtifactV2;
@@ -42,6 +43,9 @@ impl ParquetArtifactV3 {
     }
     pub const fn core(&self) -> &ParquetArtifactV2 {
         &self.core
+    }
+    pub fn validate(&self) -> Result<(), DomainError> {
+        Self::try_new(self.core.clone(), self.pipeline.clone()).map(|_| ())
     }
     pub const fn pipeline(&self) -> &ArtifactPipelineV1 {
         &self.pipeline

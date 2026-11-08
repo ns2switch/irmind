@@ -35,9 +35,7 @@ impl QueryStore<'_> {
                     hits.push(EventHit::from_batch(
                         batch,
                         row,
-                        artifacts
-                            .iter()
-                            .any(|a| matches!(a, ParquetArtifact::V2(_))),
+                        artifacts.iter().any(|a| a.precise_metadata().is_some()),
                     )?);
                 }
                 recent(&mut hits, limit)?;
@@ -158,7 +156,16 @@ impl QueryStore<'_> {
             first.map_or_else(String::new, |t| t.display()),
             last.map_or_else(String::new, |t| t.display())
         );
-        if artifacts.iter().any(|a| matches!(a, ParquetArtifact::V2(v) if v.builder_version == crate::parquet_store::partitioning::BUILDER)) {
+        if artifacts.iter().any(|a| {
+            a.precise_metadata().is_some_and(|v| {
+                matches!(
+                    v.builder_version.as_str(),
+                    crate::parquet_store::partitioning::BUILDER
+                        | crate::parquet_store::common_format::BUILDER
+                        | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
+                )
+            })
+        }) {
             summary.push_str(&partition_coverage(artifacts));
         }
         if super::scoped::available(artifacts) {
@@ -176,12 +183,18 @@ fn partition_coverage(artifacts: &[ParquetArtifact]) -> String {
     let (mut files, mut overflow, mut cardinality, mut tuples, mut invalid) =
         (0usize, 0usize, 0usize, 0usize, 0usize);
     for artifact in artifacts {
-        let ParquetArtifact::V2(v) = artifact else {
+        let Some(v) = artifact.precise_metadata() else {
             continue;
         };
-        if v.builder_version != crate::parquet_store::partitioning::BUILDER
-            || v.schema != ArtifactSchemaV2::Events
-        {
+        if !matches!(
+            v.builder_version.as_str(),
+            crate::parquet_store::partitioning::BUILDER
+                | crate::parquet_store::common_format::BUILDER
+                | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
+        ) || !matches!(
+            v.schema,
+            ArtifactSchemaV2::Events | ArtifactSchemaV2::CommonEvents
+        ) {
             continue;
         }
         files += 1;

@@ -186,5 +186,6 @@ fn legacy_partition(at: &str, account: &str, region: &str) -> Partition {
         region: safe_partition(region),
         scope: None,
         segment: 0,
+        mapping_route: None,
     }
 }

@@ -189,6 +189,7 @@ impl LocalStore {
             return Err(AppError::Cancelled);
         }
         match archive_version(&self.entries(id)?) {
+            6 => return self.export_versioned(id, path, None, false, cancel, 6),
             5 => return self.export_v5(id, path, None, false, cancel),
             4 => return self.export_v4(id, path, None, false, cancel),
             _ => {}
@@ -262,7 +263,9 @@ impl LocalStore {
 
 fn archive_version(entries: &[SignedEntry]) -> u32 {
     use irmind_domain::AuditEventKind;
-    if entries.iter().any(|e| {
+    if entries.iter().any(|e| e.kind.is_mapped_custody()) {
+        6
+    } else if entries.iter().any(|e| {
         matches!(
             e.kind,
             AuditEventKind::ParquetArtifactV2 | AuditEventKind::ParquetArtifactsMigrated

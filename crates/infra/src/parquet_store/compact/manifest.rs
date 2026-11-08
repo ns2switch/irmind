@@ -12,6 +12,9 @@ pub(super) fn validate_sources(
             "Parquet compaction requires 2–128 sources".into(),
         ));
     }
+    if matches!(&sources[0], ParquetArtifact::V3(_)) {
+        return Ok((sources.to_vec(), super::mapped::validate(sources)?));
+    }
     let first = &sources[0];
     let mut hashes = BTreeSet::new();
     for source in sources {
@@ -27,6 +30,7 @@ pub(super) fn validate_sources(
                             | "irmind-coobservations-v1"
                     )
             }
+            ParquetArtifact::V3(_) => false,
             ParquetArtifact::V2(v) => {
                 super::super::partitioning::supported_builder(&v.builder_version)
                     && v.superseded_hashes.is_empty()
@@ -45,9 +49,13 @@ pub(super) fn validate_sources(
 
 pub(super) fn stage(
     case_dir: &Path,
-    first: &ParquetArtifact,
+    sources: &[ParquetArtifact],
     hashes: Vec<EvidenceHash>,
 ) -> Result<StagedArtifact, AppError> {
+    let first = sources.first().ok_or_else(invalid_source)?;
+    if matches!(first, ParquetArtifact::V3(_)) {
+        return super::mapped::stage(case_dir, sources);
+    }
     let (part, digest_input) = match first {
         ParquetArtifact::V1(v) => (
             format!(
@@ -65,6 +73,7 @@ pub(super) fn stage(
             )
             .into_bytes(),
         ),
+        ParquetArtifact::V3(_) => return Err(invalid_source()),
         ParquetArtifact::V2(v) => {
             let mut bytes = first.compaction_key();
             for h in &hashes {
@@ -103,6 +112,7 @@ pub(super) fn stage(
             source_hashes: hashes,
         }
         .into(),
+        ParquetArtifact::V3(_) => return Err(invalid_source()),
         ParquetArtifact::V2(v) => {
             let mut next = v.clone();
             next.path = path;

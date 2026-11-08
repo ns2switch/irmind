@@ -284,3 +284,5 @@ fn mixed_legacy_and_common_queries_keep_old_data_and_explicit_coverage() {
         "{summary}"
     );
 }
+
+mod layout;

@@ -104,6 +104,33 @@ impl MappingCatalog {
             .map(AsRef::as_ref)
             .ok_or(MappingError::UnsupportedVersion)
     }
+    /// Reuse only locally registered implementations pinned by an authenticated
+    /// profile. Case metadata never supplies executable mapping code.
+    pub fn frozen_for_profile(
+        &self,
+        profile: &irmind_domain::MappingProfileV1,
+    ) -> Result<Self, MappingError> {
+        let mut mappings = Vec::new();
+        for reference in profile.catalog() {
+            let mapper = self
+                .mappings
+                .get(reference.mapping().id())
+                .filter(|m| m.manifest().identity() == reference.mapping())
+                .ok_or(MappingError::UnsupportedVersion)?;
+            if mapper
+                .manifest()
+                .snapshot()?
+                .reference()
+                .map_err(|_| MappingError::InvalidManifest)?
+                != *reference
+            {
+                return Err(MappingError::UnsupportedVersion);
+            }
+            mappings.push(Arc::clone(mapper));
+        }
+        Self::freeze(self.decoders.values().cloned().collect(), mappings)
+    }
+
     pub fn decoder_selection(
         &self,
         id: &str,

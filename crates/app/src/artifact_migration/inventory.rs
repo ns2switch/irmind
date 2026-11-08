@@ -27,7 +27,9 @@ impl SealInventoryBuilder {
                 .map_err(|_| bad())?;
                 self.insert(SealItemKind::Source, &source.source, payload.as_bytes())?;
             }
-            AuditEventKind::ParquetArtifactV1 | AuditEventKind::ParquetArtifactV2 => {
+            AuditEventKind::ParquetArtifactV1
+            | AuditEventKind::ParquetArtifactV2
+            | AuditEventKind::ParquetArtifactV3 => {
                 let artifact =
                     ParquetArtifact::decode(entry.kind, &entry.payload).map_err(|_| bad())?;
                 self.insert(
@@ -35,7 +37,7 @@ impl SealInventoryBuilder {
                     artifact.path(),
                     artifact.encode().map_err(|_| bad())?.as_bytes(),
                 )?;
-                self.has_v2 |= matches!(artifact, ParquetArtifact::V2(_));
+                self.has_v2 |= matches!(artifact, ParquetArtifact::V2(_) | ParquetArtifact::V3(_));
             }
             AuditEventKind::ParquetArtifactsMigrated => self.has_v2 = true,
             _ => {}
@@ -84,7 +86,9 @@ pub fn verify_seal_inventory_snapshot(
     if entries.iter().any(|entry| {
         matches!(
             entry.kind,
-            AuditEventKind::ParquetArtifactV2 | AuditEventKind::ParquetArtifactsMigrated
+            AuditEventKind::ParquetArtifactV2
+                | AuditEventKind::ParquetArtifactV3
+                | AuditEventKind::ParquetArtifactsMigrated
         )
     }) {
         let count = entries
@@ -96,6 +100,7 @@ pub fn verify_seal_inventory_snapshot(
                         | AuditEventKind::SourceManifestV2
                         | AuditEventKind::ParquetArtifactV1
                         | AuditEventKind::ParquetArtifactV2
+                        | AuditEventKind::ParquetArtifactV3
                 )
             })
             .count() as u64;

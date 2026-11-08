@@ -51,7 +51,7 @@ pub struct SourceManifestV2 {
 
 impl std::fmt::Debug for SourceManifestV2 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SourceManifestV2")
+        f.debug_struct(crate::AuditEventKind::SourceManifestV2.as_str())
             .field("source_hash", &self.source.sha256)
             .field("parser_id", &self.parser_id)
             .field("parser_version", &self.parser_version)

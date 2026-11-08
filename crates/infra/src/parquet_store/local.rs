@@ -145,6 +145,7 @@ impl LargeCaseStore for ParquetStore {
         let manifest =
             Self::source_manifest(relative_path, &metadata, size, hash_value, copy_original)?;
         Ok(PreparedSource {
+            mapping: None,
             manifest,
             artifacts,
             records: parse_report.accepted,
@@ -258,6 +259,17 @@ impl LargeCaseStore for ParquetStore {
             return Err(AppError::EvidenceMismatch(
                 artifact.sha256().as_str().into(),
             ));
+        }
+        if matches!(artifact, ParquetArtifact::V3(_)) {
+            file.seek(SeekFrom::Start(0)).map_err(storage)?;
+            let reader =
+                parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder::try_new(file)
+                    .map_err(storage)?;
+            super::format::validate_schema(artifact, reader.schema())?;
+            super::format::validate_row_count(
+                artifact,
+                reader.metadata().file_metadata().num_rows(),
+            )?;
         }
         Ok(())
     }

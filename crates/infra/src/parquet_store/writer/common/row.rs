@@ -156,3 +156,78 @@ impl RecordRow {
         Ok(row)
     }
 }
+
+impl RecordRow {
+    pub(in crate::parquet_store) fn from_mapping(
+        output: &irmind_app::source_mapping::MappingOutput,
+        provenance: &irmind_domain::Provenance,
+        decoder: irmind_app::ParserIdentity<'_>,
+        hash: &EvidenceHash,
+        route: String,
+    ) -> Result<Self, AppError> {
+        let record = output.record();
+        let checked = irmind_app::common_event::check_common_record(record, provenance, decoder)?;
+        if record.common.origin().source() != hash {
+            return Err(invalid_source());
+        }
+        let indexed = &record.indexed;
+        let source = &indexed.record;
+        let partition = output.partition();
+        let mut entity_pairs = source.entities.clone();
+        entity_pairs.extend(record.common.observations().values().iter().map(|o| {
+            (
+                o.entity().kind().as_str().to_owned(),
+                o.entity().value().to_owned(),
+            )
+        }));
+        entity_pairs.sort();
+        entity_pairs.dedup();
+        let relations = source
+            .relations
+            .iter()
+            .map(|r| {
+                [
+                    r.from_kind.as_str(),
+                    r.from_value.as_str(),
+                    r.relation.as_str(),
+                    r.to_kind.as_str(),
+                    r.to_value.as_str(),
+                ]
+            })
+            .collect::<Vec<_>>();
+        Ok(Self {
+            partition: super::super::Partition {
+                date: indexed
+                    .time
+                    .map_or_else(|| "unknown".into(), |t| t.instant().utc_date()),
+                account: String::new(),
+                region: String::new(),
+                scope: None,
+                segment: 0,
+                mapping_route: Some(route),
+            },
+            hash: hash.as_str().into(),
+            index: u64::try_from(source.index).map_err(storage)?,
+            at: indexed
+                .time
+                .map_or_else(String::new, irmind_app::IndexedTime::to_rfc3339),
+            event: source.event.clone(),
+            text: source.text.clone(),
+            entities: serde_json::to_string(&entity_pairs).map_err(storage)?,
+            entity_pairs,
+            relations: serde_json::to_string(&relations).map_err(storage)?,
+            time: indexed.time,
+            source_offset: indexed.source_offset,
+            precise: true,
+            common: Some(CommonRow::from_record(&checked)?),
+            profile: match partition.profile() {
+                irmind_app::PartitionProfile::Unpartitioned => 0,
+                irmind_app::PartitionProfile::CloudAccountRegion => 1,
+                irmind_app::PartitionProfile::EndpointHost => 2,
+            },
+            scope_account: partition.account().into(),
+            scope_region: partition.region().into(),
+            scope_host: partition.host().into(),
+        })
+    }
+}

@@ -17,6 +17,15 @@ impl LocalStore {
         Self::open_store(root, true, true)
     }
 
+    pub fn open_mapped(
+        root: &Path,
+        catalog: std::sync::Arc<irmind_app::source_mapping::MappingCatalog>,
+    ) -> Result<Self, AppError> {
+        let mut store = Self::open_precise(root)?;
+        store.parquet = ParquetStore::open_mapped(root, catalog)?;
+        Ok(store)
+    }
+
     fn open_store(root: &Path, precise: bool, common: bool) -> Result<Self, AppError> {
         let (evidence_dir, seal_dir, lock_dir) = Self::prepare_directories(root)?;
         let db = Self::open_database(root)?;

@@ -18,6 +18,8 @@ pub(super) struct ArtifactFrame {
     pub size: u64,
     #[serde(skip)]
     common_schema: Option<irmind_domain::ArtifactSchemaV2>,
+    #[serde(skip)]
+    common_rows: Option<u64>,
 }
 impl ArtifactFrame {
     pub(super) fn from_artifact(artifact: &ParquetArtifact) -> Self {
@@ -27,6 +29,11 @@ impl ArtifactFrame {
             size: artifact.size(),
             common_schema: match artifact {
                 ParquetArtifact::V2(v) if v.schema.is_common() => Some(v.schema),
+                ParquetArtifact::V3(v) => Some(v.core().schema),
+                _ => None,
+            },
+            common_rows: match artifact {
+                ParquetArtifact::V3(v) => Some(v.pipeline().rows()),
                 _ => None,
             },
         }
@@ -45,6 +52,7 @@ impl LocalStore {
                 entry.kind,
                 irmind_domain::AuditEventKind::ParquetArtifactV1
                     | irmind_domain::AuditEventKind::ParquetArtifactV2
+                    | irmind_domain::AuditEventKind::ParquetArtifactV3
             ) {
                 let artifact = ParquetArtifact::decode(entry.kind, &entry.payload)
                     .map_err(|_| AppError::InvalidChain(entry.seq))?;
@@ -111,7 +119,13 @@ pub(super) fn verify_artifact_frames(
             ));
         }
         if let Some(schema) = artifact.common_schema {
-            super::parquet_frame::verify_common(input, frame.size, &frame.sha256, schema)?;
+            super::parquet_frame::verify_common(
+                input,
+                frame.size,
+                &frame.sha256,
+                schema,
+                artifact.common_rows,
+            )?;
         } else {
             verify_raw(input, frame.size, &frame.sha256)?;
         }

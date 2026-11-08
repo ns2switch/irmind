@@ -18,10 +18,11 @@ pub(super) fn consolidate(
     }
     let mut groups: BTreeMap<Vec<u8>, Vec<StagedArtifact>> = BTreeMap::new();
     for artifact in staged {
-        groups
-            .entry(artifact.manifest.compaction_key())
-            .or_default()
-            .push(artifact);
+        let mut key = artifact.manifest.compaction_key();
+        if let Some(route) = super::super::mapped::route_from_path(artifact.manifest.path())? {
+            key.extend_from_slice(route.as_bytes());
+        }
+        groups.entry(key).or_default().push(artifact);
     }
     let mut out = Vec::new();
     for parts in groups.into_values() {
@@ -89,6 +90,15 @@ fn merge_parts(
         first.source_hashes[0].as_str(),
         first.schema.as_str()
     );
+    if let Some(route) = super::super::mapped::route_from_path(&first.path)? {
+        manifest.path = format!(
+            "{}.map-{route}.parquet",
+            manifest
+                .path
+                .strip_suffix(".parquet")
+                .ok_or_else(invalid_source)?
+        );
+    }
     manifest.size = size;
     manifest.sha256 = irmind_domain::EvidenceHash::parse(&irmind_app::hex(&hash))
         .map_err(|_| invalid_source())?;

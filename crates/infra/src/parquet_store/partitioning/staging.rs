@@ -18,6 +18,7 @@ pub(super) struct Input {
 }
 
 pub(super) struct StagedSource {
+    pub mapping: Option<irmind_app::source_mapping::DecodedSourceCommitmentV1>,
     pub spool: tempfile::NamedTempFile,
     pub source: File,
     pub manifest: SourceManifestV1,
@@ -97,7 +98,8 @@ impl ParquetStore {
         let mut position = None;
         let mut needs_sort = false;
         let mut disk = DiskLease::new(self.profile.clone());
-        let report = parse_normalized(
+        let (report, mapping) = self.parse_normalized(
+            case,
             stream::VerifiedInput {
                 source: &mut input.file,
                 sample: &sample,
@@ -109,7 +111,6 @@ impl ParquetStore {
                 parser,
                 precise_time: true,
             },
-            self.common_events,
             &mut |row| {
                 if cancel.is_cancelled() {
                     return Err(AppError::Cancelled);
@@ -147,6 +148,7 @@ impl ParquetStore {
             .seek(SeekFrom::Start(0))
             .map_err(storage)?;
         Ok(StagedSource {
+            mapping,
             spool,
             source: input.file,
             manifest: Self::source_manifest(&input.path, &metadata, size, value, copied)?,
@@ -199,7 +201,31 @@ pub(super) fn normalized_row(
     row.ok_or_else(invalid_source)?
 }
 
-pub(super) fn parse_normalized(
+impl ParquetStore {
+    pub(in crate::parquet_store) fn parse_normalized(
+        &self,
+        case: &CaseId,
+        mut input: stream::VerifiedInput<'_>,
+        emit: &mut dyn FnMut(RecordRow) -> Result<(), AppError>,
+    ) -> Result<
+        (
+            ParseReport,
+            Option<irmind_app::source_mapping::DecodedSourceCommitmentV1>,
+        ),
+        AppError,
+    > {
+        if self.mapping_catalog.is_some() {
+            let (report, mapped) = self.decode_mapped(case, &mut input, emit)?;
+            return Ok((report, Some(mapped)));
+        }
+        Ok((
+            parse_legacy_normalized(input, self.common_events, emit)?,
+            None,
+        ))
+    }
+}
+
+fn parse_legacy_normalized(
     input: stream::VerifiedInput<'_>,
     common: bool,
     emit: &mut dyn FnMut(RecordRow) -> Result<(), AppError>,

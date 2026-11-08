@@ -17,7 +17,7 @@ use std::time::Instant;
 pub(super) fn available(artifacts: &[ParquetArtifact]) -> bool {
     artifacts
         .iter()
-        .any(|a| matches!(a,ParquetArtifact::V2(v) if v.schema.is_common()))
+        .any(|a| a.precise_metadata().is_some_and(|v| v.schema.is_common()))
 }
 fn spec<'a>(
     id: &'a CaseId,

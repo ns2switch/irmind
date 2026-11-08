@@ -37,7 +37,7 @@ pub(super) fn validate_metadata(
     builder: &str,
 ) -> Result<(), AppError> {
     if id.is_common() {
-        if builder != BUILDER
+        if !matches!(builder, BUILDER | irmind_domain::PARQUET_LAYOUT_BUILDER_V1)
             || schema
                 .metadata()
                 .get("irmind.common.schema")
@@ -46,7 +46,9 @@ pub(super) fn validate_metadata(
         {
             return Err(invalid_source());
         }
-    } else if builder == BUILDER || schema.metadata().contains_key("irmind.common.schema") {
+    } else if matches!(builder, BUILDER | irmind_domain::PARQUET_LAYOUT_BUILDER_V1)
+        || schema.metadata().contains_key("irmind.common.schema")
+    {
         return Err(invalid_source());
     }
     Ok(())

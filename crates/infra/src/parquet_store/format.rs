@@ -33,8 +33,10 @@ pub(super) fn expected_type(name: &str, precise: bool) -> DataType {
 }
 
 pub(super) fn validate_schema(artifact: &ParquetArtifact, schema: &Schema) -> Result<(), AppError> {
-    if let ParquetArtifact::V2(v) = artifact {
-        if !super::partitioning::supported_builder(&v.builder_version)
+    if let Some(v) = artifact.precise_metadata() {
+        if !(super::partitioning::supported_builder(&v.builder_version)
+            || matches!(artifact, ParquetArtifact::V3(_))
+                && v.builder_version == irmind_domain::PARQUET_LAYOUT_BUILDER_V1)
             || (v.builder_version == super::writer::precise::BUILDER
                 && (!v.partition.scopes.is_empty() || v.partition.all_scope_overflow))
         {
@@ -42,6 +44,15 @@ pub(super) fn validate_schema(artifact: &ParquetArtifact, schema: &Schema) -> Re
         }
         super::common_format::validate_metadata(v.schema, schema, &v.builder_version)?;
         validate_columns(v.schema, schema)?;
+    }
+    Ok(())
+}
+
+pub(super) fn validate_row_count(artifact: &ParquetArtifact, rows: i64) -> Result<(), AppError> {
+    if let ParquetArtifact::V3(mapped) = artifact
+        && u64::try_from(rows).ok() != Some(mapped.pipeline().rows())
+    {
+        return Err(invalid_source());
     }
     Ok(())
 }
@@ -105,7 +116,7 @@ pub(super) fn normalize_batch(
     names: &BTreeMap<String, String>,
     display_time: bool,
 ) -> Result<RecordBatch, AppError> {
-    let precise = matches!(artifact, ParquetArtifact::V2(_));
+    let precise = artifact.precise_metadata().is_some();
     let hashes = batch
         .column_by_name("source_hash")
         .and_then(|a| a.as_any().downcast_ref::<StringArray>())

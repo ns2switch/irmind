@@ -17,7 +17,7 @@ pub(super) fn report_storage(
     let mut overflow = 0usize;
     let mut columns = columns::ColumnBudget::default();
     for artifact in &catalog.active {
-        if let ParquetArtifact::V2(v) = artifact {
+        if let Some(v) = artifact.precise_metadata() {
             partitions.insert(v.partition.path_prefix().unwrap());
             for scope in &v.partition.scopes {
                 match &scope.value {
@@ -54,6 +54,36 @@ pub(super) fn report_storage(
             .iter()
             .map(ParquetArtifact::size)
             .sum::<u64>()
+    );
+    let active_paths = catalog
+        .active
+        .iter()
+        .map(ParquetArtifact::path)
+        .collect::<BTreeSet<_>>();
+    let active_bytes = catalog
+        .active
+        .iter()
+        .map(ParquetArtifact::size)
+        .sum::<u64>();
+    let inactive_bytes = catalog
+        .all
+        .iter()
+        .filter(|a| !active_paths.contains(a.path()))
+        .map(ParquetArtifact::size)
+        .sum::<u64>();
+    let case_bytes = directory_bytes(root);
+    let basis_points = |part: u64, total: u64| {
+        if total == 0 {
+            0
+        } else {
+            u128::from(part) * 10_000 / u128::from(total)
+        }
+    };
+    println!(
+        "PARQUET_RETAINED_PARENTS scenario={} inactive_parent_bytes={inactive_bytes} active_artifact_bytes={active_bytes} retained_case_bytes={case_bytes} inactive_case_basis_points={} inactive_active_basis_points={}",
+        scenario.name(),
+        basis_points(inactive_bytes, case_bytes),
+        basis_points(inactive_bytes, active_bytes)
     );
     columns.print(&scenario.name());
     coobs

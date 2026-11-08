@@ -25,6 +25,7 @@ mod compact;
 mod format;
 pub(crate) use format::validate_common_export_schema;
 mod local;
+mod mapped;
 mod migration;
 mod partitioning;
 mod profile;
@@ -72,6 +73,7 @@ pub struct ParquetStore {
     legacy_entities: bool,
     precise_time: bool,
     common_events: bool,
+    mapping_catalog: Option<Arc<irmind_app::source_mapping::MappingCatalog>>,
 }
 
 impl ParquetStore {
@@ -100,6 +102,7 @@ impl ParquetStore {
             legacy_entities: false,
             precise_time: false,
             common_events: false,
+            mapping_catalog: None,
         })
     }
 

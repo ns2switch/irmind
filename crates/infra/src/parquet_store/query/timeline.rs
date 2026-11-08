@@ -52,7 +52,7 @@ impl QueryStore<'_> {
         let precise = spec
             .artifacts
             .iter()
-            .any(|a| matches!(a, ParquetArtifact::V2(_)));
+            .any(|a| a.precise_metadata().is_some());
         let mut hits = Vec::<EventHit>::new();
         let mut units = std::collections::BTreeMap::new();
         for (bound, artifact) in files {

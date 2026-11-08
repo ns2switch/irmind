@@ -10,6 +10,7 @@ use parquet::file::properties::WriterProperties;
 use parquet::schema::types::ColumnPath;
 use std::io::{Seek as _, SeekFrom};
 mod manifest;
+mod mapped;
 use manifest::validate_sources;
 
 impl ParquetStore {
@@ -21,9 +22,8 @@ impl ParquetStore {
     ) -> Result<ParquetArtifact, AppError> {
         let (mut ordered, hashes) = validate_sources(sources)?;
         ordered.sort_by(|left, right| left.path().cmp(right.path()));
-        let first = ordered.first().ok_or_else(invalid_source)?;
         let case_dir = self.case_dir(id)?;
-        let mut staged = manifest::stage(&case_dir, first, hashes)?;
+        let mut staged = manifest::stage(&case_dir, &ordered, hashes)?;
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
         #[cfg(unix)]
@@ -39,6 +39,13 @@ impl ParquetStore {
                 v.size = size;
                 v.sha256 =
                     EvidenceHash::parse(&irmind_app::hex(&digest)).map_err(|_| invalid_source())?;
+            }
+            ParquetArtifact::V3(v) => {
+                let mut core = v.core().clone();
+                core.size = size;
+                core.sha256 = EvidenceHash::from_bytes(digest);
+                *v = irmind_domain::ParquetArtifactV3::try_new(core, v.pipeline().clone())
+                    .map_err(|_| invalid_source())?;
             }
             ParquetArtifact::V2(v) => {
                 v.size = size;
@@ -106,10 +113,13 @@ pub(super) fn write_inputs(
         check.seek(SeekFrom::Start(0)).map_err(storage)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(check).map_err(storage)?;
         super::format::validate_schema(source, builder.schema().as_ref())?;
+        super::format::validate_row_count(source, builder.metadata().file_metadata().num_rows())?;
         // Record-batch readers expose only column metadata. Keep the validated
         // common schema metadata when constructing a replacement file; old
         // builders retain their historical construction unchanged.
-        let common_schema = matches!(source, ParquetArtifact::V2(v) if v.schema.is_common())
+        let common_schema = source
+            .precise_metadata()
+            .is_some_and(|v| v.schema.is_common())
             .then(|| builder.schema().clone());
         let reader = builder.with_batch_size(8192).build().map_err(storage)?;
         for batch in reader {
@@ -150,6 +160,13 @@ pub(super) fn write_inputs(
         .ok_or_else(invalid_source)?
         .close()
         .map_err(storage)?;
+    finish_output(output_path, cancel)
+}
+
+fn finish_output(
+    output_path: &Path,
+    cancel: &CancellationToken,
+) -> Result<(u64, [u8; 32]), AppError> {
     // Windows FlushFileBuffers requires a writable handle.
     let mut file = OpenOptions::new()
         .read(true)
