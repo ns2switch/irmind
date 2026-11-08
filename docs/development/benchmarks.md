@@ -824,3 +824,110 @@ The candidate remains opt-in and does **not** meet the unchanged complete-matrix
 For cloud, total retained Parquet is 10,146,332,714 bytes versus the matched baseline's 8,924,960,490. Common co-observations occupy 6,349,418,440 bytes; the initial complete-descriptor iteration occupied 12,712,715,750. This storage comparison does not turn timings from different runner instances into a controlled speedup. The raw JSON records active/historical file counts, all five query labels and host filters, per-column compressed bytes, HuntEval recall and bounded worst-case-path markers.
 
 Tracked normalized-staging peaks are 19,500,830 bytes for common cloud, 286,019,970 for disordered endpoint and 15,667,791 for the one-host chronological endpoint in the measured run. These are tracked staging bytes, not total process memory or total temporary disk usage. Parallel phase timers overlap; scan timers include backpressure. Scoped aggregation is not separately timed, so its zero aggregate counter cannot establish zero CPU cost. Full reconstruction, custody and typed-role correctness also have separate functional tests; the performance harness deletes generated sources batch by batch.
+
+## Source decoding, mapped V3 and retained layout parents
+
+This release benchmark is for evidence-store and mapping maintainers. It measures the complete decoder → frozen mapper → validated writer path, including signed receipts and physical compaction. It uses extraction-only cloud and journald modules, not empty projections or semantic mappings.
+
+[Run 42514919987](https://github.com/ns2switch/irmind/actions/runs/42514919987) compares [candidate 783da1c](https://github.com/ns2switch/irmind/commit/783da1cc67f0a8867ead3eaf0f1349640132926c) with [reference 3acb485](https://github.com/ns2switch/irmind/commit/3acb485bb56b01a4e19b0e04c659c3f0c0edc4db). Each pair runs sequentially in the same ubuntu-latest job with release optimization and a locked dependency graph. There is one 15 GB repetition per scenario and three at-least-1-GiB repetitions per representative source. Different rows use different runners; compare each row with its own reference.
+
+Both variants stage the 13 distinct public source hashes from the 18 pinned HuntEval episodes and still evaluate all 18 episodes. Private answers stay evaluator-only. The reference receives only the same unique-source staging rule, the 1 GiB test wrapper and the compaction wall clock; its production code is unchanged.
+
+The [complete machine-readable measurements](benchmarks/mapped-pipeline-run.json) retain p50/p95, all host-filter scopes, accumulated phase timers, columns, staging disk, recall and artifact IDs. File SHA-256: cd77071195a4bc38c4eb0fb767b8d65b3c8efff01053ba7685cb5c22569b213c.
+
+### Ingestion and unchanged acceptance gates
+
+Wall time includes corpus generation, ingestion, source verification, signed custody and compaction. The release gate stays 900 seconds for cloud/chronological input and 1,350 seconds for stress. Query failures remain failures even when ingestion passes.
+
+| 15 GB workload | Reference s | Mapped V3 s | Gate s | Candidate result |
+| --- | --- | --- | --- | --- |
+| Cloud | 957.108 | 1,119.244 | 900 | fail: ingestion |
+| Endpoint, stress, 1 host | 1,014.335 | 1,353.894 | 1350 | fail: ingestion |
+| Endpoint, stress, 64 hosts | 1,120.537 | 1,493.752 | 1350 | fail: ingestion |
+| Endpoint, stress, 1,024 hosts | 1,127.000 | 1,601.401 | 1350 | fail: ingestion |
+| Endpoint, stress, 1,025 hosts | 1,041.667 | 1,338.950 | 1350 | pass |
+| Endpoint, chronological, 1 host | 606.658 | 781.354 | 900 | fail: query |
+| Endpoint, chronological, 64 hosts | 576.336 | 735.422 | 900 | pass |
+| Endpoint, chronological, 1,024 hosts | 546.764 | 742.423 | 900 | pass |
+| Endpoint, chronological, 1,025 hosts | 549.535 | 751.690 | 900 | pass |
+
+Ingestion passes in 5/9 scenarios; sampled queries pass in 8/9; the combined benchmark passes in 4/9. Of 575 ordinary query samples, 565 return without error and 10 reach the deadline. HuntEval probes and the deliberately expansive path are counted separately.
+
+### Query p95 and errors
+
+Cells show reference → candidate p95 in seconds for the unfiltered queries. Timeout samples are marked as failures, not successful latency measurements. The JSON retains p50, exact error counts and the first/last-host filtered runs.
+
+| 15 GB workload | Term | Entity | Neighbors | Timeline | Path |
+| --- | --- | --- | --- | --- | --- |
+| Cloud | 4.177 → 3.880 | 5.859 → 9.968 | 0.704 → 0.224 | 0.285 → 0.338 | 0.760 → 0.222 |
+| Endpoint, stress, 1 host | 1.253 → 1.456 | 3.777 → 7.946 | 0.382 → 0.121 | 0.069 → 0.169 | 0.355 → 0.119 |
+| Endpoint, stress, 64 hosts | 1.538 → 1.900 | 0.443 → 0.788 | 0.050 → 0.055 | 0.065 → 0.224 | 0.051 → 0.054 |
+| Endpoint, stress, 1,024 hosts | 1.410 → 1.641 | 0.550 → 0.524 | 0.011 → 0.030 | 0.067 → 0.166 | 0.010 → 0.030 |
+| Endpoint, stress, 1,025 hosts | 1.134 → 1.314 | 0.582 → 0.471 | 0.010 → 0.023 | 0.070 → 0.156 | 0.009 → 0.022 |
+| Endpoint, chronological, 1 host | 4.554 → 4.839 | 5.204 → timeout (5/5) | 0.561 → 0.171 | 0.461 → 0.457 | 0.500 → 0.177 |
+| Endpoint, chronological, 64 hosts | 3.610 → 4.141 | 0.465 → 0.766 | 0.052 → 0.050 | 0.292 → 0.403 | 0.054 → 0.050 |
+| Endpoint, chronological, 1,024 hosts | 4.716 → 4.945 | 0.772 → 0.674 | 0.014 → 0.039 | 0.463 → 0.446 | 0.012 → 0.038 |
+| Endpoint, chronological, 1,025 hosts | 4.398 → 5.186 | 0.742 → 0.722 | 0.012 → 0.039 | 0.464 → 0.478 | 0.012 → 0.039 |
+
+The deliberate worst-case cloud path retains the existing three-hop/expansion/time limits: both variants report truncation at the 10-second budget. It is separate from the ordinary latency samples and is not a claim of complete path exploration. No query budget, result/sample cap or partial-result marker was relaxed.
+
+### Retained inactive-parent disk
+
+Bytes include all retained inactive V3 parents. Case bytes also include active artifacts and case metadata; optional copied originals are not part of this corpus. Percentages below are calculated from the byte counts and rounded to two decimals.
+
+| 15 GB workload | Inactive bytes | Active bytes | Retained case bytes | Inactive / active | Inactive / case |
+| --- | --- | --- | --- | --- | --- |
+| Cloud | 6,135,910,385 | 6,522,385,165 | 12,694,870,374 | 94.07% | 48.33% |
+| Endpoint, stress, 1 host | 2,995,574,001 | 2,965,277,588 | 5,990,596,509 | 101.02% | 50.00% |
+| Endpoint, stress, 64 hosts | 2,875,824,016 | 2,966,572,824 | 5,872,133,544 | 96.94% | 48.97% |
+| Endpoint, stress, 1,024 hosts | 2,875,862,669 | 2,965,965,163 | 5,871,998,736 | 96.96% | 48.98% |
+| Endpoint, stress, 1,025 hosts | 2,875,862,525 | 2,965,928,470 | 5,872,002,811 | 96.96% | 48.98% |
+| Endpoint, chronological, 1 host | 4,922,069,070 | 4,873,908,475 | 9,825,722,465 | 100.99% | 50.09% |
+| Endpoint, chronological, 64 hosts | 4,726,692,007 | 4,877,472,867 | 9,633,901,578 | 96.91% | 49.06% |
+| Endpoint, chronological, 1,024 hosts | 4,726,767,799 | 4,877,088,217 | 9,634,026,920 | 96.92% | 49.06% |
+| Endpoint, chronological, 1,025 hosts | 4,726,768,809 | 4,877,063,371 | 9,634,043,996 | 96.92% | 49.06% |
+
+Every measured ratio exceeds the approximately 20% planning threshold. The separate [inactive-parent retirement proposal](mapped-parent-retirement-design.md) explains an explicit future signed operation and its verification loss. No parent deletion is implemented; V6 still includes every retained file.
+
+### Phase profiles
+
+Stage, sort and replay are accumulated worker timers; replay includes Parquet writing. They can overlap across sources and are not additive wall-time percentages. The legacy conversion/row/Parquet counters are not instrumented on this staged path: zero there does not mean zero work. Compaction is measured separately and is already included in ingestion wall time.
+
+| 15 GB workload | Ref stage/sort/replay s | V3 stage/sort/replay s | Layout ref → V3 s | Peak normalized staging MiB |
+| --- | --- | --- | --- | --- |
+| Cloud | 1,815.293/0.000/661.088 | 1,622.875/0.000/607.324 | 203.715 → 286.286 | 23.41 |
+| Endpoint, stress, 1 host | 422.768/331.540/374.354 | 372.938/452.251/422.443 | 159.748 → 206.162 | 280.19 |
+| Endpoint, stress, 64 hosts | 613.399/334.140/462.021 | 519.239/472.386/506.081 | 168.569 → 211.191 | 280.19 |
+| Endpoint, stress, 1,024 hosts | 579.739/357.295/447.245 | 492.280/513.744/529.230 | 156.746 → 217.756 | 280.19 |
+| Endpoint, stress, 1,025 hosts | 438.320/341.431/391.901 | 379.399/460.526/419.345 | 159.346 → 191.170 | 280.19 |
+| Endpoint, chronological, 1 host | 869.892/0.000/301.382 | 883.832/0.000/306.091 | 193.349 → 252.813 | 18.78 |
+| Endpoint, chronological, 64 hosts | 829.304/0.000/288.307 | 839.379/0.000/292.767 | 181.729 → 231.574 | 18.78 |
+| Endpoint, chronological, 1,024 hosts | 960.917/0.000/329.733 | 939.137/0.000/332.577 | 124.984 → 181.733 | 18.78 |
+| Endpoint, chronological, 1,025 hosts | 964.047/0.000/330.702 | 952.007/0.000/336.991 | 126.150 → 183.961 | 18.78 |
+
+The decoder timer excludes its downstream callback. The pure mapper timer is a subset of select/validate/commit/map; do not add it again. Projection and ordered-input commitment have their own timers. Custody wraps the real signer, verifier and atomic append, without replacing them.
+
+| 15 GB workload | Decode s | Pure map s | Select/check/map s | Projection s | Input commit s | Sign/verify/append s |
+| --- | --- | --- | --- | --- | --- | --- |
+| Cloud | 291.674 | 165.446 | 218.735 | 94.871 | 22.670 | 0.175/0.420/0.930 |
+| Endpoint, stress, 1 host | 60.733 | 53.570 | 90.824 | 51.948 | 24.309 | 0.100/0.251/0.648 |
+| Endpoint, stress, 64 hosts | 86.437 | 84.343 | 142.432 | 90.356 | 20.437 | 0.120/0.307/0.717 |
+| Endpoint, stress, 1,024 hosts | 81.691 | 72.758 | 120.074 | 73.216 | 34.315 | 0.138/0.313/4.125 |
+| Endpoint, stress, 1,025 hosts | 61.875 | 54.839 | 92.752 | 52.403 | 24.759 | 0.099/0.256/0.567 |
+| Endpoint, chronological, 1 host | 70.810 | 60.141 | 101.293 | 80.079 | 29.339 | 0.143/0.321/2.051 |
+| Endpoint, chronological, 64 hosts | 67.981 | 58.121 | 97.733 | 76.874 | 28.148 | 0.136/0.311/1.804 |
+| Endpoint, chronological, 1,024 hosts | 92.740 | 82.718 | 133.607 | 97.756 | 28.223 | 0.156/0.374/0.734 |
+| Endpoint, chronological, 1,025 hosts | 92.258 | 84.298 | 135.924 | 99.801 | 28.275 | 0.156/0.374/0.781 |
+
+### Three-repetition smoke and correctness
+
+| At least 1 GiB | Reference repetitions s | Mapped repetitions s |
+| --- | --- | --- |
+| Cloud | 97.081, 95.927, 96.112 | 244.143, 242.878, 243.330 |
+| Endpoint, chronological, 64 hosts | 58.906, 57.917, 63.106 | 165.390, 157.180, 156.407 |
+
+All 18 HuntEval episodes retain 19/19 malicious events, 10/10 malicious entities and 14/14 expected path connections per provider, with zero parse errors, in cloud smoke and 15 GB evaluation. These are extraction/search checks, not semantic-mapping or real-model validation.
+
+The new pipeline still misses acceptance gates. Dense entity lookup is a query blocker: five accumulated cloud entity scans rise from 12.190 s to 26.456 s, and normalization from 0.136 s to 4.791 s. For chronological one-host input the corresponding counters are 13.390 → 27.301 s and 0.165 → 5.372 s, with timed-out samples. These are component counters across five queries, not per-query latency or a complete CPU profile.
+
+The common writer therefore remains opt-in. Default CLI/TUI/demo writing stays on the historical V2 builder. Fix ingestion overhead and dense scoped-identity lookup before reconsidering default activation; preserve the retained-parent/authentication boundary and every existing query gate. The [ASan summaries](benchmarks/mapped-pipeline-fuzz.json) and the [full code CI](https://github.com/ns2switch/irmind/actions/runs/42514914270) are separate from release-performance acceptance.
