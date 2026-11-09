@@ -153,3 +153,48 @@ fn chronological_mapped_sources_never_create_normalized_record_spools() {
     );
     engine.verify(&case.id).unwrap();
 }
+
+struct CancelParent(CancellationToken);
+impl irmind_app::SourceDecoder for CancelParent {
+    fn identity(&self) -> ParserIdentity<'_> {
+        JsonSourceDecoder.identity()
+    }
+    fn decode_reader(
+        &self,
+        _: SourceInput<'_>,
+        _: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        self.0.cancel();
+        Err(AppError::Fixed(irmind_app::FixedAppError::SourceFormat))
+    }
+}
+#[test]
+fn parent_cancellation_during_a_source_failure_stays_an_operation_cancellation() {
+    let root = tempfile::tempdir().unwrap();
+    let token = CancellationToken::new();
+    let (store, engine, catalog) =
+        fixture_decoder(root.path(), Arc::new(CancelParent(token.clone())));
+    let case = engine
+        .create_case("Cancelled source failure", "local only")
+        .unwrap();
+    fs::write(root.path().join("input.json"), b"{bad").unwrap();
+    let parser = catalog
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap();
+    let large = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &parser,
+    };
+    assert!(matches!(
+        large.ingest_local_batch(&case.id, root.path(), &["input.json".into()], false, &token),
+        Err(AppError::Cancelled)
+    ));
+    assert_eq!(store.entries(&case.id).unwrap().len(), 1);
+    assert!(
+        irmind_app::artifact_catalog(&store.entries(&case.id).unwrap())
+            .unwrap()
+            .all
+            .is_empty()
+    );
+}

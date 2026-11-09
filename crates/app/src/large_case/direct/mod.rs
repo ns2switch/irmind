@@ -90,7 +90,7 @@ impl LargeCaseUseCases<'_, '_> {
                     }
                     Err(error) => {
                         self.audit_rejections(request.id, &rejected)?;
-                        return Err(error);
+                        return Err(cancelled_source_error(error, request.cancel));
                     }
                 }
             }
@@ -240,4 +240,12 @@ fn pending_paths(request: &Request<'_>) -> Vec<String> {
         .filter(|path| !request.known_sources.contains_key(*path))
         .cloned()
         .collect::<Vec<_>>()
+}
+
+fn cancelled_source_error(error: AppError, cancel: &CancellationToken) -> AppError {
+    if cancel.is_cancelled() && matches!(error, AppError::SourceFailure(_)) {
+        AppError::Cancelled
+    } else {
+        error
+    }
 }
