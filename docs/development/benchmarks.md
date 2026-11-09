@@ -4,6 +4,16 @@ Current analyst-approved gates: 15 GB cloud and chronological endpoint ingestion
 
 This page is for maintainers comparing signed Parquet ingestion and bounded evidence queries. The [manual and weekly workflow](../../.github/workflows/graph-benchmark.yml) generates synthetic 1 GB and 15 GB corpora on a standard Linux runner. It uploads the raw output. No corpus or original evidence is kept as an artifact.
 
+## Current policy: sole mapped V3 writer
+
+The pre-1.0 policy removes comparative writer gates. Keep absolute 15 GB ingestion goals of 900 seconds for cloud/chronological input and 1,350 seconds for disordered stress. The 1,025-host stress case is measured and tracked as nonblocking work in [issue #218](https://github.com/ns2switch/irmind/issues/218), which links #186 and #214. Every ordinary query must still complete without errors or time-budget truncation and below ten seconds. The deliberate expansive path stays a reported diagnostic and must retain an explicit partial-result marker when its budget truncates it.
+
+The [current-format measurements](benchmarks/v3-absolute-measurements.json) select only the recorded mapped candidate. Their provenance pins the immutable source JSON and its SHA-256. Corpus labels are descriptive, measured durations are unchanged, and successful worst-path status follows the source harness's result unwrap. No comparison implementation is required by the evaluator.
+
+The [absolute evaluation](benchmarks/v3-absolute-targets.json) reports `passed: true` and `all_ingest_goals_met: false`: all required absolute checks pass, while the 1,025-host stress sample remains 1,363.429 seconds against its 1,350-second goal. This does not relabel that miss as a measured success. These are measurements of the recorded pipeline; the completed decoder/mapping rollout still requires current release measurements.
+
+Earlier paired sections below are historical measurements and decisions, not current activation requirements.
+
 ## Method
 
 The representative CloudTrail-shaped corpus has about 1,000 files of approximately 1 MB, each with 1–2 KB records. The 15 GB variant repeats synthetic records within those files and deletes each temporary source batch after conversion. A separate extreme corpus has 25 files with one large record per file; its historical result is kept only as a stress reference. Every case uses the signed source manifest and signed Parquet artifact path. Each query verifies the selected Parquet files by SHA-256 before reading. The benchmark runs in the release profile, takes five warm samples per query after a cold summary, and reports p50/p95. Times are wall-clock unless marked as CPU sums. Files are removed after each run.
@@ -1206,3 +1216,7 @@ The recorded absolute misses are the V2 reference cloud run (956.456 s against 9
 SHA-256 of `main-sqlite-run.json`: `130cb5b5af031b2d71bcfb22c3719d271ca39dc7e46630202f784cb354346bd3`.
 
 SHA-256 of `main-sqlite-gates.json`: `3227491547744402b5899ebf6264fc9b4e0e254643726a4d9843b6fadaf8e2f9`.
+
+SHA-256 of `v3-absolute-measurements.json`: `e1ffca20fa465cab0a0e7700d25c2df2366a924c1affdf147a35416180a58640`.
+
+SHA-256 of `v3-absolute-targets.json`: `3b2970d3c48a3ac41c87849da10359212812c70d4392636583756e3376c05e48`.

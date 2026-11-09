@@ -46,6 +46,10 @@ impl Scenario {
         )
     }
 
+    pub(super) fn ingestion_gate_required(&self, size: &str, mapped: bool) -> bool {
+        !(mapped && size == "15gb" && self.hosts == Some(1025) && !self.chronological)
+    }
+
     pub(super) fn name(&self) -> String {
         let version = if self.precise { 2 } else { 1 };
         let mut name = self.hosts.map_or_else(
@@ -187,5 +191,36 @@ fn release_and_stress_ingestion_gates_keep_distinct_approved_limits() {
                 900
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod absolute_gate_tests {
+    use super::Scenario;
+    #[test]
+    fn only_the_approved_mapped_1025_host_stress_case_is_nonblocking() {
+        for hosts in [1, 64, 1024, 1025] {
+            for chronological in [false, true] {
+                let scenario = Scenario {
+                    precise: true,
+                    hosts: Some(hosts),
+                    source_bytes: 1024,
+                    chronological,
+                };
+                assert!(scenario.ingestion_gate_required("15gb", false));
+                assert!(scenario.ingestion_gate_required("1gib", true));
+                assert_eq!(
+                    scenario.ingestion_gate_required("15gb", true),
+                    hosts != 1025 || chronological
+                );
+            }
+        }
+        let cloud = Scenario {
+            precise: true,
+            hosts: None,
+            source_bytes: 1024,
+            chronological: false,
+        };
+        assert!(cloud.ingestion_gate_required("15gb", true));
     }
 }

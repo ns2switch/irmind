@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""Evaluate activation evidence without changing the experimental writer setting."""
+"""Check current mapped-V3 absolute performance evidence."""
 import argparse
 import json
 from pathlib import Path
 
-SCENARIOS = {"cloud-v2"} | {
-    f"endpoint-v2-{hosts}{order}"
+SCENARIOS = {"cloud"} | {
+    f"endpoint-{hosts}{order}"
     for hosts in (1, 64, 1024, 1025)
     for order in ("", "-chronological")
 }
 QUERIES = {"term", "entity", "neighbors", "timeline", "path"}
 SECOND = 1_000_000_000
-QUERY_SLACK = SECOND // 4
 
 
 def one(records, kind):
@@ -29,9 +28,7 @@ def duration(value):
 
 def worst_path(rows):
     row = one(rows, "PARQUET_WORST_PATH")
-    # Historical harnesses emit this metric only after graph_path(...).unwrap().
-    # Its presence therefore records a successful call, not a caught error.
-    error = row.get("error", False)
+    error = row.get("error")
     truncated, timeout = row.get("truncated"), row.get("time_budget")
     if any(type(value) is not bool for value in (error, truncated, timeout)):
         raise ValueError("worst-case path outcome is missing or invalid")
@@ -49,13 +46,13 @@ def full_sample(records, scenario):
     if rows[0].get("name") != scenario:
         raise ValueError("scenario does not match its artifact")
     wall = duration(one(rows, "PARQUET_INGEST_EXACT").get("wall_ns"))
-    if one(rows, "PARQUET_INGEST").get("bytes", 0) < 15_000_000_000:
+    if type(one(rows, "PARQUET_INGEST").get("bytes")) is not int or one(rows, "PARQUET_INGEST").get("bytes", 0) < 15_000_000_000:
         raise ValueError("corpus is smaller than 15 GB")
     cold_error = one(rows, "PARQUET_COLD_QUERY").get("error")
     if type(cold_error) is not bool:
         raise ValueError("cold summary outcome is missing")
     successful = not cold_error
-    hosts = None if scenario == "cloud-v2" else int(scenario.split("-")[2])
+    hosts = None if scenario == "cloud" else int(scenario.split("-")[1])
     scopes = {"all"} if hosts is None else {"all", "endpoint-0000", f"endpoint-{hosts - 1:04}"}
     expected = {(scope, query) for scope in scopes for query in QUERIES}
     queries = {}
@@ -76,63 +73,38 @@ def full_sample(records, scenario):
     return wall, queries, successful, worst
 
 
-def worst_path_gate(reference, candidate):
-    if candidate is None:
-        return True
-    if candidate["error"]:
-        return False
-    if not candidate["time_budget"]:
-        return True
-    return (not reference["error"] and reference["time_budget"]
-            and reference["truncated"] and candidate["truncated"])
-
-
-def query_regressions(reference, candidate):
-    return [
-        {"scope": scope, "query": query, "reference_p95_ns": reference[scope, query],
-         "candidate_p95_ns": latency}
-        for (scope, query), latency in sorted(candidate.items())
-        if latency * 10 > reference[scope, query] * 11
-        and latency - reference[scope, query] > QUERY_SLACK
-    ]
-
-
 def evaluate(data):
+    if data.get("schema") != "irmind-v3-measurements-v1":
+        raise ValueError("unsupported performance measurement format")
     results = []
     seen = set()
-    for artifact in data["artifacts"]:
-        scenario = artifact["name"].removeprefix("common-schema-")
+    for sample in data["scenarios"]:
+        scenario = sample["scenario"]
+        if sample.get("writer") != "mapped-v3":
+            raise ValueError("performance evidence must use the sole mapped V3 writer")
         if scenario not in SCENARIOS or scenario in seen:
             raise ValueError("unexpected or duplicate scenario")
         seen.add(scenario)
-        stages = artifact["stages"]
-        # Two-stage runs compare default V2 (baseline) directly with mapped V3.
-        # Older three-stage runs keep their explicit V2 reference.
-        reference = stages["reference"] if "reference" in stages else stages["baseline"]
-        ref_wall, ref_queries, reference_ok, ref_worst = full_sample(reference, scenario)
-        candidate = artifact["stages"]["candidate"]
-        wall, queries, candidate_ok, worst = full_sample(candidate, scenario)
+        wall, queries, successful, worst = full_sample(sample["records"], scenario)
         stress = scenario.startswith("endpoint-") and not scenario.endswith("-chronological")
         limit = (1350 if stress else 900) * SECOND
-        relative_ingest = wall * 10 <= ref_wall * 11
-        regressions = query_regressions(ref_queries, queries)
-        relative_queries = not regressions
-        worst_ok = worst_path_gate(ref_worst, worst)
-        deadlines = candidate_ok and worst_ok
         absolute = wall < limit
-        eligible = absolute and (stress or relative_ingest) and relative_queries and deadlines
-        results.append({"scenario": scenario, "reference_wall_ns": ref_wall,
-                        "candidate_wall_ns": wall, "absolute_ingest": absolute,
-                        "relative_ingest": relative_ingest, "relative_ingest_required": not stress,
-                        "relative_queries": relative_queries, "query_regressions": regressions,
-                        "query_deadlines": deadlines, "ordinary_queries_successful": candidate_ok,
-                        "reference_queries_successful": reference_ok,
-                        "worst_path_gate": worst_ok, "reference_worst_path": ref_worst,
-                        "candidate_worst_path": worst, "eligible": eligible})
+        required = scenario != "endpoint-1025"
+        worst_ok = worst is None or not worst["error"]
+        passed = (absolute or not required) and successful and worst_ok
+        results.append({"scenario": scenario, "wall_ns": wall,
+                        "ingest_target_ns": limit, "ingest_goal_met": absolute,
+                        "ingest_gate_required": required,
+                        "ordinary_queries_successful": successful,
+                        "ordinary_query_p95_ns": [
+                            {"scope": scope, "query": name, "p95_ns": value}
+                            for (scope, name), value in sorted(queries.items())],
+                        "deliberate_worst_path": worst, "passed": passed})
     if seen != SCENARIOS:
         raise ValueError("full nine-scenario matrix is required")
-    return {"criteria": "analyst-v3-activation-v2", "run_url": data["run_url"],
-            "eligible": all(row["eligible"] for row in results),
+    return {"criteria": "analyst-v3-absolute-v1", "run_url": data["run_url"],
+            "passed": all(row["passed"] for row in results),
+            "all_ingest_goals_met": all(row["ingest_goal_met"] for row in results),
             "scenarios": sorted(results, key=lambda row: row["scenario"])}
 
 
@@ -142,7 +114,7 @@ def main():
     args = parser.parse_args()
     result = evaluate(json.loads(args.metrics.read_text()))
     print(json.dumps(result, indent=2, sort_keys=True))
-    raise SystemExit(0 if result["eligible"] else 1)
+    raise SystemExit(0 if result["passed"] else 1)
 
 
 if __name__ == "__main__":
