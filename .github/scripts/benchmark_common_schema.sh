@@ -5,7 +5,7 @@ set -euo pipefail
 candidate=$(git rev-parse HEAD)
 harness_dir=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/irmind-benchmark-harness.XXXXXXXX")
 restore_harness() {
-  git restore --source="$BASE_REF" -- crates/infra/src/tests/parquet_benchmark.rs crates/infra/src/tests/hunteval_eval.rs
+  git restore --source="$BASE_REF" -- crates/infra/src/tests/parquet_benchmark.rs crates/infra/src/tests/parquet_benchmark/measurements.rs crates/infra/src/tests/hunteval_eval.rs
   local probe=crates/infra/src/tests/parquet_benchmark/staging_probe.rs
   if git cat-file -e "$BASE_REF:$probe" 2>/dev/null; then
     git restore --source="$BASE_REF" -- "$probe"
@@ -68,6 +68,29 @@ marker = '    println!("PARQUET_COMPACTION bundles={bundles}");'
 if 'PARQUET_LAYOUT_TIME' not in source:
     assert marker in source
     source = source.replace(marker, marker + '\n    println!("PARQUET_LAYOUT_TIME seconds={:.6}", layout_started.elapsed().as_secs_f64());', 1)
+if 'PARQUET_INGEST_EXACT' not in source:
+    marker = '    let ingestion_limit = scenario.ingestion_limit(label);'
+    assert marker in source
+    source = source.replace(marker, '    println!("PARQUET_INGEST_EXACT wall_ns={}", ingest_time.as_nanos());\n' + marker, 1)
+path.write_text(source)
+path = Path("crates/infra/src/tests/parquet_benchmark/measurements.rs")
+source = path.read_text()
+if 'PARQUET_QUERY_EXACT' not in source:
+    marker = '        let after = profile.query_detail_snapshot();'
+    assert marker in source
+    addition = '''        println!(
+            "PARQUET_QUERY_EXACT scenario={} scope={scope} name={label} p50_ns={} p95_ns={} errors={errors} time_budget_hits={time_budget_hits}",
+            scenario.name(), timings[2].as_nanos(), timings[4].as_nanos()
+        );
+'''
+    source = source.replace(marker, addition + marker, 1)
+if 'let mut time_budget_hits = 0;' not in source:
+    assert '        let mut errors = 0;' in source
+    source = source.replace('        let mut errors = 0;', '        let mut errors = 0;\n        let mut time_budget_hits = 0;', 1)
+    source = source.replace('.map(|_| ())', '.map(|text| text.contains("10-second time budget"))')
+    source = source.replace('"timeline" => store.timeline_filtered(id, filter, 10).map(|text| text.contains("10-second time budget")),', '"timeline" => store.timeline_filtered(id, filter, 10).map(|_| false),')
+    source = source.replace('            if result.is_err() {', '            if matches!(result, Ok(true)) { time_budget_hits += 1; }\n            if result.is_err() {', 1)
+    source = source.replace('met_target &= errors == 0 && timings[4]', 'met_target &= errors == 0 && time_budget_hits == 0 && timings[4]', 1)
 path.write_text(source)
 path = Path("crates/infra/src/tests/hunteval_eval.rs")
 source = path.read_text()

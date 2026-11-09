@@ -1072,3 +1072,22 @@ source revisions and counters. Its SHA-256 is `847591d4c1c30159e6f35b48eb9fb0fa3
 A paired standard-runner comparison with V2 and the previous V3 reader, including
 cloud and chronological one-host 15 GB input, remains required. This smoke does
 not authorize default activation or replace the absolute and relative gates.
+
+### Exact activation-gate evaluation
+
+Paired release runs also record ingestion and query p95 as integer nanoseconds.
+The same test-only instrumentation runs on the pinned reference and candidate;
+it does not change production parsing, artifact construction or query limits.
+After collecting the complete nine-scenario matrix, run:
+
+```sh
+python3 .github/scripts/collect_parquet_pairs.py RUN_ID metrics.json --common
+python3 .github/scripts/evaluate_v3_gates.py metrics.json
+```
+
+The evaluator rejects incomplete measurements and uses integer comparisons for
+the inclusive +10% relative boundary. It keeps the 900-second chronological/cloud
+and 1,350-second stress targets. The analyst's paired-reference exception applies
+only to the absolute ingestion target; query deadlines are never waived. Its
+output is evidence for a separate default-activation decision, and does not enable
+an experimental writer.

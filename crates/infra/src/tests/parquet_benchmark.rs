@@ -209,6 +209,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         parquet_time.as_secs_f64(),
         ingest_time.as_secs_f64()
     );
+    println!("PARQUET_INGEST_EXACT wall_ns={}", ingest_time.as_nanos());
     let ingestion_limit = scenario.ingestion_limit(label);
     let ingest_target = ingest_time < ingestion_limit;
     println!(

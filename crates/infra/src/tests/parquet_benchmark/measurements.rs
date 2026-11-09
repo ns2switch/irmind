@@ -127,24 +127,28 @@ fn sample_queries(
         let before = profile.query_detail_snapshot();
         let mut timings = Vec::new();
         let mut errors = 0;
+        let mut time_budget_hits = 0;
         for _ in 0..5 {
             let started = Instant::now();
             let result = match label {
                 "term" => store
                     .text_search_filtered(id, filter, &scenario.term(scope), 10)
-                    .map(|_| ()),
+                    .map(|text| text.contains("10-second time budget")),
                 "entity" => store
                     .entity_lookup_filtered(id, filter, kind, value)
-                    .map(|_| ()),
+                    .map(|text| text.contains("10-second time budget")),
                 "neighbors" => store
                     .neighbors_filtered(id, filter, kind, value, 10)
-                    .map(|_| ()),
-                "timeline" => store.timeline_filtered(id, filter, 10).map(|_| ()),
+                    .map(|text| text.contains("10-second time budget")),
+                "timeline" => store.timeline_filtered(id, filter, 10).map(|_| false),
                 _ => store
                     .graph_path_filtered(id, filter, (kind, value), (to_kind, to_value))
-                    .map(|_| ()),
+                    .map(|text| text.contains("10-second time budget")),
             };
             timings.push(started.elapsed());
+            if matches!(result, Ok(true)) {
+                time_budget_hits += 1;
+            }
             if result.is_err() {
                 errors += 1;
             }
@@ -155,6 +159,12 @@ fn sample_queries(
             scenario.name(),
             timings[2].as_secs_f64(),
             timings[4].as_secs_f64()
+        );
+        println!(
+            "PARQUET_QUERY_EXACT scenario={} scope={scope} name={label} p50_ns={} p95_ns={} errors={errors} time_budget_hits={time_budget_hits}",
+            scenario.name(),
+            timings[2].as_nanos(),
+            timings[4].as_nanos()
         );
         let after = profile.query_detail_snapshot();
         let phase = std::array::from_fn::<_, 4, _>(|i| {
@@ -168,7 +178,8 @@ fn sample_queries(
             phase[2],
             phase[3]
         );
-        met_target &= errors == 0 && timings[4] < std::time::Duration::from_secs(10);
+        met_target &=
+            errors == 0 && time_budget_hits == 0 && timings[4] < std::time::Duration::from_secs(10);
     }
     met_target
 }
