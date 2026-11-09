@@ -1,10 +1,9 @@
 use super::{AppError, RecordBatch, invalid_source};
-use arrow::array::{
-    Array, BooleanArray, TimestampMicrosecondArray, UInt8Array, UInt16Array, UInt64Array,
-};
-use irmind_app::{IndexedInstant, IndexedTime, TimePrecision};
+use arrow::array::{Array, StringArray, UInt64Array};
+use irmind_app::IndexedTime;
 mod borrowed;
-pub(super) use borrowed::BorrowedCell;
+mod columns;
+pub(super) use borrowed::{BorrowedCell, BorrowedRows};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct TimeCell {
@@ -54,58 +53,16 @@ impl TimeCell {
 }
 
 pub(super) fn read_time(batch: &RecordBatch, row: usize) -> Result<Option<IndexedTime>, AppError> {
-    if let Some(physical) = batch
-        .column_by_name("_irmind_instant")
-        .or_else(|| batch.column_by_name("event_time"))
-        .and_then(|a| a.as_any().downcast_ref::<TimestampMicrosecondArray>())
-    {
-        let residual = batch
-            .column_by_name("submicro_nanos")
-            .and_then(|a| a.as_any().downcast_ref::<UInt16Array>())
-            .ok_or_else(invalid_source)?;
-        let precision = batch
-            .column_by_name("time_precision")
-            .and_then(|a| a.as_any().downcast_ref::<UInt8Array>())
-            .ok_or_else(invalid_source)?;
-        let inferred = batch
-            .column_by_name("time_inferred")
-            .and_then(|a| a.as_any().downcast_ref::<BooleanArray>())
-            .ok_or_else(invalid_source)?;
-        if precision.is_null(row) || inferred.is_null(row) {
-            return Err(invalid_source());
-        }
-        if physical.is_null(row) {
-            if !residual.is_null(row) || precision.value(row) != 0 || inferred.value(row) {
-                return Err(invalid_source());
-            }
-            return Ok(None);
-        }
-        if residual.is_null(row) {
-            return Err(invalid_source());
-        }
-        let instant = IndexedInstant::new(physical.value(row), residual.value(row))
-            .map_err(|_| invalid_source())?;
-        let precision =
-            TimePrecision::from_code(precision.value(row)).map_err(|_| invalid_source())?;
-        return IndexedTime::new(instant, precision, inferred.value(row))
-            .map(Some)
-            .map_err(|_| invalid_source());
+    columns::TimeColumns::new(batch)?.at(row)
+}
+
+/// Preserve whole-batch time validation when a query does not need display strings.
+pub(super) fn validate_times(batch: &RecordBatch) -> Result<(), AppError> {
+    let time = columns::TimeColumns::new(batch)?;
+    for row in 0..batch.num_rows() {
+        time.at(row)?;
     }
-    let raw = super::query::text(batch, "event_time", row)?;
-    if raw.is_empty() {
-        return Ok(None);
-    }
-    let seconds = irmind_domain::UtcTimestamp::parse(raw)
-        .map_err(|_| invalid_source())?
-        .unix_seconds();
-    let instant = IndexedInstant::new(
-        seconds.checked_mul(1_000_000).ok_or_else(invalid_source)?,
-        0,
-    )
-    .map_err(|_| invalid_source())?;
-    IndexedTime::new(instant, TimePrecision::Second, false)
-        .map(Some)
-        .map_err(|_| invalid_source())
+    Ok(())
 }
 
 /// A source uses one stable-order unit even when observations span batches/files.
@@ -116,9 +73,18 @@ pub(super) fn validate_source_units(
     let offsets = batch
         .column_by_name("source_offset")
         .and_then(|a| a.as_any().downcast_ref::<UInt64Array>());
+    let hashes = batch
+        .column_by_name("source_hash")
+        .and_then(|a| a.as_any().downcast_ref::<StringArray>())
+        .ok_or_else(invalid_source)?;
+    let mut previous = None;
     for row in 0..batch.num_rows() {
-        let hash = super::query::text(batch, "source_hash", row)?;
+        let hash = hashes.value(row);
         let has_offset = offsets.is_some_and(|a| !a.is_null(row));
+        if previous == Some((hash, has_offset)) {
+            continue;
+        }
+
         match modes.get(hash) {
             Some(old) if *old != has_offset => return Err(invalid_source()),
             None => {
@@ -126,6 +92,7 @@ pub(super) fn validate_source_units(
             }
             Some(_) => {}
         }
+        previous = Some((hash, has_offset));
     }
     Ok(())
 }

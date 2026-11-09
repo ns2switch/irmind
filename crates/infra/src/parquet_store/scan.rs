@@ -178,23 +178,36 @@ impl ParquetStore {
             if Instant::now() >= spec.deadline {
                 return Ok(ScanStatus::Deadline);
             }
-            let normalize = self
-                .profile
-                .as_ref()
-                .map(|p| p.query_timer(super::profile::QueryPhase::Normalize));
-            let normalized = super::format::normalize_batch(
-                &batch.map_err(storage)?,
-                artifact,
-                source_names,
-                spec.columns != ["event_time"],
-            )?;
-            let normalized = common::projection_defaults(normalized, spec, artifact)?;
-            drop(normalize);
+            let normalized =
+                self.normalize_scan_batch(&batch.map_err(storage)?, artifact, spec, source_names)?;
             if sender.send(Ok(ScanMessage::Batch(normalized))).is_err() {
                 return Ok(ScanStatus::Stopped);
             }
         }
         Ok(ScanStatus::Complete)
+    }
+
+    fn normalize_scan_batch(
+        &self,
+        batch: &RecordBatch,
+        artifact: &ParquetArtifact,
+        spec: &ScanSpec<'_>,
+        source_names: &std::collections::BTreeMap<String, String>,
+    ) -> Result<RecordBatch, AppError> {
+        let _normalize = self
+            .profile
+            .as_ref()
+            .map(|p| p.query_timer(super::profile::QueryPhase::Normalize));
+        let display_time = spec.columns.contains(&"event");
+        // Keep validation of every row, including rows beyond a visitor's
+        // bounded sample. Only RFC 3339 string construction is omitted.
+        if artifact.precise_metadata().is_some() && !display_time && spec.columns != ["event_time"]
+        {
+            super::time_cell::validate_times(batch)?;
+        }
+        let normalized =
+            super::format::normalize_batch(batch, artifact, source_names, display_time)?;
+        common::projection_defaults(normalized, spec, artifact)
     }
 }
 
