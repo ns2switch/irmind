@@ -18,7 +18,7 @@ hex = "0.4"
 memchr = "2"
 keyring = { version = "3", features = ["linux-native", "apple-native", "windows-native"] }
 rand = "0.8"
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.41", default-features = false, features = ["bundled", "cache", "fallible_uint"] }
 serde_json = "1"
 unicode-normalization = "=0.1.26"
 serde = { version = "1", features = ["derive"] }
