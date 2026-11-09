@@ -37,6 +37,7 @@ mod events;
 mod extrema;
 mod neighbors;
 mod path;
+mod retained;
 mod scoped;
 mod timeline;
 use coobservations::coobservation_available;
@@ -62,13 +63,18 @@ pub(super) struct EventHit {
 
 impl EventHit {
     fn from_batch(batch: &RecordBatch, row: usize, show_precision: bool) -> Result<Self, AppError> {
+        let time = super::time_cell::TimeCell::from_batch(batch, row)?;
+        let at = batch
+            .column_by_name("event_time")
+            .and_then(|a| a.as_any().downcast_ref::<StringArray>())
+            .map_or_else(|| time.display(), |a| a.value(row).into());
         Ok(Self {
             show_precision,
-            at: text(batch, "event_time", row)?.into(),
+            at,
             event: text(batch, "event", row)?.into(),
             hash: text(batch, "source_hash", row)?.into(),
             index: number(batch, "record_index", row)?,
-            time: super::time_cell::TimeCell::from_batch(batch, row)?,
+            time,
         })
     }
 

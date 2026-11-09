@@ -1,6 +1,6 @@
 use super::{
-    AppError, CancellationToken, CaseId, EventHit, GraphQueryFilter, Instant, ParquetArtifact,
-    Predicate, QUERY_DEADLINE, QueryStore, ScanFlow, ScanSpec, complete, recent, text, time_rules,
+    AppError, CancellationToken, CaseId, GraphQueryFilter, Instant, ParquetArtifact, Predicate,
+    QUERY_DEADLINE, QueryStore, ScanFlow, ScanSpec, complete, text, time_rules,
 };
 
 impl QueryStore<'_> {
@@ -17,6 +17,7 @@ impl QueryStore<'_> {
             return Err(AppError::Policy("invalid Parquet search arguments".into()));
         }
         let mut hits = Vec::new();
+        let precise = artifacts.iter().any(|a| a.precise_metadata().is_some());
         let mut rules = time_rules(filter);
         rules.push(Predicate::ContainsIgnoreCase("text", term.into()));
         let status = self.scan_artifacts(
@@ -31,14 +32,7 @@ impl QueryStore<'_> {
                 cancel,
             },
             |batch| {
-                for row in 0..batch.num_rows() {
-                    hits.push(EventHit::from_batch(
-                        batch,
-                        row,
-                        artifacts.iter().any(|a| a.precise_metadata().is_some()),
-                    )?);
-                }
-                recent(&mut hits, limit)?;
+                super::retained::retain_batch(batch, &mut hits, limit, true, precise)?;
                 Ok(ScanFlow::Continue)
             },
         )?;

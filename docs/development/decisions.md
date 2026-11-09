@@ -527,3 +527,10 @@ Use separate hash-pinned table modules for sshd, sudo, su and HTTP; each owns on
 ## Shared bounded JSON framing for source decoders
 
 Move the existing original-byte JSON framing into the source-mapping JSON utility, so format modules can reuse it without depending on another parser adapter. Framing exposes bounded original bytes and byte offsets; each module still owns detection, format decoding, timestamp interpretation and its stricter limits. SourceRecords stay tainted and mappings remain separate. This move preserves parser-json output and its existing limits byte for byte, adds no dependency, and extends the existing JSON fuzz target to cover the source decoder as well as the temporary legacy path.
+## Bounded result materialization for timeline and search
+
+Context: event queries previously formatted an RFC 3339 timestamp and allocated owned event/source strings for every matching row before retaining the bounded result set.
+
+Decision: validate every row as before, rank borrowed ordering keys within each bounded Arrow batch, apply the existing stable comparator and adjacent identity deduplication, and materialize only retained output rows. Keep whole-batch precision and source-unit validation, authenticated file reads, cancellation, deadlines and result limits.
+
+Consequences: this changes query allocation only. It changes no writer, signed bytes, schema, mapping, query order or displayed result. Paired release measurements compare V2, the preceding V3 reader and the candidate on the same runner.
