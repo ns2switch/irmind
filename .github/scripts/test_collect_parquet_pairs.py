@@ -17,6 +17,12 @@ class MetricCollection(unittest.TestCase):
             {"metric": "PARQUET_COLD_QUERY", "seconds": 0.5, "error": False},
         ])
 
+    def test_exact_nanoseconds_do_not_pass_through_floating_point(self):
+        records = collector.parse_log(b"PARQUET_INGEST_EXACT wall_ns=900000000001\nPARQUET_QUERY_EXACT scenario=cloud-v2 scope=all name=entity p50_ns=1000000001 p95_ns=1100000001 errors=0")
+        self.assertEqual(records[0]["wall_ns"], 900000000001)
+        self.assertEqual(records[1]["p95_ns"], 1100000001)
+        self.assertIs(type(records[1]["p95_ns"]), int)
+
     def test_invalid_identifiers_and_durations_are_rejected(self):
         for line in [b"PARQUET_QUERY scenario=../invalid", b"PARQUET_QUERY p95_seconds=nan", b"PARQUET_QUERY p95_seconds=-1", b"PARQUET_QUERY errors=-1", b"PARQUET_COLD_QUERY error=unknown"]:
             with self.subTest(line=line), self.assertRaises(ValueError):

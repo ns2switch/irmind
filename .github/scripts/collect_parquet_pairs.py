@@ -19,6 +19,8 @@ SCENARIO = r"(?:cloud-v[12]|endpoint-v[12]-(?:1|64|1024|1025)(?:-chronological)?
 FIELDS = {
     "PAIRED_REVISION": "stage commit scenario",
     "PARQUET_SCENARIO": "name size normalized_stage_peak_bytes",
+    "PARQUET_INGEST_EXACT": "wall_ns",
+    "PARQUET_QUERY_EXACT": "scenario scope name p50_ns p95_ns errors time_budget_hits",
     "PARQUET_INGEST": "bytes files hash_seconds conversion_seconds row_seconds parquet_seconds wall_seconds parquet_bytes coobservation_bytes",
     "PARQUET_COMPACTION": "bundles",
     "PARQUET_RETAINED_PARENTS": "scenario inactive_parent_bytes active_artifact_bytes retained_case_bytes inactive_case_basis_points inactive_active_basis_points",
