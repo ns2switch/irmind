@@ -2,6 +2,22 @@
 
 This internal plan records historical acceptance criteria and decisions behind the first pre-releases. Future sequence and ownership follow the [public roadmap](roadmap.md); this document does not set future release dates or assign the unattended gateway to this repository. The English version is authoritative.
 
+## Current pre-1.0 delivery order
+
+The [pre-1.0 format decision](decisions.md#pre-10-format-policy) supersedes compatibility and V2-comparison requirements in the historical sections below. Minor versions may change formats without migrations until stabilization, expected around v0.6–v0.7. Preserve the creating executable for old cases, or re-ingest verified originals into a new case. Decide parser retention and stable compatibility before 1.0.
+
+1. Publish the policy and an explicit format-impact note for each release.
+2. Implement approved `omit_text` in the current table interpreter and continue phase B source families and the Windows/Linux/CloudTrail authentication-failure contract.
+3. Add format-only SourceDecoders and extraction-preserving mappings to every remaining parser before removing its legacy route. Preserve current search identities and unclassified events where no semantic mapping exists.
+4. Reject foreign-version cases/exports before work; disable unavailable definition interpreters with visible startup warnings.
+5. Make mapped V3 the only CLI/TUI/demo writer. Remove relative V2 gates and track the 1,025-host stress miss separately; keep absolute ingestion and ordinary-query deadline checks.
+6. Use separate PRs for retired formats, dead code/test helpers, dependency/features cleanup across all three workspaces, and repository/CI/design cleanup. Keep current goldens, security tests, fuzzing and dependency-direction checks. Report deleted lines/tests/dependencies, binary size and CI time per PR.
+7. Complete experimental Elastic and Chronicle mappings/connectors, then prepare v0.3.0 with the breaking-format notice, signed assets, attestations, SBOMs and verified installers. Stop before creating its tag.
+
+No old case migrates automatically. No model or connector becomes enabled by default. Obsolete compatibility controls can be removed only with their retired paths; retained-version security guarantees and limits stay unchanged.
+
+The following milestone history records earlier deliveries; compatibility commitments and V2 activation comparisons there do not govern current development.
+
 ## Principles
 
 1. The model proposes; domain policy decides. No remote port executes without `AuthorizedCall`.
