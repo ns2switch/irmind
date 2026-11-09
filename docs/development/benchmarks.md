@@ -1056,8 +1056,8 @@ seconds; the earlier implementation did not instrument it. Hash verification
 remains mandatory before every file read. Worker counters overlap and include
 channel backpressure, so they cannot be summed into wall time.
 
-Only event cards materialize RFC 3339 strings. Count and scoped-identity queries
-keep checked physical time columns and still validate the complete input batch,
+Per-row RFC 3339 materialization is limited to event-output queries. Count and
+scoped-identity queries keep checked physical time columns and still validate the complete input batch,
 including rows outside a visitor's result sample. Batch-bound column references
 remove repeated schema lookup. Source-order unit checks retain their cross-batch
 state and check every hash/offset-mode transition.
@@ -1091,3 +1091,64 @@ and 1,350-second stress targets. The analyst's paired-reference exception applie
 only to the absolute ingestion target; query deadlines are never waived. Its
 output is evidence for a separate default-activation decision, and does not enable
 an experimental writer.
+
+## Dense mapped entity lookup: complete paired release matrix
+
+This comparison is for query maintainers. [Run 42595706209](https://github.com/ns2switch/irmind/actions/runs/42595706209) measures V2 and direct V3 at `f4139e574971862bb8f08cf0391aacb4db54f0cc`, then the batch-bound reader at `5b4bb1934920fe3d66a91e27c37225237100ba26`. All three stages share the same standard Linux runner within each scenario and use release builds. Compare stages within a row, not different runner instances.
+
+The [complete records](benchmarks/dense-entity-run.json) include exact integer-nanosecond timings, all ordinary/overflow host filters, phase counters, active/parent bytes and temporary peaks. The measured commits precede dependency maintenance in [PR #210](https://github.com/ns2switch/irmind/pull/210); separate composition tests cover the updated dependency. A final default-activation candidate needs evidence for its own composition.
+
+### Unfiltered entity lookup
+
+Each p95 is the maximum of five samples. The previous-reader values include failed requests where shown; a failed request is not a successful latency measurement.
+
+| Scenario | V2 p95 (s) | Previous reader p95 (s) | Candidate p95 (s) | Candidate vs V2 | Previous / candidate errors |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| cloud-v2 | 5.423 | 9.647 | 5.564 | +2.6% | 0 / 0 |
+| endpoint-v2-1 | 5.620 | 10.008 | 4.633 | -17.6% | 5 / 0 |
+| endpoint-v2-64 | 0.479 | 0.592 | 0.315 | -34.2% | 0 / 0 |
+| endpoint-v2-1024 | 0.805 | 0.157 | 0.156 | -80.6% | 0 / 0 |
+| endpoint-v2-1025 | 0.664 | 0.157 | 0.155 | -76.7% | 0 / 0 |
+| endpoint-v2-1-chronological | 5.812 | 10.008 | 4.607 | -20.7% | 5 / 0 |
+| endpoint-v2-64-chronological | 0.511 | 0.407 | 0.307 | -39.9% | 0 / 0 |
+| endpoint-v2-1024-chronological | 0.531 | 0.189 | 0.183 | -65.4% | 0 / 0 |
+| endpoint-v2-1025-chronological | 0.507 | 0.170 | 0.166 | -67.3% | 0 / 0 |
+
+The cloud entity p95 falls from 9.647 to 5.564 seconds; its paired V2 result is 5.423 seconds. The unfiltered entity result meets the +10% V2 margin in all nine scenarios. In one-host chronological input the preceding reader fails all five entity samples in both scopes and its cold summary; the candidate has no errors and completes that summary in 3.091 seconds. Entity lookup meets the relative bound in all 23 recorded filter/scenario combinations; other query families still miss it, as shown below.
+
+### Ingestion and retained disk
+
+The reader change does not change the writer recipe. Active artifact byte counts are identical before/after in all nine pairs and inactive-parent bytes remain zero. Ingestion wall time varies slightly; this query change makes no ingestion speedup claim.
+
+| Scenario | V2 reference (s) | Previous reader (s) | Candidate reader (s) | Candidate vs V2 |
+| --- | ---: | ---: | ---: | ---: |
+| cloud-v2 | 970.862 | 613.712 | 617.718 | -36.4% |
+| endpoint-v2-1 | 1032.918 | 1220.264 | 1218.638 | +18.0% |
+| endpoint-v2-64 | 1040.126 | 1257.843 | 1266.206 | +21.7% |
+| endpoint-v2-1024 | 1033.986 | 1244.795 | 1246.466 | +20.5% |
+| endpoint-v2-1025 | 1004.348 | 1221.578 | 1228.482 | +22.3% |
+| endpoint-v2-1-chronological | 573.180 | 405.055 | 403.663 | -29.6% |
+| endpoint-v2-64-chronological | 600.709 | 425.533 | 430.233 | -28.4% |
+| endpoint-v2-1024-chronological | 551.807 | 373.131 | 371.586 | -32.7% |
+| endpoint-v2-1025-chronological | 530.552 | 368.957 | 370.984 | -30.1% |
+
+### Exact activation decision
+
+The [machine-readable evaluation](benchmarks/dense-entity-gates.json) reports **eligible: false**. All nine candidate ingestions meet their absolute targets, but stress ingestion misses the paired +10% margin. Every standard query/filter sample completes without an error or time-budget truncation. The separate worst-case cloud path still reaches the ten-second budget; it is included as a failed activation condition.
+
+| Query family | Filter/scenario combinations outside +10% |
+| --- | ---: |
+| term | 14/23 |
+| entity | 0/23 |
+| neighbors | 4/23 |
+| timeline | 21/23 |
+| path | 4/23 |
+
+The relative comparisons use integer nanoseconds, not the rounded table values. Failed performance conditions produce a false decision; missing or malformed evidence is rejected. A reference miss does not waive any candidate query error or deadline. V3 stays opt-in and no sampling, hop, expansion, result, token or time limit changes.
+
+Candidate cold summaries and all 115 standard query/filter combinations complete successfully. Remaining work includes timeline/term materialization cost, stress conversion overhead and the worst-case path. Batch-bound columns retain full temporal validation and every source-unit transition, including rows outside a visitor sample. Per-file hash verification is unchanged.
+
+Three at-least-1-GiB repetitions for cloud and chronological 64-host input are retained for each stage in the raw results. No single smoke repetition replaces the full matrix.
+
+SHA-256 of `dense-entity-run.json`: `972a3ca900dd76bc7a82a223fee056ea8005c8c548eaa8b5670063be5b05d4fb`.
+SHA-256 of `dense-entity-gates.json`: `0cf4bf3edec84878aa3a327e24f82605c6062ffcf6441b3dd81dc848dabb0295`.
