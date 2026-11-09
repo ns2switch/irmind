@@ -250,7 +250,12 @@ impl QueryStore<'_> {
                     Instant::now() + QUERY_DEADLINE,
                 )
             },
-            |batch| view.visit(batch),
+            |batch| {
+                let _aggregate = self.store.profile.as_ref().map(|profile| {
+                    profile.query_timer(crate::parquet_store::profile::QueryPhase::Aggregate)
+                });
+                view.visit(batch)
+            },
         )?;
         super::super::complete(status)?;
         view.output()

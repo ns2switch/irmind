@@ -1,5 +1,6 @@
 //! Batch-lifetime ordering keys; allocate only retained extrema or output rows.
-use super::{AppError, RecordBatch, TimeCell, invalid_source, read_time};
+use super::columns::{TimeColumns, column};
+use super::{AppError, RecordBatch, TimeCell, invalid_source};
 use arrow::array::{Array as _, StringArray, UInt64Array};
 use irmind_app::IndexedTime;
 
@@ -17,23 +18,7 @@ impl<'a> BorrowedCell<'a> {
         batch: &'a RecordBatch,
         row: usize,
     ) -> Result<Self, AppError> {
-        let time = read_time(batch, row)?;
-        let hash = super::super::query::text(batch, "source_hash", row)?;
-        let source = batch
-            .column_by_name("_irmind_source")
-            .and_then(|a| a.as_any().downcast_ref::<StringArray>())
-            .map_or(hash, |a| a.value(row));
-        let offset = batch
-            .column_by_name("source_offset")
-            .and_then(|a| a.as_any().downcast_ref::<UInt64Array>())
-            .and_then(|a| (!a.is_null(row)).then(|| a.value(row)));
-        Ok(Self {
-            time,
-            source,
-            hash,
-            offset,
-            index: super::super::query::number(batch, "record_index", row)?,
-        })
+        BorrowedRows::new(batch)?.at(row)
     }
 
     pub(in crate::parquet_store) fn has_time(&self) -> bool {
@@ -75,5 +60,37 @@ impl<'a> BorrowedCell<'a> {
             offset: self.offset,
             index: self.index,
         }
+    }
+}
+
+/// Borrowed, checked column bindings for count/extrema aggregation.
+pub(in crate::parquet_store) struct BorrowedRows<'a> {
+    time: TimeColumns<'a>,
+    hashes: &'a StringArray,
+    sources: Option<&'a StringArray>,
+    offsets: Option<&'a UInt64Array>,
+    indexes: &'a UInt64Array,
+}
+impl<'a> BorrowedRows<'a> {
+    pub(in crate::parquet_store) fn new(batch: &'a RecordBatch) -> Result<Self, AppError> {
+        Ok(Self {
+            time: TimeColumns::new(batch)?,
+            hashes: column(batch, "source_hash").ok_or_else(invalid_source)?,
+            sources: column(batch, "_irmind_source"),
+            offsets: column(batch, "source_offset"),
+            indexes: column(batch, "record_index").ok_or_else(invalid_source)?,
+        })
+    }
+    pub(in crate::parquet_store) fn at(&self, row: usize) -> Result<BorrowedCell<'a>, AppError> {
+        let hash = self.hashes.value(row);
+        Ok(BorrowedCell {
+            time: self.time.at(row)?,
+            source: self.sources.map_or(hash, |a| a.value(row)),
+            hash,
+            offset: self
+                .offsets
+                .and_then(|a| (!a.is_null(row)).then(|| a.value(row))),
+            index: self.indexes.value(row),
+        })
     }
 }
