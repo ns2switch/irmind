@@ -14,6 +14,18 @@ pub(in crate::parquet_store) struct BorrowedCell<'a> {
 }
 
 impl<'a> BorrowedCell<'a> {
+    pub(in crate::parquet_store) fn from_owned(value: &'a TimeCell) -> Self {
+        Self {
+            time: value.time,
+            source: &value.source,
+            hash: &value.hash,
+            offset: value.offset,
+            index: value.index,
+        }
+    }
+    pub(in crate::parquet_store) fn identity(self) -> (&'a str, u64) {
+        (self.hash, self.index)
+    }
     pub(in crate::parquet_store) fn from_batch(
         batch: &'a RecordBatch,
         row: usize,
@@ -38,7 +50,14 @@ impl<'a> BorrowedCell<'a> {
         self,
         other: Self,
     ) -> Result<std::cmp::Ordering, AppError> {
-        irmind_domain::compare_record_keys(self.key(), other.key(), false)
+        self.compare_borrowed_order(other, false)
+    }
+    pub(in crate::parquet_store) fn compare_borrowed_order(
+        self,
+        other: Self,
+        newest: bool,
+    ) -> Result<std::cmp::Ordering, AppError> {
+        irmind_domain::compare_record_keys(self.key(), other.key(), newest)
             .map_err(|_| invalid_source())
     }
 

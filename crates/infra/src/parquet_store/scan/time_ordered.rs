@@ -80,12 +80,11 @@ impl ParquetStore {
                     .profile
                     .as_ref()
                     .map(|p| p.query_timer(super::super::profile::QueryPhase::Normalize));
-                let batch = super::super::format::normalize_batch(
-                    &batch.map_err(storage)?,
-                    artifact,
-                    names,
-                    spec.columns != ["event_time"],
-                )?;
+                let batch = batch.map_err(storage)?;
+                if precise {
+                    super::super::time_cell::validate_times(&batch)?;
+                }
+                let batch = super::super::format::normalize_batch(&batch, artifact, names, false)?;
                 let batch = super::common::projection_defaults(batch, &spec, artifact)?;
                 drop(normalize);
                 let (batch, status) = self.filter_legacy_host(spec, names, batch)?;

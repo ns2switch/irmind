@@ -198,15 +198,13 @@ impl ParquetStore {
             .profile
             .as_ref()
             .map(|p| p.query_timer(super::profile::QueryPhase::Normalize));
-        let display_time = spec.columns.contains(&"event");
+        // Event queries construct display strings only for retained output rows.
         // Keep validation of every row, including rows beyond a visitor's
         // bounded sample. Only RFC 3339 string construction is omitted.
-        if artifact.precise_metadata().is_some() && !display_time && spec.columns != ["event_time"]
-        {
+        if artifact.precise_metadata().is_some() && spec.columns != ["event_time"] {
             super::time_cell::validate_times(batch)?;
         }
-        let normalized =
-            super::format::normalize_batch(batch, artifact, source_names, display_time)?;
+        let normalized = super::format::normalize_batch(batch, artifact, source_names, false)?;
         common::projection_defaults(normalized, spec, artifact)
     }
 }

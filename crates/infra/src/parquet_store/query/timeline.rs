@@ -1,6 +1,6 @@
 use super::{
     AppError, CancellationToken, CaseId, EventHit, GraphQueryFilter, Instant, ParquetArtifact,
-    QUERY_DEADLINE, QueryStore, ScanSpec, complete, ordered, time_rules,
+    QUERY_DEADLINE, QueryStore, ScanSpec, complete, time_rules,
 };
 use irmind_app::TimelineEvent;
 
@@ -81,10 +81,7 @@ impl QueryStore<'_> {
                 cutoff,
                 |batch| {
                     super::super::time_cell::validate_source_units(batch, &mut units)?;
-                    for row in 0..batch.num_rows() {
-                        hits.push(EventHit::from_batch(batch, row, precise)?);
-                    }
-                    ordered(&mut hits, limit, newest)?;
+                    super::retained::retain_batch(batch, &mut hits, limit, newest, precise)?;
                     Ok(if hits.len() >= limit {
                         hits.last()
                             .map(|h| super::super::scan::TimeCutoff(h.time.clone()))

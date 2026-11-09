@@ -1,4 +1,5 @@
 #![allow(clippy::unwrap_used)]
+use super::super::ordered;
 use super::*;
 use crate::parquet_store::ParquetStore;
 use crate::parquet_store::scan::ScanFlow;
