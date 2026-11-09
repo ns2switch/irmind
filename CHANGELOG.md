@@ -4,10 +4,14 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
-- Add an experimental typed common-event core, frozen category/outcome/role codes and new physical schemas within artifact V2. Existing parsers use an unclassified compatibility bridge; source mappings follow separately. Historical cases remain readable and no semantic migration runs automatically.
+**Format impact — planned v0.3.0: breaking.** Mapped V3 artifacts and export V6 replace retired case/export layouts; retired parser and mapping interpreters are not retained. Before upgrading, keep the version that created an existing case or re-ingest verified originals into a new case. The source-decoder rollout and cleanup are in progress; this is not a release announcement.
+
+- Add an experimental typed common-event core, frozen category/outcome/role codes and new physical schemas within artifact V2. SourceDecoder modules preserve original fields; independent source mappings classify supported records. Pre-1.0 minor releases do not promise cross-version readers or migrations.
 - Add bounded category, type, outcome and entity-role selectors to existing evidence tools, with explicit schema-coverage notices and identity scopes that distinguish PID reuse.
 
 ## 0.2.0 — Modular parsers and precise evidence
+
+**Format impact:** Breaking: artifact V2 and export V5 add precision and partition formats. Its historical V1 reader/migration support applies only to that release.
 
 - Add experimental Zeek TSV/JSON and Suricata EVE modules with bounded detection, streaming parsing, precise timestamps, host-aware partitions, source provenance and synthetic contract fixtures. They were not distributed in v0.1.x. Source detections remain unconfirmed findings.
 - Write artifact V2 by default in the CLI, TUI and isolated demo. Preserve UTC microseconds, residual nanoseconds, source precision and stable source/record ordering. Bound host partition cardinality at 64 ordinary hosts by default, with a hard ceiling of 1,024 and signed overflow.
@@ -27,6 +31,8 @@ This remains a pre-release for evaluation with synthetic data, not real incident
 
 ## 0.1.6 — Complete bounded JSON ingestion
 
+**Format impact:** Case/export encodings unchanged; affected parser identities and declarative reader bindings change, and affected historical parser implementations are retired.
+
 ### Known issue fixed
 
 - Correct bounded document probing so large single-line JSON exports retain every source byte. In v0.1.1–v0.1.5, JSON files without a `.jsonl` or `.ndjson` extension could fail or omit records when their first line exceeded 4 MiB. The same reader was used for cloud object ingestion. A valid original hash and signed chain authenticate the stored bytes; they do not prove that a parser extracted every record.
@@ -37,12 +43,16 @@ This remains a pre-release for evaluation with synthetic data, not real incident
 
 ## 0.1.5 — Automatic demo presentation
 
+**Format impact:** No case, export or definition format change.
+
 - Replace the command-driven tutorial with an automatic ten-scene presentation. The real TUI types and runs commands against its isolated synthetic case, with full-width narration and a highlighted investigation area.
 - Add Enter, Backspace, Space and Esc navigation, proportional reading time, a clear minimum-terminal notice, visible failures and final exploration/start/exit choices.
 - Show scripted responses as a word-preserving stream with source hashes. Sign the simulated enrichment and custody confirmations only within the explicitly isolated demo; no provider is probed and no network is used.
 - Exercise every scene in automatic and manual PTYs, including cancellation and terminal/data cleanup. Refresh the complete VHS recording and scene captures from the actual versioned binary.
 
 ## 0.1.4 — Card expansion
+
+**Format impact:** Case/export encodings unchanged; declarative parser definitions and additional parser identities are introduced.
 
 - Make Ctrl+O expand or fold the selected card from any case-screen focus, falling back to the last expandable card. Keep text drafts and open forms intact.
 - Add `/expand` to the shared command menu and help as an alternative for terminal keymaps that intercept Ctrl+O.
@@ -57,6 +67,8 @@ This remains a pre-release for evaluation with synthetic data, not real incident
 
 ## 0.1.3 — Guided demo
 
+**Format impact:** No case, export or definition format change.
+
 - Guide the isolated synthetic demo through ten event-driven steps, from evidence exploration and signed approval to findings, custody verification and export.
 - Keep one current instruction in the guide. Show completed ingestion as a fact, without competing command suggestions.
 - Add command-specific help and optional empty-state hints, with a full tutorial PTY test on Linux, macOS and Windows.
@@ -65,12 +77,16 @@ This remains a pre-release for evaluation with synthetic data, not real incident
 
 ## 0.1.2 — Demo ingest repair
 
+**Format impact:** Case/export encodings unchanged; additional parser identities are introduced.
+
 - Show a persistent completion or actionable error after the demo's background ingestion, so the case never appears stuck after evidence is found.
 - Use the same parser detection registry and signed `SourceManifestV2` path as ordinary case ingestion in the demo.
 - Add experimental, auto-detected Elastic Common Schema NDJSON and OCSF JSON/Parquet parsers as optional Cargo modules compiled by default. Both normalize bounded records into signed local Parquet and preserve source provenance; ambiguous Parquet detection asks the analyst.
 - Add experimental parsers for Velociraptor, Hayabusa, Chainsaw, Plaso, and common Eric Zimmerman CSV exports, with synthetic fixtures and parser detection.
 
 ## 0.1.1 — Community preview
+
+**Format impact:** SourceManifestV2 adds signed parser/detection metadata; existing export encodings are unchanged.
 
 - Offer a temporary `/demo` case with synthetic HuntEval data and a scripted model, without a configured key or network connection.
 - Keep exact greetings conversational by withholding tools, while preserving the structured, signed agent conversation.
@@ -81,6 +97,8 @@ This remains a pre-release for evaluation with synthetic data, not real incident
 Manual validation with a real model and a real connector remains pending. Use synthetic data only; this version is not suitable for real incidents or sensitive data.
 
 ## 0.1.0 — Pre-release (2026-10-31)
+
+**Format impact:** Initial case, source-manifest, Parquet and export formats.
 
 - Investigate a signed case from the terminal, with a guided first run, conversation, approvals, findings, and evidence views.
 - Enforce case and organization scope before remote tool calls; require an analyst signature for external enrichment.

@@ -1,5 +1,20 @@
 # Design decisions
 
+## Pre-1.0 format policy
+
+Context: pre-release compatibility layers obscure current implementation boundaries and delay source decoding and mapping work. Formats are still being designed.
+
+Decision: until formats stabilize, expected around v0.6–v0.7, each minor version may change case, export, parser-definition and mapping-definition formats without migration or historical readers. Keep the exact creating IRMind version to open, verify or export a case, or re-ingest its verified originals into a new case. Parser-version retention and long-term format compatibility will be decided at stabilization, before 1.0; earlier two-minor retention proposals are not current policy.
+
+Inside a supported version, all signatures, hashes, custody verification, ContentGuard, policy ceilings, approvals, TLS checks and resource limits remain mandatory. Unsupported formats are rejected before case operations, with a safe creator-version hint when available. Definitions using a retired interpreter are disabled with a visible warning and cannot prevent startup.
+
+V3 is the sole target writer for CLI, TUI and demo. Remove V1/V2 readers and writers, old exports, precision migrations and interpreter V1 in separate area-specific changes. First provide a SourceDecoder and an extraction-preserving mapping for every parser; only then remove its legacy route. Keep goldens and fuzzing for the retained current formats. Preserve historical design documents as explicitly historical records.
+
+The analyst moves the 1,025-host stress ingestion miss, relative query regressions and result materialization to performance follow-up work. The evaluator no longer compares V3 with V2. Keep measuring absolute cloud/chronological ingestion targets and ordinary query deadlines. Release v0.3.0 requires phase B, cleanup, Elastic and Chronicle; the tag remains a separate review checkpoint.
+
+Consequences: earlier compatibility, migration and relative-activation decisions below are historical where they conflict with this policy. Each release changelog states its format impact. This decision permits removing obsolete code, not weakening a control or relabeling failed verification as success.
+
+
 Proposed, awaiting analyst review: use one explicitly versioned artifact value at the existing storage boundary, plus additive typed parser callbacks, for [mixed V1/V2 ingestion](parquet-v2-port-transition.md). The recommendation avoids a second custody pipeline; it does not authorize changing V1 bytes. No port is changed by this documentation PR.
 
 This page is for maintainers reviewing tradeoffs that shape the current build. Each row states the context, choice, consequence, and decision date. The [reference plan](plan.md) holds acceptance criteria.

@@ -13,6 +13,9 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 > [!WARNING]
 > IRMind 0.2.0 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
 
+> [!WARNING]
+> Pre-1.0: each minor version may change case, export and definition formats without migration. Keep the IRMind version that created a case to open, verify or export it, or re-ingest the verified originals into a new case.
+
 ## What you can do
 
 - Open a case, set its scope, and investigate an alert from one terminal workspace.
@@ -46,7 +49,7 @@ cargo build --release --locked -p irmind
 
 The [v0.2.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.2.0) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
 
-Existing V1 cases remain readable. Precision migration is optional and explicit; opening a case never migrates it. See the [V1 → V2 migration guide](docs/development/case-migration.md).
+Use the creating minor version for an existing case. The [version policy](docs/development/decisions.md#pre-10-format-policy) explains how to retain its executable or re-ingest verified originals.
 
 ```sh
 # After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:

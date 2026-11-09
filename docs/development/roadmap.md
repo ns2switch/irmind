@@ -6,6 +6,8 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 
 This page is for contributors and evaluators. It describes intentions, not release commitments. Read the [security model](../security-model.md) before connecting a service.
 
+Current pre-1.0 policy: minor versions may break formats without migration. V3 is the sole target layout for v0.3; compatibility statements in delivered-release sections describe those historical releases only.
+
 ## Delivered in 0.1.0 and 0.1.1
 
 The pre-releases provide the terminal case workflow, policy-gated connectors, signed custody, guarded model conversations, bounded Parquet queries, a synthetic demo, a parser detection registry, verified installers, and Sigstore-signed and attested assets. See the [changelog](../../CHANGELOG.md) for what shipped and its limitations. H5 is complete by analyst decision; unreported procedure details and validation of a real connector remain pending.
@@ -95,7 +97,7 @@ Add local detections, evidence-linked reports, controlled extensions, and a head
 Stabilize signed formats, validate connectors, sign binaries, and complete external security review.
 
 - Stable signed formats for cases, manifests, skills, subagent records, and the engine protocol, with tested migrations.
-- Confirm a parser compatibility policy before 1.0: from 1.0 onward, retain an obsolete parser version for reconstruction and verification for at least two subsequent minor releases, or an equivalent support period. Announce retirement in the changelog in advance and provide a migration procedure. This proposed policy does not restore retired pre-1.0 readers.
+- Decide parser-version retention and stable-format compatibility when formats stabilize, expected around v0.6–v0.7, before 1.0. Until then, minor releases may break case, export and definition formats without migration; keep the creating executable or re-ingest verified originals.
 - An external security review.
 - At least three connectors validated against real test environments.
 - Signed release binaries on Linux, macOS, and Windows.
