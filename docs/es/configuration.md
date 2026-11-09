@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 0054cea682b9ff01df3d84440d71314a2179fd7f; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 394586e414a7c7dbde2512ca2b8d0b1485efc94d; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
