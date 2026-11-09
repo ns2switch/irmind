@@ -17,6 +17,13 @@ class MetricCollection(unittest.TestCase):
             {"metric": "PARQUET_COLD_QUERY", "seconds": 0.5, "error": False},
         ])
 
+    def test_nonblocking_ingestion_goal_and_explicit_path_status_are_preserved(self):
+        rows = collector.parse_log(b"PARQUET_INGEST_LIMIT seconds=1350 met=false required=false\nPARQUET_WORST_PATH seconds=10.01 truncated=true time_budget=true error=false")
+        self.assertIs(rows[0]["met"], False)
+        self.assertIs(rows[0]["required"], False)
+        self.assertIs(rows[1]["error"], False)
+        self.assertIs(rows[1]["truncated"], True)
+
     def test_exact_nanoseconds_do_not_pass_through_floating_point(self):
         records = collector.parse_log(b"PARQUET_INGEST_EXACT wall_ns=900000000001\nPARQUET_QUERY_EXACT scenario=cloud-v2 scope=all name=entity p50_ns=1000000001 p95_ns=1100000001 errors=0")
         self.assertEqual(records[0]["wall_ns"], 900000000001)

@@ -19,6 +19,7 @@ SCENARIO = r"(?:cloud-v[12]|endpoint-v[12]-(?:1|64|1024|1025)(?:-chronological)?
 FIELDS = {
     "PAIRED_REVISION": "stage commit scenario",
     "PARQUET_SCENARIO": "name size normalized_stage_peak_bytes",
+    "PARQUET_INGEST_LIMIT": "seconds met required",
     "PARQUET_INGEST_EXACT": "wall_ns",
     "PARQUET_QUERY_EXACT": "scenario scope name p50_ns p95_ns errors time_budget_hits",
     "PARQUET_INGEST": "bytes files hash_seconds conversion_seconds row_seconds parquet_seconds wall_seconds parquet_bytes coobservation_bytes",
@@ -38,7 +39,7 @@ FIELDS = {
     "PARQUET_COOBS_BUDGET": "scenario active_file_bytes repeated_time_column_bytes",
     "PARQUET_QUERY_PHASE": "verify_seconds scan_seconds",
     "PARQUET_QUERY_PROFILE": "scenario scope name verify_seconds scan_seconds normalize_seconds aggregate_seconds",
-    "PARQUET_WORST_PATH": "seconds truncated time_budget",
+    "PARQUET_WORST_PATH": "seconds truncated time_budget error",
     "HUNTEVAL_RECALL": "corpus provider events entities path parse_errors",
     "HUNTEVAL_QUERY": "corpus provider query samples p50_seconds p95_seconds",
 }
@@ -94,7 +95,7 @@ def metric(prefix, key, raw):
         pattern = r"[a-z_]+"
     elif key in {"events", "entities", "path"}:
         pattern = r"[0-9]+/[0-9]+"
-    elif key in {"truncated", "time_budget", "error"}:
+    elif key in {"truncated", "time_budget", "error", "met", "required"}:
         if raw not in {"true", "false"}:
             raise ValueError("invalid benchmark boolean")
         return raw == "true"

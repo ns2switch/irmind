@@ -511,3 +511,9 @@ Context: documented empty PAM identities and Windows `-` address markers are ori
 Decision: implement `omit_text` in the current interpreter without creating another interpreter version. Each field accepts up to eight unique, control-free literals of at most 256 UTF-8 bytes. Only an exact original text match omits that field and its observation; original records and unrelated projections remain intact. Count literal comparisons in the existing operation budget.
 
 Consequences: arbitrary invalid IPs, ports, hashes and scalar types still fail the normal validated boundary. No trimming, Unicode folding, coercion or general error suppression is added. Empty lists serialize as absence, preserving current definition goldens. Retired interpreter removal follows the pre-1.0 cleanup policy.
+
+## Analyst decision: absolute goals for the sole V3 writer
+
+Mapped V3 is the sole target writer. Remove relative ingestion/query comparisons and the requirement for a comparison reader from performance evaluation. Keep all ordinary query error, exact-duration, full-corpus coverage and ten-second checks. Keep 900-second cloud/chronological goals and 1,350-second disordered goals. The 1,025-host disordered sample is a reported, nonblocking goal miss tracked by #218; it does not waive ordinary query limits or the chronological 1,025-host goal.
+
+A deliberate expansive path may report a successful time-budget truncation only with its explicit partial marker. Its error outcome remains a failure. Current measurements identify one mapped writer and nine complete scenarios; missing outcomes, incomplete query coverage or noninteger exact durations are invalid evidence. Historical comparisons remain diagnostic records only.
