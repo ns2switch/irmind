@@ -1,4 +1,6 @@
 //! Bounded original JSON fields, including exact decimal lexemes and duplicate checks.
+mod framing;
+pub use framing::{JsonFrame, JsonFrames};
 mod read;
 mod write;
 use super::{SourceRecordError, SourceValue};
