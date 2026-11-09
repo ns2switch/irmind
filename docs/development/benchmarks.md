@@ -1,6 +1,6 @@
 # Evidence scan benchmarks
 
-Current analyst-approved gates: 15 GB cloud and chronological endpoint ingestion must take less than 900 seconds; disordered endpoint stress ingestion must take less than 1,350 seconds. Existing query targets remain unchanged. See [the final measured gate](#final-v2-ingestion-and-query-gate). Earlier comparisons retain their historical acceptance criteria and workflow outcomes.
+Current measured targets are 900 seconds for 15 GB cloud/chronological ingestion and 1,350 seconds for disordered stress. The approved 1,025-host stress ingestion miss is nonblocking; ordinary query limits remain required. See the [current policy](#current-policy-sole-mapped-v3-writer). Earlier comparisons retain their historical acceptance criteria and workflow outcomes.
 
 This page is for maintainers comparing signed Parquet ingestion and bounded evidence queries. The [manual and weekly workflow](../../.github/workflows/graph-benchmark.yml) generates synthetic 1 GB and 15 GB corpora on a standard Linux runner. It uploads the raw output. No corpus or original evidence is kept as an artifact.
 
@@ -1220,3 +1220,30 @@ SHA-256 of `main-sqlite-gates.json`: `3227491547744402b5899ebf6264fc9b4e0e254643
 SHA-256 of `v3-absolute-measurements.json`: `e1ffca20fa465cab0a0e7700d25c2df2366a924c1affdf147a35416180a58640`.
 
 SHA-256 of `v3-absolute-targets.json`: `3b2970d3c48a3ac41c87849da10359212812c70d4392636583756e3376c05e48`.
+
+## Bounded result materialization
+
+Timeline and term-search scans now keep borrowed ordering keys for a bounded batch and allocate owned event payloads only for retained results. Every ordering value is still validated, even when its row lies beyond the result limit. Hash verification, cancellation, stable ordering, deduplication, samples and query deadlines are unchanged. Entity, neighbor and path algorithms are unchanged.
+
+The [release benchmark](https://github.com/ns2switch/irmind/actions/runs/42659581325) compares the previous mapped reader and this change in the same job for each corpus. The [raw allowlisted metrics](benchmarks/result-materialization-run.json) include the older reference only as historical context; the [summary](benchmarks/result-materialization-summary.json) selects the two mapped-reader stages. Every ordinary query completed without errors or deadline truncation in both stages.
+
+| 15 GB corpus | Search p95 before / after | Timeline p95 before / after | Ingest before / after |
+| --- | ---: | ---: | ---: |
+| cloud | 2.634 / 2.839 s | 0.349 / 0.346 s | 370.666 / 364.764 s |
+| endpoint 1 | 1.811 / 1.813 s | 0.204 / 0.203 s | 1309.874 / 1300.277 s |
+| endpoint 1 chronological | 4.081 / 4.186 s | 0.532 / 0.532 s | 356.440 / 357.042 s |
+| endpoint 1024 | 1.627 / 1.668 s | 0.213 / 0.210 s | 1281.167 / 1286.357 s |
+| endpoint 1024 chronological | 3.254 / 3.362 s | 0.523 / 0.525 s | 309.600 / 316.923 s |
+| endpoint 1025 | 2.272 / 2.182 s | 0.273 / 0.357 s | 1262.442 / 1252.094 s |
+| endpoint 1025 chronological | 4.872 / 4.926 s | 0.680 / 0.680 s | 427.384 / 435.486 s |
+| endpoint 64 | 1.711 / 1.861 s | 0.207 / 0.219 s | 1308.666 / 1325.067 s |
+| endpoint 64 chronological | 4.815 / 4.744 s | 0.786 / 0.484 s | 417.762 / 418.981 s |
+
+The largest 15 GB timeline improvement is the chronological 64-host sample: 0.786 to 0.484 seconds (38.4%). Cloud timeline is effectively unchanged at 0.349 to 0.346 seconds. Improvements are workload-dependent: the 1,025-host disordered timeline increases from 0.273 to 0.357 seconds, and most term-search samples remain limited by file hashing and scanning rather than result allocation. These measurements do not claim a general throughput improvement.
+
+A synthetic unit test additionally counts materialized rows: a 4,096-row batch with a result limit of ten owns only ten new result payloads, while malformed nonselected ordering values still fail validation. This is a deterministic allocation check, not a release throughput measurement.
+
+Metric file checksums (SHA-256):
+
+- `result-materialization-run.json`: `08aa2903ff59b5ef7d884daee977e27c64ce86f099fe0dfe6b7ce2773479d6d2`.
+- `result-materialization-summary.json`: `82584fefe79de9d93ea74a899db598fecff7d2a9e7274c39b890bb3785e4ae17`.

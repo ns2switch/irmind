@@ -1,0 +1,248 @@
+{
+  "run_url": "https://github.com/ns2switch/irmind/actions/runs/42659581325",
+  "scenarios": [
+    {
+      "baseline": {
+        "ingest_ns": 370666322514,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 3446607824,
+          "neighbors": 97699061,
+          "path": 99118825,
+          "term": 2633512744,
+          "timeline": 349320566
+        }
+      },
+      "candidate": {
+        "ingest_ns": 364764465047,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 3342125691,
+          "neighbors": 83120231,
+          "path": 81939723,
+          "term": 2838824141,
+          "timeline": 345654652
+        }
+      },
+      "scenario": "cloud-v2"
+    },
+    {
+      "baseline": {
+        "ingest_ns": 1309873919244,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 4141634498,
+          "neighbors": 85217375,
+          "path": 84663844,
+          "term": 1811158991,
+          "timeline": 203911963
+        }
+      },
+      "candidate": {
+        "ingest_ns": 1300276591722,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 4132208197,
+          "neighbors": 85237576,
+          "path": 84969791,
+          "term": 1813474421,
+          "timeline": 203153563
+        }
+      },
+      "scenario": "endpoint-v2-1"
+    },
+    {
+      "baseline": {
+        "ingest_ns": 356439881205,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 4215740839,
+          "neighbors": 86808417,
+          "path": 88078694,
+          "term": 4081396948,
+          "timeline": 532383696
+        }
+      },
+      "candidate": {
+        "ingest_ns": 357041543309,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 4237083056,
+          "neighbors": 88855465,
+          "path": 87479650,
+          "term": 4185966881,
+          "timeline": 532444982
+        }
+      },
+      "scenario": "endpoint-v2-1-chronological"
+    },
+    {
+      "baseline": {
+        "ingest_ns": 1281167448477,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 130916372,
+          "neighbors": 30633011,
+          "path": 30706352,
+          "term": 1626877611,
+          "timeline": 212658738
+        }
+      },
+      "candidate": {
+        "ingest_ns": 1286356596786,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 129730717,
+          "neighbors": 30048787,
+          "path": 30062608,
+          "term": 1667989937,
+          "timeline": 210337143
+        }
+      },
+      "scenario": "endpoint-v2-1024"
+    },
+    {
+      "baseline": {
+        "ingest_ns": 309599657402,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 134530002,
+          "neighbors": 26797134,
+          "path": 26972707,
+          "term": 3254015793,
+          "timeline": 523062140
+        }
+      },
+      "candidate": {
+        "ingest_ns": 316923080991,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 148915165,
+          "neighbors": 27182043,
+          "path": 26394072,
+          "term": 3362456668,
+          "timeline": 525153575
+        }
+      },
+      "scenario": "endpoint-v2-1024-chronological"
+    },
+    {
+      "baseline": {
+        "ingest_ns": 1262441804229,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 157720001,
+          "neighbors": 41044053,
+          "path": 49255201,
+          "term": 2271589867,
+          "timeline": 273253616
+        }
+      },
+      "candidate": {
+        "ingest_ns": 1252094057208,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 153511701,
+          "neighbors": 38878152,
+          "path": 39500441,
+          "term": 2182234223,
+          "timeline": 356875241
+        }
+      },
+      "scenario": "endpoint-v2-1025"
+    },
+    {
+      "baseline": {
+        "ingest_ns": 427384470631,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 197401108,
+          "neighbors": 45416361,
+          "path": 45623504,
+          "term": 4871969413,
+          "timeline": 680033709
+        }
+      },
+      "candidate": {
+        "ingest_ns": 435486071546,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 196597940,
+          "neighbors": 44471095,
+          "path": 44980936,
+          "term": 4925643898,
+          "timeline": 680318858
+        }
+      },
+      "scenario": "endpoint-v2-1025-chronological"
+    },
+    {
+      "baseline": {
+        "ingest_ns": 1308665770272,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 271368451,
+          "neighbors": 36215277,
+          "path": 34931858,
+          "term": 1710973159,
+          "timeline": 206579018
+        }
+      },
+      "candidate": {
+        "ingest_ns": 1325067499841,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 295792710,
+          "neighbors": 38276012,
+          "path": 37786623,
+          "term": 1860811703,
+          "timeline": 219446097
+        }
+      },
+      "scenario": "endpoint-v2-64"
+    },
+    {
+      "baseline": {
+        "ingest_ns": 417761600569,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 340954667,
+          "neighbors": 45341022,
+          "path": 44701782,
+          "term": 4815463284,
+          "timeline": 785585550
+        }
+      },
+      "candidate": {
+        "ingest_ns": 418980950943,
+        "ordinary_error_count": 0,
+        "ordinary_time_budget_hits": 0,
+        "query_p95_ns": {
+          "entity": 340903235,
+          "neighbors": 44543183,
+          "path": 45038434,
+          "term": 4744280942,
+          "timeline": 484022551
+        }
+      },
+      "scenario": "endpoint-v2-64-chronological"
+    }
+  ]
+}
