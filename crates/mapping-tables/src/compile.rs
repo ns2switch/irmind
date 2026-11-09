@@ -27,7 +27,7 @@ impl TableMapping {
         }
         let provenance = MappingProvenance::BundledDefinition {
             canonical,
-            interpreter: "irmind-mapping-tables-v1".into(),
+            interpreter: definition.interpreter()?.into(),
         };
         Self::compile(definition, provenance)
     }
@@ -61,18 +61,31 @@ impl TableMapping {
         definition: Definition,
         provenance: MappingProvenance,
     ) -> Result<Self, MappingError> {
+        let project_action = validate_interpreter(&definition, &provenance)?;
         if definition.source_contract != SOURCE_RECORD_V1
             || definition.rules.len() > 256
             || definition.fields.len() > 64
         {
             return Err(MappingError::InvalidDefinition);
         }
-        let primary_selector = selector(&definition, vec![])?;
+        if definition.when.len() > 8 {
+            return Err(MappingError::InvalidDefinition);
+        }
+        let primary_selector = selector(
+            &definition,
+            definition
+                .when
+                .iter()
+                .map(condition)
+                .collect::<Result<_, _>>()?,
+        )?;
         let mut rules: Vec<CompiledRule> = Vec::new();
-        let mut budget = definition.fields.len() * 33;
+        let primary_budget: usize = definition.when.iter().map(|c| c.path.len() + 1).sum();
+        let mut budget = definition.fields.len() * 33 + primary_budget;
         for rule in &definition.rules {
             let compiled = compile_rule(&definition, rule)?;
             budget += 1
+                + primary_budget
                 + rule.when.iter().map(|c| c.path.len() + 1).sum::<usize>()
                 + rule.fields.len() * 33;
             if rules
@@ -109,8 +122,24 @@ impl TableMapping {
             fields: fields::compile_fields(definition.fields)?,
             partition: fields::CompiledPartition::compile(&definition.partition)?,
             action: definition.action.as_deref().map(fields::path).transpose()?,
+            project_action,
         })
     }
+}
+fn validate_interpreter(
+    d: &Definition,
+    provenance: &MappingProvenance,
+) -> Result<bool, MappingError> {
+    let expected = d.interpreter()?;
+    let actual = match provenance {
+        MappingProvenance::BundledDefinition { interpreter, .. }
+        | MappingProvenance::InstalledDefinition { interpreter, .. } => interpreter,
+        MappingProvenance::NativeBuild { .. } => return Err(MappingError::InvalidDefinition),
+    };
+    if actual != expected {
+        return Err(MappingError::InvalidDefinition);
+    }
+    Ok(expected == "irmind-mapping-tables-v2")
 }
 fn compile_rule(
     definition: &Definition,
@@ -133,7 +162,12 @@ fn compile_rule(
     fields::compile_fields(combined)?;
     let selector = selector(
         definition,
-        rule.when.iter().map(condition).collect::<Result<_, _>>()?,
+        definition
+            .when
+            .iter()
+            .chain(&rule.when)
+            .map(condition)
+            .collect::<Result<_, _>>()?,
     )?;
     let header = EventHeaderV1::new(
         CategorySet::new(

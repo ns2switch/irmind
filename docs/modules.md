@@ -289,3 +289,7 @@ The experimental `parser-evtx` module is compiled by default but requires the ma
 **Configure:** Compiled by default with `parser-suricata`. Detection requires a supported `event_type`, a timestamp and `flow_id` in the sample; ambiguous inputs require analyst selection. The choice is signed.
 
 **Limits:** Experimental and validated only with synthetic data. It applies the same record, JSON shape, source and rejection limits as the Zeek parser. Timestamps without an explicit offset are rejected. An explicitly supplied collector `host` uses the V2 endpoint-host partition profile; a missing host is not inferred from network addresses. [Suricata EVE format](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).
+
+## Common-event mappings
+
+Optional source mappings are separate from parsers and connectors. Bundled CloudTrail tables classify supported operations, preserve actor/target account namespaces and leave unsupported results unknown. They require the experimental common writer; no remote module is enabled. See [mapping coverage and limitations](mappings.md).

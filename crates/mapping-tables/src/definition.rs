@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Definition {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interpreter: Option<String>,
     pub id: String,
     pub version: String,
     pub target_schema: String,
@@ -16,6 +18,8 @@ pub(super) struct Definition {
     pub provider: Option<String>,
     pub channel: Option<String>,
     pub native_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub when: Vec<Condition>,
     pub action: Option<Vec<String>>,
     #[serde(default)]
     pub rules: Vec<Rule>,
@@ -23,6 +27,19 @@ pub(super) struct Definition {
     pub fields: Vec<Field>,
     #[serde(default)]
     pub partition: Partition,
+}
+impl Definition {
+    pub(super) fn interpreter(
+        &self,
+    ) -> Result<&'static str, irmind_app::source_mapping::MappingError> {
+        match self.interpreter.as_deref() {
+            None | Some("irmind-mapping-tables-v1") if self.when.is_empty() => {
+                Ok("irmind-mapping-tables-v1")
+            }
+            Some("irmind-mapping-tables-v2") => Ok("irmind-mapping-tables-v2"),
+            _ => Err(irmind_app::source_mapping::MappingError::InvalidDefinition),
+        }
+    }
 }
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

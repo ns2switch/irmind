@@ -46,7 +46,7 @@ TRANSLATIONS = {
     ROOT / "docs/es/manual-validation.md": ROOT / "docs/development/manual-validation.md",
     **{
         ROOT / "docs/es" / name: ROOT / "docs" / name
-        for name in ("getting-started.md", "configuration.md", "modules.md", "security-model.md", "platforms.md", "parsers.md")
+        for name in ("getting-started.md", "configuration.md", "modules.md", "security-model.md", "platforms.md", "parsers.md", "mappings.md")
     },
 }
 

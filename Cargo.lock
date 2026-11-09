@@ -2490,6 +2490,7 @@ dependencies = [
  "irmind-mod-llm-deepseek",
  "irmind-mod-llm-openai-compatible",
  "irmind-mod-llm-openrouter",
+ "irmind-mod-mapping-cloudtrail",
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
  "irmind-mod-parser-chainsaw",
@@ -2602,6 +2603,7 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "irmind-fs",
+ "irmind-mod-mapping-cloudtrail",
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
  "irmind-mod-mapping-tables",
@@ -2647,6 +2649,19 @@ dependencies = [
  "secrecy",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "irmind-mapping-tables"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mod-parser-json",
+ "irmind-testkit",
+ "serde",
+ "serde_json",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]
@@ -2789,6 +2804,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-cloudtrail"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-mapping-json-compat",
+ "irmind-mod-parser-json",
+ "irmind-testkit",
+ "serde_json",
+]
+
+[[package]]
 name = "irmind-mod-mapping-journald-compat"
 version = "0.1.0"
 dependencies = [
@@ -2816,13 +2844,7 @@ dependencies = [
 name = "irmind-mod-mapping-tables"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
- "irmind-domain",
- "irmind-mod-parser-json",
- "irmind-testkit",
- "serde",
- "serde_json",
- "toml 0.9.12+spec-1.1.0",
+ "irmind-mapping-tables",
 ]
 
 [[package]]

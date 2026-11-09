@@ -1,0 +1,20 @@
+[package]
+name = "irmind-mod-mapping-cloudtrail"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+irmind-mapping-tables = { path = "../../mapping-tables", version = "0.1.0" }
+
+[dev-dependencies]
+irmind-mod-mapping-json-compat = { path = "../mapping-json-compat", version = "0.1.0" }
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+irmind-mod-parser-json = { path = "../parser-json", version = "0.1.0" }
+serde_json = "1"
+
+[lints]
+workspace = true

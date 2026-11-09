@@ -50,7 +50,10 @@ impl MappingManifest {
                 interpreter,
                 ..
             } => {
-                if interpreter != "irmind-mapping-tables-v1" {
+                if !matches!(
+                    interpreter.as_str(),
+                    "irmind-mapping-tables-v1" | "irmind-mapping-tables-v2"
+                ) {
                     return Err(MappingError::InvalidManifest);
                 }
                 canonical
