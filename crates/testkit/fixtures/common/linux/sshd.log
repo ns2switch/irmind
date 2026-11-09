@@ -1,0 +1,3 @@
+2026-11-01T00:00:00.123456Z host-a sshd[42]: Failed password for alice from 203.0.113.77 port 2222 ssh2
+2026-11-01T00:00:00.223456Z host-a sshd[42]: Accepted publickey for alice from 203.0.113.77 port 2222 ssh2
+2026-11-01T00:00:00.323456Z host-a sshd[42]: Connection closed by 203.0.113.77

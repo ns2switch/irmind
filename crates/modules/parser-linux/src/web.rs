@@ -1,12 +1,12 @@
 use super::{AppError, GraphRecord, bad, record::Record};
 use chrono::{DateTime, Utc};
 
-struct Access<'a> {
-    ip: &'a str,
-    user: &'a str,
-    time: &'a str,
-    request: &'a str,
-    status: &'a str,
+pub(super) struct Access<'a> {
+    pub(super) ip: &'a str,
+    pub(super) user: &'a str,
+    pub(super) time: &'a str,
+    pub(super) request: &'a str,
+    pub(super) status: &'a str,
 }
 pub(super) fn detect(line: &str) -> bool {
     fields(line).is_ok()
@@ -28,7 +28,7 @@ pub(super) fn parse(line: &str, index: usize) -> Result<GraphRecord, AppError> {
     };
     record.graph(index)
 }
-fn fields(line: &str) -> Result<Access<'_>, AppError> {
+pub(super) fn fields(line: &str) -> Result<Access<'_>, AppError> {
     let mut parts = line.splitn(4, ' ');
     let ip = parts.next().ok_or_else(invalid)?;
     ip.parse::<std::net::IpAddr>().map_err(|_| invalid())?;

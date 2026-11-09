@@ -34,7 +34,7 @@ fn source_decoder_and_independent_mapping_contracts_are_feature_independent() {
     .unwrap();
     #[cfg(feature = "parser-linux")]
     irmind_testkit::run_source_mapping_contract(
-        Arc::new(irmind_mod_parser_linux::JournalSourceDecoder),
+        Arc::new(irmind_mod_parser_linux::LinuxSourceDecoder),
         Arc::new(irmind_mod_mapping_journald_compat::JournaldCompatibilityMapping::new().unwrap()),
         "fixture.json", br#"{"__REALTIME_TIMESTAMP":"1793102400123456","_HOSTNAME":"synthetic","MESSAGE":"example"}"#, 1,
     ).unwrap();
@@ -162,5 +162,47 @@ impl irmind_app::SourceMapper for StableMapping {
     ) -> Result<irmind_app::source_mapping::MappingOutput, irmind_app::source_mapping::MappingError>
     {
         irmind_app::SourceMapper::map(&self.inner, source)
+    }
+}
+
+#[cfg(feature = "mapping-linux")]
+#[test]
+fn linux_mapping_contracts_also_run_with_insertion_ordered_json() {
+    use irmind_app::SourceMapper;
+    use irmind_mod_mapping_linux::{
+        AuditMapping, HttpMapping, SshdMapping, SuMapping, SudoMapping,
+    };
+    type Entry = (Arc<dyn SourceMapper>, &'static [u8]);
+    let entries: Vec<Entry> = vec![
+        (
+            Arc::new(SshdMapping::new().unwrap()),
+            include_bytes!("../../../testkit/fixtures/common/linux/sshd.log"),
+        ),
+        (
+            Arc::new(SudoMapping::new().unwrap()),
+            include_bytes!("../../../testkit/fixtures/common/linux/sudo.log"),
+        ),
+        (
+            Arc::new(SuMapping::new().unwrap()),
+            include_bytes!("../../../testkit/fixtures/common/linux/su.log"),
+        ),
+        (
+            Arc::new(HttpMapping::new().unwrap()),
+            include_bytes!("../../../testkit/fixtures/common/linux/http.log"),
+        ),
+        (
+            Arc::new(AuditMapping::new().unwrap()),
+            include_bytes!("../../../testkit/fixtures/common/linux/auditd.log"),
+        ),
+    ];
+    for (mapper, bytes) in entries {
+        irmind_testkit::run_source_mapping_contract(
+            Arc::new(irmind_mod_parser_linux::LinuxSourceDecoder),
+            mapper,
+            "synthetic.log",
+            bytes,
+            3,
+        )
+        .unwrap();
     }
 }

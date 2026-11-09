@@ -1,0 +1,3 @@
+2026-11-01T00:00:00Z host-a sudo[42]: alice : TTY=pts/0 ; PWD=/synthetic ; USER=root ; COMMAND=/usr/bin/id
+2026-11-01T00:00:01Z host-a sudo[42]: pam_unix(sudo:auth): authentication failure; logname=alice uid=1000 euid=0 tty=/dev/pts/0 ruser=alice rhost=203.0.113.77 user=root
+2026-11-01T00:00:02Z host-a sudo[42]: pam_unix(sudo:session): session opened for user root by alice(uid=1000)

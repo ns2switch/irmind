@@ -6,7 +6,8 @@ use irmind_app::{
     modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
     source_mapping::{
         MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
-        MappingPartition, MappingProvenance, SourceRecordV1, SourceSelector, SourceValue,
+        MappingPartition, MappingProvenance, SourceDiscriminator, SourceRecordV1, SourceSelector,
+        SourceValue,
     },
 };
 use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
@@ -32,9 +33,9 @@ impl JournaldCompatibilityMapping {
         .map_err(|_| MappingError::InvalidManifest)?;
         let selector = SourceSelector::try_new(
             "parser-linux",
-            BTreeSet::from(["journald-source-v1".into()]),
-            Some(("journald-json".into(), "journald-source-v1".into())),
-            BTreeMap::new(),
+            BTreeSet::from(["linux-source-v1".into()]),
+            Some(("linux".into(), "linux-source-v1".into())),
+            BTreeMap::from([(SourceDiscriminator::Dataset, "journald".into())]),
             Vec::new(),
         )?;
         Ok(Self {

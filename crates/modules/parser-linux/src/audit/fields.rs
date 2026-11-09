@@ -15,7 +15,17 @@ pub(super) struct Line<'a> {
 }
 impl<'a> Line<'a> {
     pub(super) fn parse(raw: &'a str) -> Result<Self, AppError> {
-        let (fields, quoted) = tokenize(raw)?;
+        Self::parse_impl(raw, false)
+    }
+    pub(super) fn parse_strict(raw: &'a str) -> Result<Self, AppError> {
+        Self::parse_impl(raw, true)
+    }
+    fn parse_impl(raw: &'a str, strict: bool) -> Result<Self, AppError> {
+        let (fields, quoted) = if strict {
+            tokenize_impl(raw, true)?
+        } else {
+            tokenize(raw)?
+        };
         let stamp = fields
             .get("msg")
             .and_then(|value| value.strip_prefix("audit("))
@@ -55,6 +65,9 @@ impl<'a> Line<'a> {
         }
         Ok(result)
     }
+    pub(super) fn is_quoted(&self, name: &str) -> bool {
+        self.quoted.contains(name)
+    }
     pub(super) fn decoded(&self, name: &str) -> Option<Cow<'a, str>> {
         self.field(name)
             .map(|value| super::encoding::text(value, self.quoted.contains(name)))
@@ -63,7 +76,10 @@ impl<'a> Line<'a> {
         self.fields.get(key).copied()
     }
 }
-pub(super) fn tokenize(mut text: &str) -> Result<Tokens<'_>, AppError> {
+pub(super) fn tokenize(text: &str) -> Result<Tokens<'_>, AppError> {
+    tokenize_impl(text, false)
+}
+fn tokenize_impl(mut text: &str, strict: bool) -> Result<Tokens<'_>, AppError> {
     let mut fields = BTreeMap::new();
     let mut quoted_keys = BTreeSet::new();
     let mut count = 0;
@@ -94,6 +110,9 @@ pub(super) fn tokenize(mut text: &str) -> Result<Tokens<'_>, AppError> {
             let end = text.find(char::is_whitespace).unwrap_or(text.len());
             (&text[..end], &text[end..])
         };
+        if strict && fields.contains_key(key) {
+            return Err(invalid());
+        }
         if !fields.contains_key(key) {
             fields.insert(key, value);
             if is_quoted {

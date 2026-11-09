@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 mod indexed;
-mod source_decode;
-pub use source_decode::JournalSourceDecoder;
+mod source_frames;
+pub use source_frames::{LinuxSourceDecoder, source_log_parser};
 
 use irmind_app::{
     AppError, CancellationToken, EventParser, GraphRecord, LogParser, ParseReport,
@@ -49,7 +49,7 @@ impl Module for LinuxParser {
         registry: &mut ModuleRegistry,
         _: &ModuleConfig,
     ) -> Result<(), AppError> {
-        registry.add_source_decoder(Arc::new(JournalSourceDecoder))?;
+        registry.add_source_decoder(Arc::new(LinuxSourceDecoder))?;
         registry.add_parser(self)
     }
 }
@@ -172,20 +172,3 @@ mod tests;
 
 #[cfg(test)]
 mod completeness_tests;
-
-/// Experimental raw decoding preserves the normal detector and historical parser.
-pub fn source_log_parser() -> std::sync::Arc<dyn irmind_app::LogParser> {
-    fn detect(source: &str, sample: &[u8]) -> Option<irmind_app::ParserConfidence> {
-        let _ = source;
-        std::str::from_utf8(sample.split(|b| *b == b'\n').next()?)
-            .ok()
-            .filter(|line| journal::detect(line))
-            .and_then(|_| ParserConfidence::new(95).ok())
-    }
-    std::sync::Arc::new(
-        irmind_app::source_mapping::SourceDecoderSelection::new(std::sync::Arc::new(
-            JournalSourceDecoder,
-        ))
-        .with_detector(detect),
-    )
-}

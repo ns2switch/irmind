@@ -4,9 +4,9 @@ use chrono::{DateTime, Utc};
 pub(super) struct Header<'a> {
     pub(super) time: &'a str,
     pub(super) host: &'a str,
-    app: &'a str,
-    pid: Option<&'a str>,
-    message: &'a str,
+    pub(super) app: &'a str,
+    pub(super) pid: Option<&'a str>,
+    pub(super) message: &'a str,
     pub(super) classic: bool,
 }
 pub(super) fn header(line: &str) -> Option<Header<'_>> {

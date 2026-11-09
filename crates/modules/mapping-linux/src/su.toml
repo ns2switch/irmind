@@ -1,0 +1,68 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-linux-su"
+version = "linux-su-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-linux"
+parser_versions = ["linux-source-v1"]
+format = "linux"
+format_version = "linux-source-v1"
+dataset = "su"
+action = ["syslog", "appname"]
+
+[partition]
+host = ["syslog", "hostname"]
+
+[[fields]]
+source = ["syslog", "hostname"]
+target = "host.name"
+observation = { kind = "host", role = "observer", scope = { kind = "host", path = ["syslog", "hostname"] } }
+
+[[fields]]
+source = ["syslog", "appname"]
+target = "process.name"
+observation = { kind = "process", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["syslog", "procid"]
+target = "process.pid"
+conversion = "decimal"
+omit_text = ["", "-"]
+observation = { kind = "process", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["su", "pam_actor"]
+target = "user.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "host", path = ["syslog", "hostname"] } }
+
+[[fields]]
+source = ["su", "pam_target"]
+target = "user.target.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "target", scope = { kind = "host", path = ["syslog", "hostname"] } }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["su", "pam_transition"]
+predicate = { op = "text", value = "opened" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["end"]
+outcome = "unknown"
+[[rules.when]]
+path = ["su", "pam_transition"]
+predicate = { op = "text", value = "closed" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "failure"
+[[rules.when]]
+path = ["su", "pam_transition"]
+predicate = { op = "text", value = "authentication failure" }
+

@@ -1,0 +1,22 @@
+[package]
+name = "irmind-mod-mapping-linux"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+build = "build.rs"
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+irmind-mapping-tables = { path = "../../mapping-tables", version = "0.1.0" }
+
+[build-dependencies]
+irmind-build-manifest = { path = "../../build-manifest", version = "0.1.0" }
+
+[dev-dependencies]
+irmind-mod-parser-linux = { path = "../parser-linux", version = "0.1.0" }
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+
+[lints]
+workspace = true

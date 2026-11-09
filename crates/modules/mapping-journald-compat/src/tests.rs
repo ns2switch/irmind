@@ -27,7 +27,7 @@ fn extracted_identity_and_projection_match_the_frozen_journald_baseline() {
             .unwrap();
         let mapper = JournaldCompatibilityMapping::new().unwrap();
         let mut actual = Vec::new();
-        irmind_mod_parser_linux::JournalSourceDecoder
+        irmind_mod_parser_linux::LinuxSourceDecoder
             .decode_reader(
                 SourceInput {
                     metadata: SourceMetadata {
@@ -61,7 +61,7 @@ fn extracted_identity_and_projection_match_the_frozen_journald_baseline() {
 #[test]
 fn shared_source_mapping_contract() {
     irmind_testkit::run_source_mapping_contract(
-        Arc::new(irmind_mod_parser_linux::JournalSourceDecoder), Arc::new(JournaldCompatibilityMapping::new().unwrap()),
+        Arc::new(irmind_mod_parser_linux::LinuxSourceDecoder), Arc::new(JournaldCompatibilityMapping::new().unwrap()),
         "journal.json", br#"{"__REALTIME_TIMESTAMP":"1793102400123456","_HOSTNAME":"synthetic","MESSAGE":"example"}"#, 1,
     ).unwrap();
 }

@@ -1,4 +1,8 @@
-#[cfg(any(feature = "mapping-json-compat", feature = "mapping-journald-compat"))]
+#[cfg(any(
+    feature = "mapping-json-compat",
+    feature = "mapping-journald-compat",
+    feature = "mapping-linux"
+))]
 mod mapping;
 #[cfg(feature = "llm-anthropic")]
 use super::Anthropic;
@@ -129,7 +133,11 @@ fn register_parsers(
     experimental: bool,
 ) -> Result<()> {
     let _ = (&issues, data_root, experimental);
-    #[cfg(any(feature = "mapping-json-compat", feature = "mapping-journald-compat"))]
+    #[cfg(any(
+        feature = "mapping-json-compat",
+        feature = "mapping-journald-compat",
+        feature = "mapping-linux"
+    ))]
     if experimental {
         mapping::register(registry)?;
     }
