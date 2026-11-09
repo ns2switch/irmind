@@ -1078,10 +1078,10 @@ not authorize default activation or replace the absolute and relative gates.
 Paired release runs also record ingestion and query p95 as integer nanoseconds.
 The same test-only instrumentation runs on the pinned reference and candidate;
 it does not change production parsing, artifact construction or query limits.
-After collecting the complete nine-scenario matrix, run:
+Use `.github/scripts/collect_parquet_pairs.py` in common-schema mode to collect
+the complete nine-scenario matrix into `metrics.json`, then run:
 
 ```sh
-python3 .github/scripts/collect_parquet_pairs.py RUN_ID metrics.json --common
 python3 .github/scripts/evaluate_v3_gates.py metrics.json
 ```
 
