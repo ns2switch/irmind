@@ -10,7 +10,9 @@ fn direct_physical_recipe_is_a_portable_golden_with_current_build_bindings() {
         .unwrap();
     let path = root.path().join("source.json");
     fs::write(&path, br#"{"eventTime":"2026-11-01T00:00:00.123456789Z","eventName":"Login","sourceIPAddress":"203.0.113.77"}"#).unwrap();
-    fs::File::open(&path)
+    fs::OpenOptions::new()
+        .write(true)
+        .open(&path)
         .unwrap()
         .set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_hours(482_136))
         .unwrap();
