@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 315b9cb3d42f5cb44f52073742b2cb2aff7179a6; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 6f743c1460ccc1ec1193245576bdc8133f936bb6; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -98,6 +98,7 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | MISP | TI interna | `ti-misp` | experimental | [Módulos](docs/es/modules.md) |
 | VirusTotal | enriquecimiento externo | `ti-virustotal` | experimental | [Módulos](docs/es/modules.md) |
 | Parser JSON y logs de nube exportados | parser local | `parser-json` (por defecto) | experimental | [Módulos](docs/es/modules.md) |
+| Mapeo de eventos comunes de CloudTrail | mapeo local | `mapping-cloudtrail` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
 | Parser de Elastic Common Schema | parser local | `parser-ecs` (por defecto) | experimental | [ECS](docs/es/modules.md#parser-de-elastic-common-schema) |
 | Parser de OCSF JSON y Parquet | parser local | `parser-ocsf` (por defecto) | experimental | [OCSF](docs/es/modules.md#parser-de-ocsf) |
 | Parser de Velociraptor | parser local | `parser-velociraptor` (por defecto) | experimental | [Velociraptor](docs/es/modules.md#parser-de-velociraptor) |

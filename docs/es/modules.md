@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 620c51bc34981ab5cb808cde7186cd798a8e5de9; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit 6f743c1460ccc1ec1193245576bdc8133f936bb6; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -253,3 +253,7 @@ Limita cada registro a 4 MiB, 1.024 campos y 64 niveles JSON, y cada fuente a di
 Lee EVE JSONL para alert, flow, dns, http, tls, fileinfo y anomaly. Relaciona registros mediante `flow_id`. Una firma de alerta se conserva como hallazgo de origen sin confirmar; nunca confirma automáticamente un hallazgo del caso. Solo requiere lectura del archivo local. Viene compilado por defecto con `parser-suricata` y es experimental, probado solo con datos sintéticos.
 
 Aplica los mismos límites de tamaño, estructura JSON y recuento que Zeek. Rechaza marcas temporales sin zona explícita. Conserva en el registro local la marca original y su zona; la timeline V2 conserva la precisión fraccionaria. Un `host` explícito usa el perfil de partición por host; no se deduce a partir de direcciones de red. [Formato EVE](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).
+
+## Mapeos de eventos comunes
+
+Los mapeos opcionales son independientes de los parsers y conectores. Las tablas incluidas de CloudTrail clasifican las operaciones admitidas, conservan los espacios de cuentas del actor y del objetivo y dejan como desconocidos los resultados no admitidos. Requieren el escritor común experimental y no habilitan ningún módulo remoto. Véase la [cobertura y las limitaciones de los mapeos](../mappings.md).
