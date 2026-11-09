@@ -523,3 +523,7 @@ A deliberate expansive path may report a successful time-budget truncation only 
 Decode auth.log/secure, auditd, journald and HTTP framing through one `LinuxSourceDecoder`, preserving original names, values, exact time, grouped-member locations and confirmed classic-syslog context. Replace the narrower journald decoder rather than retaining a redundant historical route under the pre-1.0 policy. Keep journald's established extraction projection.
 
 Use separate hash-pinned table modules for sshd, sudo, su and HTTP; each owns one declared SourceMapper port. Use native auditd mapping only for bounded cross-member selection that finite tables cannot express. Do not infer success for missing status, partial audit groups or sudo command requests, or invent process-lifetime identities from reused PIDs. Source decoding remains independent of these interpretations. No production dependency package is added.
+
+## Shared bounded JSON framing for source decoders
+
+Move the existing original-byte JSON framing into the source-mapping JSON utility, so format modules can reuse it without depending on another parser adapter. Framing exposes bounded original bytes and byte offsets; each module still owns detection, format decoding, timestamp interpretation and its stricter limits. SourceRecords stay tainted and mappings remain separate. This move preserves parser-json output and its existing limits byte for byte, adds no dependency, and extends the existing JSON fuzz target to cover the source decoder as well as the temporary legacy path.

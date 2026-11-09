@@ -1,5 +1,5 @@
 //! Streaming record boundaries. An oversized first line is never consumed as a sample.
-use irmind_app::{AppError, CancellationToken};
+use crate::{AppError, CancellationToken};
 use std::{
     collections::BTreeSet,
     io::{BufRead, BufReader, Read},
@@ -7,10 +7,22 @@ use std::{
 
 const MAX_RECORD: usize = 4 * 1024 * 1024;
 
-pub(super) struct Frame {
-    pub(super) bytes: Vec<u8>,
-    pub(super) offset: u64,
-    pub(super) oversized: bool,
+pub struct JsonFrame {
+    bytes: Vec<u8>,
+    offset: u64,
+    oversized: bool,
+}
+/// Framed bytes remain untrusted; decoding and source provenance are separate.
+impl JsonFrame {
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+    pub const fn offset(&self) -> u64 {
+        self.offset
+    }
+    pub const fn oversized(&self) -> bool {
+        self.oversized
+    }
 }
 struct Capture(Vec<u8>, bool);
 impl Capture {
@@ -28,15 +40,15 @@ enum Mode {
     Array { wrapped: bool, comma: bool },
 }
 
-pub(super) struct Frames<'a> {
+pub struct JsonFrames<'a> {
     input: BufReader<&'a mut dyn Read>,
     cancel: &'a CancellationToken,
     position: u64,
     mode: Mode,
     wrapper_keys: BTreeSet<String>,
 }
-impl<'a> Frames<'a> {
-    pub(super) fn new(reader: &'a mut dyn Read, cancel: &'a CancellationToken) -> Self {
+impl<'a> JsonFrames<'a> {
+    pub fn new(reader: &'a mut dyn Read, cancel: &'a CancellationToken) -> Self {
         Self {
             input: BufReader::new(reader),
             cancel,
@@ -45,7 +57,7 @@ impl<'a> Frames<'a> {
             wrapper_keys: BTreeSet::new(),
         }
     }
-    pub(super) fn next(&mut self) -> Result<Option<Frame>, AppError> {
+    pub fn next_frame(&mut self) -> Result<Option<JsonFrame>, AppError> {
         loop {
             self.whitespace(&mut None)?;
             match self.mode {
@@ -98,17 +110,17 @@ impl<'a> Frames<'a> {
         }
         Ok(false)
     }
-    fn value_frame(&mut self) -> Result<Option<Frame>, AppError> {
+    fn value_frame(&mut self) -> Result<Option<JsonFrame>, AppError> {
         let offset = self.position;
         let mut bytes = Capture(Vec::new(), false);
         self.value(&mut bytes)?;
-        Ok(Some(Frame {
+        Ok(Some(JsonFrame {
             oversized: bytes.1 || bytes.0.len() > MAX_RECORD,
             bytes: bytes.0,
             offset,
         }))
     }
-    fn object(&mut self) -> Result<Option<Frame>, AppError> {
+    fn object(&mut self) -> Result<Option<JsonFrame>, AppError> {
         let offset = self.position;
         let mut bytes = Capture(Vec::new(), false);
         bytes.push(self.byte()?);
@@ -151,7 +163,7 @@ impl<'a> Frames<'a> {
             return Err(invalid());
         }
         bytes.push(b'}');
-        Ok(Some(Frame {
+        Ok(Some(JsonFrame {
             oversized: bytes.1 || bytes.0.len() > MAX_RECORD,
             bytes: bytes.0,
             offset,
@@ -271,7 +283,7 @@ impl<'a> Frames<'a> {
     }
 }
 fn invalid() -> AppError {
-    AppError::Fixed(irmind_app::FixedAppError::SourceFormat)
+    AppError::Fixed(crate::FixedAppError::SourceFormat)
 }
 
 fn valid_prefix(prefix: &[u8]) -> bool {
@@ -299,9 +311,13 @@ fn trim(mut bytes: &[u8]) -> &[u8] {
     bytes
 }
 fn valid_metadata(bytes: &[u8]) -> bool {
-    irmind_app::source_mapping::json::validate_json_value(
+    crate::source_mapping::json::validate_json_value(
         bytes,
-        irmind_app::source_mapping::json::SourceJsonLimits::default(),
+        crate::source_mapping::json::SourceJsonLimits::default(),
     )
     .is_ok()
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests;
