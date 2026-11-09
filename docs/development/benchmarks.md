@@ -928,7 +928,7 @@ The decoder timer excludes its downstream callback. The pure mapper timer is a s
 
 All 18 HuntEval episodes retain 19/19 malicious events, 10/10 malicious entities and 14/14 expected path connections per provider, with zero parse errors, in cloud smoke and 15 GB evaluation. These are extraction/search checks, not semantic-mapping or real-model validation.
 
-The new pipeline still misses acceptance gates. Dense entity lookup is a query blocker: five accumulated cloud entity scans rise from 12.190 s to 26.456 s, and normalization from 0.136 s to 4.791 s. For chronological one-host input the corresponding counters are 13.390 → 27.301 s and 0.165 → 5.372 s, with timed-out samples. These are component counters across five queries, not per-query latency or a complete CPU profile.
+The new pipeline still misses acceptance gates. Dense entity lookup is a query blocker: mean accumulated cloud entity-scan counters per query rise from 12.190 s to 26.456 s, and normalization from 0.136 s to 4.791 s. For chronological one-host input the corresponding counters are 13.390 → 27.301 s and 0.165 → 5.372 s, with timed-out samples. Each component counter is averaged over five queries. Scan counters accumulate concurrent worker time and include channel backpressure; they are not wall-clock latency or a complete CPU profile. The earlier scoped aggregation counter was not instrumented, so its zero value does not mean zero aggregation cost.
 
 The common writer therefore remains opt-in. Default CLI/TUI/demo writing stays on the historical V2 builder. Fix ingestion overhead and dense scoped-identity lookup before reconsidering default activation; preserve the retained-parent/authentication boundary and every existing query gate. The [ASan summaries](benchmarks/mapped-pipeline-fuzz.json) and the [full code CI](https://github.com/ns2switch/irmind/actions/runs/42514914270) are separate from release-performance acceptance.
 
@@ -941,3 +941,33 @@ Each candidate/reference pair must run in the same release job on the same corpu
 Default activation requires the relative gate and no query deadline in every scenario. It also requires the absolute gate unless that same scenario's reference misses its absolute target in that same job. Only then can the paired relative gate substitute for the absolute gate. A reference timeout never permits a candidate timeout. Previous combined benchmark pass counts did not evaluate this new relative gate and cannot authorize default activation.
 
 The work order is direct final-file writing, dense entity lookup, then a separate default-activation PR after the complete matrix meets these conditions. Initial direct ingestion must leave zero inactive parents. Later compatible small-file compaction remains available behind a configured count threshold; signed parent retirement remains a [separate future proposal](mapped-parent-retirement-design.md).
+
+
+## Default V2 regression comparison
+
+The [paired release run](https://github.com/ns2switch/irmind/actions/runs/42537050153)
+compares pinned main `3acb485` with `4c2ad5e`. The candidate explicitly disables
+the experimental writer. Every pair runs on the same standard runner. All nine
+15 GB scenarios and their existing query checks pass on both revisions.
+
+| Scenario | Main ingestion s | Candidate ingestion s | Difference |
+| --- | --- | --- | --- |
+| cloud-v2 | 819.890 | 831.158 | +1.37% |
+| endpoint-v2-1 | 1156.807 | 1168.935 | +1.05% |
+| endpoint-v2-1-chronological | 494.383 | 484.602 | -1.98% |
+| endpoint-v2-1024 | 1174.504 | 1165.495 | -0.77% |
+| endpoint-v2-1024-chronological | 579.211 | 593.446 | +2.46% |
+| endpoint-v2-1025 | 1210.280 | 1200.620 | -0.80% |
+| endpoint-v2-1025-chronological | 560.336 | 569.788 | +1.69% |
+| endpoint-v2-64 | 1017.440 | 1026.372 | +0.88% |
+| endpoint-v2-64-chronological | 586.323 | 585.212 | -0.19% |
+
+Derived Parquet byte counts match exactly in every pair; historical physical and
+canonical golden tests also pass. Differences range from -1.98% to +2.46% and do
+not show a default-writer regression. These are V2 measurements, not evidence
+that V3 meets its separate absolute and relative activation gates. The expansive
+path result retains the existing bounded truncation behavior and does not waive
+the new common-writer no-deadline activation requirement.
+
+The [machine-readable results](benchmarks/default-v2-paired-run.json) include
+all query samples' p50/p95 and phase counters. SHA-256: `67c81c065738b87155eda766da568aad80b9a572f2fa431a7b965b9099a66d26`.
