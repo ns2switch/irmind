@@ -176,6 +176,12 @@ fn fixture_decoder<'a>(
         )
         .unwrap(),
     );
+    fixture_catalog(root, catalog)
+}
+fn fixture_catalog<'a>(
+    root: &Path,
+    catalog: Arc<MappingCatalog>,
+) -> (Arc<LocalStore>, Engine<'a>, Arc<MappingCatalog>) {
     let store = Arc::new(LocalStore::open_mapped(root, catalog.clone()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[88; 32]),
@@ -208,3 +214,5 @@ mod guard;
 mod direct;
 mod direct_failures;
 mod direct_faults;
+
+mod cloudtrail;

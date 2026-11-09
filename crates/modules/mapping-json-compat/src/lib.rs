@@ -29,6 +29,39 @@ pub struct JsonCompatibilityMapping {
     manifest: MappingManifest,
 }
 impl JsonCompatibilityMapping {
+    /// Disjoint release catalog route when the explicit `CloudTrail` module is compiled.
+    /// The broad constructor remains available for pinned compatibility benchmarks.
+    pub fn generic_only() -> Result<Self, MappingError> {
+        use irmind_app::source_mapping::{SelectorCondition, SelectorPredicate, SourcePath};
+        let mut mapper = Self::new()?;
+        let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let selector = SourceSelector::try_new(
+            "parser-json",
+            BTreeSet::from(["json-source-v1".into()]),
+            Some(("json".into(), "source-json-v1".into())),
+            BTreeMap::new(),
+            vec![SelectorCondition {
+                path: SourcePath::keys(&["eventVersion"])
+                    .map_err(|_| MappingError::InvalidManifest)?,
+                predicate: SelectorPredicate::Missing,
+            }],
+        )?;
+        mapper.manifest = MappingManifest::try_new(
+            MappingIdentityV1::try_new(
+                "mapping-json-compat",
+                &format!("json-generic-v2-{}", digest.as_str()),
+                COMMON_EVENT_V1,
+                digest,
+            )
+            .map_err(|_| MappingError::InvalidManifest)?,
+            vec![selector],
+            MappingProvenance::NativeBuild {
+                manifest: BUILD.to_vec(),
+            },
+            true,
+        )?;
+        Ok(mapper)
+    }
     pub fn new() -> Result<Self, MappingError> {
         let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
         let version = format!("json-compat-v1-{}", digest.as_str());

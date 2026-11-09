@@ -1274,7 +1274,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "irmind-mod-mapping-tables"
+name = "irmind-mapping-tables"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
@@ -1282,6 +1282,13 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "irmind-mod-mapping-tables"
+version = "0.1.0"
+dependencies = [
+ "irmind-mapping-tables",
 ]
 
 [[package]]

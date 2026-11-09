@@ -1,0 +1,1134 @@
+interpreter = "irmind-mapping-tables-v2"
+# Original CloudTrail fields; finite operation/outcome tables, no source inference.
+id = "mapping-cloudtrail"
+version = "cloudtrail-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-json"
+parser_versions = ["json-source-v1"]
+format = "json"
+format_version = "source-json-v1"
+action = ["eventName"]
+
+[[when]]
+path = ["eventVersion"]
+predicate = { op = "present" }
+
+[partition]
+account = ["recipientAccountId"]
+region = ["awsRegion"]
+
+[[fields]]
+source = ["recipientAccountId"]
+target = "cloud.account.id"
+observation = { kind = "account", role = "subject", scope = { kind = "account", path = ["recipientAccountId"] } }
+
+[[fields]]
+source = ["awsRegion"]
+target = "cloud.region"
+
+[[fields]]
+source = ["eventSource"]
+target = "cloud.service.name"
+
+[[fields]]
+source = ["userIdentity", "principalId"]
+target = "user.id"
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["userIdentity", "accountId"] } }
+
+[[fields]]
+source = ["userIdentity", "userName"]
+target = "user.name"
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["userIdentity", "accountId"] } }
+
+[[fields]]
+source = ["requestParameters", "userName"]
+target = "user.target.name"
+observation = { kind = "user", role = "target", scope = { kind = "account", path = ["recipientAccountId"] } }
+
+[[fields]]
+source = ["requestParameters", "roleArn"]
+target = "irmind.iam_role.id"
+observation = { kind = "role", role = "target", scope = { kind = "account", path = ["recipientAccountId"] } }
+
+[[fields]]
+source = ["requestParameters", "policyArn"]
+target = "irmind.resource.id"
+observation = { kind = "resource", role = "target", scope = { kind = "account", path = ["recipientAccountId"] } }
+
+[[fields]]
+source = ["sourceIPAddress"]
+target = "source.ip"
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["userAgent"]
+target = "user_agent.original"
+
+[[fields]]
+source = ["eventID"]
+target = "irmind.source_event.id"
+observation = { kind = "event", role = "subject", scope = { kind = "source_record" } }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "signin.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "ConsoleLogin" }
+[[rules.when]]
+path = ["responseElements", "ConsoleLogin"]
+predicate = { op = "text", value = "Success" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "signin.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "ConsoleLogin" }
+[[rules.when]]
+path = ["responseElements", "ConsoleLogin"]
+predicate = { op = "text", value = "Failure" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "signin.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "ConsoleLogin" }
+[[rules.when]]
+path = ["responseElements", "ConsoleLogin"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["creation"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "CreateUser" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["creation"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "CreateUser" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["deletion"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "DeleteUser" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["deletion"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "DeleteUser" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["creation"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "CreateAccessKey" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["creation"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "CreateAccessKey" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["deletion"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "DeleteAccessKey" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["deletion"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "DeleteAccessKey" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "UpdateAccessKey" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "UpdateAccessKey" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["creation"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "CreateLoginProfile" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["creation"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "CreateLoginProfile" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "UpdateLoginProfile" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "UpdateLoginProfile" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AttachUserPolicy" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AttachUserPolicy" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "DetachUserPolicy" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "DetachUserPolicy" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AttachRolePolicy" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AttachRolePolicy" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "PutUserPolicy" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "PutUserPolicy" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "PutRolePolicy" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "PutRolePolicy" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AddUserToGroup" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AddUserToGroup" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["creation"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "CreatePolicyVersion" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["creation"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "CreatePolicyVersion" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "SetDefaultPolicyVersion" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "iam.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "SetDefaultPolicyVersion" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "sts.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AssumeRole" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["start"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "sts.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AssumeRole" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "sts.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AssumeRoleWithSAML" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["start"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "sts.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AssumeRoleWithSAML" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "sts.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AssumeRoleWithWebIdentity" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["start"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "sts.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AssumeRoleWithWebIdentity" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["info"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "sts.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "GetCallerIdentity" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["info"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "sts.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "GetCallerIdentity" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["creation"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "ec2.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "RunInstances" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["creation"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "ec2.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "RunInstances" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "ec2.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "StartInstances" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["start"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "ec2.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "StartInstances" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["end"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "ec2.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "StopInstances" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["end"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "ec2.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "StopInstances" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "ec2.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AuthorizeSecurityGroupIngress" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "ec2.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "AuthorizeSecurityGroupIngress" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "s3.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "GetObject" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "s3.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "GetObject" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["creation"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "s3.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "PutObject" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["creation"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "s3.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "PutObject" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["deletion"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "s3.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "DeleteObject" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["deletion"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "s3.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "DeleteObject" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "cloudtrail.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "StopLogging" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "cloudtrail.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "StopLogging" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "cloudtrail.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "StartLogging" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "cloudtrail.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "StartLogging" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["change"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "cloudtrail.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "UpdateTrail" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["change"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "cloudtrail.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "UpdateTrail" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }
+
+[[rules]]
+categories = ["api"]
+types = ["deletion"]
+outcome = "success"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "cloudtrail.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "DeleteTrail" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["deletion"]
+outcome = "failure"
+[[rules.when]]
+path = ["eventSource"]
+predicate = { op = "text", value = "cloudtrail.amazonaws.com" }
+[[rules.when]]
+path = ["eventName"]
+predicate = { op = "text", value = "DeleteTrail" }
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "AwsApiCall" }
+[[rules.when]]
+path = ["errorCode"]
+predicate = { op = "present" }

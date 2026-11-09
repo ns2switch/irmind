@@ -244,3 +244,54 @@ fn rule_fields_and_original_action_use_only_explicit_segmented_paths() {
     );
     assert_eq!(output.record().common.observations().values().len(), 1);
 }
+
+#[test]
+fn optional_primary_conditions_preserve_historical_canonical_definition_bytes() {
+    assert_eq!(
+        TableMapping::review(DEFINITION)
+            .unwrap()
+            .identity()
+            .implementation()
+            .as_str(),
+        "e701dd829adddc20501f273c4b7e465e2e55c23439dafd44203331208baf7b95"
+    );
+    let narrowed = DEFINITION.replacen(
+        "[[rules]]",
+        "[[when]]\npath = [\"source_version\"]\npredicate = { op = \"present\" }\n\n[[rules]]",
+        1,
+    );
+    let broad = mapper(DEFINITION);
+    let narrow = mapper(&format!(
+        "interpreter = \"irmind-mapping-tables-v2\"\n{narrowed}"
+    ));
+    assert_ne!(broad.manifest().identity(), narrow.manifest().identity());
+    assert!(
+        !narrow.manifest().selectors()[0].matches(&source(SourceValue::object(vec![]).unwrap()))
+    );
+}
+
+#[test]
+fn interpreter_versions_preserve_old_display_projection_and_bind_the_new_one() {
+    let definition = DEFINITION.replacen(
+        "[[rules]]",
+        "action = [\"original_action\"]\n\n[[rules]]",
+        1,
+    );
+    let record = source(
+        SourceValue::object(vec![(
+            "original_action".into(),
+            SourceValue::Text("OriginalAction".into()),
+        )])
+        .unwrap(),
+    );
+    let historical = mapper(&definition).map(&record).unwrap();
+    let current = mapper(&format!(
+        "interpreter = \"irmind-mapping-tables-v2\"\n{definition}"
+    ))
+    .map(&record)
+    .unwrap();
+    assert_eq!(historical.record().common, current.record().common);
+    assert_eq!(historical.record().indexed.record.event, "");
+    assert_eq!(current.record().indexed.record.event, "OriginalAction");
+    assert!(TableMapping::review(&format!("interpreter = \"unknown\"\n{definition}")).is_err());
+}

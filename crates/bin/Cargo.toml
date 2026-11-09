@@ -7,7 +7,7 @@ license.workspace = true
 
 [features]
 default = [
-    "mapping-json-compat", "mapping-journald-compat",
+    "mapping-json-compat", "mapping-journald-compat", "mapping-cloudtrail",
     "keystore-os", "keystore-file",
     "parser-json", "parser-syslog", "parser-linux", "parser-evtx",
     "parser-ecs", "parser-ocsf", "parser-declarative",
@@ -17,6 +17,7 @@ default = [
     "siem-splunk", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
     "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
 ]
+mapping-cloudtrail = ["dep:irmind-mod-mapping-cloudtrail", "parser-json"]
 mapping-json-compat = ["dep:irmind-mod-mapping-json-compat", "parser-json"]
 mapping-journald-compat = ["dep:irmind-mod-mapping-journald-compat", "parser-linux"]
 keystore-os = ["dep:irmind-mod-keystore-os"]
@@ -50,6 +51,7 @@ storage-gcs = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/gcs"]
 storage-azure = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/azure"]
 
 [dependencies]
+irmind-mod-mapping-cloudtrail = { path = "../modules/mapping-cloudtrail", version = "0.1.0", optional = true }
 irmind-mod-mapping-json-compat = { path = "../modules/mapping-json-compat", version = "0.1.0", optional = true }
 irmind-mod-mapping-journald-compat = { path = "../modules/mapping-journald-compat", version = "0.1.0", optional = true }
 irmind-mod-parser-evtx = { path = "../modules/parser-evtx", version = "0.1.0", optional = true }

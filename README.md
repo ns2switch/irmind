@@ -100,6 +100,7 @@ The normal build includes every current product module and both keystores. None 
 | Windows EVTX | isolated local parser | `parser-evtx` (default) | experimental | [EVTX](docs/modules.md#windows-evtx) |
 | Syslog parser | local parser | `parser-syslog` (default) | experimental | [Syslog](docs/modules.md#syslog-parser) |
 | JSON and exported cloud log parser | local parser | `parser-json` (default) | experimental | [Local parser](docs/modules.md#streaming-json-and-exported-cloud-log-parser) |
+| CloudTrail common-event mapping | local mapping | `mapping-cloudtrail` | experimental, opt-in writer | [Mappings](docs/mappings.md) |
 | Elastic Common Schema parser | local parser | `parser-ecs` (default) | experimental | [ECS parser](docs/modules.md#elastic-common-schema-parser) |
 | OCSF JSON and Parquet parser | local parser | `parser-ocsf` (default) | experimental | [OCSF parser](docs/modules.md#ocsf-parser) |
 | Velociraptor parser | local parser | `parser-velociraptor` (default) | experimental | [Velociraptor](docs/modules.md#velociraptor-parser) |

@@ -20,6 +20,11 @@ fn check_edge(from: &str, to: &str) -> Result<(), String> {
             "build manifest utility must not depend on runtime crates: {from} -> {to}"
         ));
     }
+    if from == "irmind-mapping-tables" && !matches!(to, "irmind-domain" | "irmind-app") {
+        return Err(format!(
+            "pure table interpreter depends on a runtime adapter: {from} -> {to}"
+        ));
+    }
     if from == "irmind-tui" && to != "irmind-app" {
         return Err(format!("TUI may depend only on irmind-app: {from} -> {to}"));
     }
@@ -33,6 +38,7 @@ fn check_edge(from: &str, to: &str) -> Result<(), String> {
         "irmind-keystore-transfer",
         "irmind-llm-chat-completions",
         "irmind-build-manifest",
+        "irmind-mapping-tables",
     ];
     if layer(from)? == 2 && layer(to)? == 2 && !shared.contains(&to) {
         return Err(format!(
@@ -78,5 +84,7 @@ fn deliberate_reverse_edge_is_rejected() {
     assert!(check_edge("irmind-mod-keystore-file", "irmind-fs").is_ok());
     assert!(check_edge("irmind-fs", "irmind-process-containment").is_ok());
     assert!(check_edge("irmind-process-containment", "irmind-infra").is_err());
+    assert!(check_edge("irmind-mod-mapping-linux", "irmind-mapping-tables").is_ok());
+    assert!(check_edge("irmind-mapping-tables", "irmind-mod-parser-linux").is_err());
     assert!(check_edge("irmind-mod-siem-splunk", "irmind-http").is_ok());
 }

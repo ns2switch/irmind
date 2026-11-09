@@ -478,3 +478,13 @@ Decision: a query fails the same-job relative gate only when its p95 exceeds the
 Cloud and chronological endpoint ingestion require both the 900-second absolute target and the same-job +10% ingestion bound. Disordered stress ingestion requires the 1,350-second absolute target; its relative difference remains reported performance work rather than an activation condition. No scope, result, sample, hop, expansion, token, custody or production query limit changes.
 
 Consequences: reevaluate the frozen dense-reader matrix without changing its raw records, then run a fresh paired release matrix on main with the updated SQLite composition. Historical worst-path metric records are emitted only after a successful result unwrap, so their presence records success; missing or contradictory partial-result markers are invalid evidence. A false gate leaves V3 opt-in. A successful gate permits preparing a separate default-selection PR for CLI, TUI and demo, which remains unmerged for review. Mapping families can be delivered independently using optional V3.
+
+## CloudTrail mapping and a shared table interpreter
+
+Context: mapping families must reuse the bounded interpreter without an adapter-to-adapter dependency, and their selectors must not compete with extraction-only JSON compatibility.
+
+Decision: extract the interpreter into the shared `irmind-mapping-tables` utility, retaining the existing module crate as an API facade. The dependency-direction test permits inbound use of that utility but still rejects its dependency on any parser or mapper adapter. Optional primary conditions reuse the existing closed predicates; absent conditions serialize exactly as before, with a regression pin for the historical definition digest.
+
+CloudTrail is a feature-gated mapping module with a bundled, pinned TOML definition. Its primary selector requires the original `eventVersion` field. In a catalog containing that module, the generic extraction mapping explicitly requires the field to be missing and receives a distinct version identity. A null field remains unclassified. Broad compatibility construction remains unchanged for the frozen benchmark route. No parser output, signed wire encoding, scope or approval rule changes.
+
+The new definitions explicitly select `irmind-mapping-tables-v2`: primary conditions reuse the existing finite predicates and the original action is also used for timeline display. V1 definitions retain their canonical bytes and their historical empty display projection. The existing signed interpreter field identifies each version; no envelope, source manifest, seal or export encoding changes. Unknown interpreter versions and mismatches between definition and provenance fail closed.
