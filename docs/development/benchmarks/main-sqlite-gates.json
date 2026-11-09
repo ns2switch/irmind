@@ -1,0 +1,296 @@
+{
+  "criteria": "analyst-v3-activation-v2",
+  "eligible": false,
+  "run_url": "https://github.com/ns2switch/irmind/actions/runs/42644089484",
+  "scenarios": [
+    {
+      "absolute_ingest": true,
+      "candidate_wall_ns": 609621166793,
+      "candidate_worst_path": {
+        "error": false,
+        "time_budget": true,
+        "truncated": true
+      },
+      "eligible": false,
+      "ordinary_queries_successful": true,
+      "query_deadlines": true,
+      "query_regressions": [
+        {
+          "candidate_p95_ns": 5529884429,
+          "query": "entity",
+          "reference_p95_ns": 3977560280,
+          "scope": "all"
+        }
+      ],
+      "reference_queries_successful": true,
+      "reference_wall_ns": 956456255620,
+      "reference_worst_path": {
+        "error": false,
+        "time_budget": true,
+        "truncated": true
+      },
+      "relative_ingest": true,
+      "relative_ingest_required": true,
+      "relative_queries": false,
+      "scenario": "cloud-v2",
+      "worst_path_gate": true
+    },
+    {
+      "absolute_ingest": true,
+      "candidate_wall_ns": 1172682337240,
+      "candidate_worst_path": null,
+      "eligible": false,
+      "ordinary_queries_successful": true,
+      "query_deadlines": true,
+      "query_regressions": [
+        {
+          "candidate_p95_ns": 2857819480,
+          "query": "entity",
+          "reference_p95_ns": 2146495824,
+          "scope": "all"
+        },
+        {
+          "candidate_p95_ns": 3089988152,
+          "query": "entity",
+          "reference_p95_ns": 2178874081,
+          "scope": "endpoint-0000"
+        },
+        {
+          "candidate_p95_ns": 1784426017,
+          "query": "term",
+          "reference_p95_ns": 1405118270,
+          "scope": "endpoint-0000"
+        }
+      ],
+      "reference_queries_successful": true,
+      "reference_wall_ns": 1044181595059,
+      "reference_worst_path": null,
+      "relative_ingest": false,
+      "relative_ingest_required": false,
+      "relative_queries": false,
+      "scenario": "endpoint-v2-1",
+      "worst_path_gate": true
+    },
+    {
+      "absolute_ingest": true,
+      "candidate_wall_ns": 484326679831,
+      "candidate_worst_path": null,
+      "eligible": false,
+      "ordinary_queries_successful": true,
+      "query_deadlines": true,
+      "query_regressions": [
+        {
+          "candidate_p95_ns": 4072108660,
+          "query": "entity",
+          "reference_p95_ns": 2713157438,
+          "scope": "all"
+        },
+        {
+          "candidate_p95_ns": 6065176897,
+          "query": "term",
+          "reference_p95_ns": 5410061108,
+          "scope": "all"
+        },
+        {
+          "candidate_p95_ns": 4380788058,
+          "query": "entity",
+          "reference_p95_ns": 2859763319,
+          "scope": "endpoint-0000"
+        }
+      ],
+      "reference_queries_successful": true,
+      "reference_wall_ns": 730761350322,
+      "reference_worst_path": null,
+      "relative_ingest": true,
+      "relative_ingest_required": true,
+      "relative_queries": false,
+      "scenario": "endpoint-v2-1-chronological",
+      "worst_path_gate": true
+    },
+    {
+      "absolute_ingest": true,
+      "candidate_wall_ns": 1247545741912,
+      "candidate_worst_path": null,
+      "eligible": false,
+      "ordinary_queries_successful": true,
+      "query_deadlines": true,
+      "query_regressions": [
+        {
+          "candidate_p95_ns": 2164886378,
+          "query": "term",
+          "reference_p95_ns": 1524946030,
+          "scope": "all"
+        },
+        {
+          "candidate_p95_ns": 815547996,
+          "query": "timeline",
+          "reference_p95_ns": 197105988,
+          "scope": "endpoint-0000"
+        },
+        {
+          "candidate_p95_ns": 812509459,
+          "query": "timeline",
+          "reference_p95_ns": 199318469,
+          "scope": "endpoint-1023"
+        }
+      ],
+      "reference_queries_successful": true,
+      "reference_wall_ns": 1129952867768,
+      "reference_worst_path": null,
+      "relative_ingest": false,
+      "relative_ingest_required": false,
+      "relative_queries": false,
+      "scenario": "endpoint-v2-1024",
+      "worst_path_gate": true
+    },
+    {
+      "absolute_ingest": true,
+      "candidate_wall_ns": 407534065417,
+      "candidate_worst_path": null,
+      "eligible": false,
+      "ordinary_queries_successful": true,
+      "query_deadlines": true,
+      "query_regressions": [
+        {
+          "candidate_p95_ns": 5807608933,
+          "query": "term",
+          "reference_p95_ns": 4922273825,
+          "scope": "all"
+        },
+        {
+          "candidate_p95_ns": 2058245618,
+          "query": "timeline",
+          "reference_p95_ns": 1429824708,
+          "scope": "endpoint-0000"
+        },
+        {
+          "candidate_p95_ns": 2059048900,
+          "query": "timeline",
+          "reference_p95_ns": 1430856331,
+          "scope": "endpoint-1023"
+        }
+      ],
+      "reference_queries_successful": true,
+      "reference_wall_ns": 563980544796,
+      "reference_worst_path": null,
+      "relative_ingest": true,
+      "relative_ingest_required": true,
+      "relative_queries": false,
+      "scenario": "endpoint-v2-1024-chronological",
+      "worst_path_gate": true
+    },
+    {
+      "absolute_ingest": false,
+      "candidate_wall_ns": 1363429007765,
+      "candidate_worst_path": null,
+      "eligible": false,
+      "ordinary_queries_successful": true,
+      "query_deadlines": true,
+      "query_regressions": [
+        {
+          "candidate_p95_ns": 1868543438,
+          "query": "term",
+          "reference_p95_ns": 1457689198,
+          "scope": "all"
+        },
+        {
+          "candidate_p95_ns": 729205528,
+          "query": "timeline",
+          "reference_p95_ns": 174839479,
+          "scope": "endpoint-0000"
+        },
+        {
+          "candidate_p95_ns": 730706028,
+          "query": "timeline",
+          "reference_p95_ns": 183298191,
+          "scope": "endpoint-1024"
+        }
+      ],
+      "reference_queries_successful": true,
+      "reference_wall_ns": 1220134343099,
+      "reference_worst_path": null,
+      "relative_ingest": false,
+      "relative_ingest_required": false,
+      "relative_queries": false,
+      "scenario": "endpoint-v2-1025",
+      "worst_path_gate": true
+    },
+    {
+      "absolute_ingest": true,
+      "candidate_wall_ns": 332914522230,
+      "candidate_worst_path": null,
+      "eligible": false,
+      "ordinary_queries_successful": true,
+      "query_deadlines": true,
+      "query_regressions": [
+        {
+          "candidate_p95_ns": 3628796582,
+          "query": "term",
+          "reference_p95_ns": 3272430067,
+          "scope": "all"
+        },
+        {
+          "candidate_p95_ns": 1626331459,
+          "query": "timeline",
+          "reference_p95_ns": 1156786573,
+          "scope": "endpoint-0000"
+        },
+        {
+          "candidate_p95_ns": 1668226259,
+          "query": "timeline",
+          "reference_p95_ns": 1128509398,
+          "scope": "endpoint-1024"
+        }
+      ],
+      "reference_queries_successful": true,
+      "reference_wall_ns": 512733208338,
+      "reference_worst_path": null,
+      "relative_ingest": true,
+      "relative_ingest_required": true,
+      "relative_queries": false,
+      "scenario": "endpoint-v2-1025-chronological",
+      "worst_path_gate": true
+    },
+    {
+      "absolute_ingest": true,
+      "candidate_wall_ns": 1125712789855,
+      "candidate_worst_path": null,
+      "eligible": true,
+      "ordinary_queries_successful": true,
+      "query_deadlines": true,
+      "query_regressions": [],
+      "reference_queries_successful": true,
+      "reference_wall_ns": 991326772423,
+      "reference_worst_path": null,
+      "relative_ingest": false,
+      "relative_ingest_required": false,
+      "relative_queries": true,
+      "scenario": "endpoint-v2-64",
+      "worst_path_gate": true
+    },
+    {
+      "absolute_ingest": true,
+      "candidate_wall_ns": 433853237611,
+      "candidate_worst_path": null,
+      "eligible": false,
+      "ordinary_queries_successful": true,
+      "query_deadlines": true,
+      "query_regressions": [
+        {
+          "candidate_p95_ns": 4730722242,
+          "query": "term",
+          "reference_p95_ns": 4093426079,
+          "scope": "all"
+        }
+      ],
+      "reference_queries_successful": true,
+      "reference_wall_ns": 577333832934,
+      "reference_worst_path": null,
+      "relative_ingest": true,
+      "relative_ingest_required": true,
+      "relative_queries": false,
+      "scenario": "endpoint-v2-64-chronological",
+      "worst_path_gate": true
+    }
+  ]
+}

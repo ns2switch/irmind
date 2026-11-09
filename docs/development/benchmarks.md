@@ -1170,3 +1170,39 @@ The existing [dense-reader matrix](benchmarks/dense-entity-run.json) reevaluated
 A fresh paired matrix on main, including updated SQLite, is required before preparing default activation. V3 remains optional. Separately track stress conversion overhead, delayed materialization of timeline/search results and the expansive cloud path; these items do not prevent independent mapping-family work.
 
 SHA-256 of `dense-entity-gates-v2.json`: `77cb87fcb1c5ce0b93300e4dbe82906c7d78d852981e591e6f88a79d1369a3be`.
+
+## Fresh same-revision V2/V3 matrix with updated SQLite
+
+The [paired release run](https://github.com/ns2switch/irmind/actions/runs/42644089484) uses commit `248200faf8994c95694cfc66d64743538f63e17e` for both variants, including the SQLite update. Each scenario measures V2 and optional mapped V3 on the same standard runner. The [raw allowlisted metrics](benchmarks/main-sqlite-run.json) and [exact gate evaluation](benchmarks/main-sqlite-gates.json) preserve every sample.
+
+**Eligible: false; one of nine scenarios passes all activation gates.** Eight candidate ingestions meet the absolute target; cloud and all four chronological cases also meet the required +10% ingestion bound. The 1,025-host stress case exceeds 1,350 seconds by 13.429 seconds. Its relative difference remains informative, not a gate.
+
+| Scenario | V2 ingestion (s) | V3 ingestion (s) | Absolute ingestion | All activation gates |
+| --- | ---: | ---: | --- | --- |
+| cloud-v2 | 956.456 | 609.621 | pass | fail |
+| endpoint-v2-1 | 1044.182 | 1172.682 | pass | fail |
+| endpoint-v2-1-chronological | 730.761 | 484.327 | pass | fail |
+| endpoint-v2-1024 | 1129.953 | 1247.546 | pass | fail |
+| endpoint-v2-1024-chronological | 563.981 | 407.534 | pass | fail |
+| endpoint-v2-1025 | 1220.134 | 1363.429 | fail | fail |
+| endpoint-v2-1025-chronological | 512.733 | 332.915 | pass | fail |
+| endpoint-v2-64 | 991.327 | 1125.713 | pass | pass |
+| endpoint-v2-64-chronological | 577.334 | 433.853 | pass | fail |
+
+Every candidate cold summary and all 115 ordinary query/filter combinations finish without errors or time-budget truncation. The deliberate expansive cloud path returns the accepted matched partial result in both variants. No ordinary deadline, sample, expansion, hop, token or result limit changes.
+
+| Query | Cells failing both +10% and +0.25 s |
+| --- | ---: |
+| term | 7/23 |
+| entity | 5/23 |
+| neighbors | 0/23 |
+| timeline | 8/23 |
+| path | 0/23 |
+
+Cloud entity lookup measures 3.978 s p95 for V2 and 5.530 s for V3. The one-host stress and chronological cases also contribute entity regressions. This same-revision comparison exposes regressions that were absent when compared against the older V2 reference; a phase profile is needed before attributing the difference. Term/timeline materialization and [stress conversion overhead](https://github.com/ns2switch/irmind/issues/186) remain separate performance work.
+
+The recorded absolute misses are the V2 reference cloud run (956.456 s against 900 s) and the V3 1,025-host stress run (1,363.429 s against 1,350 s). Retain both failed samples and all query results; a reference miss does not waive any candidate gate. V3 remains optional for CLI, TUI and demo. No default-activation PR is warranted by these measurements.
+
+SHA-256 of `main-sqlite-run.json`: `130cb5b5af031b2d71bcfb22c3719d271ca39dc7e46630202f784cb354346bd3`.
+
+SHA-256 of `main-sqlite-gates.json`: `3227491547744402b5899ebf6264fc9b4e0e254643726a4d9843b6fadaf8e2f9`.
