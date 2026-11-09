@@ -11,6 +11,7 @@ SCENARIOS = {"cloud-v2"} | {
 }
 QUERIES = {"term", "entity", "neighbors", "timeline", "path"}
 SECOND = 1_000_000_000
+QUERY_SLACK = SECOND // 4
 
 
 def one(records, kind):
@@ -24,6 +25,19 @@ def duration(value):
     if type(value) is not int or value <= 0:
         raise ValueError("missing or invalid exact nanosecond duration")
     return value
+
+
+def worst_path(rows):
+    row = one(rows, "PARQUET_WORST_PATH")
+    # Historical harnesses emit this metric only after graph_path(...).unwrap().
+    # Its presence therefore records a successful call, not a caught error.
+    error = row.get("error", False)
+    truncated, timeout = row.get("truncated"), row.get("time_budget")
+    if any(type(value) is not bool for value in (error, truncated, timeout)):
+        raise ValueError("worst-case path outcome is missing or invalid")
+    if timeout and not truncated:
+        raise ValueError("time-budget path lacks its partial-result marker")
+    return {"error": error, "truncated": truncated, "time_budget": timeout}
 
 
 def full_sample(records, scenario):
@@ -58,12 +72,29 @@ def full_sample(records, scenario):
         successful &= errors == 0 and timeouts == 0 and queries[key] < 10 * SECOND
     if queries.keys() != expected:
         raise ValueError("query coverage is incomplete")
-    if hosts is None:
-        worst_timeout = one(rows, "PARQUET_WORST_PATH").get("time_budget")
-        if type(worst_timeout) is not bool:
-            raise ValueError("worst-case path outcome is missing")
-        successful &= not worst_timeout
-    return wall, queries, successful
+    worst = worst_path(rows) if hosts is None else None
+    return wall, queries, successful, worst
+
+
+def worst_path_gate(reference, candidate):
+    if candidate is None:
+        return True
+    if candidate["error"]:
+        return False
+    if not candidate["time_budget"]:
+        return True
+    return (not reference["error"] and reference["time_budget"]
+            and reference["truncated"] and candidate["truncated"])
+
+
+def query_regressions(reference, candidate):
+    return [
+        {"scope": scope, "query": query, "reference_p95_ns": reference[scope, query],
+         "candidate_p95_ns": latency}
+        for (scope, query), latency in sorted(candidate.items())
+        if latency * 10 > reference[scope, query] * 11
+        and latency - reference[scope, query] > QUERY_SLACK
+    ]
 
 
 def evaluate(data):
@@ -74,25 +105,34 @@ def evaluate(data):
         if scenario not in SCENARIOS or scenario in seen:
             raise ValueError("unexpected or duplicate scenario")
         seen.add(scenario)
-        reference = artifact["stages"]["reference"]
-        ref_wall, ref_queries, reference_ok = full_sample(reference, scenario)
+        stages = artifact["stages"]
+        # Two-stage runs compare default V2 (baseline) directly with mapped V3.
+        # Older three-stage runs keep their explicit V2 reference.
+        reference = stages["reference"] if "reference" in stages else stages["baseline"]
+        ref_wall, ref_queries, reference_ok, ref_worst = full_sample(reference, scenario)
         candidate = artifact["stages"]["candidate"]
-        wall, queries, candidate_ok = full_sample(candidate, scenario)
-        limit = (900 if scenario == "cloud-v2" or scenario.endswith("-chronological") else 1350) * SECOND
+        wall, queries, candidate_ok, worst = full_sample(candidate, scenario)
+        stress = scenario.startswith("endpoint-") and not scenario.endswith("-chronological")
+        limit = (1350 if stress else 900) * SECOND
         relative_ingest = wall * 10 <= ref_wall * 11
-        relative_queries = all(queries[key] * 10 <= ref_queries[key] * 11 for key in queries)
-        deadlines = candidate_ok
-        # The analyst permits the relative gate when the paired reference itself
-        # misses the absolute ingestion target. Query deadlines are never waived.
+        regressions = query_regressions(ref_queries, queries)
+        relative_queries = not regressions
+        worst_ok = worst_path_gate(ref_worst, worst)
+        deadlines = candidate_ok and worst_ok
         absolute = wall < limit
-        eligible = relative_ingest and relative_queries and deadlines and (absolute or ref_wall >= limit)
+        eligible = absolute and (stress or relative_ingest) and relative_queries and deadlines
         results.append({"scenario": scenario, "reference_wall_ns": ref_wall,
                         "candidate_wall_ns": wall, "absolute_ingest": absolute,
-                        "relative_ingest": relative_ingest, "relative_queries": relative_queries,
-                        "query_deadlines": deadlines, "reference_queries_successful": reference_ok, "eligible": eligible})
+                        "relative_ingest": relative_ingest, "relative_ingest_required": not stress,
+                        "relative_queries": relative_queries, "query_regressions": regressions,
+                        "query_deadlines": deadlines, "ordinary_queries_successful": candidate_ok,
+                        "reference_queries_successful": reference_ok,
+                        "worst_path_gate": worst_ok, "reference_worst_path": ref_worst,
+                        "candidate_worst_path": worst, "eligible": eligible})
     if seen != SCENARIOS:
         raise ValueError("full nine-scenario matrix is required")
-    return {"run_url": data["run_url"], "eligible": all(row["eligible"] for row in results),
+    return {"criteria": "analyst-v3-activation-v2", "run_url": data["run_url"],
+            "eligible": all(row["eligible"] for row in results),
             "scenarios": sorted(results, key=lambda row: row["scenario"])}
 
 

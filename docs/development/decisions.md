@@ -422,7 +422,9 @@ Consequences: historical parser routes, V1/V2 bytes, seal inventory V2 and expor
 
 Measured mapped-parent retention exceeds the planning threshold in every 15 GB workload. Preserve all parent files in the current implementation; the separate [retirement proposal](mapped-parent-retirement-design.md) requires an explicit future contract and makes the unavailable direct file authentication clear. The [complete measurements](benchmarks.md#source-decoding-mapped-v3-and-retained-layout-parents) keep the common writer opt-in because its gates remain unmet.
 
-## Analyst decision: common-writer default activation
+## Historical analyst decision: common-writer default activation
+
+The revised activation decision below supersedes these original gates.
 
 The absolute ingestion targets remain 900 seconds for 15 GB of cloud or chronological endpoint input and 1,350 seconds for stress input. No query may reach its deadline, including the expansive-path check; a time-truncated response does not satisfy this condition. Existing result, sample, hop, expansion, token and scope limits stay unchanged.
 
@@ -466,3 +468,13 @@ aggregation separately without treating an absent counter as zero work.
 Consequences: result, sample, scope, role, hop, expansion and deadline limits are
 unchanged. The [exploratory release smoke](benchmarks.md#dense-mapped-entity-lookup-exploratory-release-smoke)
 is preliminary; full paired 15 GB measurements remain necessary.
+
+## Analyst decision: revised V3 activation evidence
+
+Context: percentage-only query comparisons magnify subsecond differences, and the deliberately expansive cloud path produces a valid partial result in both implementations.
+
+Decision: a query fails the same-job relative gate only when its p95 exceeds the V2 reference by **both more than 10% and more than 0.25 seconds**. Compare exact nanoseconds; equality at either boundary passes. Every ordinary query must still finish without an error or a time-budget truncation, and below the existing ten-second deadline. The deliberate worst-path check is exempt from the deadline gate only when both V2 and V3 return without errors, both report time-budget truncation, and both retain the explicit partial-result marker. Keep publishing that measurement.
+
+Cloud and chronological endpoint ingestion require both the 900-second absolute target and the same-job +10% ingestion bound. Disordered stress ingestion requires the 1,350-second absolute target; its relative difference remains reported performance work rather than an activation condition. No scope, result, sample, hop, expansion, token, custody or production query limit changes.
+
+Consequences: reevaluate the frozen dense-reader matrix without changing its raw records, then run a fresh paired release matrix on main with the updated SQLite composition. Historical worst-path metric records are emitted only after a successful result unwrap, so their presence records success; missing or contradictory partial-result markers are invalid evidence. A false gate leaves V3 opt-in. A successful gate permits preparing a separate default-selection PR for CLI, TUI and demo, which remains unmerged for review. Mapping families can be delivered independently using optional V3.
