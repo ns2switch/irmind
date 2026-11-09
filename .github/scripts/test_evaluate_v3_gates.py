@@ -46,8 +46,7 @@ class ActivationGates(unittest.TestCase):
         stages["candidate"] = sample("cloud-v2", 1090 * gates.SECOND)
         self.assertTrue(gates.evaluate(data)["eligible"])
         stages["candidate"][-1]["time_budget"] = True
-        with self.assertRaisesRegex(ValueError, "time budget"):
-            gates.evaluate(data)
+        self.assertFalse(gates.evaluate(data)["eligible"])
 
     def test_missing_scenario_query_or_exact_duration_is_not_evidence(self):
         complete = matrix()
@@ -66,8 +65,18 @@ class ActivationGates(unittest.TestCase):
     def test_reported_time_budget_truncation_is_not_a_success(self):
         data = matrix()
         data["artifacts"][0]["stages"]["candidate"][4]["time_budget_hits"] = 1
-        with self.assertRaisesRegex(ValueError, "failed query"):
-            gates.evaluate(data)
+        self.assertFalse(gates.evaluate(data)["eligible"])
+
+    def test_reference_timeout_is_reported_and_cannot_hide_a_candidate_timeout(self):
+        data = matrix()
+        stages = data["artifacts"][0]["stages"]
+        stages["reference"][-1]["time_budget"] = True
+        result = gates.evaluate(data)
+        self.assertTrue(result["eligible"])
+        cloud = next(row for row in result["scenarios"] if row["scenario"] == "cloud-v2")
+        self.assertFalse(cloud["reference_queries_successful"])
+        stages["candidate"][-1]["time_budget"] = True
+        self.assertFalse(gates.evaluate(data)["eligible"])
 
     def test_query_deadline_is_never_waived(self):
         data = matrix()

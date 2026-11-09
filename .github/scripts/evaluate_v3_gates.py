@@ -37,8 +37,10 @@ def full_sample(records, scenario):
     wall = duration(one(rows, "PARQUET_INGEST_EXACT").get("wall_ns"))
     if one(rows, "PARQUET_INGEST").get("bytes", 0) < 15_000_000_000:
         raise ValueError("corpus is smaller than 15 GB")
-    if one(rows, "PARQUET_COLD_QUERY").get("error") is not False:
-        raise ValueError("cold summary failed or is missing")
+    cold_error = one(rows, "PARQUET_COLD_QUERY").get("error")
+    if type(cold_error) is not bool:
+        raise ValueError("cold summary outcome is missing")
+    successful = not cold_error
     hosts = None if scenario == "cloud-v2" else int(scenario.split("-")[2])
     scopes = {"all"} if hosts is None else {"all", "endpoint-0000", f"endpoint-{hosts - 1:04}"}
     expected = {(scope, query) for scope in scopes for query in QUERIES}
@@ -47,14 +49,21 @@ def full_sample(records, scenario):
         if row["metric"] != "PARQUET_QUERY_EXACT":
             continue
         key = row.get("scope"), row.get("name")
-        if key in queries or row.get("scenario") != scenario or row.get("errors") != 0 or row.get("time_budget_hits") != 0:
-            raise ValueError("duplicate, mismatched or failed query sample")
+        if key in queries or row.get("scenario") != scenario:
+            raise ValueError("duplicate or mismatched query sample")
+        errors, timeouts = row.get("errors"), row.get("time_budget_hits")
+        if any(type(value) is not int or not 0 <= value <= 5 for value in (errors, timeouts)) or errors + timeouts > 5:
+            raise ValueError("query outcomes are missing or invalid")
         queries[key] = duration(row.get("p95_ns"))
+        successful &= errors == 0 and timeouts == 0 and queries[key] < 10 * SECOND
     if queries.keys() != expected:
         raise ValueError("query coverage is incomplete")
-    if hosts is None and one(rows, "PARQUET_WORST_PATH").get("time_budget") is not False:
-        raise ValueError("worst-case path exhausted its time budget")
-    return wall, queries
+    if hosts is None:
+        worst_timeout = one(rows, "PARQUET_WORST_PATH").get("time_budget")
+        if type(worst_timeout) is not bool:
+            raise ValueError("worst-case path outcome is missing")
+        successful &= not worst_timeout
+    return wall, queries, successful
 
 
 def evaluate(data):
@@ -66,13 +75,13 @@ def evaluate(data):
             raise ValueError("unexpected or duplicate scenario")
         seen.add(scenario)
         reference = artifact["stages"]["reference"]
-        ref_wall, ref_queries = full_sample(reference, scenario)
+        ref_wall, ref_queries, reference_ok = full_sample(reference, scenario)
         candidate = artifact["stages"]["candidate"]
-        wall, queries = full_sample(candidate, scenario)
+        wall, queries, candidate_ok = full_sample(candidate, scenario)
         limit = (900 if scenario == "cloud-v2" or scenario.endswith("-chronological") else 1350) * SECOND
         relative_ingest = wall * 10 <= ref_wall * 11
         relative_queries = all(queries[key] * 10 <= ref_queries[key] * 11 for key in queries)
-        deadlines = all(value < 10 * SECOND for value in queries.values())
+        deadlines = candidate_ok
         # The analyst permits the relative gate when the paired reference itself
         # misses the absolute ingestion target. Query deadlines are never waived.
         absolute = wall < limit
@@ -80,7 +89,7 @@ def evaluate(data):
         results.append({"scenario": scenario, "reference_wall_ns": ref_wall,
                         "candidate_wall_ns": wall, "absolute_ingest": absolute,
                         "relative_ingest": relative_ingest, "relative_queries": relative_queries,
-                        "query_deadlines": deadlines, "eligible": eligible})
+                        "query_deadlines": deadlines, "reference_queries_successful": reference_ok, "eligible": eligible})
     if seen != SCENARIOS:
         raise ValueError("full nine-scenario matrix is required")
     return {"run_url": data["run_url"], "eligible": all(row["eligible"] for row in results),
