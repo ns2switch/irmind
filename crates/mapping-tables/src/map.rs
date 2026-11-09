@@ -38,7 +38,9 @@ impl TableMapping {
             let Some(original) = field.path.resolve(source.fields()) else {
                 continue;
             };
-            if matches!(original, irmind_app::source_mapping::SourceValue::Null) {
+            if matches!(original, irmind_app::source_mapping::SourceValue::Null)
+                || field.omits(original)
+            {
                 continue;
             }
             let value = field.convert(original)?;

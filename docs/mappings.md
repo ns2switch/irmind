@@ -34,3 +34,7 @@ The default compiled catalog uses disjoint selectors: the CloudTrail definition 
 The definition's canonical digest is fixed in the module. Changing its interpretation requires a reviewed version and digest. Its exact identity and the target common schema are bound by the existing V3 mapping profile and receipt. Definitions run without file, network, clock or secret ports.
 
 References: [CloudTrail record fields](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-record-contents.html), [console sign-in events](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-aws-console-sign-in-events.html), and [IAM/STS CloudTrail events](https://docs.aws.amazon.com/IAM/latest/UserGuide/cloudtrail-integration.html).
+
+## Optional absent-value markers
+
+In table definitions, a field may declare `omit_text = ["", "-"]` for documented source markers. A matching original string omits only that projected field and its entity observation. Original evidence is unchanged. Matching is exact and case-sensitive; invalid values not listed still fail validation. Lists contain at most eight distinct, control-free literals of at most 256 UTF-8 bytes each. See the [bounded interpreter design](development/mapping-optional-fields.md).

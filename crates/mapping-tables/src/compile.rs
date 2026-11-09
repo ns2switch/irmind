@@ -81,13 +81,22 @@ impl TableMapping {
         )?;
         let mut rules: Vec<CompiledRule> = Vec::new();
         let primary_budget: usize = definition.when.iter().map(|c| c.path.len() + 1).sum();
-        let mut budget = definition.fields.len() * 33 + primary_budget;
+        let mut budget = definition
+            .fields
+            .iter()
+            .map(super::definition::Field::operation_budget)
+            .sum::<usize>()
+            + primary_budget;
         for rule in &definition.rules {
             let compiled = compile_rule(&definition, rule)?;
             budget += 1
                 + primary_budget
                 + rule.when.iter().map(|c| c.path.len() + 1).sum::<usize>()
-                + rule.fields.len() * 33;
+                + rule
+                    .fields
+                    .iter()
+                    .map(super::definition::Field::operation_budget)
+                    .sum::<usize>();
             if rules
                 .iter()
                 .any(|old| old.selector.overlap_witness(&compiled.selector).is_some())

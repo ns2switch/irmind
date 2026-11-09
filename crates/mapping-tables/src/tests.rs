@@ -6,11 +6,11 @@ use irmind_app::{
 use irmind_domain::{COMMON_EVENT_V1, EntityRole, EventOrigin, EventOutcome, EvidenceHash};
 use std::{collections::BTreeMap, sync::Arc};
 const DEFINITION: &str = include_str!("../tests/fixtures/synthetic-status.toml");
-fn mapper(text: &str) -> TableMapping {
+pub(super) fn mapper(text: &str) -> TableMapping {
     let manifest = TableMapping::review(text).unwrap();
     TableMapping::bundled(text, manifest.identity().implementation()).unwrap()
 }
-fn source(fields: SourceValue) -> SourceRecordV1 {
+pub(super) fn source(fields: SourceValue) -> SourceRecordV1 {
     SourceRecordV1::try_new(
         EventOrigin::try_new(
             EvidenceHash::from_bytes([4; 32]),

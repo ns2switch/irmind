@@ -43,3 +43,7 @@ fn invalid<T>(_: T) -> MappingError {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod optional_field_tests;
