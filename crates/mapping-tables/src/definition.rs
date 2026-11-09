@@ -33,7 +33,14 @@ impl Definition {
         &self,
     ) -> Result<&'static str, irmind_app::source_mapping::MappingError> {
         match self.interpreter.as_deref() {
-            None | Some("irmind-mapping-tables-v1") if self.when.is_empty() => {
+            None | Some("irmind-mapping-tables-v1")
+                if self.when.is_empty()
+                    && self
+                        .fields
+                        .iter()
+                        .chain(self.rules.iter().flat_map(|r| &r.fields))
+                        .all(|field| field.omit_text.is_empty()) =>
+            {
                 Ok("irmind-mapping-tables-v1")
             }
             Some("irmind-mapping-tables-v2") => Ok("irmind-mapping-tables-v2"),
@@ -93,6 +100,8 @@ pub(super) struct Field {
     #[serde(default)]
     pub conversion: Conversion,
     pub observation: Option<Observation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub omit_text: Vec<String>,
 }
 #[derive(Clone, Copy, Default, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -135,4 +144,10 @@ pub(super) struct Partition {
     pub host: Option<Vec<String>>,
     pub account: Option<Vec<String>>,
     pub region: Option<Vec<String>>,
+}
+
+impl Field {
+    pub(super) fn operation_budget(&self) -> usize {
+        33 + self.omit_text.len()
+    }
 }

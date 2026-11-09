@@ -17,6 +17,7 @@ pub(super) struct CompiledField {
     pub target: CommonField,
     pub conversion: Conversion,
     pub observation: Option<CompiledObservation>,
+    omit_text: BTreeSet<String>,
 }
 pub(super) fn compile_fields(fields: Vec<Field>) -> Result<Vec<CompiledField>, MappingError> {
     let mut targets = BTreeSet::new();
@@ -36,10 +37,32 @@ pub(super) fn compile_fields(fields: Vec<Field>) -> Result<Vec<CompiledField>, M
                 target,
                 conversion: f.conversion,
                 observation,
+                omit_text: compile_omit_text(f.omit_text)?,
             })
         })
         .collect()
 }
+impl CompiledField {
+    pub(super) fn omits(&self, value: &irmind_app::source_mapping::SourceValue) -> bool {
+        matches!(value, irmind_app::source_mapping::SourceValue::Text(text) if self.omit_text.contains(text))
+    }
+}
+fn compile_omit_text(values: Vec<String>) -> Result<BTreeSet<String>, MappingError> {
+    if values.len() > 8
+        || values
+            .iter()
+            .any(|v| v.len() > 256 || v.chars().any(char::is_control))
+    {
+        return Err(MappingError::InvalidDefinition);
+    }
+    let count = values.len();
+    let values = values.into_iter().collect::<BTreeSet<_>>();
+    if values.len() != count {
+        return Err(MappingError::InvalidDefinition);
+    }
+    Ok(values)
+}
+
 fn compatible(kind: CommonFieldType, conversion: Conversion) -> bool {
     use CommonFieldType as T;
     use Conversion as C;

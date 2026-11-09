@@ -503,3 +503,11 @@ Decision: extract the interpreter into the shared `irmind-mapping-tables` utilit
 CloudTrail is a feature-gated mapping module with a bundled, pinned TOML definition. Its primary selector requires the original `eventVersion` field. In a catalog containing that module, the generic extraction mapping explicitly requires the field to be missing and receives a distinct version identity. A null field remains unclassified. Broad compatibility construction remains unchanged for the frozen benchmark route. No parser output, signed wire encoding, scope or approval rule changes.
 
 The new definitions explicitly select `irmind-mapping-tables-v2`: primary conditions reuse the existing finite predicates and the original action is also used for timeline display. V1 definitions retain their canonical bytes and their historical empty display projection. The existing signed interpreter field identifies each version; no envelope, source manifest, seal or export encoding changes. Unknown interpreter versions and mismatches between definition and provenance fail closed.
+
+## Exact absent-value markers in the current table interpreter
+
+Context: documented empty PAM identities and Windows `-` address markers are original source values, but cannot become typed identities or IP addresses.
+
+Decision: implement `omit_text` in the current interpreter without creating another interpreter version. Each field accepts up to eight unique, control-free literals of at most 256 UTF-8 bytes. Only an exact original text match omits that field and its observation; original records and unrelated projections remain intact. Count literal comparisons in the existing operation budget.
+
+Consequences: arbitrary invalid IPs, ports, hashes and scalar types still fail the normal validated boundary. No trimming, Unicode folding, coercion or general error suppression is added. Empty lists serialize as absence, preserving current definition goldens. Retired interpreter removal follows the pre-1.0 cleanup policy.
