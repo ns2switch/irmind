@@ -1,4 +1,4 @@
-Traducción de docs/mappings.md en el commit 6f743c1460ccc1ec1193245576bdc8133f936bb6; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/mappings.md en el commit 5c3a759132c226123b85e8b65278be851a10dacc; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos de mapeo de fuentes
 
@@ -34,3 +34,7 @@ Los selectores del catálogo compilado son excluyentes: CloudTrail exige `eventV
 El hash canónico de la definición queda fijado en el módulo. Cambiar su interpretación exige revisar la versión y el hash. El perfil y el recibo V3 existentes enlazan su identidad exacta con el esquema común. Las definiciones no reciben acceso a archivos, red, reloj ni secretos.
 
 Referencias: [campos de CloudTrail](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-record-contents.html), [eventos de inicio de sesión](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-aws-console-sign-in-events.html) y [eventos IAM/STS](https://docs.aws.amazon.com/IAM/latest/UserGuide/cloudtrail-integration.html).
+
+## Marcadores opcionales de valor ausente
+
+Un campo de una definición puede declarar `omit_text = ["", "-"]` para marcadores documentados de la fuente. Una cadena original coincidente omite solo ese campo proyectado y su observación de entidad. La evidencia original no cambia. La comparación es exacta y distingue mayúsculas; los valores inválidos no enumerados siguen rechazándose. Se admiten hasta ocho literales distintos, sin caracteres de control y de un máximo de 256 bytes UTF-8 cada uno. Consulta el [diseño del intérprete acotado](../development/mapping-optional-fields.md).
