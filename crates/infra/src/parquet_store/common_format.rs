@@ -37,17 +37,25 @@ pub(super) fn validate_metadata(
     builder: &str,
 ) -> Result<(), AppError> {
     if id.is_common() {
-        if !matches!(builder, BUILDER | irmind_domain::PARQUET_LAYOUT_BUILDER_V1)
-            || schema
-                .metadata()
-                .get("irmind.common.schema")
-                .map(String::as_str)
-                != Some(COMMON_EVENT_V1)
+        if !matches!(
+            builder,
+            BUILDER
+                | irmind_domain::COMMON_EVENT_DIRECT_BUILDER
+                | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
+        ) || schema
+            .metadata()
+            .get("irmind.common.schema")
+            .map(String::as_str)
+            != Some(COMMON_EVENT_V1)
         {
             return Err(invalid_source());
         }
-    } else if matches!(builder, BUILDER | irmind_domain::PARQUET_LAYOUT_BUILDER_V1)
-        || schema.metadata().contains_key("irmind.common.schema")
+    } else if matches!(
+        builder,
+        BUILDER
+            | irmind_domain::COMMON_EVENT_DIRECT_BUILDER
+            | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
+    ) || schema.metadata().contains_key("irmind.common.schema")
     {
         return Err(invalid_source());
     }

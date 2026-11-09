@@ -98,7 +98,7 @@ impl ParquetStore {
                         seed.push(ParquetArtifact::V3(actual.clone()));
                         rebuilt.insert(actual.core().path.clone(), actual);
                     }
-                    count += 1;
+                    count += rebuilt_sources(mapped, &inputs)?;
                 }
                 ArtifactDerivationV1::Layout { parents } => {
                     let parents = parents
@@ -133,4 +133,17 @@ impl ParquetStore {
         }
         Ok(count)
     }
+}
+
+fn rebuilt_sources(artifact: &ParquetArtifactV3, inputs: &Inputs) -> Result<usize, AppError> {
+    if artifact.core().builder_version != irmind_domain::COMMON_EVENT_DIRECT_BUILDER {
+        return Ok(1);
+    }
+    let binding = artifact.bindings().first().ok_or_else(invalid_source)?;
+    Ok(inputs
+        .profiles
+        .get(binding.profile())
+        .ok_or_else(invalid_source)?
+        .inputs()
+        .len())
 }

@@ -31,6 +31,8 @@ impl ParquetStore {
         let decoder = catalog
             .decoder(id.name, id.version)
             .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+        let mut tuple_disk =
+            crate::parquet_store::partitioning::temporary::DiskLease::new(self.profile.clone());
         let mut tuples = self.create_private_object_spool(
             case,
             input
@@ -50,6 +52,9 @@ impl ParquetStore {
                     .map(|p| p.mapping_timer(super::super::profile::MappingPhase::ValidateAndMap));
                 acc.accept(&source, &mut tuple_writer)?
             };
+            // SourceRecordSetV1 commits fixed 49-byte tuples; this includes
+            // buffered bytes as well as tuples already flushed to the spool.
+            tuple_disk.add(49)?;
             let timer = self
                 .profile
                 .as_ref()
@@ -106,13 +111,54 @@ fn decode_source(
         report
     } else {
         let mut reader = HashingReader::new(&mut *input.source);
-        let report = decoder.decode_reader(
+        let mut callback_failed = false;
+        let result = decoder.decode_reader(
             SourceInput {
                 metadata,
                 reader: &mut reader,
             },
-            emit,
-        )?;
+            &mut |record| {
+                let outcome = emit(record);
+                if outcome.is_err() {
+                    callback_failed = true;
+                }
+                outcome
+            },
+        );
+        if reader.io_failed {
+            return Err(storage("source read failed"));
+        }
+        let report = match result {
+            Err(AppError::Fixed(irmind_app::FixedAppError::SourceFormat)) if !callback_failed => {
+                return Err(rejected(
+                    input,
+                    irmind_app::SourceFailureReason::Format,
+                    vec![],
+                )?);
+            }
+            Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit)) if !callback_failed => {
+                return Err(rejected(
+                    input,
+                    irmind_app::SourceFailureReason::Limit,
+                    vec![],
+                )?);
+            }
+            Err(AppError::Cancelled) if !callback_failed && !input.cancel.is_cancelled() => {
+                return Err(rejected(
+                    input,
+                    irmind_app::SourceFailureReason::Cancelled,
+                    vec![],
+                )?);
+            }
+            other => other?,
+        };
+        if report.accepted == 0 {
+            return Err(rejected(
+                input,
+                irmind_app::SourceFailureReason::Format,
+                report.samples.clone(),
+            )?);
+        }
         reader.drain(input.cancel)?;
         let size = reader.bytes;
         check_hash(reader.finish(), size, input)?;
@@ -126,7 +172,7 @@ fn check_hash(hash: [u8; 32], size: u64, input: &VerifiedInput<'_>) -> Result<()
     }
     Ok(())
 }
-pub(super) fn projection_routes(
+pub(in crate::parquet_store) fn projection_routes(
     catalog: &MappingCatalog,
 ) -> Result<std::collections::BTreeMap<Option<irmind_domain::MappingIdentityV1>, String>, AppError>
 {
@@ -167,4 +213,23 @@ fn route_token(
         }
     }
     irmind_app::hex(&irmind_app::sha256(&bytes))
+}
+
+fn rejected(
+    input: &VerifiedInput<'_>,
+    reason: irmind_app::SourceFailureReason,
+    mut samples: Vec<String>,
+) -> Result<AppError, AppError> {
+    if samples.is_empty() {
+        samples.push(
+            String::from_utf8_lossy(&input.sample[..input.sample.len().min(256)])
+                .chars()
+                .flat_map(char::escape_default)
+                .take(256)
+                .collect(),
+        );
+    }
+    Ok(AppError::SourceFailure(
+        irmind_app::RejectedSource::try_new(input.relative_path.into(), reason, samples)?,
+    ))
 }

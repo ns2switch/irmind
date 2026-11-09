@@ -22,7 +22,7 @@ fn prepare_mapped_ingest(
 }
 ```
 
-MappedIngestRequest carries the case, authenticated source root and ordered selections, copy policy, immutable decoder/mapping catalog and committed artifact metadata. It is never a network or credential port. The request can describe the complete ingestion, while workers open at most four sources at a time.
+MappedIngestRequest carries the case, authenticated source root and ordered selections, copy policy, immutable decoder/mapping catalog and committed artifact metadata. It is never a network or credential port. The application plans the complete compatible collection; each storage preparation receives at most 128 surviving sources, while workers open at most four sources at a time. A borrowed inventory view avoids copying historical artifact metadata when a V1/V2 adapter returns None.
 
 The opaque prepared result exposes acquisition manifests, source-record commitments and finalized unsigned physical outputs. Publish, retain-committed and Drop follow the existing migration/staging lifecycle. An application-owned assembler binds final SourceManifestV2 acquisitions, source sets, mapping snapshots, profiles, V3 outputs and mapping-run receipts before one atomic signed append per bounded group. No prepared storage object supplies signatures or authoritative audit entries.
 
@@ -104,3 +104,40 @@ Initial ingestion does not call layout compaction. A later maintenance operation
 - Keep every query, source/partition, custody and cancellation limit.
 
 Default activation still requires the analyst's absolute and paired relative gates. Experimental format status does not authorize silently modifying V1/V2.
+
+## Direct recipe parameters
+
+Each preparation selects a canonical prefix of at most 128 sources and targets
+512 MiB of raw input, admitting one larger source under its existing limits.
+This bounds preflight reservations for collections containing large originals.
+The application validates the returned prefix and continues with the remainder;
+rejected sources still refill groups exactly as in the clean collection.
+
+The initial recipe targets 64 MiB files and 8,192-row groups, with at most 64
+completed row groups per file, 192 open file writers and a 128 MiB global writer
+budget. Source/envelope limits can close a file earlier. A 1 MiB normalized-row
+buffer feeds Arrow batches; it does not create a normalized-record spool for
+chronological inputs. The existing small source-commitment tuple spool remains
+private and case-local. Disordered inputs use the existing authenticated sorting
+fallback, with at most four source spools live at once.
+
+Buffered rows use the shared stable comparator, including relative source name
+and source hash. Cached partitions are visited first, then uncached partitions,
+with canonical ordering within both sets. Writer eviction uses a deterministic
+access counter and partition/schema tie-breaker. Decisions never use free RAM or
+worker completion order. The complete group is preflighted for disk space before
+parsing; each subsequent bounded input batch retains its existing space check.
+
+Initial TUI and automation ingestion skip layout compaction. Explicit maintenance
+uses a validated small-file count threshold (16 by default for direct artifacts,
+configurable by the application caller). Historical compaction remains available.
+A failed or uncommitted publication is removed on Drop; startup recovery protects
+the complete signed inventory, including inactive parents, before removing an
+orphan direct output.
+
+Release measurements compare three stages in one runner: unchanged V2 reference,
+preceding mapped V3, and direct mapped V3. Each records active bytes, inactive
+parent bytes and a case-local temporary-file peak sampled every 100 ms. The
+sampled peak is an observed lower bound; the implementation's logical staging
+counter is reported separately. Initial direct ingestion asserts zero inactive
+parent bytes. Performance evidence does not enable the experimental writer.

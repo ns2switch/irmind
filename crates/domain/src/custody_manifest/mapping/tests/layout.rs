@@ -2,6 +2,27 @@ use super::super::*;
 use super::fixtures::*;
 
 #[test]
+fn direct_recipe_uses_the_existing_builder_field_with_its_own_golden() {
+    let original = parents().remove(0);
+    let mut core = original.core().clone();
+    core.builder_version = crate::COMMON_EVENT_DIRECT_BUILDER.into();
+    let direct = ParquetArtifactV3::try_new(core, original.pipeline().clone()).unwrap();
+    assert_eq!(
+        direct.encode().unwrap(),
+        include_str!("../goldens/direct-v3.hex").trim()
+    );
+    assert_eq!(
+        ParquetArtifactV3::decode(&direct.encode().unwrap()).unwrap(),
+        direct
+    );
+    assert_ne!(original.identity().unwrap(), direct.identity().unwrap());
+    let layout = compact(&parents());
+    let mut core = layout.core().clone();
+    core.builder_version = crate::COMMON_EVENT_DIRECT_BUILDER.into();
+    assert!(ParquetArtifactV3::try_new(core, layout.pipeline().clone()).is_err());
+}
+
+#[test]
 fn mapped_and_layout_goldens_have_distinct_domains_and_unchanged_parent_bindings() {
     let parents = parents();
     let child = compact(&parents);

@@ -36,9 +36,7 @@ impl SourceDecoder for JsonSourceDecoder {
                 return Err(AppError::Cancelled);
             }
             if report.accepted as u64 + report.rejected >= 10_000_000 {
-                return Err(AppError::Policy(
-                    "JSON source exceeds record count limit".into(),
-                ));
+                return Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit));
             }
             let record = (!frame.oversized)
                 .then(|| decode_frame(input.metadata, &frame, report.accepted))
@@ -135,7 +133,7 @@ fn reject(report: &mut ParseReport, bytes: &[u8]) {
     }
 }
 fn invalid() -> AppError {
-    AppError::Policy("invalid bounded JSON source record".into())
+    AppError::Fixed(irmind_app::FixedAppError::SourceFormat)
 }
 
 #[cfg(test)]

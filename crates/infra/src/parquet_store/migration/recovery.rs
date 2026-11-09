@@ -34,10 +34,22 @@ impl ParquetStore {
                 if metadata.file_type().is_symlink() {
                     return Err(invalid_source());
                 }
+                let path = relative.join(name);
+                if metadata.is_file()
+                    && name.contains(".direct.common.")
+                    && Path::new(name)
+                        .extension()
+                        .is_some_and(|e| e == "parquet" || e == "tmp")
+                    && !signed.iter().any(|a| Path::new(a.path()) == path)
+                {
+                    std::fs::remove_file(entry.path()).map_err(storage)?;
+                    irmind_fs::sync_directory(&root.join(&relative)).map_err(storage)?;
+                    removed += 1;
+                    continue;
+                }
                 if !metadata.is_dir() {
                     continue;
                 }
-                let path = relative.join(name);
                 if let Some(hash) = name.strip_prefix("migration-") {
                     EvidenceHash::parse(hash).map_err(|_| invalid_source())?;
                     if !signed

@@ -267,7 +267,10 @@ impl Writing {
 pub(in crate::parquet_store) fn supported_builder(version: &str) -> bool {
     matches!(
         version,
-        super::super::writer::precise::BUILDER | BUILDER | super::super::common_format::BUILDER
+        super::super::writer::precise::BUILDER
+            | BUILDER
+            | super::super::common_format::BUILDER
+            | irmind_domain::COMMON_EVENT_DIRECT_BUILDER
     )
 }
 

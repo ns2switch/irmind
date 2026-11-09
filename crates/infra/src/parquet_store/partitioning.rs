@@ -1,10 +1,12 @@
+mod attempt;
 mod batch;
 mod consolidate;
+mod direct;
 mod normalize;
 mod ordered;
 mod sorting;
 mod staging;
-mod temporary;
+pub(in crate::parquet_store) mod temporary;
 #[cfg(test)]
 mod tests;
 pub(super) use batch::supported_builder;
@@ -30,8 +32,14 @@ pub(super) struct Allocator {
 }
 
 impl Allocator {
-    pub(super) fn from_signed(
+    pub(in crate::parquet_store) fn from_signed(
         artifacts: &[ParquetArtifact],
+        limits: PartitionLimits,
+    ) -> Result<Self, AppError> {
+        Self::from_signed_iter(artifacts.iter(), limits)
+    }
+    pub(in crate::parquet_store) fn from_signed_iter<'a>(
+        artifacts: impl Iterator<Item = &'a ParquetArtifact>,
         limits: PartitionLimits,
     ) -> Result<Self, AppError> {
         limits.validate()?;
@@ -56,6 +64,7 @@ impl Allocator {
                     v.builder_version.as_str(),
                     BUILDER
                         | super::common_format::BUILDER
+                        | irmind_domain::COMMON_EVENT_DIRECT_BUILDER
                         | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
                 ) {
                     return Err(invalid_source());
@@ -92,7 +101,7 @@ impl Allocator {
         Ok(())
     }
 
-    pub(super) fn assign(
+    pub(in crate::parquet_store) fn assign(
         &mut self,
         date: &str,
         profile: PartitionProfile,

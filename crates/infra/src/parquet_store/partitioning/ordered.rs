@@ -1,5 +1,7 @@
 //! Speculative direct writing. Publication waits for the complete source hash.
+mod direct;
 mod producer;
+pub(in crate::parquet_store::partitioning) use direct::DirectChunk;
 mod scheduling;
 use super::super::{AppError, CancellationToken, ParquetStore, PreparedSource, invalid_source};
 use super::Allocator;

@@ -8,6 +8,7 @@ impl LargeCaseUseCases<'_, '_> {
         &self,
         id: &CaseId,
         known: &BTreeMap<String, ParquetArtifact>,
+        small_file_threshold: usize,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
         let mut groups = BTreeMap::<Vec<u8>, Vec<ParquetArtifactV3>>::new();
@@ -21,6 +22,17 @@ impl LargeCaseUseCases<'_, '_> {
         }
         let mut compacted = 0;
         for group in groups.values() {
+            if group
+                .iter()
+                .any(|a| a.core().builder_version == irmind_domain::COMMON_EVENT_DIRECT_BUILDER)
+                && group
+                    .iter()
+                    .filter(|a| a.core().size < 64 * 1024 * 1024)
+                    .count()
+                    < small_file_threshold
+            {
+                continue;
+            }
             for parents in bounded_groups(group)? {
                 if cancel.is_cancelled() {
                     return Err(AppError::Cancelled);

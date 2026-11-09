@@ -11,6 +11,14 @@ use super::{
 use std::io::Read as _;
 
 impl LargeCaseStore for ParquetStore {
+    fn prepare_mapped_ingest(
+        &self,
+        request: irmind_app::MappedIngestRequest<'_>,
+        cancel: &CancellationToken,
+    ) -> Result<Option<Box<dyn irmind_app::PreparedMappedIngest>>, AppError> {
+        self.prepare_direct(&request, cancel)
+    }
+
     fn prepare_artifact_migration(
         &self,
         request: irmind_app::ArtifactMigrationRequest<'_>,

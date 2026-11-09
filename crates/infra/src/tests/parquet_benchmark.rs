@@ -8,6 +8,7 @@ mod custody;
 mod mapped;
 mod measurements;
 mod scenario;
+mod staging_probe;
 use corpus::{directory_bytes, representative_records, stage_worst_case_path};
 use scenario::Scenario;
 
@@ -112,9 +113,15 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     };
     let mut total_bytes = 0u64;
     custody.reset();
+    let staging_probe = staging_probe::StagingProbe::start(root.path().join("case/parquet"));
     let started = Instant::now();
-    for start in (0..files).step_by(4) {
-        let names = (start..(start + 4).min(files))
+    let batch_size = if common {
+        irmind_app::mapped_ingest::MAPPED_GROUP_SOURCES
+    } else {
+        4
+    };
+    for start in (0..files).step_by(batch_size) {
+        let names = (start..(start + batch_size).min(files))
             .map(|index| {
                 let data = scenario.source(index, multiplier);
                 total_bytes += data.len() as u64;
@@ -128,7 +135,10 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
             fs::remove_file(source_root.join(name)).unwrap();
         }
         if start.is_multiple_of(100) {
-            eprintln!("PARQUET_PROGRESS files={} of {files}", start + 4);
+            eprintln!(
+                "PARQUET_PROGRESS files={} of {files}",
+                (start + batch_size).min(files)
+            );
         }
     }
     if label == "15gb" && scenario.hosts.is_none() {
@@ -143,21 +153,30 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
                 .iter()
                 .map(|name| fs::metadata(source_root.join(name)).unwrap().len())
                 .sum::<u64>();
-            for batch in names.chunks(4) {
+            for batch in names.chunks(batch_size) {
                 ingest_selected(&ingest, &case.id, &source_root, batch);
             }
             episodes
         });
     let layout_started = Instant::now();
-    let bundles = ingest
-        .compact_case(&case.id, &CancellationToken::new())
-        .unwrap();
+    let bundles = if common {
+        0
+    } else {
+        ingest
+            .compact_case(&case.id, &CancellationToken::new())
+            .unwrap()
+    };
     println!("PARQUET_COMPACTION bundles={bundles}");
     println!(
         "PARQUET_LAYOUT_TIME seconds={:.6}",
         layout_started.elapsed().as_secs_f64()
     );
     let ingest_time = started.elapsed();
+    let (staging_peak, staging_errors) = staging_probe.finish();
+    println!(
+        "PARQUET_TEMPORARY_DISK sampled_peak_bytes={staging_peak} interval_ms=100 scan_errors={staging_errors}"
+    );
+    assert_eq!(staging_errors, 0);
     custody.report();
     if let Some((_, timings)) = &mapping {
         timings.report();

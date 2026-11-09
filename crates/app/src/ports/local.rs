@@ -314,6 +314,7 @@ pub trait StreamingEventParser: Send + Sync {
     }
 }
 
+#[derive(Clone)]
 pub struct ParseReport {
     pub accepted: usize,
     pub rejected: u64,
@@ -378,6 +379,14 @@ pub struct PreparedSource {
 /// The local adapter owns all paths and derived files. The application signs
 /// the returned manifests before any derived file is exposed to model tools.
 pub trait LargeCaseStore: Send + Sync {
+    fn prepare_mapped_ingest(
+        &self,
+        _request: crate::MappedIngestRequest<'_>,
+        _cancel: &CancellationToken,
+    ) -> Result<Option<Box<dyn crate::PreparedMappedIngest>>, AppError> {
+        Ok(None)
+    }
+
     fn prepare_artifact_migration(
         &self,
         _request: crate::ArtifactMigrationRequest<'_>,

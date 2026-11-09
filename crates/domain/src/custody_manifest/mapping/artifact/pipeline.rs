@@ -91,6 +91,15 @@ impl ArtifactPipelineV1 {
     pub const fn derivation(&self) -> &ArtifactDerivationV1 {
         &self.derivation
     }
+    pub fn accepts_builder(&self, builder: &str) -> bool {
+        match self.derivation {
+            ArtifactDerivationV1::Mapped => matches!(
+                builder,
+                crate::COMMON_EVENT_BUILDER | crate::COMMON_EVENT_DIRECT_BUILDER
+            ),
+            ArtifactDerivationV1::Layout { .. } => builder == PARQUET_LAYOUT_BUILDER_V1,
+        }
+    }
     pub fn builder(&self) -> &'static str {
         match self.derivation {
             ArtifactDerivationV1::Mapped => crate::COMMON_EVENT_BUILDER,

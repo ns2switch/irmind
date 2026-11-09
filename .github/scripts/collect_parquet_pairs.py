@@ -21,6 +21,12 @@ FIELDS = {
     "PARQUET_SCENARIO": "name size normalized_stage_peak_bytes",
     "PARQUET_INGEST": "bytes files hash_seconds conversion_seconds row_seconds parquet_seconds wall_seconds parquet_bytes coobservation_bytes",
     "PARQUET_COMPACTION": "bundles",
+    "PARQUET_RETAINED_PARENTS": "scenario inactive_parent_bytes active_artifact_bytes retained_case_bytes inactive_case_basis_points inactive_active_basis_points",
+    "PARQUET_LAYOUT_TIME": "seconds",
+    "PARQUET_TEMPORARY_DISK": "sampled_peak_bytes interval_ms scan_errors",
+    "MAPPING_PHASE": "decoder_seconds mapper_seconds",
+    "CUSTODY_PHASE": "sign_seconds verify_signature_seconds append_seconds",
+    "MAPPING_ADAPTER_PHASE": "select_validate_commit_and_map_seconds projection_seconds input_commit_finalize_seconds",
     "PARQUET_COLD_QUERY": "seconds error",
     "PARQUET_V2_PHASE": "stage_seconds sort_seconds replay_seconds source_verify_seconds publish_seconds",
     "PARQUET_QUERY": "scenario scope name p50_seconds p95_seconds errors",
@@ -75,9 +81,9 @@ def metric(prefix, key, raw):
     elif key == "scenario" or (key == "name" and prefix == "PARQUET_SCENARIO"):
         pattern = SCENARIO
     elif key == "stage":
-        pattern = r"baseline|candidate"
+        pattern = r"baseline|candidate|reference"
     elif key in {"size", "corpus"}:
-        pattern = r"(?:1|15)gb|50mb|smoke"
+        pattern = r"(?:1|15)g(?:i)?b|50mb|smoke"
     elif key == "scope":
         pattern = r"all|endpoint-[0-9]{4}"
     elif key == "provider":
@@ -124,14 +130,15 @@ def parse_log(data):
     return records
 
 
-def collect(run_id):
+def collect(run_id, common=False):
     metadata = json.loads(fetch(f"actions/runs/{run_id}/artifacts?per_page=100"))
     results = []
     for artifact in sorted(metadata["artifacts"], key=lambda item: item["name"]):
         name = artifact["name"]
-        if not name.startswith("parquet-pair-") or artifact["expired"]:
+        prefix = "common-schema-" if common else "parquet-pair-"
+        if not name.startswith(prefix) or artifact["expired"]:
             continue
-        if not re.fullmatch("parquet-pair-" + SCENARIO, name):
+        if not re.fullmatch(prefix + SCENARIO, name):
             raise ValueError("unexpected paired artifact name")
         if artifact["size_in_bytes"] > MAX_ARCHIVE:
             raise ValueError("benchmark archive limit exceeded")
@@ -139,7 +146,8 @@ def collect(run_id):
         stages = {}
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             for info in archive.infolist():
-                if info.filename not in {"benchmark-pair-baseline.txt", "benchmark-pair-candidate.txt"}:
+                members = {f"common-schema-{stage}.txt" for stage in ("baseline", "candidate", "reference")} if common else {"benchmark-pair-baseline.txt", "benchmark-pair-candidate.txt"}
+                if info.filename not in members:
                     raise ValueError("unexpected benchmark archive member")
                 if info.file_size > MAX_LOG:
                     raise ValueError("benchmark log limit exceeded")
@@ -157,8 +165,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run", type=int)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--common", action="store_true", help="collect mapped/direct schema metrics")
     args = parser.parse_args()
-    result = collect(args.run)
+    result = collect(args.run, args.common)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(f"Collected {len(result['artifacts'])} paired artifacts")
 

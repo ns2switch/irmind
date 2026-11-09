@@ -234,7 +234,9 @@ pub(super) fn manifest(
         source_hashes: vec![hash.clone()],
         time_semantics: ARTIFACT_V2_TIME_SEMANTICS.into(),
         stable_order: ARTIFACT_V2_STABLE_ORDER.into(),
-        builder_version: if sink.common {
+        builder_version: if sink.direct {
+            irmind_domain::COMMON_EVENT_DIRECT_BUILDER.into()
+        } else if sink.common {
             crate::parquet_store::common_format::BUILDER.into()
         } else if sink.partition.scope.is_some() {
             crate::parquet_store::partitioning::BUILDER.into()

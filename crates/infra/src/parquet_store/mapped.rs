@@ -16,3 +16,5 @@ impl ParquetStore {
         Ok(store)
     }
 }
+
+pub(in crate::parquet_store) use decode::projection_routes as projection_routes_for_direct;

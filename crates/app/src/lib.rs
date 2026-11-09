@@ -56,6 +56,11 @@ mod ingest_options;
 pub use ingest_options::{IngestOptions, command_time_context};
 mod keystore;
 mod large_case;
+pub mod mapped_ingest;
+pub use mapped_ingest::{
+    MappedIngestRequest, MappedSourceAcquisition, PreparedMappedGroup, PreparedMappedIngest,
+    RejectedSource, SourceFailureReason,
+};
 mod parser_calendar;
 pub use parser_calendar::ParserCalendar;
 mod parser_time;

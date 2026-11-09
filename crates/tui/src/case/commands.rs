@@ -403,6 +403,11 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         let id = self.id;
         let progress = self.progress_tx.clone();
         self.start_task("Ingest", move |cancel| {
+            let first_seq = workflow
+                .engine
+                .audit_log
+                .last_entry(id)?
+                .map_or(0, |entry| entry.seq);
             workflow
                 .ingest_path_with_selections(
                     crate::workflow::ingest::IngestRequest {
@@ -419,13 +424,33 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                         let _ = progress.send(format!("Ingested {done}/{count}: {source}"));
                     },
                 )
-                .map(|count| {
+                .and_then(|count| {
                     let warning = if workflow.io_ops.experimental_common_writer() {
                         " · Experimental V3/V6/layout: unstable, no migration guarantee"
                     } else {
                         ""
                     };
-                    format!("Ingested {count} files{warning}")
+                    let rejected = if workflow.io_ops.experimental_common_writer() {
+                        workflow
+                            .engine
+                            .audit_log
+                            .entries(id)?
+                            .iter()
+                            .filter(|entry| entry.seq > first_seq)
+                            .map(irmind_app::RejectedSource::from_audit)
+                            .collect::<std::result::Result<Vec<_>, _>>()?
+                            .into_iter()
+                            .flatten()
+                            .count()
+                    } else {
+                        0
+                    };
+                    let rejected = if rejected == 0 {
+                        String::new()
+                    } else {
+                        format!(" · {rejected} rejected; expand the rejection cards for details")
+                    };
+                    Ok(format!("Ingested {count} files{rejected}{warning}"))
                 })
         });
     }

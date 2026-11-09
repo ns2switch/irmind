@@ -14,6 +14,10 @@ on:
         description: Enable mapped V3 for the candidate; false checks unchanged default V2
         type: boolean
         default: true
+      direct_write:
+        description: Compare V2 reference, preceding mapped V3 and direct V3 in the same runner
+        type: boolean
+        default: false
       scenario:
         description: Release benchmark workload
         type: choice
@@ -205,6 +209,7 @@ jobs:
           echo "IRMIND_HUNTEVAL_ROOT=$dataset_root" >> "$GITHUB_ENV"
       - name: Compare release schemas on the same runner
         env:
+          DIRECT_WRITE: ${{ inputs.direct_write }}
           MAPPED_CANDIDATE: ${{ inputs.mapped_candidate }}
           BASE_REF: ${{ inputs.compare_base }}
           IRMIND_BENCH_SCENARIO: ${{ matrix.scenario }}
