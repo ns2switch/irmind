@@ -971,3 +971,64 @@ the new common-writer no-deadline activation requirement.
 
 The [machine-readable results](benchmarks/default-v2-paired-run.json) include
 all query samples' p50/p95 and phase counters. SHA-256: `67c81c065738b87155eda766da568aad80b9a572f2fa431a7b965b9099a66d26`.
+
+## Direct mapped writing: complete paired release matrix
+
+This measurement compares final-file writing with the preceding mapped writer. It does not enable V3.
+
+[Run 42590715429](https://github.com/ns2switch/irmind/actions/runs/42590715429) measured V2 and the preceding mapped writer at `7f1802610e9a635c6123e0ad819ba32229f80ea0`, then direct V3 at `96f238a7bb7b88d7877e92b085ee17f3d040b9d0`. Each scenario uses the same standard Linux runner for its three release stages. Separate scenarios use separate runners; do not infer cross-run speedups.
+
+The measured commits precede the bundled SQLite maintenance update in [PR #210](https://github.com/ns2switch/irmind/pull/210). The later cancellation and portable-fixture corrections do not alter the successful writer path. Composition tests cover the updated dependency, but these timings are evidence for the measured revisions, not a default-activation run of the final composition.
+
+Times include synthetic source generation and ingestion. Endpoint corpora contain 15,676,080,000 bytes. Cloud input size and all scoped query samples are retained in the [allowlisted records](benchmarks/direct-write-run.json).
+
+| Scenario | V2 reference (s) | Previous V3 (s) | Direct V3 (s) | Direct vs previous | Direct vs V2 | Longest standard query p95 (s) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cloud-v2 | 955.574 | 1121.391 | 609.233 | -45.7% | -36.2% | 9.830 |
+| endpoint-v2-1 | 1138.768 | 1561.395 | 1304.080 | -16.5% | +14.5% | 9.266 |
+| endpoint-v2-64 | 1032.679 | 1454.647 | 1279.642 | -12.0% | +23.9% | 2.621 |
+| endpoint-v2-1024 | 1125.300 | 1531.452 | 1313.879 | -14.2% | +16.8% | 1.710 |
+| endpoint-v2-1025 | 1167.178 | 1562.355 | 1334.246 | -14.6% | +14.3% | 1.627 |
+| endpoint-v2-1-chronological | 542.718 | 682.466 | 329.727 | -51.7% | -39.2% | 7.255 |
+| endpoint-v2-64-chronological | 600.507 | 776.192 | 401.578 | -48.3% | -33.1% | 3.852 |
+| endpoint-v2-1024-chronological | 558.144 | 756.079 | 406.778 | -46.2% | -27.1% | 5.166 |
+| endpoint-v2-1025-chronological | 596.984 | 789.785 | 368.930 | -53.3% | -38.2% | 4.415 |
+
+All 115 standard query/filter combinations have zero candidate errors, with five samples each. This includes unfiltered, ordinary-host and overflow-host selections. All nine candidate ingestions meet 900 seconds for cloud/chronological data or 1,350 seconds for stress data. The worst-case cloud path is separate: it still returns a time-budget truncation at 10.008 seconds. Standard-query success does not waive that miss.
+
+### Active, parent and temporary disk
+
+GB below means 1,000,000,000 bytes. Derived artifact sizes exclude originals; copying originals is disabled in this synthetic workload. Temporary peaks sample case-local temporary files every 100 ms and are observed lower bounds. The separate logical normalized-staging counters remain in the JSON.
+
+| Scenario | Previous active GB | Direct active GB | Previous inactive parents GB | Direct inactive parents GB | Previous temporary peak GB | Direct temporary peak GB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cloud-v2 | 6.522 | 2.692 | 6.136 | 0.000 | 0.052 | 0.091 |
+| endpoint-v2-1 | 2.965 | 1.318 | 2.996 | 0.000 | 0.294 | 0.330 |
+| endpoint-v2-64 | 2.967 | 1.319 | 2.876 | 0.000 | 0.294 | 0.325 |
+| endpoint-v2-1024 | 2.966 | 1.322 | 2.876 | 0.000 | 0.294 | 0.330 |
+| endpoint-v2-1025 | 2.966 | 1.323 | 2.876 | 0.000 | 0.294 | 0.330 |
+| endpoint-v2-1-chronological | 4.874 | 2.922 | 4.922 | 0.000 | 0.032 | 0.100 |
+| endpoint-v2-64-chronological | 4.877 | 2.925 | 4.727 | 0.000 | 0.032 | 0.099 |
+| endpoint-v2-1024-chronological | 4.877 | 2.928 | 4.727 | 0.000 | 0.034 | 0.099 |
+| endpoint-v2-1025-chronological | 4.877 | 2.928 | 4.727 | 0.000 | 0.034 | 0.103 |
+
+Initial direct writing retains **zero inactive-parent bytes in every scenario**. Active files also shrink; temporary peaks increase relative to previous V3 in this run. Later explicit maintenance may create retained parents under the existing layout contract. No parent retirement is implemented.
+
+### Representative 1 GiB repetitions
+
+Each representative source runs three repetitions per stage before its 15 GB case. Every smoke input is at least 1 GiB; the table reports median wall time and the full range.
+
+| Source | Stage | Median (s) | Range (s) |
+| --- | --- | ---: | --- |
+| cloud-v2 | reference | 93.022 | 92.825–94.421 |
+| cloud-v2 | baseline | 242.616 | 242.271–242.976 |
+| cloud-v2 | candidate | 43.717 | 43.567–44.045 |
+| endpoint-v2-64-chronological | reference | 69.787 | 66.846–73.544 |
+| endpoint-v2-64-chronological | baseline | 173.270 | 169.701–173.598 |
+| endpoint-v2-64-chronological | candidate | 40.197 | 39.450–42.557 |
+
+### Activation result
+
+Direct writing removes initial compaction and its inactive parents and improves all measured ingestion times relative to preceding V3. It remains **opt-in**. Stress ingestion exceeds the paired +10% V2 margin; several query p95 values also exceed that margin, and the worst-case path exhausts its budget. The absolute ingestion results alone are insufficient. Rounded values in this table are descriptive; the separate dense-reader comparison records integer nanoseconds for exact gate evaluation.
+
+The functional suite checks 300 sources with three corrupt files against the clean 297-source collection, signed rejections, bounded exclusions, publication/signing rollback, cancellation, deterministic physical goldens, exact reconstruction, copied-source reconstruction without external originals and public-key-only V6 export verification. Historical goldens remain unchanged.

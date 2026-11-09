@@ -186,3 +186,52 @@ fn corrupt_sources_refill_groups_without_changing_clean_derived_bytes() {
         0
     );
 }
+
+#[test]
+fn copied_direct_sources_reconstruct_without_the_external_originals() {
+    let root = tempfile::tempdir().unwrap();
+    let (store, engine, catalog) = fixture(root.path());
+    let case = engine
+        .create_case("Copied direct reconstruction", "local only")
+        .unwrap();
+    let sources = root.path().join("sources");
+    fs::create_dir(&sources).unwrap();
+    let paths = ["first.json", "second.json"].map(String::from);
+    for (index, path) in paths.iter().enumerate() {
+        fs::write(
+            sources.join(path),
+            format!(r#"{{"eventTime":"2026-11-01T00:00:0{index}.123456789Z","eventName":"Event{index}","sourceIPAddress":"203.0.113.77"}}"#),
+        )
+        .unwrap();
+    }
+    let parser = catalog
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap();
+    let large = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &parser,
+    };
+    large
+        .ingest_local_batch(&case.id, &sources, &paths, true, &CancellationToken::new())
+        .unwrap();
+    for path in &paths {
+        fs::remove_file(sources.join(path)).unwrap();
+    }
+    let before = store.last_entry(&case.id).unwrap().unwrap();
+    assert_eq!(
+        large
+            .verify_parquet_rebuild(&case.id, &sources, &CancellationToken::new())
+            .unwrap(),
+        2
+    );
+    let after = store.last_entry(&case.id).unwrap().unwrap();
+    assert_eq!((after.seq, after.hash), (before.seq, before.hash));
+    engine.verify(&case.id).unwrap();
+    assert_eq!(
+        fs::read_dir(store.parquet.case_dir(&case.id).unwrap().join("spool"))
+            .unwrap()
+            .count(),
+        0
+    );
+}
