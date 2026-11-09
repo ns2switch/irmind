@@ -79,6 +79,10 @@ jobs:
         with: {tool: 'cargo-nextest,cargo-deny', fallback: none}
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_select_ci_scope.py
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_release_json_features.py
+      - name: Test exact paired benchmark activation criteria
+        run: |
+          python3 -B .github/scripts/test_collect_parquet_pairs.py
+          python3 -B .github/scripts/test_evaluate_v3_gates.py
       - run: sh -n install.sh
       - run: python3 -B scripts/test_install_sh.py
       - run: cargo fmt --all -- --check

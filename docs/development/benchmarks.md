@@ -1153,3 +1153,20 @@ Three at-least-1-GiB repetitions for cloud and chronological 64-host input are r
 
 SHA-256 of `dense-entity-run.json`: `972a3ca900dd76bc7a82a223fee056ea8005c8c548eaa8b5670063be5b05d4fb`.
 SHA-256 of `dense-entity-gates.json`: `0cf4bf3edec84878aa3a327e24f82605c6062ffcf6441b3dd81dc848dabb0295`.
+
+## Revised analyst activation criteria
+
+This section supersedes the percentage-only activation decision above. Every pair uses the same corpus and release job. A query fails the relative gate only when its candidate p95 is **more than 10% and more than 0.25 seconds slower** than V2. The evaluator compares integer nanoseconds and retains all ordinary query error/deadline checks. It never changes production limits.
+
+The deliberately expansive cloud path remains measured. Its budget truncation is acceptable only when both variants return successfully with the same time-budget and partial-result markers. An unmatched timeout, an error, or a missing partial marker does not qualify. Historical successful metric lines were emitted only after `graph_path(...).unwrap()`; no missing error result is inferred from an absent metric.
+
+| Workload | Absolute ingestion gate | Relative ingestion gate |
+| --- | --- | --- |
+| Cloud and chronological endpoint, 15 GB | Below 900 seconds | At most +10% versus V2 |
+| Disordered endpoint stress, 15 GB | Below 1,350 seconds | Reported; not an activation gate |
+
+The existing [dense-reader matrix](benchmarks/dense-entity-run.json) reevaluated with these rules is still **eligible: false**: 4/9 scenarios pass; 9/9 meet their absolute ingestion target and their ordinary query deadlines. The matched deliberate path is accepted. Remaining relative query regressions are term 7/23 and timeline 8/23; entity, neighbors and ordinary path have none. See the [exact revised evaluation](benchmarks/dense-entity-gates-v2.json), which preserves every failing sample and the original measurements.
+
+A fresh paired matrix on main, including updated SQLite, is required before preparing default activation. V3 remains optional. Separately track stress conversion overhead, delayed materialization of timeline/search results and the expansive cloud path; these items do not prevent independent mapping-family work.
+
+SHA-256 of `dense-entity-gates-v2.json`: `77cb87fcb1c5ce0b93300e4dbe82906c7d78d852981e591e6f88a79d1369a3be`.
