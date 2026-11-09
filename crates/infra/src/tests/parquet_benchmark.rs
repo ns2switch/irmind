@@ -92,7 +92,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     let mapped_parser = mapping.as_ref().map(|(catalog, _)| {
         use irmind_app::SourceDecoder as _;
         let id = if scenario.hosts.is_some() {
-            irmind_mod_parser_linux::JournalSourceDecoder.identity()
+            irmind_mod_parser_linux::LinuxSourceDecoder.identity()
         } else {
             irmind_mod_parser_json::JsonSourceDecoder.identity()
         };

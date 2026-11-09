@@ -100,7 +100,7 @@ pub(super) fn catalog() -> (Arc<MappingCatalog>, Arc<Timings>) {
     let timings = Arc::new(Timings::default());
     let decoders: Vec<Arc<dyn SourceDecoder>> = vec![
         Arc::new(irmind_mod_parser_json::JsonSourceDecoder),
-        Arc::new(irmind_mod_parser_linux::JournalSourceDecoder),
+        Arc::new(irmind_mod_parser_linux::LinuxSourceDecoder),
     ];
     let mappers: Vec<Arc<dyn SourceMapper>> = vec![
         Arc::new(irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap()),

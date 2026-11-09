@@ -151,8 +151,78 @@ fn assert_journal_selection(catalog: &irmind_app::modules::ParserCatalog) {
             time_context: None,
         })
         .unwrap();
-    assert_eq!(
-        journal_selected.selection.parser_version,
-        "journald-source-v1"
+    assert_eq!(journal_selected.selection.parser_version, "linux-source-v1");
+}
+
+#[cfg(feature = "mapping-linux")]
+#[test]
+fn linux_auth_context_is_confirmed_signed_and_reproducible_through_the_mapped_writer() {
+    let root = tempfile::tempdir().unwrap();
+    let (_, engine) = setup(root.path(), false);
+    let mut registry = registry();
+    registry
+        .register(
+            Box::new(irmind_mod_mapping_linux::SshdMapping::new().unwrap()),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    let config = PersistentConfig {
+        experimental_common_writer: Some(true),
+        ..Default::default()
+    };
+    let catalog = super::super::experimental_parsers(registry.parser_catalog(), &config).unwrap();
+    let bytes = b"Dec 31 23:59:59 host-a sshd[42]: Failed password for alice from 203.0.113.77 port 22 ssh2\nJan  1 00:00:00 host-a sshd[42]: Accepted password for alice from 203.0.113.77 port 22 ssh2\n";
+    let mut request = ParserSelectionRequest {
+        source: "auth.log",
+        sample: bytes,
+        parser_override: None,
+        forced: false,
+        time_context: None,
+    };
+    assert!(matches!(
+        catalog.select_source(request),
+        Err(AppError::ParserTimeContextRequired { .. })
+    ));
+    request.time_context = Some(
+        irmind_app::ParserTimeContext::new(2026, 0, true, irmind_app::ParserTimeBasis::Analyst)
+            .unwrap(),
     );
+    let selected = catalog.select_source(request).unwrap();
+    assert_eq!(selected.selection.parser_version, "linux-source-v1");
+    assert!(selected.selection.timestamp_context.is_some());
+    let store = super::super::experimental(root.path(), &config, &registry)
+        .unwrap()
+        .unwrap();
+    let case = engine
+        .create_case("Synthetic Linux authentication", "local only")
+        .unwrap();
+    std::fs::write(root.path().join("auth.log"), bytes).unwrap();
+    let use_cases = LargeCaseUseCases {
+        engine: &engine,
+        store: &store,
+        parser: selected.parser.as_ref(),
+    };
+    use_cases
+        .ingest_local_batch_selected(
+            &case.id,
+            root.path(),
+            &["auth.log".into()],
+            false,
+            &BTreeMap::from([("auth.log".into(), selected.selection)]),
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    assert!(
+        use_cases
+            .verify_parquet(&case.id, &CancellationToken::new())
+            .unwrap()
+            > 0
+    );
+    assert_eq!(
+        use_cases
+            .verify_parquet_rebuild(&case.id, root.path(), &CancellationToken::new())
+            .unwrap(),
+        1
+    );
+    engine.verify(&case.id).unwrap();
 }

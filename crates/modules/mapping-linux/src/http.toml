@@ -1,0 +1,60 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-linux-http"
+version = "linux-http-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-linux"
+parser_versions = ["linux-source-v1"]
+format = "linux"
+format_version = "linux-source-v1"
+dataset = "http-access"
+action = ["request", "method"]
+
+[[fields]]
+source = ["remote_addr"]
+target = "source.ip"
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["remote_user"]
+target = "user.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["request", "method"]
+target = "http.request.method"
+
+[[fields]]
+source = ["request", "target"]
+target = "url.original"
+
+[[fields]]
+source = ["status"]
+target = "http.response.status_code"
+
+[[rules]]
+categories = ["web"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["status"]
+predicate = { op = "integer_interval", value = { first = 100, last = 199 } }
+
+[[rules]]
+categories = ["web"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["status"]
+predicate = { op = "integer_interval", value = { first = 200, last = 399 } }
+
+[[rules]]
+categories = ["web"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["status"]
+predicate = { op = "integer_interval", value = { first = 400, last = 599 } }
+

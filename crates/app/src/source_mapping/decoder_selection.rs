@@ -7,11 +7,13 @@ use irmind_domain::Tainted;
 use std::{io::Read, sync::Arc};
 
 type Detector = fn(&str, &[u8]) -> Option<ParserConfidence>;
+type TimeDetector = fn(&str, &[u8]) -> Result<Option<crate::ParserTimeRequirement>, AppError>;
 
 pub struct SourceDecoderSelection {
     decoder: Arc<dyn SourceDecoder>,
     context: Option<String>,
     detector: Option<Detector>,
+    time_detector: Option<TimeDetector>,
 }
 impl SourceDecoderSelection {
     pub fn new(decoder: Arc<dyn SourceDecoder>) -> Self {
@@ -19,6 +21,7 @@ impl SourceDecoderSelection {
             decoder,
             context: None,
             detector: None,
+            time_detector: None,
         }
     }
 }
@@ -26,6 +29,11 @@ impl SourceDecoderSelection {
     #[must_use]
     pub fn with_detector(mut self, detector: fn(&str, &[u8]) -> Option<ParserConfidence>) -> Self {
         self.detector = Some(detector);
+        self
+    }
+    #[must_use]
+    pub fn with_time_detector(mut self, detector: TimeDetector) -> Self {
+        self.time_detector = Some(detector);
         self
     }
 }
@@ -85,6 +93,7 @@ impl LogParser for SourceDecoderSelection {
             decoder: Arc::clone(&self.decoder),
             context: Some(super::source_time_snapshot(context)?),
             detector: self.detector,
+            time_detector: self.time_detector,
         }))
     }
 
@@ -92,7 +101,20 @@ impl LogParser for SourceDecoderSelection {
         self.detector
             .and_then(|detect| detect(source, &sample[..sample.len().min(65_536)]))
     }
+    fn time_context_requirement(
+        &self,
+        source: &str,
+        sample: &[u8],
+    ) -> Result<Option<crate::ParserTimeRequirement>, AppError> {
+        self.time_detector.map_or(Ok(None), |detect| {
+            detect(source, &sample[..sample.len().min(65_536)])
+        })
+    }
 }
 fn unsupported() -> AppError {
     AppError::Policy("this source decoder requires the selected mapping pipeline; legacy projection is unavailable".into())
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests;

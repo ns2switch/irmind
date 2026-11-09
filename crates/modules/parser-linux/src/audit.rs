@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 mod arguments;
 mod encoding;
 mod fields;
+pub(crate) mod source;
 use fields::Line;
 
 const MAX_GROUPS: usize = 64;

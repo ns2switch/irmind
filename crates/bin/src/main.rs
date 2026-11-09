@@ -167,7 +167,9 @@ impl WorkspaceIo for RootWorkspaceIo {
         self.experimental_common_writer
     }
     fn common_writer_available(&self) -> bool {
-        cfg!(feature = "mapping-json-compat") || cfg!(feature = "mapping-journald-compat")
+        cfg!(feature = "mapping-json-compat")
+            || cfg!(feature = "mapping-journald-compat")
+            || cfg!(feature = "mapping-linux")
     }
     fn definition_store(&self) -> Option<&dyn irmind_app::ParserDefinitionStore> {
         Some(&self.definition_store)

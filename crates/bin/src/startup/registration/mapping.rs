@@ -15,6 +15,20 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
         Box::new(irmind_mod_mapping_cloudtrail::CloudTrailMapping::new()?),
         &ModuleConfig::new(),
     )?;
+    #[cfg(feature = "mapping-linux")]
+    register_linux(registry)?;
+    Ok(())
+}
+#[cfg(feature = "mapping-linux")]
+fn register_linux(registry: &mut ModuleRegistry) -> Result<()> {
+    use irmind_mod_mapping_linux::{
+        AuditMapping, HttpMapping, SshdMapping, SuMapping, SudoMapping,
+    };
+    registry.register(Box::new(SshdMapping::new()?), &ModuleConfig::new())?;
+    registry.register(Box::new(SudoMapping::new()?), &ModuleConfig::new())?;
+    registry.register(Box::new(SuMapping::new()?), &ModuleConfig::new())?;
+    registry.register(Box::new(HttpMapping::new()?), &ModuleConfig::new())?;
+    registry.register(Box::new(AuditMapping::new()?), &ModuleConfig::new())?;
     Ok(())
 }
 #[cfg(feature = "mapping-json-compat")]
@@ -41,15 +55,16 @@ mod tests {
             .add_source_decoder(Arc::new(irmind_mod_parser_json::JsonSourceDecoder))
             .unwrap();
         registry
-            .add_source_decoder(Arc::new(irmind_mod_parser_linux::JournalSourceDecoder))
+            .add_source_decoder(Arc::new(irmind_mod_parser_linux::LinuxSourceDecoder))
             .unwrap();
         register(&mut registry).unwrap();
         let catalog = registry.mapping_catalog().unwrap();
         assert!(catalog.supports_decoder("parser-json", "json-source-v1"));
-        assert!(catalog.supports_decoder("parser-linux", "journald-source-v1"));
+        assert!(catalog.supports_decoder("parser-linux", "linux-source-v1"));
         assert_eq!(
             catalog.snapshots().unwrap().len(),
             2 + usize::from(cfg!(feature = "mapping-cloudtrail"))
+                + 5 * usize::from(cfg!(feature = "mapping-linux"))
         );
     }
 }

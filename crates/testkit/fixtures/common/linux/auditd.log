@@ -1,0 +1,9 @@
+node=host-a type=SYSCALL msg=audit(1793491200.123456789:1): arch=c000003e syscall=59 success=yes uid=1000 euid=0 pid=42 ppid=1 comm="synthetic" exe="/synthetic/tool"
+node=host-a type=EXECVE msg=audit(1793491200.123456789:1): argc=1 a0="synthetic"
+node=host-a type=EOE msg=audit(1793491200.123456789:1):
+node=host-a type=SYSCALL msg=audit(1793491201.123456789:2): arch=c000003e syscall=59 success=no uid=1000 euid=0 pid=42 ppid=1 comm="synthetic" exe="/synthetic/tool"
+node=host-a type=EXECVE msg=audit(1793491201.123456789:2): argc=1 a0="synthetic"
+node=host-a type=EOE msg=audit(1793491201.123456789:2):
+node=host-a type=SYSCALL msg=audit(1793491202.123456789:3): arch=c000003e syscall=59 uid=1000 euid=0 pid=42 ppid=1 comm="synthetic" exe="/synthetic/tool"
+node=host-a type=EXECVE msg=audit(1793491202.123456789:3): argc=1 a0="synthetic"
+node=host-a type=EOE msg=audit(1793491202.123456789:3):

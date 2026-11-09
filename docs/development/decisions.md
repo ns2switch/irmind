@@ -517,3 +517,9 @@ Consequences: arbitrary invalid IPs, ports, hashes and scalar types still fail t
 Mapped V3 is the sole target writer. Remove relative ingestion/query comparisons and the requirement for a comparison reader from performance evaluation. Keep all ordinary query error, exact-duration, full-corpus coverage and ten-second checks. Keep 900-second cloud/chronological goals and 1,350-second disordered goals. The 1,025-host disordered sample is a reported, nonblocking goal miss tracked by #218; it does not waive ordinary query limits or the chronological 1,025-host goal.
 
 A deliberate expansive path may report a successful time-budget truncation only with its explicit partial marker. Its error outcome remains a failure. Current measurements identify one mapped writer and nine complete scenarios; missing outcomes, incomplete query coverage or noninteger exact durations are invalid evidence. Historical comparisons remain diagnostic records only.
+
+## Linux source decoding and independent mapping modules
+
+Decode auth.log/secure, auditd, journald and HTTP framing through one `LinuxSourceDecoder`, preserving original names, values, exact time, grouped-member locations and confirmed classic-syslog context. Replace the narrower journald decoder rather than retaining a redundant historical route under the pre-1.0 policy. Keep journald's established extraction projection.
+
+Use separate hash-pinned table modules for sshd, sudo, su and HTTP; each owns one declared SourceMapper port. Use native auditd mapping only for bounded cross-member selection that finite tables cannot express. Do not infer success for missing status, partial audit groups or sudo command requests, or invent process-lifetime identities from reused PIDs. Source decoding remains independent of these interpretations. No production dependency package is added.

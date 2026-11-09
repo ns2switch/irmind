@@ -21,7 +21,8 @@ pub(super) fn experimental(
     }
     if !cfg!(any(
         feature = "mapping-json-compat",
-        feature = "mapping-journald-compat"
+        feature = "mapping-journald-compat",
+        feature = "mapping-linux"
     )) {
         return Err(AppError::Policy(
             "experimental common writer is not compiled; enable mapping features".into(),
@@ -29,7 +30,7 @@ pub(super) fn experimental(
     }
     let catalog = registry.mapping_catalog()?;
     if !catalog.supports_decoder("parser-json", "json-source-v1")
-        && !catalog.supports_decoder("parser-linux", "journald-source-v1")
+        && !catalog.supports_decoder("parser-linux", "linux-source-v1")
     {
         return Err(AppError::Policy(
             "experimental common writer is not compiled; enable mapping features".into(),
@@ -47,7 +48,8 @@ pub(super) fn experimental_parsers(
     }
     if !cfg!(any(
         feature = "mapping-json-compat",
-        feature = "mapping-journald-compat"
+        feature = "mapping-journald-compat",
+        feature = "mapping-linux"
     )) {
         return Err(AppError::Policy(
             "experimental common writer is not compiled; enable mapping features".into(),
@@ -55,7 +57,7 @@ pub(super) fn experimental_parsers(
     }
     #[cfg(feature = "mapping-json-compat")]
     let catalog = catalog.with_experimental_parser(irmind_mod_parser_json::source_log_parser())?;
-    #[cfg(feature = "mapping-journald-compat")]
+    #[cfg(any(feature = "mapping-journald-compat", feature = "mapping-linux"))]
     let catalog = catalog.with_experimental_parser(irmind_mod_parser_linux::source_log_parser())?;
     Ok(catalog)
 }
