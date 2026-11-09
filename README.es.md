@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 6f743c1460ccc1ec1193245576bdc8133f936bb6; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit c8cdf3e7796a76937eb8d642eee22d8423fc283a; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -12,6 +12,9 @@ IRMind es un asistente agéntico de terminal para respuesta a incidentes y anál
 
 > [!WARNING]
 > IRMind 0.2.0 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
+
+> [!WARNING]
+> Antes de 1.0, cada versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración. Conserva la versión de IRMind que creó un caso para abrirlo, verificarlo o exportarlo, o reingiere los originales verificados en un caso nuevo.
 
 ## Qué puedes hacer
 
@@ -46,7 +49,7 @@ cargo build --release --locked -p irmind
 
 La [versión preliminar v0.2.0](https://github.com/ns2switch/irmind/releases/tag/v0.2.0) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
-Los casos V1 siguen siendo legibles. La migración de precisión es opcional y explícita; abrir un caso nunca lo migra. Consulta la [guía V1 → V2](docs/development/case-migration.md), en inglés.
+Usa la versión menor que creó el caso para volver a abrirlo. La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable o reingerir los originales verificados.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:

@@ -1,10 +1,12 @@
-Traducción de docs/development/roadmap.md en el commit 620c51bc34981ab5cb808cde7186cd798a8e5de9; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit c8cdf3e7796a76937eb8d642eee22d8423fc283a; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
 IRMind es un asistente agéntico de terminal para respuesta a incidentes y análisis forense: el analista conversa con un agente que investiga evidencia local y remota, carga skills forenses cuando hacen falta y delega trabajo acotado en subagentes paralelos. El modelo propone, la política decide y cada acción queda firmada.
 
 Esta página es para quienes contribuyen o evalúan el proyecto. Expresa intenciones, sin comprometer fechas. La [versión inglesa](../development/roadmap.md) prevalece y el [modelo de seguridad](security-model.md) explica los límites actuales.
+
+Política anterior a 1.0: las versiones menores pueden cambiar formatos sin migración. V3 es el único formato previsto para v0.3; las notas de compatibilidad de versiones publicadas describen solo aquellas versiones históricas.
 
 ## Entregado en 0.1.0 y 0.1.1
 
@@ -79,7 +81,7 @@ Consultas estructuradas y con presupuesto en Athena, CloudTrail Lake, Security L
 ## Criterios para 1.0
 
 - Formatos firmados estables para casos, manifiestos, skills, subagentes y protocolo del motor, con migraciones probadas.
-- Confirmar antes de 1.0 una política de compatibilidad de parsers: desde 1.0, conservar una versión obsoleta para reconstrucción y verificación durante al menos dos versiones menores posteriores, o un periodo equivalente. Anunciar su retirada con antelación en el CHANGELOG y ofrecer un procedimiento de migración. Esta propuesta no recupera lectores retirados anteriores a 1.0.
+- Decidir la retención de versiones de parsers y la compatibilidad estable al estabilizar los formatos, previsiblemente en v0.6–v0.7 y antes de 1.0. Hasta entonces, una versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración: conserva el ejecutable creador o reingiere los originales verificados.
 - Revisión externa de seguridad.
 - Al menos tres conectores validados en entornos reales de pruebas.
 - Binarios de release firmados en Linux, macOS y Windows.
