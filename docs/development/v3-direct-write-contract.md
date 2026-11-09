@@ -46,6 +46,46 @@ Chronological sources use the existing ordered replay. Disordered sources may re
 
 Free-space preflight includes final staged output, optional original copies and normalized-run estimates. Error, cancellation, failed signing and failed publication remove uncommitted files. Durable publication and the case lock preserve the previous signed generation across crashes. No evidence is written to the system temporary directory.
 
+## Source failures and bounded retries
+
+A source failure rolls back every provisional output and partition allocation of
+its group. Retry the revised canonical source list once, omitting the identified
+failed sources. A later, distinct source failure can repeat that process, with a
+maximum of 16 excluded sources per group and a bounded final attempt. An already
+excluded source is never retried. Reaching the bound fails the group with an
+explicit count and reason.
+
+Refill each group from the next canonical candidates after exclusions. Group
+boundaries, partition allocation, filenames, source sets, profiles and output
+commitments depend only on successful sources. Rejected candidates do not consume
+source slots, partition cardinality or segment numbers. Thus ingesting 300 sources
+with three corrupt files produces the same derived bytes and source/mapping
+commitments as ingesting their 297 valid counterparts directly. The audit chains
+intentionally differ because the first also records three rejections.
+
+Use a closed source-failure classification: format, source limit, hash mismatch,
+or source-specific cancellation. Record each rejected relative source, its fixed
+reason and at most the existing bounded untrusted samples in the signed chain,
+with no acquisition or Parquet artifact for that source. Use the existing generic
+`ToolError` audit kind with a typed, canonical local-ingestion payload; this adds
+no audit tag or custody frame format. Guard all displayed names and samples; no
+rejected text reaches the model directly. Show accepted/rejected counts and each
+source's reason in the TUI and automation results.
+
+Disk, signing, publication, locking, catalog/configuration and unclassified errors
+are operational failures. They roll back and fail without excluding sources or
+retrying. Preserve previously committed groups. Record already identified source
+rejections when the audit service is healthy; failure to sign or append is itself
+terminal. A user cancellation aborts the complete operation, rolls back the
+current group and is audited through the existing cancellation path. It never
+becomes an automatic retry with a canceled parent token.
+
+Preparation owns private provisional files until the application has validated
+metadata, published and hash-verified files, and appended the complete group's
+signed events atomically. Marking that group committed is infallible and performs
+no I/O. Error or cancellation before the append removes all of that group's
+uncommitted outputs; a later group cannot remove earlier committed outputs.
+
 ## Later small-file compaction
 
 Initial ingestion does not call layout compaction. A later maintenance operation can use the unchanged compact_artifacts port and ParquetLayoutV1 only for a compatible partition whose small-file count exceeds a validated configured threshold. Evaluate count and size from the active signed inventory, not directory enumeration. The current operation retains parents; retirement remains separate future work.
@@ -56,6 +96,8 @@ Initial ingestion does not call layout compaction. A later maintenance operation
 - Mixed partitions, ordinary/overflow hosts and the 128-source/envelope boundaries preserve the complete record set and stable order.
 - Repeated runs and different worker completion orders reproduce identical physical bytes and ordered commitments.
 - Failure and cancellation at every preparation/publication/audit boundary leave no partial signed source group or orphan output.
+- 300 synthetic JSON files with three late corruptions in distinct positions yield 297 accepted sources and three signed rejections. Compare every physical hash and source/mapping commitment with the clean 297-source ingestion, across refilled group boundaries.
+- Source-limit, hash and source-cancellation fixtures exercise exclusions and the 16-source bound. Disk/signing/publication/lock failures prove zero exclusion retries. User cancellation stops the operation and cleans the current group.
 - Exact source/mapping reconstruction and public-key-only V6 verification authenticate every final file.
 - V2 default ingestion retains historical physical and canonical golden bytes.
 - Compare before/after time, active disk, staging peak and inactive-parent bytes in the same release job for cloud and chronological/stress endpoint at 1, 64, 1,024 and 1,025 hosts.
