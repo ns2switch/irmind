@@ -452,3 +452,17 @@ kind, and displayed paths and samples pass through the guard. The recorded recip
 selects exact reconstruction. Later compaction remains separate maintenance;
 initial ingestion retains no inactive parents. Absolute and same-run relative
 activation criteria continue to apply.
+
+## Dense query column binding
+
+Context: mapped entity scans repeatedly formatted display timestamps and resolved
+ordering columns for each observation.
+
+Decision: bind typed ordering columns once per batch. Materialize text timestamps
+only for event output; preserve whole-batch temporal validation, source-unit
+checks, signed source membership and per-file hash verification. Instrument scoped
+aggregation separately without treating an absent counter as zero work.
+
+Consequences: result, sample, scope, role, hop, expansion and deadline limits are
+unchanged. The [exploratory release smoke](benchmarks.md#dense-mapped-entity-lookup-exploratory-release-smoke)
+is preliminary; full paired 15 GB measurements remain necessary.

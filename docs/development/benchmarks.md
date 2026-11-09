@@ -1032,3 +1032,43 @@ Each representative source runs three repetitions per stage before its 15 GB cas
 Direct writing removes initial compaction and its inactive parents and improves all measured ingestion times relative to preceding V3. It remains **opt-in**. Stress ingestion exceeds the paired +10% V2 margin; several query p95 values also exceed that margin, and the worst-case path exhausts its budget. The absolute ingestion results alone are insufficient. Rounded values in this table are descriptive; the separate dense-reader comparison records integer nanoseconds for exact gate evaluation.
 
 The functional suite checks 300 sources with three corrupt files against the clean 297-source collection, signed rejections, bounded exclusions, publication/signing rollback, cancellation, deterministic physical goldens, exact reconstruction, copied-source reconstruction without external originals and public-key-only V6 export verification. Historical goldens remain unchanged.
+
+## Dense mapped entity lookup: exploratory release smoke
+
+For query maintainers, this smoke isolates repeated timestamp formatting and
+column binding before another full standard-runner matrix. Both variants use
+the mapped pipeline, the same local environment and the same synthetic cloud
+corpus: 1,077,079,150 bytes in 1,030 sources. Each query has five samples; this is
+one ingestion pair, not a three-repetition or 15 GB acceptance run.
+
+| Query | Before p50 / p95 s | After p50 / p95 s | Errors before / after |
+| --- | --- | --- | --- |
+| Term | 0.344 / 0.360 | 0.345 / 0.357 | 0 / 0 |
+| Entity | 0.312 / 0.317 | 0.177 / 0.179 | 0 / 0 |
+| Neighbors | 0.069 / 0.071 | 0.070 / 0.072 | 0 / 0 |
+| Timeline | 0.657 / 0.662 | 0.643 / 0.658 | 0 / 0 |
+| Path | 0.068 / 0.069 | 0.064 / 0.067 | 0 / 0 |
+
+Entity p95 falls by 43.5% in this smoke. Mean per-query normalization counters
+fall from 0.202181 to 0.013884 seconds; accumulated worker scan counters fall
+from 0.817129 to 0.493857 seconds. The new scoped aggregation counter is 0.053695
+seconds; the earlier implementation did not instrument it. Hash verification
+remains mandatory before every file read. Worker counters overlap and include
+channel backpressure, so they cannot be summed into wall time.
+
+Only event cards materialize RFC 3339 strings. Count and scoped-identity queries
+keep checked physical time columns and still validate the complete input batch,
+including rows outside a visitor's result sample. Batch-bound column references
+remove repeated schema lookup. Source-order unit checks retain their cross-batch
+state and check every hash/offset-mode transition.
+
+Ingestion takes 198.328 versus 185.976 seconds, including layout maintenance;
+this query change makes no ingestion speed claim from one pair. Both runs retain
+524,160,816 active artifact bytes and 542,250,885 inactive-parent bytes. No parent
+is removed, no source/writer recipe changes, and no signed-format golden changes.
+
+The [machine-readable smoke](benchmarks/dense-entity-smoke.json) records exact
+source revisions and counters. Its SHA-256 is `847591d4c1c30159e6f35b48eb9fb0fa32f72d08c9651e317c3e453b22960416`.
+A paired standard-runner comparison with V2 and the previous V3 reader, including
+cloud and chronological one-host 15 GB input, remains required. This smoke does
+not authorize default activation or replace the absolute and relative gates.

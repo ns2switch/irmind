@@ -1,0 +1,333 @@
+{
+  "benchmark": "common_schema_smoke_1gib",
+  "corpus": "cloud-v2",
+  "profile": "release",
+  "environment": "paired local smoke; same environment; no model or network",
+  "activation_evidence": false,
+  "repetitions": 1,
+  "query_samples_per_kind": 5,
+  "baseline_revision": "4c2ad5e78a1f6ed51e8b65f0df63e7d08ae8c931",
+  "candidate_revision": "fdd62a8e80b508ce0adfab9805a48c5c2c35d360",
+  "notes": [
+    "Both variants enable the experimental mapped pipeline.",
+    "This smoke does not replace paired standard-runner 15 GB measurements.",
+    "Query component counters are means over five queries and may overlap across workers.",
+    "Baseline scoped aggregation is uninstrumented; its zero counter is not zero work."
+  ],
+  "variants": {
+    "baseline": [
+      {
+        "metric": "PARQUET_LAYOUT_TIME",
+        "seconds": 26.974683
+      },
+      {
+        "metric": "CUSTODY_PHASE",
+        "sign_seconds": 0.107378,
+        "verify_signature_seconds": 0.235289,
+        "append_seconds": 8.508757
+      },
+      {
+        "metric": "PARQUET_LAYOUT",
+        "scenario": "cloud-v2",
+        "historical_files": 3312,
+        "active_files": 222,
+        "partitions": 1,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "active_bytes": 524160816
+      },
+      {
+        "metric": "PARQUET_RETAINED_PARENTS",
+        "scenario": "cloud-v2",
+        "inactive_parent_bytes": 542250885,
+        "active_artifact_bytes": 524160816,
+        "retained_case_bytes": 1098569141,
+        "inactive_case_basis_points": 4935,
+        "inactive_active_basis_points": 10345
+      },
+      {
+        "metric": "PARQUET_SCENARIO",
+        "name": "cloud-v2",
+        "size": "1gib",
+        "normalized_stage_peak_bytes": 2107555
+      },
+      {
+        "metric": "PARQUET_INGEST",
+        "bytes": 1077079150,
+        "files": 1030,
+        "hash_seconds": 0.898,
+        "conversion_seconds": 0,
+        "row_seconds": 0,
+        "parquet_seconds": 0,
+        "wall_seconds": 198.328,
+        "parquet_bytes": 1066411701,
+        "coobservation_bytes": 531856060
+      },
+      {
+        "metric": "PARQUET_V2_PHASE",
+        "stage_seconds": 25.82,
+        "sort_seconds": 0,
+        "replay_seconds": 9.112,
+        "source_verify_seconds": 0.657,
+        "publish_seconds": 17.131
+      },
+      {
+        "metric": "PARQUET_COLD_QUERY",
+        "seconds": 1.094,
+        "error": false
+      },
+      {
+        "metric": "PARQUET_QUERY",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "term",
+        "p50_seconds": 0.344,
+        "p95_seconds": 0.36,
+        "errors": 0
+      },
+      {
+        "metric": "PARQUET_QUERY_PROFILE",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "term",
+        "verify_seconds": 0.092204,
+        "scan_seconds": 1.18785,
+        "normalize_seconds": 0.000018,
+        "aggregate_seconds": 0
+      },
+      {
+        "metric": "PARQUET_QUERY",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "entity",
+        "p50_seconds": 0.312,
+        "p95_seconds": 0.317,
+        "errors": 0
+      },
+      {
+        "metric": "PARQUET_QUERY_PROFILE",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "entity",
+        "verify_seconds": 0.078159,
+        "scan_seconds": 0.817129,
+        "normalize_seconds": 0.202181,
+        "aggregate_seconds": 0
+      },
+      {
+        "metric": "PARQUET_QUERY",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "neighbors",
+        "p50_seconds": 0.069,
+        "p95_seconds": 0.071,
+        "errors": 0
+      },
+      {
+        "metric": "PARQUET_QUERY_PROFILE",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "neighbors",
+        "verify_seconds": 0.009046,
+        "scan_seconds": 0.169729,
+        "normalize_seconds": 0.008903,
+        "aggregate_seconds": 0
+      },
+      {
+        "metric": "PARQUET_QUERY",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "timeline",
+        "p50_seconds": 0.657,
+        "p95_seconds": 0.662,
+        "errors": 0
+      },
+      {
+        "metric": "PARQUET_QUERY_PROFILE",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "timeline",
+        "verify_seconds": 0.167435,
+        "scan_seconds": 0.534014,
+        "normalize_seconds": 0.179723,
+        "aggregate_seconds": 0
+      },
+      {
+        "metric": "PARQUET_QUERY",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "path",
+        "p50_seconds": 0.068,
+        "p95_seconds": 0.069,
+        "errors": 0
+      },
+      {
+        "metric": "PARQUET_QUERY_PROFILE",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "path",
+        "verify_seconds": 0.008539,
+        "scan_seconds": 0.168535,
+        "normalize_seconds": 0.009391,
+        "aggregate_seconds": 0
+      }
+    ],
+    "candidate": [
+      {
+        "metric": "PARQUET_LAYOUT_TIME",
+        "seconds": 28.862237
+      },
+      {
+        "metric": "CUSTODY_PHASE",
+        "sign_seconds": 0.109337,
+        "verify_signature_seconds": 0.235286,
+        "append_seconds": 9.122578
+      },
+      {
+        "metric": "PARQUET_LAYOUT",
+        "scenario": "cloud-v2",
+        "historical_files": 3312,
+        "active_files": 222,
+        "partitions": 1,
+        "ordinary_hosts": 0,
+        "overflow_artifacts": 0,
+        "active_bytes": 524160816
+      },
+      {
+        "metric": "PARQUET_RETAINED_PARENTS",
+        "scenario": "cloud-v2",
+        "inactive_parent_bytes": 542250885,
+        "active_artifact_bytes": 524160816,
+        "retained_case_bytes": 1098569141,
+        "inactive_case_basis_points": 4935,
+        "inactive_active_basis_points": 10345
+      },
+      {
+        "metric": "PARQUET_SCENARIO",
+        "name": "cloud-v2",
+        "size": "1gib",
+        "normalized_stage_peak_bytes": 2107555
+      },
+      {
+        "metric": "PARQUET_INGEST",
+        "bytes": 1077079150,
+        "files": 1030,
+        "hash_seconds": 0.896,
+        "conversion_seconds": 0,
+        "row_seconds": 0,
+        "parquet_seconds": 0,
+        "wall_seconds": 185.976,
+        "parquet_bytes": 1066411701,
+        "coobservation_bytes": 531856060
+      },
+      {
+        "metric": "PARQUET_V2_PHASE",
+        "stage_seconds": 26.021,
+        "sort_seconds": 0,
+        "replay_seconds": 9.153,
+        "source_verify_seconds": 0.659,
+        "publish_seconds": 17.502
+      },
+      {
+        "metric": "PARQUET_COLD_QUERY",
+        "seconds": 0.945,
+        "error": false
+      },
+      {
+        "metric": "PARQUET_QUERY",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "term",
+        "p50_seconds": 0.345,
+        "p95_seconds": 0.357,
+        "errors": 0
+      },
+      {
+        "metric": "PARQUET_QUERY_PROFILE",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "term",
+        "verify_seconds": 0.085278,
+        "scan_seconds": 1.165393,
+        "normalize_seconds": 0.000016,
+        "aggregate_seconds": 0
+      },
+      {
+        "metric": "PARQUET_QUERY",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "entity",
+        "p50_seconds": 0.177,
+        "p95_seconds": 0.179,
+        "errors": 0
+      },
+      {
+        "metric": "PARQUET_QUERY_PROFILE",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "entity",
+        "verify_seconds": 0.068074,
+        "scan_seconds": 0.493857,
+        "normalize_seconds": 0.013884,
+        "aggregate_seconds": 0.053695
+      },
+      {
+        "metric": "PARQUET_QUERY",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "neighbors",
+        "p50_seconds": 0.07,
+        "p95_seconds": 0.072,
+        "errors": 0
+      },
+      {
+        "metric": "PARQUET_QUERY_PROFILE",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "neighbors",
+        "verify_seconds": 0.008773,
+        "scan_seconds": 0.1682,
+        "normalize_seconds": 0.000636,
+        "aggregate_seconds": 0
+      },
+      {
+        "metric": "PARQUET_QUERY",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "timeline",
+        "p50_seconds": 0.643,
+        "p95_seconds": 0.658,
+        "errors": 0
+      },
+      {
+        "metric": "PARQUET_QUERY_PROFILE",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "timeline",
+        "verify_seconds": 0.154237,
+        "scan_seconds": 0.53305,
+        "normalize_seconds": 0.187958,
+        "aggregate_seconds": 0
+      },
+      {
+        "metric": "PARQUET_QUERY",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "path",
+        "p50_seconds": 0.064,
+        "p95_seconds": 0.067,
+        "errors": 0
+      },
+      {
+        "metric": "PARQUET_QUERY_PROFILE",
+        "scenario": "cloud-v2",
+        "scope": "all",
+        "name": "path",
+        "verify_seconds": 0.008935,
+        "scan_seconds": 0.160957,
+        "normalize_seconds": 0.000596,
+        "aggregate_seconds": 0
+      }
+    ]
+  }
+}
