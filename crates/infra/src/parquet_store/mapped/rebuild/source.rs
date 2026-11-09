@@ -2,6 +2,7 @@ use super::{
     AppError, CancellationToken, CaseId, Inputs, LargeCaseStore, ParquetArtifact,
     ParquetArtifactV3, ParquetStore, Path, SourceManifestV2, invalid_source,
 };
+mod direct;
 use irmind_app::{LocalBatchRequest, LogParser};
 use std::sync::Arc;
 
@@ -15,6 +16,9 @@ impl ParquetStore {
         cancel: &CancellationToken,
     ) -> Result<Vec<ParquetArtifactV3>, AppError> {
         let (case, root, workspace) = location;
+        if artifact.core().builder_version == irmind_domain::COMMON_EVENT_DIRECT_BUILDER {
+            return self.rebuild_direct_group(location, artifact, inputs, seed, cancel);
+        }
         let binding = artifact.bindings().first().ok_or_else(invalid_source)?;
         let set = inputs
             .sets

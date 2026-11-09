@@ -1,0 +1,14 @@
+[
+  {
+    "schema": "irmind-coobservations-v3",
+    "physical_sha256": "9d158ac2a3f141fe9708683319cd2c197684fa984b169031ba115ec21c01d0f6"
+  },
+  {
+    "schema": "irmind-entities-v4",
+    "physical_sha256": "da2ac9b07825abe6f623c65da4c26e6797f3bcabaddd575d1a4fe21fcbeb97ea"
+  },
+  {
+    "schema": "irmind-events-v4",
+    "physical_sha256": "cd225a9edd2eaa7708141dbae3cdd6108479f701268c625b322c5d2147f3e223"
+  }
+]

@@ -271,7 +271,7 @@ impl<'a> Frames<'a> {
     }
 }
 fn invalid() -> AppError {
-    AppError::Policy("invalid bounded JSON source framing".into())
+    AppError::Fixed(irmind_app::FixedAppError::SourceFormat)
 }
 
 fn valid_prefix(prefix: &[u8]) -> bool {

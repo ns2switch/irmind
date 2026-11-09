@@ -433,3 +433,22 @@ Default activation requires the relative gate and no query deadline in every sce
 The work order is direct final-file writing, dense entity lookup, then a separate default-activation PR after the complete matrix meets these conditions. Initial direct ingestion must leave zero inactive parents. Later compatible small-file compaction remains available behind a configured count threshold; signed parent retirement remains a [separate future proposal](mapped-parent-retirement-design.md).
 
 Inactive-parent retirement remains a design-only future operation. No parent files are removed by this implementation.
+
+## Direct mapped ingestion and source failures
+
+Context: initial mapped ingestion should create final files without retaining
+intermediate Parquet parents.
+
+Decision: use the optional local preparation contract and
+`parquet-builder-common-event-direct-v1`. The application signs each complete
+bounded group atomically. Source failures roll the group back and exclude at most
+16 failed sources before a bounded retry; operational failures abort. Successful
+sources refill canonical groups, so rejection does not change the derived bytes
+or mapping commitments of the clean collection. The experimental writer remains
+opt-in; V1/V2 formats and default selection do not change.
+
+Consequences: rejections use typed payloads in the existing generic tool-error
+kind, and displayed paths and samples pass through the guard. The recorded recipe
+selects exact reconstruction. Later compaction remains separate maintenance;
+initial ingestion retains no inactive parents. Absolute and same-run relative
+activation criteria continue to apply.

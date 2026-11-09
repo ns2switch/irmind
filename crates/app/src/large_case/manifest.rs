@@ -96,8 +96,10 @@ fn validate_manifest_links(
     }
     for (_, (selection, seq)) in parser_selections {
         if !artifacts.iter().any(|artifact| {
-            artifact.source_hashes().len() == 1
-                && artifact.source_hashes()[0] == selection.source.sha256
+            (artifact.source_hashes().len() == 1
+                || matches!(artifact, ParquetArtifact::V3(mapped)
+                    if mapped.core().builder_version == irmind_domain::COMMON_EVENT_DIRECT_BUILDER))
+                && artifact.source_hashes().contains(&selection.source.sha256)
                 && artifact.parser_version() == selection.parser_version
         }) {
             return Err(AppError::InvalidChain(seq));

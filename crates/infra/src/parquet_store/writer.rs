@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 mod batch;
 pub(super) mod common;
+pub(in crate::parquet_store) mod direct;
 pub(super) mod precise;
 mod staged_time;
 use batch::{coobservation_batch, entity_batch, record_batch};
@@ -59,9 +60,10 @@ pub(super) struct ArtifactSink {
     kind: ArtifactKind,
     precise: bool,
     common: bool,
+    direct: bool,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 enum ArtifactKind {
     Events,
     Entities,
@@ -111,6 +113,17 @@ impl ArtifactSink {
         batch: &RecordBatch,
         kind: ArtifactKind,
     ) -> Result<Self, AppError> {
+        Self::configured(case_dir, hash, partition, batch, kind, false)
+    }
+
+    fn configured(
+        case_dir: &Path,
+        hash: &EvidenceHash,
+        partition: Partition,
+        batch: &RecordBatch,
+        kind: ArtifactKind,
+        direct: bool,
+    ) -> Result<Self, AppError> {
         let precise = matches!(
             batch
                 .schema()
@@ -124,6 +137,11 @@ impl ArtifactSink {
             .get("irmind.common.schema")
             .is_some_and(|id| id == irmind_domain::COMMON_EVENT_V1);
         let (part, name) = Self::location(&partition, hash, kind, precise, common)?;
+        let name = if direct {
+            name.replace(".common.", ".direct.common.")
+        } else {
+            name
+        };
         let dir = case_dir.join(&part);
         fs::create_dir_all(&dir).map_err(storage)?;
         irmind_fs::private_dir(&dir).map_err(storage)?;
@@ -141,7 +159,8 @@ impl ArtifactSink {
             let mut properties = WriterProperties::builder()
                 .set_compression(Compression::SNAPPY)
                 .set_max_row_group_row_count(Some(
-                    if matches!(kind, ArtifactKind::Events | ArtifactKind::LegacyEntities) {
+                    if direct || matches!(kind, ArtifactKind::Events | ArtifactKind::LegacyEntities)
+                    {
                         8192
                     } else {
                         1024
@@ -163,6 +182,7 @@ impl ArtifactSink {
                 kind,
                 precise,
                 common,
+                direct,
             })
         })();
         if result.is_err() {
@@ -237,10 +257,13 @@ impl ArtifactSink {
     fn append(&mut self, batch: &RecordBatch) -> Result<(), AppError> {
         let writer = self.writer.as_mut().ok_or_else(invalid_source)?;
         writer.write(batch).map_err(storage)?;
-        if matches!(
-            self.kind,
-            ArtifactKind::Entities | ArtifactKind::Coobservations
-        ) || (self.partition.scope.is_some() && writer.memory_size() >= super::BATCH_BYTES)
+        if (self.direct && writer.memory_size() >= super::BATCH_BYTES)
+            || (!self.direct
+                && (matches!(
+                    self.kind,
+                    ArtifactKind::Entities | ArtifactKind::Coobservations
+                ) || (self.partition.scope.is_some()
+                    && writer.memory_size() >= super::BATCH_BYTES)))
         {
             writer.flush().map_err(storage)?;
         }
@@ -248,9 +271,18 @@ impl ArtifactSink {
     }
 
     fn finish(
+        self,
+        hash: &EvidenceHash,
+        parser: irmind_app::ParserIdentity<'_>,
+    ) -> Result<StagedArtifact, AppError> {
+        self.finish_cancelable(hash, parser, &CancellationToken::new())
+    }
+
+    fn finish_cancelable(
         mut self,
         hash: &EvidenceHash,
         parser: irmind_app::ParserIdentity<'_>,
+        cancel: &CancellationToken,
     ) -> Result<StagedArtifact, AppError> {
         let writer = self.writer.take().ok_or_else(invalid_source)?;
         let metadata = writer.close().map_err(storage)?;
@@ -262,7 +294,7 @@ impl ArtifactSink {
             .open(temporary)
             .map_err(storage)?;
         file.sync_all().map_err(storage)?;
-        let (digest, size) = ParquetStore::hash_reader(&mut file, &CancellationToken::new())?;
+        let (digest, size) = ParquetStore::hash_reader(&mut file, cancel)?;
         Ok(StagedArtifact {
             rows: Some(u64::try_from(metadata.file_metadata().num_rows()).map_err(storage)?),
             temporary: self.temporary.take().ok_or_else(invalid_source)?,

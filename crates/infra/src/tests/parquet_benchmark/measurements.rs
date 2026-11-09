@@ -71,14 +71,13 @@ pub(super) fn report_storage(
         .filter(|a| !active_paths.contains(a.path()))
         .map(ParquetArtifact::size)
         .sum::<u64>();
+    if std::env::var("IRMIND_BENCH_COMMON_EVENT").as_deref() == Ok("1") {
+        assert_eq!(
+            inactive_bytes, 0,
+            "initial direct ingestion must not retain inactive parents"
+        );
+    }
     let case_bytes = directory_bytes(root);
-    let basis_points = |part: u64, total: u64| {
-        if total == 0 {
-            0
-        } else {
-            u128::from(part) * 10_000 / u128::from(total)
-        }
-    };
     println!(
         "PARQUET_RETAINED_PARENTS scenario={} inactive_parent_bytes={inactive_bytes} active_artifact_bytes={active_bytes} retained_case_bytes={case_bytes} inactive_case_basis_points={} inactive_active_basis_points={}",
         scenario.name(),
@@ -172,4 +171,12 @@ fn sample_queries(
         met_target &= errors == 0 && timings[4] < std::time::Duration::from_secs(10);
     }
     met_target
+}
+
+fn basis_points(part: u64, total: u64) -> u128 {
+    if total == 0 {
+        0
+    } else {
+        u128::from(part) * 10_000 / u128::from(total)
+    }
 }

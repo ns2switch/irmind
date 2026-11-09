@@ -273,11 +273,15 @@ pub(super) fn assert_rebuild(root: &Path, paths: &[String], compact: bool) {
         parser: &Mapped,
     };
     let cancel = CancellationToken::new();
-    large
-        .ingest_local_batch_selected(&id, root, paths, true, &selections, &cancel)
-        .unwrap();
+    // Maintenance compaction combines successive ingests. Initial direct
+    // ingestion already produces final files and has no inactive parents.
+    for group in paths.chunks(if compact { 1 } else { paths.len() }) {
+        large
+            .ingest_local_batch_selected(&id, root, group, true, &selections, &cancel)
+            .unwrap();
+    }
     if compact {
-        assert!(large.compact_case(&id, &cancel).unwrap() > 0);
+        assert!(large.compact_case_with_threshold(&id, 2, &cancel).unwrap() > 0);
     }
     assert_eq!(
         large.verify_parquet_rebuild(&id, root, &cancel).unwrap(),

@@ -23,7 +23,7 @@ impl ParquetArtifactV3 {
         let inputs = super::binding::validate_bindings(pipeline.bindings())?;
         let decoder = pipeline.bindings().first().ok_or_else(invalid)?.decoder();
         if !core.schema.is_common()
-            || core.builder_version != pipeline.builder()
+            || !pipeline.accepts_builder(&core.builder_version)
             || core.parser_id != decoder.id()
             || core.parser_version != decoder.version()
             || !core.superseded_hashes.is_empty()

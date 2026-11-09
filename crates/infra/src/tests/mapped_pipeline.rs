@@ -79,7 +79,12 @@ fn mapped_pipeline_binds_raw_inputs_and_maps_before_writing_and_exporting() {
         3
     );
     engine.verify(&case.id).unwrap();
-    assert_eq!(large.compact_case(&case.id, &cancel).unwrap(), 3);
+    assert_eq!(
+        large
+            .compact_case_with_threshold(&case.id, 2, &cancel)
+            .unwrap(),
+        3
+    );
     assert_eq!(large.verify_parquet(&case.id, &cancel).unwrap(), 9);
     assert!(
         store
@@ -158,9 +163,15 @@ fn mapped_store_preserves_the_published_route_without_a_registered_raw_decoder()
 }
 
 fn fixture<'a>(root: &Path) -> (Arc<LocalStore>, Engine<'a>, Arc<MappingCatalog>) {
+    fixture_decoder(root, Arc::new(JsonSourceDecoder))
+}
+fn fixture_decoder<'a>(
+    root: &Path,
+    decoder: Arc<dyn irmind_app::SourceDecoder>,
+) -> (Arc<LocalStore>, Engine<'a>, Arc<MappingCatalog>) {
     let catalog = Arc::new(
         MappingCatalog::freeze(
-            vec![Arc::new(JsonSourceDecoder)],
+            vec![decoder],
             vec![Arc::new(JsonCompatibilityMapping::new().unwrap())],
         )
         .unwrap(),
@@ -193,3 +204,7 @@ fn fixture<'a>(root: &Path) -> (Arc<LocalStore>, Engine<'a>, Arc<MappingCatalog>
 mod repeat;
 
 mod guard;
+
+mod direct;
+mod direct_failures;
+mod direct_faults;

@@ -120,7 +120,7 @@ fn record(
     .map_err(|_| invalid())
 }
 fn invalid() -> AppError {
-    AppError::Policy("invalid bounded journald source record".into())
+    AppError::Fixed(irmind_app::FixedAppError::SourceFormat)
 }
 
 #[cfg(test)]

@@ -1,6 +1,8 @@
 use crate::*;
 #[derive(Debug, Error)]
 pub enum AppError {
+    #[error("source preparation rejected a file")]
+    SourceFailure(crate::RejectedSource),
     #[error(transparent)]
     Fixed(FixedAppError),
     #[error("module secret not found")]

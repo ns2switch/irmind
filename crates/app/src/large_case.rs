@@ -3,6 +3,7 @@ use crate::{
     StreamingEventParser, sha256,
 };
 
+mod direct;
 mod manifest;
 mod mapped_compaction;
 mod mapped_source;
@@ -57,6 +58,22 @@ impl LargeCaseUseCases<'_, '_> {
     /// Sign bounded, reproducible Parquet bundles after ingest. Historical
     /// single-source artifacts remain available for full reconstruction.
     pub fn compact_case(&self, id: &CaseId, cancel: &CancellationToken) -> Result<usize, AppError> {
+        self.compact_case_with_threshold(id, 16, cancel)
+    }
+
+    /// Explicit maintenance only: direct files are compacted above this count
+    /// per compatible partition/schema; initial ingestion never calls it.
+    pub fn compact_case_with_threshold(
+        &self,
+        id: &CaseId,
+        small_file_threshold: usize,
+        cancel: &CancellationToken,
+    ) -> Result<usize, AppError> {
+        if !(2..=4096).contains(&small_file_threshold) {
+            return Err(AppError::Policy(
+                "invalid small-file maintenance threshold".into(),
+            ));
+        }
         self.engine.require_attended_analyst("compact Parquet")?;
         let _case_lock = self.engine.repo.lock_case(id)?;
         if self.engine.repo.get_case(id)?.sealed {
@@ -96,7 +113,7 @@ impl LargeCaseUseCases<'_, '_> {
                     .push(artifact);
             }
         }
-        let mut compacted = self.compact_mapped(id, &known, cancel)?;
+        let mut compacted = self.compact_mapped(id, &known, small_file_threshold, cancel)?;
         for artifacts in groups.values_mut() {
             artifacts.sort_by(|left, right| left.source_hashes()[0].cmp(&right.source_hashes()[0]));
             for chunk in artifacts.chunks(128) {
@@ -192,6 +209,18 @@ impl LargeCaseUseCases<'_, '_> {
             .into_iter()
             .map(|source| (source.source.clone(), source))
             .collect::<BTreeMap<_, _>>();
+        if let Some(ingested) = self.try_direct(&mut direct::Request {
+            id,
+            source_root,
+            ordered: &ordered,
+            copy_original,
+            selections,
+            known_artifacts: &mut known_artifacts,
+            known_sources: &known_sources,
+            cancel,
+        })? {
+            return Ok(ingested);
+        }
         let mut ingested = Vec::with_capacity(ordered.len());
         for paths in ordered.chunks(4) {
             if cancel.is_cancelled() {

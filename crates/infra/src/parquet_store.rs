@@ -311,6 +311,7 @@ fn parse_hash(value: &EvidenceHash) -> Result<[u8; 32], AppError> {
 struct HashingReader<R> {
     inner: R,
     hasher: Sha256,
+    io_failed: bool,
     bytes: u64,
 }
 
@@ -319,6 +320,7 @@ impl<R: Read> HashingReader<R> {
         Self {
             inner,
             hasher: Sha256::new(),
+            io_failed: false,
             bytes: 0,
         }
     }
@@ -342,7 +344,9 @@ impl<R: Read> HashingReader<R> {
 
 impl<R: Read> Read for HashingReader<R> {
     fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
-        let count = self.inner.read(output)?;
+        let count = self.inner.read(output).inspect_err(|_| {
+            self.io_failed = true;
+        })?;
         self.hasher.update(&output[..count]);
         self.bytes = self
             .bytes

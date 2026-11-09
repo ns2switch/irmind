@@ -7,6 +7,7 @@ use irmind_domain::{
 };
 
 /// Unsigned physical output. It is not a historical V2 custody envelope.
+#[derive(Clone)]
 pub struct MappedArtifactProjection {
     physical: ParquetArtifactV2,
     mapping: Option<MappingIdentityV1>,
@@ -21,7 +22,10 @@ impl MappedArtifactProjection {
         physical.validate().map_err(|_| invalid())?;
         if rows == 0
             || !physical.schema.is_common()
-            || physical.builder_version != COMMON_EVENT_BUILDER
+            || !matches!(
+                physical.builder_version.as_str(),
+                COMMON_EVENT_BUILDER | irmind_domain::COMMON_EVENT_DIRECT_BUILDER
+            )
             || !physical.superseded_hashes.is_empty()
         {
             return Err(invalid());

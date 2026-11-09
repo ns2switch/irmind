@@ -70,15 +70,8 @@ impl CaseWorkflow<'_, '_> {
         request: IngestRequest<'_>,
         mut progress: impl FnMut(usize, usize, &str),
     ) -> Result<usize, AppError> {
-        let IngestRequest {
-            id,
-            path,
-            copy_original,
-            forced_parser,
-            analyst_choices: _,
-            cancel,
-            ..
-        } = request;
+        let path = request.path;
+        let forced_parser = request.forced_parser;
         if self.io_ops.experimental_common_writer() {
             progress(
                 0,
@@ -100,6 +93,29 @@ impl CaseWorkflow<'_, '_> {
         {
             return Err(AppError::Policy("parser override is unavailable".into()));
         }
+        self.ingest_without_catalog(request, &files, &mut progress)
+    }
+
+    fn group_size(&self) -> usize {
+        if self.io_ops.experimental_common_writer() {
+            usize::MAX
+        } else {
+            4
+        }
+    }
+    fn ingest_without_catalog(
+        &self,
+        request: IngestRequest<'_>,
+        files: &[std::path::PathBuf],
+        progress: &mut impl FnMut(usize, usize, &str),
+    ) -> Result<usize, AppError> {
+        let IngestRequest {
+            id,
+            path,
+            copy_original,
+            cancel,
+            ..
+        } = request;
         let total = files.len();
         let (store, parser) = self
             .io_ops
@@ -130,15 +146,23 @@ impl CaseWorkflow<'_, '_> {
                 store,
                 parser,
             };
-            for (group_index, group) in sources.chunks(4).enumerate() {
+            for (group_index, group) in sources.chunks(self.group_size()).enumerate() {
                 let ingested =
                     use_cases.ingest_local_batch(id, source_root, group, copy_original, cancel)?;
                 for (offset, (source, _)) in ingested.into_iter().enumerate() {
                     let safe_source = self.engine.guard.screen(&source)?.text;
-                    progress(group_index * 4 + offset + 1, total, &safe_source);
+                    progress(
+                        group_index * self.group_size() + offset + 1,
+                        total,
+                        &safe_source,
+                    );
                 }
             }
-            let bundles = use_cases.compact_case(id, cancel)?;
+            let bundles = if self.io_ops.experimental_common_writer() {
+                0
+            } else {
+                use_cases.compact_case(id, cancel)?
+            };
             if bundles > 0 {
                 progress(
                     total,
@@ -182,10 +206,11 @@ impl CaseWorkflow<'_, '_> {
             let parser_id = &first.parser_id;
             let end = selected[cursor..]
                 .iter()
-                .take(4)
+                .take(self.group_size())
                 .take_while(|(_, resolved)| {
                     resolved.selection.parser_id == *parser_id
                         && resolved.selection.parser_version == first.parser_version
+                        && resolved.selection.timestamp_context == first.timestamp_context
                 })
                 .count()
                 + cursor;
@@ -204,6 +229,11 @@ impl CaseWorkflow<'_, '_> {
                 .iter()
                 .map(|(source, resolved)| (source.clone(), resolved.selection.clone()))
                 .collect::<BTreeMap<_, _>>();
+            progress(
+                done,
+                files.len(),
+                "Preparing authenticated sources; uncommitted groups can be cancelled",
+            );
             for (source, _) in use_cases
                 .ingest_local_batch_selected(
                     id,
@@ -226,7 +256,7 @@ impl CaseWorkflow<'_, '_> {
             cursor = end;
         }
         self.compact_detected(request, last_parser, files.len(), progress)?;
-        Ok(files.len())
+        Ok(done)
     }
 
     fn compact_detected(
@@ -236,6 +266,9 @@ impl CaseWorkflow<'_, '_> {
         count: usize,
         progress: &mut impl FnMut(usize, usize, &str),
     ) -> Result<(), AppError> {
+        if self.io_ops.experimental_common_writer() {
+            return Ok(());
+        }
         let Some(parser) = parser else {
             return Ok(());
         };

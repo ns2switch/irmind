@@ -34,6 +34,7 @@ pub(super) fn audit_card(
             Some(decision_card(entry, state, engine)?)
         }
         AuditEventKind::ToolResult => Some(result_card(entry, state, engine)?),
+        AuditEventKind::ToolError => rejected_source_card(entry, engine)?,
         AuditEventKind::EvidenceIngested => Some(Card::new(
             CardKind::Notice,
             "Evidence ingested",
@@ -64,6 +65,26 @@ pub(super) fn audit_card(
         _ => None,
     };
     Ok(card)
+}
+
+fn rejected_source_card(entry: &SignedEntry, engine: &Engine<'_>) -> Result<Option<Card>> {
+    let Some(source) = irmind_app::RejectedSource::from_audit(entry)? else {
+        return Ok(None);
+    };
+    let summary = format!(
+        "Rejected source: {} · {}",
+        source.source(),
+        source.reason().description()
+    );
+    let mut body = engine.guard.screen(&summary)?.text;
+    for sample in source.samples() {
+        body.push('\n');
+        body.push_str(&engine.guard.screen(sample)?.text);
+    }
+    Ok(Some(
+        Card::new(CardKind::Notice, "Rejected source", body, false)
+            .with_summary(engine.guard.screen(&summary)?.text),
+    ))
 }
 
 fn is_hidden_custody_payload(kind: AuditEventKind) -> bool {

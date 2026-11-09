@@ -18,6 +18,7 @@ struct PlanExecution<'a> {
     source_root: &'a Path,
     plan: &'a [(String, ResolvedParserSelection)],
     copy_original: bool,
+    common: bool,
     engine: &'a Engine<'a>,
     store: &'a dyn LargeCaseStore,
     cancel: &'a irmind_app::CancellationToken,
@@ -96,6 +97,7 @@ impl AutomationContext<'_, '_> {
                     source_root,
                     plan: &plan,
                     copy_original,
+                    common: workspace_io.experimental_common_writer(),
                     engine,
                     store: store.as_ref(),
                     cancel,
@@ -114,11 +116,16 @@ fn perform_ingest_plan(args: PlanExecution<'_>) -> Result<()> {
         source_root,
         plan,
         copy_original,
+        common,
         engine,
         store,
         cancel,
         catalog,
     } = args;
+    let start_seq = engine
+        .audit_log
+        .last_entry(id)?
+        .map_or(0, |entry| entry.seq);
     let mut cursor = 0;
     let mut last_parser = None;
     while cursor < plan.len() {
@@ -126,10 +133,11 @@ fn perform_ingest_plan(args: PlanExecution<'_>) -> Result<()> {
         let parser_id = &first.parser_id;
         let end = plan[cursor..]
             .iter()
-            .take(4)
+            .take(if common { usize::MAX } else { 4 })
             .take_while(|(_, choice)| {
                 choice.selection.parser_id == *parser_id
                     && choice.selection.parser_version == first.parser_version
+                    && choice.selection.timestamp_context == first.timestamp_context
             })
             .count()
             + cursor;
@@ -160,7 +168,7 @@ fn perform_ingest_plan(args: PlanExecution<'_>) -> Result<()> {
         last_parser = Some(parser);
         cursor = end;
     }
-    if let Some(parser) = last_parser {
+    if let Some(parser) = last_parser.filter(|_| !common) {
         let large = LargeCaseUseCases {
             engine,
             store,
@@ -168,6 +176,33 @@ fn perform_ingest_plan(args: PlanExecution<'_>) -> Result<()> {
         };
         let bundles = large.compact_case(id, cancel)?;
         println!("created {bundles} signed Parquet bundles");
+    }
+    if common {
+        report_rejected_sources(engine, id, start_seq)?;
+    }
+    Ok(())
+}
+
+fn report_rejected_sources(engine: &Engine<'_>, id: &CaseId, start_seq: u64) -> Result<()> {
+    let mut count = 0;
+    for entry in engine
+        .audit_log
+        .entries(id)?
+        .iter()
+        .filter(|entry| entry.seq > start_seq)
+    {
+        if let Some(rejected) = irmind_app::RejectedSource::from_audit(entry)? {
+            let safe = engine.guard.screen(rejected.source())?.text;
+            eprintln!(
+                "rejected {}: {}",
+                terminal_safe_path(Path::new(&safe)),
+                rejected.reason().description()
+            );
+            count += 1;
+        }
+    }
+    if count > 0 {
+        eprintln!("{count} sources rejected; their reasons are recorded in the signed audit log");
     }
     Ok(())
 }

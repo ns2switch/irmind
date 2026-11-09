@@ -4,6 +4,14 @@ use super::{
 };
 
 impl LargeCaseStore for crate::LocalStore {
+    fn prepare_mapped_ingest(
+        &self,
+        request: irmind_app::MappedIngestRequest<'_>,
+        cancel: &CancellationToken,
+    ) -> Result<Option<Box<dyn irmind_app::PreparedMappedIngest>>, AppError> {
+        self.parquet.prepare_mapped_ingest(request, cancel)
+    }
+
     fn prepare_artifact_migration(
         &self,
         request: irmind_app::ArtifactMigrationRequest<'_>,
