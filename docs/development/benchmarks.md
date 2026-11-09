@@ -1069,9 +1069,10 @@ is removed, no source/writer recipe changes, and no signed-format golden changes
 
 The [machine-readable smoke](benchmarks/dense-entity-smoke.json) records exact
 source revisions and counters. Its SHA-256 is `847591d4c1c30159e6f35b48eb9fb0fa32f72d08c9651e317c3e453b22960416`.
-A paired standard-runner comparison with V2 and the previous V3 reader, including
-cloud and chronological one-host 15 GB input, remains required. This smoke does
-not authorize default activation or replace the absolute and relative gates.
+The complete paired standard-runner matrix below supersedes this exploratory
+smoke for the measured revisions, including cloud and chronological one-host
+15 GB input. Neither result authorizes default activation or replaces the
+absolute and relative gates.
 
 ### Exact activation-gate evaluation
 
