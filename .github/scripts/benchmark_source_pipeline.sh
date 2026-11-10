@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 [[ "${BASE_REF:-}" =~ ^[0-9a-f]{40}$ ]] || { echo 'baseline must be a commit hash' >&2; exit 2; }
+case "${PIPELINE_SOURCES:-evtx ecs cloudtrail linux}" in
+  'evtx ecs cloudtrail linux'|ocsf) ;;
+  *) echo 'unknown synthetic profile source' >&2; exit 2 ;;
+esac
+export PIPELINE_SOURCES="${PIPELINE_SOURCES:-evtx ecs cloudtrail linux}"
 export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
 export IRMIND_EVTX_HELPER_TEST="$CARGO_TARGET_DIR/release/irmind-evtx"
 export IRMIND_EVTX_SOURCE_BENCH_INPUT="$RUNNER_TEMP/pipeline-synthetic.evtx"
@@ -24,13 +29,15 @@ Path('pipeline-results/metadata.json').write_text(json.dumps({
     'baseline':os.environ['PIPELINE_BASELINE'], 'candidate':os.environ['PIPELINE_CANDIDATE'],
     'heaptrack':os.environ['PIPELINE_HEAPTRACK_VERSION'], 'runner':'ubuntu-24.04',
     'build':'release', 'release_debug':os.environ['CARGO_PROFILE_RELEASE_DEBUG'], 'release_strip':os.environ['CARGO_PROFILE_RELEASE_STRIP'], 'repetitions':3, 'minimum_source_bytes':1073741824,
-    'sources':['evtx','ecs','cloudtrail','linux-journald'],
+    'sources':[s.replace('linux','linux-journald') for s in os.environ['PIPELINE_SOURCES'].split()],
     'first_party_rebuilt_each_revision':True,
     'method':'Timings without Heaptrack; separate V3 allocation runs. Ingestion uses normal source hashing, mapping, partitioning, Parquet writing and signed custody. Nested timing intervals are labeled inclusive.'
 },indent=2)+'\n')
 PY
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/generate_evtx_mapping_benchmark.py "$IRMIND_EVTX_SOURCE_BENCH_INPUT"
-cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
+if [[ "$PIPELINE_SOURCES" == *evtx* ]]; then
+  PYTHONDONTWRITEBYTECODE=1 python3 scripts/generate_evtx_mapping_benchmark.py "$IRMIND_EVTX_SOURCE_BENCH_INPUT"
+  cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
+fi
 build() {
   local tree=$1 label=$2
   # The worktrees share external dependencies, never first-party fingerprints.
@@ -73,7 +80,7 @@ if [[ "$BASE_REF" != "$candidate" ]]; then
 fi
 export IRMIND_PIPELINE_BYTES=1073741824
 unset IRMIND_PIPELINE_VARIANT
-for source in evtx ecs cloudtrail linux; do
+for source in $PIPELINE_SOURCES; do
   export IRMIND_PIPELINE_SOURCE="$source"
   for label in "${labels[@]}"; do
     exe="$work/bin-$label"
