@@ -8,9 +8,9 @@ from pathlib import Path
 # The deepest recognized production frame owns each allocation; never count twice.
 PHASES = (
     ("commitment_finalization", ("source_mapping::stream::commitment::finish",)),
-    ("common_validation_serialization", ("common_event::check_common_record", "common_event::codec::encode_common_event")),
+    ("common_validation_serialization", ("common_event::check_common_record", "common_event::codec::encode_common_event", "common_event::codec::Wire")),
     ("writer_projection", ("writer::common::row", "RecordRow::from_mapping")),
-    ("mapping", ("irmind_mapping_tables::map::", "mapping_ecs::", "mapping_cloudtrail::", "mapping_journald_compat::")),
+    ("mapping", ("irmind_mapping_tables::map::", "irmind_mapping_tables::TableMapping::project", "mapping_ecs::", "mapping_cloudtrail::", "mapping_journald_compat::")),
     ("source_validation_commitment", ("SourceRecordAccumulator", "source_mapping::stream::validation", "source_mapping::stream::commitment::spool_tuple")),
     ("decode", ("parser_ecs::source_decode", "parser_json::source_decode", "parser_linux::source_frames", "parser_evtx::source_decode", "parser_evtx::codec")),
     ("parquet_write", ("parquet_store::writer::", "parquet::arrow::arrow_writer", "parquet::column::writer")),
@@ -21,6 +21,8 @@ PHASES = (
 
 def phase(stack):
     for frame in reversed(stack.split(';')):
+        if 'SourceRecordAccumulator' in frame and '::finish' in frame:
+            return 'commitment_finalization'
         for name, patterns in PHASES:
             if any(pattern in frame for pattern in patterns):
                 # Mapping construction outside ingestion is not mapping work.
@@ -47,6 +49,9 @@ def aggregate(text):
     assert sum(counts.values()) == total
     if counts['outside_or_unattributed'] == total:
         raise ValueError('no production allocation stacks could be attributed')
+    for required in ('mapping', 'writer_projection', 'common_validation_serialization', 'source_validation_commitment', 'commitment_finalization'):
+        if not counts[required]:
+            raise ValueError('missing production allocation symbols for ' + required)
     return {'allocation_calls': dict(counts), 'total_allocation_calls': total,
             'attributed_calls': total - counts['outside_or_unattributed'],
             'method': 'Heaptrack calls to allocation functions; exclusive deepest recognized stack frame. Other calls remain explicit. Timing comes from separate uninstrumented runs.'}

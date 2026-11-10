@@ -20,7 +20,8 @@ spent inside the writer callback. Mapper wrappers time the selected mapping.
 The production adapter supplies its existing validation/mapping, projection,
 commitment-finalization, row, Parquet and partition counters. Subtracting mapper
 time from validation/mapping exposes the remaining selection, validation and
-commit-spool work. Hashing and custody signing/append intervals are also printed.
+commit-spool work. Hashing and custody signing/append intervals are also printed. Active artifact
+bytes are reported by schema so physical storage cost stays visible.
 
 Partition, conversion and callback intervals can contain child phases. They are
 explicitly labeled inclusive and must not be added to those child intervals or
@@ -28,6 +29,10 @@ treated as a disjoint wall-clock total. The top-level elapsed ingestion interval
 is the throughput measurement; verification after ingestion is outside it.
 
 ## Allocation calls
+
+Full debug symbols, unshortened Rust trait frames and GNU demangling retain the
+function names needed for allocation attribution. Missing production-phase symbols
+fail the measurement instead of being reported as zero work.
 
 A separate V3 ingestion for each revision and source runs under the distro's
 Heaptrack development tool. Its allocation-call stacks are aggregated by
