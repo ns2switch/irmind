@@ -15,7 +15,6 @@ mod ids;
 mod indexed_time;
 mod mapping_identity;
 mod policy;
-mod sealed_migration;
 mod source_record;
 mod tainted;
 use canonical::{canonical_args, put, take_field, take_u64};
@@ -33,7 +32,6 @@ pub use ids::*;
 pub use indexed_time::*;
 pub use mapping_identity::*;
 pub use policy::*;
-pub use sealed_migration::*;
 pub use source_record::*;
 pub use tainted::*;
 

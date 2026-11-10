@@ -11,8 +11,8 @@ use irmind_domain::{
 };
 pub use irmind_domain::{
     AuditEventKind, Case, CaseId, CaseScope, GraphQueryFilter, IndexedInstant, IndexedTime,
-    ParserSelectionMode, ProposedCall, Provenance, SealedParquetMigrationV1, Severity, SourceKind,
-    SourceManifestV1, SourceManifestV2, TimePrecision, Tool,
+    ParserSelectionMode, ProposedCall, Provenance, Severity, SourceKind, SourceManifestV1,
+    SourceManifestV2, TimePrecision, Tool,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -67,12 +67,10 @@ pub use parser_calendar::ParserCalendar;
 mod parser_time;
 mod parser_time_json;
 mod parser_time_suggestions;
-mod parser_warnings;
 pub use parser_time::{
     ParserTimeBasis, ParserTimeContext, ParserTimeRequirement, ParserTimeSuggestion, parse_offset,
 };
 pub use parser_time_json::{ParserTimeFields, json_time_requirement};
-pub use parser_warnings::{ParserExtractionWarning, parser_extraction_warning};
 mod ports;
 pub use fixed_errors::FixedAppError;
 mod report;
@@ -101,8 +99,8 @@ pub use report::{EntityDetails, Finding, FindingKind};
 #[cfg(test)]
 mod tests;
 
-mod artifact_migration;
-pub use artifact_migration::{
-    ArtifactCatalog, ArtifactCatalogBuilder, ArtifactMigrationRequest, PreparedArtifactMigration,
-    SealInventoryBuilder, artifact_catalog, seal_inventory, verify_seal_inventory_snapshot,
+mod artifact_catalog;
+pub use artifact_catalog::{
+    ArtifactCatalog, ArtifactCatalogBuilder, SealInventoryBuilder, artifact_catalog,
+    seal_inventory, verify_seal_inventory_snapshot,
 };

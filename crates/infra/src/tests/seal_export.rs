@@ -4,7 +4,7 @@ use super::*;
 #[allow(clippy::too_many_lines)]
 fn sealed_export_verifies_without_local_key_and_detects_tampering() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[9u8; 32]),
         actor: Actor::Analyst,
@@ -35,7 +35,6 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
     let hash = ingest_synthetic(
         &engine,
         store.as_ref(),
-        parser.as_ref(),
         &case.id,
         cloudtrail,
         "cloudtrail.json",
@@ -66,7 +65,7 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
             .entries(&case.id)
             .unwrap()
             .iter()
-            .any(|entry| { entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV1 })
+            .any(|entry| { entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV3 })
     );
     assert!(
         store
@@ -111,7 +110,7 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
         irmind_app::verify_export_details(&LocalExportVerifier, &path, None)
             .unwrap()
             .format_version,
-        4
+        6
     );
     let mut bundle = fs::read(&path).unwrap();
     let middle = bundle.len() / 2;

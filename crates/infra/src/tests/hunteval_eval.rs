@@ -293,7 +293,7 @@ fn private_answers_are_never_ingested_or_displayed() {
         format!("{{\"acceptable_conclusions\":[\"{secret_marker}\"]}}"),
     )
     .unwrap();
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(open_source_store(&root.path().join("case")).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[76u8; 32]),
         actor: Actor::Analyst,
@@ -320,7 +320,7 @@ fn private_answers_are_never_ingested_or_displayed() {
     let ingest = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: &json_source_parser(),
     };
     let hash = ingest
         .ingest_local(

@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
 use crate::SignedEntry;
+use irmind_domain::Actor;
 use irmind_domain::{ParquetArtifactV2, ParserSelectionMode};
 fn entry(seq: u64, kind: AuditEventKind, payload: String) -> SignedEntry {
     SignedEntry {

@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn forged_approval_without_challenge_signature_fails_verification() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[61u8; 32]),
         actor: Actor::Analyst,
@@ -64,7 +64,7 @@ fn concurrent_ingest_serializes_a_case() {
     assert_send_sync::<LocalStore>();
     assert_send_sync::<Engine<'_>>();
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[13u8; 32]),
         actor: Actor::Analyst,
@@ -99,7 +99,6 @@ fn concurrent_ingest_serializes_a_case() {
                 ingest_synthetic(
                     engine,
                     store.as_ref(),
-                    &JsonParser,
                     &id,
                     payload.as_bytes(),
                     &format!("event-{number}.json"),
@@ -114,7 +113,7 @@ fn concurrent_ingest_serializes_a_case() {
 #[allow(clippy::too_many_lines)]
 fn analyst_and_agent_entries_use_distinct_keys_in_one_export() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let analyst_key = SigningKey::from_bytes(&[21u8; 32]);
     let agent_key = SigningKey::from_bytes(&[22u8; 32]);
     let analyst = Arc::new(TestSigner {
@@ -171,14 +170,7 @@ fn analyst_and_agent_entries_use_distinct_keys_in_one_export() {
     .unwrap();
     let case = attended.create_case("Alert", "local evidence").unwrap();
     assert!(matches!(
-        ingest_synthetic_result(
-            &unattended,
-            store.as_ref(),
-            parser.as_ref(),
-            &case.id,
-            b"{}",
-            "log.json"
-        ),
+        ingest_synthetic_result(&unattended, store.as_ref(), &case.id, b"{}", "log.json"),
         Err(AppError::PendingApproval(_))
     ));
     unattended
@@ -198,10 +190,10 @@ fn analyst_and_agent_entries_use_distinct_keys_in_one_export() {
 }
 
 #[test]
-fn obsolete_graph_file_is_discarded_without_changing_the_signed_case() {
+fn retired_graph_file_is_ignored_without_changing_the_signed_case() {
     let root = tempfile::tempdir().unwrap();
     let id = {
-        let store = Arc::new(LocalStore::open(root.path()).unwrap());
+        let store = Arc::new(open_source_store(root.path()).unwrap());
         let signer = Arc::new(LocalSigner {
             key: SigningKey::from_bytes(&[31u8; 32]),
             actor: Actor::Analyst,
@@ -231,8 +223,8 @@ fn obsolete_graph_file_is_discarded_without_changing_the_signed_case() {
     std::fs::create_dir_all(&graph_dir).unwrap();
     let old_index = graph_dir.join(format!("{}.duckdb", id.as_str()));
     std::fs::write(&old_index, b"derived index").unwrap();
-    let reopened = LocalStore::open(root.path()).unwrap();
-    assert!(!old_index.exists());
+    let reopened = open_source_store(root.path()).unwrap();
+    assert_eq!(fs::read(old_index).unwrap(), b"derived index");
     assert_eq!(reopened.entries(&id).unwrap().len(), 1);
     assert!(
         reopened

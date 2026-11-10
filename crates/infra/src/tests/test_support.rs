@@ -1,23 +1,41 @@
 use super::*;
 
+pub(super) fn source_catalog() -> Arc<irmind_app::source_mapping::MappingCatalog> {
+    Arc::new(
+        irmind_app::source_mapping::MappingCatalog::freeze(
+            vec![Arc::new(irmind_mod_parser_json::JsonSourceDecoder)],
+            vec![Arc::new(
+                irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap(),
+            )],
+        )
+        .unwrap(),
+    )
+}
+pub(super) fn open_source_store(root: &Path) -> Result<LocalStore, AppError> {
+    LocalStore::open_mapped(root, source_catalog())
+}
+pub(super) fn json_source_parser() -> irmind_app::source_mapping::SourceDecoderSelection {
+    source_catalog()
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap()
+}
+
 mod selected_ingest;
 pub(super) use selected_ingest::ingest_selected;
 
 pub(super) fn ingest_synthetic(
     engine: &Engine<'_>,
     store: &LocalStore,
-    parser: &JsonParser,
     id: &CaseId,
     bytes: &[u8],
     source: &str,
 ) -> String {
-    ingest_synthetic_result(engine, store, parser, id, bytes, source).unwrap()
+    ingest_synthetic_result(engine, store, id, bytes, source).unwrap()
 }
 
 pub(super) fn ingest_synthetic_result(
     engine: &Engine<'_>,
     store: &LocalStore,
-    parser: &JsonParser,
     id: &CaseId,
     bytes: &[u8],
     source: &str,
@@ -29,52 +47,10 @@ pub(super) fn ingest_synthetic_result(
     irmind_app::LargeCaseUseCases {
         engine,
         store,
-        parser,
+        parser: &json_source_parser(),
     }
     .ingest_local(id, root.path(), source, true, &CancellationToken::new())
     .map(|hash| hash.as_str().to_owned())
-}
-
-pub(super) fn ingest_historical_fixture(
-    store: &LocalStore,
-    signer: &LocalSigner,
-    id: &CaseId,
-    bytes: &[u8],
-    source: &str,
-) -> String {
-    let hash = hex(&sha256(bytes));
-    store.put_evidence(id, &hash, bytes).unwrap();
-    let count = JsonParser.parse(source, bytes).unwrap().len();
-    for (kind, payload) in [
-        (
-            irmind_domain::AuditEventKind::EvidenceIngested,
-            source.to_owned(),
-        ),
-        (
-            irmind_domain::AuditEventKind::GraphIndexed,
-            format!("parser=json-cloudtrail-v5;graph=duckdb-graph-v4;records={count}"),
-        ),
-    ] {
-        let last = store.last_entry(id).unwrap().unwrap();
-        let mut entry = SignedEntry {
-            seq: last.seq + 1,
-            case_id: id.as_str().to_owned(),
-            at: last.at + 1,
-            actor: Actor::Analyst,
-            origin: "system".into(),
-            kind,
-            payload,
-            evidence: Some(hash.clone()),
-            prev: last.hash,
-            hash: [0; 32],
-            sig: Vec::new(),
-            public_key: signer.public_key(),
-        };
-        entry.hash = sha256(&entry.canonical());
-        entry.sig = signer.sign(&entry.hash).unwrap();
-        store.append(&entry).unwrap();
-    }
-    hash
 }
 
 pub(super) struct FakeSiem {

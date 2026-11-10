@@ -47,7 +47,7 @@ impl LlmPort for ProtocolModel {
 
 fn engine_fixture() -> (tempfile::TempDir, Arc<LocalStore>, Engine<'static>, CaseId) {
     let root = tempfile::tempdir().expect("temporary case root");
-    let store = Arc::new(LocalStore::open(root.path()).expect("local store"));
+    let store = Arc::new(open_source_store(root.path()).expect("local store"));
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[69u8; 32]),
         actor: Actor::Analyst,
@@ -290,7 +290,6 @@ fn case_context_and_injected_timeline_never_enter_system_role() {
     ingest_synthetic(
         &engine,
         store.as_ref(),
-        &JsonParser,
         &id,
         source,
         "synthetic/timeline.json",

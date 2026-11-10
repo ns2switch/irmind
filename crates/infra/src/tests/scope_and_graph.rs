@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn organization_ceiling_rejects_case_creation_and_expansion_and_limits_old_cases() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[91u8; 32]),
         actor: Actor::Analyst,
@@ -82,7 +82,7 @@ fn organization_ceiling_rejects_case_creation_and_expansion_and_limits_old_cases
 #[test]
 fn malicious_evidence_cannot_trigger_external_call() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[7u8; 32]),
         actor: Actor::Analyst,
@@ -111,7 +111,6 @@ fn malicious_evidence_cannot_trigger_external_call() {
     let hash = ingest_synthetic(
         &engine,
         store.as_ref(),
-        parser.as_ref(),
         &case.id,
         original,
         "cloudtrail.json",
@@ -165,7 +164,7 @@ fn malicious_evidence_cannot_trigger_external_call() {
 #[test]
 fn altered_case_scope_cannot_expand_signed_policy_scope() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[51u8; 32]),
         actor: Actor::Analyst,
@@ -207,7 +206,7 @@ fn altered_case_scope_cannot_expand_signed_policy_scope() {
 #[test]
 fn analyst_scope_change_is_atomic_signed_and_exportable() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[52u8; 32]),
         actor: Actor::Analyst,
@@ -271,7 +270,7 @@ fn analyst_scope_change_is_atomic_signed_and_exportable() {
 #[test]
 fn cloudtrail_assume_role_edge_is_verified_and_queryable() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[53u8; 32]),
         actor: Actor::Analyst,
@@ -297,14 +296,7 @@ fn cloudtrail_assume_role_edge_is_verified_and_queryable() {
     .unwrap();
     let case = engine.create_case("Role change", "local only").unwrap();
     let bytes = br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","userIdentity":{"arn":"arn:aws:iam::123456789012:user/alice"},"requestParameters":{"roleArn":"arn:aws:iam::123456789012:role/Admin"}}]}"#;
-    let hash = ingest_synthetic(
-        &engine,
-        store.as_ref(),
-        parser.as_ref(),
-        &case.id,
-        bytes,
-        "cloudtrail.json",
-    );
+    let hash = ingest_synthetic(&engine, store.as_ref(), &case.id, bytes, "cloudtrail.json");
     let neighbors = store
         .neighbors(
             &case.id,
@@ -326,7 +318,7 @@ fn cloudtrail_assume_role_edge_is_verified_and_queryable() {
 #[test]
 fn cloudtrail_session_and_access_key_edges_are_verified_and_queryable() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[54u8; 32]),
         actor: Actor::Analyst,
@@ -352,14 +344,7 @@ fn cloudtrail_session_and_access_key_edges_are_verified_and_queryable() {
     .unwrap();
     let case = engine.create_case("Session", "local only").unwrap();
     let bytes = br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"GetObject","sourceIPAddress":"198.51.100.9","userIdentity":{"arn":"arn:aws:sts::123456789012:assumed-role/Analyst/session","accessKeyId":"ASIAABCDEFGHIJKLMNOP","sessionContext":{"sessionIssuer":{"arn":"arn:aws:iam::123456789012:role/Analyst"}}}}]}"#;
-    let hash = ingest_synthetic(
-        &engine,
-        store.as_ref(),
-        parser.as_ref(),
-        &case.id,
-        bytes,
-        "cloudtrail.json",
-    );
+    let hash = ingest_synthetic(&engine, store.as_ref(), &case.id, bytes, "cloudtrail.json");
     let actor = "arn:aws:sts::123456789012:assumed-role/Analyst/session";
     let neighbors = store.neighbors(&case.id, "identity", actor, 10).unwrap();
     assert!(neighbors.contains("ip 198.51.100.9 co-observed"));

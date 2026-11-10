@@ -16,7 +16,7 @@ fn narrowed_policy_keeps_old_pending_auditable_but_blocks_its_approval() {
     }
 
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[92u8; 32]),
         actor: Actor::Analyst,

@@ -1,11 +1,10 @@
 use crate::WorkspaceIo;
 use irmind_app::{
     AppError, AuditEventKind, CancellationToken, CaseId, Engine, LargeCaseUseCases, LlmPort,
-    SealPreview, SealedParquetMigrationV1, Severity, SourceCheckMode,
+    SealPreview, Severity, SourceCheckMode,
 };
 use std::path::Path;
 
-mod artifact_migration;
 pub(crate) mod ingest;
 
 /// Presentation controller shared by keyboard actions and `TestBackend` tests.
@@ -17,21 +16,6 @@ pub(crate) struct CaseWorkflow<'a, 'ports> {
 }
 
 impl CaseWorkflow<'_, '_> {
-    pub(crate) fn verification_message(
-        &self,
-        id: &CaseId,
-        message: String,
-    ) -> Result<String, AppError> {
-        let entries = self.engine.audit_log.entries(id)?;
-        match irmind_app::parser_extraction_warning(&entries)? {
-            Some(warning) => Ok(format!(
-                "{message}\n{}",
-                warning.display(self.engine.guard.as_ref())?
-            )),
-            None => Ok(message),
-        }
-    }
-
     pub(crate) fn create_case(
         &self,
         title: &str,
@@ -89,7 +73,7 @@ impl CaseWorkflow<'_, '_> {
         id: &CaseId,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
-        if self.has_source_manifests(id)? || self.has_parquet_artifacts(id)? {
+        if self.has_source_manifests(id)? {
             return Err(AppError::Policy(
                 "select the original source root with /verify <path>".into(),
             ));
@@ -121,13 +105,10 @@ impl CaseWorkflow<'_, '_> {
                 report.missing_or_changed.len()
             )));
         }
-        self.verification_message(
-            id,
-            format!(
-                "Verified {} of {} original sources; {} were not sampled",
-                report.checked, report.total, report.unchecked
-            ),
-        )
+        Ok(format!(
+            "Verified {} of {} original sources; {} were not sampled",
+            report.checked, report.total, report.unchecked
+        ))
     }
 
     pub(crate) fn verify_parquet_rebuild(
@@ -156,78 +137,27 @@ impl CaseWorkflow<'_, '_> {
         .verify_parquet_rebuild(id, root, cancel)
     }
 
-    pub(crate) fn migrate_legacy(
-        &self,
-        id: &CaseId,
-        cancel: &CancellationToken,
-    ) -> Result<usize, AppError> {
-        let (store, parser) = self
-            .io_ops
-            .large_case_store()
-            .zip(self.io_ops.streaming_parser())
-            .ok_or(AppError::Policy("large-case storage is unavailable".into()))?;
-        let use_cases = LargeCaseUseCases {
-            engine: self.engine,
-            store,
-            parser,
-        };
-        let converted = use_cases.migrate_legacy(id, cancel)?;
-        if !self.engine.repo.get_case(id)?.sealed {
-            use_cases.compact_case(id, cancel)?;
-        }
-        Ok(converted)
-    }
-
     pub(crate) fn has_source_manifests(&self, id: &CaseId) -> Result<bool, AppError> {
-        Ok(self.engine.audit_log.entries(id)?.iter().any(|entry| {
-            matches!(
-                entry.kind,
-                AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2
-            )
-        }))
-    }
-
-    fn has_parquet_artifacts(&self, id: &CaseId) -> Result<bool, AppError> {
-        let case_chain = self.engine.audit_log.entries(id)?.iter().any(|entry| {
-            matches!(
-                entry.kind,
-                AuditEventKind::ParquetArtifactV1 | AuditEventKind::ParquetArtifactV2
-            )
-        });
-        for operation in self.engine.audit_log.operations(id)? {
-            if SealedParquetMigrationV1::decode(&operation.operation)
-                .map_err(|_| AppError::InvalidChain(operation.seq))?
-                .is_some()
-            {
-                return Ok(true);
-            }
-        }
-        Ok(case_chain)
-    }
-
-    pub(crate) fn rebuild_graph(
-        &self,
-        id: &CaseId,
-        cancel: &CancellationToken,
-    ) -> Result<usize, AppError> {
-        self.migrate_legacy(id, cancel)
+        Ok(self
+            .engine
+            .audit_log
+            .entries(id)?
+            .iter()
+            .any(|entry| entry.kind == AuditEventKind::SourceManifestV2))
     }
 
     pub(crate) fn verify_graph(
         &self,
         id: &CaseId,
-        cancel: &CancellationToken,
+        _cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
         if self.has_source_manifests(id)? {
             return Err(AppError::Policy(
                 "use /verify-graph <source-root> to rebuild and compare Parquet".into(),
             ));
         }
-        if self.has_parquet_artifacts(id)? {
-            return self.verify_parquet_rebuild(id, Path::new("."), cancel);
-        }
         Err(AppError::Policy(
-            "no signed Parquet artifacts; migrate copied evidence first".into(),
+            "no signed Parquet artifacts in this case".into(),
         ))
     }
 
@@ -264,7 +194,7 @@ impl CaseWorkflow<'_, '_> {
         include_originals: bool,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        if self.has_source_manifests(id)? || self.has_parquet_artifacts(id)? {
+        if self.has_source_manifests(id)? {
             let exporter = self
                 .io_ops
                 .large_case_exporter()

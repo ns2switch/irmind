@@ -1,26 +1,7 @@
 mod inventory;
 mod mapped;
-use crate::{
-    AppError, CancellationToken, CaseId, PartitionLimits, SignedEntry, StreamingEventParser,
-};
+use crate::{AppError, SignedEntry};
 pub use inventory::{SealInventoryBuilder, verify_seal_inventory_snapshot};
-use irmind_domain::{ParquetArtifactV2, ParquetMigrationV1};
-use std::path::Path;
-
-pub struct ArtifactMigrationRequest<'a> {
-    pub case_id: &'a CaseId,
-    pub source_root: Option<&'a Path>,
-    pub signed_entries: &'a [SignedEntry],
-    pub parser: &'a dyn StreamingEventParser,
-    pub limits: PartitionLimits,
-}
-
-pub trait PreparedArtifactMigration: Send {
-    fn artifacts(&self) -> &[ParquetArtifactV2];
-    fn record(&self) -> &ParquetMigrationV1;
-    fn publish(&mut self, cancel: &CancellationToken) -> Result<(), AppError>;
-    fn retain_committed(&mut self);
-}
 
 pub struct ArtifactCatalog {
     pub all: Vec<irmind_domain::ParquetArtifact>,
@@ -114,14 +95,16 @@ pub fn artifact_catalog(entries: &[SignedEntry]) -> Result<ArtifactCatalog, AppE
 
 pub fn seal_inventory(entries: &[SignedEntry], legacy: &[String]) -> Result<Vec<String>, AppError> {
     use irmind_domain::AuditEventKind;
-    if !entries.iter().any(|e| {
-        matches!(
-            e.kind,
-            AuditEventKind::ParquetArtifactV2
-                | AuditEventKind::ParquetArtifactV3
-                | AuditEventKind::ParquetArtifactsMigrated
-        )
-    }) {
+    if entries
+        .iter()
+        .any(|entry| entry.kind.is_retired_case_format())
+    {
+        return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
+    }
+    if !entries
+        .iter()
+        .any(|entry| entry.kind == AuditEventKind::ParquetArtifactV3)
+    {
         return Ok(legacy.to_vec());
     }
     let mut catalog = ArtifactCatalogBuilder::default();

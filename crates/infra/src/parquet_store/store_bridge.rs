@@ -12,14 +12,6 @@ impl LargeCaseStore for crate::LocalStore {
         self.parquet.prepare_mapped_ingest(request, cancel)
     }
 
-    fn prepare_artifact_migration(
-        &self,
-        request: irmind_app::ArtifactMigrationRequest<'_>,
-        cancel: &CancellationToken,
-    ) -> Result<Box<dyn irmind_app::PreparedArtifactMigration>, AppError> {
-        self.parquet.prepare_artifact_migration(request, cancel)
-    }
-
     fn prepare_local_batch(
         &self,
         request: irmind_app::LocalBatchRequest<'_>,
@@ -37,14 +29,9 @@ impl LargeCaseStore for crate::LocalStore {
     }
 
     fn clean_orphan_spools(&self, case_id: &CaseId) -> Result<usize, AppError> {
-        use irmind_app::AuditLog as _;
         // Validate signatures before using the inventory to protect files.
         self.signed_parquet_artifacts(case_id)?;
-        let catalog = irmind_app::artifact_catalog(&self.entries(case_id)?)?;
-        let removed = self
-            .parquet
-            .remove_orphaned_migrations(case_id, &catalog.all)?;
-        Ok(removed + self.parquet.clean_orphan_spools(case_id)?)
+        self.parquet.clean_orphan_spools(case_id)
     }
 
     fn prepare_local(
@@ -119,47 +106,13 @@ impl LargeCaseStore for crate::LocalStore {
         &self,
         case_id: &CaseId,
         source_root: &Path,
-        sources: &[SourceManifestV1],
-        artifacts: &[ParquetArtifact],
-        parser: &dyn StreamingEventParser,
+        _sources: &[SourceManifestV1],
+        _artifacts: &[ParquetArtifact],
+        _parser: &dyn StreamingEventParser,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
-        if artifacts
-            .iter()
-            .any(|a| matches!(a, ParquetArtifact::V3(_)))
-        {
-            use irmind_app::AuditLog as _;
-            let mapped = self.parquet.rebuild_mapped_history(
-                case_id,
-                source_root,
-                &self.entries(case_id)?,
-                cancel,
-            )?;
-            let old = artifacts
-                .iter()
-                .filter(|a| !matches!(a, ParquetArtifact::V3(_)))
-                .cloned()
-                .collect::<Vec<_>>();
-            let old_hashes = old
-                .iter()
-                .flat_map(ParquetArtifact::source_hashes)
-                .collect::<std::collections::BTreeSet<_>>();
-            let old_sources = sources
-                .iter()
-                .filter(|s| old_hashes.contains(&s.sha256))
-                .cloned()
-                .collect::<Vec<_>>();
-            return Ok(mapped
-                + self.parquet.rebuild_compare(
-                    case_id,
-                    source_root,
-                    &old_sources,
-                    &old,
-                    parser,
-                    cancel,
-                )?);
-        }
+        use irmind_app::AuditLog as _;
         self.parquet
-            .rebuild_compare(case_id, source_root, sources, artifacts, parser, cancel)
+            .rebuild_mapped_history(case_id, source_root, &self.entries(case_id)?, cancel)
     }
 }

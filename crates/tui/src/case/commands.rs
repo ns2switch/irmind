@@ -1,4 +1,3 @@
-mod migration;
 use super::command_registry;
 use super::conversation::{Card, CardKind};
 use super::demo_guide::DemoEvent;
@@ -366,29 +365,6 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             self.start_pending_ingest();
             return Ok(true);
         }
-        if prompt == "/rebuild" {
-            let workflow = self.workflow();
-            let id = self.id;
-            self.start_task("Migrate copied evidence", move |cancel| {
-                workflow
-                    .rebuild_graph(id, &cancel)
-                    .map(|count| format!("Converted {count} copied sources to Parquet"))
-            });
-            return Ok(true);
-        }
-        if self.migrate_v2_command(prompt)? {
-            return Ok(true);
-        }
-        if prompt == "/migrate" {
-            let workflow = self.workflow();
-            let id = self.id;
-            self.start_task("Migrate copied evidence", move |cancel| {
-                workflow
-                    .migrate_legacy(id, &cancel)
-                    .map(|count| format!("Converted {count} legacy copied sources to Parquet"))
-            });
-            return Ok(true);
-        }
         if self.verify_command(prompt)? {
             return Ok(true);
         }
@@ -452,7 +428,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             let id = self.id;
             self.start_task("Verify", move |cancel| {
                 let count = workflow.verify(id, &cancel)?;
-                workflow.verification_message(id, format!("Verified {count} audit entries"))
+                Ok(format!("Verified {count} audit entries"))
             });
             return Ok(true);
         }

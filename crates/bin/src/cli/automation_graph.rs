@@ -60,7 +60,6 @@ impl AutomationContext<'_, '_> {
             engine,
             store,
             cancel,
-            guard,
             ..
         } = self;
         let Command::Verify {
@@ -73,16 +72,10 @@ impl AutomationContext<'_, '_> {
         };
         let id = parse_id(&case_id)?;
         let entries = engine.verify_cancelable(&id, cancel)?;
-        if let Some(warning) = irmind_app::parser_extraction_warning(&store.entries(&id)?)? {
-            eprintln!("{}", warning.display(guard.as_ref())?);
-        }
-        let has_sources = store.entries(&id)?.iter().any(|entry| {
-            matches!(
-                entry.kind,
-                irmind_domain::AuditEventKind::SourceManifestV1
-                    | irmind_domain::AuditEventKind::SourceManifestV2
-            )
-        });
+        let has_sources = store
+            .entries(&id)?
+            .iter()
+            .any(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV2);
         if has_sources {
             let root = source_root.ok_or_else(|| {
                 anyhow!("source root required to verify originals; use --source-root")
@@ -132,24 +125,6 @@ impl AutomationContext<'_, '_> {
                 println!(
                     "{}",
                     irmind_app::ContentGuard::screen(guard.as_ref(), &summary)?.text
-                );
-            }
-            Command::GraphRebuild { case_id } => {
-                let id = parse_id(&case_id)?;
-                let parser = JsonParser;
-                let large = LargeCaseUseCases {
-                    engine,
-                    store: store.as_ref(),
-                    parser: &parser,
-                };
-                let converted = large.migrate_legacy(&id, cancel)?;
-                let bundles = if engine.repo.get_case(&id)?.sealed {
-                    0
-                } else {
-                    large.compact_case(&id, cancel)?
-                };
-                println!(
-                    "converted {converted} copied sources to signed Parquet; created {bundles} bundles"
                 );
             }
             Command::VerifyGraph {
@@ -407,20 +382,11 @@ fn parquet_status(
     id: &irmind_app::CaseId,
 ) -> Result<(bool, bool)> {
     let entries = store.entries(id)?;
-    let has_sources = entries.iter().any(|entry| {
-        matches!(
-            entry.kind,
-            irmind_domain::AuditEventKind::SourceManifestV1
-                | irmind_domain::AuditEventKind::SourceManifestV2
-        )
-    });
-    let mut has_artifacts = entries
+    let has_sources = entries
         .iter()
-        .any(|entry| entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV1);
-    for operation in store.operations(id)? {
-        has_artifacts |= irmind_domain::SealedParquetMigrationV1::decode(&operation.operation)
-            .map_err(|_| anyhow!("invalid sealed Parquet operation"))?
-            .is_some();
-    }
+        .any(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV2);
+    let has_artifacts = entries
+        .iter()
+        .any(|entry| entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV3);
     Ok((has_sources, has_artifacts))
 }

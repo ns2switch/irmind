@@ -4,11 +4,11 @@ use irmind_domain::{AuditEventKind, ParserSelectionMode};
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn signed_mixed_case_verifies_rebuilds_and_rejects_parser_substitution() {
+fn signed_case_preserves_precise_time_and_rejects_decoder_substitution() {
     let root = tempfile::tempdir().unwrap();
     let sources = root.path().join("inputs");
     fs::create_dir(&sources).unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[31; 32]),
         actor: Actor::Analyst,
@@ -36,7 +36,7 @@ fn signed_mixed_case_verifies_rebuilds_and_rejects_parser_substitution() {
     LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: &JsonParser,
+        parser: &json_source_parser(),
     }
     .ingest_local(
         &case.id,
@@ -46,14 +46,14 @@ fn signed_mixed_case_verifies_rebuilds_and_rejects_parser_substitution() {
         &CancellationToken::new(),
     )
     .unwrap();
-    let precise = crate::ParquetStore::open_precise(root.path()).unwrap();
+    let precise = crate::ParquetStore::open_mapped(root.path(), source_catalog()).unwrap();
     let new = br#"{"eventTime":"2026-11-01T00:00:00.000001100Z","eventName":"Fine"}"#;
     fs::write(sources.join("new.json"), new).unwrap();
     let selections = BTreeMap::from([(
         "new.json".into(),
         ParserSelection {
             parser_id: "parser-json".into(),
-            parser_version: "json-stream-v3".into(),
+            parser_version: "json-source-v1".into(),
             confidence: 90,
             mode: ParserSelectionMode::Automatic,
             timestamp_context: None,
@@ -63,7 +63,7 @@ fn signed_mixed_case_verifies_rebuilds_and_rejects_parser_substitution() {
     let uses = LargeCaseUseCases {
         engine: &engine,
         store: &precise,
-        parser: &JsonParser,
+        parser: &json_source_parser(),
     };
     uses.ingest_local_batch_selected(
         &case.id,
@@ -85,15 +85,19 @@ fn signed_mixed_case_verifies_rebuilds_and_rejects_parser_substitution() {
     let entries = store.entries(&case.id).unwrap();
     let mut original = entries
         .iter()
-        .find(|e| e.kind == AuditEventKind::ParquetArtifactV2)
+        .find(|e| e.kind == AuditEventKind::ParquetArtifactV3)
         .unwrap()
         .clone();
-    let mut artifact = irmind_domain::ParquetArtifactV2::decode(&original.payload).unwrap();
-    artifact.parser_id = "parser-ecs".into();
+
     let last = store.last_entry(&case.id).unwrap().unwrap();
     original.seq = last.seq + 1;
     original.prev = last.hash;
-    original.payload = artifact.encode().unwrap();
+    // Change only the physical core's decoder id; signed pipeline bindings stay intact.
+    let altered = original
+        .payload
+        .replacen("7061727365722d6a736f6e", "7061727365722d6576696c", 1);
+    assert_ne!(altered, original.payload);
+    original.payload = altered;
     original.hash = sha256(&original.canonical());
     original.sig = signer.sign(&original.hash).unwrap();
     store.append(&original).unwrap();

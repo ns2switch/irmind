@@ -2,7 +2,7 @@ use super::*;
 
 fn fixture() -> (tempfile::TempDir, Arc<LocalStore>, Engine<'static>, CaseId) {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[61u8; 32]),
         actor: Actor::Analyst,
@@ -33,7 +33,6 @@ fn fixture() -> (tempfile::TempDir, Arc<LocalStore>, Engine<'static>, CaseId) {
         ingest_synthetic(
             &engine,
             store.as_ref(),
-            &JsonParser,
             &case.id,
             bytes.as_bytes(),
             &format!("synthetic/{index}.json"),
@@ -96,7 +95,6 @@ fn explicit_verify_rechecks_old_entries_and_invalidates_the_checkpoint() {
         ingest_synthetic_result(
             &engine,
             store.as_ref(),
-            &JsonParser,
             &id,
             br#"{"eventName":"Third"}"#,
             "synthetic/third.json"

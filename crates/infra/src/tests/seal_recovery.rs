@@ -5,7 +5,7 @@ use super::*;
 fn seal_recovers_each_crash_boundary_and_refuses_inconsistent_chain() {
     for crash_point in ["intent", "temporary", "rename", "directory_sync"] {
         let root = tempfile::tempdir().unwrap();
-        let store = Arc::new(LocalStore::open(root.path()).unwrap());
+        let store = Arc::new(open_source_store(root.path()).unwrap());
         let signer = Arc::new(LocalSigner {
             key: SigningKey::from_bytes(&[73u8; 32]),
             actor: Actor::Analyst,
@@ -54,7 +54,7 @@ fn seal_recovers_each_crash_boundary_and_refuses_inconsistent_chain() {
         }
         drop(engine);
         drop(store);
-        let recovered = LocalStore::open(root.path()).unwrap();
+        let recovered = open_source_store(root.path()).unwrap();
         assert!(
             recovered.case_seal(&case.id).unwrap().is_some(),
             "{crash_point}"
@@ -73,7 +73,7 @@ fn seal_recovers_each_crash_boundary_and_refuses_inconsistent_chain() {
     }
 
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[74u8; 32]),
         actor: Actor::Analyst,
@@ -113,7 +113,7 @@ fn seal_recovers_each_crash_boundary_and_refuses_inconsistent_chain() {
         .unwrap();
     drop(engine);
     drop(store);
-    let recovered = Arc::new(LocalStore::open(root.path()).unwrap());
+    let recovered = Arc::new(open_source_store(root.path()).unwrap());
     assert!(matches!(
         recovered.case_seal(&case.id),
         Err(AppError::InvalidChain(0))
@@ -141,7 +141,7 @@ fn seal_recovers_each_crash_boundary_and_refuses_inconsistent_chain() {
 #[test]
 fn crash_after_seal_transaction_without_seal_signature_is_inconsistent() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[75u8; 32]),
         actor: Actor::Analyst,
@@ -188,7 +188,7 @@ fn crash_after_seal_transaction_without_seal_signature_is_inconsistent() {
         .unwrap();
     drop(engine);
     drop(store);
-    let reopened = LocalStore::open(root.path()).unwrap();
+    let reopened = open_source_store(root.path()).unwrap();
     assert!(matches!(
         reopened.case_seal(&case.id),
         Err(AppError::InvalidChain(0))

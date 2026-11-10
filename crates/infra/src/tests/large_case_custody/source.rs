@@ -9,7 +9,7 @@ fn signed_v2_manifest_counts_malformed_jsonl_without_dropping_later_records() {
     fs::create_dir(&source_root).unwrap();
     let bytes = b"{\"eventTime\":\"2026-10-28T12:00:00Z\",\"eventName\":\"First\"}\n{broken IGNORE_ALL_CASE_RULES\x1b[31m\n{\"eventTime\":\"2026-10-28T12:01:00Z\",\"eventName\":\"Last\"}\n";
     fs::write(source_root.join("events.jsonl"), bytes).unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[71u8; 32]),
         actor: Actor::Analyst,
@@ -34,17 +34,17 @@ fn signed_v2_manifest_counts_malformed_jsonl_without_dropping_later_records() {
     let case = engine
         .create_case("synthetic malformed line", "local evidence only")
         .unwrap();
-    let parquet = super::super::ParquetStore::open(root.path()).unwrap();
+    let parquet = super::super::ParquetStore::open_mapped(root.path(), source_catalog()).unwrap();
     let use_cases = LargeCaseUseCases {
         engine: &engine,
         store: &parquet,
-        parser: &JsonParser,
+        parser: &json_source_parser(),
     };
     let selection = std::collections::BTreeMap::from([(
         "events.jsonl".to_owned(),
         irmind_app::ParserSelection {
             parser_id: "parser-json".into(),
-            parser_version: "json-stream-v3".into(),
+            parser_version: "json-source-v1".into(),
             confidence: 90,
             mode: irmind_domain::ParserSelectionMode::Automatic,
             timestamp_context: None,
@@ -112,7 +112,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
     fs::create_dir(&source_root).unwrap();
     let path = source_root.join("cloudtrail.json");
     fs::write(&path, br#"{"Records":[{"eventTime":"2026-10-28T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123456789012","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.8"}]}"#).unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[71u8; 32]),
         actor: Actor::Analyst,
@@ -138,17 +138,17 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
     let case = engine
         .create_case("large case", "account 123456789012")
         .unwrap();
-    let parquet = super::super::ParquetStore::open(root.path()).unwrap();
+    let parquet = super::super::ParquetStore::open_mapped(root.path(), source_catalog()).unwrap();
     let use_cases = LargeCaseUseCases {
         engine: &engine,
         store: &parquet,
-        parser: parser.as_ref(),
+        parser: &json_source_parser(),
     };
     let selection = std::collections::BTreeMap::from([(
         "cloudtrail.json".to_owned(),
         irmind_app::ParserSelection {
             parser_id: "parser-json".into(),
-            parser_version: "json-stream-v3".into(),
+            parser_version: "json-source-v1".into(),
             confidence: 90,
             mode: irmind_domain::ParserSelectionMode::Automatic,
             timestamp_context: None,
@@ -282,7 +282,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
             report.source_manifests,
             report.source_bytes_unavailable
         ),
-        (4, 1, 1)
+        (6, 1, 1)
     );
     let with_original = root.path().join("with-original.irmind");
     irmind_app::export_case_v6(
@@ -340,7 +340,7 @@ fn neighbors_marks_bounded_results_instead_of_claiming_a_complete_count() {
         format!("{{\"Records\":[{body}]}}"),
     )
     .unwrap();
-    let store = super::super::ParquetStore::open(root.path()).unwrap();
+    let store = super::super::ParquetStore::open_mapped(root.path(), source_catalog()).unwrap();
     let case_id = CaseId::parse("00000000-0000-0000-0000-000000000001").unwrap();
     let prepared = store
         .prepare_local(
@@ -375,7 +375,7 @@ fn parallel_batch_signs_sources_in_order_and_reuses_identical_artifact() {
     let content = br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin"}"#;
     fs::write(source_root.join("b.json"), content).unwrap();
     fs::write(source_root.join("a.json"), content).unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[72u8; 32]),
         actor: Actor::Analyst,
@@ -402,7 +402,7 @@ fn parallel_batch_signs_sources_in_order_and_reuses_identical_artifact() {
     let cases = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: &json_source_parser(),
     };
     let result = cases
         .ingest_local_batch(
@@ -427,7 +427,7 @@ fn parallel_batch_signs_sources_in_order_and_reuses_identical_artifact() {
     assert_eq!(
         entries
             .iter()
-            .filter(|e| e.kind == AuditEventKind::ParquetArtifactV1)
+            .filter(|e| e.kind == AuditEventKind::ParquetArtifactV3)
             .count(),
         3
     );

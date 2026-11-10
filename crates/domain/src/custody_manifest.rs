@@ -2,8 +2,8 @@ use crate::{AuditEventKind, DomainError, EvidenceHash, canonical::put};
 
 mod seal_inventory;
 pub use seal_inventory::*;
-mod migration;
-pub use migration::*;
+mod commitment;
+pub use commitment::{ByteStream, DigestStream, SetCommitment};
 mod artifact_v2;
 pub use artifact_v2::*;
 mod versioned_artifact;

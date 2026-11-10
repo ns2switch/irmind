@@ -34,7 +34,7 @@ fn detected_injection_cannot_expand_next_read_scope() {
         }
     }
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[61u8; 32]),
         actor: Actor::Analyst,
@@ -113,7 +113,7 @@ fn scoped_internal_intel_uses_its_own_read_port() {
         }
     }
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[47u8; 32]),
         actor: Actor::Analyst,
@@ -208,7 +208,7 @@ fn result_is_redacted_before_model_byte_limit() {
     }
 
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[56u8; 32]),
         actor: Actor::Analyst,
@@ -256,7 +256,7 @@ fn result_is_redacted_before_model_byte_limit() {
 #[test]
 fn tainted_release_requires_analyst_signature_and_signed_audit() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[93u8; 32]),
         actor: Actor::Analyst,
