@@ -56,22 +56,30 @@ export IRMIND_BENCH_SCENARIO=cloud-v2 IRMIND_BENCH_COMMON_EVENT=1
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$root/target}"
 unset IRMIND_HUNTEVAL_ROOT IRMIND_BENCH_WORKERS
 build_binary() {
-    local workspace=$1
+    local workspace=$1 target=$2
     (
         cd "$workspace"
-        cargo test -p irmind-infra --release --locked --lib --no-run --message-format=json
+        CARGO_TARGET_DIR="$target" cargo test -p irmind-infra --release --locked --lib --no-run --message-format=json
     ) | python3 -c '
 import json, sys
-rows = (json.loads(line) for line in sys.stdin)
-binaries = [r["executable"] for r in rows if r.get("reason") == "compiler-artifact"
-            and r["target"]["name"] == "irmind_infra" and r.get("executable")]
+binaries = []
+for line in sys.stdin:
+    row = json.loads(line)
+    if row.get("reason") == "compiler-message":
+        message = row["message"].get("rendered")
+        if message:
+            print(message, file=sys.stderr, end="")
+    if row.get("reason") == "compiler-artifact" and row["target"]["name"] == "irmind_infra" and row.get("executable"):
+        binaries.append(row["executable"])
 assert len(binaries) == 1
 print(binaries[0])
 '
 }
-reference=$(build_binary "$scratch/reference")
+# Never reuse first-party Cargo fingerprints between distinct source trees.
+reference=$(build_binary "$scratch/reference" "$scratch/reference-target")
 cp "$reference" "$scratch/fixed"
-current=$(build_binary "$root")
+rm -rf -- "$scratch/reference-target"
+current=$(build_binary "$root" "$CARGO_TARGET_DIR")
 cp "$current" "$scratch/adaptive"
 cores=$(nproc)
 printf 'reference=%s candidate=%s available_cores=%s\n' "$BASE_REF" "$candidate" "$cores" |
