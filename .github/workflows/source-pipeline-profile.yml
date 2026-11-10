@@ -2,11 +2,19 @@ name: Production source pipeline profile
 on:
   workflow_call:
     inputs:
+      source:
+        type: string
+        default: all
       baseline:
         type: string
         required: true
   workflow_dispatch:
     inputs:
+      source:
+        description: Synthetic source family
+        type: choice
+        default: all
+        options: [all, ocsf]
       baseline:
         description: Profiling-only baseline commit (40 hexadecimal characters)
         type: string
@@ -26,6 +34,7 @@ jobs:
       CARGO_PROFILE_RELEASE_STRIP: none
       RUSTFLAGS: -C link-arg=-fuse-ld=mold -C force-frame-pointers=yes
       BASE_REF: ${{ inputs.baseline }}
+      PIPELINE_SOURCES: ${{ inputs.source == 'ocsf' && 'ocsf' || 'evtx ecs cloudtrail linux' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: {persist-credentials: false, fetch-depth: 0}

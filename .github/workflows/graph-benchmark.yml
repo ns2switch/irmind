@@ -6,6 +6,11 @@ on:
         description: Profile the production pipeline and allocation calls against a pinned baseline
         type: boolean
         default: false
+      profile_source:
+        description: Production profile source
+        type: choice
+        default: all
+        options: [all, ocsf]
       profile_base:
         description: Profiling-only baseline commit for the production pipeline
         type: string
@@ -278,3 +283,4 @@ jobs:
     uses: ./.github/workflows/source-pipeline-profile.yml
     with:
       baseline: ${{ inputs.profile_base }}
+      source: ${{ inputs.profile_source || 'all' }}
