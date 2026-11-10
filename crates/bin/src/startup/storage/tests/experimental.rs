@@ -281,7 +281,7 @@ mod evtx;
 #[cfg(any(feature = "mapping-ecs", feature = "mapping-evtx"))]
 mod profile;
 
-#[cfg(feature = "mapping-ocsf")]
-mod ocsf;
 #[cfg(feature = "mapping-dfir")]
 mod dfir;
+#[cfg(feature = "mapping-ocsf")]
+mod ocsf;
