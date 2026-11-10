@@ -120,7 +120,10 @@ pub(crate) fn timezone(value: &str) -> Result<FixedOffset, AppError> {
     FixedOffset::east_opt(seconds).ok_or_else(|| error("default timezone offset is out of range"))
 }
 
-fn timestamp(value: &str, context: &crate::config::Timestamp) -> Result<String, AppError> {
+pub(super) fn timestamp(
+    value: &str,
+    context: &crate::config::Timestamp,
+) -> Result<String, AppError> {
     let instant = match context.format.as_str() {
         "rfc3339" => DateTime::parse_from_rfc3339(value)
             .map_err(|_| error("invalid RFC 3339 event time"))?

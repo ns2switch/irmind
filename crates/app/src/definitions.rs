@@ -2,6 +2,8 @@ use crate::{AppError, Engine, LogParser, hex, modules::ParserResolver, sha256};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::Arc};
 
+mod compiled;
+pub use compiled::{ApprovedDefinition, CompiledDefinition, definition_mapping_descriptor};
 mod errors;
 pub use errors::DefinitionError;
 mod operations;
@@ -22,7 +24,7 @@ pub trait ParserDefinitionStore: Send + Sync {
 }
 
 pub trait DefinitionCompiler: Send + Sync {
-    fn compile(&self, contents: &str) -> Result<Arc<dyn LogParser>, AppError>;
+    fn compile(&self, contents: &str) -> Result<CompiledDefinition, AppError>;
 }
 
 #[derive(Clone, Debug)]
@@ -59,7 +61,7 @@ impl ApprovedDefinitions {
         &self,
         store: &dyn ParserDefinitionStore,
         compiler: &dyn DefinitionCompiler,
-    ) -> (Vec<Arc<dyn LogParser>>, Vec<DefinitionStatus>) {
+    ) -> (Vec<ApprovedDefinition>, Vec<DefinitionStatus>) {
         let mut active = Vec::new();
         let mut statuses = Vec::new();
         for snapshot in self.latest.values() {
@@ -67,11 +69,11 @@ impl ApprovedDefinitions {
             if snapshot.active
                 && let Ok(parser) = &loaded
             {
-                active.push(Arc::clone(parser));
+                active.push(ApprovedDefinition::new(parser.clone()));
             }
             statuses.push(DefinitionStatus {
                 id: snapshot.id.clone(), version: snapshot.version.clone(), sha256: snapshot.sha256.clone(), active: snapshot.active,
-                available: loaded.is_ok(), description: loaded.as_ref().map_or_else(|_| String::new(), |parser| parser.description().to_owned()),
+                available: loaded.is_ok(), description: loaded.as_ref().map_or_else(|_| String::new(), |parser| parser.selector().description().to_owned()),
                 warning: loaded.err().map(|_| "Definition file is missing, changed or invalid; restore the approved version.".into()),
             });
         }
@@ -102,7 +104,7 @@ impl ApprovedDefinitions {
         snapshot: &Snapshot,
         store: &dyn ParserDefinitionStore,
         compiler: &dyn DefinitionCompiler,
-    ) -> Result<Arc<dyn LogParser>, AppError> {
+    ) -> Result<CompiledDefinition, AppError> {
         let contents = if snapshot.active {
             store.read_active(&snapshot.id)?.ok_or_else(invalid)?
         } else {
@@ -137,16 +139,20 @@ impl ParserResolver for ArchiveResolver {
                 DefinitionError::VersionUnavailable,
             )))?;
         compile_snapshot(snapshot, self.compiler.as_ref())
+            .map(|compiled| Arc::clone(compiled.selector()))
     }
 }
 
 fn compile_snapshot(
     snapshot: &Snapshot,
     compiler: &dyn DefinitionCompiler,
-) -> Result<Arc<dyn LogParser>, AppError> {
+) -> Result<CompiledDefinition, AppError> {
     validate_snapshot(snapshot)?;
     let parser = compiler.compile(&snapshot.contents)?;
-    if parser.identity().name != snapshot.id || parser.identity().version != snapshot.version {
+    if parser.selector().identity().name != snapshot.id
+        || parser.selector().identity().version != snapshot.version
+        || parser.definition_hash() != snapshot.sha256
+    {
         return Err(invalid());
     }
     Ok(parser)

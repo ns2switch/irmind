@@ -534,3 +534,10 @@ Context: event queries previously formatted an RFC 3339 timestamp and allocated 
 Decision: validate every row as before, rank borrowed ordering keys within each bounded Arrow batch, apply the existing stable comparator and adjacent identity deduplication, and materialize only retained output rows. Keep whole-batch precision and source-unit validation, authenticated file reads, cancellation, deadlines and result limits.
 
 Consequences: this changes query allocation only. It changes no writer, signed bytes, schema, mapping, query order or displayed result. Paired release measurements compare V2, the preceding V3 reader and the candidate on the same runner.
+
+
+## Approved declarative source pipelines and process-lifetime identities
+
+Compile each parser definition once into a checked selector, source decoder and extraction mapper. Bind all three identities and the fixed extraction descriptor to the exact definition digest. Only application-validated signed installations produce registration tokens; preview uses the same decoder and mapper. Original typed source fields remain separate from the unclassified search/entity projection. No external package or signed envelope changes.
+
+Extend the current table interpreter with explicit, bounded host and lifetime paths for process observations only. Included mappings may use a documented producer lifetime identifier such as Sysmon ProcessGuid. Security 4688, auditd and Linux process observations remain source-record scoped; PID, process name and timestamp never substitute for a lifetime identifier. Invalid or missing scope values fail without falling back to a broader identity.

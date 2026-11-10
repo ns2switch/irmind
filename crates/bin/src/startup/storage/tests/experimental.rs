@@ -77,7 +77,8 @@ fn experimental_routes_are_new_ingestion_only_and_export_v6() {
         experimental_common_writer: Some(true),
         ..Default::default()
     };
-    let catalog = super::super::experimental_parsers(registry.parser_catalog(), &config).unwrap();
+    let catalog =
+        super::super::experimental_parsers(registry.parser_catalog(), &config, &registry).unwrap();
     assert_eq!(
         catalog
             .get_version("parser-json", "json-stream-v3")
@@ -170,7 +171,8 @@ fn linux_auth_context_is_confirmed_signed_and_reproducible_through_the_mapped_wr
         experimental_common_writer: Some(true),
         ..Default::default()
     };
-    let catalog = super::super::experimental_parsers(registry.parser_catalog(), &config).unwrap();
+    let catalog =
+        super::super::experimental_parsers(registry.parser_catalog(), &config, &registry).unwrap();
     let bytes = b"Dec 31 23:59:59 host-a sshd[42]: Failed password for alice from 203.0.113.77 port 22 ssh2\nJan  1 00:00:00 host-a sshd[42]: Accepted password for alice from 203.0.113.77 port 22 ssh2\n";
     let mut request = ParserSelectionRequest {
         source: "auth.log",

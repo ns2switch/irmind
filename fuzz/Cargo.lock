@@ -1204,6 +1204,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-build-manifest"
+version = "0.1.0"
+dependencies = [
+ "sha2",
+]
+
+[[package]]
 name = "irmind-domain"
 version = "0.1.0"
 dependencies = [
@@ -1309,6 +1316,7 @@ dependencies = [
  "chrono",
  "csv",
  "irmind-app",
+ "irmind-build-manifest",
  "irmind-domain",
  "regex",
  "serde",

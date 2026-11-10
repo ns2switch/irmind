@@ -2878,6 +2878,7 @@ dependencies = [
  "chrono",
  "csv",
  "irmind-app",
+ "irmind-build-manifest",
  "irmind-domain",
  "irmind-testkit",
  "regex",

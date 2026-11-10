@@ -39,7 +39,12 @@ impl Definition {
                         .fields
                         .iter()
                         .chain(self.rules.iter().flat_map(|r| &r.fields))
-                        .all(|field| field.omit_text.is_empty()) =>
+                        .all(|field| {
+                            field.omit_text.is_empty()
+                                && !field.observation.as_ref().is_some_and(|o| {
+                                    matches!(o.scope, Scope::ProcessLifetime { .. })
+                                })
+                        }) =>
             {
                 Ok("irmind-mapping-tables-v1")
             }
@@ -137,6 +142,10 @@ pub(super) enum Scope {
     Global,
     Host(Vec<String>),
     Account(Vec<String>),
+    ProcessLifetime {
+        host: Vec<String>,
+        lifetime: Vec<String>,
+    },
 }
 #[derive(Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -149,5 +158,10 @@ pub(super) struct Partition {
 impl Field {
     pub(super) fn operation_budget(&self) -> usize {
         33 + self.omit_text.len()
+            + usize::from(
+                self.observation
+                    .as_ref()
+                    .is_some_and(|o| matches!(o.scope, Scope::ProcessLifetime { .. })),
+            ) * 66
     }
 }

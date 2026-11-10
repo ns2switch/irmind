@@ -64,7 +64,7 @@ impl Engine<'_> {
             return Err(invalid());
         }
         let parser = compiler.compile(contents)?;
-        let identity = parser.identity();
+        let identity = parser.selector().identity();
         let _lock = self.audit_log.lock_global_operations()?;
         let approved = self.approved_definitions()?;
         let prior = approved.latest.get(identity.name);

@@ -47,3 +47,7 @@ mod tests;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod optional_field_tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod lifetime_tests;

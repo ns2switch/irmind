@@ -525,3 +525,22 @@ fn network_normalization_is_independent_of_json_map_features() {
         assert_eq!(hex(&sha256(&encoded)), expected, "{name}");
     }
 }
+
+#[test]
+fn declarative_source_pipeline_is_independent_of_json_map_features() {
+    use irmind_app::DefinitionCompiler;
+    let pipeline = irmind_mod_parser_declarative::DeclarativeCompiler
+        .compile(include_str!(
+            "../../../docs/examples/parsers/nested-ndjson.toml"
+        ))
+        .unwrap();
+    let sample = include_bytes!("../../testkit/fixtures/parser-declarative/source/events.ndjson");
+    irmind_testkit::run_source_mapping_contract(
+        pipeline.decoder().clone(),
+        pipeline.extraction_mapper().clone(),
+        "synthetic.ndjson",
+        sample,
+        2,
+    )
+    .unwrap();
+}

@@ -14,6 +14,7 @@ pub struct SourceDecoderSelection {
     context: Option<String>,
     detector: Option<Detector>,
     time_detector: Option<TimeDetector>,
+    selector: Option<Arc<dyn LogParser>>,
 }
 impl SourceDecoderSelection {
     pub fn new(decoder: Arc<dyn SourceDecoder>) -> Self {
@@ -22,10 +23,19 @@ impl SourceDecoderSelection {
             context: None,
             detector: None,
             time_detector: None,
+            selector: None,
         }
     }
 }
 impl SourceDecoderSelection {
+    /// Reuse approved detection while keeping source-pipeline time metadata separate.
+    pub fn with_selector(mut self, selector: Arc<dyn LogParser>) -> Result<Self, AppError> {
+        if selector.identity() != self.decoder.identity() {
+            return Err(unsupported());
+        }
+        self.selector = Some(selector);
+        Ok(self)
+    }
     #[must_use]
     pub fn with_detector(mut self, detector: fn(&str, &[u8]) -> Option<ParserConfidence>) -> Self {
         self.detector = Some(detector);
@@ -85,6 +95,11 @@ impl EventParser for SourceDecoderSelection {
     }
 }
 impl LogParser for SourceDecoderSelection {
+    fn description(&self) -> &str {
+        self.selector
+            .as_ref()
+            .map_or("", |selector| selector.description())
+    }
     fn with_time_context(
         &self,
         context: &crate::ParserTimeContext,
@@ -94,10 +109,14 @@ impl LogParser for SourceDecoderSelection {
             context: Some(super::source_time_snapshot(context)?),
             detector: self.detector,
             time_detector: self.time_detector,
+            selector: self.selector.clone(),
         }))
     }
 
     fn detect(&self, source: &str, sample: &[u8]) -> Option<ParserConfidence> {
+        if let Some(selector) = &self.selector {
+            return selector.detect(source, &sample[..sample.len().min(65_536)]);
+        }
         self.detector
             .and_then(|detect| detect(source, &sample[..sample.len().min(65_536)]))
     }

@@ -82,7 +82,7 @@ impl DeclarativeParser {
         Ok(report)
     }
 
-    fn csv_header(&self, bytes: &[u8]) -> Result<Vec<String>, AppError> {
+    pub(super) fn csv_header(&self, bytes: &[u8]) -> Result<Vec<String>, AppError> {
         if bytes.len() > self.definition.limits.record_bytes {
             return Err(error("CSV header exceeds size limit"));
         }
@@ -99,7 +99,7 @@ impl DeclarativeParser {
         Ok(values)
     }
 
-    fn csv_values(&self, bytes: &[u8]) -> Result<Vec<String>, AppError> {
+    pub(super) fn csv_values(&self, bytes: &[u8]) -> Result<Vec<String>, AppError> {
         let mut reader = csv::ReaderBuilder::new()
             .has_headers(false)
             .delimiter(self.definition.delimiter()?)

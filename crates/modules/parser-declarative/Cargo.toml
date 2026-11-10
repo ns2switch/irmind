@@ -20,3 +20,6 @@ workspace = true
 
 [dev-dependencies]
 irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+
+[build-dependencies]
+irmind-build-manifest = { path = "../../build-manifest", version = "0.1.0" }
