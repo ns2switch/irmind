@@ -47,3 +47,24 @@ fn invalid_headers_chunks_and_partial_files_are_rejected() {
     bytes[6000] ^= 1;
     assert!(irmind_evtx::decode(Cursor::new(bytes), &mut Vec::new()).is_err());
 }
+
+#[test]
+fn owned_chunks_match_every_frame_with_one_two_four_and_seven_workers() {
+    let fixture =
+        include_bytes!("../../../crates/testkit/fixtures/parser-evtx/source/Security.evtx");
+    let mut bytes = fixture[..4096].to_vec();
+    bytes[16..24].copy_from_slice(&7u64.to_le_bytes());
+    bytes[42..44].copy_from_slice(&8u16.to_le_bytes());
+    let checksum = evtx::checksum_ieee(&bytes[..120]);
+    bytes[124..128].copy_from_slice(&checksum.to_le_bytes());
+    for _ in 0..8 {
+        bytes.extend_from_slice(&fixture[4096..]);
+    }
+    let mut reference = Vec::new();
+    irmind_evtx::decode(Cursor::new(&bytes), &mut reference).unwrap();
+    for workers in [2, 4, 7] {
+        let mut result = Vec::new();
+        irmind_evtx::decode_with_workers(Cursor::new(&bytes), &mut result, workers).unwrap();
+        assert_eq!(result, reference);
+    }
+}

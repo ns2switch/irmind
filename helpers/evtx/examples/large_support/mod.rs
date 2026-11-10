@@ -31,6 +31,9 @@ impl Signer for SyntheticSigner {
 }
 
 pub(super) fn helper() -> Result<PathBuf, Error> {
+    if let Some(path) = std::env::var_os("IRMIND_EVTX_HELPER_TEST") {
+        return Ok(PathBuf::from(path));
+    }
     Ok(std::env::current_exe()?
         .parent()
         .and_then(Path::parent)

@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+mod chunks;
 mod output;
 use evtx::{EvtxParser, ParserSettings};
 use std::{
@@ -20,7 +21,17 @@ fn invalid() -> io::Error {
 
 /// Decode only an already-authorized, seekable source. The executable establishes
 /// its OS containment before calling this function. Fuzzing exercises it directly.
-pub fn decode<R: Read + Seek + Send>(mut input: R, output: &mut dyn Write) -> io::Result<()> {
+pub fn decode<R: Read + Seek + Send>(input: R, output: &mut dyn Write) -> io::Result<()> {
+    decode_with_workers(input, output, 1)
+}
+
+/// Used by the native benchmark helper. The shipped entry point still uses one
+/// worker. This function never starts or changes OS containment.
+pub fn decode_with_workers<R: Read + Seek + Send>(
+    mut input: R,
+    output: &mut dyn Write,
+    workers: usize,
+) -> io::Result<()> {
     let size = input.seek(SeekFrom::End(0))?;
     if !(4096..=MAX_SOURCE).contains(&size) || !(size - 4096).is_multiple_of(65_536) {
         return Err(invalid());
@@ -41,47 +52,8 @@ pub fn decode<R: Read + Seek + Send>(mut input: R, output: &mut dyn Write) -> io
     let settings = Arc::new(config);
     let mut writer = output::Output::new(output, size);
     writer.frame(&serde_json::json!({"kind":"ready","protocol":PROTOCOL,"decoder":"0.15.1"}))?;
-    let mut accepted = 0u64;
-    let mut rejected = 0u64;
-    for chunk in parser.chunks() {
-        let mut chunk = chunk.map_err(|_| invalid())?;
-        let base = chunk
-            .number
-            .ok_or_else(invalid)?
-            .checked_mul(65_536)
-            .and_then(|v| v.checked_add(4096))
-            .ok_or_else(invalid)?;
-        let mut parsed = chunk.parse(settings.clone()).map_err(|_| invalid())?;
-        for record in parsed.iter() {
-            if accepted + rejected >= MAX_RECORDS {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "EVTX record limit reached (8000000 records); entire file rejected; no partial ingestion",
-                ));
-            }
-            if let Ok(record) = record {
-                let offset = base
-                    .checked_add(record.binxml_offset)
-                    .and_then(|v| v.checked_sub(24))
-                    .ok_or_else(invalid)?;
-                if offset >= size {
-                    return Err(invalid());
-                }
-                let id = record.event_record_id;
-                let time = record.timestamp.to_string();
-                if let Ok(value) = record.into_json_value() {
-                    writer.frame(&serde_json::json!({"kind":"record","record_id":id,"offset":offset,"timestamp":time,"event":value.data}))?;
-                    accepted += 1;
-                } else {
-                    writer.rejected(Some(id), Some(offset))?;
-                    rejected += 1;
-                }
-            } else {
-                writer.rejected(None, None)?;
-                rejected += 1;
-            }
-        }
-    }
+    let (accepted, rejected) =
+        chunks::decode(parser.chunks(), size, &settings, workers, &mut writer)?;
     writer
         .frame(&serde_json::json!({"kind":"complete","accepted":accepted,"rejected":rejected}))?;
     writer.flush()

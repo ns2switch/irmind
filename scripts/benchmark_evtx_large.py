@@ -47,7 +47,11 @@ def measure(executable, mib, work, batch_files, single=False, dense=False):
                 raise RuntimeError('benchmark memory could not be measured for both processes')
             result.update({'corpus_mib': mib, 'single_source': single, 'dense_source': dense, 'parent_peak_bytes': peaks['parent'],
                            'helper_peak_bytes': peaks['helper'], 'observed_children': len(child_peaks),
-                           'memory_method': '20 ms sampling of OS process high-water resident/working-set counters; per-process maximum, not sum',
+                           'memory_method': (
+                               'sampled RSS via ps; per-process maximum, not sum'
+                               if platform.system() == 'Darwin' else
+                               '20 ms sampling of OS process high-water resident/working-set counters; per-process maximum, not sum'
+                           ),
                            'initial_free_disk_bytes': initial_free, 'os': platform.system(), 'architecture': platform.machine()})
             return result
         finally:
@@ -60,8 +64,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('executable', type=Path)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--smoke', action='store_true')
-    parser.add_argument('--extended', action='store_true')
+    workload = parser.add_mutually_exclusive_group()
+    workload.add_argument('--smoke', action='store_true')
+    workload.add_argument('--extended', action='store_true')
+    workload.add_argument('--one-gib', action='store_true')
     parser.add_argument('--batch-files', type=int, choices=(1, 4), default=int(os.environ.get('EVTX_BATCH_FILES', '4')))
     args = parser.parse_args()
     if args.batch_files not in (1, 4):
@@ -69,6 +75,8 @@ def main():
     executable = args.executable.resolve(strict=True)
     results = []
     corpora = [(16, False, False)] if args.smoke else [(100, False, False), (1024, False, False)]
+    if args.one_gib:
+        corpora = [(1024, True, False)]
     if args.extended:
         corpora.append((1024, True, False))
         if platform.system() == 'Linux': corpora.append((4096, True, False))
