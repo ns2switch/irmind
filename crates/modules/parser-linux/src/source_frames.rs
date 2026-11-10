@@ -110,10 +110,10 @@ impl<'a> State<'a> {
         Ok(())
     }
     fn single(&mut self, line: &str, index: u64, offset: u64) -> Result<Decoded, AppError> {
-        if super::auth::header(line).is_some() {
-            auth::decode(self.meta, line, index, offset, &mut self.calendar)
-        } else if line.starts_with('{') {
+        if line.starts_with('{') {
             record::journal(line, index, offset)
+        } else if super::auth::header(line).is_some() {
+            auth::decode(self.meta, line, index, offset, &mut self.calendar)
         } else {
             web::decode(line, index, offset)
         }

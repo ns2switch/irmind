@@ -20,6 +20,9 @@ impl Timings {
             Ordering::Relaxed,
         );
     }
+    pub(super) fn snapshot(&self) -> [Duration; 2] {
+        [&self.decoder, &self.mapping].map(|n| Duration::from_nanos(n.load(Ordering::Relaxed)))
+    }
     pub(super) fn report(&self) {
         println!(
             "MAPPING_PHASE decoder_seconds={:.6} mapper_seconds={:.6}",
@@ -97,7 +100,6 @@ impl SourceMapper for Mapper {
     }
 }
 pub(super) fn catalog() -> (Arc<MappingCatalog>, Arc<Timings>) {
-    let timings = Arc::new(Timings::default());
     let decoders: Vec<Arc<dyn SourceDecoder>> = vec![
         Arc::new(irmind_mod_parser_json::JsonSourceDecoder),
         Arc::new(irmind_mod_parser_linux::LinuxSourceDecoder),
@@ -106,6 +108,13 @@ pub(super) fn catalog() -> (Arc<MappingCatalog>, Arc<Timings>) {
         Arc::new(irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap()),
         Arc::new(irmind_mod_mapping_journald_compat::JournaldCompatibilityMapping::new().unwrap()),
     ];
+    catalog_with(decoders, mappers)
+}
+pub(super) fn catalog_with(
+    decoders: Vec<Arc<dyn SourceDecoder>>,
+    mappers: Vec<Arc<dyn SourceMapper>>,
+) -> (Arc<MappingCatalog>, Arc<Timings>) {
+    let timings = Arc::new(Timings::default());
     let decoders = decoders
         .into_iter()
         .map(|inner| {
