@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 1c2bdeca8f4ea226102ae6b854341b039a49a3e1; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit a6baf5a1d57824185ebd5cdd08d86f6c919045aa; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
