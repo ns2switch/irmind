@@ -132,8 +132,8 @@ Authentication, Network Activity y API Activity. Otras versiones o pares de
 clase y categoría quedan sin clasificar, con diagnóstico y datos consultables.
 
 Los estados explícitos 1 y 2 significan éxito y fallo. Un estado ausente,
-desconocido o contradictorio queda desconocido. `actor.user` es el actor y
-`user` el objetivo. Los extremos mantienen sus roles de origen y destino.
+desconocido o contradictorio queda desconocido. En Authentication, `actor.user` es el actor y
+`user` el objetivo. Solo Process Activity interpreta los campos raíz del proceso. Los extremos mantienen sus roles de origen y destino.
 Los usuarios conservan sus espacios de nombres explícitos; los PID, también
 los reutilizados, usan el ámbito del registro original y nunca identifican
 una vida de proceso. Un Detection Finding no confirma un hallazgo del caso.

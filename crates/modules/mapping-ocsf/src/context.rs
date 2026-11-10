@@ -41,7 +41,20 @@ pub(super) fn project(view: &View<'_>, supported: bool) -> Result<EventContextV1
     if !supported {
         return Ok(context);
     }
+    let authentication = view.uint("class_uid")? == Some(3002);
+    let process_activity = view.uint("class_uid")? == Some(1007);
     for &(field, path) in FIELDS {
+        // Root `user` is the authentication subject, not a universal target alias.
+        if matches!(
+            field,
+            F::UserTargetName | F::UserTargetId | F::UserTargetDomain
+        ) && !authentication
+        {
+            continue;
+        }
+        if field.as_str().starts_with("process.") && !process_activity {
+            continue;
+        }
         let Some(value) = view.get(path) else {
             continue;
         };

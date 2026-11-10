@@ -69,12 +69,6 @@ fn explicit_ocsf_roles_preserve_both_occurrences_and_precise_time() {
             .text
             .contains("synthetic only")
     );
-    for field in [F::ProcessPid, F::ProcessParentPid] {
-        assert!(matches!(
-            at(field).entity().scope(),
-            EntityIdentityScope::SourceRecord { .. }
-        ));
-    }
 }
 #[test]
 fn outcomes_are_closed_and_missing_is_unknown_without_action_inference() {
@@ -126,7 +120,6 @@ fn explicit_realm_and_record_scope_prevent_user_and_pid_aliasing() {
     let sources = records(bytes.as_bytes());
     let mapper = OcsfMapping::new().unwrap();
     let a = mapper.map(&sources[0]).unwrap();
-    let b = mapper.map(&sources[1]).unwrap();
     let at = |out: &MappingOutput, field| {
         out.record()
             .common
@@ -139,7 +132,19 @@ fn explicit_realm_and_record_scope_prevent_user_and_pid_aliasing() {
             .clone()
     };
     assert_ne!(at(&a, F::UserName), at(&a, F::UserTargetName));
+    let process_text = bytes
+        .replace("\"class_uid\":3002", "\"class_uid\":1007")
+        .replace("\"category_uid\":3", "\"category_uid\":1");
+    let processes = records(process_text.as_bytes());
+    let a = mapper.map(&processes[0]).unwrap();
+    let b = mapper.map(&processes[1]).unwrap();
     assert_ne!(at(&a, F::ProcessPid), at(&b, F::ProcessPid));
+    for field in [F::ProcessPid, F::ProcessParentPid] {
+        assert!(matches!(
+            at(&a, field).scope(),
+            EntityIdentityScope::SourceRecord { .. }
+        ));
+    }
 }
 #[test]
 fn invalid_typed_fields_are_rejected_and_all_six_classes_are_explicit() {
@@ -147,7 +152,9 @@ fn invalid_typed_fields_are_rejected_and_all_six_classes_are_explicit() {
     let mapper = OcsfMapping::new().unwrap();
     for bad in [
         text.replace("203.0.113.77", "not an IP"),
-        text.replace("\"pid\":42", "\"pid\":-1"),
+        text.replace("\"pid\":42", "\"pid\":-1")
+            .replace("\"class_uid\":3002", "\"class_uid\":1007")
+            .replace("\"category_uid\":3", "\"category_uid\":1"),
     ] {
         assert!(mapper.map(&records(bad.as_bytes()).remove(0)).is_err());
     }
@@ -179,4 +186,25 @@ fn mapping_passes_shared_purity_and_limits_contract() {
         1,
     )
     .unwrap();
+}
+
+#[test]
+fn unrelated_root_fields_never_assign_authentication_or_process_roles() {
+    let text = std::str::from_utf8(SAMPLE)
+        .unwrap()
+        .replace("\"class_uid\":3002", "\"class_uid\":1001")
+        .replace("\"category_uid\":3", "\"category_uid\":1");
+    let output = OcsfMapping::new()
+        .unwrap()
+        .map(&records(text.as_bytes()).remove(0))
+        .unwrap();
+    for field in [
+        F::UserTargetName,
+        F::UserTargetId,
+        F::ProcessPid,
+        F::ProcessParentPid,
+    ] {
+        assert!(output.record().common.context().get(field).is_none());
+    }
+    assert!(output.record().indexed.record.text.contains("bob"));
 }

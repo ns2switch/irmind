@@ -141,9 +141,9 @@ status remains unknown. Activity and status tables never interpret message text.
 Other schema versions and unsupported class/category pairs remain unclassified,
 with diagnostics and their original searchable fields and extraction aliases.
 
-`actor.user` and root `user` map to actor and target; endpoints retain source
+In Authentication, `actor.user` and root `user` map to actor and target; endpoints retain source
 and destination roles. Directory, host and account qualifiers namespace users.
-An absent directory keeps a user local to its source record. Process and parent
+An absent directory keeps a user local to its source record. Only Process Activity maps root process and parent fields. Their
 PIDs always use source-record scope, including reused PIDs: a UID is retained
 as context, without assuming that it proves a process lifetime. Detection
 Finding is source telemetry and never confirms a case finding.

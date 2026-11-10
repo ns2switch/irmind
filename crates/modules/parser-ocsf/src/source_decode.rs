@@ -80,22 +80,64 @@ impl<'a> State<'a> {
         offset: Option<u64>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<(), AppError> {
+        self.accept(
+            bytes,
+            |state| {
+                fields::decode(
+                    bytes,
+                    state.metadata,
+                    state.report.accepted as u64,
+                    state.seen - 1,
+                    offset,
+                    state.encoding,
+                )
+            },
+            offset,
+            emit,
+        )
+    }
+    fn record_fields(
+        &mut self,
+        values: Result<irmind_domain::SourceValue, AppError>,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<(), AppError> {
+        let sample = format!(
+            "Parquet record {}: unsupported value or source limit",
+            self.seen
+        );
+        self.accept(
+            sample.as_bytes(),
+            |state| {
+                values.and_then(|fields| {
+                    fields::build(
+                        fields,
+                        state.metadata,
+                        state.report.accepted as u64,
+                        state.seen - 1,
+                        None,
+                        state.encoding,
+                    )
+                })
+            },
+            None,
+            emit,
+        )
+    }
+    fn accept(
+        &mut self,
+        bytes: &[u8],
+        build: impl FnOnce(&Self) -> Result<SourceRecordV1, AppError>,
+        offset: Option<u64>,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<(), AppError> {
         if self.metadata.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
         if self.seen >= 10_000_000 {
             return Err(limit());
         }
-        let ordinal = self.seen;
         self.seen += 1;
-        let source = fields::decode(
-            bytes,
-            self.metadata,
-            self.report.accepted as u64,
-            ordinal,
-            offset,
-            self.encoding,
-        );
+        let source = build(self);
         match source {
             Ok(source) => {
                 let mut provenance = Provenance::new(
