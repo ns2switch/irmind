@@ -17,6 +17,10 @@ impl JsonFrame {
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+
     pub const fn offset(&self) -> u64 {
         self.offset
     }

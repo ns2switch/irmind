@@ -28,7 +28,7 @@ Worker output is an owned, validated candidate, not a trusted record. Only the c
 
 ## EVTX helper
 
-The pinned `evtx` 0.15.1 crate decodes chunks in parallel only with its optional `multithreading` feature, which adds Rayon and its transitive dependencies to the helper workspace. Its `num_threads` setting bounds in-flight chunk work; the actual Rayon pool must also be capped. Neither feature nor dependency is enabled by this proposal.
+The pinned `evtx` 0.15.1 crate offers a parallel pipeline through its optional `multithreading` feature. Its public serialized record does not expose the original record offset, which IRMind needs for provenance. The alternative to evaluate is scheduling the owned original chunks returned by `chunks()` and keeping the existing offset calculation on each chunk. This does not require adding Rayon.
 
 The current Linux seccomp policy does not permit the helper to create threads after applying isolation. Keep Linux serial under that policy. Do not start an unrestricted thread pool before installing the sandbox. On macOS and Windows, consider the feature only if the bounded pool can be started inside the existing isolation boundary and native isolation tests pass. The broker still starts at most one Windows helper at a time and retains the one verified network witness per session. No shell, handle expansion, or protocol change is proposed.
 

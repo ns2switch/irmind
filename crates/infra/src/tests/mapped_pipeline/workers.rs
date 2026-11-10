@@ -8,7 +8,31 @@ fn worker_caps_preserve_parquet_and_the_complete_signed_chain() {
     let inputs = root.path().join("sources");
     fs::create_dir(&inputs).unwrap();
     let paths = write_sources(&inputs);
-    let seed = root.path().join("seed");
+    compare_worker_counts(root.path(), &inputs, &paths);
+}
+
+#[test]
+fn one_ndjson_source_preserves_signed_bytes_with_parallel_record_decoding() {
+    use std::io::Write as _;
+    let root = tempfile::tempdir().unwrap();
+    let inputs = root.path().join("sources");
+    fs::create_dir(&inputs).unwrap();
+    let name = "synthetic.ndjson";
+    let mut out = std::io::BufWriter::new(fs::File::create(inputs.join(name)).unwrap());
+    for index in 0..800 {
+        if index == 223 {
+            // A valid JSON frame that fails the existing timestamp contract.
+            out.write_all(b"{\"eventTime\":\"invalid\"}\r\n").unwrap();
+        }
+        writeln!(out, r#"{{"eventTime":"2026-11-01T00:00:01.123456789Z","eventName":"Synthetic{index}","sourceIPAddress":"203.0.113.77"}}"#).unwrap();
+    }
+    out.flush().unwrap();
+    drop(out);
+    compare_worker_counts(root.path(), &inputs, &[name.into()]);
+}
+
+fn compare_worker_counts(root: &Path, inputs: &Path, paths: &[String]) {
+    let seed = root.join("seed");
     let (_, engine, catalog) = fixture(&seed);
     let case = engine
         .create_case("Synthetic concurrency", "local only")
@@ -17,7 +41,7 @@ fn worker_caps_preserve_parquet_and_the_complete_signed_chain() {
     let clock = Arc::new(FixedClock::new(1_793_491_200));
     let mut expected = None;
     for cap in [1, 2, 4, 256] {
-        let run = root.path().join(format!("workers-{cap}"));
+        let run = root.join(format!("workers-{cap}"));
         fs::create_dir(&run).unwrap();
         fs::copy(seed.join("irmind.db"), run.join("irmind.db")).unwrap();
         let (store, engine, catalog) = fixture_with_clock(&run, catalog.clone(), clock.clone());
@@ -33,7 +57,7 @@ fn worker_caps_preserve_parquet_and_the_complete_signed_chain() {
         let cancel = CancellationToken::new();
         assert_eq!(
             ingest
-                .ingest_local_batch(&case.id, &inputs, &paths, false, &cancel)
+                .ingest_local_batch(&case.id, inputs, paths, false, &cancel)
                 .unwrap()
                 .len(),
             paths.len()
@@ -41,7 +65,7 @@ fn worker_caps_preserve_parquet_and_the_complete_signed_chain() {
         engine.verify(&case.id).unwrap();
         assert_eq!(
             ingest
-                .verify_parquet_rebuild(&case.id, &inputs, &cancel)
+                .verify_parquet_rebuild(&case.id, inputs, &cancel)
                 .unwrap(),
             paths.len()
         );
@@ -73,3 +97,5 @@ fn write_sources(root: &Path) -> Vec<String> {
         path
     }).collect()
 }
+
+mod benchmark;

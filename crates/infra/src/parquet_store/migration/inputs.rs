@@ -179,6 +179,7 @@ fn records(
             size: input.manifest.size,
             cancel,
             precise_time: precise,
+            decode_budget: irmind_app::source_mapping::DecodeBudget::sequential(),
         },
         &mut |row| {
             let mut value = None;

@@ -6,7 +6,10 @@ mod web;
 use super::{bounds, time::Calendar};
 use irmind_app::{
     AppError, ParseReport, ParserIdentity, SourceDecoder,
-    source_mapping::{SourceInput, SourceMetadata, SourceRecordV1},
+    source_mapping::{
+        DecodeBudget, DecodeInput, SourceInput, SourceMetadata, SourceRecordV1,
+        ordered_decode::decode_ordered,
+    },
 };
 use irmind_domain::{ParserLocation, Provenance, Tainted};
 use record::Decoded;
@@ -26,31 +29,82 @@ impl SourceDecoder for LinuxSourceDecoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
-        let mut reader = BufReader::new(input.reader);
-        let mut state = State::new(input.metadata, emit);
+        self.decode_with_budget(DecodeInput::Reader(input), DecodeBudget::sequential(), emit)
+    }
+    fn decode_with_budget(
+        &self,
+        input: DecodeInput<'_>,
+        budget: DecodeBudget,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        let SourceInput { metadata, reader } = input.into_reader();
+        let mut reader = BufReader::new(reader);
+        let mut state = State::new(metadata, emit);
         let (mut index, mut offset) = (0u64, 0u64);
-        loop {
-            let (bytes, consumed) = bounds::line(&mut reader, input.metadata.cancel)?;
-            if consumed == 0 {
-                break;
-            }
-            if index >= bounds::MAX_RECORDS as u64 || offset + consumed > bounds::MAX_SOURCE {
-                return Err(invalid());
-            }
-            if consumed > bounds::MAX_LINE as u64 {
-                state.reject(&bytes);
-            } else if !bytes.iter().all(u8::is_ascii_whitespace) {
-                state.line(&bytes, index, offset)?;
-            }
-            index += 1;
-            offset += consumed;
-        }
+        decode_ordered(
+            budget,
+            metadata.cancel,
+            || loop {
+                let (bytes, consumed) = bounds::line(&mut reader, metadata.cancel)?;
+                if consumed == 0 {
+                    return Ok(None);
+                }
+                if index >= bounds::MAX_RECORDS as u64 || offset + consumed > bounds::MAX_SOURCE {
+                    return Err(invalid());
+                }
+                let item = (bytes, index, offset, consumed > bounds::MAX_LINE as u64);
+                index += 1;
+                offset += consumed;
+                if item.3 || !item.0.iter().all(u8::is_ascii_whitespace) {
+                    let weight = item.0.len().saturating_mul(64);
+                    return Ok(Some((item, weight)));
+                }
+            },
+            |(bytes, index, offset, oversized)| {
+                let prepared = if oversized {
+                    Prepared::Invalid
+                } else {
+                    prepare(&bytes, index, offset)
+                };
+                (bytes, index, offset, prepared)
+            },
+            |(bytes, index, offset, prepared)| state.accept(&bytes, index, offset, prepared),
+        )?;
         for decoded in state.audit.finish()? {
             state.emit(decoded)?;
         }
         Ok(state.report)
     }
 }
+enum Prepared {
+    Invalid,
+    Audit,
+    Authentication,
+    Independent(Box<Result<Decoded, AppError>>),
+}
+
+fn text(bytes: &[u8]) -> Result<&str, AppError> {
+    std::str::from_utf8(bytes)
+        .map(|line| line.trim_end_matches(['\r', '\n']))
+        .map_err(|_| invalid())
+}
+
+fn prepare(bytes: &[u8], index: u64, offset: u64) -> Prepared {
+    let Ok(line) = std::str::from_utf8(bytes) else {
+        return Prepared::Invalid;
+    };
+    let line = line.trim_end_matches(['\r', '\n']);
+    if super::audit::detect(line) {
+        Prepared::Audit
+    } else if line.starts_with('{') {
+        Prepared::Independent(Box::new(record::journal(line, index, offset)))
+    } else if super::auth::header(line).is_some() {
+        Prepared::Authentication
+    } else {
+        Prepared::Independent(Box::new(web::decode(line, index, offset)))
+    }
+}
+
 struct State<'a> {
     meta: SourceMetadata<'a>,
     emit: &'a mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
@@ -81,21 +135,30 @@ impl<'a> State<'a> {
         self.audit.invalidate_open();
         bounds::reject(&mut self.report, bytes);
     }
-    fn line(&mut self, bytes: &[u8], index: u64, offset: u64) -> Result<(), AppError> {
-        let Ok(line) = std::str::from_utf8(bytes) else {
+    fn accept(
+        &mut self,
+        bytes: &[u8],
+        index: u64,
+        offset: u64,
+        prepared: Prepared,
+    ) -> Result<(), AppError> {
+        if matches!(prepared, Prepared::Invalid) {
             self.reject(bytes);
             return Ok(());
-        };
-        let line = line.trim_end_matches(['\r', '\n']);
-        let is_audit = super::audit::detect(line);
+        }
+        let is_audit = matches!(prepared, Prepared::Audit);
         if *self.audit_mode.get_or_insert(is_audit) != is_audit {
             self.reject(bytes);
             return Ok(());
         }
-        let result = if is_audit {
-            self.audit.push(line, index, offset)
-        } else {
-            self.single(line, index, offset).map(|r| vec![r])
+        let result = match prepared {
+            Prepared::Audit => self.audit.push(text(bytes)?, index, offset),
+            Prepared::Authentication => {
+                auth::decode(self.meta, text(bytes)?, index, offset, &mut self.calendar)
+                    .map(|record| vec![record])
+            }
+            Prepared::Independent(result) => result.map(|record| vec![record]),
+            Prepared::Invalid => return Err(invalid()),
         };
         match result {
             Ok(records) => {
@@ -108,15 +171,6 @@ impl<'a> State<'a> {
             Err(_) => self.reject(bytes),
         }
         Ok(())
-    }
-    fn single(&mut self, line: &str, index: u64, offset: u64) -> Result<Decoded, AppError> {
-        if line.starts_with('{') {
-            record::journal(line, index, offset)
-        } else if super::auth::header(line).is_some() {
-            auth::decode(self.meta, line, index, offset, &mut self.calendar)
-        } else {
-            web::decode(line, index, offset)
-        }
     }
     fn emit(&mut self, decoded: Decoded) -> Result<(), AppError> {
         if self.meta.cancel.is_cancelled() {

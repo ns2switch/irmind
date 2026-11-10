@@ -2,9 +2,10 @@
 use irmind_app::{
     AppError, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
-        DecodeAnnotationsV1, SourceDiscriminator, SourceFormatV1, SourceInput, SourceMetadata,
-        SourceRecordV1, SourceValue,
+        DecodeAnnotationsV1, DecodeBudget, DecodeInput, SourceDiscriminator, SourceFormatV1,
+        SourceInput, SourceMetadata, SourceRecordV1, SourceValue,
         json::{JsonFrame, JsonFrames, SourceJsonLimits, decode_json_fields},
+        ordered_decode::decode_ordered,
     },
 };
 use irmind_domain::{EventOrigin, EvidenceHash, IndexedTime, ParserLocation, Provenance, Tainted};
@@ -23,26 +24,55 @@ impl SourceDecoder for JsonSourceDecoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
-        let mut frames = JsonFrames::new(input.reader, input.metadata.cancel);
-        let mut report = ParseReport {
-            accepted: 0,
-            rejected: 0,
-            samples: Vec::new(),
-        };
-        while let Some(frame) = frames.next_frame()? {
-            if input.metadata.cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            if report.accepted as u64 + report.rejected >= 10_000_000 {
+        decode(input, DecodeBudget::sequential(), emit)
+    }
+
+    fn decode_with_budget(
+        &self,
+        input: DecodeInput<'_>,
+        budget: DecodeBudget,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        decode(input.into_reader(), budget, emit)
+    }
+}
+
+fn decode(
+    SourceInput { metadata, reader }: SourceInput<'_>,
+    budget: DecodeBudget,
+    emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
+    let mut frames = JsonFrames::new(reader, metadata.cancel);
+    let mut seen = 0u64;
+    let mut report = ParseReport {
+        accepted: 0,
+        rejected: 0,
+        samples: Vec::new(),
+    };
+    decode_ordered(
+        budget,
+        metadata.cancel,
+        || {
+            let Some(frame) = frames.next_frame()? else {
+                return Ok(None);
+            };
+            seen += 1;
+            if seen > 10_000_000 {
                 return Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit));
             }
-            let record = (!frame.oversized())
-                .then(|| decode_frame(input.metadata, &frame, report.accepted))
-                .transpose();
+            // Account for both original bytes and the parsed field tree.
+            let weight = frame.bytes().len().saturating_mul(64);
+            Ok(Some((frame, weight)))
+        },
+        prepare_frame,
+        |(frame, parsed)| {
+            let record = parsed.and_then(|(fields, time)| {
+                materialize_frame(metadata, &frame, report.accepted, fields, time)
+            });
             match record {
-                Ok(Some(record)) => {
+                Ok(record) => {
                     let location = ParserLocation::new(
-                        input.metadata.source.reference(),
+                        metadata.source.reference(),
                         "parser-json",
                         frame.offset(),
                     )
@@ -50,29 +80,48 @@ impl SourceDecoder for JsonSourceDecoder {
                     emit(Tainted::from_external(
                         record,
                         Provenance::new(
-                            input.metadata.evidence_hash,
+                            metadata.evidence_hash,
                             Some(report.accepted as u64),
-                            input.metadata.source.kind(),
+                            metadata.source.kind(),
                         )
                         .with_parser_location(location),
                     ))?;
                     report.accepted += 1;
                 }
-                _ => reject(&mut report, frame.bytes()),
+                Err(_) => reject(&mut report, frame.bytes()),
             }
-        }
-        Ok(report)
-    }
+            Ok(())
+        },
+    )?;
+    Ok(report)
 }
 
-fn decode_frame(
+fn prepare_frame(
+    frame: JsonFrame,
+) -> (
+    JsonFrame,
+    Result<(SourceValue, Option<IndexedTime>), AppError>,
+) {
+    let result = if frame.oversized() {
+        Err(invalid())
+    } else {
+        decode_json_fields(frame.bytes(), SourceJsonLimits::default())
+            .map_err(|_| invalid())
+            .and_then(|fields| {
+                let time = timestamp(&fields)?;
+                Ok((fields, time))
+            })
+    };
+    (frame, result)
+}
+
+fn materialize_frame(
     metadata: SourceMetadata<'_>,
     frame: &JsonFrame,
     index: usize,
+    fields: SourceValue,
+    timestamp: Option<IndexedTime>,
 ) -> Result<SourceRecordV1, AppError> {
-    let fields =
-        decode_json_fields(frame.bytes(), SourceJsonLimits::default()).map_err(|_| invalid())?;
-    let timestamp = timestamp(&fields)?;
     let origin = EventOrigin::try_new(
         EvidenceHash::from_bytes(metadata.evidence_hash),
         index as u64,

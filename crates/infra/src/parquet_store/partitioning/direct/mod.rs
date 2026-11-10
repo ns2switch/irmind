@@ -44,7 +44,7 @@ impl ParquetStore {
         let mut sources = Vec::new();
         let mut sorted_fallback = false;
         for paths in request.relative_paths.chunks(workers) {
-            let inputs = self.staging_inputs(request.case_id, request.source_root, paths)?;
+            let inputs = self.direct_inputs(request, paths, workers)?;
             match self.stream_direct_chunk(request, inputs, &mut writing, &mut allocator, cancel)? {
                 super::ordered::DirectChunk::Ordered(chunk) => sources.extend(chunk),
                 super::ordered::DirectChunk::NeedsSort => {
@@ -62,7 +62,7 @@ impl ParquetStore {
             )?;
             sources.clear();
             for paths in request.relative_paths.chunks(workers) {
-                let inputs = self.staging_inputs(request.case_id, request.source_root, paths)?;
+                let inputs = self.direct_inputs(request, paths, workers)?;
                 let mut staged = read::stage(self, request, inputs, cancel)?;
                 self.sort_staged_sources(request.case_id, &mut staged, cancel)?;
                 for source in staged {
@@ -90,6 +90,27 @@ impl ParquetStore {
             self.profile.clone(),
         ))))
     }
+    fn direct_inputs(
+        &self,
+        request: &MappedIngestRequest<'_>,
+        paths: &[String],
+        workers: usize,
+    ) -> Result<Vec<super::staging::Input>, AppError> {
+        let mut inputs = self.staging_inputs(request.case_id, request.source_root, paths)?;
+        let count = inputs.len().max(1);
+        for (index, input) in inputs.iter_mut().enumerate() {
+            // Account for the existing source worker and distribute spare slots
+            // in canonical order. Nested decoders cannot oversubscribe the pool.
+            let slots = workers / count + usize::from(index < workers % count);
+            let slots = std::num::NonZeroUsize::new(slots).ok_or_else(invalid_source)?;
+            input.decode_budget = irmind_app::source_mapping::DecodeBudget::new(
+                slots,
+                slots.get() * (64 * 1024 * 1024),
+            );
+        }
+        Ok(inputs)
+    }
+
     fn validate_direct_sources(
         &self,
         request: &MappedIngestRequest<'_>,

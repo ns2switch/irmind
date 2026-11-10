@@ -1,7 +1,10 @@
 //! Shared bounded framing mechanics. Source modules still own their format and time rules.
 mod json;
 mod time;
-use super::{DecodeAnnotationsV1, SourceFormatV1, SourceMetadata, SourceRecordV1, SourceValue};
+use super::{
+    DecodeAnnotationsV1, DecodeBudget, SourceFormatV1, SourceMetadata, SourceRecordV1, SourceValue,
+    ordered_decode::decode_ordered,
+};
 use crate::{AppError, FixedAppError, ParseReport, ParserIdentity};
 use irmind_domain::{
     EventOrigin, EvidenceHash, IndexedTime, ParserLocation, Provenance, SourceMemberV1, Tainted,
@@ -67,6 +70,37 @@ impl<'a> SourceFrameEmitter<'a> {
         }
         Ok(())
     }
+    /// Frame input in one place, then decode the bounded payloads independently.
+    pub fn decode_frames<T: Send>(
+        &mut self,
+        budget: DecodeBudget,
+        mut next: impl FnMut() -> Result<Option<(Vec<u8>, Option<u64>, T)>, AppError>,
+        decode: impl Fn(&[u8], T) -> Result<DecodedSourceFrame, AppError> + Sync,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<(), AppError> {
+        let mut seen = self.seen;
+        decode_ordered(
+            budget,
+            self.metadata.cancel,
+            || {
+                let Some(frame) = next()? else {
+                    return Ok(None);
+                };
+                if seen >= 10_000_000 {
+                    return Err(limit());
+                }
+                seen += 1;
+                let weight = frame.0.len().saturating_mul(64);
+                Ok(Some((frame, weight)))
+            },
+            |(bytes, offset, context)| {
+                let result = decode(&bytes, context);
+                (bytes, offset, result)
+            },
+            |(bytes, offset, decoded)| self.frame(&bytes, offset, decoded, emit),
+        )
+    }
+
     fn record(
         &self,
         frame: DecodedSourceFrame,

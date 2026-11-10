@@ -3,8 +3,8 @@ use super::super::{
 };
 use crate::parquet_store::local::stream::VerifiedInput;
 use irmind_app::source_mapping::{
-    DecodedSourceCommitmentV1, MappingCatalog, SourceFileInput, SourceInput, SourceMetadata,
-    SourceRecordAccumulator, SourceReferenceV1, decode_source_time_context,
+    DecodeInput, DecodedSourceCommitmentV1, MappingCatalog, SourceFileInput, SourceInput,
+    SourceMetadata, SourceRecordAccumulator, SourceReferenceV1, decode_source_time_context,
 };
 use std::io::{Seek, SeekFrom, Write};
 
@@ -100,11 +100,12 @@ fn decode_source(
     input.source.seek(SeekFrom::Start(0)).map_err(storage)?;
     let report = if decoder.needs_random_access(logical, input.sample) {
         let mut callback_failed = false;
-        let result = decoder.decode_local_file(
-            SourceFileInput {
+        let result = decoder.decode_with_budget(
+            DecodeInput::File(SourceFileInput {
                 metadata,
                 file: input.source,
-            },
+            }),
+            input.decode_budget,
             &mut |record| {
                 let result = emit(record);
                 callback_failed |= result.is_err();
@@ -124,11 +125,12 @@ fn decode_source(
     } else {
         let mut reader = HashingReader::new(&mut *input.source);
         let mut callback_failed = false;
-        let result = decoder.decode_reader(
-            SourceInput {
+        let result = decoder.decode_with_budget(
+            DecodeInput::Reader(SourceInput {
                 metadata,
                 reader: &mut reader,
-            },
+            }),
+            input.decode_budget,
             &mut |record| {
                 let outcome = emit(record);
                 if outcome.is_err() {

@@ -4,7 +4,9 @@ mod json;
 mod parquet;
 use irmind_app::{
     AppError, LogParser, ParseReport, ParserIdentity, SourceDecoder,
-    source_mapping::{SourceFileInput, SourceInput, SourceMetadata, SourceRecordV1},
+    source_mapping::{
+        DecodeBudget, DecodeInput, SourceFileInput, SourceInput, SourceMetadata, SourceRecordV1,
+    },
 };
 use irmind_domain::{ParserLocation, Provenance, Tainted};
 use std::{
@@ -28,7 +30,18 @@ impl SourceDecoder for OcsfSourceDecoder {
         mut input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
-        json::decode(&mut input, emit)
+        json::decode(&mut input, DecodeBudget::sequential(), emit)
+    }
+    fn decode_with_budget(
+        &self,
+        input: DecodeInput<'_>,
+        budget: DecodeBudget,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        match input {
+            DecodeInput::Reader(mut input) => json::decode(&mut input, budget, emit),
+            DecodeInput::File(input) => self.decode_local_file(input, emit),
+        }
     }
     fn decode_local_file(
         &self,
@@ -77,20 +90,23 @@ impl<'a> State<'a> {
     fn record(
         &mut self,
         bytes: &[u8],
+        parsed: Result<irmind_domain::SourceValue, AppError>,
         offset: Option<u64>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<(), AppError> {
         self.accept(
             bytes,
             |state| {
-                fields::decode(
-                    bytes,
-                    state.metadata,
-                    state.report.accepted as u64,
-                    state.seen - 1,
-                    offset,
-                    state.encoding,
-                )
+                parsed.and_then(|fields| {
+                    fields::build(
+                        fields,
+                        state.metadata,
+                        state.report.accepted as u64,
+                        state.seen - 1,
+                        offset,
+                        state.encoding,
+                    )
+                })
             },
             offset,
             emit,

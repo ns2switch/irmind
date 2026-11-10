@@ -44,6 +44,7 @@ impl ParsedSource {
             file: source,
             path: self.manifest.source,
             budget: self.budget,
+            decode_budget: irmind_app::source_mapping::DecodeBudget::sequential(),
         };
         let initial = self.initial.ok_or_else(invalid_source)?;
         let staged = store.stage_hashed_source(
@@ -100,6 +101,7 @@ impl ParquetStore {
                     cancel,
                     parser: request.parser,
                     precise_time: true,
+                    decode_budget: input.decode_budget,
                 },
                 &mut |row| {
                     if cancel.is_cancelled() {

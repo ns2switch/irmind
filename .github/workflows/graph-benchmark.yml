@@ -6,6 +6,11 @@ on:
         description: Measure adaptive workers and the fixed-worker reference on one Linux runner
         type: boolean
         default: false
+      worker_workload:
+        description: Corpus for the worker sweep
+        type: choice
+        default: cloud-files
+        options: [cloud-files, ndjson-1gib, ndjson-4gib]
       pipeline_profile:
         description: Profile the production pipeline and allocation calls against a pinned baseline
         type: boolean
@@ -306,6 +311,7 @@ jobs:
       - name: Compare fixed and adaptive workers
         env:
           BASE_REF: ${{ inputs.compare_base }}
+          WORKER_WORKLOAD: ${{ inputs.worker_workload }}
         run: bash .github/scripts/benchmark_workers.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
