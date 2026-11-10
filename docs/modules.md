@@ -150,7 +150,7 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 ## Elastic Common Schema parser
 
-**Does:** Detects ECS NDJSON from `@timestamp` and `ecs.version`, or characteristic ECS event and host fields. Maps event, host, user, source, destination, process, file, and URL fields into UTC records and entities. Unmapped fields remain in the local normalized record.
+**Does:** Detects ECS NDJSON from `@timestamp` and `ecs.version`, or characteristic ECS event fields. The original-field decoder preserves timestamps, source fields and provenance. With the experimental common writer, the separate `mapping-ecs` module validates explicit classifications and roles; the existing route remains during decoder rollout. See [ECS mapping coverage](mappings.md#elastic-common-schema).
 
 **Permission:** Read access to the selected local file only.
 
@@ -292,4 +292,4 @@ The experimental `parser-evtx` module is compiled by default but requires the ma
 
 ## Common-event mappings
 
-Optional source mappings are separate from parsers and connectors. Bundled CloudTrail tables classify supported operations, preserve actor/target account namespaces and leave unsupported results unknown. They require the experimental common writer; no remote module is enabled. See [mapping coverage and limitations](mappings.md).
+Optional source mappings are separate from parsers and connectors. Bundled CloudTrail tables and Linux mappings classify supported operations. Native ECS mapping validates explicit sets, typed values and roles. Missing or unsupported results remain unknown. They require the experimental common writer; no remote module is enabled. See [mapping coverage and limitations](mappings.md).

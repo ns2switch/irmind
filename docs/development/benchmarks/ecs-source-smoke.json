@@ -1,0 +1,70 @@
+{
+  "format": "irmind-ecs-source-smoke-v1",
+  "profile": "release",
+  "implementation_commit": "fbe7d8748b43145c978f3b8c6d2c29d5282d7997",
+  "source": "synthetic ECS 9.5 NDJSON; one host; chronological; 900-byte padding",
+  "scope": "paired local smoke in one execution; not the 15 GB release gate",
+  "timed": "ingestion only; corpus generation and post-ingestion verification excluded",
+  "measurements": [
+    {
+      "repetition": 1,
+      "pipeline": "existing_v2",
+      "bytes": 1073742930,
+      "records": 917729,
+      "rejected_records": 0,
+      "seconds": 25.167686,
+      "mib_per_second": 40.687136,
+      "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+    },
+    {
+      "repetition": 1,
+      "pipeline": "mapped_v3",
+      "bytes": 1073742930,
+      "records": 917729,
+      "rejected_records": 0,
+      "seconds": 30.713324,
+      "mib_per_second": 33.340613,
+      "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+    },
+    {
+      "repetition": 2,
+      "pipeline": "existing_v2",
+      "bytes": 1073742930,
+      "records": 917729,
+      "rejected_records": 0,
+      "seconds": 23.098444,
+      "mib_per_second": 44.332036,
+      "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+    },
+    {
+      "repetition": 2,
+      "pipeline": "mapped_v3",
+      "bytes": 1073742930,
+      "records": 917729,
+      "rejected_records": 0,
+      "seconds": 33.611381,
+      "mib_per_second": 30.465902,
+      "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+    },
+    {
+      "repetition": 3,
+      "pipeline": "existing_v2",
+      "bytes": 1073742930,
+      "records": 917729,
+      "rejected_records": 0,
+      "seconds": 23.492849,
+      "mib_per_second": 43.587776,
+      "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+    },
+    {
+      "repetition": 3,
+      "pipeline": "mapped_v3",
+      "bytes": 1073742930,
+      "records": 917729,
+      "rejected_records": 0,
+      "seconds": 30.672814,
+      "mib_per_second": 33.384646,
+      "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+    }
+  ]
+}
