@@ -10,7 +10,7 @@ IRMind v0.1.0
   │Context hints: on                                                         │
   │Theme: auto                                                               │
   │Common writer (experimental): not compiled                                │
-  │                                                                          │
+  │Maximum parallel workers: automatic                                       │
   │                                                                          │
   │                                                                          │
   │                                                                          │
