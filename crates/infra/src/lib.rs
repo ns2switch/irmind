@@ -15,7 +15,6 @@ pub use config_toml::TomlConfigurationStore;
 use irmind_fs::{private_dir, private_file};
 pub use parquet_store::ParquetStore;
 
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use ed25519_dalek::{Signature, Signer as _, SigningKey, VerifyingKey};
 use fs4::fs_std::FileExt as _;
 use irmind_app::{
@@ -26,8 +25,7 @@ use irmind_app::{
 };
 use irmind_domain::{Actor, AnalystApprovalVerifier, Case, CaseId, Severity, Tainted};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::json;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};

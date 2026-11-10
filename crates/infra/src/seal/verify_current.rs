@@ -5,7 +5,7 @@ use super::{
     storage_reason, verify_case_metadata,
 };
 use irmind_app::{ExportVerification, SignedEntry, SignedOperation, Verifier};
-use irmind_domain::{Actor, AuditEventKind, SealedParquetMigrationV1, SourceManifestV1};
+use irmind_domain::{Actor, AuditEventKind, SourceManifestV2};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::Read;
@@ -39,7 +39,7 @@ pub(super) fn verify_export_v6(
     if count == 0 || count > MAX_AUDIT_ENTRIES {
         return Err(storage_reason("invalid audit entry count"));
     }
-    let mut chain = ChainState::new(version);
+    let mut chain = ChainState::new();
     for index in 0..count {
         let entry: SignedEntry =
             serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
@@ -54,10 +54,10 @@ pub(super) fn verify_export_v6(
             ),
         ));
     }
-    verify_legacy_blobs(&mut input, &mut chain)?;
+    verify_evidence_blobs(&mut input, &mut chain)?;
     let provided_count = verify_source_frames(&mut input, &mut chain)?;
     verify_operation_frames(&mut input, &mut chain, &header)?;
-    if version >= 6 {
+    {
         super::mapping_proofs::read(
             &mut input,
             &chain.mapping_installations,
@@ -65,13 +65,8 @@ pub(super) fn verify_export_v6(
             &header.seal.public_key,
         )?;
     }
-    if version >= 5 {
+    {
         super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
-    } else {
-        let mut trailer = [0u8; 1];
-        if input.read(&mut trailer).map_err(storage)? != 0 {
-            return Err(storage_reason("export has trailing bytes"));
-        }
     }
     let mut result = v6_result(
         fingerprint,
@@ -108,27 +103,6 @@ fn verify_operation_frames(
             .verifier
             .verify(&operation.public_key, &operation.hash, &operation.sig)
             .map_err(|_| AppError::InvalidChain(operation.seq))?;
-        if let Some(record) = SealedParquetMigrationV1::decode(&operation.operation)
-            .map_err(|_| AppError::InvalidChain(operation.seq))?
-        {
-            if operation.actor != Actor::Analyst
-                || record.seal_hash != header.seal.hash
-                || record.artifact.source_hashes.len() != 1
-                || !chain
-                    .source_hashes
-                    .contains(record.artifact.source_hashes[0].as_str())
-                || !chain.artifact_paths.insert(record.artifact.path.clone())
-            {
-                return Err(AppError::InvalidChain(operation.seq));
-            }
-            chain.artifact_sources.extend(
-                record
-                    .artifact
-                    .source_hashes
-                    .into_iter()
-                    .map(|hash| hash.as_str().to_owned()),
-            );
-        }
         previous = operation.hash;
     }
     if !chain.source_hashes.is_subset(&chain.artifact_sources) {
@@ -137,7 +111,7 @@ fn verify_operation_frames(
     Ok(())
 }
 
-fn verify_legacy_blobs(input: &mut File, chain: &mut ChainState) -> Result<(), AppError> {
+fn verify_evidence_blobs(input: &mut File, chain: &mut ChainState) -> Result<(), AppError> {
     let evidence_count = read_u64(input)?;
     if evidence_count > MAX_SOURCE_MANIFESTS as u64 {
         return Err(storage_reason("too many copied evidence blobs"));
@@ -152,7 +126,7 @@ fn verify_legacy_blobs(input: &mut File, chain: &mut ChainState) -> Result<(), A
         verify_raw(input, size, &hash)?;
     }
     let last = chain.last.as_ref().ok_or(AppError::InvalidChain(0))?;
-    let matches = if chain.version >= 5 && chain.inventory.has_v2() {
+    let matches = if chain.inventory.has_v2() {
         for hash in &evidence_hashes {
             chain.inventory.add_evidence(hash)?;
         }
@@ -207,7 +181,6 @@ fn verify_source_frames(input: &mut File, chain: &mut ChainState) -> Result<usiz
 }
 
 struct ChainState {
-    version: u32,
     mapping_installations:
         BTreeMap<irmind_domain::EvidenceHash, irmind_app::source_mapping::MappingManifest>,
     catalog: irmind_app::ArtifactCatalogBuilder,
@@ -226,9 +199,8 @@ struct ChainState {
 }
 
 impl ChainState {
-    fn new(version: u32) -> Self {
+    fn new() -> Self {
         Self {
-            version,
             mapping_installations: BTreeMap::new(),
             catalog: irmind_app::ArtifactCatalogBuilder::default(),
             inventory: irmind_app::SealInventoryBuilder::default(),
@@ -250,15 +222,9 @@ impl ChainState {
 
     fn accept(&mut self, id: &CaseId, index: u64, entry: SignedEntry) -> Result<(), AppError> {
         if entry.case_id != id.as_str()
-            || (self.version < 6 && entry.kind.is_mapped_custody())
             || entry.seq != index + 1
             || entry.prev != self.previous
             || sha256(&entry.canonical()) != entry.hash
-            || (self.version == 4
-                && matches!(
-                    entry.kind,
-                    AuditEventKind::ParquetArtifactV2 | AuditEventKind::ParquetArtifactsMigrated
-                ))
             || (index == 0 && entry.kind != AuditEventKind::CaseCreated)
             || (index > 0 && entry.kind == AuditEventKind::CaseCreated)
             || self
@@ -276,7 +242,7 @@ impl ChainState {
             .clone()
             .with_trusted_key(&entry.actor, &entry.public_key)
             .map_err(|_| AppError::InvalidChain(entry.seq))?;
-        if self.version >= 5 {
+        {
             self.catalog.accept(&entry)?;
             self.inventory.accept(&entry)?;
         }
@@ -304,10 +270,10 @@ impl ChainState {
                     .map_err(|_| AppError::InvalidChain(entry.seq))?;
                 self.source_hashes.insert(hash.to_owned());
             }
-            AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2 => {
-                let source = SourceManifestV1::decode_signed(entry.kind, &entry.payload)
-                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                let source = source.ok_or(AppError::InvalidChain(entry.seq))?;
+            AuditEventKind::SourceManifestV2 => {
+                let source = SourceManifestV2::decode(&entry.payload)
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?
+                    .source;
                 if entry.evidence.is_some() || self.source_count >= MAX_SOURCE_MANIFESTS {
                     return Err(AppError::InvalidChain(entry.seq));
                 }
@@ -318,9 +284,7 @@ impl ChainState {
                     .entry((source.sha256.as_str().into(), source.size))
                     .or_default() += 1;
             }
-            AuditEventKind::ParquetArtifactV1
-            | AuditEventKind::ParquetArtifactV2
-            | AuditEventKind::ParquetArtifactV3 => {
+            AuditEventKind::ParquetArtifactV3 => {
                 let artifact = irmind_domain::ParquetArtifact::decode(entry.kind, &entry.payload)
                     .map_err(|_| AppError::InvalidChain(entry.seq))?;
                 self.artifacts.insert(
@@ -349,7 +313,7 @@ impl ChainState {
     }
 
     fn verify_seal(&self, id: &CaseId, header: &HeaderV6) -> Result<(), AppError> {
-        if self.version >= 5 {
+        {
             self.catalog.validate()?;
         }
         let severity = Severity::parse(&header.severity).map_err(|_| AppError::InvalidChain(1))?;

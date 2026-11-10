@@ -1,5 +1,5 @@
 use super::{
-    AppError, CaseId, Connection, LocalStore, Mutex, OpenOptions, ParquetStore, Path, PathBuf, fs,
+    AppError, Connection, LocalStore, Mutex, OpenOptions, ParquetStore, Path, PathBuf, fs,
     private_dir, private_file, storage,
 };
 
@@ -37,7 +37,6 @@ impl LocalStore {
             seal_dir,
             lock_dir,
         };
-        Self::discard_old_graph_indexes(root)?;
         store.reconcile_pending_seals()?;
         Ok(store)
     }
@@ -80,6 +79,7 @@ impl LocalStore {
         let db = Connection::open(db_path).map_err(storage)?;
         db.busy_timeout(std::time::Duration::from_secs(30))
             .map_err(storage)?;
+        super::schema::validate_existing(&db)?;
         db.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, title TEXT NOT NULL, scope TEXT NOT NULL, severity TEXT NOT NULL DEFAULT 'medium', sealed INTEGER NOT NULL DEFAULT 0, seal_pending INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS audit (case_id TEXT NOT NULL, seq INTEGER NOT NULL, at INTEGER NOT NULL, actor TEXT NOT NULL, origin TEXT NOT NULL,
@@ -104,67 +104,10 @@ impl LocalStore {
             CREATE TRIGGER IF NOT EXISTS global_operational_audit_no_update BEFORE UPDATE ON global_operational_audit BEGIN SELECT RAISE(ABORT,'global operational audit is append only'); END;
             CREATE TRIGGER IF NOT EXISTS global_operational_audit_no_delete BEFORE DELETE ON global_operational_audit BEGIN SELECT RAISE(ABORT,'global operational audit is append only'); END;
         ").map_err(storage)?;
-        Self::migrate_case_columns(&db)?;
         Ok(db)
-    }
-
-    fn migrate_case_columns(db: &Connection) -> Result<(), AppError> {
-        let has_severity = {
-            let mut statement = db.prepare("PRAGMA table_info(cases)").map_err(storage)?;
-            statement
-                .query_map([], |row| row.get::<_, String>(1))
-                .map_err(storage)?
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(storage)?
-                .contains(&"severity".to_owned())
-        };
-        if !has_severity {
-            db.execute_batch(
-                "ALTER TABLE cases ADD COLUMN severity TEXT NOT NULL DEFAULT 'medium'",
-            )
-            .map_err(storage)?;
-        }
-        let has_seal_pending = {
-            let mut statement = db.prepare("PRAGMA table_info(cases)").map_err(storage)?;
-            statement
-                .query_map([], |row| row.get::<_, String>(1))
-                .map_err(storage)?
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(storage)?
-                .contains(&"seal_pending".to_owned())
-        };
-        if !has_seal_pending {
-            db.execute_batch(
-                "ALTER TABLE cases ADD COLUMN seal_pending INTEGER NOT NULL DEFAULT 0",
-            )
-            .map_err(storage)?;
-        }
-        Ok(())
     }
 
     pub(crate) fn conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>, AppError> {
         self.db.lock().map_err(storage)
-    }
-
-    fn discard_old_graph_indexes(root: &Path) -> Result<(), AppError> {
-        let old_dir = root.join("graph");
-        if !old_dir.exists() {
-            return Ok(());
-        }
-        for entry in fs::read_dir(&old_dir).map_err(storage)? {
-            let entry = entry.map_err(storage)?;
-            let path = entry.path();
-            let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-                continue;
-            };
-            let Some(stem) = name.strip_suffix(".duckdb") else {
-                continue;
-            };
-            if CaseId::parse(stem).is_err() || !entry.file_type().map_err(storage)?.is_file() {
-                continue;
-            }
-            fs::remove_file(path).map_err(storage)?;
-        }
-        Ok(())
     }
 }
