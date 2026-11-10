@@ -2,8 +2,8 @@
 use irmind_app::{
     AppError, LogParser, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
-        SourceDecoderSelection, SourceDiscriminator, SourceFormatV1, SourceInput, SourceMetadata,
-        SourceRecordV1, SourceValue,
+        DecodeBudget, DecodeInput, SourceDecoderSelection, SourceDiscriminator, SourceFormatV1,
+        SourceInput, SourceMetadata, SourceRecordV1, SourceValue,
         framed::{DecodedSourceFrame, SourceFrameEmitter, decode_json_source, source_datetime},
     },
 };
@@ -26,6 +26,15 @@ impl SourceDecoder for HayabusaSourceDecoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
+        self.decode_with_budget(DecodeInput::Reader(input), DecodeBudget::sequential(), emit)
+    }
+    fn decode_with_budget(
+        &self,
+        input: DecodeInput<'_>,
+        budget: DecodeBudget,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        let input = input.into_reader();
         if input.metadata.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
@@ -35,7 +44,7 @@ impl SourceDecoder for HayabusaSourceDecoder {
             .map_err(|_| invalid())?
             .starts_with(b"Timestamp,")
         {
-            csv_decode(&mut reader, input.metadata, emit)
+            csv_decode(&mut reader, input.metadata, budget, emit)
         } else {
             let context = input.metadata.time_context;
             decode_json_source(
@@ -44,7 +53,8 @@ impl SourceDecoder for HayabusaSourceDecoder {
                     reader: &mut reader,
                 },
                 self.identity(),
-                &mut |fields| frame(fields, context, "json", "timeline"),
+                budget,
+                &|fields| frame(fields, context, "json", "timeline"),
                 emit,
             )
         }
@@ -53,6 +63,7 @@ impl SourceDecoder for HayabusaSourceDecoder {
 fn csv_decode(
     reader: &mut impl BufRead,
     metadata: SourceMetadata<'_>,
+    budget: DecodeBudget,
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
     let (header, size) = super::csv::csv_record(reader, metadata.cancel)?;
@@ -72,21 +83,29 @@ fn csv_decode(
     let dataset = "timeline";
     let mut state = SourceFrameEmitter::new(metadata, HayabusaSourceDecoder.identity());
     let mut offset = size;
-    loop {
-        let (bytes, size) = super::csv::csv_record(reader, metadata.cancel)?;
-        if size == 0 {
-            return Ok(state.finish());
-        }
-        let start = offset;
-        offset = offset.checked_add(size).ok_or_else(invalid)?;
-        if offset > 50 * 1024 * 1024 * 1024 {
-            return Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit));
-        }
-        let decoded = csv_fields(&headers, &bytes)
-            .and_then(|fields| frame(fields, metadata.time_context, "csv", dataset));
-        state.frame(&bytes, Some(start), decoded, emit)?;
-    }
+    state.decode_frames(
+        budget,
+        || {
+            let (bytes, size) = super::csv::csv_record(reader, metadata.cancel)?;
+            if size == 0 {
+                return Ok(None);
+            }
+            let start = offset;
+            offset = offset.checked_add(size).ok_or_else(invalid)?;
+            if offset > 50 * 1024 * 1024 * 1024 {
+                return Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit));
+            }
+            Ok(Some((bytes, Some(start), ())))
+        },
+        |bytes, ()| {
+            csv_fields(&headers, bytes)
+                .and_then(|fields| frame(fields, metadata.time_context, "csv", dataset))
+        },
+        emit,
+    )?;
+    Ok(state.finish())
 }
+
 fn csv_fields(headers: &::csv::StringRecord, bytes: &[u8]) -> Result<SourceValue, AppError> {
     if bytes.len() > irmind_domain::SOURCE_MAX_BYTES {
         return Err(invalid());
@@ -138,4 +157,59 @@ pub fn source_log_parser() -> Arc<dyn LogParser> {
                 super::HayabusaParser.time_context_requirement(source, sample)
             }),
     )
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use irmind_app::source_mapping::SourceReferenceV1;
+    use irmind_app::{CancellationToken, sha256};
+    use std::{io::Cursor, num::NonZeroUsize};
+
+    #[test]
+    fn parallel_csv_preserves_quoted_newlines_rejections_and_original_offsets() {
+        let header = "Timestamp,RuleTitle,Computer,Details\r\n";
+        let first = "2026-11-01T00:00:00Z,Synthetic,host,\"line one\r\nline two\"\r\n";
+        let bad = "invalid,Rejected,host,synthetic\r\n";
+        let last = "2026-11-01T00:01:00Z,Other,host,synthetic\r\n";
+        let input = format!("{header}{first}{bad}{last}");
+        let cancel = CancellationToken::new();
+        let source = SourceReferenceV1::file("synthetic.csv").unwrap();
+        let decode = |workers| {
+            let mut seen = Vec::new();
+            let report = HayabusaSourceDecoder
+                .decode_with_budget(
+                    DecodeInput::Reader(SourceInput {
+                        metadata: SourceMetadata {
+                            source: &source,
+                            evidence_hash: sha256(input.as_bytes()),
+                            time_context: None,
+                            cancel: &cancel,
+                        },
+                        reader: &mut Cursor::new(input.as_bytes()),
+                    }),
+                    DecodeBudget::new(NonZeroUsize::new(workers).unwrap(), 1024 * 1024),
+                    &mut |record| {
+                        record.inspect(|row| {
+                            let mut bytes = Vec::new();
+                            row.feed_canonical(&mut |part| bytes.extend_from_slice(part));
+                            seen.push((row.origin().offset(), sha256(&bytes)));
+                        });
+                        Ok(())
+                    },
+                )
+                .unwrap();
+            ((report.accepted, report.rejected, report.samples), seen)
+        };
+        let expected = decode(1);
+        assert_eq!(expected.0.0, 2);
+        assert_eq!(expected.0.1, 1);
+        assert_eq!(expected.1[0].0, Some(header.len() as u64));
+        assert_eq!(
+            expected.1[1].0,
+            Some((header.len() + first.len() + bad.len()) as u64)
+        );
+        assert_eq!(decode(4), expected);
+    }
 }

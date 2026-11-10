@@ -31,7 +31,8 @@ fn decode(
             name: "parser-synthetic",
             version: "v1",
         },
-        &mut |fields| Ok(frame(fields)),
+        super::super::DecodeBudget::sequential(),
+        &|fields| Ok(frame(fields)),
         emit,
     )
 }

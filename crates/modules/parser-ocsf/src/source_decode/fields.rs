@@ -1,24 +1,10 @@
 use super::{AppError, SourceMetadata, SourceRecordV1, VERSION, invalid};
-use irmind_app::source_mapping::{
-    DecodeAnnotationsV1, SourceFormatV1, SourceValue,
-    json::{SourceJsonLimits, decode_json_fields},
-};
+use irmind_app::source_mapping::{DecodeAnnotationsV1, SourceFormatV1, SourceValue};
 use irmind_domain::{
     EventOrigin, EvidenceHash, IndexedInstant, IndexedTime, SourceDiscriminator, SourceMemberV1,
     TimePrecision,
 };
 use std::collections::BTreeMap;
-pub(super) fn decode(
-    bytes: &[u8],
-    meta: SourceMetadata<'_>,
-    accepted: u64,
-    ordinal: u64,
-    offset: Option<u64>,
-    encoding: &str,
-) -> Result<SourceRecordV1, AppError> {
-    let fields = decode_json_fields(bytes, SourceJsonLimits::default()).map_err(|_| invalid())?;
-    build(fields, meta, accepted, ordinal, offset, encoding)
-}
 pub(super) fn build(
     fields: SourceValue,
     meta: SourceMetadata<'_>,

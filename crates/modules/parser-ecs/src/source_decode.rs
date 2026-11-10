@@ -2,9 +2,10 @@
 use irmind_app::{
     AppError, LogParser, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
-        DecodeAnnotationsV1, SourceDecoderSelection, SourceFormatV1, SourceInput, SourceRecordV1,
-        SourceValue,
+        DecodeAnnotationsV1, DecodeBudget, DecodeInput, SourceDecoderSelection, SourceFormatV1,
+        SourceInput, SourceRecordV1, SourceValue,
         json::{SourceJsonLimits, decode_json_fields},
+        ordered_decode::decode_ordered,
     },
 };
 use irmind_domain::{EventOrigin, EvidenceHash, IndexedTime, ParserLocation, Provenance, Tainted};
@@ -23,25 +24,42 @@ impl SourceDecoder for EcsSourceDecoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
-        let mut reader = BufReader::new(input.reader);
-        let mut report = ParseReport {
-            accepted: 0,
-            rejected: 0,
-            samples: Vec::new(),
-        };
-        let mut offset = 0u64;
-        let mut seen = 0usize;
-        loop {
-            if input.metadata.cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
+        self.decode_with_budget(DecodeInput::Reader(input), DecodeBudget::sequential(), emit)
+    }
+    fn decode_with_budget(
+        &self,
+        input: DecodeInput<'_>,
+        budget: DecodeBudget,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        decode(input.into_reader(), budget, emit)
+    }
+}
+
+fn decode(
+    SourceInput { metadata, reader }: SourceInput<'_>,
+    budget: DecodeBudget,
+    emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
+    let mut reader = BufReader::new(reader);
+    let mut report = ParseReport {
+        accepted: 0,
+        rejected: 0,
+        samples: Vec::new(),
+    };
+    let mut offset = 0u64;
+    let mut seen = 0usize;
+    decode_ordered(
+        budget,
+        metadata.cancel,
+        || loop {
             let (bytes, consumed) = super::bounded_line(
                 &mut reader,
-                input.metadata.cancel,
+                metadata.cancel,
                 super::MAX_SOURCE_BYTES.saturating_sub(offset),
             )?;
             if consumed == 0 {
-                return Ok(report);
+                return Ok(None);
             }
             if seen >= super::MAX_RECORDS {
                 return Err(super::policy_error("ECS source exceeds record limit"));
@@ -54,25 +72,31 @@ impl SourceDecoder for EcsSourceDecoder {
             {
                 continue;
             }
-            let record = if bytes.len() > super::MAX_RECORD_BYTES {
+            let weight = bytes.len().saturating_mul(64);
+            return Ok(Some(((bytes, current), weight)));
+        },
+        |(bytes, current)| {
+            let parsed = if bytes.len() > super::MAX_RECORD_BYTES {
                 Err(invalid())
             } else {
-                decode(&bytes, input.metadata, report.accepted as u64, current)
+                prepare(&bytes, metadata.time_context)
             };
-            match record {
+            (bytes, current, parsed)
+        },
+        |(bytes, current, parsed)| {
+            match parsed.and_then(|(fields, time)| {
+                materialize(fields, time, metadata, report.accepted as u64, current)
+            }) {
                 Ok(record) => {
-                    let location = ParserLocation::new(
-                        input.metadata.source.reference(),
-                        "parser-ecs",
-                        current,
-                    )
-                    .map_err(|_| invalid())?;
+                    let location =
+                        ParserLocation::new(metadata.source.reference(), "parser-ecs", current)
+                            .map_err(|_| invalid())?;
                     emit(Tainted::from_external(
                         record,
                         Provenance::new(
-                            input.metadata.evidence_hash,
+                            metadata.evidence_hash,
                             Some(report.accepted as u64),
-                            input.metadata.source.kind(),
+                            metadata.source.kind(),
                         )
                         .with_parser_location(location),
                     ))?;
@@ -80,15 +104,16 @@ impl SourceDecoder for EcsSourceDecoder {
                 }
                 Err(_) => super::reject(&mut report, &bytes),
             }
-        }
-    }
+            Ok(())
+        },
+    )?;
+    Ok(report)
 }
-fn decode(
+
+fn prepare(
     bytes: &[u8],
-    metadata: irmind_app::source_mapping::SourceMetadata<'_>,
-    record: u64,
-    offset: u64,
-) -> Result<SourceRecordV1, AppError> {
+    context: Option<&irmind_app::ParserTimeContext>,
+) -> Result<(SourceValue, IndexedTime), AppError> {
     let fields = decode_json_fields(bytes, SourceJsonLimits::default()).map_err(|_| invalid())?;
     let at = fields
         .field("@timestamp")
@@ -103,7 +128,17 @@ fn decode(
     {
         return Err(invalid());
     }
-    let timestamp = timestamp(at, metadata.time_context)?;
+    let timestamp = timestamp(at, context)?;
+    Ok((fields, timestamp))
+}
+
+fn materialize(
+    fields: SourceValue,
+    timestamp: IndexedTime,
+    metadata: irmind_app::source_mapping::SourceMetadata<'_>,
+    record: u64,
+    offset: u64,
+) -> Result<SourceRecordV1, AppError> {
     SourceRecordV1::try_from_source(
         EventOrigin::try_new(
             EvidenceHash::from_bytes(metadata.evidence_hash),

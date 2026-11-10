@@ -2,7 +2,8 @@
 use irmind_app::{
     AppError, LogParser, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
-        SourceDecoderSelection, SourceFormatV1, SourceInput, SourceRecordV1, SourceValue,
+        DecodeBudget, DecodeInput, SourceDecoderSelection, SourceFormatV1, SourceInput,
+        SourceRecordV1, SourceValue,
         framed::{DecodedSourceFrame, decode_json_source, source_datetime},
     },
 };
@@ -21,11 +22,21 @@ impl SourceDecoder for ChainsawSourceDecoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
+        self.decode_with_budget(DecodeInput::Reader(input), DecodeBudget::sequential(), emit)
+    }
+    fn decode_with_budget(
+        &self,
+        input: DecodeInput<'_>,
+        budget: DecodeBudget,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        let input = input.into_reader();
         let context = input.metadata.time_context;
         decode_json_source(
             input,
             self.identity(),
-            &mut |fields| decode(fields, context),
+            budget,
+            &|fields| decode(fields, context),
             emit,
         )
     }

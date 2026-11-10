@@ -9,7 +9,7 @@ const MAX_SOURCE_BYTES: u64 = 50 * 1024 * 1024 * 1024;
 const MAX_FIELDS: usize = 1024;
 const MAX_DEPTH: usize = 64;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct TsvHeader {
     pub(super) path: Option<String>,
     pub(super) fields: Vec<String>,

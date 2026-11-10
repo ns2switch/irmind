@@ -83,6 +83,7 @@ pub(super) fn stream_records(
             size,
             cancel,
             precise_time,
+            decode_budget: irmind_app::source_mapping::DecodeBudget::sequential(),
         },
         &mut emit,
     )?;
@@ -104,6 +105,7 @@ pub(super) fn stream_records(
 }
 
 pub(in crate::parquet_store) struct VerifiedInput<'a> {
+    pub(in crate::parquet_store) decode_budget: irmind_app::source_mapping::DecodeBudget,
     pub(in crate::parquet_store) source: &'a mut File,
     pub(in crate::parquet_store) sample: &'a [u8],
     pub(in crate::parquet_store) relative_path: &'a str,
@@ -141,6 +143,7 @@ fn parse_verified(
         size,
         cancel,
         precise_time,
+        ..
     } = input;
     source.seek(SeekFrom::Start(0)).map_err(storage)?;
     if parser.prefers_local_file(relative_path, sample) {

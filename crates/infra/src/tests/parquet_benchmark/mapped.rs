@@ -1,8 +1,8 @@
 //! Benchmark-only clocks surround the production decoder and pure mapper.
 use super::*;
 use irmind_app::source_mapping::{
-    MappingCatalog, MappingError, MappingManifest, MappingOutput, SourceFileInput, SourceInput,
-    SourceRecordV1,
+    DecodeBudget, DecodeInput, MappingCatalog, MappingError, MappingManifest, MappingOutput,
+    SourceFileInput, SourceInput, SourceRecordV1,
 };
 use irmind_app::{ParseReport, ParserIdentity, SourceDecoder, SourceMapper};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -50,28 +50,24 @@ impl SourceDecoder for Decoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
-        let started = Instant::now();
-        let mut callback = Duration::ZERO;
-        let result = self.inner.decode_reader(input, &mut |record| {
-            let started = Instant::now();
-            let result = emit(record);
-            callback += started.elapsed();
-            result
-        });
-        Timings::add(
-            &self.timings.decoder,
-            started.elapsed().saturating_sub(callback),
-        );
-        result
+        self.decode_with_budget(DecodeInput::Reader(input), DecodeBudget::sequential(), emit)
     }
     fn decode_local_file(
         &self,
         input: SourceFileInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
+        self.decode_with_budget(DecodeInput::File(input), DecodeBudget::sequential(), emit)
+    }
+    fn decode_with_budget(
+        &self,
+        input: DecodeInput<'_>,
+        budget: DecodeBudget,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
         let started = Instant::now();
         let mut callback = Duration::ZERO;
-        let result = self.inner.decode_local_file(input, &mut |record| {
+        let result = self.inner.decode_with_budget(input, budget, &mut |record| {
             let started = Instant::now();
             let result = emit(record);
             callback += started.elapsed();

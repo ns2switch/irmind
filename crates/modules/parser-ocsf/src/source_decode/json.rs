@@ -1,10 +1,15 @@
 use super::{
     AppError, ParseReport, Read, SourceInput, SourceRecordV1, State, Tainted, invalid, limit,
 };
-use irmind_app::source_mapping::json::{JsonFrames, SourceJsonLimits, decode_json_fields};
+use irmind_app::source_mapping::{
+    DecodeBudget,
+    json::{JsonFrames, SourceJsonLimits, decode_json_fields},
+    ordered_decode::decode_ordered,
+};
 use std::io::{BufRead, BufReader};
 pub(super) fn decode(
     input: &mut SourceInput<'_>,
+    budget: DecodeBudget,
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
     if input.metadata.cancel.is_cancelled() {
@@ -34,9 +39,9 @@ pub(super) fn decode(
             || (!known_lines && decode_json_fields(line, SourceJsonLimits::default()).is_err());
         let mut state = State::new(input.metadata, "ocsf-json");
         if document {
-            frames(&mut reader, &mut state, &mut forward)
+            frames(&mut reader, &mut state, budget, &mut forward)
         } else {
-            lines(&mut reader, &mut state, &mut forward)
+            lines(&mut reader, &mut state, budget, &mut forward)
         }
         .map(|()| state.report)
     };
@@ -46,45 +51,86 @@ pub(super) fn decode(
         result
     }
 }
+type Frame = (Vec<u8>, u64, bool);
+
 fn frames(
     reader: &mut dyn Read,
     state: &mut State<'_>,
+    budget: DecodeBudget,
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<(), AppError> {
     let mut frames = JsonFrames::new(reader, state.metadata.cancel).without_record_wrappers();
-    while let Some(frame) = frames.next_frame()? {
-        if frame.oversized() {
-            if state.seen >= 10_000_000 {
-                return Err(limit());
-            }
-            state.seen += 1;
-            state.reject(frame.bytes());
-        } else {
-            state.record(frame.bytes(), Some(frame.offset()), emit)?;
-        }
-    }
-    Ok(())
+    records(
+        state,
+        budget,
+        || {
+            Ok(frames.next_frame()?.map(|frame| {
+                let (offset, oversized) = (frame.offset(), frame.oversized());
+                (frame.into_bytes(), offset, oversized)
+            }))
+        },
+        emit,
+    )
 }
 fn lines(
     reader: &mut impl BufRead,
     state: &mut State<'_>,
+    budget: DecodeBudget,
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<(), AppError> {
     let mut offset = 0u64;
-    loop {
-        let (bytes, consumed) = crate::json_stream::bounded_line(
-            reader,
-            state.metadata.cancel,
-            crate::json_stream::MAX_SOURCE_BYTES.saturating_sub(offset),
-        )?;
-        if consumed == 0 {
-            return Ok(());
-        }
-        let start = offset;
-        offset = offset.checked_add(consumed).ok_or_else(limit)?;
-        if bytes.iter().all(u8::is_ascii_whitespace) {
-            continue;
-        }
-        state.record(&bytes, Some(start), emit)?;
-    }
+    let cancel = state.metadata.cancel;
+    records(
+        state,
+        budget,
+        || loop {
+            let (bytes, consumed) = crate::json_stream::bounded_line(
+                reader,
+                cancel,
+                crate::json_stream::MAX_SOURCE_BYTES.saturating_sub(offset),
+            )?;
+            if consumed == 0 {
+                return Ok(None);
+            }
+            let start = offset;
+            offset = offset.checked_add(consumed).ok_or_else(limit)?;
+            if !bytes.iter().all(u8::is_ascii_whitespace) {
+                return Ok(Some((bytes, start, false)));
+            }
+        },
+        emit,
+    )
+}
+
+fn records(
+    state: &mut State<'_>,
+    budget: DecodeBudget,
+    mut next: impl FnMut() -> Result<Option<Frame>, AppError>,
+    emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<(), AppError> {
+    let mut seen = state.seen;
+    decode_ordered(
+        budget,
+        state.metadata.cancel,
+        || {
+            let Some(frame) = next()? else {
+                return Ok(None);
+            };
+            if seen >= 10_000_000 {
+                return Err(limit());
+            }
+            seen += 1;
+            let weight = frame.0.len().saturating_mul(64);
+            Ok(Some((frame, weight)))
+        },
+        |(bytes, offset, oversized)| {
+            let parsed = if oversized {
+                Err(invalid())
+            } else {
+                decode_json_fields(&bytes, SourceJsonLimits::default()).map_err(|_| invalid())
+            };
+            (bytes, offset, parsed)
+        },
+        |(bytes, offset, parsed)| state.record(&bytes, parsed, Some(offset), emit),
+    )
 }

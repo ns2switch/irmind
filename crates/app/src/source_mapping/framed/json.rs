@@ -2,7 +2,7 @@ use super::{DecodedSourceFrame, SourceFrameEmitter, invalid, limit};
 use crate::{
     AppError, ParseReport, ParserIdentity,
     source_mapping::{
-        SourceInput, SourceRecordV1, SourceValue,
+        DecodeBudget, SourceInput, SourceRecordV1, SourceValue,
         json::{JsonFrames, SourceJsonLimits, decode_json_fields},
     },
 };
@@ -13,14 +13,59 @@ const MAX_SOURCE: u64 = 50 * 1024 * 1024 * 1024;
 pub fn decode_json_source(
     input: SourceInput<'_>,
     identity: ParserIdentity<'_>,
-    decode: &mut dyn FnMut(SourceValue) -> Result<DecodedSourceFrame, AppError>,
+    budget: DecodeBudget,
+    decode: &(impl Fn(SourceValue) -> Result<DecodedSourceFrame, AppError> + Sync),
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
-    if input.metadata.cancel.is_cancelled() {
+    let metadata = input.metadata;
+    if metadata.cancel.is_cancelled() {
         return Err(AppError::Cancelled);
     }
-    let mut state = SourceFrameEmitter::new(input.metadata, identity);
     let mut reader = BufReader::new(input.reader);
+    let mut state = SourceFrameEmitter::new(metadata, identity);
+    if is_document(&mut reader, metadata.source.reference())? {
+        let mut limited = reader.take(MAX_SOURCE + 1);
+        let mut frames = JsonFrames::new(&mut limited, metadata.cancel).without_record_wrappers();
+        state.decode_frames(
+            budget,
+            || {
+                Ok(frames.next_frame()?.map(|frame| {
+                    let (offset, oversized) = (frame.offset(), frame.oversized());
+                    (frame.into_bytes(), Some(offset), oversized)
+                }))
+            },
+            |bytes, oversized| parse_frame(bytes, oversized, decode),
+            emit,
+        )?;
+        if limited.limit() == 0 {
+            return Err(limit());
+        }
+    } else {
+        let mut offset = 0;
+        state.decode_frames(
+            budget,
+            || {
+                loop {
+                    let (bytes, size) =
+                        line_frame(&mut reader, metadata.cancel, MAX_SOURCE - offset)?;
+                    if size == 0 {
+                        return Ok(None);
+                    }
+                    let start = offset;
+                    offset += size;
+                    if !bytes.iter().all(u8::is_ascii_whitespace) {
+                        return Ok(Some((bytes, Some(start), false)));
+                    }
+                }
+            },
+            |bytes, oversized| parse_frame(bytes, oversized, decode),
+            emit,
+        )?;
+    }
+    Ok(state.finish())
+}
+
+fn is_document(reader: &mut impl BufRead, source: &str) -> Result<bool, AppError> {
     let prefix = reader.fill_buf().map_err(|_| invalid())?.trim_ascii_start();
     let line = prefix
         .split(|b| *b == b'\n')
@@ -28,53 +73,28 @@ pub fn decode_json_source(
         .unwrap_or_default()
         .trim_ascii();
     // A malformed complete JSONL row stays a rejected row, not a whole document.
-    let known_lines = std::path::Path::new(input.metadata.source.reference())
+    let known_lines = std::path::Path::new(source)
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("ndjson") || e.eq_ignore_ascii_case("jsonl"));
-    let incomplete_object = prefix.first() == Some(&b'{')
+    let incomplete = prefix.first() == Some(&b'{')
         && serde_json::from_slice::<serde::de::IgnoredAny>(line).is_err_and(|e| e.is_eof());
-    let document =
-        prefix.first() == Some(&b'[') || line == b"{" || (!known_lines && incomplete_object);
-    if document {
-        let mut limited = reader.take(MAX_SOURCE + 1);
-        {
-            let mut frames =
-                JsonFrames::new(&mut limited, input.metadata.cancel).without_record_wrappers();
-            while let Some(frame) = frames.next_frame()? {
-                let decoded = if frame.oversized() {
-                    Err(invalid())
-                } else {
-                    decode_json_fields(frame.bytes(), SourceJsonLimits::default())
-                        .map_err(|_| invalid())
-                        .and_then(&mut *decode)
-                };
-                state.frame(frame.bytes(), Some(frame.offset()), decoded, emit)?;
-            }
-        }
-        if limited.limit() == 0 {
-            return Err(limit());
-        }
-    } else {
-        let mut offset = 0;
-        loop {
-            let (bytes, size) =
-                line_frame(&mut reader, input.metadata.cancel, MAX_SOURCE - offset)?;
-            if size == 0 {
-                break;
-            }
-            let start = offset;
-            offset += size;
-            if bytes.iter().all(u8::is_ascii_whitespace) {
-                continue;
-            }
-            let decoded = decode_json_fields(&bytes, SourceJsonLimits::default())
-                .map_err(|_| invalid())
-                .and_then(&mut *decode);
-            state.frame(&bytes, Some(start), decoded, emit)?;
-        }
-    }
-    Ok(state.finish())
+    Ok(prefix.first() == Some(&b'[') || line == b"{" || (!known_lines && incomplete))
 }
+
+fn parse_frame(
+    bytes: &[u8],
+    oversized: bool,
+    decode: &impl Fn(SourceValue) -> Result<DecodedSourceFrame, AppError>,
+) -> Result<DecodedSourceFrame, AppError> {
+    if oversized {
+        Err(invalid())
+    } else {
+        decode_json_fields(bytes, SourceJsonLimits::default())
+            .map_err(|_| invalid())
+            .and_then(decode)
+    }
+}
+
 fn line_frame(
     reader: &mut impl BufRead,
     cancel: &crate::CancellationToken,

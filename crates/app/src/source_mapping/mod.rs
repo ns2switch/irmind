@@ -7,6 +7,7 @@ mod installation;
 pub mod json;
 mod manifest;
 pub use installation::{ApprovedMappingDefinition, verify_mapping_installation};
+pub mod ordered_decode;
 mod output;
 mod ports;
 mod proofs;
@@ -27,7 +28,10 @@ pub use irmind_domain::{
 };
 pub use manifest::{MappingManifest, MappingProvenance};
 pub use output::{MappingDiagnostic, MappingOutput, MappingPartition};
-pub use ports::{SourceDecoder, SourceFileInput, SourceInput, SourceMapper, SourceMetadata};
+pub use ports::{
+    DecodeBudget, DecodeInput, SourceDecoder, SourceFileInput, SourceInput, SourceMapper,
+    SourceMetadata,
+};
 pub use prepared::{BoundMappingSource, MappedArtifactProjection, PreparedMappingSource};
 pub use selector::{SelectorCondition, SelectorPredicate, SelectorScalar, SourceSelector};
 

@@ -2,8 +2,8 @@
 use irmind_app::{
     AppError, LogParser, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
-        SourceDecoderSelection, SourceDiscriminator, SourceFormatV1, SourceInput, SourceMetadata,
-        SourceRecordV1, SourceValue,
+        DecodeBudget, DecodeInput, SourceDecoderSelection, SourceDiscriminator, SourceFormatV1,
+        SourceInput, SourceMetadata, SourceRecordV1, SourceValue,
         framed::{DecodedSourceFrame, SourceFrameEmitter, decode_json_source},
     },
 };
@@ -26,12 +26,21 @@ impl SourceDecoder for ZeekSourceDecoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
+        self.decode_with_budget(DecodeInput::Reader(input), DecodeBudget::sequential(), emit)
+    }
+    fn decode_with_budget(
+        &self,
+        input: DecodeInput<'_>,
+        budget: DecodeBudget,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        let input = input.into_reader();
         if input.metadata.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
         let mut reader = BufReader::new(input.reader);
         if reader.fill_buf().map_err(|_| invalid())?.starts_with(b"#") {
-            tsv(&mut reader, input.metadata, emit)
+            tsv(&mut reader, input.metadata, budget, emit)
         } else {
             decode_json_source(
                 SourceInput {
@@ -39,7 +48,8 @@ impl SourceDecoder for ZeekSourceDecoder {
                     metadata: input.metadata,
                 },
                 self.identity(),
-                &mut json_frame,
+                budget,
+                &json_frame,
                 emit,
             )
         }
@@ -72,31 +82,41 @@ fn format(id: &str, dataset: Option<&str>) -> Result<SourceFormatV1, AppError> {
 fn tsv(
     reader: &mut impl BufRead,
     metadata: SourceMetadata<'_>,
+    budget: DecodeBudget,
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
-    let mut header = crate::stream::TsvHeader::default();
+    let mut header = Arc::new(crate::stream::TsvHeader::default());
     let mut state = SourceFrameEmitter::new(metadata, ZeekSourceDecoder.identity());
     let mut offset = 0u64;
-    loop {
-        let (bytes, size) = crate::stream::bounded_line(reader, metadata.cancel)?;
-        if size == 0 {
-            return Ok(state.finish());
-        }
-        let start = offset;
-        offset = offset.checked_add(size).ok_or_else(limit)?;
-        if offset > 50 * 1024 * 1024 * 1024 {
-            return Err(limit());
-        }
-        if bytes.iter().all(u8::is_ascii_whitespace) {
-            continue;
-        }
-        if bytes.len() <= 4 * 1024 * 1024 && header.metadata(&bytes)? {
-            continue;
-        }
-        let decoded = tsv_frame(&bytes, &header);
-        state.frame(&bytes, Some(start), decoded, emit)?;
-    }
+    state.decode_frames(
+        budget,
+        || loop {
+            let (bytes, size) = crate::stream::bounded_line(reader, metadata.cancel)?;
+            if size == 0 {
+                return Ok(None);
+            }
+            let start = offset;
+            offset = offset.checked_add(size).ok_or_else(limit)?;
+            if offset > 50 * 1024 * 1024 * 1024 {
+                return Err(limit());
+            }
+            if bytes.iter().all(u8::is_ascii_whitespace) {
+                continue;
+            }
+            if bytes.first() == Some(&b'#')
+                && bytes.len() <= 4 * 1024 * 1024
+                && Arc::make_mut(&mut header).metadata(&bytes)?
+            {
+                continue;
+            }
+            return Ok(Some((bytes, Some(start), Arc::clone(&header))));
+        },
+        |bytes, header| tsv_frame(bytes, &header),
+        emit,
+    )?;
+    Ok(state.finish())
 }
+
 fn tsv_frame(
     bytes: &[u8],
     header: &crate::stream::TsvHeader,

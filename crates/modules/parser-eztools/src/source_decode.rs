@@ -2,8 +2,8 @@
 use irmind_app::{
     AppError, LogParser, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
-        SourceDecoderSelection, SourceDiscriminator, SourceFormatV1, SourceInput, SourceMetadata,
-        SourceRecordV1, SourceValue,
+        DecodeBudget, DecodeInput, SourceDecoderSelection, SourceDiscriminator, SourceFormatV1,
+        SourceInput, SourceMetadata, SourceRecordV1, SourceValue,
         framed::{DecodedSourceFrame, SourceFrameEmitter, source_datetime},
     },
 };
@@ -26,15 +26,30 @@ impl SourceDecoder for EztoolsSourceDecoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
+        self.decode_with_budget(DecodeInput::Reader(input), DecodeBudget::sequential(), emit)
+    }
+    fn decode_with_budget(
+        &self,
+        input: DecodeInput<'_>,
+        budget: DecodeBudget,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        let input = input.into_reader();
         if input.metadata.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        csv_decode(&mut BufReader::new(input.reader), input.metadata, emit)
+        csv_decode(
+            &mut BufReader::new(input.reader),
+            input.metadata,
+            budget,
+            emit,
+        )
     }
 }
 fn csv_decode(
     reader: &mut impl BufRead,
     metadata: SourceMetadata<'_>,
+    budget: DecodeBudget,
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
     let (header, size) = super::csv_record(reader, metadata.cancel)?;
@@ -48,21 +63,29 @@ fn csv_decode(
     let dataset = super::mapping::tool_for_headers(&headers).ok_or_else(invalid)?;
     let mut state = SourceFrameEmitter::new(metadata, EztoolsSourceDecoder.identity());
     let mut offset = size;
-    loop {
-        let (bytes, size) = super::csv_record(reader, metadata.cancel)?;
-        if size == 0 {
-            return Ok(state.finish());
-        }
-        let start = offset;
-        offset = offset.checked_add(size).ok_or_else(invalid)?;
-        if offset > 50 * 1024 * 1024 * 1024 {
-            return Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit));
-        }
-        let decoded = csv_fields(&headers, &bytes)
-            .and_then(|fields| frame(fields, metadata.time_context, "csv", dataset));
-        state.frame(&bytes, Some(start), decoded, emit)?;
-    }
+    state.decode_frames(
+        budget,
+        || {
+            let (bytes, size) = super::csv_record(reader, metadata.cancel)?;
+            if size == 0 {
+                return Ok(None);
+            }
+            let start = offset;
+            offset = offset.checked_add(size).ok_or_else(invalid)?;
+            if offset > 50 * 1024 * 1024 * 1024 {
+                return Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit));
+            }
+            Ok(Some((bytes, Some(start), ())))
+        },
+        |bytes, ()| {
+            csv_fields(&headers, bytes)
+                .and_then(|fields| frame(fields, metadata.time_context, "csv", dataset))
+        },
+        emit,
+    )?;
+    Ok(state.finish())
 }
+
 fn csv_fields(headers: &::csv::StringRecord, bytes: &[u8]) -> Result<SourceValue, AppError> {
     if bytes.len() > irmind_domain::SOURCE_MAX_BYTES {
         return Err(invalid());

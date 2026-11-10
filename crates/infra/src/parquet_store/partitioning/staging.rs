@@ -15,6 +15,7 @@ pub(super) struct Input {
     pub file: File,
     pub path: String,
     pub budget: u64,
+    pub(super) decode_budget: irmind_app::source_mapping::DecodeBudget,
 }
 
 pub(super) struct StagedSource {
@@ -52,6 +53,7 @@ impl ParquetStore {
                 file,
                 path: path.clone(),
                 budget,
+                decode_budget: irmind_app::source_mapping::DecodeBudget::sequential(),
             });
         }
         let dir = self.spool_dir(case)?;
@@ -110,6 +112,7 @@ impl ParquetStore {
                 cancel,
                 parser,
                 precise_time: true,
+                decode_budget: input.decode_budget,
             },
             &mut |row| {
                 if cancel.is_cancelled() {
