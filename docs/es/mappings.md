@@ -1,4 +1,4 @@
-Traducción de docs/mappings.md en el commit 8832e3f159bffef87873b32d074648b6cb5b34e6; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/mappings.md en el commit af961cae2dd05befe06d2714eaf155b307c2dc3c; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos de mapeo de fuentes
 
@@ -68,7 +68,7 @@ etiquetas desconocidas se conservan y generan diagnósticos; un resultado ausent
 queda como desconocido.
 
 Las direcciones de origen y destino mantienen sus roles. Actor y objetivo usan
-los calificadores explícitos de directorio, host y cuenta; sin directorio, su
+los calificadores explícitos de directorio, host y cuenta/proyecto; sin directorio, su
 identidad queda limitada al registro de origen. Los PID siempre tienen ámbito de
 registro. Los nombres y los identificadores del productor siguen como contexto
 consultable, sin inventar una vida de proceso. Las representaciones anidadas y
