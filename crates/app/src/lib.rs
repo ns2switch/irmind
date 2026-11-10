@@ -85,7 +85,7 @@ pub use configuration::{
     ConfigChange, ConfigDifference, ConfigurationInspection, ConfigurationReview,
     ConfigurationStore, PersistentConfig, ProductSettings,
 };
-pub use custody::{SealPreview, export_case, export_case_v4, verify_export, verify_export_details};
+pub use custody::{SealPreview, export_case, export_case_v6, verify_export, verify_export_details};
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::{GraphRecord, GraphRelation, IndexedGraphRecord, TimelineEvent};
 mod indexed_parser;

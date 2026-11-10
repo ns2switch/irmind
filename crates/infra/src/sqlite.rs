@@ -5,3 +5,5 @@ mod audit;
 mod codec;
 mod open_and_migrate;
 mod repository;
+
+mod schema;

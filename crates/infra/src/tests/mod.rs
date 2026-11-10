@@ -1,5 +1,5 @@
 use super::evidence_fs::read_evidence_file;
-use super::seal::MAX_EXPORT_BYTES;
+
 use super::*;
 use irmind_app::modules::{ModuleConfig, ModuleRegistry};
 use irmind_app::{
