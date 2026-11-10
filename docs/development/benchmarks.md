@@ -1274,3 +1274,60 @@ verification occur outside the timed region. The sample commitment uses the same
 record the implementation commit and the identical source SHA-256 for all runs.
 
 Reproduce from the repository root with `sh scripts/benchmark_ecs_source.sh`.
+
+## EVTX and ECS: shared source-pipeline smoke
+
+For contributors investigating decode/map overhead, this release measurement compares
+three paired 1 GiB ingestions per source on one `ubuntu-24.04` runner. Both variants
+use the same generated file, native helper and normal custody checks. The EVTX
+fixture contains 278,528 records across the supported Security IDs; ECS contains
+917,729 records. Every ingestion verifies its event count, zero rejections and the
+signed chain. These smokes do not replace the full 15 GB matrix.
+
+[Workflow run](https://github.com/ns2switch/irmind/actions/runs/42813786675) ·
+[Complete measurements](benchmarks/evtx-ecs-shared-source-profile.json).
+
+| Source | V2 median | Mapped median | Difference |
+| --- | ---: | ---: | ---: |
+| EVTX | 13.358 s | 22.333 s | +67.20% |
+| ECS | 31.578 s | 41.555 s | +31.59% |
+
+The same diagnostic harness then runs additional source-decoder/mapping passes.
+It preserves the mapping manifests, output and source commitments; a shared
+contract checks that instrumentation does not change the result. These are wall
+intervals, not CPU samples. They exclude Parquet writing and signed custody. The
+diagnostic tuple file uses unbuffered writes; production ingestion already buffers
+those writes. Its shared-boundary interval therefore must not be presented as the
+production validation cost or added to the full-ingestion totals.
+
+| Standalone phase, median | EVTX | ECS |
+| --- | ---: | ---: |
+| Decoder/IPC, excluding callback | 3.429 s | 5.414 s |
+| Selected mapper | 1.556 s | 13.539 s |
+| Shared validation, selection, source hash and diagnostic tuple writes | 1.195 s | 3.162 s |
+| Source commitment finalization | 0.619 s | 2.045 s |
+
+A 20,000-iteration micro-measurement uses one decoded source record from each
+corpus. It times clone/drop, bounded validation and JSON rendering separately.
+These values are diagnostics for those representative records, not allocator
+counts or evidence that every record has the same cost.
+
+| Operation, median microseconds per iteration | EVTX | ECS |
+| --- | ---: | ---: |
+| Clone/drop decoded source tree | 1.061 | 0.889 |
+| Validate decoded fields | 0.081 | 0.076 |
+| Validate and render decoded fields | 1.099 | 1.593 |
+
+The measured mapper cost differs substantially between the sources. The data does
+not establish a single parser bottleneck, and the small validation micro-time does
+not justify weakening checks. Code inspection identifies shared opportunities:
+move a validated projection into the writer instead of cloning its text and
+entities, retain one rendered source buffer where possible, and buffer the tuple
+reads used by commitment finalization. The ECS compatibility projection also
+clones its original field tree before rendering. Measure these changes on the full
+ingestion path with the same corpus and runner; preserve every origin, taint,
+validation, hash, signature and canonical byte check. No optimization is applied
+by this measurement.
+
+Reproduce with the manual graph-benchmark workflow's `evtx_source` input. It runs
+both paired release smokes and the shared counters; no provider or model is used.

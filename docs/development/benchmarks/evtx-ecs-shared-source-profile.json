@@ -1,0 +1,263 @@
+{
+  "commit": "95fe78009e555380c586c67d1f2b755e247bdaaf",
+  "run": "https://github.com/ns2switch/irmind/actions/runs/42813786675",
+  "runner": "ubuntu-24.04",
+  "build": "release",
+  "method": "Three paired full ingestions per source; additional standalone decode/map passes and 20,000-iteration micro-measurements. Standalone tuple spools use unbuffered temporary files; production ingestion buffers tuple writes. These diagnostic times are not a complete ingestion-phase breakdown or allocator counts.",
+  "sources": {
+    "evtx": {
+      "ingestions": [
+        {
+          "repetition": 1,
+          "mapped": false,
+          "bytes": 1073745920,
+          "records": 278528,
+          "seconds": 13.454056,
+          "MiB_per_second": 76.11117,
+          "source_sha256": "a60d0a48760ad6a0d852adbb17fd1fbef059e5bf4a5b2313775ccd247b238109"
+        },
+        {
+          "repetition": 1,
+          "mapped": true,
+          "bytes": 1073745920,
+          "records": 278528,
+          "seconds": 24.981717,
+          "MiB_per_second": 40.990132,
+          "source_sha256": "a60d0a48760ad6a0d852adbb17fd1fbef059e5bf4a5b2313775ccd247b238109"
+        },
+        {
+          "repetition": 2,
+          "mapped": false,
+          "bytes": 1073745920,
+          "records": 278528,
+          "seconds": 13.357549,
+          "MiB_per_second": 76.661062,
+          "source_sha256": "a60d0a48760ad6a0d852adbb17fd1fbef059e5bf4a5b2313775ccd247b238109"
+        },
+        {
+          "repetition": 2,
+          "mapped": true,
+          "bytes": 1073745920,
+          "records": 278528,
+          "seconds": 22.333193,
+          "MiB_per_second": 45.85121,
+          "source_sha256": "a60d0a48760ad6a0d852adbb17fd1fbef059e5bf4a5b2313775ccd247b238109"
+        },
+        {
+          "repetition": 3,
+          "mapped": false,
+          "bytes": 1073745920,
+          "records": 278528,
+          "seconds": 13.284549,
+          "MiB_per_second": 77.082323,
+          "source_sha256": "a60d0a48760ad6a0d852adbb17fd1fbef059e5bf4a5b2313775ccd247b238109"
+        },
+        {
+          "repetition": 3,
+          "mapped": true,
+          "bytes": 1073745920,
+          "records": 278528,
+          "seconds": 21.847942,
+          "MiB_per_second": 46.869583,
+          "source_sha256": "a60d0a48760ad6a0d852adbb17fd1fbef059e5bf4a5b2313775ccd247b238109"
+        }
+      ],
+      "pipeline": [
+        {
+          "source": "evtx",
+          "repetition": 1,
+          "records": 278528,
+          "decode_ipc_seconds": 3.428758,
+          "mapping_seconds": 1.546709,
+          "shared_boundary_seconds": 1.194757,
+          "finalize_seconds": 0.622474,
+          "observations": 1540096,
+          "source_sha256": "a60d0a48760ad6a0d852adbb17fd1fbef059e5bf4a5b2313775ccd247b238109"
+        },
+        {
+          "source": "evtx",
+          "repetition": 2,
+          "records": 278528,
+          "decode_ipc_seconds": 3.402375,
+          "mapping_seconds": 1.55583,
+          "shared_boundary_seconds": 1.194095,
+          "finalize_seconds": 0.618584,
+          "observations": 1540096,
+          "source_sha256": "a60d0a48760ad6a0d852adbb17fd1fbef059e5bf4a5b2313775ccd247b238109"
+        },
+        {
+          "source": "evtx",
+          "repetition": 3,
+          "records": 278528,
+          "decode_ipc_seconds": 3.456142,
+          "mapping_seconds": 1.581784,
+          "shared_boundary_seconds": 1.217541,
+          "finalize_seconds": 0.615443,
+          "observations": 1540096,
+          "source_sha256": "a60d0a48760ad6a0d852adbb17fd1fbef059e5bf4a5b2313775ccd247b238109"
+        }
+      ],
+      "micro": [
+        {
+          "source": "evtx",
+          "repetition": 1,
+          "iterations": 20000,
+          "clone_seconds": 0.020732,
+          "validation_seconds": 0.001628,
+          "rendering_seconds": 0.021826,
+          "source_estimated_bytes": 625
+        },
+        {
+          "source": "evtx",
+          "repetition": 2,
+          "iterations": 20000,
+          "clone_seconds": 0.02129,
+          "validation_seconds": 0.001636,
+          "rendering_seconds": 0.021984,
+          "source_estimated_bytes": 625
+        },
+        {
+          "source": "evtx",
+          "repetition": 3,
+          "iterations": 20000,
+          "clone_seconds": 0.021217,
+          "validation_seconds": 0.001628,
+          "rendering_seconds": 0.022244,
+          "source_estimated_bytes": 625
+        }
+      ],
+      "median": {
+        "v2_seconds": 13.357549,
+        "mapped_seconds": 22.333193,
+        "mapped_overhead_percent": 67.19529159129418
+      }
+    },
+    "ecs": {
+      "ingestions": [
+        {
+          "repetition": 1,
+          "mapped": false,
+          "bytes": 1073742930,
+          "records": 917729,
+          "seconds": 31.630774,
+          "MiB_per_second": 32.37357,
+          "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+        },
+        {
+          "repetition": 1,
+          "mapped": true,
+          "bytes": 1073742930,
+          "records": 917729,
+          "seconds": 42.212759,
+          "MiB_per_second": 24.258094,
+          "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+        },
+        {
+          "repetition": 2,
+          "mapped": false,
+          "bytes": 1073742930,
+          "records": 917729,
+          "seconds": 31.46838,
+          "MiB_per_second": 32.540635,
+          "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+        },
+        {
+          "repetition": 2,
+          "mapped": true,
+          "bytes": 1073742930,
+          "records": 917729,
+          "seconds": 41.554902,
+          "MiB_per_second": 24.642124,
+          "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+        },
+        {
+          "repetition": 3,
+          "mapped": false,
+          "bytes": 1073742930,
+          "records": 917729,
+          "seconds": 31.577969,
+          "MiB_per_second": 32.427704,
+          "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+        },
+        {
+          "repetition": 3,
+          "mapped": true,
+          "bytes": 1073742930,
+          "records": 917729,
+          "seconds": 41.414681,
+          "MiB_per_second": 24.725557,
+          "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+        }
+      ],
+      "pipeline": [
+        {
+          "source": "ecs",
+          "repetition": 1,
+          "records": 917729,
+          "decode_ipc_seconds": 5.414297,
+          "mapping_seconds": 13.538571,
+          "shared_boundary_seconds": 3.162036,
+          "finalize_seconds": 2.036873,
+          "observations": 2753187,
+          "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+        },
+        {
+          "source": "ecs",
+          "repetition": 2,
+          "records": 917729,
+          "decode_ipc_seconds": 5.391479,
+          "mapping_seconds": 13.504971,
+          "shared_boundary_seconds": 3.149914,
+          "finalize_seconds": 2.05149,
+          "observations": 2753187,
+          "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+        },
+        {
+          "source": "ecs",
+          "repetition": 3,
+          "records": 917729,
+          "decode_ipc_seconds": 5.443612,
+          "mapping_seconds": 13.624251,
+          "shared_boundary_seconds": 3.186038,
+          "finalize_seconds": 2.044777,
+          "observations": 2753187,
+          "source_sha256": "79bba63808516fabae38b4d57c39da673cd6af06f58081cffcbf3c8ddde1b1d8"
+        }
+      ],
+      "micro": [
+        {
+          "source": "ecs",
+          "repetition": 1,
+          "iterations": 20000,
+          "clone_seconds": 0.017588,
+          "validation_seconds": 0.00157,
+          "rendering_seconds": 0.032016,
+          "source_estimated_bytes": 1361
+        },
+        {
+          "source": "ecs",
+          "repetition": 2,
+          "iterations": 20000,
+          "clone_seconds": 0.017777,
+          "validation_seconds": 0.001513,
+          "rendering_seconds": 0.031853,
+          "source_estimated_bytes": 1361
+        },
+        {
+          "source": "ecs",
+          "repetition": 3,
+          "iterations": 20000,
+          "clone_seconds": 0.018158,
+          "validation_seconds": 0.001514,
+          "rendering_seconds": 0.031529,
+          "source_estimated_bytes": 1361
+        }
+      ],
+      "median": {
+        "v2_seconds": 31.577969,
+        "mapped_seconds": 41.554902,
+        "mapped_overhead_percent": 31.59460002003296
+      }
+    }
+  }
+}
