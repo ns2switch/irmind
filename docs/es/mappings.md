@@ -140,3 +140,26 @@ una vida de proceso. Un Detection Finding no confirma un hallazgo del caso.
 La implementación nativa valida campos anidados y relaciones entre clase y
 categoría, sin deducir resultados del texto. Véase el
 [esquema oficial fijado](https://github.com/ocsf/ocsf-schema/tree/v1.4.0).
+
+## Extracción de salidas DFIR
+
+La feature `mapping-dfir` incluye cinco módulos de extracción con identidades
+independientes: Velociraptor, Hayabusa, Chainsaw, plaso y EZTools. Sus
+decodificadores conservan los tipos JSON o las columnas CSV originales, la
+ubicación de cada registro y la precisión temporal. Un campo personalizado
+`events` se conserva como dato. Los registros inválidos se cuentan y dejan
+muestras no confiables acotadas.
+
+Se mantienen los alias de búsqueda, las relaciones de correlación y las
+particiones por host sin inferir categorías, resultados ni roles. Las reglas de
+Hayabusa son telemetría y no confirman hallazgos. Plaso conserva el instante en
+microsegundos y sus campos `parser` y `data_type`. EZTools conserva la herramienta
+y las columnas originales. Las fechas CSV documentadas como UTC no usan el reloj
+del equipo ni la fecha de modificación del archivo.
+
+Estos mapeos son nativos porque los alias anidados, los formatos CSV y las
+relaciones no caben en las tablas finitas de clasificación. Cada módulo tiene un
+manifiesto y una identidad de compilación fijada. Los contratos comprueban
+repetición, concurrencia, procedencia, cancelación y determinismo. Los fixtures
+comparan las identidades de búsqueda y los instantes existentes. La ingesta y la
+reconstrucción usan el mismo decodificador y mapeo firmado de cada fuente.

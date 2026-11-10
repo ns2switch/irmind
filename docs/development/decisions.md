@@ -612,3 +612,18 @@ a PID is permitted.
 Consequences: current default ingestion and current golden bytes are unchanged.
 The experimental pipeline uses the existing mapping, custody and export
 contracts. No production package is added to the lockfile.
+
+### Decode original DFIR fields before unclassified extraction
+
+Context: the common writer must retain the search behavior of DFIR tool output
+before the presentation-oriented parser route can be retired.
+
+Decision: use source-only decoders and separately identified native extraction
+modules for Velociraptor, Hayabusa, Chainsaw, plaso and EZTools. They retain
+original types, exact timestamps and measured record locations. Shared framing
+mechanics enforce the existing limits and never downgrade callback failures to
+rejected source rows. Tool-specific aliases and relations remain unclassified;
+a rule name does not become an analyst-confirmed finding.
+
+Consequences: mappings can evolve independently of format decoding. No signed
+format, permission, default model or external production dependency changes.

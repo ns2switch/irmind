@@ -1,0 +1,24 @@
+[package]
+name = "irmind-mod-mapping-dfir"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+
+[build-dependencies]
+irmind-build-manifest = { path = "../../build-manifest", version = "0.1.0" }
+
+[dev-dependencies]
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+irmind-mod-parser-velociraptor = { path = "../parser-velociraptor", version = "0.1.0" }
+irmind-mod-parser-hayabusa = { path = "../parser-hayabusa", version = "0.1.0" }
+irmind-mod-parser-chainsaw = { path = "../parser-chainsaw", version = "0.1.0" }
+irmind-mod-parser-plaso = { path = "../parser-plaso", version = "0.1.0" }
+irmind-mod-parser-eztools = { path = "../parser-eztools", version = "0.1.0" }
+
+[lints]
+workspace = true

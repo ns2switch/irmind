@@ -75,7 +75,7 @@ pub(super) fn parse_csv_lines(
         index += 1;
     }
 }
-fn csv_record(
+pub(super) fn csv_record(
     reader: &mut impl BufRead,
     cancel: &CancellationToken,
 ) -> Result<(Vec<u8>, u64), AppError> {
@@ -104,7 +104,7 @@ fn csv_record(
         }
     }
 }
-fn decode_csv(bytes: &[u8]) -> Result<::csv::StringRecord, AppError> {
+pub(super) fn decode_csv(bytes: &[u8]) -> Result<::csv::StringRecord, AppError> {
     let mut reader = ::csv::ReaderBuilder::new()
         .has_headers(false)
         .from_reader(bytes);
