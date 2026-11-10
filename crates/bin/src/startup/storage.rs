@@ -23,6 +23,7 @@ pub(super) fn experimental(
         feature = "mapping-json-compat",
         feature = "mapping-journald-compat",
         feature = "mapping-linux",
+        feature = "mapping-ecs",
         feature = "parser-declarative"
     )) {
         return Err(AppError::Policy(
@@ -32,6 +33,7 @@ pub(super) fn experimental(
     let catalog = registry.mapping_catalog()?;
     if !catalog.supports_decoder("parser-json", "json-source-v1")
         && !catalog.supports_decoder("parser-linux", "linux-source-v1")
+        && !catalog.supports_decoder("parser-ecs", "ecs-source-v1")
         && !registry
             .parser_catalog()
             .available()
@@ -59,6 +61,7 @@ pub(super) fn experimental_parsers(
         feature = "mapping-json-compat",
         feature = "mapping-journald-compat",
         feature = "mapping-linux",
+        feature = "mapping-ecs",
         feature = "parser-declarative"
     )) {
         return Err(AppError::Policy(
@@ -69,6 +72,8 @@ pub(super) fn experimental_parsers(
     let catalog = catalog.with_experimental_parser(irmind_mod_parser_json::source_log_parser())?;
     #[cfg(any(feature = "mapping-journald-compat", feature = "mapping-linux"))]
     let catalog = catalog.with_experimental_parser(irmind_mod_parser_linux::source_log_parser())?;
+    #[cfg(feature = "mapping-ecs")]
+    let catalog = catalog.with_experimental_parser(irmind_mod_parser_ecs::source_log_parser())?;
     let mappings = registry.mapping_catalog()?;
     let mut catalog = catalog;
     for (id, version) in catalog.available() {

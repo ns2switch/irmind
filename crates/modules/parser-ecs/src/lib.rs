@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 mod indexed;
+mod source_decode;
+pub use source_decode::{EcsSourceDecoder, source_log_parser};
 
 use chrono::{DateTime, Utc};
 use irmind_app::{
@@ -22,7 +24,7 @@ pub struct EcsParser;
 static MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-ecs",
     version: "0.1.0",
-    ports: &[ModulePort::EventParser],
+    ports: &[ModulePort::EventParser, ModulePort::SourceDecoder],
     tools: &[],
     config: &[],
 };
@@ -37,7 +39,8 @@ impl Module for EcsParser {
         registry: &mut ModuleRegistry,
         _config: &ModuleConfig,
     ) -> Result<(), AppError> {
-        registry.add_parser(self)
+        registry.add_parser(self)?;
+        registry.add_source_decoder(std::sync::Arc::new(EcsSourceDecoder))
     }
 }
 
@@ -447,3 +450,7 @@ mod tests {
 
 #[cfg(test)]
 mod completeness_tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod source_tests;

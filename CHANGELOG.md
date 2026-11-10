@@ -9,6 +9,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 - Add an experimental typed common-event core, frozen category/outcome/role codes and new physical schemas within artifact V2. SourceDecoder modules preserve original fields; independent source mappings classify supported records. Pre-1.0 minor releases do not promise cross-version readers or migrations.
 - Add bounded category, type, outcome and entity-role selectors to existing evidence tools, with explicit schema-coverage notices and identity scopes that distinguish PID reuse.
 
+- Add an independent experimental ECS source decoder and native ECS 9.5 mapping, with explicit categories, outcomes and occurrence roles, precise original timestamps and extraction-preserving search. PID observations retain source-record scope.
+
 ## 0.2.0 — Modular parsers and precise evidence
 
 **Format impact:** Breaking: artifact V2 and export V5 add precision and partition formats. Its historical V1 reader/migration support applies only to that release.

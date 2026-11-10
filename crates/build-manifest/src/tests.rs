@@ -85,3 +85,27 @@ fn serialized_paths_use_utf8_slash_order_including_nested_and_numbered_names() {
         .unwrap();
     assert!(nested < numbered);
 }
+
+#[test]
+fn shared_implementation_is_committed_and_parent_paths_are_rejected() {
+    let root = tempfile::tempdir().unwrap();
+    let module = fixture(root.path(), false);
+    let shared = root.path().join("crates/mapping-tables");
+    fs::create_dir_all(shared.join("src")).unwrap();
+    fs::write(shared.join("Cargo.toml"), "synthetic shared package").unwrap();
+    fs::write(shared.join("src/lib.rs"), "// shared implementation\n").unwrap();
+    let original = manifest(root.path(), &module, vec![]).unwrap();
+    let before =
+        manifest_with_sources(root.path(), &module, vec![], &["crates/mapping-tables"]).unwrap();
+    fs::write(
+        shared.join("src/lib.rs"),
+        "// changed shared implementation\n",
+    )
+    .unwrap();
+    assert_ne!(
+        before,
+        manifest_with_sources(root.path(), &module, vec![], &["crates/mapping-tables"]).unwrap()
+    );
+    assert_eq!(original, manifest(root.path(), &module, vec![]).unwrap());
+    assert!(manifest_with_sources(root.path(), &module, vec![], &["../outside"]).is_err());
+}

@@ -557,3 +557,18 @@ load implementations supplied by a case or export.
 Consequences: replacement and deactivation preserve reconstruction with the same
 creating implementation. Unavailable interpreters and mismatched snapshots fail
 closed. Signed formats, limits and authentication-only verification are unchanged.
+
+### ECS interpretation remains a separate native mapping
+
+Context: ECS source fields can be nested or dotted and categorization is a bounded
+set. Typed values and occurrence roles require validation beyond finite tables.
+
+Decision: `parser-ecs` only decodes original source fields, instants and provenance.
+A separate optional `mapping-ecs` crate handles the agreed ECS 9.5 common subset,
+explicit roles and the extraction projection. Shared typed conversion code is
+included in its native implementation manifest. PIDs remain source-record scoped.
+
+Consequences: existing search aliases remain available during the optional common
+writer rollout. Unknown labels are diagnostic, missing outcome stays unknown, and
+conflicting aliases never silently override each other. No new external package,
+case envelope or export format is introduced.

@@ -544,3 +544,17 @@ fn declarative_source_pipeline_is_independent_of_json_map_features() {
     )
     .unwrap();
 }
+
+#[cfg(feature = "mapping-ecs")]
+#[test]
+fn ecs_source_and_mapping_contract_is_independent_of_json_map_features() {
+    use std::sync::Arc;
+    irmind_testkit::run_source_mapping_contract(
+        Arc::new(irmind_mod_parser_ecs::EcsSourceDecoder),
+        Arc::new(irmind_mod_mapping_ecs::EcsMapping::new().unwrap()),
+        "synthetic.ndjson",
+        include_bytes!("../../testkit/fixtures/parser-ecs/source/events.ndjson"),
+        2,
+    )
+    .unwrap();
+}

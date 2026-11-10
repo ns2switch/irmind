@@ -7,6 +7,7 @@ The common writer is currently experimental and opt-in during the decoder rollou
 | Module | Input | Implementation | Cargo feature | Status |
 | --- | --- | --- | --- | --- |
 | CloudTrail | CloudTrail JSON through `json-source-v1` | Bundled, hash-pinned TOML | `mapping-cloudtrail` | Experimental; synthetic contracts |
+| ECS | Original ECS NDJSON through `ecs-source-v1` | Native, typed ECS 9.5 validation | `mapping-ecs` | Experimental; synthetic contracts |
 | Generic JSON compatibility | Other JSON without `eventVersion` | Native, extraction-only | `mapping-json-compat` | Experimental; no inferred categories or roles |
 | Journald compatibility | Original journald JSON | Native, extraction-only | `mapping-journald-compat` | Experimental; no inferred categories or roles |
 | Linux authentication | auth.log and secure: sshd, sudo and su | Bundled, hash-pinned TOML | `mapping-linux` | Experimental; synthetic contracts |
@@ -55,3 +56,23 @@ Five mapping modules share the `mapping-linux` feature. The sshd, sudo, su and H
 - HTTP 2xx/3xx statuses map to success, 4xx/5xx to failure and 1xx to unknown. The original `-` user marker is retained, and `omit_text` prevents it from becoming a user identity. HTTP logs do not establish a server hostname, so the mapping does not invent a host partition.
 
 Malformed IPs, ports and other typed values retain the shared boundary's unsupported-value diagnostic and original source record. These mappings do not infer results from arbitrary message substrings and do not grant tools any permission.
+
+
+## Elastic Common Schema
+
+`parser-ecs` preserves original ECS JSON fields through `ecs-source-v1`.
+The separate `mapping-ecs` module validates explicit category/type sets,
+outcomes, addresses, ports and other supported common fields. It does not infer
+classifications from action or message text. Unknown labels stay in the source
+and produce diagnostics; missing outcome remains unknown.
+
+Source and destination addresses retain their roles. Actor and target users use
+explicit directory, host and account qualifiers; an absent directory namespace
+keeps identities local to their source record. Process PIDs always use source-record
+scope. Names and producer IDs remain searchable context, without inventing a
+process lifetime. Conflicting dotted and nested aliases are unsupported.
+
+The extraction projection preserves existing search aliases and original
+attributes. The native implementation is required for bounded sets, typed values
+and alias validation. See the [ECS pipeline design](development/ecs-source-mapping.md)
+for exact identity rules and [supported fields](development/common-event-schema.md).

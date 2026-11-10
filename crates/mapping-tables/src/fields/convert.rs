@@ -1,8 +1,8 @@
 use super::{CompiledField, Conversion};
 use irmind_app::source_mapping::{MappingError, SourceValue};
 use irmind_domain::{
-    CommonFieldType, CommonValue, ContentHash, EntityIdentityScope, EventText, EventTextList,
-    HashAlgorithm, NetworkDirection, ObservedEntity, ObservedEntityKind,
+    CommonField, CommonFieldType, CommonValue, ContentHash, EntityIdentityScope, EventText,
+    EventTextList, HashAlgorithm, NetworkDirection, ObservedEntity, ObservedEntityKind,
 };
 impl CompiledField {
     pub(crate) fn convert(&self, value: &SourceValue) -> Result<CommonValue, MappingError> {
@@ -26,7 +26,7 @@ impl CompiledField {
                 )
                 .map_err(|_| bad())?,
             )),
-            Conversion::Copy => self.copy(value),
+            Conversion::Copy => copy_common_value(self.target, value),
             Conversion::Ip => Ok(CommonValue::Ip(text()?.parse().map_err(|_| bad())?)),
             Conversion::Md5 | Conversion::Sha1 | Conversion::Sha256 => {
                 let algorithm = match self.conversion {
@@ -40,54 +40,59 @@ impl CompiledField {
             }
         }
     }
-    fn copy(&self, value: &SourceValue) -> Result<CommonValue, MappingError> {
-        let bad = || MappingError::UnsupportedSourceValue;
-        let text = || value.as_text().ok_or_else(bad);
-        match self.target.value_type() {
-            CommonFieldType::Text | CommonFieldType::LongText => Ok(CommonValue::Text(
-                EventText::new(text()?).map_err(|_| bad())?,
-            )),
-            CommonFieldType::Ip => Ok(CommonValue::Ip(text()?.parse().map_err(|_| bad())?)),
-            CommonFieldType::Port
-            | CommonFieldType::Pid
-            | CommonFieldType::Unsigned
-            | CommonFieldType::HttpStatus => {
-                let SourceValue::Number(number) = value else {
-                    return Err(bad());
-                };
-                Ok(CommonValue::Unsigned(
-                    number.as_str().parse().map_err(|_| bad())?,
-                ))
-            }
-            CommonFieldType::Md5 | CommonFieldType::Sha1 | CommonFieldType::Sha256 => {
-                let algorithm = match self.target.value_type() {
-                    CommonFieldType::Md5 => HashAlgorithm::Md5,
-                    CommonFieldType::Sha1 => HashAlgorithm::Sha1,
-                    _ => HashAlgorithm::Sha256,
-                };
-                Ok(CommonValue::Hash(
-                    ContentHash::new(algorithm, text()?).map_err(|_| bad())?,
-                ))
-            }
-            CommonFieldType::Direction => Ok(CommonValue::Direction(
-                NetworkDirection::parse(text()?).map_err(|_| bad())?,
-            )),
-            CommonFieldType::TextList => {
-                let SourceValue::Array(values) = value else {
-                    return Err(bad());
-                };
-                if values.len() > 16 {
-                    return Err(bad());
-                }
-                let texts = values
-                    .iter()
-                    .map(|v| EventText::new(v.as_text().ok_or_else(bad)?).map_err(|_| bad()))
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(CommonValue::TextList(
-                    EventTextList::new(texts).map_err(|_| bad())?,
-                ))
-            }
-            CommonFieldType::Time | CommonFieldType::DnsAnswers => Err(bad()),
+}
+
+/// Copy one closed common field through the shared validated conversion rules.
+pub fn copy_common_value(
+    target: CommonField,
+    value: &SourceValue,
+) -> Result<CommonValue, MappingError> {
+    let bad = || MappingError::UnsupportedSourceValue;
+    let text = || value.as_text().ok_or_else(bad);
+    match target.value_type() {
+        CommonFieldType::Text | CommonFieldType::LongText => Ok(CommonValue::Text(
+            EventText::new(text()?).map_err(|_| bad())?,
+        )),
+        CommonFieldType::Ip => Ok(CommonValue::Ip(text()?.parse().map_err(|_| bad())?)),
+        CommonFieldType::Port
+        | CommonFieldType::Pid
+        | CommonFieldType::Unsigned
+        | CommonFieldType::HttpStatus => {
+            let SourceValue::Number(number) = value else {
+                return Err(bad());
+            };
+            Ok(CommonValue::Unsigned(
+                number.as_str().parse().map_err(|_| bad())?,
+            ))
         }
+        CommonFieldType::Md5 | CommonFieldType::Sha1 | CommonFieldType::Sha256 => {
+            let algorithm = match target.value_type() {
+                CommonFieldType::Md5 => HashAlgorithm::Md5,
+                CommonFieldType::Sha1 => HashAlgorithm::Sha1,
+                _ => HashAlgorithm::Sha256,
+            };
+            Ok(CommonValue::Hash(
+                ContentHash::new(algorithm, text()?).map_err(|_| bad())?,
+            ))
+        }
+        CommonFieldType::Direction => Ok(CommonValue::Direction(
+            NetworkDirection::parse(text()?).map_err(|_| bad())?,
+        )),
+        CommonFieldType::TextList => {
+            let SourceValue::Array(values) = value else {
+                return Err(bad());
+            };
+            if values.len() > 16 {
+                return Err(bad());
+            }
+            let texts = values
+                .iter()
+                .map(|v| EventText::new(v.as_text().ok_or_else(bad)?).map_err(|_| bad()))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(CommonValue::TextList(
+                EventTextList::new(texts).map_err(|_| bad())?,
+            ))
+        }
+        CommonFieldType::Time | CommonFieldType::DnsAnswers => Err(bad()),
     }
 }

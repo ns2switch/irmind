@@ -17,6 +17,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     )?;
     #[cfg(feature = "mapping-linux")]
     register_linux(registry)?;
+    #[cfg(feature = "mapping-ecs")]
+    registry.register(
+        Box::new(irmind_mod_mapping_ecs::EcsMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     Ok(())
 }
 #[cfg(feature = "mapping-linux")]
@@ -57,6 +62,10 @@ mod tests {
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_linux::LinuxSourceDecoder))
             .unwrap();
+        #[cfg(feature = "mapping-ecs")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_ecs::EcsSourceDecoder))
+            .unwrap();
         register(&mut registry).unwrap();
         let catalog = registry.mapping_catalog().unwrap();
         assert!(catalog.supports_decoder("parser-json", "json-source-v1"));
@@ -65,6 +74,7 @@ mod tests {
             catalog.snapshots().unwrap().len(),
             2 + usize::from(cfg!(feature = "mapping-cloudtrail"))
                 + 5 * usize::from(cfg!(feature = "mapping-linux"))
+                + usize::from(cfg!(feature = "mapping-ecs"))
         );
     }
 }

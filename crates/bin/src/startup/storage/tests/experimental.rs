@@ -29,6 +29,21 @@ fn registry() -> ModuleRegistry {
             &ModuleConfig::new(),
         )
         .unwrap();
+    #[cfg(feature = "mapping-ecs")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_ecs::EcsParser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_ecs::EcsMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
     registry
 }
 
@@ -228,3 +243,6 @@ fn linux_auth_context_is_confirmed_signed_and_reproducible_through_the_mapped_wr
     );
     engine.verify(&case.id).unwrap();
 }
+
+#[cfg(feature = "mapping-ecs")]
+mod ecs;
