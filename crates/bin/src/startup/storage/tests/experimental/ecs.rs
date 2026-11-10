@@ -187,6 +187,17 @@ fn benchmark_ingest(
         records
     );
     assert_eq!(manifest.rejected_records, 0);
+    if mapped {
+        super::profile::run(
+            &registry.mapping_catalog().unwrap(),
+            &source.join("events.ndjson"),
+            &manifest.source.sha256,
+            ("parser-ecs", "ecs-source-v1"),
+            "ecs",
+            repetition,
+            data.path(),
+        );
+    }
     engine.verify(&case.id).unwrap();
     println!(
         "ECS_SOURCE_BENCH repetition={repetition} mapped={mapped} bytes={bytes} records={records} seconds={seconds:.6} MiB_per_second={:.6} source_sha256={}",

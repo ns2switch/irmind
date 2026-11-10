@@ -10,7 +10,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4624,
         include_str!("tables/security-4624.toml"),
-        "42ec6a07ac967e1d05fbf6e6dc63d0a263fba0f61ec171797a213f2ad7a982a4",
+        "20affc8fd4c2b9d508806b45bf36d090552e71aea9470151d38c0415695c5e56",
         ModuleManifest {
             id: "mapping-evtx-security-4624",
             version: "0.1.0",
@@ -22,7 +22,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4625,
         include_str!("tables/security-4625.toml"),
-        "33cb565955140ff5240f95d3854fc98fa25cd89dbf525e71d8f1d3efe950340b",
+        "d2780c8595d8ccbfe0eacc252cd4e54c02353fc9b803ed1a69423406d3a36a19",
         ModuleManifest {
             id: "mapping-evtx-security-4625",
             version: "0.1.0",
@@ -34,7 +34,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4634,
         include_str!("tables/security-4634.toml"),
-        "2ce8c5ee7aa53a1f3272347574119b73bba14798b210879f5cf32f1d5f43b269",
+        "74268bc5639842d527ca910ad3c00988382d0f0e92744ccd855fffe966ba25e3",
         ModuleManifest {
             id: "mapping-evtx-security-4634",
             version: "0.1.0",
@@ -46,7 +46,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4648,
         include_str!("tables/security-4648.toml"),
-        "42e5175757ce823d19fa1d137ded3ecd8cb51a107cb3def39f18d60304c3addb",
+        "4f31007c76887153338df3771d878836dc2a01cb731b2b4419012cba8f46e8f4",
         ModuleManifest {
             id: "mapping-evtx-security-4648",
             version: "0.1.0",
@@ -58,7 +58,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4672,
         include_str!("tables/security-4672.toml"),
-        "1790dd579949b1c15623c51a635358e28d452edaee3d2c02bade0bc7432a8c0c",
+        "84ae726315285456e0e4dfd0274b7f114d6fc74df38a8fb8374affe0176ad477",
         ModuleManifest {
             id: "mapping-evtx-security-4672",
             version: "0.1.0",
@@ -70,7 +70,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4688,
         include_str!("tables/security-4688.toml"),
-        "ef14b587e95372fea461e59142ecd411954a5fef3e8784052284fc8e5876e795",
+        "f039708bb47ecf0aa0626eea5a3bf560b5c1c4462dec40e4d232f844f5248572",
         ModuleManifest {
             id: "mapping-evtx-security-4688",
             version: "0.1.0",
@@ -82,7 +82,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4697,
         include_str!("tables/security-4697.toml"),
-        "c3c25344e079d80a7f74279686d94c4c2148fd55e5fb52f96fc4287e65720bdc",
+        "9ec0d58119538c639f70bc37c1e6135a50765fadb61f71714260cf6ac0b14cf9",
         ModuleManifest {
             id: "mapping-evtx-security-4697",
             version: "0.1.0",
@@ -94,7 +94,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4720,
         include_str!("tables/security-4720.toml"),
-        "df48a23b04b730691f6a66074b123ee59749132a33efb9a6aed4ff2a493ab5f3",
+        "3a310d62fea4837215875b9b5601adeead11b4735fc14798f420ef074a455d20",
         ModuleManifest {
             id: "mapping-evtx-security-4720",
             version: "0.1.0",
@@ -106,7 +106,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4722,
         include_str!("tables/security-4722.toml"),
-        "39610fc2d2ca74e3ddaae9e2667250603f1a02c03e4ec8a2d9ba4211f9ea45df",
+        "832364944b5c7a1618dab64029dc5ef8c8487b052031c213086c5371fbc8f7ea",
         ModuleManifest {
             id: "mapping-evtx-security-4722",
             version: "0.1.0",
@@ -118,7 +118,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4724,
         include_str!("tables/security-4724.toml"),
-        "0e435ffb14bccdabaccf2a95ecfa3e4c2cb8f012f19ce7e99a27fbd046cbf264",
+        "5f24792310e0873b7c2fa8ad8c052a961bc457b23edcfd889046eefd81a5417d",
         ModuleManifest {
             id: "mapping-evtx-security-4724",
             version: "0.1.0",
@@ -130,7 +130,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4728,
         include_str!("tables/security-4728.toml"),
-        "31821c6217bbf7227db8bf5ee71dd87963d62a56b00b6e50d3f703b7d88de095",
+        "379539af4d5003733774c4c39a0db8f59a4489d7d50283a8b423f811fda13965",
         ModuleManifest {
             id: "mapping-evtx-security-4728",
             version: "0.1.0",
@@ -142,7 +142,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4732,
         include_str!("tables/security-4732.toml"),
-        "91946da4b8a9bdde343fb1443c9b5811cd6685e8f4636e7dc555be16759101dc",
+        "8d8895210ae7c361fc60b2b66de29371f9e47607a31a565c7dc0b1e134e25908",
         ModuleManifest {
             id: "mapping-evtx-security-4732",
             version: "0.1.0",
@@ -154,7 +154,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4756,
         include_str!("tables/security-4756.toml"),
-        "980e9394d3e361d0155b5c77a2d45b6a7fbda3a2f0677caf5200ea601aba9feb",
+        "46f1d36c623989980ce6fded38846f9ddc623d5298906cf7348ce4e88f0228a0",
         ModuleManifest {
             id: "mapping-evtx-security-4756",
             version: "0.1.0",
@@ -166,7 +166,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4768,
         include_str!("tables/security-4768.toml"),
-        "93446f51d5d1d793707ffab2c9159d5aa1c310bf8ac61f91c3e44af7586f44ec",
+        "211518b5744815f9b166e4c4071db324012d31f5be5f4571fdd59f9c14f7cbdf",
         ModuleManifest {
             id: "mapping-evtx-security-4768",
             version: "0.1.0",
@@ -178,7 +178,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4769,
         include_str!("tables/security-4769.toml"),
-        "b4b12975ec46769ab43d1567b770fcd59fc8bb3c2d979450afb4a9e3a318d580",
+        "9314c36d5618662561002fa3f473190a1ace2c972f3f9861b1c89c207b93a6ff",
         ModuleManifest {
             id: "mapping-evtx-security-4769",
             version: "0.1.0",
@@ -190,7 +190,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4771,
         include_str!("tables/security-4771.toml"),
-        "9360c361008b792b5f7993e847374e48a341b25dcb8381fc7260bf073689b480",
+        "e511dd0e683ed24f95a6078984770de3a78c36bc702c0b0c2d5b05bec7e56ea5",
         ModuleManifest {
             id: "mapping-evtx-security-4771",
             version: "0.1.0",
@@ -202,7 +202,7 @@ const DEFINITIONS: &[Entry] = &[
     (
         4776,
         include_str!("tables/security-4776.toml"),
-        "f6d89c123fd3407d0d78cc45db5589ca7daafa1c93b1f81c5e55291b1a59dacc",
+        "218eb380c267b4b15bf6cee0cbff9de59423fcf1118dcf11c51210696a5e9cae",
         ModuleManifest {
             id: "mapping-evtx-security-4776",
             version: "0.1.0",

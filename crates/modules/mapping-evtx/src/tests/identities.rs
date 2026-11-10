@@ -165,3 +165,34 @@ fn successful_logon_and_group_membership_keep_event_specific_roles() {
         );
     }
 }
+
+#[test]
+fn account_management_uses_target_sid_and_null_sid_is_not_an_identity() {
+    for id in [4720, 4722, 4724] {
+        let row = sources("security").remove(
+            SecurityMapping::EVENT_IDS
+                .iter()
+                .position(|n| *n == id)
+                .unwrap(),
+        );
+        let out = SecurityMapping::new(id).unwrap().map(&row).unwrap();
+        assert!(
+            out.record()
+                .common
+                .observations()
+                .values()
+                .iter()
+                .any(|o| o.field() == F::UserTargetId && o.entity().value() == "S-1-5-21-1001")
+        );
+    }
+    let mut raw = original(&sources("security")[1]);
+    raw["Event"]["EventData"]["SubjectUserSid"] = json!("S-1-0-0");
+    raw["Event"]["EventData"]["TargetUserSid"] = json!("S-1-0-0");
+    let out = SecurityMapping::new(4625)
+        .unwrap()
+        .map(&source(0, &raw))
+        .unwrap();
+    assert!(out.record().common.context().get(F::UserId).is_none());
+    assert!(out.record().common.context().get(F::UserTargetId).is_none());
+    assert!(out.record().indexed.record.text.contains("S-1-0-0"));
+}
