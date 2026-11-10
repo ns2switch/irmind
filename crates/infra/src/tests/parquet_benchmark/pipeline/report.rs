@@ -21,6 +21,19 @@ pub(super) fn check(store: &LocalStore, case: &CaseId, root: &Path, expected: u6
         })
         .sum();
     assert_eq!(count, expected);
+    let mut schema_bytes = BTreeMap::<String, u64>::new();
+    for artifact in &catalog.active {
+        *schema_bytes
+            .entry(artifact.schema_version().into())
+            .or_default() += artifact.size();
+    }
+    println!(
+        "PIPELINE_LAYOUT {}",
+        serde_json::json!({
+            "files":catalog.active.len(), "by_schema_bytes":schema_bytes,
+            "active_bytes":catalog.active.iter().map(irmind_domain::ParquetArtifact::size).sum::<u64>()
+        })
+    );
     let manifests: Vec<_> = entries
         .iter()
         .filter(|e| e.kind == irmind_domain::AuditEventKind::SourceManifestV2)

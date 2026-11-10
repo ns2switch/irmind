@@ -23,7 +23,7 @@ from pathlib import Path
 Path('pipeline-results/metadata.json').write_text(json.dumps({
     'baseline':os.environ['PIPELINE_BASELINE'], 'candidate':os.environ['PIPELINE_CANDIDATE'],
     'heaptrack':os.environ['PIPELINE_HEAPTRACK_VERSION'], 'runner':'ubuntu-24.04',
-    'build':'release', 'repetitions':3, 'minimum_source_bytes':1073741824,
+    'build':'release', 'release_debug':os.environ['CARGO_PROFILE_RELEASE_DEBUG'], 'release_strip':os.environ['CARGO_PROFILE_RELEASE_STRIP'], 'repetitions':3, 'minimum_source_bytes':1073741824,
     'sources':['evtx','ecs','cloudtrail','linux-journald'],
     'method':'Timings without Heaptrack; separate V3 allocation runs. Ingestion uses normal source hashing, mapping, partitioning, Parquet writing and signed custody. Nested timing intervals are labeled inclusive.'
 },indent=2)+'\n')
@@ -59,15 +59,16 @@ for source in evtx ecs cloudtrail linux; do
     exe="$work/bin-$label"
     [[ -f "$exe" && -x "$exe" ]] || { echo "missing production-profile test executable" >&2; exit 2; }
     "$exe" --exact tests::parquet_benchmark::pipeline::source_pipeline_production_1gib --ignored --nocapture --test-threads=1 > "$work/timings.txt" 2>&1
-    sed -n -E '/^(PIPELINE_PRODUCTION|PIPELINE_SOURCE|CUSTODY_PHASE) /p' "$work/timings.txt" > "pipeline-results/$label-$source-timings.txt"
+    sed -n -E '/^(PIPELINE_PRODUCTION|PIPELINE_SOURCE|PIPELINE_LAYOUT|CUSTODY_PHASE) /p' "$work/timings.txt" > "pipeline-results/$label-$source-timings.txt"
     test "$(grep -c '^PIPELINE_PRODUCTION ' "pipeline-results/$label-$source-timings.txt")" = 6
     IRMIND_PIPELINE_VARIANT=v3 heaptrack --output "$work/capture" "$exe" --exact tests::parquet_benchmark::pipeline::source_pipeline_production_1gib --ignored --nocapture --test-threads=1 > "$work/heaptrack.txt" 2>&1
     capture=$(find "$work" -maxdepth 1 -name 'capture*' -type f -print)
     test -n "$capture"
-    heaptrack_print "$capture" --print-peaks=false --print-allocators=false --print-temporary=false --print-flamegraph "$work/stacks.txt" --flamegraph-cost-type allocations > "$work/analysis.txt" 2>&1
+    heaptrack_print "$capture" --print-peaks=false --print-allocators=false --print-temporary=false --print-flamegraph "$work/stacks.txt" --flamegraph-cost-type allocations --shorten-templates=false > "$work/analysis.txt" 2>&1
+    c++filt --format=rust < "$work/stacks.txt" > "$work/demangled.txt"
     revision=$candidate
     [[ "$label" != baseline ]] || revision=$BASE_REF
-    python3 scripts/profile_pipeline_allocations.py "$work/stacks.txt" "pipeline-results/$label-$source-allocations.json" --source "$source" --revision "$revision" --heaptrack-version "$heaptrack_version"
-    rm -f -- "$capture" "$work/stacks.txt" "$work/analysis.txt" "$work/heaptrack.txt"
+    python3 scripts/profile_pipeline_allocations.py "$work/demangled.txt" "pipeline-results/$label-$source-allocations.json" --source "$source" --revision "$revision" --heaptrack-version "$heaptrack_version"
+    rm -f -- "$capture" "$work/stacks.txt" "$work/demangled.txt" "$work/analysis.txt" "$work/heaptrack.txt"
   done
 done
