@@ -33,7 +33,7 @@ cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
 build() {
   local tree=$1 label=$2
   cargo test --manifest-path "$tree/Cargo.toml" -p irmind-infra --release --locked --no-run --message-format=json > "$work/$label-build.json"
-  python3 - "$work/$label-build.json" "$work/$label" <<'PY'
+  python3 - "$work/$label-build.json" "$work/bin-$label" <<'PY'
 import json, shutil, sys
 executables=[]
 for line in open(sys.argv[1]):
@@ -56,7 +56,8 @@ unset IRMIND_PIPELINE_VARIANT
 for source in evtx ecs cloudtrail linux; do
   export IRMIND_PIPELINE_SOURCE="$source"
   for label in "${labels[@]}"; do
-    exe="$work/$label"
+    exe="$work/bin-$label"
+    [[ -f "$exe" && -x "$exe" ]] || { echo "missing production-profile test executable" >&2; exit 2; }
     "$exe" --exact tests::parquet_benchmark::pipeline::source_pipeline_production_1gib --ignored --nocapture --test-threads=1 > "$work/timings.txt" 2>&1
     sed -n -E '/^(PIPELINE_PRODUCTION|PIPELINE_SOURCE|CUSTODY_PHASE) /p' "$work/timings.txt" > "pipeline-results/$label-$source-timings.txt"
     test "$(grep -c '^PIPELINE_PRODUCTION ' "pipeline-results/$label-$source-timings.txt")" = 6
