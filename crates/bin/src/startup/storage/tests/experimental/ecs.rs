@@ -115,7 +115,17 @@ fn benchmark_source(root: &Path) -> (u64, u64, Vec<u8>) {
         records += 1;
     }
     output.flush().unwrap();
-    (bytes, records, line.into_bytes())
+    drop(output);
+    let mut sample = Vec::new();
+    std::io::Read::read_to_end(
+        &mut std::io::Read::take(
+            std::fs::File::open(root.join("events.ndjson")).unwrap(),
+            65_536,
+        ),
+        &mut sample,
+    )
+    .unwrap();
+    (bytes, records, sample)
 }
 fn benchmark_ingest(
     source: &Path,
