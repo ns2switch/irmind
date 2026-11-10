@@ -195,7 +195,7 @@ impl PreparedStartup {
             #[cfg(feature = "parser-declarative")]
             &self.definitions,
         );
-        let catalog = storage::experimental_parsers(catalog, &self.saved)?;
+        let catalog = storage::experimental_parsers(catalog, &self.saved, registry)?;
         if let Some(store) = storage::experimental(&self.home, &self.saved, registry)? {
             self.store = Arc::new(store);
         }

@@ -344,3 +344,64 @@ fn unsupported_audit_member_types_stay_unclassified_regardless_of_message_text()
         &irmind_domain::EventHeaderV1::default()
     );
 }
+
+#[test]
+fn every_included_linux_process_observation_uses_source_record_scope() {
+    use irmind_domain::{EntityIdentityScope, ObservedEntityKind};
+    let fixtures: Vec<(Box<dyn SourceMapper>, &str)> = vec![
+        (
+            Box::new(SshdMapping::new().unwrap()),
+            include_str!("../../../testkit/fixtures/common/linux/sshd.log"),
+        ),
+        (
+            Box::new(SudoMapping::new().unwrap()),
+            include_str!("../../../testkit/fixtures/common/linux/sudo.log"),
+        ),
+        (
+            Box::new(SuMapping::new().unwrap()),
+            include_str!("../../../testkit/fixtures/common/linux/su.log"),
+        ),
+        (
+            Box::new(HttpMapping::new().unwrap()),
+            include_str!("../../../testkit/fixtures/common/linux/http.log"),
+        ),
+        (
+            Box::new(AuditMapping::new().unwrap()),
+            include_str!("../../../testkit/fixtures/common/linux/auditd.log"),
+        ),
+    ];
+    let mut checked = 0;
+    for (mapper, fixture) in fixtures {
+        let mut per_mapping = 0;
+        for source in decode(fixture) {
+            if !mapper
+                .manifest()
+                .selectors()
+                .iter()
+                .any(|s| s.matches(&source))
+            {
+                continue;
+            }
+            let output = mapper.map(&source).unwrap();
+            for observation in output
+                .record()
+                .common
+                .observations()
+                .values()
+                .iter()
+                .filter(|o| o.entity().kind() == ObservedEntityKind::Process)
+            {
+                assert!(matches!(
+                    observation.entity().scope(),
+                    EntityIdentityScope::SourceRecord { .. }
+                ));
+                checked += 1;
+                per_mapping += 1;
+            }
+        }
+        if mapper.manifest().identity().id() != "mapping-linux-http" {
+            assert!(per_mapping > 0, "{}", mapper.manifest().identity().id());
+        }
+    }
+    assert!(checked > 0);
+}

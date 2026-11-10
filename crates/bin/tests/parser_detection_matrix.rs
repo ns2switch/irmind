@@ -100,7 +100,7 @@ mod matrix {
         #[cfg(feature = "parser-declarative")]
         registry.register(
             Box::new(irmind_mod_parser_declarative::DeclarativeModule::new(
-                custom_parsers()?,
+                custom_approved()?,
             )?),
             &ModuleConfig::new(),
         )?;
@@ -318,6 +318,57 @@ mod matrix {
                 .map(irmind_app::ParserConfidence::value),
             (expected == "parser-suricata").then_some(95)
         );
+    }
+    #[cfg(feature = "parser-declarative")]
+    #[allow(clippy::unwrap_used)]
+    fn custom_approved() -> Result<Vec<irmind_app::ApprovedDefinition>, irmind_app::AppError> {
+        use ed25519_dalek::{Signer as _, SigningKey};
+        use irmind_app::{AppError, CryptoPorts, Engine, EnginePorts, Signer};
+        use std::sync::Arc;
+        struct TestSigner(SigningKey);
+        impl Signer for TestSigner {
+            fn actor(&self) -> irmind_domain::Actor {
+                irmind_domain::Actor::Analyst
+            }
+            fn public_key(&self) -> Vec<u8> {
+                self.0.verifying_key().to_bytes().to_vec()
+            }
+            fn sign(&self, bytes: &[u8]) -> Result<Vec<u8>, AppError> {
+                Ok(self.0.sign(bytes).to_bytes().to_vec())
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let store = Arc::new(irmind_infra::LocalStore::open(root.path())?);
+        let signer = Arc::new(TestSigner(SigningKey::from_bytes(&[55; 32])));
+        let engine = Engine::new(
+            EnginePorts::new(
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                CryptoPorts::new(
+                    signer.clone(),
+                    Arc::new(irmind_infra::LocalVerifier::from_signer(signer.as_ref())),
+                ),
+                Arc::new(irmind_security::MandatoryGuard::new()?),
+                Arc::new(JsonParser),
+            ),
+            irmind_domain::ExecutionMode::Attended,
+            Arc::new(irmind_infra::SystemClock),
+        )?;
+        let definitions = irmind_infra::FileDefinitionStore::new(root.path());
+        let compiler = irmind_mod_parser_declarative::DeclarativeCompiler;
+        for text in [
+            include_str!("../../../docs/examples/parsers/access-csv.toml"),
+            include_str!("../../../docs/examples/parsers/nested-ndjson.toml"),
+            include_str!("../../../docs/examples/parsers/auth-regex.toml"),
+        ] {
+            engine.install_parser_definition(&definitions, &compiler, text)?;
+        }
+        Ok(engine
+            .approved_definitions()?
+            .load_active(&definitions, &compiler)
+            .0)
     }
     #[cfg(feature = "parser-declarative")]
     fn custom_parsers() -> Result<Vec<std::sync::Arc<dyn LogParser>>, irmind_app::AppError> {

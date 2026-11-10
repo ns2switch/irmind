@@ -102,7 +102,7 @@ fn prepare(
     let contents =
         String::from_utf8(bytes).map_err(|_| anyhow!("definition must be UTF-8 TOML"))?;
     let parser = compiler.compile(&contents)?;
-    let identity = parser.identity();
+    let identity = parser.selector().identity();
     let preview = if action == Action::Preview {
         let sample = io.read_parser_input(Path::new(&state.fields[1]), 1024 * 1024)?;
         engine.preview_parser_definition(compiler, &contents, &sample)?
@@ -112,7 +112,7 @@ fn prepare(
             identity.name,
             identity.version,
             irmind_app::hex(&irmind_app::sha256(contents.as_bytes())),
-            parser.description()
+            parser.selector().description()
         )
     };
     Ok((contents, preview))

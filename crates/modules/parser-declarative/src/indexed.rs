@@ -11,11 +11,18 @@ pub(super) fn project(
 ) -> Result<IndexedProjection, AppError> {
     let row: Row<'_> = serde_json::from_str(&record.text)
         .map_err(|_| AppError::Fixed(irmind_app::FixedAppError::PolicyInvalidIndexedTimestamp))?;
+    Ok((Some(timestamp(parser, row.time, &record.at)?), None))
+}
+pub(super) fn timestamp(
+    parser: &crate::DeclarativeParser,
+    value: &str,
+    at: &str,
+) -> Result<IndexedTime, AppError> {
     let format = parser.definition.timestamp.format.as_str();
     let time = if format == "rfc3339" {
-        irmind_app::indexed_rfc3339(row.time, false, false)?
+        irmind_app::indexed_rfc3339(value, false, false)?
     } else if format == "unix" {
-        IndexedTime::from_epoch_decimal(row.time, false).map_err(|_| {
+        IndexedTime::from_epoch_decimal(value, false).map_err(|_| {
             AppError::Fixed(irmind_app::FixedAppError::PolicyInvalidIndexedTimestamp)
         })?
     } else {
@@ -23,7 +30,7 @@ pub(super) fn project(
             && !format.contains("%:z")
             && !format.contains("%#z")
             && !format.contains("%+");
-        let time = irmind_app::indexed_rfc3339(&record.at, inferred, false)?;
+        let time = irmind_app::indexed_rfc3339(at, inferred, false)?;
         let precision = if format.contains("%3f") || format.contains("%.3f") {
             TimePrecision::Millisecond
         } else if format.contains("%6f") || format.contains("%.6f") {
@@ -41,5 +48,5 @@ pub(super) fn project(
             AppError::Fixed(irmind_app::FixedAppError::PolicyInvalidIndexedTimestamp)
         })?
     };
-    Ok((Some(time), None))
+    Ok(time)
 }

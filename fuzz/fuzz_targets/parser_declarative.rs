@@ -1,5 +1,5 @@
 #![no_main]
-use irmind_app::{CancellationToken, StreamingEventParser as _, sha256};
+use irmind_app::{CancellationToken, DefinitionCompiler as _, StreamingEventParser as _, sha256};
 use irmind_mod_parser_declarative::DeclarativeParser;
 use libfuzzer_sys::fuzz_target;
 
@@ -28,6 +28,30 @@ fuzz_target!(|bytes: &[u8]| {
         return;
     };
     let _ = parser.detect_sample(data);
+    if let Ok(pipeline) = irmind_mod_parser_declarative::DeclarativeCompiler
+        .compile(DEFINITIONS[usize::from(selector % 3)])
+    {
+        let cancel = CancellationToken::new();
+        let source =
+            irmind_app::source_mapping::SourceReferenceV1::file("synthetic/fuzz.log").unwrap();
+        let _ = pipeline.decoder().decode_reader(
+            irmind_app::source_mapping::SourceInput {
+                metadata: irmind_app::source_mapping::SourceMetadata {
+                    source: &source,
+                    evidence_hash: sha256(data),
+                    time_context: None,
+                    cancel: &cancel,
+                },
+                reader: &mut std::io::Cursor::new(data),
+            },
+            &mut |row| {
+                row.inspect(|source| {
+                    let _ = pipeline.extraction_mapper().map(source);
+                });
+                Ok(())
+            },
+        );
+    }
     let _ = parser.parse_indexed_reader_report(
         "synthetic/fuzz.log",
         &mut std::io::Cursor::new(data),

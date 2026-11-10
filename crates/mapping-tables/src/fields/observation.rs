@@ -21,6 +21,10 @@ enum CompiledScope {
     SourceRecord,
     Host(SourcePath),
     Account(SourcePath),
+    ProcessLifetime {
+        host: SourcePath,
+        lifetime: SourcePath,
+    },
 }
 impl CompiledObservation {
     pub(super) fn compile(value: Observation, target: CommonField) -> Result<Self, MappingError> {
@@ -32,6 +36,10 @@ impl CompiledObservation {
                 Scope::SourceRecord => CompiledScope::SourceRecord,
                 Scope::Host(keys) => CompiledScope::Host(path(&keys)?),
                 Scope::Account(keys) => CompiledScope::Account(path(&keys)?),
+                Scope::ProcessLifetime { host, lifetime } => CompiledScope::ProcessLifetime {
+                    host: path(&host)?,
+                    lifetime: path(&lifetime)?,
+                },
             },
         };
         let dummy = match result.kind {
@@ -40,7 +48,11 @@ impl CompiledObservation {
             ObservedEntityKind::Hash => "00000000000000000000000000000000",
             _ => "synthetic",
         };
-        let scope = match result.scope {
+        let scope = match &result.scope {
+            CompiledScope::ProcessLifetime { .. } => EntityIdentityScope::ProcessLifetime {
+                host: EventText::identifier("host").map_err(invalid)?,
+                lifetime: EventText::identifier("lifetime").map_err(invalid)?,
+            },
             CompiledScope::Global => EntityIdentityScope::Global,
             CompiledScope::SourceRecord => EntityIdentityScope::SourceRecord {
                 source: EvidenceHash::from_bytes([0; 32]),
@@ -91,6 +103,12 @@ impl CompiledObservation {
             },
             CompiledScope::Host(p) => EntityIdentityScope::Host(named(p)?),
             CompiledScope::Account(p) => EntityIdentityScope::Account(named(p)?),
+            CompiledScope::ProcessLifetime { host, lifetime } => {
+                EntityIdentityScope::ProcessLifetime {
+                    host: named(host)?,
+                    lifetime: named(lifetime)?,
+                }
+            }
         };
         EntityObservation::try_new(
             ObservedEntity::try_new(self.kind, &text, scope).map_err(|_| bad())?,

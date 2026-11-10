@@ -14,23 +14,48 @@ impl Engine<'_> {
                 super::DefinitionError::PreviewLimit,
             )));
         }
-        let parser = compiler.compile(definition)?;
+        let pipeline = compiler.compile(definition)?;
+        let parser = pipeline.selector();
         let confidence = parser
             .detect("preview.log", &sample[..sample.len().min(65536)])
             .map_or(0, crate::ParserConfidence::value);
         let cancel = CancellationToken::new();
         let mut rows = Vec::new();
         let mut reader = Cursor::new(sample).take(1024 * 1024);
-        let outcome = parser.parse_reader_report(
-            "preview.log",
-            &mut reader,
-            crate::sha256(sample),
-            &cancel,
+        let source = crate::source_mapping::SourceReferenceV1::file("preview.log")
+            .map_err(|_| super::invalid())?;
+        let outcome = pipeline.decoder().decode_reader(
+            crate::source_mapping::SourceInput {
+                metadata: crate::source_mapping::SourceMetadata {
+                    source: &source,
+                    evidence_hash: crate::sha256(sample),
+                    time_context: None,
+                    cancel: &cancel,
+                },
+                reader: &mut reader,
+            },
             &mut |row| {
                 if rows.len() == 10 {
                     return Err(AppError::Cancelled);
                 }
-                row.inspect(|record| rows.push(record.text.chars().take(4096).collect::<String>()));
+                let mut output = Err(super::invalid());
+                row.inspect(|record| {
+                    output = pipeline
+                        .extraction_mapper()
+                        .map(record)
+                        .map_err(crate::source_mapping::MappingError::into_app);
+                });
+                let output = output?;
+                rows.push(
+                    output
+                        .record()
+                        .indexed
+                        .record
+                        .text
+                        .chars()
+                        .take(4096)
+                        .collect::<String>(),
+                );
                 Ok(())
             },
         );

@@ -64,7 +64,7 @@ fn approved_definitions_are_pinned_signed_and_rebuild_after_replacement_or_remov
     let (active, statuses) = approved.load_active(&definitions, &DeclarativeCompiler);
     assert_eq!(active.len(), 1);
     assert!(statuses[0].available && statuses[0].active);
-    let parser = active[0].clone();
+    let parser = active[0].compiled().selector().clone();
     let version = parser.identity().version.to_owned();
     let mut registry = ModuleRegistry::new();
     registry
@@ -243,6 +243,7 @@ fn interrupted_write_stays_disabled_until_the_analyst_restores_signed_bytes() {
     let id = DeclarativeCompiler
         .compile(DEFINITION)
         .unwrap()
+        .selector()
         .identity()
         .name
         .to_owned();
@@ -300,7 +301,9 @@ fn benchmark_declarative_one_gib() {
         .compile(include_str!(
             "../../../docs/examples/parsers/nested-ndjson.toml"
         ))
-        .unwrap();
+        .unwrap()
+        .selector()
+        .clone();
     let mut sample = Vec::new();
     {
         use std::io::Read as _;
@@ -373,7 +376,9 @@ fn synthetic_episode_maps_expected_entities_without_ingesting_private_answers() 
         .compile(include_str!(
             "../../../docs/examples/parsers/nested-ndjson.toml"
         ))
-        .unwrap();
+        .unwrap()
+        .selector()
+        .clone();
     let mut rows = Vec::new();
     let report = parser
         .parse_reader_report(
@@ -406,4 +411,72 @@ fn synthetic_episode_maps_expected_entities_without_ingesting_private_answers() 
     );
     assert!(rows[0].at < rows[1].at);
     assert!(rows[0].text.contains(".000001Z"));
+}
+
+#[test]
+fn authenticated_definition_registers_and_rebuilds_the_mapped_pipeline() {
+    let root = tempfile::tempdir().unwrap();
+    let base = Arc::new(LocalStore::open(root.path()).unwrap());
+    let engine = engine(&base);
+    let definitions = FileDefinitionStore::new(root.path());
+    let id = engine
+        .install_parser_definition(&definitions, &DeclarativeCompiler, DEFINITION)
+        .unwrap();
+    let approved = engine.approved_definitions().unwrap();
+    let (active, statuses) = approved.load_active(&definitions, &DeclarativeCompiler);
+    assert!(statuses[0].available);
+    let original = active[0].compiled().selector().clone();
+    let selector: Arc<dyn irmind_app::LogParser> = Arc::new(
+        irmind_app::source_mapping::SourceDecoderSelection::new(
+            active[0].compiled().decoder().clone(),
+        )
+        .with_selector(original)
+        .unwrap(),
+    );
+    let mut registry = ModuleRegistry::new();
+    registry
+        .register(
+            Box::new(DeclarativeModule::new(active).unwrap()),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    let mappings = registry.mapping_catalog().unwrap();
+    assert!(mappings.supports_decoder(&id, selector.identity().version));
+    let mapped = LocalStore::open_mapped(root.path(), Arc::new(mappings)).unwrap();
+    let source = root.path().join("input");
+    fs::create_dir(&source).unwrap();
+    fs::write(source.join("access.csv"), SAMPLE).unwrap();
+    let case = engine
+        .create_case("Synthetic mapped definition", "local evidence only")
+        .unwrap();
+    LargeCaseUseCases {
+        engine: &engine,
+        store: &mapped,
+        parser: selector.as_ref(),
+    }
+    .ingest_local_batch(
+        &case.id,
+        &source,
+        &["access.csv".into()],
+        false,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    assert_eq!(mapped.timeline(&case.id, 10).unwrap().len(), 1);
+    engine.verify(&case.id).unwrap();
+    let entries = base.entries(&case.id).unwrap();
+    let router = registry.parser_catalog().rebuild_router(&entries).unwrap();
+    LargeCaseUseCases {
+        engine: &engine,
+        store: &mapped,
+        parser: &router,
+    }
+    .verify_parquet_rebuild(&case.id, &source, &CancellationToken::new())
+    .unwrap();
+    let descriptor = mapped.entity_lookup(&case.id, "user", "alice").unwrap();
+    assert!(descriptor.contains("alice"));
+    let ip = mapped
+        .entity_lookup(&case.id, "ip", "203.0.113.77")
+        .unwrap();
+    assert!(ip.contains("203.0.113.77"));
 }

@@ -28,8 +28,9 @@ mod audit_origin;
 mod configuration;
 mod definitions;
 pub use definitions::{
-    ApprovedDefinitions, DefinitionCompiler, DefinitionError, DefinitionStatus,
-    MAX_DEFINITION_BYTES, ParserDefinitionStore,
+    ApprovedDefinition, ApprovedDefinitions, CompiledDefinition, DefinitionCompiler,
+    DefinitionError, DefinitionStatus, MAX_DEFINITION_BYTES, ParserDefinitionStore,
+    definition_mapping_descriptor,
 };
 pub mod common_event;
 pub use common_event::{

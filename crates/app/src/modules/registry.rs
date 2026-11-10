@@ -7,7 +7,11 @@ use crate::{
 use irmind_domain::Tool;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+mod definitions;
 mod mapping;
+fn mapping_error() -> AppError {
+    crate::source_mapping::MappingError::InvalidDefinition.into_app()
+}
 
 #[derive(Default)]
 pub struct ModuleRegistry {
@@ -23,6 +27,7 @@ pub struct ModuleRegistry {
     internal_intel: Vec<Box<dyn InternalIntelPort>>,
     threat_intel: Option<Box<dyn ThreatIntelPort>>,
     object_sources: Vec<Box<dyn ObjectSource>>,
+    definition_variants: Vec<crate::ApprovedDefinition>,
     source_decoders: Vec<Arc<dyn crate::SourceDecoder>>,
     source_mappers: Vec<Arc<dyn crate::SourceMapper>>,
 }
@@ -49,6 +54,12 @@ impl ModuleRegistry {
         let mut staged = Self::new();
         module.register(&mut staged, config)?;
         self.validate_staged(manifest, &staged)?;
+        for definition in staged.definition_variants {
+            self.source_decoders
+                .push(Arc::clone(definition.compiled().decoder()));
+            self.source_mappers
+                .push(Arc::clone(definition.compiled().extraction_mapper()));
+        }
         self.source_decoders.extend(staged.source_decoders);
         self.source_mappers.extend(staged.source_mappers);
         self.llms.extend(staged.llms);
@@ -74,6 +85,7 @@ impl ModuleRegistry {
     }
 
     fn validate_staged(&self, manifest: &ModuleManifest, staged: &Self) -> Result<(), AppError> {
+        staged.validate_definition_variants(manifest)?;
         self.validate_mapping_registration(manifest, staged)?;
         let actual = staged.counts();
         for port in [

@@ -4,7 +4,7 @@ use irmind_app::{
     modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
 use irmind_domain::Tainted;
-use std::{io::Read, sync::Arc};
+use std::io::Read;
 
 pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-declarative",
@@ -16,15 +16,15 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
 
 /// Definitions have already been compiled from approved bytes by the composition root.
 pub struct DeclarativeModule {
-    active: Vec<Arc<dyn LogParser>>,
+    active: Vec<irmind_app::ApprovedDefinition>,
 }
 
 impl DeclarativeModule {
-    pub fn new(active: Vec<Arc<dyn LogParser>>) -> Result<Self, AppError> {
+    pub fn new(active: Vec<irmind_app::ApprovedDefinition>) -> Result<Self, AppError> {
         if active.len() > 64
             || active
                 .iter()
-                .any(|parser| parser.parser_name() != MANIFEST.id)
+                .any(|parser| parser.compiled().selector().parser_name() != MANIFEST.id)
         {
             return Err(error("invalid declarative module definitions"));
         }
@@ -43,7 +43,7 @@ impl Module for DeclarativeModule {
     ) -> Result<(), AppError> {
         registry.add_parser(Box::new(Unconfigured))?;
         for parser in self.active {
-            registry.add_parser_variant(parser)?;
+            registry.add_approved_definition(parser)?;
         }
         Ok(())
     }
@@ -94,7 +94,7 @@ impl LogParser for Unconfigured {
 
 pub struct DeclarativeCompiler;
 impl irmind_app::DefinitionCompiler for DeclarativeCompiler {
-    fn compile(&self, contents: &str) -> Result<Arc<dyn LogParser>, AppError> {
-        Ok(Arc::new(crate::DeclarativeParser::from_toml(contents)?))
+    fn compile(&self, contents: &str) -> Result<irmind_app::CompiledDefinition, AppError> {
+        crate::pipeline::compile(contents)
     }
 }

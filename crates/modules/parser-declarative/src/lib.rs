@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 mod indexed;
+mod pipeline;
 
 use irmind_app::AppError;
 use regex::Regex;
