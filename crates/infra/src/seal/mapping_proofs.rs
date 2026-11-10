@@ -54,7 +54,10 @@ pub(super) fn write(
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        super::export_v4::write_frame(out, &serde_json::to_vec(&proof).map_err(super::storage)?)?;
+        super::export_current::write_frame(
+            out,
+            &serde_json::to_vec(&proof).map_err(super::storage)?,
+        )?;
     }
     Ok(())
 }

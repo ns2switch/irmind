@@ -322,7 +322,7 @@ impl AutomationContext<'_, '_> {
                 let (has_sources, has_artifacts) = parquet_status(store.as_ref(), &id)?;
                 let has_new_custody = has_sources || has_artifacts;
                 let fingerprint = if include_originals || has_new_custody {
-                    irmind_app::export_case_v4(
+                    irmind_app::export_case_v6(
                         engine,
                         store.as_ref(),
                         &id,

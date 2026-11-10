@@ -1,5 +1,5 @@
 //! V5 derived files, keyed by authenticated relative paths.
-use super::export_v4::write_frame;
+use super::export_current::write_frame;
 use super::frames::{read_frame, verify_raw};
 use super::{AppError, CancellationToken, CaseId, LocalStore, Path, storage, storage_reason};
 use irmind_domain::{ParquetArtifact, SourceManifestV1};
@@ -83,7 +83,7 @@ impl LocalStore {
                 provider_checksum: None,
                 copied: false,
             };
-            super::export_v4::copy_verified(&mut file, out, &manifest, cancel)?;
+            super::export_current::copy_verified(&mut file, out, &manifest, cancel)?;
         }
         Ok(())
     }

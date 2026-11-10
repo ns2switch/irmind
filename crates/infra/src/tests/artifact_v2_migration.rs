@@ -108,7 +108,7 @@ fn explicit_migration_keeps_history_queries_rebuild_seal_and_v5_public_verificat
     engine.seal(&id).unwrap();
     engine.verify(&id).unwrap();
     let path = root.path().join("mixed.irmind");
-    let key = irmind_app::export_case_v4(
+    let key = irmind_app::export_case_v6(
         &engine,
         store.as_ref(),
         &id,
@@ -296,7 +296,7 @@ fn v5_checks_original_frames_and_rejects_truncation_and_version_confusion() {
     .unwrap();
     engine.seal(&id).unwrap();
     let archive = root.path().join("with-originals.irmind");
-    let key = irmind_app::export_case_v4(
+    let key = irmind_app::export_case_v6(
         &engine,
         store.as_ref(),
         &id,

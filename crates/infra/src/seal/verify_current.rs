@@ -1,4 +1,4 @@
-use super::export_v4::{HeaderV4, MAGIC_V4, MAGIC_V5, MAGIC_V6, v4_result};
+use super::export_current::{HeaderV6, MAGIC_V6, v6_result};
 use super::frames::{read_frame, read_hash, read_u64, verify_raw};
 use super::{
     AppError, CaseId, LocalVerifier, Path, Severity, hex, seal_challenge, sha256, storage,
@@ -12,51 +12,24 @@ use std::io::Read;
 
 const MAX_AUDIT_ENTRIES: u64 = 5_000_000;
 const MAX_SOURCE_MANIFESTS: usize = 1_000_000;
-const MAX_V4_FILE_BYTES: u64 = 2_000_000_000_000;
-
-pub(super) fn verify_export_v4(
-    path: &Path,
-    expected_key: Option<&str>,
-) -> Result<ExportVerification, AppError> {
-    verify_versioned(path, expected_key, 4)
-}
-
-pub(super) fn verify_export_v5(
-    path: &Path,
-    expected_key: Option<&str>,
-) -> Result<ExportVerification, AppError> {
-    verify_versioned(path, expected_key, 5)
-}
+const MAX_PACKAGE_FILE_BYTES: u64 = 2_000_000_000_000;
 
 pub(super) fn verify_export_v6(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
-    verify_versioned(path, expected_key, 6)
-}
-
-fn verify_versioned(
-    path: &Path,
-    expected_key: Option<&str>,
-    version: u32,
-) -> Result<ExportVerification, AppError> {
+    let version = 6;
     let mut input = File::open(path).map_err(storage)?;
-    if input.metadata().map_err(storage)?.len() > MAX_V4_FILE_BYTES {
+    if input.metadata().map_err(storage)?.len() > MAX_PACKAGE_FILE_BYTES {
         return Err(storage_reason("export package exceeds size limit"));
     }
-    let mut magic = [0u8; MAGIC_V4.len()];
-    input.read_exact(&mut magic).map_err(storage)?;
-    if magic
-        != match version {
-            4 => MAGIC_V4,
-            5 => MAGIC_V5,
-            6 => MAGIC_V6,
-            _ => return Err(storage_reason("unsupported export version")),
-        }
-    {
-        return Err(storage_reason("unsupported export version"));
+    let mut magic = [0u8; MAGIC_V6.len()];
+    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V6 {
+        return Err(AppError::Fixed(
+            irmind_app::FixedAppError::RetiredExportFormat,
+        ));
     }
-    let header: HeaderV4 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
+    let header: HeaderV6 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
     if header.version != version {
         return Err(storage_reason("unsupported export version"));
     }
@@ -100,7 +73,7 @@ fn verify_versioned(
             return Err(storage_reason("export has trailing bytes"));
         }
     }
-    let mut result = v4_result(
+    let mut result = v6_result(
         fingerprint,
         usize::try_from(count).map_err(storage)?,
         chain.source_count,
@@ -113,7 +86,7 @@ fn verify_versioned(
 fn verify_operation_frames(
     input: &mut File,
     chain: &mut ChainState,
-    header: &HeaderV4,
+    header: &HeaderV6,
 ) -> Result<(), AppError> {
     let count = read_u64(input)?;
     if count > MAX_AUDIT_ENTRIES {
@@ -375,7 +348,7 @@ impl ChainState {
         Ok(())
     }
 
-    fn verify_seal(&self, id: &CaseId, header: &HeaderV4) -> Result<(), AppError> {
+    fn verify_seal(&self, id: &CaseId, header: &HeaderV6) -> Result<(), AppError> {
         if self.version >= 5 {
             self.catalog.validate()?;
         }
