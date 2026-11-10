@@ -189,8 +189,9 @@ fn benchmark_ingest(
     assert_eq!(manifest.rejected_records, 0);
     engine.verify(&case.id).unwrap();
     println!(
-        "ECS_SOURCE_BENCH repetition={repetition} mapped={mapped} bytes={bytes} records={records} seconds={seconds:.6} MiB_per_second={:.6}",
-        f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / seconds
+        "ECS_SOURCE_BENCH repetition={repetition} mapped={mapped} bytes={bytes} records={records} seconds={seconds:.6} MiB_per_second={:.6} source_sha256={}",
+        f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / seconds,
+        manifest.source.sha256.as_str()
     );
 }
 
