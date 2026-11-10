@@ -199,3 +199,23 @@ command, host, process and PID search aliases for `useradd`, `usermod`, `cron`,
 Its bounded native extraction reads the original message layout; it assigns no
 category, outcome or process lifetime. A request in a cron log does not prove
 that a command succeeded.
+
+## Zeek and Suricata extraction
+
+The source decoders preserve original Zeek JSON and TSV fields and Suricata EVE
+JSON. Zeek TSV retains its original column strings and declared types as two
+separate objects; the format discriminator records the header's dataset. Decimal
+Zeek timestamps retain microseconds or nanoseconds without floating-point
+rounding. EVE numeric UTC offsets are parsed explicitly.
+
+The `mapping-network` feature provides separately identified Zeek and Suricata
+extraction modules. They retain UID/flow correlation, endpoints, domains,
+certificates, files and source detection aliases. These modules do not infer
+common-event categories, outcomes or roles. A source alert remains telemetry;
+it does not confirm a case finding. Native extraction preserves literal dotted
+Zeek field names, TSV nil markers and source-specific correlation relations that
+are not classification-table operations.
+
+The existing bounded record framing, source-size limits, measured offsets,
+cancellation and untrusted rejection samples apply to both ingestion and
+reconstruction. No original fields are recovered from normalized display text.

@@ -1,0 +1,21 @@
+[package]
+name = "irmind-mod-mapping-network"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+
+[build-dependencies]
+irmind-build-manifest = { path = "../../build-manifest", version = "0.1.0" }
+
+[dev-dependencies]
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+irmind-mod-parser-zeek = { path = "../parser-zeek", version = "0.1.0" }
+irmind-mod-parser-suricata = { path = "../parser-suricata", version = "0.1.0" }
+
+[lints]
+workspace = true

@@ -2497,6 +2497,7 @@ dependencies = [
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
  "irmind-mod-mapping-linux",
+ "irmind-mod-mapping-network",
  "irmind-mod-mapping-ocsf",
  "irmind-mod-mapping-syslog",
  "irmind-mod-parser-chainsaw",
@@ -2901,6 +2902,18 @@ dependencies = [
  "irmind-domain",
  "irmind-mapping-tables",
  "irmind-mod-parser-linux",
+ "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-mapping-network"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mod-parser-suricata",
+ "irmind-mod-parser-zeek",
  "irmind-testkit",
 ]
 

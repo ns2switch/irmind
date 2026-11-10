@@ -27,6 +27,7 @@ pub(super) fn experimental(
         feature = "mapping-ocsf",
         feature = "mapping-dfir",
         feature = "mapping-syslog",
+        feature = "mapping-network",
         feature = "mapping-evtx",
         feature = "parser-declarative"
     )) {
@@ -41,6 +42,8 @@ pub(super) fn experimental(
         && !catalog.supports_decoder("parser-ocsf", "ocsf-source-v1")
         && !catalog.supports_decoder("parser-velociraptor", "velociraptor-source-v1")
         && !catalog.supports_decoder("parser-syslog", "syslog-source-v1")
+        && !catalog.supports_decoder("parser-zeek", "zeek-source-v1")
+        && !catalog.supports_decoder("parser-suricata", "suricata-source-v1")
         && !catalog.supports_decoder("parser-evtx", "evtx-source-v1")
         && !registry
             .parser_catalog()
@@ -73,6 +76,7 @@ pub(super) fn experimental_parsers(
         feature = "mapping-ocsf",
         feature = "mapping-dfir",
         feature = "mapping-syslog",
+        feature = "mapping-network",
         feature = "mapping-evtx",
         feature = "parser-declarative"
     )) {
@@ -108,6 +112,9 @@ pub(super) fn experimental_parsers(
     } else {
         catalog
     };
+
+    #[cfg(feature = "mapping-network")]
+    let catalog = network_sources(catalog)?;
     let mappings = registry.mapping_catalog()?;
     #[cfg(feature = "mapping-evtx")]
     let catalog = if mappings
@@ -149,6 +156,25 @@ fn dfir_sources(
         irmind_mod_parser_chainsaw::source_log_parser(),
         irmind_mod_parser_plaso::source_log_parser(),
         irmind_mod_parser_eztools::source_log_parser(),
+    ] {
+        if catalog
+            .available()
+            .iter()
+            .any(|(id, _)| id == parser.identity().name)
+        {
+            catalog = catalog.with_experimental_parser(parser)?;
+        }
+    }
+    Ok(catalog)
+}
+
+#[cfg(feature = "mapping-network")]
+fn network_sources(
+    mut catalog: irmind_app::modules::ParserCatalog,
+) -> Result<irmind_app::modules::ParserCatalog, AppError> {
+    for parser in [
+        irmind_mod_parser_zeek::source_log_parser(),
+        irmind_mod_parser_suricata::source_log_parser(),
     ] {
         if catalog
             .available()

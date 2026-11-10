@@ -641,3 +641,18 @@ No category, outcome or role is inferred from application or message text.
 Consequences: the source selection still signs per-ingestion year, offset and
 rollover context. Ingestion and reconstruction use the same source decoder and
 mapping. No current signed format or external production dependency changes.
+
+### Preserve original network records before extraction
+
+Context: the common writer needs Zeek and Suricata source decoders before the
+presentation-oriented parser route can be retired.
+
+Decision: decode original JSON fields or TSV columns with declared types and
+measured offsets. Separate native extraction modules retain existing UID/flow
+relations and search identities without interpreting outcomes or entity roles.
+The native projections handle literal dotted columns, nil markers and
+source-specific relations; no arbitrary expressions or code are loaded.
+
+Consequences: exact decimal timestamps remain available to the common writer,
+and reconstruction uses the same signed source and mapping identities. No
+current signed format or external production dependency changes.

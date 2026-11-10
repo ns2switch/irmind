@@ -38,6 +38,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
         Box::new(irmind_mod_mapping_syslog::SyslogExtractionMapping::new()?),
         &ModuleConfig::new(),
     )?;
+
+    #[cfg(feature = "mapping-network")]
+    for mapper in irmind_mod_mapping_network::NetworkExtractionMapping::all()? {
+        registry.register(Box::new(mapper), &ModuleConfig::new())?;
+    }
     Ok(())
 }
 #[cfg(feature = "mapping-evtx")]
@@ -131,6 +136,16 @@ mod tests {
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_syslog::SyslogSourceDecoder))
             .unwrap();
+
+        #[cfg(feature = "mapping-network")]
+        {
+            registry
+                .add_source_decoder(Arc::new(irmind_mod_parser_zeek::ZeekSourceDecoder))
+                .unwrap();
+            registry
+                .add_source_decoder(Arc::new(irmind_mod_parser_suricata::SuricataSourceDecoder))
+                .unwrap();
+        }
         register(&mut registry).unwrap();
         let catalog = registry.mapping_catalog().unwrap();
         assert!(catalog.supports_decoder("parser-json", "json-source-v1"));
@@ -140,6 +155,7 @@ mod tests {
             2 + usize::from(cfg!(feature = "mapping-cloudtrail"))
                 + usize::from(cfg!(feature = "mapping-syslog"))
                 + 6 * usize::from(cfg!(feature = "mapping-linux"))
+                + 2 * usize::from(cfg!(feature = "mapping-network"))
                 + usize::from(cfg!(feature = "mapping-ecs"))
                 + usize::from(cfg!(feature = "mapping-ocsf"))
                 + 5 * usize::from(cfg!(feature = "mapping-dfir"))

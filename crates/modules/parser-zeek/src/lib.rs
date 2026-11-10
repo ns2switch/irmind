@@ -9,14 +9,16 @@ use irmind_domain::Tainted;
 use std::io::{Cursor, Read};
 
 mod mapping;
+mod source_decode;
 mod stream;
+pub use source_decode::{ZeekSourceDecoder, source_log_parser};
 
 pub struct ZeekParser;
 
 static MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-zeek",
     version: "0.1.0",
-    ports: &[ModulePort::EventParser],
+    ports: &[ModulePort::EventParser, ModulePort::SourceDecoder],
     tools: &[],
     config: &[],
 };
@@ -31,6 +33,7 @@ impl Module for ZeekParser {
         registry: &mut ModuleRegistry,
         _config: &ModuleConfig,
     ) -> Result<(), AppError> {
+        registry.add_source_decoder(std::sync::Arc::new(ZeekSourceDecoder))?;
         registry.add_parser(self)
     }
 }
