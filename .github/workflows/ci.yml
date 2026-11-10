@@ -178,7 +178,7 @@ jobs:
           IRMIND_EXPECT_PRESERVE_ORDER: '1'
         run: |
           cargo nextest run -p irmind --test format_goldens --all-features --features serde_json/preserve_order --cargo-profile ci --locked
-          cargo nextest run -p irmind-mapping-tables -p irmind-mod-mapping-cloudtrail --lib --features serde_json/preserve_order --cargo-profile ci --locked
+          cargo nextest run -p irmind-mapping-tables -p irmind-mod-mapping-cloudtrail -p irmind-mod-parser-evtx -p irmind-mod-mapping-evtx --lib --features serde_json/preserve_order --cargo-profile ci --locked
   evtx_linux_compatibility:
     needs: [dco, linux]
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true }}

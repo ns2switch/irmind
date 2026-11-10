@@ -17,7 +17,9 @@ fn registry() -> ModuleRegistry {
         .unwrap();
     registry
         .register(
-            Box::new(irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap()),
+            Box::new(
+                irmind_mod_mapping_json_compat::JsonCompatibilityMapping::generic_only().unwrap(),
+            ),
             &ModuleConfig::new(),
         )
         .unwrap();
@@ -44,6 +46,13 @@ fn registry() -> ModuleRegistry {
             )
             .unwrap();
     }
+    #[cfg(feature = "mapping-cloudtrail")]
+    registry
+        .register(
+            Box::new(irmind_mod_mapping_cloudtrail::CloudTrailMapping::new().unwrap()),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
     registry
 }
 
@@ -246,3 +255,10 @@ fn linux_auth_context_is_confirmed_signed_and_reproducible_through_the_mapped_wr
 
 #[cfg(feature = "mapping-ecs")]
 mod ecs;
+
+#[cfg(all(
+    feature = "mapping-evtx",
+    feature = "mapping-linux",
+    feature = "mapping-cloudtrail"
+))]
+mod evtx;

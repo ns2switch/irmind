@@ -11,6 +11,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 - Add an independent experimental ECS source decoder and native ECS 9.5 mapping, with explicit categories, outcomes and occurrence roles, precise original timestamps and extraction-preserving search. PID observations retain source-record scope.
 
+- Add independent, bundled declarative Windows mappings for Security, System, PowerShell and Sysmon, preserving source provenance and original 100 ns timestamps. Only reported Sysmon process GUIDs establish process lifetimes. Verify cross-source authentication failures through signed ingestion, typed queries, reconstruction and export V6.
+
 ## 0.2.0 — Modular parsers and precise evidence
 
 **Format impact:** Breaking: artifact V2 and export V5 add precision and partition formats. Its historical V1 reader/migration support applies only to that release.

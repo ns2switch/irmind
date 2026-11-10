@@ -572,3 +572,12 @@ Consequences: existing search aliases remain available during the optional commo
 writer rollout. Unknown labels are diagnostic, missing outcome stays unknown, and
 conflicting aliases never silently override each other. No new external package,
 case envelope or export format is introduced.
+
+### EVTX interpretation is bundled declarative data
+
+Context: binary decoding and event interpretation must remain separate modules.
+Decision: reuse the isolated EVTX helper through `evtx-source-v1` and register
+hash-pinned table modules by exact provider/channel and original Security EventID. Only Sysmon's reported
+process GUIDs establish lifetimes; Security PIDs retain source-record scope.
+Consequences: new ingestions can opt into common-event mappings without changing
+the existing writer, helper protocol, isolation, custody formats or dependencies.

@@ -1,0 +1,38 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-evtx-system"
+version = "evtx-system-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-evtx"
+parser_versions = ["evtx-source-v1"]
+format = "evtx"
+format_version = "evtx-source-v1"
+provider = "Service Control Manager"
+channel = "System"
+
+native_type = "7045"
+
+[partition]
+host = ["Event", "System", "Computer"]
+
+[[fields]]
+source = ["Event", "System", "Computer"]
+target = "host.name"
+omit_text = ["-"]
+observation = { kind = "host", role = "observer", scope = { kind = "host", path = ["Event", "System", "Computer"] } }
+
+[[fields]]
+source = ["Event", "EventData", "ImagePath"]
+target = "process.executable"
+omit_text = ["-"]
+
+[[fields]]
+source = ["Event", "EventData", "AccountName"]
+target = "user.target.name"
+omit_text = ["-"]
+observation = { kind = "user", role = "target", scope = { kind = "source_record" } }
+
+[[rules]]
+categories = ["configuration"]
+types = ["creation"]
+outcome = "success"

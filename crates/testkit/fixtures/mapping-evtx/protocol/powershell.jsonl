@@ -1,0 +1,4 @@
+{"kind":"ready","protocol":"irmind-evtx-ndjson-v1","decoder":"0.15.1"}
+{"kind":"record","record_id":1,"offset":4608,"timestamp":"2026-11-01T12:00:00.0000007Z","event":{"Event":{"System":{"Provider":{"#attributes":{"Name":"Microsoft-Windows-PowerShell"}},"EventID":"4103","Channel":"Microsoft-Windows-PowerShell/Operational","Computer":"synthetic-endpoint","EventRecordID":"1"},"EventData":{"ScriptBlockText":"Write-Output synthetic"}}}}
+{"kind":"record","record_id":2,"offset":5301,"timestamp":"2026-11-01T12:00:00.0000017Z","event":{"Event":{"System":{"Provider":{"#attributes":{"Name":"Microsoft-Windows-PowerShell"}},"EventID":"4104","Channel":"Microsoft-Windows-PowerShell/Operational","Computer":"synthetic-endpoint","EventRecordID":"2"},"EventData":{"ScriptBlockText":"Write-Output synthetic"}}}}
+{"kind":"complete","accepted":2,"rejected":0}

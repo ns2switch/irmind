@@ -2,7 +2,9 @@
 mod codec;
 mod input;
 mod normalize;
+mod source_decode;
 mod strict;
+pub use source_decode::{SOURCE_VERSION, detect_source};
 
 use irmind_app::{
     AppError, CancellationToken, EventParser, GraphRecord, LogParser, ParseReport,
@@ -11,18 +13,19 @@ use irmind_app::{
 };
 use irmind_domain::Tainted;
 use irmind_process_containment::{Mode, Program};
-use std::{fs::File, io::Read, path::Path, time::Duration};
+use std::{fs::File, io::Read, path::Path, sync::Arc, time::Duration};
 
 pub const VERSION: &str = "evtx-0.15.1-ndjson-v1";
 pub const MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-evtx",
     version: "0.1.0",
-    ports: &[ModulePort::EventParser],
+    ports: &[ModulePort::EventParser, ModulePort::SourceDecoder],
     tools: &[],
     config: &[],
 };
+#[derive(Clone)]
 pub struct EvtxParser {
-    program: Option<Program>,
+    program: Option<Arc<Program>>,
     issue: Option<String>,
 }
 fn bad(message: &'static str) -> AppError {
@@ -65,7 +68,7 @@ impl EvtxParser {
         })();
         match prepared {
             Ok(program) => Self {
-                program: Some(program),
+                program: Some(Arc::new(program)),
                 issue: None,
             },
             Err(error) => Self {
@@ -77,7 +80,7 @@ impl EvtxParser {
     pub fn witness_stats(&self) -> irmind_process_containment::WitnessStats {
         self.program
             .as_ref()
-            .map_or_else(Default::default, Program::witness_stats)
+            .map_or_else(Default::default, |program| program.witness_stats())
     }
     pub fn unavailable_reason(&self) -> Option<&str> {
         self.issue.as_deref()
@@ -90,6 +93,33 @@ impl EvtxParser {
         cancel: &CancellationToken,
         emit: &mut dyn FnMut(Tainted<irmind_app::IndexedGraphRecord>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        let size = file
+            .metadata()
+            .map_err(|_| bad("cannot inspect EVTX source"))?
+            .len();
+        let mut state = codec::State::new(source, hash, size);
+        let result = self
+            .decode_file(file, cancel, &mut |bytes| state.frame(bytes, emit))
+            .and_then(|()| state.finish());
+        self.completed(result)
+    }
+    fn completed(&self, result: Result<ParseReport, AppError>) -> Result<ParseReport, AppError> {
+        if result.is_err()
+            && let Some(program) = &self.program
+        {
+            program.invalidate();
+        }
+        result
+    }
+    fn decode_file(
+        &self,
+        file: &File,
+        cancel: &CancellationToken,
+        frame: &mut dyn FnMut(&[u8]) -> Result<(), AppError>,
+    ) -> Result<(), AppError> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
@@ -106,15 +136,13 @@ impl EvtxParser {
         let child = program
             .spawn_cancelable(file, Mode::Decode, &|| cancel.is_cancelled())
             .map_err(|_| if cancel.is_cancelled() { AppError::Cancelled } else { bad("cannot start the contained EVTX decoder; check BFE/MpsSvc and the verified sandbox") })?;
-        let mut state = codec::State::new(source, hash, size);
         let result = input::run(
             child,
             (size.saturating_mul(32) + (1 << 20)).min(8 << 30),
             Duration::from_mins(10),
             cancel,
-            &mut |bytes| state.frame(&bytes, emit),
-        )
-        .and_then(|()| state.finish());
+            &mut |bytes| frame(&bytes),
+        );
         if result.is_err() {
             program.invalidate();
         }
@@ -130,6 +158,7 @@ impl Module for EvtxParser {
         registry: &mut ModuleRegistry,
         _: &ModuleConfig,
     ) -> Result<(), AppError> {
+        registry.add_source_decoder(Arc::new((*self).clone()))?;
         registry.add_parser(self)
     }
 }
@@ -228,6 +257,7 @@ impl StreamingEventParser for EvtxParser {
 #[cfg(feature = "fuzzing")]
 pub fn fuzz_protocol(bytes: &[u8]) {
     irmind_process_containment::fuzz_witness_protocol(bytes);
+    source_decode::fuzz(bytes);
     let _ = strict::decode(bytes);
     let _ = codec::detect(bytes);
     let mut state = codec::State::new("synthetic.evtx", [0; 32], 69632);

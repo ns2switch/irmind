@@ -2492,6 +2492,7 @@ dependencies = [
  "irmind-mod-llm-openrouter",
  "irmind-mod-mapping-cloudtrail",
  "irmind-mod-mapping-ecs",
+ "irmind-mod-mapping-evtx",
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
  "irmind-mod-mapping-linux",
@@ -2828,6 +2829,19 @@ dependencies = [
  "irmind-mapping-tables",
  "irmind-mod-parser-ecs",
  "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-mapping-evtx"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-evtx",
+ "irmind-testkit",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
