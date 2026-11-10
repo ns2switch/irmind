@@ -1,4 +1,4 @@
-Traducción de README.md en el commit c8cdf3e7796a76937eb8d642eee22d8423fc283a; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit a9fbc58504ea525e5a2d2b40943feb2bc76aa3a1; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -77,7 +77,7 @@ Usa **Enter** para avanzar, **Retroceso** para revisar un paso, **Espacio** para
 6. Usa `/verify <directorio-origen>` para comprobar el original; revisa `/report` antes de `/seal` y `/export`. Estas dos acciones muestran el hash del caso y la huella de la clave antes de confirmar.
 
 Ningún LLM está habilitado por defecto. Puedes ingerir y verificar evidencia local sin uno.
-En los siguientes arranques, IRMind verifica y reabre el último caso abierto que usaste. Usa `/home` para volver a la lista o `/settings preferences` para desactivar esta opción. `/settings` también reúne conectores, credenciales, ratón y tema. `/help` enumera los comandos y las teclas reservadas: Enter, Esc, flechas, Tab/Shift+Tab, PgUp/PgDn, Ctrl+C, Ctrl+K y Ctrl+O. Los caracteres imprimibles, incluido `/`, se escriben en el campo de formulario que tiene el foco; el pegado también funciona allí.
+En los siguientes arranques, IRMind verifica y reabre el último caso abierto que usaste. Usa `/home` para volver a la lista o `/settings preferences` para desactivar esta opción. `/settings` también reúne conectores, credenciales, ratón y tema. `/help` enumera los comandos y las teclas reservadas: Enter, Esc, flechas, Tab/Shift+Tab, PgUp/PgDn, Ctrl+C, Ctrl+K y Ctrl+O. Ctrl+O o `/expand` despliega o pliega la tarjeta seleccionada o la última plegable sin salir del campo de entrada. Los caracteres imprimibles, incluido `/`, se escriben en el campo de formulario que tiene el foco; el pegado también funciona allí.
 
 ## Módulos
 
@@ -102,6 +102,7 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | VirusTotal | enriquecimiento externo | `ti-virustotal` | experimental | [Módulos](docs/es/modules.md) |
 | Parser JSON y logs de nube exportados | parser local | `parser-json` (por defecto) | experimental | [Módulos](docs/es/modules.md) |
 | Mapeo de eventos comunes de CloudTrail | mapeo local | `mapping-cloudtrail` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
+| Mapeo de eventos comunes ECS | mapeo local | `mapping-ecs` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
 | Parser de Elastic Common Schema | parser local | `parser-ecs` (por defecto) | experimental | [ECS](docs/es/modules.md#parser-de-elastic-common-schema) |
 | Parser de OCSF JSON y Parquet | parser local | `parser-ocsf` (por defecto) | experimental | [OCSF](docs/es/modules.md#parser-de-ocsf) |
 | Parser de Velociraptor | parser local | `parser-velociraptor` (por defecto) | experimental | [Velociraptor](docs/es/modules.md#parser-de-velociraptor) |
@@ -151,5 +152,3 @@ La [hoja de ruta pública](docs/es/roadmap.md) describe intenciones, sin comprom
 - [Contribuciones](CONTRIBUTING.es.md) · [Código de conducta](CODE_OF_CONDUCT.es.md) · [Reporte privado de vulnerabilidades](SECURITY.md) · [Licencias](LICENSE-MIT)
 
 Licencia dual **MIT OR Apache-2.0**; consulta [LICENSE-MIT](LICENSE-MIT) y [LICENSE-APACHE](LICENSE-APACHE).
-
-`Ctrl+O` o `/expand` despliega o pliega la tarjeta seleccionada desde la caja de texto o el panel lateral. Si no hay una tarjeta plegable seleccionada, usa la última. Tu borrador se conserva.

@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 6f743c1460ccc1ec1193245576bdc8133f936bb6; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit a9fbc58504ea525e5a2d2b40943feb2bc76aa3a1; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -152,7 +152,7 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 ## Parser de Elastic Common Schema
 
-**Función:** Detecta ECS NDJSON mediante `@timestamp` y `ecs.version`, o mediante campos característicos de evento y host. Convierte evento, host, usuario, origen, destino, proceso, archivo y URL en registros y entidades con hora UTC. Los campos restantes permanecen en el registro local.
+**Función:** Detecta ECS NDJSON mediante `@timestamp` y `ecs.version`, o mediante campos característicos de evento. El decodificador conserva los instantes, los campos originales y la procedencia. Con el escritor común experimental, el módulo independiente `mapping-ecs` valida clasificaciones y roles explícitos; la ruta actual se mantiene durante la incorporación de decodificadores. Consulta la [cobertura del mapeo ECS](mappings.md#elastic-common-schema).
 
 **Permiso:** Solo lectura del archivo local elegido.
 
@@ -250,10 +250,12 @@ Limita cada registro a 4 MiB, 1.024 campos y 64 niveles JSON, y cada fuente a di
 
 ## Parser de Suricata EVE
 
-Lee EVE JSONL para alert, flow, dns, http, tls, fileinfo y anomaly. Relaciona registros mediante `flow_id`. Una firma de alerta se conserva como hallazgo de origen sin confirmar; nunca confirma automáticamente un hallazgo del caso. Solo requiere lectura del archivo local. Viene compilado por defecto con `parser-suricata` y es experimental, probado solo con datos sintéticos.
+Lee EVE JSONL para alert, flow, dns, http, tls, fileinfo y anomaly. Relaciona registros mediante `flow_id`. Una firma de alerta se conserva como hallazgo de origen sin confirmar; nunca confirma automáticamente un hallazgo del caso. Solo requiere lectura del archivo local. Conserva el instante original y el offset; V2 mantiene su precisión fraccionaria en el índice. No ejecuta Suricata ni abre conexiones de red.
+
+Viene compilado por defecto con `parser-suricata` y es experimental, probado solo con datos sintéticos. La detección requiere un `event_type` admitido, un instante y `flow_id` en la muestra. Si hay ambigüedad, el analista elige; la elección queda firmada.
 
 Aplica los mismos límites de tamaño, estructura JSON y recuento que Zeek. Rechaza marcas temporales sin zona explícita. Conserva en el registro local la marca original y su zona; la timeline V2 conserva la precisión fraccionaria. Un `host` explícito usa el perfil de partición por host; no se deduce a partir de direcciones de red. [Formato EVE](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).
 
 ## Mapeos de eventos comunes
 
-Los mapeos opcionales son independientes de los parsers y conectores. Las tablas incluidas de CloudTrail clasifican las operaciones admitidas, conservan los espacios de cuentas del actor y del objetivo y dejan como desconocidos los resultados no admitidos. Requieren el escritor común experimental y no habilitan ningún módulo remoto. Véase la [cobertura y las limitaciones de los mapeos](../mappings.md).
+Los mapeos opcionales son independientes de los parsers y conectores. Las tablas de CloudTrail y los mapeos de Linux clasifican las operaciones admitidas. El mapeo nativo ECS valida conjuntos explícitos, valores tipados y roles. Los resultados ausentes o no admitidos quedan como desconocidos. Requieren el escritor común experimental y no habilitan ningún módulo remoto. Véase la [cobertura y las limitaciones de los mapeos](mappings.md).
