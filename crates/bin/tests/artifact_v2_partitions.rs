@@ -2,7 +2,7 @@
 #![allow(clippy::unwrap_used)]
 #![cfg(all(feature = "parser-json", feature = "parser-linux"))]
 use ed25519_dalek::{Signer as _, SigningKey};
-use irmind_app::modules::{ModuleConfig, ModuleRegistry};
+use irmind_app::source_mapping::{MappingCatalog, SourceDecoderSelection};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, Clock, CryptoPorts, Engine, EnginePorts, EvidenceGraph,
     LargeCaseUseCases, ParserSelection, Repository, Signer, StreamingEventParser, sha256,
@@ -10,9 +10,10 @@ use irmind_app::{
 use irmind_domain::{
     Actor, ExecutionMode, ParquetArtifact, ParserSelectionMode, ScopePartitionKey,
 };
-use irmind_infra::{LocalStore, LocalVerifier, ParquetStore};
+use irmind_infra::{LocalStore, LocalVerifier};
 use irmind_mod_parser_json::JsonParser;
-use irmind_mod_parser_linux::LinuxParser;
+use irmind_mod_parser_json::JsonSourceDecoder;
+use irmind_mod_parser_linux::LinuxSourceDecoder;
 use std::{collections::BTreeMap, fs, sync::Arc};
 struct FixedClock;
 impl Clock for FixedClock {
@@ -54,7 +55,7 @@ fn engine(store: &Arc<LocalStore>) -> Engine<'static> {
 }
 fn ingest(
     engine: &Engine<'_>,
-    storage: &ParquetStore,
+    storage: &LocalStore,
     id: &irmind_domain::CaseId,
     root: &std::path::Path,
     name: &str,
@@ -89,41 +90,46 @@ fn ingest(
     )
     .unwrap();
 }
+fn source_store(root: &std::path::Path) -> Arc<LocalStore> {
+    let catalog = MappingCatalog::freeze(
+        vec![Arc::new(JsonSourceDecoder), Arc::new(LinuxSourceDecoder)],
+        vec![
+            Arc::new(irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap()),
+            Arc::new(irmind_mod_mapping_linux::AuditMapping::new().unwrap()),
+        ],
+    )
+    .unwrap();
+    Arc::new(LocalStore::open_mapped(root, Arc::new(catalog)).unwrap())
+}
+
 #[test]
 fn signed_cloud_and_interleaved_audit_reconstruct_with_their_own_profiles() {
     let data = tempfile::tempdir().unwrap();
     let inputs = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(data.path()).unwrap());
+    let store = source_store(data.path());
     let engine = engine(&store);
     let case = engine
-        .create_case("Synthetic mixed parsers", "local only")
+        .create_case("Synthetic mixed sources", "local only")
         .unwrap();
-    let precise = ParquetStore::open_precise(data.path()).unwrap();
-    ingest(&engine, &precise, &case.id, inputs.path(), "cloud.json", br#"{"eventTime":"2026-11-01T01:00:00.000001Z","eventName":"AssumeRole","recipientAccountId":"111111111111","awsRegion":"eu-west-1"}"#, &JsonParser);
+    let json = SourceDecoderSelection::new(Arc::new(JsonSourceDecoder));
+    ingest(&engine, &store, &case.id, inputs.path(), "cloud.json", br#"{"eventTime":"2026-11-01T01:00:00.000001Z","eventName":"AssumeRole","recipientAccountId":"111111111111","awsRegion":"eu-west-1"}"#, &json);
     let audit = b"node=lab-host type=SYSCALL msg=audit(1793494800.1:1): uid=1000 syscall=59\nnode=lab-host type=SYSCALL msg=audit(1793494800.3:2): uid=1000 syscall=59\nnode=lab-host type=EOE msg=audit(1793494800.3:2):\nnode=lab-host type=EOE msg=audit(1793494800.1:1):\n";
+    let linux = SourceDecoderSelection::new(Arc::new(LinuxSourceDecoder));
     ingest(
         &engine,
-        &precise,
+        &store,
         &case.id,
         inputs.path(),
         "audit.log",
         audit,
-        &LinuxParser::default(),
+        &linux,
     );
     let entries = store.entries(&case.id).unwrap();
-    let mut registry = ModuleRegistry::new();
-    registry
-        .register(Box::new(JsonParser), &ModuleConfig::default())
-        .unwrap();
-    registry
-        .register(Box::<LinuxParser>::default(), &ModuleConfig::default())
-        .unwrap();
-    let router = registry.parser_catalog().rebuild_router(&entries).unwrap();
     assert_eq!(
         LargeCaseUseCases {
             engine: &engine,
-            store: &precise,
-            parser: &router
+            store: store.as_ref(),
+            parser: &json
         }
         .verify_parquet_rebuild(&case.id, inputs.path(), &CancellationToken::new())
         .unwrap(),
@@ -133,116 +139,54 @@ fn signed_cloud_and_interleaved_audit_reconstruct_with_their_own_profiles() {
         .iter()
         .filter_map(|e| ParquetArtifact::decode(e.kind, &e.payload).ok())
         .collect::<Vec<_>>();
-    assert!(partitions.iter().any(|a| matches!(a, ParquetArtifact::V2(v) if v.partition.scopes.iter().any(|s| s.key == ScopePartitionKey::Account))));
-    assert!(partitions.iter().any(|a| matches!(a, ParquetArtifact::V2(v) if v.partition.scopes.iter().any(|s| s.key == ScopePartitionKey::Host))));
+    for key in [ScopePartitionKey::Account, ScopePartitionKey::Host] {
+        assert!(partitions.iter().any(|a| matches!(a, ParquetArtifact::V3(v) if v.core().partition.scopes.iter().any(|s| s.key == key))));
+    }
     assert_eq!(store.timeline(&case.id, 10).unwrap().len(), 3);
     assert!(!store.get_case(&case.id).unwrap().sealed);
     engine.verify(&case.id).unwrap();
 }
 
 #[test]
-fn a_source_alias_cannot_bypass_explicit_generation_migration() {
+fn a_source_alias_cannot_rebind_already_signed_bytes() {
     let data = tempfile::tempdir().unwrap();
     let inputs = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(data.path()).unwrap());
+    let store = source_store(data.path());
     let engine = engine(&store);
     let case = engine
-        .create_case("Synthetic generation guard", "local only")
+        .create_case("Synthetic source alias", "local only")
         .unwrap();
-    let bytes = br#"{"eventTime":"2026-11-01T00:00:00Z","host":"lab-host"}"#;
-    fs::write(inputs.path().join("old.json"), bytes).unwrap();
-    LargeCaseUseCases {
+    let json = SourceDecoderSelection::new(Arc::new(JsonSourceDecoder));
+    let bytes = br#"{"eventTime":"2026-11-01T00:00:00Z","eventName":"Login"}"#;
+    ingest(
+        &engine,
+        &store,
+        &case.id,
+        inputs.path(),
+        "original.json",
+        bytes,
+        &json,
+    );
+    let before = store.entries(&case.id).unwrap();
+    fs::write(inputs.path().join("alias.json"), bytes).unwrap();
+    let result = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: &JsonParser,
+        parser: &json,
     }
     .ingest_local(
         &case.id,
         inputs.path(),
-        "old.json",
+        "alias.json",
         false,
-        &CancellationToken::new(),
-    )
-    .unwrap();
-    let count = store.entries(&case.id).unwrap().len();
-    fs::write(inputs.path().join("alias.json"), bytes).unwrap();
-    let precise = ParquetStore::open_precise(data.path()).unwrap();
-    let choices = BTreeMap::from([(
-        "alias.json".into(),
-        ParserSelection {
-            parser_id: "parser-json".into(),
-            parser_version: "json-stream-v3".into(),
-            confidence: 90,
-            mode: ParserSelectionMode::Automatic,
-            timestamp_context: None,
-            format_sample_sha256: sha256(bytes),
-        },
-    )]);
-    let result = LargeCaseUseCases {
-        engine: &engine,
-        store: &precise,
-        parser: &JsonParser,
-    }
-    .ingest_local_batch_selected(
-        &case.id,
-        inputs.path(),
-        &["alias.json".into()],
-        false,
-        &choices,
         &CancellationToken::new(),
     );
     assert!(matches!(
         result,
         Err(AppError::Fixed(
-            irmind_app::FixedAppError::PolicyArtifactVersionRequiresMigration
+            irmind_app::FixedAppError::PolicyMappedSourceAlreadyIndexed
         ))
     ));
-    assert_eq!(store.entries(&case.id).unwrap().len(), count);
+    assert_eq!(store.entries(&case.id).unwrap().len(), before.len());
     engine.verify(&case.id).unwrap();
-}
-
-#[test]
-fn mixed_reconstruction_preserves_allocation_order_across_explicit_migration() {
-    let data = tempfile::tempdir().unwrap();
-    let inputs = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(data.path()).unwrap());
-    let engine = engine(&store);
-    let case = engine
-        .create_case("Interleaved generations", "local only")
-        .unwrap();
-    let v1 = ParquetStore::open(data.path()).unwrap();
-    let v2 = ParquetStore::open_precise(data.path()).unwrap();
-    ingest(&engine,&v1,&case.id,inputs.path(),"old.json",br#"{"eventTime":"2026-11-01T01:00:00.000001Z","eventName":"AssumeRole","recipientAccountId":"111111111111","awsRegion":"eu-west-1"}"#,&JsonParser);
-    let linux = LinuxParser::default();
-    ingest(&engine,&v2,&case.id,inputs.path(),"before.json",br#"{"__REALTIME_TIMESTAMP":"1793494800000100","_HOSTNAME":"before-host","MESSAGE":"before migration"}"#,&linux);
-    LargeCaseUseCases {
-        engine: &engine,
-        store: store.as_ref(),
-        parser: &JsonParser,
-    }
-    .migrate_artifacts_v2(&case.id, Some(inputs.path()), &CancellationToken::new())
-    .unwrap();
-    ingest(&engine,&v2,&case.id,inputs.path(),"after.json",br#"{"__REALTIME_TIMESTAMP":"1793494800000200","_HOSTNAME":"after-host","MESSAGE":"after migration"}"#,&linux);
-    let mut registry = ModuleRegistry::new();
-    registry
-        .register(Box::new(JsonParser), &ModuleConfig::default())
-        .unwrap();
-    registry
-        .register(Box::<LinuxParser>::default(), &ModuleConfig::default())
-        .unwrap();
-    let router = registry
-        .parser_catalog()
-        .rebuild_router(&store.entries(&case.id).unwrap())
-        .unwrap();
-    assert_eq!(
-        LargeCaseUseCases {
-            engine: &engine,
-            store: store.as_ref(),
-            parser: &router
-        }
-        .verify_parquet_rebuild(&case.id, inputs.path(), &CancellationToken::new())
-        .unwrap(),
-        3
-    );
-    assert_eq!(store.timeline(&case.id, 10).unwrap().len(), 3);
 }

@@ -6,16 +6,13 @@ use crate::{
 mod direct;
 mod manifest;
 mod mapped_compaction;
-mod mapped_source;
-mod migrate_v2;
-mod migration;
 mod source_event;
 mod verification;
 use irmind_domain::{
     EvidenceHash, ParquetArtifact, ParserSelectionMode, SourceManifestV1, SourceManifestV2,
 };
+pub(crate) use manifest::read_manifest_index;
 use manifest::select_sources;
-pub(crate) use manifest::{read_manifest_index, read_sealed_artifacts};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -81,54 +78,11 @@ impl LargeCaseUseCases<'_, '_> {
         }
         self.engine.verify_ingest_checkpoint(id, cancel)?;
         let index = crate::artifact_catalog(&self.engine.audit_log.entries(id)?)?.active;
-        let mut known = index
-            .iter()
-            .map(|artifact| (artifact.path().to_owned(), artifact.clone()))
-            .collect::<BTreeMap<_, _>>();
-        let covered = index
-            .iter()
-            .filter(|artifact| artifact.source_hashes().len() > 1)
-            .flat_map(|artifact| {
-                artifact
-                    .source_hashes()
-                    .iter()
-                    .map(|hash| (artifact.compaction_key(), hash.clone()))
-            })
-            .collect::<BTreeSet<_>>();
-        let mut groups: BTreeMap<Vec<u8>, Vec<ParquetArtifact>> = BTreeMap::new();
-        for artifact in index {
-            if !matches!(&artifact, ParquetArtifact::V3(_))
-                && !matches!(&artifact, ParquetArtifact::V2(v) if !v.superseded_hashes.is_empty())
-                && artifact.source_hashes().len() == 1
-                && (artifact.parser_version() == "json-stream-v3"
-                    || matches!(artifact, ParquetArtifact::V2(_)))
-                && !covered.contains(&(
-                    artifact.compaction_key(),
-                    artifact.source_hashes()[0].clone(),
-                ))
-            {
-                groups
-                    .entry(artifact.compaction_key())
-                    .or_default()
-                    .push(artifact);
-            }
-        }
-        let mut compacted = self.compact_mapped(id, &known, small_file_threshold, cancel)?;
-        for artifacts in groups.values_mut() {
-            artifacts.sort_by(|left, right| left.source_hashes()[0].cmp(&right.source_hashes()[0]));
-            for chunk in artifacts.chunks(128) {
-                if chunk.len() < 2 {
-                    continue;
-                }
-                if cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
-                }
-                let bundle = self.store.compact_artifacts(id, chunk, cancel)?;
-                self.store.verify_artifact(id, &bundle, cancel)?;
-                self.audit_artifact(id, bundle, &mut known)?;
-                compacted += 1;
-            }
-        }
+        let known = index
+            .into_iter()
+            .map(|a| (a.path().to_owned(), a))
+            .collect();
+        let compacted = self.compact_mapped(id, &known, small_file_threshold, cancel)?;
         self.engine.verify_ingest_checkpoint(id, cancel)?;
         Ok(compacted)
     }
@@ -204,12 +158,12 @@ impl LargeCaseUseCases<'_, '_> {
             .into_iter()
             .map(|artifact| (artifact.path().to_owned(), artifact))
             .collect::<BTreeMap<_, _>>();
-        let mut known_sources = index
+        let known_sources = index
             .sources
             .into_iter()
             .map(|source| (source.source.clone(), source))
             .collect::<BTreeMap<_, _>>();
-        if let Some(ingested) = self.try_direct(&mut direct::Request {
+        self.try_direct(&mut direct::Request {
             id,
             source_root,
             ordered: &ordered,
@@ -218,158 +172,10 @@ impl LargeCaseUseCases<'_, '_> {
             known_artifacts: &mut known_artifacts,
             known_sources: &known_sources,
             cancel,
-        })? {
-            return Ok(ingested);
-        }
-        let mut ingested = Vec::with_capacity(ordered.len());
-        for paths in ordered.chunks(4) {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            let mut pending = Vec::new();
-            for path in paths {
-                if let Some(existing) = known_sources.get(path) {
-                    if copy_original && !existing.copied {
-                        return Err(AppError::Policy(
-                            "this source was signed without a copy; select a new source path"
-                                .into(),
-                        ));
-                    }
-                    self.store
-                        .verify_local_source(source_root, existing, cancel)?;
-                    ingested.push((path.clone(), existing.sha256.clone()));
-                } else {
-                    pending.push(path);
-                }
-            }
-            let prepared = self.prepare_sources_parallel(
-                id,
-                source_root,
-                &pending,
-                copy_original,
-                &known_artifacts,
-                cancel,
-            )?;
-            for (path, source) in pending.iter().zip(prepared) {
-                known_sources.insert((*path).clone(), source.manifest.clone());
-                let hash = self.sign_prepared_with_selection(
-                    id,
-                    source,
-                    selections.get(*path),
-                    cancel,
-                    &mut known_artifacts,
-                )?;
-                ingested.push(((*path).clone(), hash));
-            }
-        }
-        ingested.sort_by(|left, right| left.0.cmp(&right.0));
-        Ok(ingested)
-    }
-
-    fn prepare_sources_parallel(
-        &self,
-        id: &CaseId,
-        source_root: &Path,
-        pending: &[&String],
-        copy_original: bool,
-        known: &BTreeMap<String, ParquetArtifact>,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<crate::PreparedSource>, AppError> {
-        let paths = pending.iter().map(|p| (*p).clone()).collect::<Vec<_>>();
-        let committed = known.values().cloned().collect::<Vec<_>>();
-        self.store.prepare_local_batch(
-            crate::LocalBatchRequest {
-                case_id: id,
-                source_root,
-                relative_paths: &paths,
-                copy_original,
-                parser: self.parser,
-                committed_artifacts: &committed,
-                limits: crate::PartitionLimits::default(),
-            },
-            cancel,
-        )
-    }
-
-    pub(crate) fn sign_prepared_with_selection(
-        &self,
-        id: &CaseId,
-        mut prepared: crate::PreparedSource,
-        selection: Option<&ParserSelection>,
-        cancel: &CancellationToken,
-        known_artifacts: &mut BTreeMap<String, ParquetArtifact>,
-    ) -> Result<EvidenceHash, AppError> {
-        if prepared
-            .artifacts
-            .iter()
-            .any(|a| matches!(a, ParquetArtifact::V2(_)))
-            && selection.is_none()
-        {
-            return Err(AppError::Fixed(
-                crate::FixedAppError::PolicyPreciseArtifactsRequireParserSelection,
-            ));
-        }
-        if prepared.records == 0 || prepared.artifacts.is_empty() {
-            return Err(AppError::Policy(
-                "source produced no Parquet records".into(),
-            ));
-        }
-        mapped_source::ensure_new_source(&prepared, known_artifacts)?;
-        let source_event = self.source_event(&prepared, selection)?;
-        let mapped = mapped_source::bind(&mut prepared, &source_event, known_artifacts)?;
-        self.engine.verify_mapping_events(
-            mapped
-                .before
-                .iter()
-                .map(|(_, kind, payload)| (*kind, payload.as_str())),
-        )?;
-        let source_hash = prepared.manifest.sha256.clone();
-        for artifact in &prepared.artifacts {
-            if artifact.source_hashes() != [source_hash.clone()] {
-                return Err(AppError::Policy("Parquet source linkage is invalid".into()));
-            }
-            if known_artifacts.values().any(|old| {
-                !old.same_generation(artifact)
-                    && old.source_hashes().binary_search(&source_hash).is_ok()
-            }) {
-                return Err(AppError::Fixed(
-                    crate::FixedAppError::PolicyArtifactVersionRequiresMigration,
-                ));
-            }
-            self.store.verify_artifact(id, artifact, cancel)?;
-        }
-        if cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        let mut events = vec![(AuditOrigin::System, source_event.0, source_event.1)];
-        events.extend(mapped.before);
-        let mut new_artifacts = Vec::new();
-        let mut new_paths = BTreeSet::new();
-        for artifact in prepared.artifacts {
-            if let Some(previous) = known_artifacts.get(artifact.path()) {
-                if previous != &artifact {
-                    return Err(AppError::EvidenceMismatch(artifact.path().to_owned()));
-                }
-                continue;
-            }
-            if !new_paths.insert(artifact.path().to_owned()) {
-                return Err(invalid_manifest());
-            }
-            events.push((
-                AuditOrigin::System,
-                artifact.audit_kind(),
-                artifact.encode().map_err(|_| invalid_manifest())?,
-            ));
-            new_artifacts.push(artifact);
-        }
-        events.extend(mapped.after);
-        self.engine.audit_batch(id, &events)?;
-        known_artifacts.extend(
-            new_artifacts
-                .into_iter()
-                .map(|artifact| (artifact.path().to_owned(), artifact)),
-        );
-        Ok(source_hash)
+        })?
+        .ok_or(AppError::Fixed(
+            crate::FixedAppError::PolicyMappedSourceDecoderUnavailable,
+        ))
     }
 }
 

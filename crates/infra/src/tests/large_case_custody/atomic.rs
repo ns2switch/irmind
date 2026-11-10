@@ -11,7 +11,7 @@ fn failed_artifact_insert_rolls_back_the_source_manifest() {
         br#"{"Records":[{"eventTime":"2026-10-28T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123456789012"},{"eventTime":"2026-10-29T12:00:00Z","eventName":"ConsoleLogin","recipientAccountId":"123456789012"}]}"#,
     )
     .unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[79; 32]),
         actor: Actor::Analyst,
@@ -42,14 +42,14 @@ fn failed_artifact_insert_rolls_back_the_source_manifest() {
     external
         .execute_batch(
             "CREATE TRIGGER reject_parquet_for_test BEFORE INSERT ON audit
-         WHEN NEW.kind='ParquetArtifactV1'
+         WHEN NEW.kind='ParquetArtifactV3'
          BEGIN SELECT RAISE(ABORT, 'simulated artifact failure'); END;",
         )
         .unwrap();
     let large = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: &json_source_parser(),
     };
     assert!(
         large
@@ -66,9 +66,7 @@ fn failed_artifact_insert_rolls_back_the_source_manifest() {
     assert!(store.entries(&case.id).unwrap().iter().all(|entry| {
         !matches!(
             entry.kind,
-            AuditEventKind::SourceManifestV1
-                | AuditEventKind::SourceManifestV2
-                | AuditEventKind::ParquetArtifactV1
+            AuditEventKind::SourceManifestV2 | AuditEventKind::ParquetArtifactV3
         )
     }));
     external

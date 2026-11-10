@@ -201,7 +201,7 @@ fn v6_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     let large = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: &JsonParser,
+        parser: &json_source_parser(),
     };
     assert_eq!(large.compact_case(&case.id, &cancel).unwrap(), 3);
     let catalog = irmind_app::artifact_catalog(&store.entries(&case.id).unwrap()).unwrap();

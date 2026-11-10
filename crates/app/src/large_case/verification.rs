@@ -1,6 +1,6 @@
 use super::{
-    AppError, AuditEventKind, BTreeSet, CancellationToken, CaseId, LargeCaseUseCases, Path,
-    SourceCheckMode, SourceCheckReport, read_manifest_index, read_sealed_artifacts, select_sources,
+    AppError, CancellationToken, CaseId, LargeCaseUseCases, Path, SourceCheckMode,
+    SourceCheckReport, read_manifest_index, select_sources,
 };
 
 impl LargeCaseUseCases<'_, '_> {
@@ -54,19 +54,8 @@ impl LargeCaseUseCases<'_, '_> {
         let _case_lock = self.engine.repo.lock_case(id)?;
         self.engine.verify_unlocked_cancelable(id, cancel)?;
         let entries = self.engine.audit_log.entries(id)?;
-        let mut index = read_manifest_index(&entries)?;
-        if self.engine.repo.get_case(id)?.sealed {
-            let seal = self
-                .engine
-                .repo
-                .case_seal(id)?
-                .ok_or(AppError::InvalidChain(0))?;
-            index.artifacts.extend(read_sealed_artifacts(
-                &entries,
-                &self.engine.audit_log.operations(id)?,
-                seal.hash,
-            )?);
-        }
+        let index = read_manifest_index(&entries)?;
+
         for artifact in &index.artifacts {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
@@ -85,20 +74,9 @@ impl LargeCaseUseCases<'_, '_> {
         let _case_lock = self.engine.repo.lock_case(id)?;
         self.engine.verify_unlocked_cancelable(id, cancel)?;
         let entries = self.engine.audit_log.entries(id)?;
-        let mut index = read_manifest_index(&entries)?;
-        if self.engine.repo.get_case(id)?.sealed {
-            let seal = self
-                .engine
-                .repo
-                .case_seal(id)?
-                .ok_or(AppError::InvalidChain(0))?;
-            index.artifacts.extend(read_sealed_artifacts(
-                &entries,
-                &self.engine.audit_log.operations(id)?,
-                seal.hash,
-            )?);
-        }
-        let mut checked = if index.sources.is_empty() {
+        let index = read_manifest_index(&entries)?;
+
+        let checked = if index.sources.is_empty() {
             0
         } else {
             self.store.rebuild_compare(
@@ -110,43 +88,6 @@ impl LargeCaseUseCases<'_, '_> {
                 cancel,
             )?
         };
-        let new_hashes = index
-            .sources
-            .iter()
-            .map(|source| source.sha256.as_str())
-            .collect::<BTreeSet<_>>();
-        let legacy_hashes = entries
-            .iter()
-            .filter(|entry| entry.kind == AuditEventKind::GraphIndexed)
-            .filter_map(|entry| entry.evidence.as_deref())
-            .filter(|hash| !new_hashes.contains(hash))
-            .collect::<BTreeSet<_>>();
-        for hash in legacy_hashes {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            self.require_legacy_parser(hash)?;
-            let bytes = self.engine.evidence_store.get_evidence(id, hash)?;
-            let source = irmind_domain::SourceManifestV1 {
-                source: format!("legacy/{hash}.json"),
-                size: bytes.len() as u64,
-                modified_unix_seconds: None,
-                version: None,
-                provider_checksum: None,
-                sha256: irmind_domain::EvidenceHash::parse(hash)
-                    .map_err(|_| AppError::InvalidChain(0))?,
-                copied: true,
-            };
-            self.store.rebuild_compare(
-                id,
-                source_root,
-                &[source],
-                &index.artifacts,
-                self.parser,
-                cancel,
-            )?;
-            checked += 1;
-        }
         Ok(checked)
     }
 }

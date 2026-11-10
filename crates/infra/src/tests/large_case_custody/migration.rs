@@ -1,158 +1,6 @@
 use super::*;
 
 #[test]
-fn missing_legacy_original_keeps_a_verified_read_only_chain() {
-    let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
-    let signer = Arc::new(LocalSigner {
-        key: SigningKey::from_bytes(&[79u8; 32]),
-        actor: Actor::Analyst,
-    });
-    let parser = Arc::new(JsonParser);
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(
-                signer.clone(),
-                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-            ),
-            Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
-    let id = engine.create_case("Old case", "local").unwrap().id;
-    let bytes = br#"{"eventName":"AssumeRole"}"#;
-    let hash = ingest_historical_fixture(store.as_ref(), signer.as_ref(), &id, bytes, "old.json");
-    fs::remove_file(root.path().join("evidence").join(hash)).unwrap();
-    assert!(engine.verify(&id).is_err());
-    assert_eq!(
-        engine
-            .inspect_signed_chain_only(&id, &CancellationToken::new())
-            .unwrap(),
-        3
-    );
-    assert!(store.graph_summary(&id).is_err());
-    assert!(
-        LargeCaseUseCases {
-            engine: &engine,
-            store: store.as_ref(),
-            parser: parser.as_ref()
-        }
-        .migrate_legacy(&id, &CancellationToken::new())
-        .is_err()
-    );
-}
-
-#[test]
-#[allow(clippy::too_many_lines)]
-fn retired_reader_cannot_reinterpret_open_or_sealed_history_but_exports_still_verify() {
-    for sealed in [false, true] {
-        let root = tempfile::tempdir().unwrap();
-        let store = Arc::new(LocalStore::open(root.path()).unwrap());
-        let signer = Arc::new(LocalSigner {
-            key: SigningKey::from_bytes(&[73; 32]),
-            actor: Actor::Analyst,
-        });
-        let engine = Engine::new(
-            EnginePorts::new(
-                store.clone(),
-                store.clone(),
-                store.clone(),
-                store.clone(),
-                CryptoPorts::new(
-                    signer.clone(),
-                    Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-                ),
-                Arc::new(MandatoryGuard::new().unwrap()),
-                Arc::new(JsonParser),
-            ),
-            ExecutionMode::Attended,
-            Arc::new(SystemClock),
-        )
-        .unwrap();
-        let case = engine
-            .create_case("Legacy authenticated history", "local only")
-            .unwrap();
-        ingest_historical_fixture(store.as_ref(), signer.as_ref(), &case.id, br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin","sourceIPAddress":"203.0.113.9"}"#, "legacy.json");
-        if sealed {
-            engine.seal(&case.id).unwrap();
-        }
-        let before = store.entries(&case.id).unwrap();
-        let warning = irmind_app::parser_extraction_warning(&before)
-            .unwrap()
-            .unwrap();
-        let shown = warning.display(engine.guard.as_ref()).unwrap();
-        assert!(shown.contains("https://github.com/ns2switch/irmind/"));
-        assert!(shown.contains("CHANGELOG.md#known-issue-fixed"));
-        assert!(
-            engine
-                .open_case_verified(&case.id, &CancellationToken::new())
-                .is_ok()
-        );
-        let before_seal = store.case_seal(&case.id).unwrap();
-        let before_operations = store.operations(&case.id).unwrap().len();
-        let large = LargeCaseUseCases {
-            engine: &engine,
-            store: store.as_ref(),
-            parser: &JsonParser,
-        };
-        assert!(
-            large
-                .verify_parquet_rebuild(&case.id, root.path(), &CancellationToken::new())
-                .is_err()
-        );
-        let error = large
-            .migrate_legacy(&case.id, &CancellationToken::new())
-            .unwrap_err();
-        assert!(error.to_string().contains("create a new case"));
-        assert_eq!(
-            store
-                .entries(&case.id)
-                .unwrap()
-                .iter()
-                .map(|e| e.hash)
-                .collect::<Vec<_>>(),
-            before.iter().map(|e| e.hash).collect::<Vec<_>>()
-        );
-        assert_eq!(
-            store.case_seal(&case.id).unwrap().map(|s| s.hash),
-            before_seal.map(|s| s.hash)
-        );
-        assert_eq!(store.operations(&case.id).unwrap().len(), before_operations);
-        assert_eq!(engine.verify(&case.id).unwrap(), before.len());
-        if !sealed {
-            engine.seal(&case.id).unwrap();
-        }
-        let path = root.path().join("legacy.irmind");
-        irmind_app::export_case(
-            &engine,
-            store.as_ref(),
-            &case.id,
-            &path,
-            &CancellationToken::new(),
-        )
-        .unwrap();
-        assert_eq!(
-            verify_export_details(&LocalExportVerifier, &path, None)
-                .unwrap()
-                .format_version,
-            3
-        );
-        let mut tampered = fs::read(&path).unwrap();
-        let last = tampered.len() - 1;
-        tampered[last] ^= 1;
-        fs::write(&path, tampered).unwrap();
-        assert!(verify_export_details(&LocalExportVerifier, &path, None).is_err());
-    }
-}
-
-#[test]
 #[allow(clippy::too_many_lines)]
 fn signed_bundles_replace_base_files_for_queries_and_rebuild_exactly() {
     let root = tempfile::tempdir().unwrap();
@@ -163,7 +11,7 @@ fn signed_bundles_replace_base_files_for_queries_and_rebuild_exactly() {
             "{{\"eventTime\":\"2026-10-28T12:00:00Z\",\"eventName\":\"ConsoleLogin\",\"sourceIPAddress\":\"{ip}\"}}"
         )).unwrap();
     }
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[75u8; 32]),
         actor: Actor::Analyst,
@@ -192,31 +40,34 @@ fn signed_bundles_replace_base_files_for_queries_and_rebuild_exactly() {
     let large = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: &json_source_parser(),
     };
-    large
-        .ingest_local_batch(
-            &case.id,
-            &source_root,
-            &["b.json".into(), "a.json".into()],
-            false,
-            &CancellationToken::new(),
-        )
-        .unwrap();
+    for name in ["a.json", "b.json"] {
+        large
+            .ingest_local(
+                &case.id,
+                &source_root,
+                name,
+                false,
+                &CancellationToken::new(),
+            )
+            .unwrap();
+    }
+    let before = engine.verify(&case.id).unwrap();
     assert_eq!(store.timeline(&case.id, 10).unwrap().len(), 2);
     assert_eq!(
         large
-            .compact_case(&case.id, &CancellationToken::new())
+            .compact_case_with_threshold(&case.id, 2, &CancellationToken::new())
             .unwrap(),
         3
     );
     assert_eq!(
         large
-            .compact_case(&case.id, &CancellationToken::new())
+            .compact_case_with_threshold(&case.id, 2, &CancellationToken::new())
             .unwrap(),
         0
     );
-    assert_eq!(engine.verify(&case.id).unwrap(), 12);
+    assert_eq!(engine.verify(&case.id).unwrap(), before + 6);
     assert_eq!(
         large
             .verify_parquet_rebuild(&case.id, &source_root, &CancellationToken::new())

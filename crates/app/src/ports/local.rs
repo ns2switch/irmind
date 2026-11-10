@@ -387,16 +387,6 @@ pub trait LargeCaseStore: Send + Sync {
         Ok(None)
     }
 
-    fn prepare_artifact_migration(
-        &self,
-        _request: crate::ArtifactMigrationRequest<'_>,
-        _cancel: &CancellationToken,
-    ) -> Result<Box<dyn crate::PreparedArtifactMigration>, AppError> {
-        Err(AppError::Fixed(
-            crate::FixedAppError::PolicyArtifactMigrationUnavailable,
-        ))
-    }
-
     /// Prepare a canonical bounded batch against the verified signed snapshot.
     fn prepare_local_batch(
         &self,

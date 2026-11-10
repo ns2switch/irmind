@@ -44,20 +44,8 @@ pub(super) const COMMANDS: &[Command] = &[
         slash: true,
     },
     Command {
-        name: "rebuild",
-        description: "Rebuild the evidence graph",
-        shortcut: "",
-        slash: true,
-    },
-    Command {
         name: "verify-graph",
         description: "Verify graph; add a source root for Parquet",
-        shortcut: "",
-        slash: true,
-    },
-    Command {
-        name: "migrate",
-        description: "Migrate copied evidence; --v2 [source-root] upgrades open cases",
         shortcut: "",
         slash: true,
     },

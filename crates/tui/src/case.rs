@@ -20,7 +20,6 @@ mod commands;
 mod confirmation;
 mod conversation;
 mod demo_guide;
-mod extraction_warning;
 mod markdown;
 mod operation;
 mod picker;
@@ -123,7 +122,6 @@ fn initial_state(
         operations,
         timeline,
     } = load_case_evidence(engine, id, &mut conversation)?;
-    extraction_warning::append(&mut conversation, engine.guard.as_ref(), &entries)?;
     add_context_hints(
         &mut conversation,
         io_ops.show_hints() && !io_ops.demo_mode(),
@@ -439,21 +437,18 @@ fn run_signed_history_only(
     let case = engine.repo.get_case(id)?;
     let title = engine.guard.screen(&case.title)?.text;
     let entries = engine.audit_log.entries(id)?;
-    let warning = extraction_warning::message(engine.guard.as_ref(), &entries)?.unwrap_or_default();
     let mut offset = 0usize;
     let mut page_rows = 1;
     let mut confirm_exit = false;
     loop {
         terminal.draw(|frame| {
-            let warning_lines = markdown::render(&warning, usize::from(frame.area().width), false);
-            let visible = usize::from(frame.area().height).saturating_sub(5 + warning_lines.len());
+            let visible = usize::from(frame.area().height).saturating_sub(5);
             page_rows = visible.max(1);
             let mut lines = vec![
                 format!("IRMind · Signed history · {title}"),
                 format!("Original evidence unavailable or changed: {reason}"),
                 "Read-only view. Graph queries and case actions are disabled.".into(),
             ];
-            lines.extend(warning_lines.into_iter().map(|line| line.to_string()));
             lines.extend(entries.iter().skip(offset).take(visible).map(|entry| {
                 let hash = irmind_app::hex(&entry.hash);
                 format!(
