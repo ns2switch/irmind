@@ -211,6 +211,10 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         );
     }
     let [hash_time, conversion_time, row_time, parquet_time, _, _] = profile.snapshot();
+    println!(
+        "PARQUET_FINALIZE seconds={:.6}",
+        profile.partition_finalize_time().as_secs_f64()
+    );
     let disk_bytes = directory_bytes(&root.path().join("case/parquet"));
     let coobservation_bytes = measurements::report_storage(
         store.as_ref(),

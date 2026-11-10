@@ -40,7 +40,7 @@ TMPDIR=$(native_path "$scratch/runtime")
 export TMP="$TMPDIR" TEMP="$TMPDIR"
 workload=${WORKER_WORKLOAD:-cloud-files}
 case "$workload" in
-    cloud-files)
+    cloud-files|endpoint-files)
         # The fixed-worker reference needs the same 1 GiB corpus as the candidate.
         python3 - "$scratch/reference/crates/infra/src/tests/parquet_benchmark.rs" <<'PYWORKLOAD'
 from pathlib import Path
@@ -77,6 +77,9 @@ PYWORKLOAD
 esac
 
 export IRMIND_BENCH_SCENARIO=cloud-v2 IRMIND_BENCH_COMMON_EVENT=1
+if [[ "$workload" == endpoint-files ]]; then
+    export IRMIND_BENCH_SCENARIO=endpoint-v2-64-chronological
+fi
 export CARGO_TARGET_DIR
 CARGO_TARGET_DIR=$(native_path "${CARGO_TARGET_DIR:-$root/target}")
 unset IRMIND_HUNTEVAL_ROOT IRMIND_BENCH_WORKERS
@@ -121,8 +124,8 @@ run() {
             tee "worker-sweep-$label.txt"
     fi
 }
-if [[ "$workload" == cloud-files ]]; then
-    run fixed '::parquet_benchmark_1gb' fixed-four
+if [[ "$workload" == *-files ]]; then
+    IRMIND_BENCH_WORKERS=4 run fixed '::parquet_benchmark_1gb' reference-four
     filter='::parquet_worker_benchmark_1gib'
 else
     filter='::benchmark_single_ndjson_release'

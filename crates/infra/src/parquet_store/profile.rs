@@ -8,6 +8,7 @@ pub(crate) struct ParquetProfile {
     conversion: AtomicU64,
     row: AtomicU64,
     parquet: AtomicU64,
+    partition_finalize: AtomicU64,
     query_verify: AtomicU64,
     query_scan: AtomicU64,
     query_normalize: AtomicU64,
@@ -40,6 +41,16 @@ impl ParquetProfile {
     pub(super) fn record_parquet(&self, duration: Duration) {
         self.parquet
             .fetch_add(Self::nanos(duration), Ordering::Relaxed);
+    }
+
+    pub(super) fn record_partition_finalize(&self, duration: Duration) {
+        self.partition_finalize
+            .fetch_add(Self::nanos(duration), Ordering::Relaxed);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn partition_finalize_time(&self) -> Duration {
+        Duration::from_nanos(self.partition_finalize.load(Ordering::Relaxed))
     }
 
     pub(super) fn record_query_verify(&self, duration: Duration) {

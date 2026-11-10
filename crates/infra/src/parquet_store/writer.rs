@@ -295,26 +295,27 @@ impl ArtifactSink {
             .map_err(storage)?;
         file.sync_all().map_err(storage)?;
         let (digest, size) = ParquetStore::hash_reader(&mut file, cancel)?;
+        let manifest = if self.precise {
+            precise::manifest(&self, hash, parser, size, &digest)?
+        } else {
+            ParquetArtifactV1 {
+                path: self.relative_path.clone(),
+                size,
+                sha256: EvidenceHash::parse(&irmind_app::hex(&digest))
+                    .map_err(|_| invalid_source())?,
+                parser_version: parser.version.into(),
+                schema_version: self.kind.schema().into(),
+                partition_date: self.partition.date.clone(),
+                partition_account: self.partition.account.clone(),
+                partition_region: self.partition.region.clone(),
+                source_hashes: vec![hash.clone()],
+            }
+            .into()
+        };
         Ok(StagedArtifact {
             rows: Some(u64::try_from(metadata.file_metadata().num_rows()).map_err(storage)?),
             temporary: self.temporary.take().ok_or_else(invalid_source)?,
-            manifest: if self.precise {
-                precise::manifest(&self, hash, parser, size, &digest)?
-            } else {
-                ParquetArtifactV1 {
-                    path: self.relative_path.clone(),
-                    size,
-                    sha256: EvidenceHash::parse(&irmind_app::hex(&digest))
-                        .map_err(|_| invalid_source())?,
-                    parser_version: parser.version.into(),
-                    schema_version: self.kind.schema().into(),
-                    partition_date: self.partition.date.clone(),
-                    partition_account: self.partition.account.clone(),
-                    partition_region: self.partition.region.clone(),
-                    source_hashes: vec![hash.clone()],
-                }
-                .into()
-            },
+            manifest,
         })
     }
 }

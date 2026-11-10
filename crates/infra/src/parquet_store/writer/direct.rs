@@ -5,6 +5,7 @@ use super::{
     precise, table_batches,
 };
 use crate::parquet_store::partitioning::Allocator;
+mod finalize;
 mod rows;
 use rows::{bounded_rows, stable_rows};
 use std::collections::BTreeSet;
@@ -321,42 +322,45 @@ impl DirectWriting {
     }
     fn close(&mut self, key: &Key, cancel: &CancellationToken) -> Result<(), AppError> {
         if let Some(live) = self.open.remove(key) {
-            let mut output = live.sink.finish_cancelable(
-                &self.hash,
-                irmind_app::ParserIdentity {
-                    name: &self.parser.0,
-                    version: &self.parser.1,
-                },
-                cancel,
-            )?;
-            let ParquetArtifact::V2(core) = &mut output.manifest else {
-                return Err(invalid_source());
-            };
-            core.source_hashes = live.sources.into_iter().collect();
-            if output.rows.is_some_and(|rows| rows > 0) {
-                self.staged.push(output);
-            }
-            if self.staged.len() > 8192 {
-                return Err(invalid_source());
-            }
+            let output = finalize::finish_live(live, &self.hash, self.parser_identity(), cancel)?;
+            self.record_finished(output)?;
         }
         Ok(())
     }
+
+    fn parser_identity(&self) -> irmind_app::ParserIdentity<'_> {
+        irmind_app::ParserIdentity {
+            name: &self.parser.0,
+            version: &self.parser.1,
+        }
+    }
+
+    fn record_finished(&mut self, output: Option<StagedArtifact>) -> Result<(), AppError> {
+        if let Some(output) = output {
+            self.staged.push(output);
+        }
+        if self.staged.len() > 8192 {
+            return Err(invalid_source());
+        }
+        Ok(())
+    }
+
     pub(in crate::parquet_store) fn finish(
         mut self,
         dir: &Path,
+        workers: usize,
         cancel: &CancellationToken,
     ) -> Result<Vec<StagedArtifact>, AppError> {
         self.flush(dir, cancel)?;
         let started = Instant::now();
-        for key in self.open.keys().cloned().collect::<Vec<_>>() {
-            self.close(&key, cancel)?;
-        }
+        self.finish_partitions(workers, cancel)?;
         self.staged
             .sort_by(|a, b| a.manifest.path().cmp(b.manifest.path()));
         self.measure_staging();
         if let Some(profile) = &self.profile {
-            profile.record_parquet(started.elapsed());
+            let elapsed = started.elapsed();
+            profile.record_parquet(elapsed);
+            profile.record_partition_finalize(elapsed);
         }
         Ok(self.staged)
     }
