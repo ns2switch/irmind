@@ -1,4 +1,4 @@
-Traducción de docs/mappings.md en el commit e5d05eba95c43a9856bee26acf4e8e6150866a66; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/mappings.md en el commit f13e53f395e3ada9839b2075773f21e23f2e72bd; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos de mapeo de fuentes
 
@@ -9,6 +9,7 @@ El escritor común es experimental y opcional durante la incorporación de decod
 | Módulo | Entrada | Implementación | Feature de Cargo | Estado |
 | --- | --- | --- | --- | --- |
 | CloudTrail | JSON de CloudTrail mediante `json-source-v1` | TOML incluido, con hash fijado | `mapping-cloudtrail` | Experimental; contratos sintéticos |
+| ECS | NDJSON original mediante `ecs-source-v1` | Validación nativa ECS 9.5 | `mapping-ecs` | Experimental; contratos sintéticos |
 | Compatibilidad JSON genérico | Otros JSON sin `eventVersion` | Nativo, solo extracción | `mapping-json-compat` | Experimental; sin categorías ni roles inferidos |
 | Compatibilidad journald | JSON original de journald | Nativo, solo extracción | `mapping-journald-compat` | Experimental; sin categorías ni roles inferidos |
 | Autenticación Linux | auth.log y secure: sshd, sudo y su | TOML incluido, con hash fijado | `mapping-linux` | Experimental; contratos sintéticos |
@@ -55,3 +56,24 @@ Cinco módulos de mapeo comparten la feature `mapping-linux`. Los módulos sshd,
 - Los estados HTTP 2xx/3xx indican éxito, 4xx/5xx fallo y 1xx resultado desconocido. El marcador original de usuario `-` se conserva y `omit_text` evita convertirlo en identidad. Los logs HTTP no establecen el nombre del servidor: el mapeo no inventa una partición de host.
 
 Las IP, puertos y otros valores tipados inválidos conservan el diagnóstico de valor no soportado y el registro original de la frontera compartida. Los mapeos no deducen resultados a partir de fragmentos arbitrarios del mensaje ni conceden permisos a las herramientas.
+
+
+## Elastic Common Schema
+
+`parser-ecs` conserva los campos JSON originales de ECS mediante `ecs-source-v1`.
+El módulo independiente `mapping-ecs` valida los conjuntos explícitos de categoría
+y tipo, el resultado, las direcciones, los puertos y los demás campos comunes
+admitidos. No infiere clasificaciones del texto de la acción o del mensaje. Las
+etiquetas desconocidas se conservan y generan diagnósticos; un resultado ausente
+queda como desconocido.
+
+Las direcciones de origen y destino mantienen sus roles. Actor y objetivo usan
+los calificadores explícitos de directorio, host y cuenta; sin directorio, su
+identidad queda limitada al registro de origen. Los PID siempre tienen ámbito de
+registro. Los nombres y los identificadores del productor siguen como contexto
+consultable, sin inventar una vida de proceso. Las representaciones anidadas y
+con puntos que discrepen se consideran no admitidas.
+
+La proyección conserva los alias de búsqueda y los atributos originales. El
+mapeo nativo resuelve conjuntos acotados, valores tipados y validación de alias.
+Consulta el [diseño del pipeline ECS](../development/ecs-source-mapping.md).
