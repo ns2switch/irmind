@@ -1,0 +1,170 @@
+{
+  "cloudtrail": {
+    "allocation_reduction_percent": 10.1867335618814,
+    "baseline": {
+      "allocation_calls": 371933729,
+      "attributed_percent": 99.96723045249817,
+      "mapped_median_phases": {
+        "commitment_finalize_seconds": 1.692225306,
+        "conversion_inclusive_seconds": 0.0,
+        "decoder_exclusive_seconds": 14.383527996,
+        "elapsed_seconds": 54.107869871,
+        "hash_seconds": 0.78218514,
+        "mapper_seconds": 12.199936451,
+        "parquet_seconds": 6.848113237,
+        "projection_seconds": 15.092456213,
+        "row_seconds": 3.734652487,
+        "validation_selection_commit_spool_seconds": 2.845485354
+      },
+      "v2_median_seconds": 24.363358774,
+      "v3_median_seconds": 54.107869871,
+      "v3_overhead_percent": 122.08707088754376
+    },
+    "candidate": {
+      "allocation_calls": 334045831,
+      "attributed_percent": 99.96351368923386,
+      "mapped_median_phases": {
+        "commitment_finalize_seconds": 0.128024144,
+        "conversion_inclusive_seconds": 0.0,
+        "decoder_exclusive_seconds": 14.284844397,
+        "elapsed_seconds": 49.725213077,
+        "hash_seconds": 0.781412237,
+        "mapper_seconds": 11.077257978,
+        "parquet_seconds": 6.9245227929999995,
+        "projection_seconds": 13.819662025,
+        "row_seconds": 3.698670967,
+        "validation_selection_commit_spool_seconds": 2.787209104
+      },
+      "v2_median_seconds": 23.946703919,
+      "v3_median_seconds": 49.725213077,
+      "v3_overhead_percent": 107.64950886433513
+    },
+    "v3_improvement_percent": 8.099850917156425
+  },
+  "ecs": {
+    "allocation_reduction_percent": 14.625743733066066,
+    "baseline": {
+      "allocation_calls": 368008547,
+      "attributed_percent": 99.9830810994724,
+      "mapped_median_phases": {
+        "commitment_finalize_seconds": 2.034238823,
+        "conversion_inclusive_seconds": 0.0,
+        "decoder_exclusive_seconds": 6.762438998,
+        "elapsed_seconds": 55.256287078,
+        "hash_seconds": 0.777683246,
+        "mapper_seconds": 21.970689843,
+        "parquet_seconds": 6.046718099,
+        "projection_seconds": 13.340510849,
+        "row_seconds": 2.967561837,
+        "validation_selection_commit_spool_seconds": 3.057595511
+      },
+      "v2_median_seconds": 40.132863986,
+      "v3_median_seconds": 55.256287078,
+      "v3_overhead_percent": 37.683388599616706
+    },
+    "candidate": {
+      "allocation_calls": 314184560,
+      "attributed_percent": 99.98018266715589,
+      "mapped_median_phases": {
+        "commitment_finalize_seconds": 0.15258891,
+        "conversion_inclusive_seconds": 0.0,
+        "decoder_exclusive_seconds": 6.501393678,
+        "elapsed_seconds": 50.471405512,
+        "hash_seconds": 0.784506034,
+        "mapper_seconds": 20.85864852,
+        "parquet_seconds": 5.839304229,
+        "projection_seconds": 12.257823151,
+        "row_seconds": 2.874190922,
+        "validation_selection_commit_spool_seconds": 2.860051141
+      },
+      "v2_median_seconds": 39.942430465,
+      "v3_median_seconds": 50.471405512,
+      "v3_overhead_percent": 26.36037648291365
+    },
+    "v3_improvement_percent": 8.659433738726685
+  },
+  "evtx": {
+    "allocation_reduction_percent": 7.222880895366557,
+    "baseline": {
+      "allocation_calls": 171033237,
+      "attributed_percent": 99.6649165916213,
+      "mapped_median_phases": {
+        "commitment_finalize_seconds": 0.620657317,
+        "conversion_inclusive_seconds": 0.0,
+        "decoder_exclusive_seconds": 6.634279287,
+        "elapsed_seconds": 28.549688095,
+        "hash_seconds": 0.74901216,
+        "mapper_seconds": 3.631462708,
+        "parquet_seconds": 16.14245734,
+        "projection_seconds": 8.100792825,
+        "row_seconds": 4.449658144,
+        "validation_selection_commit_spool_seconds": 1.9393937239999999
+      },
+      "v2_median_seconds": 17.718233536,
+      "v3_median_seconds": 28.549688095,
+      "v3_overhead_percent": 61.13168413201346
+    },
+    "candidate": {
+      "allocation_calls": 158679710,
+      "attributed_percent": 99.63882527892193,
+      "mapped_median_phases": {
+        "commitment_finalize_seconds": 0.048090026,
+        "conversion_inclusive_seconds": 0.0,
+        "decoder_exclusive_seconds": 6.587808508,
+        "elapsed_seconds": 27.460707562,
+        "hash_seconds": 0.748491146,
+        "mapper_seconds": 3.379853771,
+        "parquet_seconds": 15.930873392,
+        "projection_seconds": 7.800602469,
+        "row_seconds": 4.41472836,
+        "validation_selection_commit_spool_seconds": 1.930274893
+      },
+      "v2_median_seconds": 17.741440766,
+      "v3_median_seconds": 27.460707562,
+      "v3_overhead_percent": 54.78284951144536
+    },
+    "v3_improvement_percent": 3.814334256039442
+  },
+  "linux": {
+    "allocation_reduction_percent": 2.392656297642759,
+    "baseline": {
+      "allocation_calls": 160560211,
+      "attributed_percent": 99.953182672387,
+      "mapped_median_phases": {
+        "commitment_finalize_seconds": 2.139916613,
+        "conversion_inclusive_seconds": 0.0,
+        "decoder_exclusive_seconds": 8.332386253,
+        "elapsed_seconds": 31.692487135,
+        "hash_seconds": 0.787605737,
+        "mapper_seconds": 4.852911877,
+        "parquet_seconds": 5.490660324,
+        "projection_seconds": 6.011885917,
+        "row_seconds": 3.480471713,
+        "validation_selection_commit_spool_seconds": 3.305171363
+      },
+      "v2_median_seconds": 32.650382725,
+      "v3_median_seconds": 31.692487135,
+      "v3_overhead_percent": -2.933795900856473
+    },
+    "candidate": {
+      "allocation_calls": 156718557,
+      "attributed_percent": 99.95203503564673,
+      "mapped_median_phases": {
+        "commitment_finalize_seconds": 0.16031201,
+        "conversion_inclusive_seconds": 0.0,
+        "decoder_exclusive_seconds": 8.664809603,
+        "elapsed_seconds": 29.035620827,
+        "hash_seconds": 0.786064446,
+        "mapper_seconds": 4.762127212,
+        "parquet_seconds": 5.520883652,
+        "projection_seconds": 5.139020345,
+        "row_seconds": 3.359217215,
+        "validation_selection_commit_spool_seconds": 3.199548431
+      },
+      "v2_median_seconds": 32.633044802,
+      "v3_median_seconds": 29.035620827,
+      "v3_overhead_percent": -11.023868587277896
+    },
+    "v3_improvement_percent": 8.383268554097977
+  }
+}
