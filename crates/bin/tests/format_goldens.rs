@@ -581,4 +581,3 @@ fn ocsf_source_and_projection_bytes_are_independent_of_json_map_features() {
 #[cfg(feature = "mapping-dfir")]
 #[path = "support/dfir_source_goldens.rs"]
 mod dfir_source_goldens;
-
