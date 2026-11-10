@@ -30,7 +30,7 @@ impl irmind_app::Signer for FixtureSigner {
 #[cfg(feature = "parser-json")]
 fn synthetic_export_v4(path: &std::path::Path) -> String {
     use irmind_app::{
-        CancellationToken, CryptoPorts, Engine, EnginePorts, LargeCaseUseCases, export_case_v4,
+        CancellationToken, CryptoPorts, Engine, EnginePorts, LargeCaseUseCases, export_case_v6,
     };
     use irmind_domain::ExecutionMode;
     use irmind_infra::{LocalStore, LocalVerifier, SystemClock};

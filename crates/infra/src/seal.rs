@@ -1,23 +1,9 @@
-use crate::*;
-
-pub(crate) const MAX_EXPORT_BYTES: usize = 128 * 1024 * 1024;
-
-#[derive(Deserialize, Serialize)]
-pub(crate) struct ExportBundle {
-    version: u32,
-    case_id: String,
-    title: String,
-    #[serde(default = "default_export_severity")]
-    severity: String,
-    scope: String,
-    audit: Vec<SignedEntry>,
-    seal: CaseSeal,
-    evidence: std::collections::BTreeMap<String, String>,
-}
-
-fn default_export_severity() -> String {
-    "medium".into()
-}
+use crate::{
+    Actor, AppError, AuditLog, CancellationToken, CaseExporter, CaseId, CaseSeal, EvidenceStore,
+    ExportVerifier, LocalStore, LocalVerifier, OpenOptions, OptionalExtension, Path, Repository,
+    Severity, Write, fs, hex, json, params, private_file, seal_challenge, sha256, storage,
+    storage_reason, verify_case_metadata, verify_signature,
+};
 
 mod artifact_frames;
 mod export;
@@ -26,5 +12,6 @@ mod frames;
 mod local;
 mod mapping_proofs;
 mod parquet_frame;
+mod read;
 mod verify_current;
 pub use export::{LocalExportVerifier, verify_export, verify_export_expected};

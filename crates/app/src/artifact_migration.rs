@@ -27,19 +27,11 @@ pub struct ArtifactCatalog {
     pub active: Vec<irmind_domain::ParquetArtifact>,
 }
 
+#[derive(Default)]
 pub struct ArtifactCatalogBuilder {
     mapped: irmind_domain::MappingLineageV1,
     names: std::collections::BTreeSet<String>,
     artifact_order: Vec<String>,
-}
-impl Default for ArtifactCatalogBuilder {
-    fn default() -> Self {
-        Self {
-            mapped: irmind_domain::MappingLineageV1::default(),
-            names: std::collections::BTreeSet::new(),
-            artifact_order: Vec::new(),
-        }
-    }
 }
 impl ArtifactCatalogBuilder {
     pub fn accept(&mut self, entry: &SignedEntry) -> Result<(), AppError> {

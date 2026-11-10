@@ -170,10 +170,10 @@ impl LocalStore {
             }
             write_frame(&mut out, &serde_json::to_vec(&operation).map_err(storage)?)?;
         }
-        if header.version >= 6 {
+        {
             super::mapping_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
         }
-        if header.version >= 5 {
+        {
             self.write_artifact_frames(id, &mut out, cancel)?;
         }
         out.sync_all().map_err(storage)?;
