@@ -1,0 +1,21 @@
+{
+  "allocation_calls": {
+    "commitment_finalization": 8,
+    "common_validation_serialization": 56940912,
+    "decode": 44418008,
+    "hash_read": 31,
+    "mapping": 93997696,
+    "outside_or_unattributed": 62201,
+    "parquet_write": 12849622,
+    "partition_sort": 18987207,
+    "signed_custody": 753,
+    "source_validation_commitment": 22595607,
+    "writer_projection": 65979152
+  },
+  "attributed_calls": 315768996,
+  "heaptrack_version": "heaptrack 1.5.0",
+  "method": "Heaptrack calls to allocation functions; exclusive deepest recognized stack frame. Other calls remain explicit. Timing comes from separate uninstrumented runs.",
+  "revision": "585a8c12e691679298023b760d577c2493e18295",
+  "source": "ocsf",
+  "total_allocation_calls": 315831197
+}
