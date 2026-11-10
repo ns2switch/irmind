@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 255627db6840ca2e3fabc42f288155edb397c2c7; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 1b32bb82a153516f0edc8cff48d1812f169b1368; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -102,6 +102,7 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | VirusTotal | enriquecimiento externo | `ti-virustotal` | experimental | [Módulos](docs/es/modules.md) |
 | Parser JSON y logs de nube exportados | parser local | `parser-json` (por defecto) | experimental | [Módulos](docs/es/modules.md) |
 | Mapeo de eventos comunes de CloudTrail | mapeo local | `mapping-cloudtrail` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
+| Mapeo de eventos comunes Windows | mapeo local | `mapping-evtx` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md#registro-de-eventos-de-windows) |
 | Mapeo de eventos comunes ECS | mapeo local | `mapping-ecs` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
 | Parser de Elastic Common Schema | parser local | `parser-ecs` (por defecto) | experimental | [ECS](docs/es/modules.md#parser-de-elastic-common-schema) |
 | Parser de OCSF JSON y Parquet | parser local | `parser-ocsf` (por defecto) | experimental | [OCSF](docs/es/modules.md#parser-de-ocsf) |
