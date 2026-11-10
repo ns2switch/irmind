@@ -2,8 +2,7 @@ use super::{
     AppError, AuditEventKind, BTreeMap, BTreeSet, EvidenceHash, ManifestIndex, ParquetArtifact,
     SourceCheckMode, SourceManifestV1, sha256,
 };
-use crate::SignedOperation;
-use irmind_domain::{Actor, SealedParquetMigrationV1, SourceManifestV2};
+use irmind_domain::SourceManifestV2;
 
 pub(crate) fn read_manifest_index(
     entries: &[crate::SignedEntry],
@@ -17,27 +16,6 @@ pub(crate) fn read_manifest_index(
     let mut parser_selections = BTreeMap::new();
     for entry in entries {
         match entry.kind {
-            AuditEventKind::EvidenceIngested | AuditEventKind::GraphIndexed => {
-                let hash = entry
-                    .evidence
-                    .as_deref()
-                    .ok_or(AppError::InvalidChain(entry.seq))?;
-                source_hashes.insert(
-                    EvidenceHash::parse(hash).map_err(|_| AppError::InvalidChain(entry.seq))?,
-                );
-            }
-            AuditEventKind::SourceManifestV1 => {
-                if entry.evidence.is_some() {
-                    return Err(AppError::InvalidChain(entry.seq));
-                }
-                let source = SourceManifestV1::decode(&entry.payload)
-                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                if !source_names.insert(source.source.clone()) {
-                    return Err(AppError::InvalidChain(entry.seq));
-                }
-                source_hashes.insert(source.sha256.clone());
-                sources.push(source);
-            }
             AuditEventKind::SourceManifestV2 => {
                 record_parser_manifest(
                     entry,
@@ -47,9 +25,7 @@ pub(crate) fn read_manifest_index(
                     &mut parser_selections,
                 )?;
             }
-            AuditEventKind::ParquetArtifactV1
-            | AuditEventKind::ParquetArtifactV2
-            | AuditEventKind::ParquetArtifactV3 => {
+            AuditEventKind::ParquetArtifactV3 => {
                 if entry.evidence.is_some() {
                     return Err(AppError::InvalidChain(entry.seq));
                 }
@@ -131,43 +107,6 @@ fn record_parser_manifest(
     source_hashes.insert(source.sha256.clone());
     sources.push(source.clone());
     Ok(())
-}
-
-pub(crate) fn read_sealed_artifacts(
-    entries: &[crate::SignedEntry],
-    operations: &[SignedOperation],
-    seal_hash: [u8; 32],
-) -> Result<Vec<ParquetArtifact>, AppError> {
-    let legacy = entries
-        .iter()
-        .filter(|entry| entry.kind == AuditEventKind::GraphIndexed)
-        .filter_map(|entry| entry.evidence.as_deref())
-        .map(EvidenceHash::parse)
-        .collect::<Result<BTreeSet<_>, _>>()
-        .map_err(|_| AppError::InvalidChain(0))?;
-    let mut paths = read_manifest_index(entries)?
-        .artifacts
-        .into_iter()
-        .map(|artifact| artifact.path().to_owned())
-        .collect::<BTreeSet<_>>();
-    let mut artifacts = Vec::new();
-    for operation in operations {
-        let Some(record) = SealedParquetMigrationV1::decode(&operation.operation)
-            .map_err(|_| AppError::InvalidChain(operation.seq))?
-        else {
-            continue;
-        };
-        if operation.actor != Actor::Analyst
-            || record.seal_hash != seal_hash
-            || record.artifact.source_hashes.len() != 1
-            || !legacy.contains(&record.artifact.source_hashes[0])
-            || !paths.insert(record.artifact.path.clone())
-        {
-            return Err(AppError::InvalidChain(operation.seq));
-        }
-        artifacts.push(record.artifact.into());
-    }
-    Ok(artifacts)
 }
 
 pub(super) fn select_sources(

@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn scoped_edr_read_is_audited_indexed_and_redacted() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[58u8; 32]),
         actor: Actor::Analyst,
@@ -112,7 +112,7 @@ fn cloud_identity_uses_scoped_read_port() {
         }
     }
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[55u8; 32]),
         actor: Actor::Analyst,
@@ -203,7 +203,7 @@ fn malicious_siem_record_cannot_dispatch_external_intel() {
         }
     }
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[46u8; 32]),
         actor: Actor::Analyst,

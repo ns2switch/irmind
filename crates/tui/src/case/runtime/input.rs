@@ -511,9 +511,9 @@ impl CaseRuntime<'_, '_, '_> {
             if self.state.confirmation_option == 1 {
                 self.state.input = match &pending {
                     Confirmation::Seal(_, _) => "/seal".into(),
-                    Confirmation::Export(command, _)
-                    | Confirmation::ObjectRead(command, _)
-                    | Confirmation::Migration(command, _) => command.clone(),
+                    Confirmation::Export(command, _) | Confirmation::ObjectRead(command, _) => {
+                        command.clone()
+                    }
                 };
                 self.state.confirmed_action = Some(pending);
                 return Ok(Some(KeyCode::Enter));

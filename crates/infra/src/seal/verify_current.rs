@@ -126,7 +126,7 @@ fn verify_evidence_blobs(input: &mut File, chain: &mut ChainState) -> Result<(),
         verify_raw(input, size, &hash)?;
     }
     let last = chain.last.as_ref().ok_or(AppError::InvalidChain(0))?;
-    let matches = if chain.inventory.has_v2() {
+    let matches = if chain.inventory.has_mapped_artifacts() {
         for hash in &evidence_hashes {
             chain.inventory.add_evidence(hash)?;
         }

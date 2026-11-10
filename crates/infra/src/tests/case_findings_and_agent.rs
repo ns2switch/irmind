@@ -4,7 +4,7 @@ use super::*;
 #[allow(clippy::too_many_lines)]
 fn agent_can_propose_but_only_analyst_can_confirm_evidence_finding() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let analyst_key = SigningKey::from_bytes(&[56u8; 32]);
     let agent_key = SigningKey::from_bytes(&[57u8; 32]);
     let analyst = Arc::new(TestSigner {
@@ -63,7 +63,6 @@ fn agent_can_propose_but_only_analyst_can_confirm_evidence_finding() {
     let hash = ingest_synthetic(
         &attended,
         store.as_ref(),
-        parser.as_ref(),
         &case.id,
         br#"{"eventName":"Alert","sourceIPAddress":"198.51.100.9"}"#,
         "alert.json",
@@ -115,7 +114,7 @@ fn agent_can_propose_but_only_analyst_can_confirm_evidence_finding() {
 #[test]
 fn raw_record_pointer_selects_one_event_from_cloud_response() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[55u8; 32]),
         actor: Actor::Analyst,
@@ -144,7 +143,6 @@ fn raw_record_pointer_selects_one_event_from_cloud_response() {
     let hash = ingest_synthetic(
         &engine,
         store.as_ref(),
-        parser.as_ref(),
         &case.id,
         bytes,
         "cloud-response.json",
@@ -158,7 +156,7 @@ fn raw_record_pointer_selects_one_event_from_cloud_response() {
 #[test]
 fn failed_local_tool_call_has_signed_error_event() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[59u8; 32]),
         actor: Actor::Analyst,
@@ -199,7 +197,7 @@ fn failed_local_tool_call_has_signed_error_event() {
 #[test]
 fn tool_call_quota_ends_with_a_no_tool_summary() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[42u8; 32]),
         actor: Actor::Analyst,
@@ -262,7 +260,7 @@ fn tool_call_quota_ends_with_a_no_tool_summary() {
 #[test]
 fn signed_model_usage_stops_case_before_followup_tool_dispatch() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[44u8; 32]),
         actor: Actor::Analyst,
@@ -347,7 +345,7 @@ fn signed_approval_executes_external_port_once_and_screens_next_context() {
         }
     }
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[43u8; 32]),
         actor: Actor::Analyst,

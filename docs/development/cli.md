@@ -27,8 +27,6 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 | `irmind case show <CASE_ID>` | Show case details. |
 | `irmind case scope <CASE_ID> <SCOPE>` | Sign a new scope. |
 | `irmind ingest <CASE_ID> <PATH> [--copy-original]` | Hash originals in place and index JSON as Parquet. Copy originals only when requested. Symlinks are rejected. |
-| `irmind migrate <CASE_ID>` | Verify an open legacy case, convert copied indexed JSON to signed Parquet artifacts, and verify again. |
-| `irmind migrate <CASE_ID> --artifact-v2 [--source-root <PATH>]` | Explicitly upgrade an open case after source and artifact verification; retain the original signed generation. See [case migration](case-migration.md). |
 | `irmind evidence <CASE_ID> <HASH> [--output <PATH>]` | Display or save original evidence. |
 | `irmind findings <CASE_ID>` | List proposed and confirmed findings. |
 | `irmind add-finding <CASE_ID> <KIND> <VALUE> <EVIDENCE_HASH>` | Propose a finding. |
@@ -52,7 +50,6 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 | Command | Purpose |
 | --- | --- |
 | `irmind graph <CASE_ID>` | Show the case graph summary. |
-| `irmind graph-rebuild <CASE_ID>` | Compatibility alias for `migrate`: convert copied originals into signed Parquet. Use `verify-graph` to rebuild and compare artifacts. |
 | `irmind verify-graph <CASE_ID> [--source-root <PATH>]` | Rebuild and compare Parquet with originals, or verify a legacy graph. |
 | `irmind timeline <CASE_ID>` | List timeline events. |
 | `irmind entity <CASE_ID> <KIND> <VALUE>` | Look up an entity. |
@@ -62,7 +59,7 @@ For automation, the scope argument uses `v2;sources=...;accounts=...;projects=..
 | `irmind text-search <CASE_ID> <QUERY> [--limit <N>]` | Search indexed text. |
 | `irmind raw-records <CASE_ID> <HASH> <INDEX>` | Read one source record. |
 
-The timeline, entity, neighbors, entity-timeline, graph-path, and text-search commands accept optional `--from <UTC> --to <UTC>`, `--account <ID>` or `--project <ID>`, and `--region <NAME>`. The UTC bounds must be paired. A filtered query requires a fully migrated Parquet case and must stay within its case scope. Unfiltered calls retain the legacy graph behavior. Neighbor counts over more than 4,096 matching records are explicitly marked as partial.
+The timeline, entity, neighbors, entity-timeline, graph-path, and text-search commands accept optional `--from <UTC> --to <UTC>`, `--account <ID>` or `--project <ID>`, and `--region <NAME>`. The UTC bounds must be paired. Filtered queries must stay within their case scope and the organization ceiling. Neighbor counts over more than 4,096 matching records are explicitly marked as partial.
 
 ## Custody
 

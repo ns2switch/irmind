@@ -275,7 +275,7 @@ impl irmind_app::Clock for ZeroClock {
 fn installed_catalog() -> (Arc<MappingCatalog>, SignedOperation) {
     use irmind_mod_mapping_tables::TableMapping;
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[43; 32]),
         actor: Actor::Analyst,

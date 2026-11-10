@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       worker_sweep:
-        description: Measure adaptive workers and the fixed-worker reference on one Linux runner
+        description: Compare current mapped writer worker settings on one runner
         type: boolean
         default: false
       worker_workload:
@@ -11,56 +11,10 @@ on:
         type: choice
         default: cloud-files
         options: [cloud-files, endpoint-files, endpoint-disorder, ndjson-1gib, ndjson-4gib]
-
-      current_v3:
-        description: Run the current mapped writer against the nine absolute 15 GB targets
-        type: boolean
-        default: false
-      pipeline_profile:
-        description: Profile the production pipeline and allocation calls against a pinned baseline
-        type: boolean
-        default: false
-      profile_source:
-        description: Production profile source
-        type: choice
-        default: all
-        options: [all, ocsf]
-      profile_base:
-        description: Profiling-only baseline commit for the production pipeline
-        type: string
-        default: ""
       compare_base:
-        description: Optional 40-character baseline commit for paired release measurements
+        description: Full reference commit for the paired worker sweep
         type: string
         default: ""
-      common_schema:
-        description: Compare the source decoder and mapping pipeline with the pinned baseline
-        type: boolean
-        default: false
-      mapped_candidate:
-        description: Enable mapped V3 for the candidate; false checks unchanged default V2
-        type: boolean
-        default: true
-      direct_write:
-        description: Compare V2 reference, preceding mapped V3 and direct V3 in the same runner
-        type: boolean
-        default: false
-      scenario:
-        description: Release benchmark workload
-        type: choice
-        default: all
-        options:
-          - all
-          - cloud-v1
-          - cloud-v2
-          - endpoint-v1-1
-          - endpoint-v1-64
-          - endpoint-v1-1024
-          - endpoint-v1-1025
-          - endpoint-v2-1
-          - endpoint-v2-64
-          - endpoint-v2-1024
-          - endpoint-v2-1025
   schedule:
     - cron: '31 4 * * 1'
 permissions:
@@ -73,198 +27,8 @@ env:
   RUSTFLAGS: -C link-arg=-fuse-ld=mold
   HUNTEVAL_COMMIT: 4cbb555a56bc17cb03b988ad2f15b1374eecf183
 jobs:
-  graph_benchmark:
-    if: ${{ !inputs.current_v3 && !inputs.worker_sweep && !inputs.pipeline_profile && !inputs.compare_base && !inputs.common_schema }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with: {persist-credentials: false}
-      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with: {key: graph-benchmark-linux}
-      - run: sudo apt-get update && sudo apt-get install -y mold
-      - name: Fetch and verify pinned HuntEval public sources and private answers
-        shell: bash
-        run: |
-          set -euo pipefail
-          dataset_root=$(mktemp -d "$RUNNER_TEMP/hunteval.XXXXXXXX")
-          trap 'rm -rf "$dataset_root"' ERR
-          git -C "$dataset_root" init -q
-          git -C "$dataset_root" remote add origin https://github.com/ns2switch/HuntEval.git
-          git -C "$dataset_root" fetch -q --depth 1 origin "$HUNTEVAL_COMMIT"
-          git -C "$dataset_root" checkout -q --detach FETCH_HEAD
-          test "$(git -C "$dataset_root" rev-parse HEAD)" = "$HUNTEVAL_COMMIT"
-          (cd "$dataset_root" && sha256sum -c "$GITHUB_WORKSPACE/scripts/hunteval.sha256")
-          echo "IRMIND_HUNTEVAL_ROOT=$dataset_root" >> "$GITHUB_ENV"
-      - name: Evaluate all 18 HuntEval episodes without a model
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo test -p irmind-infra hunteval_reference_corpus --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee benchmark-results.txt
-      - name: Compare V1 and V2 CloudTrail and endpoint Parquet in release mode
-        shell: bash
-        env:
-          BENCH_SCENARIO: ${{ inputs.scenario || 'all' }}
-        run: |
-          set -euo pipefail
-          failed=0
-          for version in v1 v2; do
-            export IRMIND_BENCH_SCENARIO="cloud-$version"
-            if [[ "$BENCH_SCENARIO" == all || "$BENCH_SCENARIO" == "$IRMIND_BENCH_SCENARIO" ]]; then
-              if ! cargo test -p irmind-infra parquet_benchmark_ --release --locked -- --ignored --nocapture --test-threads 1 --skip parquet_benchmark_50mb 2>&1 | tee -a benchmark-results.txt; then
-                failed=1
-              fi
-            fi
-            for hosts in 1 64 1024 1025; do
-              export IRMIND_BENCH_SCENARIO="endpoint-$version-$hosts"
-              if [[ "$BENCH_SCENARIO" == all || "$BENCH_SCENARIO" == "$IRMIND_BENCH_SCENARIO" ]]; then
-                if ! cargo test -p irmind-infra parquet_benchmark_15gb --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee -a benchmark-results.txt; then
-                  failed=1
-                fi
-              fi
-            done
-          done
-          exit "$failed"
-      - name: Measure warm build and binary size
-        if: ${{ !cancelled() }}
-        shell: bash
-        run: |
-          set -o pipefail
-          started=$(date +%s)
-          cargo test -p irmind-infra --release --locked --no-run 2>&1 | tee -a benchmark-results.txt
-          echo "BUILD_HOT_SECONDS=$(($(date +%s) - started))" | tee -a benchmark-results.txt
-          started=$(date +%s)
-          cargo build -p irmind --release --locked 2>&1 | tee -a benchmark-results.txt
-          echo "BINARY_BUILD_SECONDS=$(($(date +%s) - started))" | tee -a benchmark-results.txt
-          stat -c 'BINARY_BYTES=%s' target/release/irmind | tee -a benchmark-results.txt
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
-        with:
-          name: graph-benchmark-results
-          path: benchmark-results.txt
-          if-no-files-found: warn
-      - name: Remove downloaded HuntEval files
-        if: always()
-        shell: bash
-        run: |
-          if [[ -n "${IRMIND_HUNTEVAL_ROOT:-}" && "$IRMIND_HUNTEVAL_ROOT" == "$RUNNER_TEMP"/hunteval.* ]]; then
-            rm -rf -- "$IRMIND_HUNTEVAL_ROOT"
-          fi
-
-  paired_v2:
-    if: ${{ !inputs.current_v3 && !inputs.worker_sweep && !inputs.pipeline_profile && inputs.compare_base != '' && !inputs.common_schema }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        scenario: [cloud-v2, endpoint-v2-1, endpoint-v2-64, endpoint-v2-1024, endpoint-v2-1025, endpoint-v2-1-chronological, endpoint-v2-64-chronological, endpoint-v2-1024-chronological, endpoint-v2-1025-chronological, cloud-v1, endpoint-v1-1, endpoint-v1-64, endpoint-v1-1024, endpoint-v1-1025, endpoint-v1-1-chronological, endpoint-v1-64-chronological, endpoint-v1-1024-chronological, endpoint-v1-1025-chronological]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with: {persist-credentials: false, fetch-depth: 0}
-      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with:
-          key: graph-benchmark-linux
-          save-if: ${{ github.ref_name == 'main' }}
-      - run: sudo apt-get update && sudo apt-get install -y mold
-      - name: Fetch and verify pinned HuntEval public sources and private answers
-        shell: bash
-        run: |
-          set -euo pipefail
-          dataset_root=$(mktemp -d "$RUNNER_TEMP/hunteval.XXXXXXXX")
-          trap 'rm -rf "$dataset_root"' ERR
-          git -C "$dataset_root" init -q
-          git -C "$dataset_root" remote add origin https://github.com/ns2switch/HuntEval.git
-          git -C "$dataset_root" fetch -q --depth 1 origin "$HUNTEVAL_COMMIT"
-          git -C "$dataset_root" checkout -q --detach FETCH_HEAD
-          test "$(git -C "$dataset_root" rev-parse HEAD)" = "$HUNTEVAL_COMMIT"
-          (cd "$dataset_root" && sha256sum -c "$GITHUB_WORKSPACE/scripts/hunteval.sha256")
-          echo "IRMIND_HUNTEVAL_ROOT=$dataset_root" >> "$GITHUB_ENV"
-      - name: Compare the baseline and candidate in the same runner
-        shell: bash
-        env:
-          BASE_REF: ${{ inputs.compare_base }}
-          IRMIND_BENCH_SCENARIO: ${{ matrix.scenario }}
-        run: bash .github/scripts/benchmark_parquet_pair.sh
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
-        with:
-          name: parquet-pair-${{ matrix.scenario }}
-          path: benchmark-pair-*.txt
-          if-no-files-found: warn
-      - name: Remove downloaded HuntEval files
-        if: always()
-        shell: bash
-        run: |
-          if [[ -n "${IRMIND_HUNTEVAL_ROOT:-}" && "$IRMIND_HUNTEVAL_ROOT" == "$RUNNER_TEMP"/hunteval.* ]]; then
-            rm -rf -- "$IRMIND_HUNTEVAL_ROOT"
-          fi
-
-  common_schema:
-    if: ${{ !inputs.current_v3 && !inputs.worker_sweep && !inputs.pipeline_profile && inputs.common_schema && inputs.compare_base != '' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        scenario: [cloud-v2, endpoint-v2-1, endpoint-v2-64, endpoint-v2-1024, endpoint-v2-1025, endpoint-v2-1-chronological, endpoint-v2-64-chronological, endpoint-v2-1024-chronological, endpoint-v2-1025-chronological]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with: {persist-credentials: false, fetch-depth: 0}
-      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with:
-          key: common-schema-benchmark-linux
-          save-if: ${{ github.ref_name == 'main' }}
-      - run: sudo apt-get update && sudo apt-get install -y mold
-      - name: Fetch and verify pinned HuntEval public sources and private answers
-        shell: bash
-        run: |
-          set -euo pipefail
-          dataset_root=$(mktemp -d "$RUNNER_TEMP/hunteval.XXXXXXXX")
-          trap 'rm -rf "$dataset_root"' ERR
-          git -C "$dataset_root" init -q
-          git -C "$dataset_root" remote add origin https://github.com/ns2switch/HuntEval.git
-          git -C "$dataset_root" fetch -q --depth 1 origin "$HUNTEVAL_COMMIT"
-          git -C "$dataset_root" checkout -q --detach FETCH_HEAD
-          test "$(git -C "$dataset_root" rev-parse HEAD)" = "$HUNTEVAL_COMMIT"
-          (cd "$dataset_root" && sha256sum -c "$GITHUB_WORKSPACE/scripts/hunteval.sha256")
-          echo "IRMIND_HUNTEVAL_ROOT=$dataset_root" >> "$GITHUB_ENV"
-      - name: Compare release schemas on the same runner
-        env:
-          DIRECT_WRITE: ${{ inputs.direct_write }}
-          MAPPED_CANDIDATE: ${{ inputs.mapped_candidate }}
-          BASE_REF: ${{ inputs.compare_base }}
-          IRMIND_BENCH_SCENARIO: ${{ matrix.scenario }}
-        run: bash .github/scripts/benchmark_common_schema.sh
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
-        with:
-          name: common-schema-${{ matrix.scenario }}
-          path: common-schema-*.txt
-          if-no-files-found: warn
-      - name: Remove downloaded HuntEval files
-        if: always()
-        shell: bash
-        run: |
-          if [[ -n "${IRMIND_HUNTEVAL_ROOT:-}" && "$IRMIND_HUNTEVAL_ROOT" == "$RUNNER_TEMP"/hunteval.* ]]; then
-            rm -rf -- "$IRMIND_HUNTEVAL_ROOT"
-          fi
-
-  source_pipeline_profile:
-    if: ${{ !inputs.current_v3 && !inputs.worker_sweep && inputs.pipeline_profile }}
-    uses: ./.github/workflows/source-pipeline-profile.yml
-    with:
-      baseline: ${{ inputs.profile_base }}
-      source: ${{ inputs.profile_source || 'all' }}
-
-
   worker_sweep:
-    if: ${{ !inputs.current_v3 && inputs.worker_sweep }}
+    if: ${{ inputs.worker_sweep }}
     runs-on: ${{ inputs.worker_workload == 'ndjson-4gib' && 'windows-latest' || 'ubuntu-24.04' }}
     timeout-minutes: 90
     env:
@@ -297,16 +61,15 @@ jobs:
           if-no-files-found: warn
 
   current_v3:
-    if: ${{ inputs.current_v3 }}
+    if: ${{ !inputs.worker_sweep }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
       fail-fast: false
       max-parallel: 3
       matrix:
-        scenario: [cloud-v2, endpoint-v2-1, endpoint-v2-64, endpoint-v2-1024, endpoint-v2-1025, endpoint-v2-1-chronological, endpoint-v2-64-chronological, endpoint-v2-1024-chronological, endpoint-v2-1025-chronological]
+        scenario: [cloud, endpoint-1, endpoint-64, endpoint-1024, endpoint-1025, endpoint-1-chronological, endpoint-64-chronological, endpoint-1024-chronological, endpoint-1025-chronological]
     env:
-      IRMIND_BENCH_COMMON_EVENT: '1'
       IRMIND_BENCH_SCENARIO: ${{ matrix.scenario }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -348,3 +111,78 @@ jobs:
           if [[ -n "${IRMIND_HUNTEVAL_ROOT:-}" && "$IRMIND_HUNTEVAL_ROOT" == "$RUNNER_TEMP"/hunteval.* ]]; then
             rm -rf -- "$IRMIND_HUNTEVAL_ROOT"
           fi
+
+  hunt_eval:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      IRMIND_BENCH_SCENARIO: cloud
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: common-schema-benchmark-linux
+          save-if: ${{ github.ref_name == 'main' }}
+      - run: sudo apt-get update && sudo apt-get install -y mold
+      - name: Fetch and verify pinned HuntEval public sources and private answers
+        shell: bash
+        run: |
+          set -euo pipefail
+          dataset_root=$(mktemp -d "$RUNNER_TEMP/hunteval.XXXXXXXX")
+          trap 'rm -rf "$dataset_root"' ERR
+          git -C "$dataset_root" init -q
+          git -C "$dataset_root" remote add origin https://github.com/ns2switch/HuntEval.git
+          git -C "$dataset_root" fetch -q --depth 1 origin "$HUNTEVAL_COMMIT"
+          git -C "$dataset_root" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$dataset_root" rev-parse HEAD)" = "$HUNTEVAL_COMMIT"
+          (cd "$dataset_root" && sha256sum -c "$GITHUB_WORKSPACE/scripts/hunteval.sha256")
+          echo "IRMIND_HUNTEVAL_ROOT=$dataset_root" >> "$GITHUB_ENV"
+
+      - name: Evaluate HuntEval without a model
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p irmind-infra hunteval_reference_corpus --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee hunteval.txt
+          cargo test -p irmind-infra parquet_benchmark_1gb --release --locked -- --ignored --nocapture --test-threads 1 2>&1 | tee -a hunteval.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: hunteval-synthetic-results
+          path: hunteval.txt
+          if-no-files-found: error
+      - name: Remove downloaded HuntEval files
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${IRMIND_HUNTEVAL_ROOT:-}" && "$IRMIND_HUNTEVAL_ROOT" == "$RUNNER_TEMP"/hunteval.* ]]; then
+            rm -rf -- "$IRMIND_HUNTEVAL_ROOT"
+          fi
+
+  absolute_targets:
+    needs: current_v3
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: current-v3-*
+          path: graph-measurements
+      - name: Verify complete release measurements and absolute targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B .github/scripts/collect_graph_metrics.py graph-measurements metrics.json --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --commit "$GITHUB_SHA"
+          python3 -B .github/scripts/evaluate_v3_gates.py metrics.json | tee absolute-targets.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: current-graph-metrics
+          path: |
+            metrics.json
+            absolute-targets.json
+          if-no-files-found: error

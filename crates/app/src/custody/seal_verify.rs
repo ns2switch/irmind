@@ -146,14 +146,6 @@ impl Engine<'_> {
         self.findings_unlocked(id, &entries)?;
         summarize_usage(&entries)?;
         self.verify_operations_unlocked(id, cancel)?;
-        if case.sealed {
-            let seal = self.repo.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
-            crate::large_case::read_sealed_artifacts(
-                &entries,
-                &self.audit_log.operations(id)?,
-                seal.hash,
-            )?;
-        }
         Ok(entries.len())
     }
 
@@ -246,14 +238,6 @@ impl Engine<'_> {
         self.findings_unlocked(id, &entries)?;
         summarize_usage(&entries)?;
         self.verify_operations_unlocked(id, cancel)?;
-        if case.sealed {
-            let seal = self.repo.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
-            crate::large_case::read_sealed_artifacts(
-                &entries,
-                &self.audit_log.operations(id)?,
-                seal.hash,
-            )?;
-        }
         self.remember_verified_checkpoint(id, entries.last())?;
         Ok(entries.len())
     }

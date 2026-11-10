@@ -5,7 +5,7 @@ use irmind_app::GraphQueryFilter;
 fn parquet_filters_prune_partitions_and_exact_utc_window() {
     let root = tempfile::tempdir().unwrap();
     let inputs = write_source(root.path());
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(open_source_store(&root.path().join("case")).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[75u8; 32]),
         actor: Actor::Analyst,
@@ -37,7 +37,7 @@ fn parquet_filters_prune_partitions_and_exact_utc_window() {
     LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: &json_source_parser(),
     }
     .ingest_local(
         &case.id,
