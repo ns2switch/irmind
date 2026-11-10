@@ -82,7 +82,7 @@ fn synthetic_export_v4(path: &std::path::Path) -> String {
     )
     .unwrap();
     engine.seal(&case.id).unwrap();
-    export_case_v4(
+    export_case_v6(
         &engine,
         store.as_ref(),
         &case.id,

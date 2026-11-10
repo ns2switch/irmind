@@ -146,6 +146,18 @@ impl AuditEventKind {
         }
     }
 
+    /// Recognize obsolete layouts for a fail-closed, actionable format message.
+    pub const fn is_retired_case_format(self) -> bool {
+        matches!(
+            self,
+            Self::SourceManifestV1
+                | Self::ParquetArtifactV1
+                | Self::ParquetArtifactV2
+                | Self::ParquetArtifactsMigrated
+                | Self::GraphIndexed
+        )
+    }
+
     pub const fn is_mapped_custody(self) -> bool {
         matches!(
             self,
