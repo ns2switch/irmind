@@ -7,6 +7,7 @@ mod corpus;
 mod custody;
 mod mapped;
 mod measurements;
+mod pipeline;
 mod scenario;
 mod staging_probe;
 use corpus::{directory_bytes, representative_records, stage_worst_case_path};

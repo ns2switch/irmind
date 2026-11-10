@@ -1,0 +1,48 @@
+name: Production source pipeline profile
+on:
+  workflow_call:
+    inputs:
+      baseline:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: Profiling-only baseline commit (40 hexadecimal characters)
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: source-pipeline-profile-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_RELEASE_DEBUG: line-tables-only
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold -C force-frame-pointers=yes
+      BASE_REF: ${{ inputs.baseline }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {persist-credentials: false, fetch-depth: 0}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0
+        with:
+          key: source-pipeline-release-linux
+          save-if: ${{ github.ref_name == 'main' }}
+      - name: Install development profiler and linker
+        run: sudo apt-get update && sudo apt-get install -y mold heaptrack
+      - name: Run paired production measurements and separate allocation profiles
+        run: bash .github/scripts/benchmark_source_pipeline.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: source-pipeline-profile
+          path: |
+            pipeline-results/*-timings.txt
+            pipeline-results/*-allocations.json
+            pipeline-results/metadata.json
+          if-no-files-found: error

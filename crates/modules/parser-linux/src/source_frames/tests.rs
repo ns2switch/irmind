@@ -195,3 +195,24 @@ fn downstream_cancellation_is_propagated_without_consuming_later_records() {
     assert!(matches!(result, Err(AppError::Cancelled)));
     assert_eq!(calls, 1);
 }
+
+#[test]
+fn journal_message_words_and_colons_do_not_select_the_auth_framer() {
+    let value = serde_json::json!({
+        "MESSAGE": "Failed password for alice from 203.0.113.77 port 22 ssh2",
+        "SYSLOG_IDENTIFIER": "sshd", "_HOSTNAME": "synthetic-host",
+        "_PID": "42", "_UID": "1000", "__REALTIME_TIMESTAMP": "1793491200123456"
+    });
+    let line = format!("{value}\n");
+    let (report, rows) = decoded(line.as_bytes(), None);
+    assert_eq!((report.accepted, report.rejected), (1, 0));
+    assert_eq!(
+        rows[0].fields().field("MESSAGE").unwrap().as_text(),
+        value["MESSAGE"].as_str()
+    );
+    assert_eq!(
+        rows[0].timestamp().unwrap().instant().unix_micros(),
+        1_793_491_200_123_456
+    );
+    assert!(rows[0].fields().field("outcome").is_none());
+}

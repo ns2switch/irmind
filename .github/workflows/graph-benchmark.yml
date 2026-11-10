@@ -2,6 +2,14 @@ name: Synthetic graph benchmark
 on:
   workflow_dispatch:
     inputs:
+      pipeline_profile:
+        description: Profile the production pipeline and allocation calls against a pinned baseline
+        type: boolean
+        default: false
+      profile_base:
+        description: Profiling-only baseline commit for the production pipeline
+        type: string
+        default: ""
       evtx_source:
         description: Paired EVTX and ECS release smokes with shared pipeline counters (three 1 GiB repetitions)
         type: boolean
@@ -51,7 +59,7 @@ env:
   HUNTEVAL_COMMIT: 4cbb555a56bc17cb03b988ad2f15b1374eecf183
 jobs:
   graph_benchmark:
-    if: ${{ !inputs.evtx_source && !inputs.compare_base && !inputs.common_schema }}
+    if: ${{ !inputs.pipeline_profile && !inputs.evtx_source && !inputs.compare_base && !inputs.common_schema }}
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -130,7 +138,7 @@ jobs:
           fi
 
   paired_v2:
-    if: ${{ !inputs.evtx_source && inputs.compare_base != '' && !inputs.common_schema }}
+    if: ${{ !inputs.pipeline_profile && !inputs.evtx_source && inputs.compare_base != '' && !inputs.common_schema }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -181,7 +189,7 @@ jobs:
           fi
 
   common_schema:
-    if: ${{ !inputs.evtx_source && inputs.common_schema && inputs.compare_base != '' }}
+    if: ${{ !inputs.pipeline_profile && !inputs.evtx_source && inputs.common_schema && inputs.compare_base != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -264,3 +272,9 @@ jobs:
           name: evtx-source-smoke
           path: '*-source-benchmark.txt'
           if-no-files-found: error
+
+  source_pipeline_profile:
+    if: ${{ inputs.pipeline_profile }}
+    uses: ./.github/workflows/source-pipeline-profile.yml
+    with:
+      baseline: ${{ inputs.profile_base }}
