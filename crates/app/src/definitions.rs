@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::Arc};
 
 mod compiled;
+pub(crate) mod history;
 pub use compiled::{ApprovedDefinition, CompiledDefinition, definition_mapping_descriptor};
 mod errors;
 pub use errors::DefinitionError;
@@ -52,8 +53,8 @@ struct Snapshot {
 /// Verified installation history. Construction is restricted to application use cases.
 #[derive(Clone, Default)]
 pub struct ApprovedDefinitions {
-    latest: BTreeMap<String, Snapshot>,
-    versions: BTreeMap<(String, String), Snapshot>,
+    latest: BTreeMap<String, Arc<Snapshot>>,
+    versions: BTreeMap<(String, String), Arc<Snapshot>>,
 }
 
 impl ApprovedDefinitions {

@@ -480,3 +480,6 @@ fn authenticated_definition_registers_and_rebuilds_the_mapped_pipeline() {
         .unwrap();
     assert!(ip.contains("203.0.113.77"));
 }
+
+#[path = "declarative/history.rs"]
+mod history;

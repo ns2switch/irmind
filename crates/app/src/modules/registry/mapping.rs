@@ -53,8 +53,26 @@ impl ModuleRegistry {
         Ok(())
     }
 
+    /// Retain authenticated definition snapshots for exact-profile reconstruction only.
+    #[must_use]
+    pub fn with_definition_history(
+        mut self,
+        approved: crate::ApprovedDefinitions,
+        compiler: Arc<dyn crate::DefinitionCompiler>,
+    ) -> Self {
+        self.definition_history = Some(Arc::new(
+            crate::definitions::history::DefinitionHistory::new(approved, compiler),
+        ));
+        self
+    }
+
     pub fn mapping_catalog(&self) -> Result<MappingCatalog, AppError> {
-        MappingCatalog::freeze(self.source_decoders.clone(), self.source_mappers.clone())
-            .map_err(MappingError::into_app)
+        let mut catalog =
+            MappingCatalog::freeze(self.source_decoders.clone(), self.source_mappers.clone())
+                .map_err(MappingError::into_app)?;
+        catalog
+            .definition_history
+            .clone_from(&self.definition_history);
+        Ok(catalog)
     }
 }
