@@ -25,6 +25,7 @@ Path('pipeline-results/metadata.json').write_text(json.dumps({
     'heaptrack':os.environ['PIPELINE_HEAPTRACK_VERSION'], 'runner':'ubuntu-24.04',
     'build':'release', 'release_debug':os.environ['CARGO_PROFILE_RELEASE_DEBUG'], 'release_strip':os.environ['CARGO_PROFILE_RELEASE_STRIP'], 'repetitions':3, 'minimum_source_bytes':1073741824,
     'sources':['evtx','ecs','cloudtrail','linux-journald'],
+    'first_party_rebuilt_each_revision':True,
     'method':'Timings without Heaptrack; separate V3 allocation runs. Ingestion uses normal source hashing, mapping, partitioning, Parquet writing and signed custody. Nested timing intervals are labeled inclusive.'
 },indent=2)+'\n')
 PY
@@ -32,7 +33,26 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/generate_evtx_mapping_benchmark.py "$I
 cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
 build() {
   local tree=$1 label=$2
-  cargo test --manifest-path "$tree/Cargo.toml" -p irmind-infra --release --locked --no-run --message-format=json > "$work/$label-build.json"
+  # The worktrees share external dependencies, never first-party fingerprints.
+  # Cargo timestamp checks can otherwise retain a different worktree's metadata.
+  python3 - "$CARGO_TARGET_DIR/release/.fingerprint" <<'PYFINGERPRINTS'
+from pathlib import Path
+import shutil, sys
+for path in Path(sys.argv[1]).glob('irmind-*'):
+    if path.is_dir(): shutil.rmtree(path)
+PYFINGERPRINTS
+  if ! cargo test --manifest-path "$tree/Cargo.toml" -p irmind-infra --release --locked --no-run --message-format=json > "$work/$label-build.json"; then
+    python3 - "$work/$label-build.json" <<'PYDIAGNOSTICS'
+import json, sys
+for line in open(sys.argv[1]):
+    try: message=json.loads(line)
+    except ValueError: continue
+    if message.get('reason') == 'compiler-message':
+        print(message['message'].get('rendered', ''), file=sys.stderr)
+PYDIAGNOSTICS
+    df -h "$CARGO_TARGET_DIR"
+    return 1
+  fi
   python3 - "$work/$label-build.json" "$work/bin-$label" <<'PY'
 import json, shutil, sys
 executables=[]
