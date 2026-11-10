@@ -1,4 +1,5 @@
 //! Read the already opened original; no temporary evidence copy is created.
+mod values;
 use super::{
     AppError, ParseReport, SourceFileInput, SourceRecordV1, State, Tainted, invalid, limit,
 };
@@ -24,11 +25,8 @@ pub(super) fn decode(
         if state.seen >= 10_000_000 {
             return Err(limit());
         }
-        let mut value = row.map_err(|_| invalid())?.to_json_value();
-        value.sort_all_objects();
-        let encoded = value.to_string();
-        drop(value);
-        state.record(encoded.as_bytes(), None, emit)?;
+        let row = row.map_err(|_| invalid())?;
+        state.record_fields(values::decode(&row), emit)?;
     }
     Ok(state.report)
 }

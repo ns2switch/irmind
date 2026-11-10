@@ -17,6 +17,16 @@ pub(super) fn decode(
     encoding: &str,
 ) -> Result<SourceRecordV1, AppError> {
     let fields = decode_json_fields(bytes, SourceJsonLimits::default()).map_err(|_| invalid())?;
+    build(fields, meta, accepted, ordinal, offset, encoding)
+}
+pub(super) fn build(
+    fields: SourceValue,
+    meta: SourceMetadata<'_>,
+    accepted: u64,
+    ordinal: u64,
+    offset: Option<u64>,
+    encoding: &str,
+) -> Result<SourceRecordV1, AppError> {
     let class = uint(&fields, "class_uid")?;
     uint(&fields, "category_uid")?;
     let version = fields
