@@ -182,6 +182,14 @@ fn fixture_catalog<'a>(
     root: &Path,
     catalog: Arc<MappingCatalog>,
 ) -> (Arc<LocalStore>, Engine<'a>, Arc<MappingCatalog>) {
+    fixture_with_clock(root, catalog, Arc::new(SystemClock))
+}
+
+fn fixture_with_clock<'a>(
+    root: &Path,
+    catalog: Arc<MappingCatalog>,
+    clock: Arc<dyn irmind_app::Clock>,
+) -> (Arc<LocalStore>, Engine<'a>, Arc<MappingCatalog>) {
     let store = Arc::new(LocalStore::open_mapped(root, catalog.clone()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[88; 32]),
@@ -201,7 +209,7 @@ fn fixture_catalog<'a>(
             Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
-        Arc::new(SystemClock),
+        clock,
     )
     .unwrap();
     (store, engine, catalog)
@@ -216,3 +224,5 @@ mod direct_failures;
 mod direct_faults;
 
 mod cloudtrail;
+
+mod workers;

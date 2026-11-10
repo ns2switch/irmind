@@ -283,3 +283,34 @@ fn experimental_writer_requires_a_visible_confirmation() {
     update(&mut state, KeyCode::Esc);
     assert!(state.pending_module_change.is_none());
 }
+
+#[test]
+fn worker_limit_is_edited_and_confirmed_as_a_preference() {
+    let mut state = HomeState::new(Vec::new(), false);
+    state.mode = Mode::Config;
+    state.preference_selected = 5;
+    assert!(matches!(
+        update(&mut state, KeyCode::Enter),
+        HomeAction::None
+    ));
+    paste(&mut state, "257");
+    assert!(matches!(
+        update(&mut state, KeyCode::Enter),
+        HomeAction::None
+    ));
+    assert!(state.notice.contains("1 to 256"));
+    clear_active_field(&mut state);
+    paste(&mut state, "4");
+    assert!(matches!(
+        update(&mut state, KeyCode::Enter),
+        HomeAction::ChangeModule(ConfigChange::SetMaxParallelWorkers(Some(4)), true)
+    ));
+    assert!(matches!(
+        update(&mut state, KeyCode::Enter),
+        HomeAction::None
+    ));
+    assert!(matches!(
+        update(&mut state, KeyCode::Enter),
+        HomeAction::ChangeModule(ConfigChange::SetMaxParallelWorkers(None), true)
+    ));
+}

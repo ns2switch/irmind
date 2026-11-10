@@ -30,7 +30,8 @@ impl ParquetStore {
             relative_paths: &paths,
             ..*request
         };
-        self.preflight_direct_group(request, cancel)?;
+        let workers = self.workers.count();
+        self.preflight_direct_group(request, workers, cancel)?;
         let mut allocator =
             super::Allocator::from_signed_iter(request.committed_artifacts.iter(), request.limits)?;
         let hash = group_identity(request.relative_paths, identity);
@@ -42,7 +43,7 @@ impl ParquetStore {
             DirectWriting::new(hash.clone(), identity, routes.clone(), self.profile.clone());
         let mut sources = Vec::new();
         let mut sorted_fallback = false;
-        for paths in request.relative_paths.chunks(4) {
+        for paths in request.relative_paths.chunks(workers) {
             let inputs = self.staging_inputs(request.case_id, request.source_root, paths)?;
             match self.stream_direct_chunk(request, inputs, &mut writing, &mut allocator, cancel)? {
                 super::ordered::DirectChunk::Ordered(chunk) => sources.extend(chunk),
@@ -60,7 +61,7 @@ impl ParquetStore {
                 request.limits,
             )?;
             sources.clear();
-            for paths in request.relative_paths.chunks(4) {
+            for paths in request.relative_paths.chunks(workers) {
                 let inputs = self.staging_inputs(request.case_id, request.source_root, paths)?;
                 let mut staged = read::stage(self, request, inputs, cancel)?;
                 self.sort_staged_sources(request.case_id, &mut staged, cancel)?;
@@ -137,6 +138,7 @@ impl ParquetStore {
     fn preflight_direct_group(
         &self,
         request: &MappedIngestRequest<'_>,
+        workers: usize,
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
         let mut sizes = Vec::new();
@@ -155,9 +157,12 @@ impl ParquetStore {
             total.checked_add(*size).ok_or_else(invalid_source)
         })?;
         sizes.sort_unstable_by(|a, b| b.cmp(a));
-        let scratch = sizes.into_iter().take(4).try_fold(0u64, |total, size| {
-            total.checked_add(size).ok_or_else(invalid_source)
-        })?;
+        let scratch = sizes
+            .into_iter()
+            .take(workers)
+            .try_fold(0u64, |total, size| {
+                total.checked_add(size).ok_or_else(invalid_source)
+            })?;
         let required = total
             .checked_mul(if request.copy_original { 17 } else { 16 })
             .and_then(|bytes| {

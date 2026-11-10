@@ -72,7 +72,7 @@ impl ParquetStore {
         }
         let dir = self.case_dir(spec.id)?;
         let mut ordered = Vec::with_capacity(selected.len());
-        for group in selected.chunks(4) {
+        for group in selected.chunks(self.workers.count()) {
             let bounds = std::thread::scope(|scope| {
                 let workers = group
                     .iter()

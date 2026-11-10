@@ -301,6 +301,7 @@ fn run_in_directory(
             overrides_active: false,
             mouse_capture: false,
             theme: None,
+            max_parallel_workers: None,
         },
         presentation_speed,
     )?;

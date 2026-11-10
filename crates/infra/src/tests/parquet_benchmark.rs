@@ -20,6 +20,16 @@ fn parquet_benchmark_1gb() {
 }
 
 #[test]
+#[ignore = "manual release-only synthetic 1 GiB worker sweep"]
+fn parquet_worker_benchmark_1gib() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("worker benchmark requires a release build");
+    }
+    benchmark(1_030, 1, "1gb");
+    Ok(())
+}
+
+#[test]
 #[ignore = "manual and weekly benchmark: synthetic 15 GB CloudTrail corpus"]
 fn parquet_benchmark_15gb() {
     benchmark(1_000, 15, "15gb");
@@ -66,6 +76,14 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     println!("PARQUET_COMMON_EVENT enabled={common}");
     let profile = Arc::new(ParquetProfile::default());
     store.parquet.attach_profile(profile.clone());
+    if let Some(limit) = std::env::var_os("IRMIND_BENCH_WORKERS") {
+        let limit = limit
+            .to_str()
+            .unwrap()
+            .parse::<std::num::NonZeroU16>()
+            .unwrap();
+        store.set_parallel_worker_limit(Some(limit));
+    }
     let store = Arc::new(store);
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[74u8; 32]),
@@ -173,6 +191,9 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         layout_started.elapsed().as_secs_f64()
     );
     let ingest_time = started.elapsed();
+    if files == 1_030 {
+        assert!(total_bytes >= 1 << 30);
+    }
     let (staging_peak, staging_errors) = staging_probe.finish();
     println!(
         "PARQUET_TEMPORARY_DISK sampled_peak_bytes={staging_peak} interval_ms=100 scan_errors={staging_errors}"

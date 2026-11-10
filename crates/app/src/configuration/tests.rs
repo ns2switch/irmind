@@ -335,3 +335,27 @@ fn experimental_writer_is_opt_in_and_does_not_change_historical_default_bytes() 
         original.fingerprint().unwrap()
     );
 }
+
+#[test]
+fn worker_preference_is_optional_signed_and_bounded() {
+    let defaults = PersistentConfig::default();
+    for limit in [0, 257] {
+        assert!(
+            defaults
+                .changed(ConfigChange::SetMaxParallelWorkers(Some(limit)), &[])
+                .is_err()
+        );
+    }
+    let limited = defaults
+        .changed(ConfigChange::SetMaxParallelWorkers(Some(2)), &[])
+        .unwrap();
+    assert_eq!(limited.max_parallel_workers, Some(2));
+    assert_ne!(
+        limited.fingerprint().unwrap(),
+        defaults.fingerprint().unwrap()
+    );
+    let auto = limited
+        .changed(ConfigChange::SetMaxParallelWorkers(None), &[])
+        .unwrap();
+    assert_eq!(auto.fingerprint().unwrap(), defaults.fingerprint().unwrap());
+}

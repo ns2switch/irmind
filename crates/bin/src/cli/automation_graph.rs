@@ -358,6 +358,7 @@ impl AutomationContext<'_, '_> {
                         overrides_active,
                         mouse_capture,
                         theme: None,
+                        max_parallel_workers: None,
                     },
                 )
                 .map(|outcome| outcome == irmind_tui::WorkspaceOutcome::Restart);

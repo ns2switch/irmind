@@ -31,6 +31,9 @@ pub struct PersistentConfig {
     /// Presentation-only setting; absence keeps existing signed configuration bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub show_hints: Option<bool>,
+    /// Local execution preference. Absence preserves existing signed snapshots.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_parallel_workers: Option<u16>,
     /// Opt-in unstable V3 custody; absence preserves historical configuration bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub experimental_common_writer: Option<bool>,
@@ -69,6 +72,7 @@ pub enum ConfigChange {
     SetShowHints(bool),
     SetMouseCapture(bool),
     SetTheme(String),
+    SetMaxParallelWorkers(Option<u16>),
     SetExperimentalCommonWriter(bool),
 }
 
@@ -93,6 +97,7 @@ impl Default for PersistentConfig {
             theme: None,
             resume_last_case: None,
             show_hints: None,
+            max_parallel_workers: None,
             experimental_common_writer: None,
             modules: BTreeMap::new(),
         }
@@ -125,6 +130,9 @@ impl PersistentConfig {
                 .theme
                 .as_deref()
                 .is_some_and(|theme| !matches!(theme, "auto" | "light" | "dark"))
+            || self
+                .max_parallel_workers
+                .is_some_and(|n| !(1..=256).contains(&n))
             || self.modules.len() > 256
             || self.policy_path.as_ref().is_some_and(|path| {
                 path.is_empty() || path.len() > 4096 || path.chars().any(disallowed_char)
@@ -243,6 +251,7 @@ impl PersistentConfig {
             ConfigChange::SetShowHints(enabled) => next.show_hints = Some(enabled),
             ConfigChange::SetMouseCapture(enabled) => next.mouse_capture = Some(enabled),
             ConfigChange::SetTheme(theme) => next.theme = Some(theme),
+            ConfigChange::SetMaxParallelWorkers(limit) => next.max_parallel_workers = limit,
             ConfigChange::SetExperimentalCommonWriter(enabled) => {
                 next.experimental_common_writer = Some(enabled);
             }
