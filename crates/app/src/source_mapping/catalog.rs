@@ -9,6 +9,7 @@ pub struct MappingCatalog {
     decoders: BTreeMap<(String, String), Arc<dyn SourceDecoder>>,
     mappings: BTreeMap<String, Arc<dyn SourceMapper>>,
     proofs: BTreeMap<irmind_domain::EvidenceHash, crate::SignedOperation>,
+    pub(crate) definition_history: Option<Arc<crate::definitions::history::DefinitionHistory>>,
 }
 
 impl MappingCatalog {
@@ -138,29 +139,7 @@ impl MappingCatalog {
         &self,
         profile: &irmind_domain::MappingProfileV1,
     ) -> Result<Self, MappingError> {
-        let mut mappings = Vec::new();
-        for reference in profile.catalog() {
-            let mapper = self
-                .mappings
-                .get(reference.mapping().id())
-                .filter(|m| m.manifest().identity() == reference.mapping())
-                .ok_or(MappingError::UnsupportedVersion)?;
-            if mapper
-                .manifest()
-                .snapshot()?
-                .reference()
-                .map_err(|_| MappingError::InvalidManifest)?
-                != *reference
-            {
-                return Err(MappingError::UnsupportedVersion);
-            }
-            mappings.push(Arc::clone(mapper));
-        }
-        Self::freeze_verified(
-            self.decoders.values().cloned().collect(),
-            mappings,
-            self.proofs.clone(),
-        )
+        self.reconstruct_profile(profile)
     }
 
     pub fn decoder_selection(
@@ -232,6 +211,7 @@ impl MappingCatalog {
 }
 
 mod authenticated;
+mod reconstruction;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;

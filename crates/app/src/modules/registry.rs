@@ -28,6 +28,7 @@ pub struct ModuleRegistry {
     threat_intel: Option<Box<dyn ThreatIntelPort>>,
     object_sources: Vec<Box<dyn ObjectSource>>,
     definition_variants: Vec<crate::ApprovedDefinition>,
+    definition_history: Option<Arc<crate::definitions::history::DefinitionHistory>>,
     source_decoders: Vec<Arc<dyn crate::SourceDecoder>>,
     source_mappers: Vec<Arc<dyn crate::SourceMapper>>,
 }

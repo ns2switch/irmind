@@ -3,6 +3,7 @@ use super::{
     ParserDefinitionStore, Snapshot, invalid, validate_snapshot,
 };
 use crate::{AppError, hex, sha256};
+use std::sync::Arc;
 
 impl Engine<'_> {
     pub fn clean_definition_temporary(
@@ -38,6 +39,7 @@ impl Engine<'_> {
             {
                 return Err(invalid());
             }
+            let snapshot = Arc::new(snapshot);
             approved.versions.insert(
                 (snapshot.id.clone(), snapshot.version.clone()),
                 snapshot.clone(),
@@ -104,7 +106,12 @@ impl Engine<'_> {
         self.require_attended_analyst("deactivate parser definition")?;
         let _lock = self.audit_log.lock_global_operations()?;
         let approved = self.approved_definitions()?;
-        let mut snapshot = approved.latest.get(id).cloned().ok_or_else(invalid)?;
+        let mut snapshot = approved
+            .latest
+            .get(id)
+            .ok_or_else(invalid)?
+            .as_ref()
+            .clone();
         snapshot.previous = Some(snapshot.sha256.clone());
         snapshot.active = false;
         self.save_definition_snapshot(store, snapshot)?;
@@ -119,7 +126,12 @@ impl Engine<'_> {
         self.require_attended_analyst("restore parser definition")?;
         let _lock = self.audit_log.lock_global_operations()?;
         let approved = self.approved_definitions()?;
-        let mut snapshot = approved.latest.get(id).cloned().ok_or_else(invalid)?;
+        let mut snapshot = approved
+            .latest
+            .get(id)
+            .ok_or_else(invalid)?
+            .as_ref()
+            .clone();
         snapshot.previous = Some(snapshot.sha256.clone());
         self.save_definition_snapshot(store, snapshot)?;
         Ok(())

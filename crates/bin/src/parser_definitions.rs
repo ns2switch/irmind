@@ -29,7 +29,10 @@ pub(super) fn register(
         )?),
         &irmind_app::modules::ModuleConfig::new(),
     )?;
-    Ok(registry)
+    Ok(registry.with_definition_history(
+        definitions.clone(),
+        std::sync::Arc::new(irmind_mod_parser_declarative::DeclarativeCompiler),
+    ))
 }
 
 pub(super) fn read(path: &Path, limit: usize) -> Result<Vec<u8>> {

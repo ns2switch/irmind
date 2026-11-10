@@ -541,3 +541,19 @@ Consequences: this changes query allocation only. It changes no writer, signed b
 Compile each parser definition once into a checked selector, source decoder and extraction mapper. Bind all three identities and the fixed extraction descriptor to the exact definition digest. Only application-validated signed installations produce registration tokens; preview uses the same decoder and mapper. Original typed source fields remain separate from the unclassified search/entity projection. No external package or signed envelope changes.
 
 Extend the current table interpreter with explicit, bounded host and lifetime paths for process observations only. Included mappings may use a documented producer lifetime identifier such as Sysmon ProcessGuid. Security 4688, auditd and Linux process observations remain source-record scoped; PID, process name and timestamp never substitute for a lifetime identifier. Invalid or missing scope values fail without falling back to a broader identity.
+
+### Exact declarative reconstruction from approved snapshots
+
+Context: replacing or deactivating a parser definition changes the active source
+catalog, while an existing mapped case still pins its original definition and
+mapping snapshot.
+
+Decision: full reconstruction resolves that exact pipeline lazily from the
+already authenticated global installation history and the current compiled
+interpreter. The complete mapping reference must match. Definition contents are
+shared in memory; reconstruction does not reactivate them for new ingestions or
+load implementations supplied by a case or export.
+
+Consequences: replacement and deactivation preserve reconstruction with the same
+creating implementation. Unavailable interpreters and mismatched snapshots fail
+closed. Signed formats, limits and authentication-only verification are unchanged.
