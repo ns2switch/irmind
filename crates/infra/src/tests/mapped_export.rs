@@ -209,7 +209,7 @@ fn v6_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     engine.verify(&case.id).unwrap();
     engine.seal(&case.id).unwrap();
     let package = root.path().join("mapped.irmind");
-    let expected = irmind_app::export_case_v4(
+    let expected = irmind_app::export_case_v6(
         &engine,
         store.as_ref(),
         &case.id,
@@ -250,7 +250,7 @@ fn v6_export_authenticates_retained_parents_receipts_schema_and_public_key() {
         .join(parent.path());
     fs::write(path, b"changed retained parent").unwrap();
     assert!(
-        irmind_app::export_case_v4(
+        irmind_app::export_case_v6(
             &engine,
             store.as_ref(),
             &case.id,

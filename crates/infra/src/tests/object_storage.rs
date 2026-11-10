@@ -309,7 +309,7 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     assert_eq!(source.reads.load(Ordering::SeqCst), reads);
     engine.seal(&copied_case.id).unwrap();
     let package = root.path().join("copied-cloud.irmind");
-    irmind_app::export_case_v4(
+    irmind_app::export_case_v6(
         &engine,
         store.as_ref(),
         &copied_case.id,

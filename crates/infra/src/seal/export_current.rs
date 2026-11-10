@@ -8,14 +8,12 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Write};
 
-pub(super) const MAGIC_V4: &[u8] = b"IRMIND-EXPORT-V4\0";
-pub(super) const MAGIC_V5: &[u8] = b"IRMIND-EXPORT-V5\0";
 pub(super) const MAGIC_V6: &[u8] = b"IRMIND-EXPORT-V6\0";
 pub(super) const MAX_FRAME_BYTES: u64 = 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct HeaderV4 {
+pub(super) struct HeaderV6 {
     pub version: u32,
     pub case_id: String,
     pub title: String,
@@ -24,13 +22,13 @@ pub(super) struct HeaderV4 {
     pub seal: CaseSeal,
 }
 
-struct ExportV4Request<'a> {
+struct ExportRequest<'a> {
     id: &'a CaseId,
     path: &'a Path,
     source_root: Option<&'a Path>,
     include_originals: bool,
     cancel: &'a CancellationToken,
-    header: HeaderV4,
+    header: HeaderV6,
     entry_count: u64,
     evidence: Vec<String>,
     source_count: u64,
@@ -45,34 +43,11 @@ impl LargeCaseExporter for LocalStore {
         include_originals: bool,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        self.export_versioned(id, path, source_root, include_originals, cancel, 6)
-    }
-
-    fn export_case_v5(
-        &self,
-        id: &CaseId,
-        path: &Path,
-        source_root: Option<&Path>,
-        include_originals: bool,
-        cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
-        self.export_v5(id, path, source_root, include_originals, cancel)
-    }
-
-    fn export_case_v4(
-        &self,
-        id: &CaseId,
-        path: &Path,
-        source_root: Option<&Path>,
-        include_originals: bool,
-        cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
-        self.export_v4(id, path, source_root, include_originals, cancel)
+        self.export_current(id, path, source_root, include_originals, cancel)
     }
 }
-
 impl LocalStore {
-    pub(super) fn export_v4(
+    pub(super) fn export_current(
         &self,
         id: &CaseId,
         path: &Path,
@@ -80,49 +55,17 @@ impl LocalStore {
         include_originals: bool,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        self.export_versioned(id, path, source_root, include_originals, cancel, 4)
-    }
-
-    pub(super) fn export_v5(
-        &self,
-        id: &CaseId,
-        path: &Path,
-        source_root: Option<&Path>,
-        include_originals: bool,
-        cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
-        self.export_versioned(id, path, source_root, include_originals, cancel, 5)
-    }
-
-    pub(super) fn export_versioned(
-        &self,
-        id: &CaseId,
-        path: &Path,
-        source_root: Option<&Path>,
-        include_originals: bool,
-        cancel: &CancellationToken,
-        version: u32,
-    ) -> Result<String, AppError> {
-        if version < 6 && self.entries(id)?.iter().any(|e| e.kind.is_mapped_custody()) {
-            return Err(storage_reason("mapped custody requires export V6"));
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
         }
-        if version == 4
-            && self.entries(id)?.iter().any(|e| {
-                matches!(
-                    e.kind,
-                    AuditEventKind::ParquetArtifactV2 | AuditEventKind::ParquetArtifactsMigrated
-                )
-            })
-        {
-            return Err(storage_reason("export V4 requires V1-only artifacts"));
-        }
+        irmind_app::artifact_catalog(&self.entries(id)?)?;
         let case = self.get_case(id)?;
         if !case.sealed {
             return Err(AppError::Sealed);
         }
         let seal = self.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
-        let header = HeaderV4 {
-            version,
+        let header = HeaderV6 {
+            version: 6,
             case_id: id.as_str().into(),
             title: case.title,
             severity: case.severity.as_str().into(),
@@ -133,8 +76,8 @@ impl LocalStore {
         let evidence = self.evidence_hashes(id)?;
         let source_count = self.source_manifest_count(id)?;
         let mut created = false;
-        let result = self.write_v4_body(
-            &ExportV4Request {
+        let result = self.write_current_body(
+            &ExportRequest {
                 id,
                 path,
                 source_root,
@@ -156,23 +99,19 @@ impl LocalStore {
     fn source_manifest_count(&self, id: &CaseId) -> Result<u64, AppError> {
         self.conn()?
             .query_row(
-                "SELECT COUNT(*) FROM audit WHERE case_id=?1 AND kind IN (?2, ?3)",
-                params![
-                    id.as_str(),
-                    AuditEventKind::SourceManifestV1.as_str(),
-                    AuditEventKind::SourceManifestV2.as_str()
-                ],
+                "SELECT COUNT(*) FROM audit WHERE case_id=?1 AND kind=?2",
+                params![id.as_str(), AuditEventKind::SourceManifestV2.as_str()],
                 |row| row.get::<_, u64>(0),
             )
             .map_err(storage)
     }
 
-    fn write_v4_body(
+    fn write_current_body(
         &self,
-        request: &ExportV4Request<'_>,
+        request: &ExportRequest<'_>,
         created: &mut bool,
     ) -> Result<String, AppError> {
-        let ExportV4Request {
+        let ExportRequest {
             id,
             path,
             source_root,
@@ -193,13 +132,7 @@ impl LocalStore {
         let mut out = options.open(path).map_err(storage)?;
         *created = true;
         private_file(path).map_err(storage)?;
-        out.write_all(match header.version {
-            4 => MAGIC_V4,
-            5 => MAGIC_V5,
-            6 => MAGIC_V6,
-            _ => return Err(storage_reason("unsupported export version")),
-        })
-        .map_err(storage)?;
+        out.write_all(MAGIC_V6).map_err(storage)?;
         write_frame(&mut out, &serde_json::to_vec(&header).map_err(storage)?)?;
         out.write_all(&entry_count.to_be_bytes()).map_err(storage)?;
         let written = self.for_each_audit_entry(id, |entry| {
@@ -325,7 +258,7 @@ pub(super) fn write_frame(out: &mut File, bytes: &[u8]) -> Result<(), AppError> 
     out.write_all(bytes).map_err(storage)
 }
 
-pub(super) fn v4_result(
+pub(super) fn v6_result(
     fingerprint: String,
     entries: usize,
     source_manifests: usize,
@@ -334,7 +267,7 @@ pub(super) fn v4_result(
     ExportVerification {
         analyst_key_fingerprint: fingerprint,
         entries,
-        format_version: 4,
+        format_version: 6,
         source_manifests,
         source_bytes_verified,
         source_bytes_unavailable: source_manifests.saturating_sub(source_bytes_verified),

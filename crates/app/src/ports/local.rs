@@ -560,28 +560,6 @@ pub trait LargeCaseExporter: Send + Sync {
     ) -> Result<String, AppError> {
         Err(AppError::Policy("export V6 is unavailable".into()))
     }
-
-    fn export_case_v5(
-        &self,
-        _id: &CaseId,
-        _path: &Path,
-        _source_root: Option<&Path>,
-        _include_originals: bool,
-        _cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
-        Err(AppError::Fixed(
-            crate::FixedAppError::PolicyExportV5Unavailable,
-        ))
-    }
-
-    fn export_case_v4(
-        &self,
-        id: &CaseId,
-        path: &Path,
-        source_root: Option<&Path>,
-        include_originals: bool,
-        cancel: &CancellationToken,
-    ) -> Result<String, AppError>;
 }
 
 /// Writes a sealed case package to a new local path. The application verifies
