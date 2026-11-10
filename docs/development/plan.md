@@ -14,6 +14,8 @@ The [pre-1.0 format decision](decisions.md#pre-10-format-policy) supersedes comp
 6. Use separate PRs for retired formats, dead code/test helpers, dependency/features cleanup across all three workspaces, and repository/CI/design cleanup. Keep current goldens, security tests, fuzzing and dependency-direction checks. Report deleted lines/tests/dependencies, binary size and CI time per PR.
 7. Complete experimental Elastic and Chronicle mappings/connectors, then prepare v0.3.0 with the breaking-format notice, signed assets, attestations, SBOMs and verified installers. Stop before creating its tag.
 
+Decoder rollout: JSON, declarative definitions, Linux inputs and ECS have source pipelines; CloudTrail, Linux authentication/auditd/HTTP and ECS have independent semantic mappings. Remaining families keep their existing ingestion route until their original-field decoders and extraction-preserving mappings are complete. The common writer remains opt-in until that coverage permits the sole-writer cleanup.
+
 No old case migrates automatically. No model or connector becomes enabled by default. Obsolete compatibility controls can be removed only with their retired paths; retained-version security guarantees and limits stay unchanged.
 
 The following milestone history records earlier deliveries; compatibility commitments and V2 activation comparisons there do not govern current development.

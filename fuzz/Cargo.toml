@@ -22,6 +22,7 @@ irmind-security = { path = "../crates/security", version = "0.1.0" }
 irmind-mod-parser-linux = { path = "../crates/modules/parser-linux", version = "0.1.0" }
 irmind-mod-parser-syslog = { path = "../crates/modules/parser-syslog", version = "0.1.0" }
 irmind-mod-parser-json = { path = "../crates/modules/parser-json", version = "0.1.0" }
+irmind-mod-mapping-ecs = { path = "../crates/modules/mapping-ecs", version = "0.1.0" }
 irmind-mod-parser-ecs = { path = "../crates/modules/parser-ecs", version = "0.1.0" }
 irmind-mod-parser-ocsf = { path = "../crates/modules/parser-ocsf", version = "0.1.0" }
 irmind-mod-parser-velociraptor = { path = "../crates/modules/parser-velociraptor", version = "0.1.0" }

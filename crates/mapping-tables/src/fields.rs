@@ -1,4 +1,5 @@
 mod convert;
+pub use convert::copy_common_value;
 mod observation;
 use super::{
     definition::{Conversion, Field, Partition},

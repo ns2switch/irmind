@@ -8,33 +8,37 @@ use std::{
 };
 
 pub fn emit_native_mapping_manifest(production_features: &[&str]) -> io::Result<()> {
+    emit_native_mapping_manifest_with_sources(production_features, &[])
+}
+
+/// Include shared mapping implementation crates in the same canonical build identity.
+pub fn emit_native_mapping_manifest_with_sources(
+    production_features: &[&str],
+    shared_sources: &[&str],
+) -> io::Result<()> {
     let module = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").ok_or_else(invalid)?);
     let root = module.ancestors().nth(3).ok_or_else(invalid)?;
     let features = production_features
         .iter()
         .map(|feature| (*feature).to_owned())
         .collect();
-    let output = manifest(root, &module, features)?;
+    let output = manifest_with_sources(root, &module, features, shared_sources)?;
     let target = PathBuf::from(std::env::var_os("OUT_DIR").ok_or_else(invalid)?);
     fs::write(target.join("native-mapping-manifest.bin"), output)
 }
 
-fn manifest(root: &Path, module: &Path, mut features: Vec<String>) -> io::Result<Vec<u8>> {
-    let mut files = Vec::new();
-    for directory in [
-        module.to_path_buf(),
-        root.join("crates/app"),
-        root.join("crates/domain"),
-        root.join("crates/build-manifest"),
-    ] {
-        files.push(directory.join("Cargo.toml"));
-        if directory.join("build.rs").exists() {
-            files.push(directory.join("build.rs"));
-        }
-        collect(&directory.join("src"), &mut files)?;
-    }
-    files.push(root.join("Cargo.toml"));
-    files.push(root.join("Cargo.lock"));
+#[cfg(test)]
+fn manifest(root: &Path, module: &Path, features: Vec<String>) -> io::Result<Vec<u8>> {
+    manifest_with_sources(root, module, features, &[])
+}
+
+fn manifest_with_sources(
+    root: &Path,
+    module: &Path,
+    mut features: Vec<String>,
+    shared_sources: &[&str],
+) -> io::Result<Vec<u8>> {
+    let files = source_files(root, module, shared_sources)?;
     let mut files = files
         .into_iter()
         .map(|file| {
@@ -66,6 +70,35 @@ fn manifest(root: &Path, module: &Path, mut features: Vec<String>) -> io::Result
         return Err(invalid());
     }
     Ok(bytes)
+}
+fn source_files(root: &Path, module: &Path, shared_sources: &[&str]) -> io::Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    let mut directories = vec![
+        module.to_path_buf(),
+        root.join("crates/app"),
+        root.join("crates/domain"),
+        root.join("crates/build-manifest"),
+    ];
+    for relative in shared_sources {
+        let path = Path::new(relative);
+        if path
+            .components()
+            .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        {
+            return Err(invalid());
+        }
+        directories.push(root.join(path));
+    }
+    for directory in directories {
+        files.push(directory.join("Cargo.toml"));
+        if directory.join("build.rs").exists() {
+            files.push(directory.join("build.rs"));
+        }
+        collect(&directory.join("src"), &mut files)?;
+    }
+    files.push(root.join("Cargo.toml"));
+    files.push(root.join("Cargo.lock"));
+    Ok(files)
 }
 fn collect(root: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
     println!("cargo:rerun-if-changed={}", root.display());
