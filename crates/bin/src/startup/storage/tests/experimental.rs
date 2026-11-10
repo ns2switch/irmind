@@ -262,3 +262,6 @@ mod ecs;
     feature = "mapping-cloudtrail"
 ))]
 mod evtx;
+
+#[cfg(any(feature = "mapping-ecs", feature = "mapping-evtx"))]
+mod profile;

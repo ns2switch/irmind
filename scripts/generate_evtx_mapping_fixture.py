@@ -14,7 +14,7 @@ def security(event):
     if event in (4728, 4732, 4756):
         fields = [(name, 'Synthetic Operators' if name == 'TargetUserName' else value) for name, value in fields]
         fields += [('TargetSid', 'S-1-5-32-544'), ('MemberName', 'alice'), ('MemberSid', 'S-1-5-21-1002')]
-    if event in (4768, 4771):
+    if event in (4720, 4722, 4724, 4768, 4771):
         fields = [('TargetSid' if name == 'TargetUserSid' else name, value) for name, value in fields]
     if event in (4771, 4776):
         fields = [(name, value) for name, value in fields if name != "TargetDomainName"]

@@ -92,6 +92,17 @@ fn measure(
     let manifest = irmind_domain::SourceManifestV2::decode(&manifest.payload).unwrap();
     assert_eq!(event_count(data.path(), &case.id, &entries), records);
     assert_eq!(manifest.rejected_records, 0);
+    if mapped {
+        super::super::profile::run(
+            &registry.mapping_catalog().unwrap(),
+            &source.join("events.evtx"),
+            &manifest.source.sha256,
+            ("parser-evtx", "evtx-source-v1"),
+            "evtx",
+            repetition,
+            data.path(),
+        );
+    }
     engine.verify(&case.id).unwrap();
     println!(
         "EVTX_SOURCE_BENCH repetition={repetition} mapped={mapped} bytes={bytes} records={records} seconds={seconds:.6} MiB_per_second={:.6} source_sha256={}",

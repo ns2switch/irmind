@@ -22,7 +22,7 @@ observation = { kind = "host", role = "observer", scope = { kind = "host", path 
 [[fields]]
 source = ["Event", "System", "Security", "#attributes", "UserID"]
 target = "user.id"
-omit_text = ["-"]
+omit_text = ["-", "S-1-0-0"]
 observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
 
 [[rules]]

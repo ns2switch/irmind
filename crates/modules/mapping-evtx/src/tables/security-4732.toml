@@ -30,7 +30,7 @@ observation = { kind = "user", role = "actor", scope = { kind = "account", path 
 [[fields]]
 source = ["Event", "EventData", "SubjectUserSid"]
 target = "user.id"
-omit_text = ["-"]
+omit_text = ["-", "S-1-0-0"]
 observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
 
 [[fields]]
@@ -47,13 +47,13 @@ observation = { kind = "user", role = "target", scope = { kind = "source_record"
 [[fields]]
 source = ["Event", "EventData", "MemberSid"]
 target = "user.target.id"
-omit_text = ["-"]
+omit_text = ["-", "S-1-0-0"]
 observation = { kind = "user", role = "target", scope = { kind = "source_record" } }
 
 [[fields]]
 source = ["Event", "EventData", "TargetSid"]
 target = "irmind.resource.id"
-omit_text = ["-"]
+omit_text = ["-", "S-1-0-0"]
 observation = { kind = "resource", role = "target", scope = { kind = "source_record" } }
 
 [[rules]]

@@ -59,7 +59,7 @@ table_module!(
     PowerShellMapping,
     "mapping-evtx-powershell",
     "tables/powershell.toml",
-    "eca590ff59394e3097a889f3e73d341509c0c1868c045a08e3d95b77aff2728c"
+    "be62964e9d118e0fdb7a9821c2dde0cd019e4302ad281e2c35dd68095f1bd13c"
 );
 table_module!(
     SysmonMapping,
