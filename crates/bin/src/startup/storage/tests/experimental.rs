@@ -283,3 +283,5 @@ mod profile;
 
 #[cfg(feature = "mapping-ocsf")]
 mod ocsf;
+#[cfg(feature = "mapping-dfir")]
+mod dfir;

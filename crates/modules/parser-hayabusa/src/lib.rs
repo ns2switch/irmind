@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 mod indexed;
+mod source_decode;
+pub use source_decode::{HayabusaSourceDecoder, source_log_parser};
 
 use irmind_app::{
     AppError, CancellationToken, EventParser, GraphRecord, LogParser, ParseReport,
@@ -20,7 +22,7 @@ const MAX_DEPTH: usize = 64;
 static MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-hayabusa",
     version: "0.1.0",
-    ports: &[ModulePort::EventParser],
+    ports: &[ModulePort::EventParser, ModulePort::SourceDecoder],
     tools: &[],
     config: &[],
 };
@@ -34,6 +36,7 @@ impl Module for HayabusaParser {
         registry: &mut ModuleRegistry,
         _config: &ModuleConfig,
     ) -> Result<(), AppError> {
+        registry.add_source_decoder(std::sync::Arc::new(HayabusaSourceDecoder))?;
         registry.add_parser(self)
     }
 }

@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 mod indexed;
+mod source_decode;
+pub use source_decode::{VelociraptorSourceDecoder, source_log_parser};
 
 use irmind_app::{
     AppError, CancellationToken, EventParser, GraphRecord, LogParser, ParseReport,
@@ -19,7 +21,7 @@ const MAX_DEPTH: usize = 64;
 static MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-velociraptor",
     version: "0.1.0",
-    ports: &[ModulePort::EventParser],
+    ports: &[ModulePort::EventParser, ModulePort::SourceDecoder],
     tools: &[],
     config: &[],
 };
@@ -33,6 +35,7 @@ impl Module for VelociraptorParser {
         registry: &mut ModuleRegistry,
         _config: &ModuleConfig,
     ) -> Result<(), AppError> {
+        registry.add_source_decoder(std::sync::Arc::new(VelociraptorSourceDecoder))?;
         registry.add_parser(self)
     }
 }

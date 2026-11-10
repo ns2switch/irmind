@@ -2,6 +2,7 @@
 mod catalog;
 mod decoder_selection;
 mod error;
+pub mod framed;
 mod installation;
 pub mod json;
 mod manifest;

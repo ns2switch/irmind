@@ -2491,6 +2491,7 @@ dependencies = [
  "irmind-mod-llm-openai-compatible",
  "irmind-mod-llm-openrouter",
  "irmind-mod-mapping-cloudtrail",
+ "irmind-mod-mapping-dfir",
  "irmind-mod-mapping-ecs",
  "irmind-mod-mapping-evtx",
  "irmind-mod-mapping-journald-compat",
@@ -2824,6 +2825,21 @@ dependencies = [
  "irmind-mod-parser-json",
  "irmind-testkit",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-mapping-dfir"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mod-parser-chainsaw",
+ "irmind-mod-parser-eztools",
+ "irmind-mod-parser-hayabusa",
+ "irmind-mod-parser-plaso",
+ "irmind-mod-parser-velociraptor",
+ "irmind-testkit",
 ]
 
 [[package]]

@@ -152,3 +152,26 @@ The native implementation validates nested typed values and class/category
 relationships that finite field tables cannot express. It follows the
 [pinned OCSF schema](https://github.com/ocsf/ocsf-schema/tree/v1.4.0),
 including the documented [authentication roles](https://github.com/ocsf/ocsf-schema/blob/v1.4.0/events/iam/authentication.json).
+
+## DFIR tool output extraction
+
+The `mapping-dfir` feature includes five independently identified extraction
+modules: Velociraptor, Hayabusa, Chainsaw, plaso and EZTools. Their source
+decoders retain original JSON types or CSV columns, record locations and exact
+timestamp precision. A custom field named `events` remains data; it is not a
+record wrapper. Invalid rows are counted with bounded untrusted samples.
+
+These modules preserve existing search aliases, correlation relations and host
+partitioning without inferring categories, outcomes or entity roles. Hayabusa
+rule names remain source telemetry; they do not confirm a case finding. Plaso
+keeps its numeric microsecond timestamp and original `parser` and `data_type`.
+EZTools retains the detected tool and its original columns. Documented UTC CSV
+timestamps do not use the machine clock or file modification time.
+
+The projections are native because they preserve tool-specific nested aliases,
+CSV layouts and correlation relations that the finite classification tables do
+not express. They have separate manifests and pinned build identities. Shared
+contracts test repeated and concurrent decoding, provenance, cancellation and
+deterministic mapping; parity fixtures check the existing search identities and
+timestamps. Both the ordinary ingestion route and reconstruction use the same
+source decoder and mapping selected for each signed source.

@@ -25,6 +25,7 @@ pub(super) fn experimental(
         feature = "mapping-linux",
         feature = "mapping-ecs",
         feature = "mapping-ocsf",
+        feature = "mapping-dfir",
         feature = "mapping-evtx",
         feature = "parser-declarative"
     )) {
@@ -37,6 +38,7 @@ pub(super) fn experimental(
         && !catalog.supports_decoder("parser-linux", "linux-source-v1")
         && !catalog.supports_decoder("parser-ecs", "ecs-source-v1")
         && !catalog.supports_decoder("parser-ocsf", "ocsf-source-v1")
+        && !catalog.supports_decoder("parser-velociraptor", "velociraptor-source-v1")
         && !catalog.supports_decoder("parser-evtx", "evtx-source-v1")
         && !registry
             .parser_catalog()
@@ -67,6 +69,7 @@ pub(super) fn experimental_parsers(
         feature = "mapping-linux",
         feature = "mapping-ecs",
         feature = "mapping-ocsf",
+        feature = "mapping-dfir",
         feature = "mapping-evtx",
         feature = "parser-declarative"
     )) {
@@ -90,6 +93,13 @@ pub(super) fn experimental_parsers(
     } else {
         catalog
     };
+    #[cfg(feature = "mapping-dfir")]
+    let catalog = catalog
+        .with_experimental_parser(irmind_mod_parser_velociraptor::source_log_parser())?
+        .with_experimental_parser(irmind_mod_parser_hayabusa::source_log_parser())?
+        .with_experimental_parser(irmind_mod_parser_chainsaw::source_log_parser())?
+        .with_experimental_parser(irmind_mod_parser_plaso::source_log_parser())?
+        .with_experimental_parser(irmind_mod_parser_eztools::source_log_parser())?;
     let mappings = registry.mapping_catalog()?;
     #[cfg(feature = "mapping-evtx")]
     let catalog = if mappings
