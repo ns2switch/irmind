@@ -25,7 +25,7 @@ pub(in crate::parquet_store) struct CommonRow {
     pub(super) co_observations: String,
 }
 impl CommonRow {
-    fn from_record(checked: &CheckedCommonRecord<'_>) -> Result<Self, AppError> {
+    fn from_record(checked: CheckedCommonRecord<'_>) -> Result<Self, AppError> {
         let record = checked.record();
         let common = &record.common;
         let header = common.event();
@@ -75,12 +75,16 @@ impl CommonRow {
                 && a.field == b.field
         });
         let co_observations = typed_peers(&observations)?;
+        let categories = header.categories().bits();
+        let types = header.types().bits();
+        let outcome = u8::try_from(header.outcome().code()).map_err(|_| invalid_source())?;
+        let kind = u8::try_from(header.kind().code()).map_err(|_| invalid_source())?;
         Ok(Self {
-            payload: checked.encoded().to_owned(),
-            categories: header.categories().bits(),
-            types: header.types().bits(),
-            outcome: u8::try_from(header.outcome().code()).map_err(|_| invalid_source())?,
-            kind: u8::try_from(header.kind().code()).map_err(|_| invalid_source())?,
+            payload: checked.into_encoded(),
+            categories,
+            types,
+            outcome,
+            kind,
             role_bits,
             observations,
             co_observations,
@@ -170,7 +174,7 @@ impl RecordRow {
             time: indexed.time,
             source_offset: indexed.source_offset,
             precise: true,
-            common: Some(CommonRow::from_record(&checked)?),
+            common: Some(CommonRow::from_record(checked)?),
             profile: match partition.profile() {
                 irmind_app::PartitionProfile::Unpartitioned => 0,
                 irmind_app::PartitionProfile::CloudAccountRegion => 1,

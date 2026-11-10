@@ -1,5 +1,5 @@
 use super::{AppError, OffsetState, SourceRecordAccumulator, SourceRecordV1, invalid};
-use irmind_domain::{EvidenceHash, Provenance, TimePrecision};
+use irmind_domain::{Provenance, TimePrecision};
 
 impl SourceRecordAccumulator<'_> {
     pub(super) fn validate(
@@ -10,7 +10,7 @@ impl SourceRecordAccumulator<'_> {
         let origin = source.origin();
         if self.records >= 10_000_000
             || self.previous.is_some_and(|n| origin.record() <= n)
-            || origin.source() != &EvidenceHash::from_bytes(self.metadata.evidence_hash)
+            || origin.source() != &self.source_hash
             || origin.parser() != self.identity.id()
             || origin.parser_version() != self.identity.version()
             || source.reference() != self.metadata.source

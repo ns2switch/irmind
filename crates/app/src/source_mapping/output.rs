@@ -136,6 +136,11 @@ impl MappingOutput {
     pub const fn record(&self) -> &CommonGraphRecord {
         &self.record
     }
+    /// Consume this validated pure projection without cloning its indexed record.
+    /// A Tainted wrapper still controls access when the output crosses a boundary.
+    pub fn into_record(self) -> CommonGraphRecord {
+        self.record
+    }
     pub const fn partition(&self) -> &MappingPartition {
         &self.partition
     }

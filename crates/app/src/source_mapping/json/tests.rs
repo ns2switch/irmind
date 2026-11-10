@@ -45,3 +45,28 @@ fn source_limits_are_applied_before_a_whole_unbounded_tree_is_allocated() {
     }
     assert!(decode_json_fields(br#"{"x":{}}"#, SourceJsonLimits::default()).is_ok());
 }
+
+#[test]
+fn source_rendering_preserves_control_escapes_unicode_and_number_lexemes() {
+    let controls: String = (0..=31).map(char::from).collect();
+    for text in [
+        controls.as_str(),
+        "quoted \" slash / backslash \\",
+        "é 中 🔒 \u{2028}\u{2029}",
+    ] {
+        let fields = SourceValue::Text(text.into());
+        assert_eq!(
+            render_source_fields(&fields).unwrap(),
+            serde_json::to_string(text).unwrap()
+        );
+    }
+    let fields = decode_json_fields(
+        br#"{"z":-0e+1,"a":1.00000000000000000001}"#,
+        SourceJsonLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        render_source_fields(&fields).unwrap(),
+        r#"{"a":1.00000000000000000001,"z":-0e+1}"#
+    );
+}

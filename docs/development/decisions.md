@@ -581,3 +581,18 @@ hash-pinned table modules by exact provider/channel and original Security EventI
 process GUIDs establish lifetimes; Security PIDs retain source-record scope.
 Consequences: new ingestions can opt into common-event mappings without changing
 the existing writer, helper protocol, isolation, custody formats or dependencies.
+
+### Shared source-pipeline allocation and serialization work
+
+Context: standalone decoder diagnostics do not measure the full ingestion path.
+Decision: use complete synthetic release ingestions with real custody and separate
+Heaptrack allocation-call runs for EVTX, ECS, CloudTrail and Linux journald.
+Keep inclusive timing intervals explicit and publish only aggregated profiles.
+
+The common implementation reuses checked JSON serialization, moves owned pure
+projections where possible, writes JSON strings into one shared buffer, and uses a
+64 KiB buffered reader with a reusable tuple buffer for commitment finalization.
+Source hashes remain bound to frozen metadata. No check, limit, taint, canonical
+ordering rule, port signature or current format golden is removed or changed.
+The profiler and its allocator interception remain development tools; the product
+uses its existing allocator and introduces no unsafe code.

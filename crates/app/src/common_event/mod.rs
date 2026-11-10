@@ -43,6 +43,10 @@ impl CheckedCommonRecord<'_> {
     pub fn encoded(&self) -> &str {
         &self.encoded
     }
+    /// Move the already checked serialization; this does not remove source taint.
+    pub fn into_encoded(self) -> String {
+        self.encoded
+    }
 }
 
 /// Validate the mapped projection against its authenticated decoder provenance.
@@ -61,8 +65,7 @@ pub fn check_common_record<'a>(
     identity: crate::ParserIdentity<'_>,
 ) -> Result<CheckedCommonRecord<'a>, AppError> {
     let origin = record.common.origin();
-    let hash =
-        EvidenceHash::parse(&crate::hex(provenance.evidence_hash())).map_err(|_| invalid())?;
+    let hash = EvidenceHash::from_bytes(*provenance.evidence_hash());
     let index = u64::try_from(record.indexed.record.index).map_err(|_| invalid())?;
     if origin.source() != &hash
         || origin.record() != index

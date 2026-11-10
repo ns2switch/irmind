@@ -6,6 +6,18 @@ fuzz_target!(|bytes: &[u8]| {
     if bytes.len() > 65_536 {
         return;
     }
+    if let Ok(fields) = irmind_app::source_mapping::json::decode_json_fields(
+        bytes,
+        irmind_app::source_mapping::json::SourceJsonLimits::default(),
+    ) {
+        let rendered = irmind_app::source_mapping::json::render_source_fields(&fields).unwrap();
+        let restored = irmind_app::source_mapping::json::decode_json_fields(
+            rendered.as_bytes(),
+            irmind_app::source_mapping::json::SourceJsonLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(fields, restored);
+    }
     if let Ok(text) = std::str::from_utf8(bytes) {
         if let Ok(manifest) = irmind_mod_mapping_tables::TableMapping::review(text) {
             let mapping = irmind_mod_mapping_tables::TableMapping::bundled(
