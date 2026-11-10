@@ -263,7 +263,6 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     .into(),
             );
         }
-        let text = super::extraction_warning::completion(&mut self.state.conversation, label, text);
         if should_show_completion(label) {
             if is_result_card_label(label)
                 && !text.starts_with("approval pending:")

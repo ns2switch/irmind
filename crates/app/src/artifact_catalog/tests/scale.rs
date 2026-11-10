@@ -8,41 +8,16 @@ fn append(entries: &mut Vec<SignedEntry>, mut value: SignedEntry) {
     value.hash = crate::sha256(&value.canonical());
     entries.push(value);
 }
+const ARTIFACTS_PER_GROUP: usize = 1_000;
+
 fn snapshot(count: usize) -> Vec<SignedEntry> {
-    let mut artifact = ParquetArtifactV2::decode(
-        include_str!("../../../../domain/tests/fixtures/parquet-artifact-v2.hex").trim(),
-    )
-    .unwrap();
-    artifact.builder_version = "parquet-builder-v3".into();
-    // This suite measures inventory cardinality, independently of partition
-    // normalization, whose scoped golden and boundary suites run separately.
-    artifact.partition.scopes.clear();
-    let source = SourceManifestV2 {
-        source: source("source.json", artifact.source_hashes[0].clone()),
-        parser_id: artifact.parser_id.clone(),
-        parser_version: artifact.parser_version.clone(),
-        confidence: 90,
-        selection: ParserSelectionMode::Automatic,
-        timestamp_context: None,
-        rejected_records: 0,
-        rejected_sample: Vec::new(),
-    };
-    let mut entries = Vec::with_capacity(count + 1);
-    append(
-        &mut entries,
-        entry(AuditEventKind::SourceManifestV2, source.encode().unwrap()),
-    );
-    let prefix = artifact.partition.path_prefix().unwrap();
-    for n in 0..count {
-        artifact.path = format!("{prefix}part-{n:08}.parquet");
-        artifact.sha256 = EvidenceHash::parse(&format!("{n:064x}")).unwrap();
-        append(
-            &mut entries,
-            entry(
-                AuditEventKind::ParquetArtifactV2,
-                artifact.encode().unwrap(),
-            ),
-        );
+    let mut entries = Vec::new();
+    for (group, start) in (0..count).step_by(ARTIFACTS_PER_GROUP).enumerate() {
+        let records = (count - start).min(ARTIFACTS_PER_GROUP);
+        let (batch, _) = super::mapped::mapped_history_for(group, records);
+        for value in batch {
+            append(&mut entries, value);
+        }
     }
     entries
 }
@@ -52,7 +27,7 @@ fn exercise(count: usize) {
     assert!(payload.len() < 1024);
     assert_eq!(
         SealInventoryV2::decode(&payload).unwrap().count,
-        count as u64 + 1
+        (count + count.div_ceil(ARTIFACTS_PER_GROUP)) as u64
     );
     verify_seal_inventory_snapshot(&entries, &[], &payload).unwrap();
     let mut counter = SealInventoryV2::decode(&payload).unwrap();
@@ -61,16 +36,28 @@ fn exercise(count: usize) {
     counter.count -= 1;
     counter.sha256 = EvidenceHash::from_bytes([0; 32]);
     assert!(verify_seal_inventory_snapshot(&entries, &[], &counter.encode().unwrap()).is_err());
-    let mut added = entries.last().unwrap().clone();
-    let mut artifact = ParquetArtifactV2::decode(&added.payload).unwrap();
-    artifact.path = format!("{}extra.parquet", artifact.partition.path_prefix().unwrap());
-    added.payload = artifact.encode().unwrap();
+    let mut added = entries
+        .iter()
+        .rfind(|entry| entry.kind == AuditEventKind::ParquetArtifactV3)
+        .unwrap()
+        .clone();
+    let artifact = irmind_domain::ParquetArtifactV3::decode(&added.payload).unwrap();
+    let mut core = artifact.core().clone();
+    core.path = format!("{}extra.parquet", core.partition.path_prefix().unwrap());
+    added.payload = irmind_domain::ParquetArtifactV3::try_new(core, artifact.pipeline().clone())
+        .unwrap()
+        .encode()
+        .unwrap();
     append(&mut entries, added);
     assert!(verify_seal_inventory_snapshot(&entries, &[], &payload).is_err());
     entries.pop();
-    let removed = entries.pop().unwrap();
+    let position = entries
+        .iter()
+        .rposition(|entry| entry.kind == AuditEventKind::ParquetArtifactV3)
+        .unwrap();
+    let removed = entries.remove(position);
     assert!(verify_seal_inventory_snapshot(&entries, &[], &payload).is_err());
-    entries.push(removed);
+    entries.insert(position, removed);
     let middle = count / 2;
     entries.swap(middle, middle + 1);
     assert!(verify_seal_inventory_snapshot(&entries, &[], &payload).is_err());

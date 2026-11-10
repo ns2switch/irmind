@@ -33,7 +33,6 @@ impl Command {
             "demo" => " [check|exit]",
             "evidence" | "raw" => " <hash>",
             "ingest" => " [--parser <name>] [--year YYYY --utc-offset ±HH:MM] <path>",
-            "migrate" => " [--v2 [source-root]]",
             "objects" => " <source> <scheme> <container> <prefix> <from> <to>",
             "object-read" => " <number> [--copy-original]",
             "search" => " <words>",

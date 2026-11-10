@@ -234,7 +234,7 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     let large = irmind_app::LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: &JsonParser,
+        parser: &json_source_parser(),
     };
     assert!(
         large

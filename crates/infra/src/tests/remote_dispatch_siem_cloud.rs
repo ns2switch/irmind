@@ -60,7 +60,7 @@ fn every_port_family_dispatches_signed_approval_through_registry() {
 
     for (family, tool, args) in scenarios {
         let root = tempfile::tempdir().unwrap();
-        let store = Arc::new(LocalStore::open(root.path()).unwrap());
+        let store = Arc::new(open_source_store(root.path()).unwrap());
         let signer = Arc::new(LocalSigner {
             key: SigningKey::from_bytes(&[60u8; 32]),
             actor: Actor::Analyst,
@@ -201,7 +201,7 @@ fn scoped_siem_read_uses_authorized_port_and_keeps_raw_evidence_local() {
         }
     }
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[45u8; 32]),
         actor: Actor::Analyst,
@@ -299,7 +299,7 @@ fn scoped_cloud_read_is_audited_and_redacted() {
         }
     }
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[54u8; 32]),
         actor: Actor::Analyst,

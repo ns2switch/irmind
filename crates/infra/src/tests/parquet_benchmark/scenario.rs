@@ -1,7 +1,6 @@
 use super::representative_records;
 
 pub(super) struct Scenario {
-    pub(super) precise: bool,
     pub(super) hosts: Option<usize>,
     pub(super) source_bytes: usize,
     pub(super) chronological: bool,
@@ -9,27 +8,25 @@ pub(super) struct Scenario {
 
 impl Scenario {
     pub(super) fn from_environment() -> Self {
-        let name = std::env::var("IRMIND_BENCH_SCENARIO").unwrap_or_else(|_| "cloud-v1".into());
+        let name = std::env::var("IRMIND_BENCH_SCENARIO").unwrap_or_else(|_| "cloud".into());
         Self::named(&name)
     }
 
     fn named(name: &str) -> Self {
         let parts = name.split('-').collect::<Vec<_>>();
         assert!(matches!(parts[0], "cloud" | "endpoint"));
-        assert!(matches!(parts.get(1), Some(&"v1" | &"v2")));
-        let hosts = (parts[0] == "endpoint").then(|| parts[2].parse::<usize>().unwrap());
+        let hosts = (parts[0] == "endpoint").then(|| parts[1].parse::<usize>().unwrap());
         assert!(hosts.is_none_or(|n| [1, 64, 1024, 1025].contains(&n)));
         let chronological = parts.last() == Some(&"chronological");
         assert_eq!(
             parts.len(),
             if hosts.is_some() {
-                3 + usize::from(chronological)
+                2 + usize::from(chronological)
             } else {
-                2
+                1
             }
         );
         Self {
-            precise: parts[1] == "v2",
             hosts,
             source_bytes: 1_045_000,
             chronological,
@@ -46,16 +43,14 @@ impl Scenario {
         )
     }
 
-    pub(super) fn ingestion_gate_required(&self, size: &str, mapped: bool) -> bool {
-        !(mapped && size == "15gb" && self.hosts == Some(1025) && !self.chronological)
+    pub(super) fn ingestion_gate_required(&self, size: &str) -> bool {
+        !(size == "15gb" && self.hosts == Some(1025) && !self.chronological)
     }
 
     pub(super) fn name(&self) -> String {
-        let version = if self.precise { 2 } else { 1 };
-        let mut name = self.hosts.map_or_else(
-            || format!("cloud-v{version}"),
-            |n| format!("endpoint-v{version}-{n}"),
-        );
+        let mut name = self
+            .hosts
+            .map_or_else(|| "cloud".into(), |n| format!("endpoint-{n}"));
         if self.chronological {
             name.push_str("-chronological");
         }
@@ -130,7 +125,7 @@ fn endpoint_corpora_have_their_declared_number_of_hosts() {
     for hosts in [1, 64, 1024, 1025] {
         let scenario = Scenario {
             source_bytes: 2048,
-            ..Scenario::named(&format!("endpoint-v2-{hosts}"))
+            ..Scenario::named(&format!("endpoint-{hosts}"))
         };
         let mut seen = std::collections::BTreeSet::new();
         for file in 0..1000 {
@@ -149,7 +144,7 @@ fn chronological_endpoint_sources_do_not_reset_their_timestamps() {
         let scenario = Scenario {
             chronological,
             source_bytes: 2048,
-            ..Scenario::named("endpoint-v2-64")
+            ..Scenario::named("endpoint-64")
         };
         let text = scenario.source(0, 15);
         let times = text
@@ -170,57 +165,16 @@ fn chronological_endpoint_sources_do_not_reset_their_timestamps() {
 
 #[test]
 fn release_and_stress_ingestion_gates_keep_distinct_approved_limits() {
-    for version in ["v1", "v2"] {
-        assert_eq!(
-            Scenario::named(&format!("cloud-{version}"))
-                .ingestion_limit("15gb")
-                .as_secs(),
-            900
-        );
-        for hosts in [1, 64, 1024, 1025] {
-            let base = format!("endpoint-{version}-{hosts}");
-            assert_eq!(
-                Scenario::named(&base).ingestion_limit("15gb").as_secs(),
-                1350
-            );
-            assert_eq!(Scenario::named(&base).ingestion_limit("1gb").as_secs(), 900);
-            assert_eq!(
-                Scenario::named(&format!("{base}-chronological"))
-                    .ingestion_limit("15gb")
-                    .as_secs(),
-                900
-            );
-        }
-    }
-}
-
-#[cfg(test)]
-mod absolute_gate_tests {
-    use super::Scenario;
-    #[test]
-    fn only_the_approved_mapped_1025_host_stress_case_is_nonblocking() {
-        for hosts in [1, 64, 1024, 1025] {
-            for chronological in [false, true] {
-                let scenario = Scenario {
-                    precise: true,
-                    hosts: Some(hosts),
-                    source_bytes: 1024,
-                    chronological,
-                };
-                assert!(scenario.ingestion_gate_required("15gb", false));
-                assert!(scenario.ingestion_gate_required("1gib", true));
-                assert_eq!(
-                    scenario.ingestion_gate_required("15gb", true),
-                    hosts != 1025 || chronological
-                );
-            }
-        }
-        let cloud = Scenario {
-            precise: true,
-            hosts: None,
-            source_bytes: 1024,
-            chronological: false,
-        };
-        assert!(cloud.ingestion_gate_required("15gb", true));
+    let cloud = Scenario::named("cloud");
+    assert_eq!(cloud.ingestion_limit("15gb").as_secs(), 900);
+    assert!(cloud.ingestion_gate_required("15gb"));
+    for hosts in [1, 64, 1024, 1025] {
+        let stress = Scenario::named(&format!("endpoint-{hosts}"));
+        assert_eq!(stress.ingestion_limit("15gb").as_secs(), 1350);
+        assert_eq!(stress.ingestion_gate_required("15gb"), hosts != 1025);
+        assert!(stress.ingestion_gate_required("1gib"));
+        let ordered = Scenario::named(&format!("endpoint-{hosts}-chronological"));
+        assert_eq!(ordered.ingestion_limit("15gb").as_secs(), 900);
+        assert!(ordered.ingestion_gate_required("15gb"));
     }
 }

@@ -20,9 +20,6 @@ impl Timings {
             Ordering::Relaxed,
         );
     }
-    pub(super) fn snapshot(&self) -> [Duration; 2] {
-        [&self.decoder, &self.mapping].map(|n| Duration::from_nanos(n.load(Ordering::Relaxed)))
-    }
     pub(super) fn report(&self) {
         println!(
             "MAPPING_PHASE decoder_seconds={:.6} mapper_seconds={:.6}",

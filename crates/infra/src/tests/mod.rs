@@ -83,7 +83,6 @@ macro_rules! streaming_test_model {
 }
 
 mod artifact_v2_foundation;
-mod artifact_v2_migration;
 mod artifact_v2_reader;
 mod foundation;
 mod test_support;
@@ -93,7 +92,8 @@ use foundation::{
 };
 use test_support::{
     CaptureModel, EdrModel, FakeCloudAudit, FakeInternalIntel, FakeSiem, TestSigner,
-    ingest_historical_fixture, ingest_selected, ingest_synthetic, ingest_synthetic_result,
+    ingest_selected, ingest_synthetic, ingest_synthetic_result, json_source_parser,
+    open_source_store, source_catalog,
 };
 #[allow(clippy::expect_used)]
 mod agent_loop;

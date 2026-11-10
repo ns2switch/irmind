@@ -145,7 +145,7 @@ fn mapped_store_preserves_the_published_route_without_a_registered_raw_decoder()
                     source_root: &source,
                     relative_paths: &["event.json".into()],
                     copy_original: false,
-                    parser: &JsonParser,
+                    parser: &json_source_parser(),
                     committed_artifacts: &[],
                     limits: irmind_app::PartitionLimits::default(),
                 },

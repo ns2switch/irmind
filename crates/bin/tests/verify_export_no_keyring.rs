@@ -28,13 +28,14 @@ impl irmind_app::Signer for FixtureSigner {
 }
 
 #[cfg(feature = "parser-json")]
-fn synthetic_export_v4(path: &std::path::Path) -> String {
+fn synthetic_export_with_originals(path: &std::path::Path) -> String {
+    use irmind_app::source_mapping::{MappingCatalog, SourceDecoderSelection};
     use irmind_app::{
         CancellationToken, CryptoPorts, Engine, EnginePorts, LargeCaseUseCases, export_case_v6,
     };
     use irmind_domain::ExecutionMode;
     use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
-    use irmind_mod_parser_json::JsonParser;
+    use irmind_mod_parser_json::{JsonParser, JsonSourceDecoder};
     use irmind_security::MandatoryGuard;
 
     let scratch = tempfile::tempdir().unwrap();
@@ -45,7 +46,18 @@ fn synthetic_export_v4(path: &std::path::Path) -> String {
         b"{\"Records\":[{\"eventTime\":\"2026-10-28T12:00:00Z\",\"eventName\":\"AssumeRole\",\"recipientAccountId\":\"123456789012\"}]}\n",
     )
     .unwrap();
-    let store = Arc::new(LocalStore::open(&scratch.path().join("case")).unwrap());
+    let decoder = Arc::new(JsonSourceDecoder);
+    let catalog = Arc::new(
+        MappingCatalog::freeze(
+            vec![decoder.clone()],
+            vec![Arc::new(
+                irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap(),
+            )],
+        )
+        .unwrap(),
+    );
+    let store = Arc::new(LocalStore::open_mapped(&scratch.path().join("case"), catalog).unwrap());
+    let source_parser = SourceDecoderSelection::new(decoder);
     let signer = Arc::new(FixtureSigner(SigningKey::from_bytes(&[17; 32])));
     let parser = Arc::new(JsonParser);
     let engine = Engine::new(
@@ -71,7 +83,7 @@ fn synthetic_export_v4(path: &std::path::Path) -> String {
     LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: &source_parser,
     }
     .ingest_local(
         &case.id,
@@ -157,18 +169,29 @@ fn synthetic_export(path: &std::path::Path) -> String {
         public_key,
         analyst_key_fingerprint: fingerprint.clone(),
     };
-    let bundle = json!({
-        "version": 3,
+    let header = json!({
+        "version": 6,
         "case_id": case_id,
         "title": "Synthetic",
         "severity": "medium",
         "scope": scope,
-        "audit": [created, sealed],
         "seal": seal,
-        "evidence": {},
     });
-    std::fs::write(path, serde_json::to_vec(&bundle).unwrap()).unwrap();
+    let mut output = b"IRMIND-EXPORT-V6\0".to_vec();
+    append_frame(&mut output, &header);
+    output.extend_from_slice(&2u64.to_be_bytes());
+    append_frame(&mut output, &created);
+    append_frame(&mut output, &sealed);
+    // Zero copied evidence, originals, operations, mapping proofs and artifacts.
+    output.extend_from_slice(&[0; 5 * 8]);
+    std::fs::write(path, output).unwrap();
     fingerprint
+}
+
+fn append_frame(output: &mut Vec<u8>, value: &impl serde::Serialize) {
+    let frame = serde_json::to_vec(value).unwrap();
+    output.extend_from_slice(&(frame.len() as u64).to_be_bytes());
+    output.extend_from_slice(&frame);
 }
 
 #[test]
@@ -203,7 +226,7 @@ fn portable_export_fixture() {
         .map_or_else(|| scratch.path().to_path_buf(), std::path::PathBuf::from);
     std::fs::create_dir_all(&root).unwrap();
     let path = root.join("synthetic.irmind.json");
-    let fingerprint = synthetic_export_v4(&path);
+    let fingerprint = synthetic_export_with_originals(&path);
     std::fs::write(root.join("expected-key.txt"), format!("{fingerprint}\n")).unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_irmind"))
         .env_clear()

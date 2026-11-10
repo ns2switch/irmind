@@ -1,13 +1,12 @@
 use super::hunteval_eval;
 use super::*;
 use crate::parquet_store::ParquetProfile;
-use irmind_app::LargeCaseUseCases;
+use irmind_app::{LargeCaseUseCases, SourceDecoder as _};
 use std::time::Instant;
 mod corpus;
 mod custody;
 mod mapped;
 mod measurements;
-mod pipeline;
 mod scenario;
 mod staging_probe;
 use corpus::{directory_bytes, representative_records, stage_worst_case_path};
@@ -69,17 +68,9 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     let root = tempfile::tempdir().unwrap();
     let source_root = root.path().join("sources");
     fs::create_dir(&source_root).unwrap();
-    let mut store = LocalStore::open(&root.path().join("case")).unwrap();
-    let common = std::env::var("IRMIND_BENCH_COMMON_EVENT").as_deref() == Ok("1");
-    let mapping = common.then(mapped::catalog);
-    if let Some((catalog, _)) = &mapping {
-        assert!(scenario.precise, "mapped schemas preserve precise V2 time");
-        store.parquet =
-            crate::ParquetStore::open_mapped(&root.path().join("case"), catalog.clone()).unwrap();
-    } else if scenario.precise {
-        store.parquet = crate::ParquetStore::open_precise(&root.path().join("case")).unwrap();
-    }
-    println!("PARQUET_COMMON_EVENT enabled={common}");
+    let (catalog, timings) = mapped::catalog();
+    let mut store = LocalStore::open_mapped(&root.path().join("case"), catalog.clone()).unwrap();
+    println!("\nPARQUET_WRITER name=mapped-v3");
     let profile = Arc::new(ParquetProfile::default());
     store.parquet.attach_profile(profile.clone());
     if let Some(limit) = std::env::var_os("IRMIND_BENCH_WORKERS") {
@@ -113,38 +104,24 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     let case = engine
         .create_case("Synthetic Parquet benchmark", "local synthetic sources")
         .unwrap();
-    let endpoint_parser = irmind_mod_parser_linux::LinuxParser::default();
-    let mapped_parser = mapping.as_ref().map(|(catalog, _)| {
-        use irmind_app::SourceDecoder as _;
-        let id = if scenario.hosts.is_some() {
-            irmind_mod_parser_linux::LinuxSourceDecoder.identity()
-        } else {
-            irmind_mod_parser_json::JsonSourceDecoder.identity()
-        };
-        catalog.decoder_selection(id.name, id.version).unwrap()
-    });
-    let source_parser: &dyn irmind_app::StreamingEventParser = if let Some(parser) = &mapped_parser
-    {
-        parser
-    } else if scenario.hosts.is_some() {
-        &endpoint_parser
+    let identity = if scenario.hosts.is_some() {
+        irmind_mod_parser_linux::LinuxSourceDecoder.identity()
     } else {
-        parser.as_ref()
+        irmind_mod_parser_json::JsonSourceDecoder.identity()
     };
+    let source_parser = catalog
+        .decoder_selection(identity.name, identity.version)
+        .unwrap();
     let ingest = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: source_parser,
+        parser: &source_parser,
     };
     let mut total_bytes = 0u64;
     custody.reset();
     let staging_probe = staging_probe::StagingProbe::start(root.path().join("case/parquet"));
     let started = Instant::now();
-    let batch_size = if common {
-        irmind_app::mapped_ingest::MAPPED_GROUP_SOURCES
-    } else {
-        4
-    };
+    let batch_size = irmind_app::mapped_ingest::MAPPED_GROUP_SOURCES;
     for start in (0..files).step_by(batch_size) {
         let names = (start..(start + batch_size).min(files))
             .map(|index| {
@@ -183,19 +160,6 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
             }
             episodes
         });
-    let layout_started = Instant::now();
-    let bundles = if common {
-        0
-    } else {
-        ingest
-            .compact_case(&case.id, &CancellationToken::new())
-            .unwrap()
-    };
-    println!("PARQUET_COMPACTION bundles={bundles}");
-    println!(
-        "PARQUET_LAYOUT_TIME seconds={:.6}",
-        layout_started.elapsed().as_secs_f64()
-    );
     let ingest_time = started.elapsed();
     if matches!(files, 515 | 1_030) {
         assert!(total_bytes >= 1 << 30);
@@ -206,16 +170,14 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     );
     assert_eq!(staging_errors, 0);
     custody.report();
-    if let Some((_, timings)) = &mapping {
-        timings.report();
-        let [combined, projection, commitment] = profile.mapping_snapshot();
-        println!(
-            "MAPPING_ADAPTER_PHASE select_validate_commit_and_map_seconds={:.6} projection_seconds={:.6} input_commit_finalize_seconds={:.6}",
-            combined.as_secs_f64(),
-            projection.as_secs_f64(),
-            commitment.as_secs_f64()
-        );
-    }
+    timings.report();
+    let [combined, projection, commitment] = profile.mapping_snapshot();
+    println!(
+        "MAPPING_ADAPTER_PHASE select_validate_commit_and_map_seconds={:.6} projection_seconds={:.6} input_commit_finalize_seconds={:.6}",
+        combined.as_secs_f64(),
+        projection.as_secs_f64(),
+        commitment.as_secs_f64()
+    );
     let [hash_time, conversion_time, row_time, parquet_time, _, _] = profile.snapshot();
     println!(
         "PARQUET_FINALIZE seconds={:.6} normalized_staged_sources={}",
@@ -245,14 +207,14 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     println!("PARQUET_INGEST_EXACT wall_ns={}", ingest_time.as_nanos());
     let ingestion_limit = scenario.ingestion_limit(label);
     let ingest_target = ingest_time < ingestion_limit;
-    let ingest_gate_required = scenario.ingestion_gate_required(label, common);
+    let ingest_gate_required = scenario.ingestion_gate_required(label);
     println!(
         "PARQUET_INGEST_LIMIT seconds={} met={ingest_target} required={ingest_gate_required}",
         ingestion_limit.as_secs()
     );
     let [stage, sort, replay, source_verify, publish] = profile.partition_snapshot();
     println!(
-        "PARQUET_V2_PHASE stage_seconds={:.3} sort_seconds={:.3} replay_seconds={:.3} source_verify_seconds={:.3} publish_seconds={:.3}",
+        "PARQUET_WRITE_PHASE stage_seconds={:.3} sort_seconds={:.3} replay_seconds={:.3} source_verify_seconds={:.3} publish_seconds={:.3}",
         stage.as_secs_f64(),
         sort.as_secs_f64(),
         replay.as_secs_f64(),
@@ -305,31 +267,17 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
 }
 
 #[test]
-fn parquet_v2_benchmark_endpoint_smoke() {
-    run_benchmark(
-        4,
-        1,
-        "smoke",
-        &Scenario {
-            precise: true,
-            hosts: Some(2),
-            source_bytes: 2048,
-            chronological: false,
-        },
-    );
-}
-
-#[test]
-fn parquet_v1_benchmark_endpoint_smoke() {
-    run_benchmark(
-        4,
-        1,
-        "smoke",
-        &Scenario {
-            precise: false,
-            hosts: Some(2),
-            source_bytes: 2048,
-            chronological: false,
-        },
-    );
+fn mapped_benchmark_endpoint_smoke() {
+    for chronological in [false, true] {
+        run_benchmark(
+            4,
+            2,
+            "smoke",
+            &Scenario {
+                hosts: Some(2),
+                source_bytes: 2048,
+                chronological,
+            },
+        );
+    }
 }

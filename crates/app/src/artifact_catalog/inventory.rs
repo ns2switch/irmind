@@ -1,6 +1,7 @@
 use crate::{AppError, SignedEntry, sha256, sha256_stream};
 use irmind_domain::{
-    AuditEventKind, EvidenceHash, ParquetArtifact, SealInventoryV2, SealItemKind, SourceManifestV1,
+    AuditEventKind, EvidenceHash, ParquetArtifactV3, SealInventoryV2, SealItemKind,
+    SourceManifestV2,
 };
 use std::collections::BTreeMap;
 
@@ -9,37 +10,33 @@ use std::collections::BTreeMap;
 #[derive(Default)]
 pub struct SealInventoryBuilder {
     items: BTreeMap<(SealItemKind, String), [u8; 32]>,
-    has_v2: bool,
+    has_mapped_artifacts: bool,
 }
 impl SealInventoryBuilder {
     pub fn accept(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
         let bad = || AppError::InvalidChain(entry.seq);
+        if entry.kind.is_retired_case_format() {
+            return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
+        }
         match entry.kind {
-            AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2 => {
-                let source = SourceManifestV1::decode_signed(entry.kind, &entry.payload)
-                    .map_err(|_| bad())?
-                    .ok_or_else(bad)?;
-                let payload = if entry.kind == AuditEventKind::SourceManifestV1 {
-                    source.encode()
-                } else {
-                    irmind_domain::SourceManifestV2::decode(&entry.payload).and_then(|v| v.encode())
-                }
-                .map_err(|_| bad())?;
-                self.insert(SealItemKind::Source, &source.source, payload.as_bytes())?;
+            AuditEventKind::SourceManifestV2 => {
+                let source = SourceManifestV2::decode(&entry.payload).map_err(|_| bad())?;
+                let payload = source.encode().map_err(|_| bad())?;
+                self.insert(
+                    SealItemKind::Source,
+                    &source.source.source,
+                    payload.as_bytes(),
+                )?;
             }
-            AuditEventKind::ParquetArtifactV1
-            | AuditEventKind::ParquetArtifactV2
-            | AuditEventKind::ParquetArtifactV3 => {
-                let artifact =
-                    ParquetArtifact::decode(entry.kind, &entry.payload).map_err(|_| bad())?;
+            AuditEventKind::ParquetArtifactV3 => {
+                let artifact = ParquetArtifactV3::decode(&entry.payload).map_err(|_| bad())?;
                 self.insert(
                     SealItemKind::Artifact,
-                    artifact.path(),
+                    &artifact.core().path,
                     artifact.encode().map_err(|_| bad())?.as_bytes(),
                 )?;
-                self.has_v2 |= matches!(artifact, ParquetArtifact::V2(_) | ParquetArtifact::V3(_));
+                self.has_mapped_artifacts = true;
             }
-            AuditEventKind::ParquetArtifactsMigrated => self.has_v2 = true,
             _ => {}
         }
         Ok(())
@@ -55,8 +52,8 @@ impl SealInventoryBuilder {
         EvidenceHash::parse(hash).map_err(|_| AppError::InvalidChain(0))?;
         self.insert(SealItemKind::Evidence, hash, hash.as_bytes())
     }
-    pub const fn has_v2(&self) -> bool {
-        self.has_v2
+    pub const fn has_mapped_artifacts(&self) -> bool {
+        self.has_mapped_artifacts
     }
     pub fn commitment(&self) -> Result<SealInventoryV2, AppError> {
         SealInventoryV2::from_ordered(
@@ -83,24 +80,16 @@ pub fn verify_seal_inventory_snapshot(
     legacy: &[String],
     payload: &str,
 ) -> Result<(), AppError> {
-    if entries.iter().any(|entry| {
-        matches!(
-            entry.kind,
-            AuditEventKind::ParquetArtifactV2
-                | AuditEventKind::ParquetArtifactV3
-                | AuditEventKind::ParquetArtifactsMigrated
-        )
-    }) {
+    if entries
+        .iter()
+        .any(|entry| entry.kind == AuditEventKind::ParquetArtifactV3)
+    {
         let count = entries
             .iter()
             .filter(|entry| {
                 matches!(
                     entry.kind,
-                    AuditEventKind::SourceManifestV1
-                        | AuditEventKind::SourceManifestV2
-                        | AuditEventKind::ParquetArtifactV1
-                        | AuditEventKind::ParquetArtifactV2
-                        | AuditEventKind::ParquetArtifactV3
+                    AuditEventKind::SourceManifestV2 | AuditEventKind::ParquetArtifactV3
                 )
             })
             .count() as u64;

@@ -92,7 +92,7 @@ fn analyst_resolves_persistent_agent_requests_without_external_execution() {
     let guard = Arc::new(MandatoryGuard::new().unwrap());
     let parser = Arc::new(JsonParser);
     let case_id = {
-        let store = Arc::new(LocalStore::open(root.path()).unwrap());
+        let store = Arc::new(open_source_store(root.path()).unwrap());
         let attended = Engine::new(
             EnginePorts::new(
                 store.clone(),
@@ -153,7 +153,7 @@ fn analyst_resolves_persistent_agent_requests_without_external_execution() {
         assert!(unattended.approve(&case.id, &pending[0].id).is_err());
         case.id
     };
-    let reopened = Arc::new(LocalStore::open(root.path()).unwrap());
+    let reopened = Arc::new(open_source_store(root.path()).unwrap());
     let attended = Engine::new(
         EnginePorts::new(
             reopened.clone(),

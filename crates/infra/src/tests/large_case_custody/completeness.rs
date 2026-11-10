@@ -6,7 +6,7 @@ fn large_sources_sign_complete_reports_and_current_parser_identity() {
     let root = tempfile::tempdir().unwrap();
     let inputs = root.path().join("inputs");
     fs::create_dir(&inputs).unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[71u8; 32]),
         actor: Actor::Analyst,
@@ -32,7 +32,7 @@ fn large_sources_sign_complete_reports_and_current_parser_identity() {
     let uses = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: &JsonParser,
+        parser: &json_source_parser(),
     };
     let first =
         r#"{"eventTime":"2026-11-01T00:00:00Z","eventName":"First","recipientAccountId":"123"}"#;
@@ -92,7 +92,7 @@ fn large_sources_sign_complete_reports_and_current_parser_identity() {
                 .unwrap()
                 .contains(&format!("Parquet records={expected};"))
         );
-        assert_eq!(manifest.parser_version, "json-stream-v3");
+        assert_eq!(manifest.parser_version, "json-source-v1");
         assert_eq!(manifest.parser_id, "parser-json");
         assert_eq!(manifest.confidence, 0);
         assert_eq!(

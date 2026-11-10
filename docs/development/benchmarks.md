@@ -1089,7 +1089,7 @@ absolute and relative gates.
 Paired release runs also record ingestion and query p95 as integer nanoseconds.
 The same test-only instrumentation runs on the pinned reference and candidate;
 it does not change production parsing, artifact construction or query limits.
-Use `.github/scripts/collect_parquet_pairs.py` in common-schema mode to collect
+The historical paired-run collector from that revision was used to collect
 the complete nine-scenario matrix into `metrics.json`, then run:
 
 ```sh
@@ -1273,7 +1273,7 @@ verification occur outside the timed region. The sample commitment uses the same
 64 KiB prefix as normal ingestion. The [machine-readable measurements](benchmarks/ecs-source-smoke.json)
 record the implementation commit and the identical source SHA-256 for all runs.
 
-Reproduce from the repository root with `sh .github/scripts/benchmark_source_pipeline.sh`.
+The historical profiling workflow and its paired commands are pinned by the measured revisions above. The current graph benchmark measures the mapped writer directly.
 
 ## EVTX and ECS: shared source-pipeline smoke
 

@@ -49,7 +49,7 @@ impl LlmPort for WaitingModel {
 #[test]
 fn cancelling_model_request_is_audited_without_a_result() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[91u8; 32]),
         actor: Actor::Analyst,
@@ -188,7 +188,7 @@ impl ThreatIntelPort for WaitingIntel {
 #[test]
 fn cancelling_approved_external_call_is_audited_without_evidence() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[92u8; 32]),
         actor: Actor::Analyst,

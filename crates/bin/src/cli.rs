@@ -68,15 +68,6 @@ pub(super) enum Command {
         #[arg(long)]
         no_year_rollover: bool,
     },
-    Migrate {
-        case_id: String,
-        /// Explicitly upgrade verified artifacts of an open case to V2.
-        #[arg(long)]
-        artifact_v2: bool,
-        /// Resolve originals that were not retained in the case.
-        #[arg(long, requires = "artifact_v2")]
-        source_root: Option<PathBuf>,
-    },
     Ask {
         case_id: String,
         alert: String,
@@ -136,9 +127,6 @@ pub(super) enum Command {
         case_id: String,
     },
     Graph {
-        case_id: String,
-    },
-    GraphRebuild {
         case_id: String,
     },
     VerifyGraph {

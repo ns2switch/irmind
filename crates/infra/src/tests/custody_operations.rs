@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn operational_cancellation_preserves_a_sealed_case_and_is_verified() {
     let root = tempfile::tempdir().unwrap();
-    let store = std::sync::Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = std::sync::Arc::new(open_source_store(root.path()).unwrap());
     let signer = std::sync::Arc::new(TestSigner {
         key: SigningKey::from_bytes(&[116u8; 32]),
         actor: Actor::Analyst,
@@ -64,7 +64,7 @@ fn operational_cancellation_preserves_a_sealed_case_and_is_verified() {
 #[test]
 fn altered_global_operational_chain_blocks_engine_startup() {
     let root = tempfile::tempdir().unwrap();
-    let store = std::sync::Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = std::sync::Arc::new(open_source_store(root.path()).unwrap());
     let signer = std::sync::Arc::new(TestSigner {
         key: SigningKey::from_bytes(&[118u8; 32]),
         actor: Actor::Analyst,
@@ -117,7 +117,7 @@ fn altered_global_operational_chain_blocks_engine_startup() {
 #[test]
 fn seal_preview_rejects_a_changed_case() {
     let root = tempfile::tempdir().unwrap();
-    let store = std::sync::Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = std::sync::Arc::new(open_source_store(root.path()).unwrap());
     let signer = std::sync::Arc::new(TestSigner {
         key: SigningKey::from_bytes(&[117u8; 32]),
         actor: Actor::Analyst,

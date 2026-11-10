@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn analyst_siem_alert_uses_policy_custody_and_redaction() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[55u8; 32]),
         actor: Actor::Analyst,

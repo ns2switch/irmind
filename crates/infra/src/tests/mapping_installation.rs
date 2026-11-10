@@ -28,7 +28,7 @@ impl Harness {
     fn new() -> Self {
         let root = tempfile::tempdir().unwrap();
         Self {
-            store: Arc::new(LocalStore::open(root.path()).unwrap()),
+            store: Arc::new(open_source_store(root.path()).unwrap()),
             root,
             signer: Arc::new(LocalSigner {
                 key: SigningKey::from_bytes(&[89; 32]),

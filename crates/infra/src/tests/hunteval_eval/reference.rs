@@ -18,7 +18,7 @@ fn reference_corpus(precise: bool) -> Result<(), String> {
         let input = root.path().join("source");
         fs::create_dir(&input).unwrap();
         let names = stage_sources(&input, std::slice::from_ref(episode));
-        let mut local = LocalStore::open(&root.path().join("case")).unwrap();
+        let mut local = open_source_store(&root.path().join("case")).unwrap();
         if precise {
             local.parquet = crate::ParquetStore::open_precise(&root.path().join("case")).unwrap();
         }
@@ -51,7 +51,7 @@ fn reference_corpus(precise: bool) -> Result<(), String> {
         let ingest = LargeCaseUseCases {
             engine: &engine,
             store: store.as_ref(),
-            parser: parser.as_ref(),
+            parser: &json_source_parser(),
         };
         assert_eq!(ingest_selected(&ingest, &case.id, &input, &names), 1);
         assert_eq!(

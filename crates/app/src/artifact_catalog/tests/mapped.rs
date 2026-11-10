@@ -6,13 +6,24 @@ use irmind_domain::{
 };
 
 fn mapped_history() -> (Vec<SignedEntry>, Vec<ParquetArtifactV3>) {
+    mapped_history_for(0, 2)
+}
+
+pub(super) fn mapped_history_for(
+    group: usize,
+    records: usize,
+) -> (Vec<SignedEntry>, Vec<ParquetArtifactV3>) {
     let template = ParquetArtifactV3::decode(
         include_str!("../../../../domain/src/custody_manifest/mapping/goldens/mapped-v3.hex")
             .trim(),
     )
     .unwrap();
+    let name = format!("mapped-{group}.json");
     let manifest = SourceManifestV2 {
-        source: source("mapped.json", template.core().source_hashes[0].clone()),
+        source: source(
+            &name,
+            EvidenceHash::from_bytes(crate::sha256(name.as_bytes())),
+        ),
         parser_id: template.core().parser_id.clone(),
         parser_version: template.core().parser_version.clone(),
         confidence: 90,
@@ -23,9 +34,9 @@ fn mapped_history() -> (Vec<SignedEntry>, Vec<ParquetArtifactV3>) {
     };
     let input = SourceRecordSetV1::from_manifest(
         &manifest,
-        SourceReferenceV1::file("mapped.json").unwrap(),
+        SourceReferenceV1::file(&name).unwrap(),
         vec![SourceFormatIdentityV1::try_new("json", "source-json-v1").unwrap()],
-        2,
+        records as u64,
         hash("3"),
     )
     .unwrap();
@@ -40,9 +51,14 @@ fn mapped_history() -> (Vec<SignedEntry>, Vec<ParquetArtifactV3>) {
         None,
     );
     let mut parents = Vec::new();
-    for suffix in ["one", "two"] {
+    for suffix in 0..records {
         let mut core = template.core().clone();
-        core.path = format!("date=2026-01-02/part-{suffix}.parquet");
+        core.source_hashes = vec![manifest.source.sha256.clone()];
+        core.path = format!(
+            "{}part-{group}-{suffix:08}.parquet",
+            core.partition.path_prefix().unwrap()
+        );
+        core.sha256 = EvidenceHash::from_bytes(crate::sha256(core.path.as_bytes()));
         parents.push(
             ParquetArtifactV3::try_new(
                 core,
@@ -57,7 +73,7 @@ fn mapped_history() -> (Vec<SignedEntry>, Vec<ParquetArtifactV3>) {
             MappingRouteV1::try_new(
                 manifest.source.sha256.clone(),
                 None,
-                MappingCountsV1::try_new(2, 2, 0, 0).unwrap(),
+                MappingCountsV1::try_new(records as u64, records as u64, 0, 0).unwrap(),
             )
             .unwrap(),
         ],

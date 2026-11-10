@@ -165,7 +165,6 @@ def source_cli() -> tuple[set[str], set[str], set[str]]:
 def source_tui_flags() -> set[str]:
     source = "\n".join((ROOT / name).read_text(encoding="utf-8") for name in (
         "crates/tui/src/case/commands/export.rs", "crates/tui/src/case/commands.rs",
-        "crates/tui/src/case/commands/migration.rs"
     ))
     return set(re.findall(r'strip_prefix\("(?:/[a-z-]+ )?(--[a-z0-9-]+) ?"\)', source))
 
@@ -211,7 +210,9 @@ def main() -> int:
         return 2
     paths = markdown_files()
     link_count, link_errors = check_links(paths)
-    cli_count, cli_errors = check_cli(paths, binary)
+    cli_count, cli_errors = check_cli(
+        [path for path in paths if "archive" not in path.relative_to(ROOT).parts], binary
+    )
     translation_warnings = check_translations()
     for error in link_errors + cli_errors:
         print(error, file=sys.stderr)
