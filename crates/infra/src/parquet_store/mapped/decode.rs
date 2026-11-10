@@ -99,12 +99,24 @@ fn decode_source(
     let logical = metadata.source.reference();
     input.source.seek(SeekFrom::Start(0)).map_err(storage)?;
     let report = if decoder.needs_random_access(logical, input.sample) {
-        let report = decoder.decode_local_file(
+        let mut callback_failed = false;
+        let result = decoder.decode_local_file(
             SourceFileInput {
                 metadata,
                 file: input.source,
             },
-            emit,
+            &mut |record| {
+                let result = emit(record);
+                callback_failed |= result.is_err();
+                result
+            },
+        );
+        let report = source_result(
+            input.relative_path,
+            input.sample,
+            input.cancel.is_cancelled(),
+            result,
+            callback_failed,
         )?;
         let (hash, size) = ParquetStore::hash_reader(input.source, input.cancel)?;
         check_hash(hash, size, input)?;
@@ -128,42 +140,62 @@ fn decode_source(
         if reader.io_failed {
             return Err(storage("source read failed"));
         }
-        let report = match result {
-            Err(AppError::Fixed(irmind_app::FixedAppError::SourceFormat)) if !callback_failed => {
-                return Err(rejected(
-                    input,
-                    irmind_app::SourceFailureReason::Format,
-                    vec![],
-                )?);
-            }
-            Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit)) if !callback_failed => {
-                return Err(rejected(
-                    input,
-                    irmind_app::SourceFailureReason::Limit,
-                    vec![],
-                )?);
-            }
-            Err(AppError::Cancelled) if !callback_failed && !input.cancel.is_cancelled() => {
-                return Err(rejected(
-                    input,
-                    irmind_app::SourceFailureReason::Cancelled,
-                    vec![],
-                )?);
-            }
-            other => other?,
-        };
-        if report.accepted == 0 {
-            return Err(rejected(
-                input,
-                irmind_app::SourceFailureReason::Format,
-                report.samples.clone(),
-            )?);
-        }
+        let report = source_result(
+            input.relative_path,
+            input.sample,
+            input.cancel.is_cancelled(),
+            result,
+            callback_failed,
+        )?;
         reader.drain(input.cancel)?;
         let size = reader.bytes;
         check_hash(reader.finish(), size, input)?;
         report
     };
+    Ok(report)
+}
+fn source_result(
+    relative_path: &str,
+    sample: &[u8],
+    cancelled: bool,
+    result: Result<irmind_app::ParseReport, AppError>,
+    callback_failed: bool,
+) -> Result<irmind_app::ParseReport, AppError> {
+    let report = match result {
+        Err(AppError::Fixed(irmind_app::FixedAppError::SourceFormat)) if !callback_failed => {
+            return Err(rejected(
+                relative_path,
+                sample,
+                irmind_app::SourceFailureReason::Format,
+                vec![],
+            )?);
+        }
+        Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit)) if !callback_failed => {
+            return Err(rejected(
+                relative_path,
+                sample,
+                irmind_app::SourceFailureReason::Limit,
+                vec![],
+            )?);
+        }
+        Err(AppError::Cancelled) if !callback_failed && !cancelled => {
+            return Err(rejected(
+                relative_path,
+                sample,
+                irmind_app::SourceFailureReason::Cancelled,
+                vec![],
+            )?);
+        }
+        other => other?,
+    };
+    if report.accepted == 0 {
+        return Err(rejected(
+            relative_path,
+            sample,
+            irmind_app::SourceFailureReason::Format,
+            report.samples.clone(),
+        )?);
+    }
     Ok(report)
 }
 fn check_hash(hash: [u8; 32], size: u64, input: &VerifiedInput<'_>) -> Result<(), AppError> {
@@ -216,13 +248,14 @@ fn route_token(
 }
 
 fn rejected(
-    input: &VerifiedInput<'_>,
+    relative_path: &str,
+    sample: &[u8],
     reason: irmind_app::SourceFailureReason,
     mut samples: Vec<String>,
 ) -> Result<AppError, AppError> {
     if samples.is_empty() {
         samples.push(
-            String::from_utf8_lossy(&input.sample[..input.sample.len().min(256)])
+            String::from_utf8_lossy(&sample[..sample.len().min(256)])
                 .chars()
                 .flat_map(char::escape_default)
                 .take(256)
@@ -230,6 +263,6 @@ fn rejected(
         );
     }
     Ok(AppError::SourceFailure(
-        irmind_app::RejectedSource::try_new(input.relative_path.into(), reason, samples)?,
+        irmind_app::RejectedSource::try_new(relative_path.into(), reason, samples)?,
     ))
 }

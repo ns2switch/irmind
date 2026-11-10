@@ -121,3 +121,22 @@ quedan sin clasificar; un proveedor distinto o ausente nunca coincide solo por c
 
 Consulta las referencias oficiales de campos y resultados en la
 [versión en inglés](../mappings.md#windows-event-log).
+
+## Open Cybersecurity Schema Framework
+
+`parser-ocsf` conserva los campos originales, la precisión temporal y la
+procedencia con `ocsf-source-v1`. Lee Parquet local desde el fichero abierto,
+sin copia temporal ni offsets inventados. El módulo separado `mapping-ocsf`
+valida OCSF **1.4.0**: File Activity, Process Activity, Detection Finding,
+Authentication, Network Activity y API Activity. Otras versiones o pares de
+clase y categoría quedan sin clasificar, con diagnóstico y datos consultables.
+
+Los estados explícitos 1 y 2 significan éxito y fallo. Un estado ausente,
+desconocido o contradictorio queda desconocido. `actor.user` es el actor y
+`user` el objetivo. Los extremos mantienen sus roles de origen y destino.
+Los usuarios conservan sus espacios de nombres explícitos; los PID, también
+los reutilizados, usan el ámbito del registro original y nunca identifican
+una vida de proceso. Un Detection Finding no confirma un hallazgo del caso.
+La implementación nativa valida campos anidados y relaciones entre clase y
+categoría, sin deducir resultados del texto. Véase el
+[esquema oficial fijado](https://github.com/ocsf/ocsf-schema/tree/v1.4.0).

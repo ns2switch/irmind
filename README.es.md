@@ -104,6 +104,7 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Mapeo de eventos comunes de CloudTrail | mapeo local | `mapping-cloudtrail` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
 | Mapeo de eventos comunes Windows | mapeo local | `mapping-evtx` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md#registro-de-eventos-de-windows) |
 | Mapeo de eventos comunes ECS | mapeo local | `mapping-ecs` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
+| Mapeo OCSF de eventos comunes | mapeo local | `mapping-ocsf` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
 | Parser de Elastic Common Schema | parser local | `parser-ecs` (por defecto) | experimental | [ECS](docs/es/modules.md#parser-de-elastic-common-schema) |
 | Parser de OCSF JSON y Parquet | parser local | `parser-ocsf` (por defecto) | experimental | [OCSF](docs/es/modules.md#parser-de-ocsf) |
 | Parser de Velociraptor | parser local | `parser-velociraptor` (por defecto) | experimental | [Velociraptor](docs/es/modules.md#parser-de-velociraptor) |

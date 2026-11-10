@@ -596,3 +596,19 @@ Source hashes remain bound to frozen metadata. No check, limit, taint, canonical
 ordering rule, port signature or current format golden is removed or changed.
 The profiler and its allocator interception remain development tools; the product
 uses its existing allocator and introduces no unsafe code.
+
+### Native OCSF mapping and direct source decoding
+
+Context: OCSF JSON and Parquet require the same typed source pipeline as other
+parsers. Classification belongs to an independent, versioned mapping.
+
+Decision: `ocsf-source-v1` retains original fields and timestamp precision;
+Parquet uses the authenticated source handle and a row ordinal. Native
+`mapping-ocsf` pins OCSF 1.4.0 to validate class/category pairs, nested typed
+values, explicit statuses and occurrence roles. Other versions retain
+unclassified extraction. No message-text inference or process lifetime from
+a PID is permitted.
+
+Consequences: current default ingestion and current golden bytes are unchanged.
+The experimental pipeline uses the existing mapping, custody and export
+contracts. No production package is added to the lockfile.

@@ -274,3 +274,5 @@ fn oversized_parquet_row_keeps_only_a_bounded_sample() -> Result<(), Box<dyn std
     assert!(report.samples[0].len() <= 256);
     Ok(())
 }
+
+mod source_decode;

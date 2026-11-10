@@ -2,7 +2,8 @@
     feature = "mapping-json-compat",
     feature = "mapping-journald-compat",
     feature = "mapping-linux",
-    feature = "mapping-ecs"
+    feature = "mapping-ecs",
+    feature = "mapping-ocsf"
 ))]
 mod mapping;
 #[cfg(feature = "llm-anthropic")]
@@ -138,7 +139,8 @@ fn register_parsers(
         feature = "mapping-json-compat",
         feature = "mapping-journald-compat",
         feature = "mapping-linux",
-        feature = "mapping-ecs"
+        feature = "mapping-ecs",
+        feature = "mapping-ocsf"
     ))]
     if experimental {
         mapping::register(registry)?;

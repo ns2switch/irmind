@@ -107,6 +107,7 @@ The normal build includes every current product module and both keystores. None 
 | Windows common-event mapping | local mapping | `mapping-evtx` | experimental, opt-in writer | [Mappings](docs/mappings.md#windows-event-log) |
 | ECS common-event mapping | local mapping | `mapping-ecs` | experimental, opt-in writer | [Mappings](docs/mappings.md) |
 | Elastic Common Schema parser | local parser | `parser-ecs` (default) | experimental | [ECS parser](docs/modules.md#elastic-common-schema-parser) |
+| OCSF common-event mapping | local mapping | `mapping-ocsf` | experimental, opt-in writer | [Mappings](docs/mappings.md) |
 | OCSF JSON and Parquet parser | local parser | `parser-ocsf` (default) | experimental | [OCSF parser](docs/modules.md#ocsf-parser) |
 | Velociraptor parser | local parser | `parser-velociraptor` (default) | experimental | [Velociraptor](docs/modules.md#velociraptor-parser) |
 | Hayabusa parser | local parser | `parser-hayabusa` (default) | experimental | [Hayabusa](docs/modules.md#hayabusa-parser) |

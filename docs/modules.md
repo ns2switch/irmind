@@ -162,7 +162,7 @@ The mapping follows the [official ECS field reference](https://www.elastic.co/do
 
 ## OCSF parser
 
-**Does:** Detects OCSF JSON (including pretty-printed records) or NDJSON from `class_uid`, `category_uid`, and `metadata.version`. Maps Authentication, API Activity, Network Activity, Process Activity, File Activity, and Detection Finding. It also reads OCSF Parquet exports, including Security Lake files, through the existing Parquet reader. Unknown fields remain local as attributes.
+**Does:** Detects OCSF JSON (including pretty-printed records) or NDJSON from `class_uid`, `category_uid`, and `metadata.version`. The original-field decoder preserves OCSF fields and precise timestamps. With the experimental common writer, the separate `mapping-ocsf` module validates OCSF 1.4 classifications and roles for Authentication, API Activity, Network Activity, Process Activity, File Activity, and Detection Finding; other versions remain unclassified and searchable. See [mapping coverage](mappings.md#open-cybersecurity-schema-framework). It also reads OCSF Parquet exports, including Security Lake files, through the existing Parquet reader. Unknown fields remain local as attributes.
 
 **Permission:** Read access to the selected local file. Local OCSF Parquet is read directly with random access, without a parser-created copy. Cloud object streams use a private, automatically removed spool inside the case data directory before parsing.
 

@@ -22,6 +22,7 @@ impl Input {
             (bytes, (bytes - 4096) / 65536 * 17)
         } else {
             let mut value = match label {
+                "ocsf" => serde_json::json!({"time_dt":"2026-11-01T00:00:00.123456789Z","metadata":{"version":"1.4.0"},"class_uid":3002,"category_uid":3,"activity_id":1,"status_id":2,"device":{"hostname":"synthetic-host"},"actor":{"user":{"name":"alice","domain":"LAB"}},"src_endpoint":{"ip":"203.0.113.77"}}),
                 "ecs" => {
                     serde_json::json!({"@timestamp":"2026-11-01T00:00:00.123456789Z","ecs":{"version":"9.5.0"},"event":{"category":["authentication"],"type":["start"],"outcome":"failure"},"host":{"name":"synthetic-host"},"user":{"name":"alice","domain":"LAB"},"source":{"ip":"203.0.113.77"}})
                 }
@@ -60,6 +61,7 @@ impl Input {
 }
 pub(super) fn catalog(label: &str, root: &Path) -> (Arc<MappingCatalog>, Arc<mapped::Timings>) {
     let (decoder, mappers): (Arc<dyn SourceDecoder>, Vec<Arc<dyn SourceMapper>>) = match label {
+        "ocsf" => (Arc::new(irmind_mod_parser_ocsf::OcsfSourceDecoder),vec![Arc::new(irmind_mod_mapping_ocsf::OcsfMapping::new().unwrap())]),
         "ecs" => (
             Arc::new(irmind_mod_parser_ecs::EcsSourceDecoder),
             vec![Arc::new(irmind_mod_mapping_ecs::EcsMapping::new().unwrap())],
@@ -107,6 +109,7 @@ pub(super) fn parser(
 ) -> Box<dyn StreamingEventParser> {
     if mapped {
         let (id, version) = match label {
+            "ocsf" => ("parser-ocsf", "ocsf-source-v1"),
             "ecs" => ("parser-ecs", "ecs-source-v1"),
             "cloudtrail" => ("parser-json", "json-source-v1"),
             "linux" => ("parser-linux", "linux-source-v1"),
@@ -116,6 +119,7 @@ pub(super) fn parser(
         return Box::new(catalog.decoder_selection(id, version).unwrap());
     }
     match label {
+        "ocsf" => Box::new(irmind_mod_parser_ocsf::OcsfParser),
         "ecs" => Box::new(irmind_mod_parser_ecs::EcsParser),
         "cloudtrail" => Box::new(JsonParser),
         "linux" => Box::new(irmind_mod_parser_linux::LinuxParser::default()),
