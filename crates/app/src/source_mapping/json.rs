@@ -58,8 +58,8 @@ pub fn validate_json_value(
 /// Display/search projection only. Source hashes use the typed canonical codec.
 /// Binary values have an explicit hexadecimal display wrapper.
 pub fn render_source_fields(fields: &SourceValue) -> Result<String, SourceRecordError> {
-    fields.validate()?;
-    write::render(fields)
+    let capacity = fields.validate()?;
+    write::render(fields, capacity)
 }
 
 #[cfg(test)]

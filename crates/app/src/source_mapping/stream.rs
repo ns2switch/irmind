@@ -59,6 +59,7 @@ pub struct SourceRecordAccumulator<'a> {
     identity: SourceDecoderIdentityV1,
     catalog: &'a MappingCatalog,
     source_size: u64,
+    source_hash: EvidenceHash,
     records: u64,
     previous: Option<u64>,
     offset: OffsetState,
@@ -82,6 +83,7 @@ impl<'a> SourceRecordAccumulator<'a> {
                 .map_err(|_| invalid())?,
             catalog,
             source_size,
+            source_hash: EvidenceHash::from_bytes(metadata.evidence_hash),
             records: 0,
             previous: None,
             offset: OffsetState::Initial,
@@ -154,7 +156,7 @@ impl<'a> SourceRecordAccumulator<'a> {
             return Err(invalid());
         }
         let hash = commitment::finish(spool, self.records, self.metadata, self.spool_hash)?;
-        let source = EvidenceHash::from_bytes(self.metadata.evidence_hash);
+        let source = self.source_hash;
         let routes = self
             .routes
             .into_iter()

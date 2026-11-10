@@ -1,14 +1,27 @@
 use super::{SourceRecordError, SourceValue};
 use std::fmt::Write as _;
 
-pub(super) fn render(value: &SourceValue) -> Result<String, SourceRecordError> {
-    let mut output = String::new();
+pub(super) fn render(value: &SourceValue, capacity: usize) -> Result<String, SourceRecordError> {
+    let mut output = String::with_capacity(capacity);
     write(value, &mut output)?;
     Ok(output)
 }
 fn quoted(value: &str, output: &mut String) -> Result<(), SourceRecordError> {
-    output.push_str(&serde_json::to_string(value).map_err(|_| SourceRecordError::InvalidEncoding)?);
-    Ok(())
+    serde_json::to_writer(Append(output), value).map_err(|_| SourceRecordError::InvalidEncoding)
+}
+/// String fragments emitted by `serde_json` remain UTF-8. Append to the shared
+/// output buffer instead of allocating a temporary JSON string for every field.
+struct Append<'a>(&'a mut String);
+impl std::io::Write for Append<'_> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let text = std::str::from_utf8(bytes)
+            .map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidData))?;
+        self.0.push_str(text);
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 fn write(value: &SourceValue, output: &mut String) -> Result<(), SourceRecordError> {
     match value {

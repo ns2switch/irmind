@@ -28,6 +28,8 @@ pub(super) fn finish<S: Read + Seek>(
     digest.update(b"irmind-source-records-commitment-v1\0");
     digest.update(count.to_be_bytes());
     let mut observed = Sha256::new();
+    let mut spool = std::io::BufReader::with_capacity(64 * 1024, spool);
+    let mut tuple = Vec::with_capacity(129);
     for _ in 0..count {
         if metadata.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
@@ -38,7 +40,7 @@ pub(super) fn finish<S: Read + Seek>(
         if header[8] > 1 {
             return Err(invalid());
         }
-        let mut tuple = Vec::with_capacity(129);
+        tuple.clear();
         field(&mut tuple, source.as_str().as_bytes());
         tuple.extend_from_slice(&header);
         if header[8] == 1 {

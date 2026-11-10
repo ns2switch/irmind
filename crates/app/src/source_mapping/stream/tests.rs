@@ -333,3 +333,22 @@ fn prepared_outputs_bind_only_after_complete_source_manifest_and_row_accounting(
     bad.source.size += 1;
     assert!(prepare(2).bind(&bad).is_err());
 }
+
+#[test]
+fn buffered_commitment_rejects_changes_on_both_sides_of_the_read_boundary() {
+    let source = SourceReferenceV1::file("logs/record.json").unwrap();
+    let cancel = CancellationToken::new();
+    let catalog = MappingCatalog::freeze(vec![Arc::new(Decoder)], vec![]).unwrap();
+    for position in [None, Some(65_535), Some(65_536), Some(65_537)] {
+        let mut acc = accumulator(&source, &cancel, &catalog);
+        let mut spool = Cursor::new(Vec::new());
+        for n in 0..2048 {
+            acc.accept(&record(n, 0), &mut spool).unwrap();
+        }
+        if let Some(position) = position {
+            spool.get_mut()[position] ^= 1;
+        }
+        let result = acc.finish(&mut spool, &report(2048));
+        assert_eq!(result.is_ok(), position.is_none());
+    }
+}
