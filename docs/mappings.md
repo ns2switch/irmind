@@ -67,7 +67,7 @@ classifications from action or message text. Unknown labels stay in the source
 and produce diagnostics; missing outcome remains unknown.
 
 Source and destination addresses retain their roles. Actor and target users use
-explicit directory, host and account qualifiers; an absent directory namespace
+explicit directory, host and account/project qualifiers; an absent directory namespace
 keeps identities local to their source record. Process PIDs always use source-record
 scope. Names and producer IDs remain searchable context, without inventing a
 process lifetime. Conflicting dotted and nested aliases are unsupported.

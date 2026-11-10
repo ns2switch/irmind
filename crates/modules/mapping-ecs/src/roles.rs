@@ -87,17 +87,19 @@ fn user_scope(
         _ => "",
     };
     let realm = read(domain);
-    let host = if read(F::HostId).is_empty() {
-        read(F::HostName)
+    let (host_kind, host) = if read(F::HostId).is_empty() {
+        ("name", read(F::HostName))
     } else {
-        read(F::HostId)
+        ("id", read(F::HostId))
     };
     let account = read(F::CloudAccountId);
-    let source_namespace = if realm.is_empty() || (host.is_empty() && account.is_empty()) {
-        source.origin().source().as_str()
-    } else {
-        ""
-    };
+    let project = read(F::CloudProjectId);
+    let source_namespace =
+        if realm.is_empty() || (host.is_empty() && account.is_empty() && project.is_empty()) {
+            source.origin().source().as_str()
+        } else {
+            ""
+        };
     let mut material = b"irmind-ecs-user-namespace-v1\0".to_vec();
     let ordinal = source.origin().record().to_string();
     let record = if realm.is_empty() {
@@ -116,6 +118,8 @@ fn user_scope(
     for value in [
         read(F::CloudProvider),
         account,
+        project,
+        if host.is_empty() { "" } else { host_kind },
         host,
         realm,
         source_namespace,

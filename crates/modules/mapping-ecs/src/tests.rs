@@ -203,3 +203,35 @@ fn identical_names_in_two_roles_share_identity_only_in_the_same_namespace() {
     assert_eq!(actor.entity(), target.entity());
     assert_ne!(actor.role(), target.role());
 }
+
+#[test]
+fn reported_host_identifier_kind_and_cloud_project_qualify_user_namespaces() {
+    let user = |text: &str| {
+        let output = EcsMapping::new()
+            .unwrap()
+            .map(&records(text.as_bytes()).remove(0))
+            .unwrap();
+        output
+            .record()
+            .common
+            .observations()
+            .values()
+            .iter()
+            .find(|o| o.field() == F::UserName)
+            .unwrap()
+            .entity()
+            .clone()
+    };
+    let text = std::str::from_utf8(SAMPLE).unwrap();
+    assert_ne!(
+        user(text),
+        user(&text.replace("\"host\":{\"name\":", "\"host\":{\"id\":"))
+    );
+    let project = |name| {
+        text.replace(
+            "\"message\":",
+            &format!("\"cloud\":{{\"project\":{{\"id\":\"{name}\"}}}},\"message\":"),
+        )
+    };
+    assert_ne!(user(&project("synthetic-a")), user(&project("synthetic-b")));
+}
