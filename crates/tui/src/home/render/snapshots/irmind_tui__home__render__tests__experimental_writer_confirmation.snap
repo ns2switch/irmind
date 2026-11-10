@@ -10,10 +10,10 @@ IRMind v0.1.0
   │Context hints: on                                                         │
   │Theme: auto                                                               │
   │Common writer (experimental): off (V2 default)                            │
+  │Maximum parallel workers: automatic                                       │
   │Experimental V3 / export V6 / ParquetLayoutV1 are unstable.               │
   │Updates can break these cases without migration. Synthetic data only.     │
   │> 1. Cancel     2. Enable and sign                                        │
-  │                                                                          │
   │                                                                          │
   │                                                                          │
   │                                                                          │

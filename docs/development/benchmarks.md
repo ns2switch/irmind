@@ -1423,3 +1423,16 @@ class/category, activity/status and typed fields; the reference does not perform
 that common-event interpretation. This compressible synthetic smoke is not a
 substitute for the full 15 GB matrix. [Raw counters and allocation attribution](benchmark-data/ocsf-source-585a8c1/metadata.json)
 are retained with the run metadata.
+
+### Adaptive source and query workers
+
+The [same-runner release sweep](https://github.com/ns2switch/irmind/actions/runs/42920654601) used four logical CPUs and 1,077,079,150 bytes of synthetic CloudTrail across 1,030 files. Both revisions wrote mapped V3, with identical output size (259,162,335 bytes). Peak RSS covers the benchmark process, including queries; it excludes compilation.
+
+| Scheduling | Ingest wall (s) | Speedup over one worker | Peak RSS (MiB) | Slowest query p95 (s) |
+| --- | ---: | ---: | ---: | ---: |
+| Fixed four workers, reference | 44.460 | 1.49× | 133.0 | 0.399 |
+| Adaptive, cap one | 66.312 | 1.00× | 89.2 | 0.829 |
+| Adaptive, automatic (three) | 48.146 | 1.38× | 100.7 | 0.442 |
+| Adaptive, cap four (all CPUs) | 44.391 | 1.49× | 109.9 | 0.389 |
+
+One run per setting. The four-worker cap matched the fixed reference's elapsed time. Automatic mode took 8.3% longer while leaving a logical CPU available. This sweep measures scheduling across files, not decoding a single large file.
