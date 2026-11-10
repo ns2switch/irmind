@@ -2496,6 +2496,7 @@ dependencies = [
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
  "irmind-mod-mapping-linux",
+ "irmind-mod-mapping-ocsf",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
@@ -2881,6 +2882,18 @@ dependencies = [
  "irmind-domain",
  "irmind-mapping-tables",
  "irmind-mod-parser-linux",
+ "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-mapping-ocsf"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-ocsf",
  "irmind-testkit",
 ]
 

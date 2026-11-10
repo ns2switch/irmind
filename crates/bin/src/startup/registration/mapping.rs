@@ -24,6 +24,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
         Box::new(irmind_mod_mapping_ecs::EcsMapping::new()?),
         &ModuleConfig::new(),
     )?;
+    #[cfg(feature = "mapping-ocsf")]
+    registry.register(
+        Box::new(irmind_mod_mapping_ocsf::OcsfMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     Ok(())
 }
 #[cfg(feature = "mapping-evtx")]
@@ -94,6 +99,10 @@ mod tests {
                 )))
                 .unwrap();
         }
+        #[cfg(feature = "mapping-ocsf")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_ocsf::OcsfSourceDecoder))
+            .unwrap();
         register(&mut registry).unwrap();
         let catalog = registry.mapping_catalog().unwrap();
         assert!(catalog.supports_decoder("parser-json", "json-source-v1"));
@@ -103,6 +112,7 @@ mod tests {
             2 + usize::from(cfg!(feature = "mapping-cloudtrail"))
                 + 5 * usize::from(cfg!(feature = "mapping-linux"))
                 + usize::from(cfg!(feature = "mapping-ecs"))
+                + usize::from(cfg!(feature = "mapping-ocsf"))
                 + 20 * usize::from(cfg!(feature = "mapping-evtx"))
         );
     }

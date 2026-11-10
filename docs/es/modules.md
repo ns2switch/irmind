@@ -164,6 +164,8 @@ El mapeo sigue la [referencia oficial de ECS](https://www.elastic.co/docs/refere
 
 ## Parser de OCSF
 
+El decodificador conserva campos y precisión originales. Con el escritor común experimental, `mapping-ocsf` valida OCSF 1.4 y sus roles. Otras versiones quedan sin clasificar y siguen siendo consultables. Véase la [cobertura del mapeo](mappings.md#open-cybersecurity-schema-framework).
+
 **Función:** Detecta OCSF JSON, incluidos registros con formato multilínea, o NDJSON mediante `class_uid`, `category_uid` y `metadata.version`. Mapea Authentication, API Activity, Network Activity, Process Activity, File Activity y Detection Finding. También lee exportaciones OCSF Parquet, incluidas las de Security Lake, con el lector Parquet existente. Los campos desconocidos se conservan localmente.
 
 **Permiso:** Lectura del archivo local. OCSF Parquet local se lee directamente con acceso aleatorio, sin copia creada por el parser. Los flujos de objetos en la nube usan un temporal privado dentro del directorio de datos del caso que se elimina al terminar.

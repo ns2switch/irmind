@@ -24,6 +24,7 @@ pub(super) fn experimental(
         feature = "mapping-journald-compat",
         feature = "mapping-linux",
         feature = "mapping-ecs",
+        feature = "mapping-ocsf",
         feature = "mapping-evtx",
         feature = "parser-declarative"
     )) {
@@ -35,6 +36,7 @@ pub(super) fn experimental(
     if !catalog.supports_decoder("parser-json", "json-source-v1")
         && !catalog.supports_decoder("parser-linux", "linux-source-v1")
         && !catalog.supports_decoder("parser-ecs", "ecs-source-v1")
+        && !catalog.supports_decoder("parser-ocsf", "ocsf-source-v1")
         && !catalog.supports_decoder("parser-evtx", "evtx-source-v1")
         && !registry
             .parser_catalog()
@@ -64,6 +66,7 @@ pub(super) fn experimental_parsers(
         feature = "mapping-journald-compat",
         feature = "mapping-linux",
         feature = "mapping-ecs",
+        feature = "mapping-ocsf",
         feature = "mapping-evtx",
         feature = "parser-declarative"
     )) {
@@ -77,6 +80,8 @@ pub(super) fn experimental_parsers(
     let catalog = catalog.with_experimental_parser(irmind_mod_parser_linux::source_log_parser())?;
     #[cfg(feature = "mapping-ecs")]
     let catalog = catalog.with_experimental_parser(irmind_mod_parser_ecs::source_log_parser())?;
+    #[cfg(feature = "mapping-ocsf")]
+    let catalog = catalog.with_experimental_parser(irmind_mod_parser_ocsf::source_log_parser())?;
     let mappings = registry.mapping_catalog()?;
     #[cfg(feature = "mapping-evtx")]
     let catalog = if mappings

@@ -36,6 +36,8 @@ tempfile = "3"
 dbus = { version = "0.9", features = ["vendored"] }
 
 [dev-dependencies]
+irmind-mod-parser-ocsf = { path = "../modules/parser-ocsf", version = "0.1.0" }
+irmind-mod-mapping-ocsf = { path = "../modules/mapping-ocsf", version = "0.1.0" }
 irmind-mod-mapping-ecs = { path = "../modules/mapping-ecs", version = "0.1.0" }
 irmind-mod-mapping-evtx = { path = "../modules/mapping-evtx", version = "0.1.0" }
 irmind-mod-parser-ecs = { path = "../modules/parser-ecs", version = "0.1.0" }

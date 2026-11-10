@@ -5,7 +5,7 @@ use parquet::file::reader::{FileReader, SerializedFileReader};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 
-const MAX_PARQUET_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+pub(super) const MAX_PARQUET_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_RECORDS: usize = 10_000_000;
 const MAX_METADATA_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_ROW_GROUP_BYTES: i64 = 256 * 1024 * 1024;
@@ -89,7 +89,7 @@ fn reject_row(report: &mut ParseReport, encoded: &str) {
     }
 }
 
-fn validate_row_groups(
+pub(super) fn validate_row_groups(
     metadata: &parquet::file::metadata::ParquetMetaData,
 ) -> Result<(), AppError> {
     if metadata.num_row_groups() > 100_000
@@ -111,7 +111,7 @@ fn validate_row_groups(
     Ok(())
 }
 
-fn validate_footer(spool: &mut std::fs::File, size: u64) -> Result<(), AppError> {
+pub(super) fn validate_footer(spool: &mut std::fs::File, size: u64) -> Result<(), AppError> {
     if size < 12 {
         return Err(policy_error("OCSF Parquet footer is missing"));
     }

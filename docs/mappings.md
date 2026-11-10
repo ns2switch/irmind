@@ -8,6 +8,7 @@ The common writer is currently experimental and opt-in during the decoder rollou
 | --- | --- | --- | --- | --- |
 | CloudTrail | CloudTrail JSON through `json-source-v1` | Bundled, hash-pinned TOML | `mapping-cloudtrail` | Experimental; synthetic contracts |
 | Windows Event Log | Original EVTX through `evtx-source-v1` | Bundled, hash-pinned per-event/channel TOML modules | `mapping-evtx` | Experimental; synthetic contracts |
+| OCSF | Original JSON or Parquet through `ocsf-source-v1` | Native, typed OCSF 1.4 validation | `mapping-ocsf` | Experimental; synthetic contracts |
 | ECS | Original ECS NDJSON through `ecs-source-v1` | Native, typed ECS 9.5 validation | `mapping-ecs` | Experimental; synthetic contracts |
 | Generic JSON compatibility | Other JSON without `eventVersion` | Native, extraction-only | `mapping-json-compat` | Experimental; no inferred categories or roles |
 | Journald compatibility | Original journald JSON | Native, extraction-only | `mapping-journald-compat` | Experimental; no inferred categories or roles |
@@ -124,3 +125,30 @@ Field and outcome references: Microsoft's [4625](https://learn.microsoft.com/en-
 [4776](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4776),
 [PowerShell logging](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows)
 and [Sysmon](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon) documentation.
+
+## Open Cybersecurity Schema Framework
+
+`parser-ocsf` emits original typed fields, measured byte offsets for JSON,
+and full source timestamp precision. Local Parquet uses the original open file;
+its row ordinal is recorded without inventing a byte offset. Both formats use
+`ocsf-source-v1`.
+
+The separate `mapping-ocsf` module validates OCSF **1.4.0** class/category pairs
+for File Activity (1001), Process Activity (1007), Detection Finding (2004),
+Authentication (3002), Network Activity (4001) and API Activity (6003). Explicit
+status IDs 1/2 mean success/failure; missing, unknown, other or conflicting
+status remains unknown. Activity and status tables never interpret message text.
+Other schema versions and unsupported class/category pairs remain unclassified,
+with diagnostics and their original searchable fields and extraction aliases.
+
+`actor.user` and root `user` map to actor and target; endpoints retain source
+and destination roles. Directory, host and account qualifiers namespace users.
+An absent directory keeps a user local to its source record. Process and parent
+PIDs always use source-record scope, including reused PIDs: a UID is retained
+as context, without assuming that it proves a process lifetime. Detection
+Finding is source telemetry and never confirms a case finding.
+
+The native implementation validates nested typed values and class/category
+relationships that finite field tables cannot express. It follows the
+[pinned OCSF schema](https://github.com/ocsf/ocsf-schema/tree/v1.4.0),
+including the documented [authentication roles](https://github.com/ocsf/ocsf-schema/blob/v1.4.0/events/iam/authentication.json).

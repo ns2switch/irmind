@@ -46,6 +46,7 @@ pub struct JsonFrames<'a> {
     position: u64,
     mode: Mode,
     wrapper_keys: BTreeSet<String>,
+    record_wrappers: bool,
 }
 impl<'a> JsonFrames<'a> {
     pub fn new(reader: &'a mut dyn Read, cancel: &'a CancellationToken) -> Self {
@@ -55,7 +56,14 @@ impl<'a> JsonFrames<'a> {
             position: 0,
             mode: Mode::Roots,
             wrapper_keys: BTreeSet::new(),
+            record_wrappers: true,
         }
+    }
+    /// Formats with flat event objects must retain fields named `events` as data.
+    #[must_use]
+    pub fn without_record_wrappers(mut self) -> Self {
+        self.record_wrappers = false;
+        self
     }
     pub fn next_frame(&mut self) -> Result<Option<JsonFrame>, AppError> {
         loop {
@@ -134,7 +142,8 @@ impl<'a> JsonFrames<'a> {
             if keys.len() > 1024 {
                 return Err(invalid());
             }
-            if matches!(key.as_str(), "Records" | "records" | "events")
+            if self.record_wrappers
+                && matches!(key.as_str(), "Records" | "records" | "events")
                 && self.peek()? == Some(b'[')
             {
                 if duplicates || bytes.1 || !valid_prefix(&bytes.0[..metadata_end]) {

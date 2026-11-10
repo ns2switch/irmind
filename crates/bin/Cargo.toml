@@ -7,7 +7,7 @@ license.workspace = true
 
 [features]
 default = [
-    "mapping-json-compat", "mapping-journald-compat", "mapping-cloudtrail", "mapping-linux", "mapping-ecs", "mapping-evtx",
+    "mapping-json-compat", "mapping-journald-compat", "mapping-cloudtrail", "mapping-linux", "mapping-ecs", "mapping-evtx", "mapping-ocsf",
     "keystore-os", "keystore-file",
     "parser-json", "parser-syslog", "parser-linux", "parser-evtx",
     "parser-ecs", "parser-ocsf", "parser-declarative",
@@ -20,6 +20,7 @@ default = [
 mapping-cloudtrail = ["dep:irmind-mod-mapping-cloudtrail", "parser-json"]
 mapping-evtx = ["dep:irmind-mod-mapping-evtx", "parser-evtx"]
 mapping-ecs = ["dep:irmind-mod-mapping-ecs", "parser-ecs"]
+mapping-ocsf = ["dep:irmind-mod-mapping-ocsf", "parser-ocsf"]
 mapping-linux = ["dep:irmind-mod-mapping-linux", "parser-linux"]
 mapping-json-compat = ["dep:irmind-mod-mapping-json-compat", "parser-json"]
 mapping-journald-compat = ["dep:irmind-mod-mapping-journald-compat", "parser-linux"]
@@ -56,6 +57,7 @@ storage-azure = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/azu
 [dependencies]
 irmind-mod-mapping-evtx = { path = "../modules/mapping-evtx", version = "0.1.0", optional = true }
 irmind-mod-mapping-cloudtrail = { path = "../modules/mapping-cloudtrail", version = "0.1.0", optional = true }
+irmind-mod-mapping-ocsf = { path = "../modules/mapping-ocsf", version = "0.1.0", optional = true }
 irmind-mod-mapping-ecs = { path = "../modules/mapping-ecs", version = "0.1.0", optional = true }
 irmind-mod-mapping-linux = { path = "../modules/mapping-linux", version = "0.1.0", optional = true }
 irmind-mod-mapping-json-compat = { path = "../modules/mapping-json-compat", version = "0.1.0", optional = true }

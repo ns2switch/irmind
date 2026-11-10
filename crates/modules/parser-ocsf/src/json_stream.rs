@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader, Read};
 
 const MAX_RECORD_BYTES: usize = 4 * 1024 * 1024;
 const MAX_RECORDS: usize = 10_000_000;
-const MAX_SOURCE_BYTES: u64 = 50 * 1024 * 1024 * 1024;
+pub(super) const MAX_SOURCE_BYTES: u64 = 50 * 1024 * 1024 * 1024;
 
 pub(super) fn parse(
     source: &str,
@@ -114,7 +114,7 @@ fn parse_json_value(
     Ok(parsed)
 }
 
-fn bounded_line(
+pub(super) fn bounded_line(
     reader: &mut impl BufRead,
     cancel: &CancellationToken,
     remaining: u64,

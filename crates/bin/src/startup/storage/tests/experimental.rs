@@ -46,6 +46,21 @@ fn registry() -> ModuleRegistry {
             )
             .unwrap();
     }
+    #[cfg(feature = "mapping-ocsf")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_ocsf::OcsfParser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_ocsf::OcsfMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
     #[cfg(feature = "mapping-cloudtrail")]
     registry
         .register(
@@ -265,3 +280,6 @@ mod evtx;
 
 #[cfg(any(feature = "mapping-ecs", feature = "mapping-evtx"))]
 mod profile;
+
+#[cfg(feature = "mapping-ocsf")]
+mod ocsf;
