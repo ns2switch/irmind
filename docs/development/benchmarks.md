@@ -1247,3 +1247,30 @@ Metric file checksums (SHA-256):
 
 - `result-materialization-run.json`: `08aa2903ff59b5ef7d884daee977e27c64ce86f099fe0dfe6b7ce2773479d6d2`.
 - `result-materialization-summary.json`: `82584fefe79de9d93ea74a899db598fecff7d2a9e7274c39b890bb3785e4ae17`.
+
+
+## ECS source pipeline: paired release smoke
+
+The separate ECS source decoder and native mapping were measured in one local
+release execution, with three paired repetitions per pipeline. Each ingested the
+same 1,073,742,930-byte synthetic NDJSON file: 917,729 chronological events, one
+host, explicit authentication failures and 900 bytes of padding per event. Every
+run retained all events, rejected none and verified the signed chain. This is a
+1 GiB smoke measurement, not a new 15 GB release-gate result.
+
+| Pipeline | Repetition 1 (s) | Repetition 2 (s) | Repetition 3 (s) | Median (s) | Median MiB/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Existing V2 extraction | 25.168 | 23.098 | 23.493 | 23.493 | 43.588 |
+| Source decoder + native ECS mapping, V3 | 30.713 | 33.611 | 30.673 | 30.713 | 33.341 |
+
+The mapped pipeline takes 30.7% longer at the median. It performs explicit typed
+classification and role validation and writes the common schemas; this is not
+an isolated parser-speed comparison. The default route and its golden bytes are
+unchanged during decoder rollout. No performance threshold is relaxed.
+
+Timing covers ingestion; corpus creation, physical-row accounting and signed
+verification occur outside the timed region. The sample commitment uses the same
+64 KiB prefix as normal ingestion. The [machine-readable measurements](benchmarks/ecs-source-smoke.json)
+record the implementation commit and the identical source SHA-256 for all runs.
+
+Reproduce from the repository root with `sh scripts/benchmark_ecs_source.sh`.
