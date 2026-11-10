@@ -656,3 +656,11 @@ source-specific relations; no arbitrary expressions or code are loaded.
 Consequences: exact decimal timestamps remain available to the common writer,
 and reconstruction uses the same signed source and mapping identities. No
 current signed format or external production dependency changes.
+
+### Size local worker pools without changing signed groups
+
+Context: a fixed four-source schedule can oversubscribe a small machine and leave capacity idle on a larger one.
+
+Decision: the direct mapped writer and parallel Parquet scans use the available logical CPU count minus one by default. A signed local preference can request a specific cap. Each operation reserves 512 MiB for the coordinator and writers and 512 MiB per worker within a 4 GiB scheduling budget. The reservation bounds concurrency; it is not a claim about process RSS. Existing decoder, row group, queue and writer limits still apply.
+
+Consequences: the signed source group and canonical order stay independent of worker count. Disk preflight reserves scratch space for the largest concurrently staged sources. Windows EVTX retains serial helper launch with parallel hashing.

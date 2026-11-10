@@ -121,6 +121,9 @@ fn fields(config: &PersistentConfig) -> BTreeMap<String, String> {
     if let Some(value) = config.resume_last_case {
         out.insert("resume_last_case".into(), value.to_string());
     }
+    if let Some(value) = config.max_parallel_workers {
+        out.insert("max_parallel_workers".into(), value.to_string());
+    }
     if let Some(value) = config.experimental_common_writer {
         out.insert("experimental_common_writer".into(), value.to_string());
     }

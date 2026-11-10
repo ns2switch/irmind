@@ -199,6 +199,11 @@ impl PreparedStartup {
         if let Some(store) = storage::experimental(&self.home, &self.saved, registry)? {
             self.store = Arc::new(store);
         }
+        self.store.set_parallel_worker_limit(
+            self.saved
+                .max_parallel_workers
+                .and_then(std::num::NonZeroU16::new),
+        );
         Ok(catalog)
     }
 
@@ -422,6 +427,7 @@ fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) ->
                     overrides_active: context.overrides_active,
                     mouse_capture: context.mouse_capture,
                     theme: saved.theme.as_deref(),
+                    max_parallel_workers: saved.max_parallel_workers,
                 },
             )?;
             match outcome {

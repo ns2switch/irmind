@@ -38,6 +38,7 @@ mod source_parser;
 mod spool;
 mod store_bridge;
 mod time_cell;
+mod workers;
 mod writer;
 use writer::{
     Partition, PartitionSinks, RecordRow, StagedArtifact, batch_to_parquet, finish_parquet,
@@ -69,6 +70,7 @@ fn invalid_source() -> AppError {
 pub struct ParquetStore {
     root: PathBuf,
     finish_lock: std::sync::Mutex<()>,
+    workers: workers::WorkerSettings,
     profile: Option<Arc<ParquetProfile>>,
     legacy_entities: bool,
     precise_time: bool,
@@ -91,6 +93,7 @@ impl ParquetStore {
         Ok(Self {
             root,
             finish_lock: std::sync::Mutex::new(()),
+            workers: workers::WorkerSettings::default(),
             profile: None,
             legacy_entities: false,
             precise_time: false,

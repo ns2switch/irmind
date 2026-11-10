@@ -1,4 +1,4 @@
-//! Canonical consumption of at most four bounded parser queues into final writers.
+//! Canonical consumption of bounded parser queues into final writers.
 use super::{
     Allocator, AppError, Arc, AtomicBool, CancellationToken, Duration, Input, LocalBatchRequest,
     ParquetStore, ParsedSource, ProducedSource, Receiver, RecvTimeoutError, RowBatch,

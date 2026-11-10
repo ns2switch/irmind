@@ -43,6 +43,8 @@ For Splunk, MISP, CrowdStrike, SentinelOne, and an S3-compatible storage endpoin
 
 `resume_last_case` and `show_hints` default to `true`. After startup, the TUI reopens the most recently used open case only if its custody chain verifies. Sealed or deleted cases stay on the home screen; a verification failure appears there as a warning. Use `/settings preferences` to change resumption, context hints, mouse capture, or the `auto`, `light`, or `dark` theme. The private `last-case` reference is stored beside `config.toml` and is not part of custody. CLI automation does not resume a case.
 
+Use **Maximum parallel workers** in `/settings preferences` to cap local source decoding and parallel Parquet scans. Leave it blank to use one fewer worker than the available logical CPUs, with at least one worker. An explicit `max_parallel_workers` value (1–256) can use all available CPUs. The local memory budget may reduce the effective count further. This signed preference applies when the session reloads. It does not change source order or artifact boundaries.
+
 For automation, resolution order is **CLI flag > environment variable > config.toml > default**. An override lasts only for that run; the TUI does not silently replace it. The file contains module IDs, models, URLs, source IDs, indexes, regions, and optional pricing, but never credentials or passphrases. Unknown or secret manifest fields fail validation. Example:
 
 ```toml

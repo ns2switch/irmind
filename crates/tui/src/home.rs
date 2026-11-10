@@ -146,6 +146,8 @@ pub(crate) struct HomeState {
     settings_selected: usize,
     settings_return: Mode,
     preference_selected: usize,
+    max_parallel_workers: Option<u16>,
+    worker_limit_input: Option<String>,
     ui_selection: UiSelection,
     theme_choice: String,
     form: [String; 9],
@@ -206,6 +208,8 @@ impl HomeState {
             settings_selected: 0,
             settings_return: Mode::List,
             preference_selected: 0,
+            max_parallel_workers: None,
+            worker_limit_input: None,
             ui_selection: UiSelection {
                 mouse_capture: true,
                 keystore_action_focus: false,
@@ -462,6 +466,7 @@ fn prepare_home_state(
         state.parsers = catalog.available();
     }
     state.resume_last_case = launch.resume_last_case;
+    state.max_parallel_workers = launch.max_parallel_workers;
     state.show_hints = io_ops.show_hints().into();
     state.common_writer = if !io_ops.common_writer_available() {
         CommonWriterState::Unavailable

@@ -2,6 +2,10 @@ name: Synthetic graph benchmark
 on:
   workflow_dispatch:
     inputs:
+      worker_sweep:
+        description: Measure adaptive workers and the fixed-worker reference on one Linux runner
+        type: boolean
+        default: false
       pipeline_profile:
         description: Profile the production pipeline and allocation calls against a pinned baseline
         type: boolean
@@ -64,7 +68,7 @@ env:
   HUNTEVAL_COMMIT: 4cbb555a56bc17cb03b988ad2f15b1374eecf183
 jobs:
   graph_benchmark:
-    if: ${{ !inputs.pipeline_profile && !inputs.evtx_source && !inputs.compare_base && !inputs.common_schema }}
+    if: ${{ !inputs.worker_sweep && !inputs.pipeline_profile && !inputs.evtx_source && !inputs.compare_base && !inputs.common_schema }}
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -143,7 +147,7 @@ jobs:
           fi
 
   paired_v2:
-    if: ${{ !inputs.pipeline_profile && !inputs.evtx_source && inputs.compare_base != '' && !inputs.common_schema }}
+    if: ${{ !inputs.worker_sweep && !inputs.pipeline_profile && !inputs.evtx_source && inputs.compare_base != '' && !inputs.common_schema }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -194,7 +198,7 @@ jobs:
           fi
 
   common_schema:
-    if: ${{ !inputs.pipeline_profile && !inputs.evtx_source && inputs.common_schema && inputs.compare_base != '' }}
+    if: ${{ !inputs.worker_sweep && !inputs.pipeline_profile && !inputs.evtx_source && inputs.common_schema && inputs.compare_base != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -246,7 +250,7 @@ jobs:
           fi
 
   evtx_source:
-    if: ${{ inputs.evtx_source }}
+    if: ${{ !inputs.worker_sweep && inputs.evtx_source }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -279,8 +283,33 @@ jobs:
           if-no-files-found: error
 
   source_pipeline_profile:
-    if: ${{ inputs.pipeline_profile }}
+    if: ${{ !inputs.worker_sweep && inputs.pipeline_profile }}
     uses: ./.github/workflows/source-pipeline-profile.yml
     with:
       baseline: ${{ inputs.profile_base }}
       source: ${{ inputs.profile_source || 'all' }}
+
+
+  worker_sweep:
+    if: ${{ inputs.worker_sweep }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false, fetch-depth: 0}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: worker-sweep-linux
+          save-if: ${{ github.ref_name == 'main' }}
+      - run: sudo apt-get update && sudo apt-get install -y mold time
+      - name: Compare fixed and adaptive workers
+        env:
+          BASE_REF: ${{ inputs.compare_base }}
+        run: bash .github/scripts/benchmark_workers.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: worker-sweep
+          path: worker-sweep-*.txt
+          if-no-files-found: warn

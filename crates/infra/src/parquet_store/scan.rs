@@ -12,7 +12,6 @@ use std::sync::mpsc::{SyncSender, sync_channel};
 use std::time::Instant;
 
 pub(super) const MAX_QUERY_FILES: usize = 8192;
-const FILE_WORKERS: usize = 4;
 mod common;
 mod selection;
 pub(super) use selection::partition_matches;
@@ -79,7 +78,7 @@ impl ParquetStore {
         }
         let case_dir = self.case_dir(spec.id)?;
         let mut source_units = std::collections::BTreeMap::new();
-        for group in selected.chunks(FILE_WORKERS) {
+        for group in selected.chunks(self.workers.count()) {
             let status = std::thread::scope(|scope| {
                 let receivers = group
                     .iter()

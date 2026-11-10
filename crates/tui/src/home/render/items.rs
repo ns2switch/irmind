@@ -321,6 +321,9 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
         irmind_app::ConfigChange::SetShowHints(enabled) => format!("context hints={enabled}"),
         irmind_app::ConfigChange::SetMouseCapture(enabled) => format!("mouse capture={enabled}"),
         irmind_app::ConfigChange::SetTheme(theme) => format!("theme={theme}"),
+        irmind_app::ConfigChange::SetMaxParallelWorkers(limit) => {
+            format!("maximum parallel workers={}", worker_limit_label(*limit))
+        }
         irmind_app::ConfigChange::SetExperimentalCommonWriter(enabled) => {
             format!("experimental common writer={enabled}")
         }
@@ -582,6 +585,10 @@ fn model_review_rows(setup: &model::ModelSetup) -> Vec<String> {
     rows
 }
 
+fn worker_limit_label(limit: Option<u16>) -> String {
+    limit.map_or_else(|| "automatic".into(), |n| n.to_string())
+}
+
 pub(super) fn preference_items(
     state: &HomeState,
     modules: &[ModuleStatus],
@@ -627,6 +634,15 @@ pub(super) fn preference_items(
         ))
         .style(theme.warning()),
     );
+    items.push(ListItem::new(format!(
+        "Maximum parallel workers: {}",
+        worker_limit_label(state.max_parallel_workers)
+    )));
+    if let Some(input) = &state.worker_limit_input {
+        items.push(ListItem::new(format!(
+            "New limit (1–256, blank for automatic): [{input}]"
+        )));
+    }
     if state.pending_module_change.is_some() {
         items.push(
             ListItem::new("Experimental V3 / export V6 / ParquetLayoutV1 are unstable.")

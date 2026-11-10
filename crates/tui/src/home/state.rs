@@ -117,6 +117,11 @@ pub(crate) fn clear_active_field(state: &mut HomeState) {
                 edit.replace_on_type = false;
             }
         }
+        Mode::Config => {
+            if let Some(input) = &mut state.worker_limit_input {
+                input.clear();
+            }
+        }
         Mode::List => state.input.clear(),
         _ => {}
     }
@@ -382,6 +387,9 @@ fn update_new_case(state: &mut HomeState, key: KeyCode) -> HomeAction {
 }
 
 fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
+    if state.worker_limit_input.is_some() {
+        return update_worker_limit(state, key);
+    }
     if state.pending_module_change.is_some() {
         return modules::confirm_pending_change(state, key);
     }
@@ -395,7 +403,7 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
             HomeAction::None
         }
         KeyCode::Down => {
-            state.preference_selected = (state.preference_selected + 1).min(4);
+            state.preference_selected = (state.preference_selected + 1).min(5);
             HomeAction::None
         }
         KeyCode::Enter => {
@@ -411,6 +419,10 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
                     }
                     .into(),
                 ),
+                5 => {
+                    state.worker_limit_input = Some(String::new());
+                    return HomeAction::None;
+                }
                 _ => {
                     if state.common_writer == super::CommonWriterState::Unavailable {
                         state.notice =
@@ -431,6 +443,34 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
         }
         _ => HomeAction::None,
     }
+}
+
+fn update_worker_limit(state: &mut HomeState, key: KeyCode) -> HomeAction {
+    let Some(input) = state.worker_limit_input.as_mut() else {
+        return HomeAction::None;
+    };
+    match key {
+        KeyCode::Esc => state.worker_limit_input = None,
+        KeyCode::Backspace => {
+            input.pop();
+        }
+        KeyCode::Char(ch) if ch.is_ascii_digit() && input.len() < 3 => input.push(ch),
+        KeyCode::Enter => {
+            let limit = if input.is_empty() {
+                None
+            } else if let Ok(value @ 1..=256) = input.parse::<u16>() {
+                Some(value)
+            } else {
+                state.notice =
+                    "Enter a worker limit from 1 to 256, or leave it blank for automatic.".into();
+                return HomeAction::None;
+            };
+            state.worker_limit_input = None;
+            return HomeAction::ChangeModule(ConfigChange::SetMaxParallelWorkers(limit), true);
+        }
+        _ => {}
+    }
+    HomeAction::None
 }
 
 fn update_verify_export(state: &mut HomeState, key: KeyCode) -> HomeAction {

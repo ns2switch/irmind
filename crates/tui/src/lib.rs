@@ -106,6 +106,7 @@ pub struct WorkspaceLaunch<'a> {
     pub overrides_active: bool,
     pub mouse_capture: bool,
     pub theme: Option<&'a str>,
+    pub max_parallel_workers: Option<u16>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
