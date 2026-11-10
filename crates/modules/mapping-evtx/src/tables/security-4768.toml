@@ -1,0 +1,151 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-evtx-security-4768"
+version = "evtx-security-4768-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-evtx"
+parser_versions = ["evtx-source-v1"]
+format = "evtx"
+format_version = "evtx-source-v1"
+provider = "Microsoft-Windows-Security-Auditing"
+channel = "Security"
+
+native_type = "4768"
+
+[partition]
+host = ["Event", "System", "Computer"]
+
+[[fields]]
+source = ["Event", "System", "Computer"]
+target = "host.name"
+omit_text = ["-"]
+observation = { kind = "host", role = "observer", scope = { kind = "host", path = ["Event", "System", "Computer"] } }
+
+[[fields]]
+source = ["Event", "EventData", "SubjectUserName"]
+target = "user.name"
+omit_text = ["-"]
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["Event", "EventData", "SubjectDomainName"] } }
+
+[[fields]]
+source = ["Event", "EventData", "SubjectUserSid"]
+target = "user.id"
+omit_text = ["-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["Event", "EventData", "SubjectDomainName"]
+target = "user.domain"
+omit_text = ["-"]
+
+[[fields]]
+source = ["Event", "EventData", "TargetUserName"]
+target = "user.target.name"
+omit_text = ["-"]
+observation = { kind = "user", role = "target", scope = { kind = "account", path = ["Event", "EventData", "TargetDomainName"] } }
+
+[[fields]]
+source = ["Event", "EventData", "TargetSid"]
+target = "user.target.id"
+omit_text = ["-"]
+observation = { kind = "user", role = "target", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["Event", "EventData", "TargetDomainName"]
+target = "user.target.domain"
+omit_text = ["-"]
+
+[[fields]]
+source = ["Event", "EventData", "IpAddress"]
+target = "source.ip"
+omit_text = ["-"]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["Event", "EventData", "IpPort"]
+target = "source.port"
+omit_text = ["-"]
+conversion = "decimal"
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "success"
+[[rules.when]]
+path = ["Event", "EventData", "Status"]
+predicate = { op = "text", value = "0x0" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "success"
+[[rules.when]]
+path = ["Event", "EventData", "Status"]
+predicate = { op = "text", value = "0x00000000" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "failure"
+[[rules.when]]
+path = ["Event", "EventData", "Status"]
+predicate = { op = "text", value = "0x6" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "failure"
+[[rules.when]]
+path = ["Event", "EventData", "Status"]
+predicate = { op = "text", value = "0x12" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "failure"
+[[rules.when]]
+path = ["Event", "EventData", "Status"]
+predicate = { op = "text", value = "0x17" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "failure"
+[[rules.when]]
+path = ["Event", "EventData", "Status"]
+predicate = { op = "text", value = "0x25" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "success"
+[[rules.when]]
+path = ["Event", "EventData", "Status"]
+predicate = { op = "missing" }
+[[rules.when]]
+path = ["Event", "System", "Keywords"]
+predicate = { op = "text", value = "0x8020000000000000" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "failure"
+[[rules.when]]
+path = ["Event", "EventData", "Status"]
+predicate = { op = "missing" }
+[[rules.when]]
+path = ["Event", "System", "Keywords"]
+predicate = { op = "text", value = "0x8010000000000000" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Event", "EventData", "Status"]
+predicate = { op = "missing" }
+[[rules.when]]
+path = ["Event", "System", "Keywords"]
+predicate = { op = "missing" }
+

@@ -40,11 +40,18 @@ class Xml:
         self.data += b"\x02"
         text = str(value).encode("utf-16le")
         self.data += b"\x05\x01" + struct.pack("<H", len(text)//2) + text + b"\x04"
+    def provider(self, name):
+        self.data += b"\x41" + struct.pack("<I", 0)
+        self.name("Provider")
+        self.data += struct.pack("<I", 0) + b"\x06"
+        self.name("Name")
+        encoded = name.encode("utf-16le")
+        self.data += b"\x05\x01" + struct.pack("<H", len(encoded)//2) + encoded + b"\x03"
     def end(self):
         self.data += b"\x04"
 
 
-def make(channel, ids):
+def make(channel, ids, *, provider=None, fields=None):
     file = bytearray(4096 + 65536)
     def put(at, fmt, value):
         struct.pack_into(fmt, file, at, value)
@@ -59,10 +66,11 @@ def make(channel, ids):
         last=cursor
         xml=Xml(cursor+24)
         xml.start("Event");xml.start("System")
+        if provider is not None: xml.provider(provider)
         for name,value in [("EventID",event),("Channel",channel),("Computer","synthetic-endpoint"),("EventRecordID",index+1)]:
             xml.text(name,value)
         xml.end();xml.start("EventData")
-        for name,value in [("TargetUserName","synthetic-user"),("User","synthetic-user"),("Image",r"C:\Windows\System32\cmd.exe"),("CommandLine","cmd.exe /c synthetic"),("IpAddress","203.0.113.77"),("SourceIp","203.0.113.77"),("DestinationIp","198.51.100.42"),("SourcePort",49152),("DestinationPort",443),("LogonType",3),("ProcessId",1234),("ServiceName","SyntheticService"),("TaskName","SyntheticTask"),("TargetObject",r"HKCU\Software\Synthetic"),("ScriptBlockText","Write-Output synthetic")]:
+        for name,value in (fields(event) if fields is not None else [("TargetUserName","synthetic-user"),("User","synthetic-user"),("Image",r"C:\Windows\System32\cmd.exe"),("CommandLine","cmd.exe /c synthetic"),("IpAddress","203.0.113.77"),("SourceIp","203.0.113.77"),("DestinationIp","198.51.100.42"),("SourcePort",49152),("DestinationPort",443),("LogonType",3),("ProcessId",1234),("ServiceName","SyntheticService"),("TaskName","SyntheticTask"),("TargetObject",r"HKCU\Software\Synthetic"),("ScriptBlockText","Write-Output synthetic")]):
             xml.data_field(name,value)
         xml.end();xml.end();xml.data+=b"\x00"
         size=24+len(xml.data)+4

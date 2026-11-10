@@ -7,6 +7,7 @@ The common writer is currently experimental and opt-in during the decoder rollou
 | Module | Input | Implementation | Cargo feature | Status |
 | --- | --- | --- | --- | --- |
 | CloudTrail | CloudTrail JSON through `json-source-v1` | Bundled, hash-pinned TOML | `mapping-cloudtrail` | Experimental; synthetic contracts |
+| Windows Event Log | Original EVTX through `evtx-source-v1` | Bundled, hash-pinned per-event/channel TOML modules | `mapping-evtx` | Experimental; synthetic contracts |
 | ECS | Original ECS NDJSON through `ecs-source-v1` | Native, typed ECS 9.5 validation | `mapping-ecs` | Experimental; synthetic contracts |
 | Generic JSON compatibility | Other JSON without `eventVersion` | Native, extraction-only | `mapping-json-compat` | Experimental; no inferred categories or roles |
 | Journald compatibility | Original journald JSON | Native, extraction-only | `mapping-journald-compat` | Experimental; no inferred categories or roles |
@@ -76,3 +77,50 @@ The extraction projection preserves existing search aliases and original
 attributes. The native implementation is required for bounded sets, typed values
 and alias validation. See the [ECS pipeline design](development/ecs-source-mapping.md)
 for exact identity rules and [supported fields](development/common-event-schema.md).
+
+## Windows Event Log
+
+`parser-evtx` exposes original decoded fields through `evtx-source-v1`, using
+its existing isolated helper, authenticated seekable handle and bounded protocol.
+Timestamps retain 100 ns precision. Original record IDs and measured offsets stay
+in provenance. Windows still schedules EVTX sources serially; both routes share
+the same session isolation witness. The helper, permissions and signed formats remain unchanged.
+
+Bundled TOML modules select exact provider/channel pairs. Security also selects the original EventID; each ID has an independent, bounded table:
+
+| Provider / channel | Event IDs |
+| --- | --- |
+| Microsoft-Windows-Security-Auditing / Security | 4624, 4625, 4634, 4648, 4672, 4688, 4697, 4720, 4722, 4724, 4728, 4732, 4756, 4768, 4769, 4771, 4776 |
+| Service Control Manager / System | 7045 |
+| Microsoft-Windows-PowerShell / Microsoft-Windows-PowerShell/Operational | 4103, 4104 |
+| Microsoft-Windows-Sysmon / Microsoft-Windows-Sysmon/Operational | 1, 3, 11, 13, 22 |
+
+Security identities use event-specific roles and reported directory namespaces.
+On successful logon/logoff, the reported logged-on account is the actor; the
+reporting service remains a separate source identity on 4624. On a failed logon,
+the subject and attempted account remain actor and target. Group membership
+events keep the member user separate from the target group resource. Events 4771 and 4776 lack a target directory field; their
+names use the reporting host namespace. Missing fields remain absent. Event 4776
+never invents a source IP from its workstation name. Security 4688 process and
+parent PIDs use source-record scope. Only the original Sysmon ProcessGuid and
+ParentProcessGuid supply process-lifetime identities; PIDs remain context and
+never substitute for a GUID. Exact `-` markers omit only the projected field,
+while the original source stays searchable.
+
+Event 4625 and 4771 are failures. Event 4648 records an attempt, not confirmed
+success. Password reset (4724) uses explicit Audit Success/Failure keywords. Ticket and
+credential validation (4768, 4769 and 4776) use finite, documented Status tables,
+with audit keywords only when Status is absent. An absent state stays unknown;
+unlisted status codes remain original and unclassified. PowerShell
+and Sysmon activity does not establish an authentication result. Unsupported IDs
+stay unclassified; a different or missing provider never matches by channel alone.
+
+Field and outcome references: Microsoft's [4625](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4625),
+[4648](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4648),
+[4688](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4688),
+[4724](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4724),
+[4768](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4768),
+[4769](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4769),
+[4776](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4776),
+[PowerShell logging](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows)
+and [Sysmon](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon) documentation.

@@ -293,3 +293,7 @@ The experimental `parser-evtx` module is compiled by default but requires the ma
 ## Common-event mappings
 
 Optional source mappings are separate from parsers and connectors. Bundled CloudTrail tables and Linux mappings classify supported operations. Native ECS mapping validates explicit sets, typed values and roles. Missing or unsupported results remain unknown. They require the experimental common writer; no remote module is enabled. See [mapping coverage and limitations](mappings.md).
+
+### Windows common-event mapping
+
+The `mapping-evtx` feature compiles independent bundled TOML mappings for Security, System, PowerShell and Sysmon. They use original fields from the isolated EVTX decoder. The writer remains opt-in during decoder rollout. No additional credentials or permissions are required. See [Windows mapping coverage](mappings.md#windows-event-log).

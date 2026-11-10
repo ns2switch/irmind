@@ -1,0 +1,91 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-evtx-powershell"
+version = "evtx-powershell-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-evtx"
+parser_versions = ["evtx-source-v1"]
+format = "evtx"
+format_version = "evtx-source-v1"
+provider = "Microsoft-Windows-PowerShell"
+channel = "Microsoft-Windows-PowerShell/Operational"
+
+[partition]
+host = ["Event", "System", "Computer"]
+
+[[fields]]
+source = ["Event", "System", "Computer"]
+target = "host.name"
+omit_text = ["-"]
+observation = { kind = "host", role = "observer", scope = { kind = "host", path = ["Event", "System", "Computer"] } }
+
+[[fields]]
+source = ["Event", "System", "Security", "#attributes", "UserID"]
+target = "user.id"
+omit_text = ["-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[rules]]
+categories = ["process"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Event", "System", "EventID"]
+predicate = { op = "text", value = "4103" }
+
+[[rules]]
+categories = ["process"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Event", "System", "EventID", "#text"]
+predicate = { op = "text", value = "4103" }
+
+[[rules]]
+categories = ["process"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Event", "System", "EventID"]
+predicate = { op = "number", value = "4103" }
+
+[[rules]]
+categories = ["process"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Event", "System", "EventID", "#text"]
+predicate = { op = "number", value = "4103" }
+
+[[rules]]
+categories = ["process"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Event", "System", "EventID"]
+predicate = { op = "text", value = "4104" }
+
+[[rules]]
+categories = ["process"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Event", "System", "EventID", "#text"]
+predicate = { op = "text", value = "4104" }
+
+[[rules]]
+categories = ["process"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Event", "System", "EventID"]
+predicate = { op = "number", value = "4104" }
+
+[[rules]]
+categories = ["process"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Event", "System", "EventID", "#text"]
+predicate = { op = "number", value = "4104" }
+

@@ -104,6 +104,7 @@ The normal build includes every current product module and both keystores. None 
 | Syslog parser | local parser | `parser-syslog` (default) | experimental | [Syslog](docs/modules.md#syslog-parser) |
 | JSON and exported cloud log parser | local parser | `parser-json` (default) | experimental | [Local parser](docs/modules.md#streaming-json-and-exported-cloud-log-parser) |
 | CloudTrail common-event mapping | local mapping | `mapping-cloudtrail` | experimental, opt-in writer | [Mappings](docs/mappings.md) |
+| Windows common-event mapping | local mapping | `mapping-evtx` | experimental, opt-in writer | [Mappings](docs/mappings.md#windows-event-log) |
 | ECS common-event mapping | local mapping | `mapping-ecs` | experimental, opt-in writer | [Mappings](docs/mappings.md) |
 | Elastic Common Schema parser | local parser | `parser-ecs` (default) | experimental | [ECS parser](docs/modules.md#elastic-common-schema-parser) |
 | OCSF JSON and Parquet parser | local parser | `parser-ocsf` (default) | experimental | [OCSF parser](docs/modules.md#ocsf-parser) |

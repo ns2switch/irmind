@@ -2,6 +2,10 @@ name: Synthetic graph benchmark
 on:
   workflow_dispatch:
     inputs:
+      evtx_source:
+        description: Run only the paired release EVTX source-mapping smoke (three 1 GiB repetitions)
+        type: boolean
+        default: false
       compare_base:
         description: Optional 40-character baseline commit for paired release measurements
         type: string
@@ -47,7 +51,7 @@ env:
   HUNTEVAL_COMMIT: 4cbb555a56bc17cb03b988ad2f15b1374eecf183
 jobs:
   graph_benchmark:
-    if: ${{ !inputs.compare_base && !inputs.common_schema }}
+    if: ${{ !inputs.evtx_source && !inputs.compare_base && !inputs.common_schema }}
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -126,7 +130,7 @@ jobs:
           fi
 
   paired_v2:
-    if: ${{ inputs.compare_base != '' && !inputs.common_schema }}
+    if: ${{ !inputs.evtx_source && inputs.compare_base != '' && !inputs.common_schema }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -177,7 +181,7 @@ jobs:
           fi
 
   common_schema:
-    if: ${{ inputs.common_schema && inputs.compare_base != '' }}
+    if: ${{ !inputs.evtx_source && inputs.common_schema && inputs.compare_base != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
@@ -227,3 +231,30 @@ jobs:
           if [[ -n "${IRMIND_HUNTEVAL_ROOT:-}" && "$IRMIND_HUNTEVAL_ROOT" == "$RUNNER_TEMP"/hunteval.* ]]; then
             rm -rf -- "$IRMIND_HUNTEVAL_ROOT"
           fi
+
+  evtx_source:
+    if: ${{ inputs.evtx_source }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: evtx-mapping-smoke-linux
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: sudo apt-get update && sudo apt-get install -y mold
+      - name: Build the separately resolved isolated helper in release mode
+        run: cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
+      - name: Generate synthetic EVTX and compare both writers in the same runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          export IRMIND_EVTX_SOURCE_BENCH_INPUT="$RUNNER_TEMP/synthetic-mapping.evtx"
+          trap 'rm -f "$IRMIND_EVTX_SOURCE_BENCH_INPUT"' EXIT
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/generate_evtx_mapping_benchmark.py "$IRMIND_EVTX_SOURCE_BENCH_INPUT"
+          sh scripts/benchmark_evtx_source.sh 2>&1 | tee evtx-source-benchmark.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with: {name: evtx-source-smoke, path: evtx-source-benchmark.txt, if-no-files-found: error}

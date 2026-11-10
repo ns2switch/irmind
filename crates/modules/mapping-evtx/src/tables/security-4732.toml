@@ -1,0 +1,63 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-evtx-security-4732"
+version = "evtx-security-4732-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-evtx"
+parser_versions = ["evtx-source-v1"]
+format = "evtx"
+format_version = "evtx-source-v1"
+provider = "Microsoft-Windows-Security-Auditing"
+channel = "Security"
+
+native_type = "4732"
+
+[partition]
+host = ["Event", "System", "Computer"]
+
+[[fields]]
+source = ["Event", "System", "Computer"]
+target = "host.name"
+omit_text = ["-"]
+observation = { kind = "host", role = "observer", scope = { kind = "host", path = ["Event", "System", "Computer"] } }
+
+[[fields]]
+source = ["Event", "EventData", "SubjectUserName"]
+target = "user.name"
+omit_text = ["-"]
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["Event", "EventData", "SubjectDomainName"] } }
+
+[[fields]]
+source = ["Event", "EventData", "SubjectUserSid"]
+target = "user.id"
+omit_text = ["-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["Event", "EventData", "SubjectDomainName"]
+target = "user.domain"
+omit_text = ["-"]
+
+[[fields]]
+source = ["Event", "EventData", "MemberName"]
+target = "user.target.name"
+omit_text = ["-"]
+observation = { kind = "user", role = "target", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["Event", "EventData", "MemberSid"]
+target = "user.target.id"
+omit_text = ["-"]
+observation = { kind = "user", role = "target", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["Event", "EventData", "TargetSid"]
+target = "irmind.resource.id"
+omit_text = ["-"]
+observation = { kind = "resource", role = "target", scope = { kind = "source_record" } }
+
+[[rules]]
+categories = ["iam"]
+types = ["group", "change"]
+outcome = "success"
+

@@ -1,0 +1,3 @@
+{"kind":"ready","protocol":"irmind-evtx-ndjson-v1","decoder":"0.15.1"}
+{"kind":"record","record_id":1,"offset":4608,"timestamp":"2026-11-01T12:00:00.0000007Z","event":{"Event":{"System":{"Provider":{"#attributes":{"Name":"Service Control Manager"}},"EventID":"7045","Channel":"System","Computer":"synthetic-endpoint","EventRecordID":"1"},"EventData":{"ImagePath":"C:\\synthetic\\service.exe","AccountName":"LocalSystem"}}}}
+{"kind":"complete","accepted":1,"rejected":0}

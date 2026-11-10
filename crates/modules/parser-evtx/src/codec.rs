@@ -42,6 +42,14 @@ pub(super) fn probe(bytes: &[u8]) -> Result<(), AppError> {
     }
     Ok(())
 }
+pub(super) struct DecodedRecord {
+    pub accepted_index: u64,
+    pub index: u64,
+    pub record_id: u64,
+    pub offset: u64,
+    pub timestamp: String,
+    pub event: serde_json::Value,
+}
 pub(super) struct State<'a> {
     source: &'a str,
     hash: [u8; 32],
@@ -76,6 +84,29 @@ impl<'a> State<'a> {
         bytes: &[u8],
         emit: &mut dyn FnMut(Tainted<IndexedGraphRecord>) -> Result<(), AppError>,
     ) -> Result<(), AppError> {
+        let (source, hash) = (self.source, self.hash);
+        self.project_frame(bytes, &mut |row| {
+            if let Ok(record) = super::normalize::record(
+                source,
+                hash,
+                row.index,
+                row.record_id,
+                row.offset,
+                &row.timestamp,
+                &row.event,
+            ) {
+                emit(record)?;
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        })
+    }
+    pub(super) fn project_frame(
+        &mut self,
+        bytes: &[u8],
+        project: &mut dyn FnMut(DecodedRecord) -> Result<bool, AppError>,
+    ) -> Result<(), AppError> {
         if self.complete {
             return Err(bad("EVTX output after completion"));
         }
@@ -96,16 +127,14 @@ impl<'a> State<'a> {
                 self.next()?;
                 self.offset(offset)?;
                 self.decoder_accepted += 1;
-                if let Ok(record) = super::normalize::record(
-                    self.source,
-                    self.hash,
-                    self.seen - 1,
+                if project(DecodedRecord {
+                    accepted_index: self.report.accepted as u64,
+                    index: self.seen - 1,
                     record_id,
                     offset,
-                    &timestamp,
-                    &event,
-                ) {
-                    emit(record)?;
+                    timestamp,
+                    event,
+                })? {
                     self.report.accepted += 1;
                 } else {
                     self.report.rejected += 1;
