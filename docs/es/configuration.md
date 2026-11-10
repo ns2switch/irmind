@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 394586e414a7c7dbde2512ca2b8d0b1485efc94d; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit f98ed0639e161b1fed54cebd13c637b29a4e4510; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -44,6 +44,8 @@ La TUI guarda los ajustes no secretos en `config.toml` dentro del [directorio de
 Para Splunk, MISP, CrowdStrike, SentinelOne y un servicio S3 compatible, `/settings connectors` admite un archivo PEM de CA opcional. IRMind muestra y firma su huella SHA-256 junto con la ruta. El PEM se añade a las raíces del sistema; la comprobación del nombre del servidor sigue activa. Al iniciar el conector se vuelve a comprobar el hash, por lo que sustituir el archivo exige otra aprobación. Borra la ruta para retirar esa CA. No guardes una clave privada en el archivo.
 
 `resume_last_case` y `show_hints` valen `true` por defecto. Tras arrancar, la TUI reabre el último caso abierto que se usó solo si verifica su cadena de custodia. Un caso sellado o eliminado deja la pantalla de inicio; un fallo de verificación aparece allí como aviso. Usa `/settings preferences` para cambiar la reanudación, las pistas de contexto, el ratón o el tema (`auto`, `light`, `dark`). La referencia privada `last-case` se guarda junto a `config.toml` y no forma parte de la custodia. La automatización CLI no reanuda casos.
+
+Usa **Maximum parallel workers** en `/settings preferences` para limitar la decodificación de fuentes locales y las lecturas paralelas de Parquet. Deja el campo vacío para usar un trabajador menos que las CPU lógicas disponibles, con un mínimo de uno. Un valor explícito de `max_parallel_workers` (1–256) puede usar todas las CPU disponibles. El presupuesto local de memoria puede reducir el número efectivo. La preferencia se firma y se aplica al recargar la sesión. El orden de las fuentes y los límites de cada artefacto se mantienen.
 
 Para automatización, el orden es **flag de CLI > variable de entorno > config.toml > valor por defecto**. Un override solo dura esa ejecución; la TUI no lo sustituye en silencio. El archivo contiene IDs de módulos, modelos, URLs, fuentes, índices, regiones y precios opcionales, pero nunca credenciales ni passphrases. Se rechazan los campos desconocidos o secretos. Ejemplo:
 
