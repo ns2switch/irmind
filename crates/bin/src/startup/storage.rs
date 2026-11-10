@@ -94,12 +94,7 @@ pub(super) fn experimental_parsers(
         catalog
     };
     #[cfg(feature = "mapping-dfir")]
-    let catalog = catalog
-        .with_experimental_parser(irmind_mod_parser_velociraptor::source_log_parser())?
-        .with_experimental_parser(irmind_mod_parser_hayabusa::source_log_parser())?
-        .with_experimental_parser(irmind_mod_parser_chainsaw::source_log_parser())?
-        .with_experimental_parser(irmind_mod_parser_plaso::source_log_parser())?
-        .with_experimental_parser(irmind_mod_parser_eztools::source_log_parser())?;
+    let catalog = dfir_sources(catalog)?;
     let mappings = registry.mapping_catalog()?;
     #[cfg(feature = "mapping-evtx")]
     let catalog = if mappings
@@ -126,6 +121,28 @@ pub(super) fn experimental_parsers(
                 .map_err(irmind_app::source_mapping::MappingError::into_app)?
                 .with_selector(catalog.get(&id)?)?;
             catalog = catalog.with_experimental_parser(std::sync::Arc::new(selector))?;
+        }
+    }
+    Ok(catalog)
+}
+
+#[cfg(feature = "mapping-dfir")]
+fn dfir_sources(
+    mut catalog: irmind_app::modules::ParserCatalog,
+) -> Result<irmind_app::modules::ParserCatalog, AppError> {
+    for parser in [
+        irmind_mod_parser_velociraptor::source_log_parser(),
+        irmind_mod_parser_hayabusa::source_log_parser(),
+        irmind_mod_parser_chainsaw::source_log_parser(),
+        irmind_mod_parser_plaso::source_log_parser(),
+        irmind_mod_parser_eztools::source_log_parser(),
+    ] {
+        if catalog
+            .available()
+            .iter()
+            .any(|(id, _)| id == parser.identity().name)
+        {
+            catalog = catalog.with_experimental_parser(parser)?;
         }
     }
     Ok(catalog)
