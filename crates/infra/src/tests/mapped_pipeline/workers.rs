@@ -91,7 +91,7 @@ fn write_sources(root: &Path) -> Vec<String> {
         let path = format!("source-{source:02}.json");
         // Include a disorder fallback as well as different partitions and ties.
         let first = if source == 5 { "02" } else { "00" };
-        let event = |time| format!(r#"{{"eventTime":"2026-11-01T00:00:{time}.123456789Z","eventName":"Synthetic{source}","recipientAccountId":"123456789012","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.77"}}"#);
+        let event = |time| format!(r#"{{"eventTime":"2026-11-01T00:00:{time}.123456789Z","eventName":"Synthetic{source}","recipientAccountId":"1234567890{source:02}","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.77"}}"#);
         let raw = format!(r#"{{"Records":[{},{}]}}"#, event(first), event("01"));
         fs::write(root.join(&path), raw).unwrap();
         path

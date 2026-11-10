@@ -72,7 +72,7 @@ impl ParquetStore {
             }
         }
         self.validate_direct_sources(request, &sources, cancel)?;
-        let staged = writing.finish(&self.case_dir(request.case_id)?, cancel)?;
+        let staged = writing.finish(&self.case_dir(request.case_id)?, workers, cancel)?;
         let projections = prepared::projections(catalog, &staged)?;
         let metadata = PreparedMappedGroup {
             sources,
