@@ -562,7 +562,8 @@ fn ecs_source_and_mapping_contract_is_independent_of_json_map_features() {
 #[cfg(any(
     feature = "mapping-ocsf",
     feature = "mapping-dfir",
-    feature = "mapping-syslog"
+    feature = "mapping-syslog",
+    feature = "mapping-network"
 ))]
 #[path = "support/source_pipeline_goldens.rs"]
 mod source_pipeline_goldens;
@@ -601,5 +602,34 @@ fn syslog_source_and_projection_bytes_are_independent_of_json_map_features() {
     assert_eq!(
         actual,
         "83a7d4584d9a83b95abe71bdb2a0ae02146874b1bacc2f3859368ff1f6b91deb"
+    );
+}
+
+#[cfg(feature = "mapping-network")]
+#[test]
+fn network_source_and_projection_bytes_are_independent_of_json_map_features() {
+    let zeek = irmind_mod_mapping_network::NetworkExtractionMapping::new("parser-zeek").unwrap();
+    let suricata =
+        irmind_mod_mapping_network::NetworkExtractionMapping::new("parser-suricata").unwrap();
+    let actual = [
+        source_pipeline_goldens::digest(
+            &irmind_mod_parser_zeek::ZeekSourceDecoder,
+            &zeek,
+            include_bytes!("../../testkit/fixtures/parser-zeek/source/dns.jsonl"),
+            1,
+        ),
+        source_pipeline_goldens::digest(
+            &irmind_mod_parser_suricata::SuricataSourceDecoder,
+            &suricata,
+            include_bytes!("../../testkit/fixtures/parser-suricata/source/eve.jsonl"),
+            2,
+        ),
+    ];
+    assert_eq!(
+        actual,
+        [
+            "997c13d7a5840fec396e743a057a2cb7e7a5a0e408fd7748a28b556220d19694",
+            "16d352ec9785d3431326eddb39bdda28a25e86ded552cb310de6a734f125745a"
+        ]
     );
 }

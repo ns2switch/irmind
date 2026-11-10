@@ -10,14 +10,15 @@ const MAX_FIELDS: usize = 1024;
 const MAX_DEPTH: usize = 64;
 
 #[derive(Default)]
-struct TsvHeader {
-    path: Option<String>,
-    fields: Vec<String>,
+pub(super) struct TsvHeader {
+    pub(super) path: Option<String>,
+    pub(super) fields: Vec<String>,
+    pub(super) types: Vec<String>,
     types_seen: bool,
 }
 
 impl TsvHeader {
-    fn metadata(&mut self, line: &[u8]) -> Result<bool, AppError> {
+    pub(super) fn metadata(&mut self, line: &[u8]) -> Result<bool, AppError> {
         if line.starts_with(b"#separator ") {
             if line.trim_ascii() != b"#separator \\x09" {
                 return Err(policy("unsupported Zeek field separator"));
@@ -43,7 +44,8 @@ impl TsvHeader {
             return Ok(true);
         }
         if let Some(rest) = line.strip_prefix(b"#types\t") {
-            self.types_seen = split_header(rest)?.len() == self.fields.len();
+            self.types = split_header(rest)?;
+            self.types_seen = self.types.len() == self.fields.len();
             if !self.types_seen {
                 return Err(policy("Zeek field and type counts differ"));
             }
@@ -60,7 +62,7 @@ impl TsvHeader {
         .any(|prefix| line.starts_with(prefix)))
     }
 
-    fn ready(&self) -> bool {
+    pub(super) fn ready(&self) -> bool {
         self.path.is_some() && !self.fields.is_empty() && self.types_seen
     }
 }
@@ -158,7 +160,7 @@ pub(super) fn parse(
     }
 }
 
-fn bounded_line(
+pub(super) fn bounded_line(
     reader: &mut impl BufRead,
     cancel: &CancellationToken,
 ) -> Result<(Vec<u8>, u64), AppError> {

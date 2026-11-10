@@ -186,3 +186,23 @@ host, proceso y PID para `useradd`, `usermod`, `cron`, `crond` y `CRON`, con
 selectores separados de sshd, sudo y su. La extracción nativa acotada lee el
 mensaje original sin asignar categoría, resultado ni vida de proceso. Una
 petición registrada por cron no demuestra que el comando terminara bien.
+
+## Extracción de Zeek y Suricata
+
+Los decodificadores conservan los campos originales JSON y TSV de Zeek y el JSON
+EVE de Suricata. El TSV mantiene las cadenas de las columnas y sus tipos
+declarados en dos objetos separados; el discriminador de formato registra el
+dataset de la cabecera. Los instantes decimales de Zeek conservan microsegundos
+o nanosegundos sin redondeo de coma flotante. Los offsets UTC de EVE se
+interpretan explícitamente.
+
+`mapping-network` proporciona módulos independientes para Zeek y Suricata.
+Mantienen la correlación por UID o flujo, extremos de red, dominios,
+certificados, archivos y alias de detección sin inferir categorías, resultados
+ni roles. Una alerta de la fuente no confirma un hallazgo del caso. La extracción
+nativa conserva los nombres de campo con puntos de Zeek, los marcadores nulos de
+TSV y las relaciones propias de cada fuente.
+
+La ingesta y la reconstrucción mantienen los límites de registro y fuente, los
+offsets medidos, la cancelación y las muestras no confiables de rechazo. Los
+campos originales no se reconstruyen a partir del texto de presentación.

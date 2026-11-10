@@ -288,3 +288,6 @@ mod ocsf;
 
 #[cfg(feature = "mapping-syslog")]
 mod syslog;
+
+#[cfg(feature = "mapping-network")]
+mod network;
