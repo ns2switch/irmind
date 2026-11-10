@@ -1331,3 +1331,73 @@ by this measurement.
 
 Reproduce with the manual graph-benchmark workflow's `evtx_source` input. It runs
 both paired release smokes and the shared counters; no provider or model is used.
+
+## Production source pipeline: shared allocation work
+
+The [paired release run](https://github.com/ns2switch/irmind/actions/runs/42858498451)
+compares profiling-only `7df7050` with optimized `f455a5c` in the same
+`ubuntu-24.04` job. Each source has three V2/V3 pairs before and after the change,
+at least 1 GiB of synthetic input, actual source hashing, Parquet publication and
+signed custody. Every ingestion checks the complete event count, zero rejected
+records and the chain. EVTX uses the isolated helper. Linux is journald extraction;
+EVTX, ECS and CloudTrail use their independent classification mappings.
+
+Both builds use the same optimized release settings, full debug symbols and frame
+pointers. Timing runs do **not** run under Heaptrack. Separate V3 runs count calls
+to allocation functions; at least 99.64% are attributed to production phases.
+First-party crates are rebuilt between worktrees; external dependencies are shared.
+See the [method](source-pipeline-profiling.md), [exact summary](benchmark-data/common-pipeline-f455a5c/summary.json)
+and [run metadata](benchmark-data/common-pipeline-f455a5c/metadata.json).
+
+Median wall time in seconds:
+
+| Source | V2 before | V3 before | V2 after | V3 after | V3 improvement | V3 overhead vs V2 after |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| EVTX | 17.718 | 28.550 | 17.741 | 27.461 | 3.81% | +54.78% |
+| ECS | 40.133 | 55.256 | 39.942 | 50.471 | 8.66% | +26.36% |
+| CloudTrail | 24.363 | 54.108 | 23.947 | 49.725 | 8.10% | +107.65% |
+| Linux / journald | 32.650 | 31.692 | 32.633 | 29.036 | 8.38% | -11.02% |
+
+The unchanged V2 reference varies by at most 1.71%. The orienting 15% typed-pipeline
+overhead target is met only by journald. This result does not meet that target
+for EVTX, ECS or CloudTrail and is not a reason to remove validation or limits.
+
+Allocation calls, including explicitly reported outside/unattributed calls:
+
+| Source | Before | After | Reduction | Commitment finalization before → after |
+| --- | ---: | ---: | ---: | ---: |
+| EVTX | 171,033,237 | 158,679,710 | 7.22% | 278,554 → 27 |
+| ECS | 368,008,547 | 314,184,560 | 14.63% | 912,278 → 8 |
+| CloudTrail | 371,933,729 | 334,045,831 | 10.19% | 757,765 → 8 |
+| Linux / journald | 160,560,211 | 156,718,557 | 2.39% | 960,421 → 8 |
+
+The buffer and reused tuple remove almost all per-record finalization allocations.
+Moving checked projections and reusing JSON string serialization reduce mapping
+allocations from 144.14 to 93.96 million for ECS and 81.84 to 46.98 million for
+CloudTrail. Current format goldens are unchanged.
+
+Candidate median timing counters, in seconds:
+
+| Source | Decoder exclusive | Pure mapping | Validation / selection / tuple spool | Writer projection | Finalize commitment | Row / Arrow batches | Parquet writing |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| EVTX | 6.588 | 3.380 | 1.930 | 7.801 | 0.048 | 4.415 | 15.931 |
+| ECS | 6.501 | 20.859 | 2.860 | 12.258 | 0.153 | 2.874 | 5.839 |
+| CloudTrail | 14.285 | 11.077 | 2.787 | 13.820 | 0.128 | 3.699 | 6.925 |
+| Linux / journald | 8.665 | 4.762 | 3.200 | 5.139 | 0.160 | 3.359 | 5.521 |
+
+These intervals overlap and can include work in parallel workers; **do not sum
+them or turn them into disjoint wall-time percentages**. Allocation attribution
+uses the deepest recognized frame and is exclusive. Per-phase counts are in the
+`*-allocations.json` files alongside the summary, with raw timing counters in
+`*-timings.txt`. Raw Heaptrack captures and filesystem paths are not published.
+
+The remaining measured cost is concentrated in pure mapping and checked writer
+projection for ECS, decoding and projection for CloudTrail, and Parquet writing
+plus projection for EVTX. The typed route also retains classifications, occurrence
+roles and provenance that V2 does not compute. Observed active artifact sizes are
+88.05/67.97 MB (V3/V2) for EVTX, 163.01/51.43 MB for ECS, 161.68/54.86 MB for
+CloudTrail and 85.31/69.53 MB for journald. EVTX has 149 active files, compared with
+three in its V2 reference. These layout differences are observations, not an
+isolated causal experiment. The synthetic padding is compressible; these smokes
+do not replace the full 15 GB matrix. The source-pipeline rollout continues with
+these remaining costs documented, without changing the absolute performance gates.
