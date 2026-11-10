@@ -57,3 +57,8 @@ invalid profiles. Existing format golden tests remain the byte-level control.
 The benchmark asserts a complete source count and a valid signed chain for every
 variant. A developer can reduce `IRMIND_PIPELINE_BYTES` for a local smoke only;
 published release comparisons leave it unset and use at least 1 GiB.
+
+Paired worktrees reuse compiled external dependencies, but rebuild all first-party
+crates for each revision. Cargo's timestamp fingerprints must not substitute a
+different worktree's metadata. The executable for each revision is copied before
+building the next revision; compiler diagnostics are retained on failure.
