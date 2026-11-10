@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 255627db6840ca2e3fabc42f288155edb397c2c7; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit 1b32bb82a153516f0edc8cff48d1812f169b1368; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -259,3 +259,7 @@ Aplica los mismos límites de tamaño, estructura JSON y recuento que Zeek. Rech
 ## Mapeos de eventos comunes
 
 Los mapeos opcionales son independientes de los parsers y conectores. Las tablas de CloudTrail y los mapeos de Linux clasifican las operaciones admitidas. El mapeo nativo ECS valida conjuntos explícitos, valores tipados y roles. Los resultados ausentes o no admitidos quedan como desconocidos. Requieren el escritor común experimental y no habilitan ningún módulo remoto. Véase la [cobertura y las limitaciones de los mapeos](mappings.md).
+
+### Mapeo de eventos comunes Windows
+
+La feature `mapping-evtx` compila mapeos TOML independientes para Security, System, PowerShell y Sysmon. Usan los campos originales del decodificador EVTX aislado. El escritor sigue siendo opcional durante la incorporación de decodificadores. No requieren credenciales ni permisos adicionales. Consulta la [cobertura de Windows](mappings.md#registro-de-eventos-de-windows).

@@ -1,4 +1,4 @@
-Traducción de docs/mappings.md en el commit ec0e5f663b86faf4fc1eff0b8434987d584a3bb9; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/mappings.md en el commit 1b32bb82a153516f0edc8cff48d1812f169b1368; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos de mapeo de fuentes
 
@@ -9,6 +9,7 @@ El escritor común es experimental y opcional durante la incorporación de decod
 | Módulo | Entrada | Implementación | Feature de Cargo | Estado |
 | --- | --- | --- | --- | --- |
 | CloudTrail | JSON de CloudTrail mediante `json-source-v1` | TOML incluido, con hash fijado | `mapping-cloudtrail` | Experimental; contratos sintéticos |
+| Registro de eventos de Windows | EVTX original mediante `evtx-source-v1` | Módulos TOML por evento o canal incluidos, con hash fijado | `mapping-evtx` | Experimental; contratos sintéticos |
 | ECS | NDJSON original mediante `ecs-source-v1` | Validación nativa ECS 9.5 | `mapping-ecs` | Experimental; contratos sintéticos |
 | Compatibilidad JSON genérico | Otros JSON sin `eventVersion` | Nativo, solo extracción | `mapping-json-compat` | Experimental; sin categorías ni roles inferidos |
 | Compatibilidad journald | JSON original de journald | Nativo, solo extracción | `mapping-journald-compat` | Experimental; sin categorías ni roles inferidos |
@@ -77,3 +78,46 @@ con puntos que discrepen se consideran no admitidas.
 La proyección conserva los alias de búsqueda y los atributos originales. El
 mapeo nativo resuelve conjuntos acotados, valores tipados y validación de alias.
 Consulta el [diseño del pipeline ECS](../development/ecs-source-mapping.md).
+
+## Registro de eventos de Windows
+
+`parser-evtx` entrega los campos originales mediante `evtx-source-v1`. Reutiliza
+el auxiliar aislado, el descriptor autenticado y el protocolo acotado actuales.
+Los instantes conservan precisión de 100 ns. La procedencia conserva el ID de
+registro y su offset medido. Windows sigue procesando las fuentes EVTX en serie;
+las dos rutas comparten el testigo de aislamiento de la sesión. El auxiliar,
+los permisos y los formatos firmados se mantienen.
+
+Los módulos TOML eligen pares exactos de proveedor y canal. Security también usa
+el EventID original; cada ID tiene su propia tabla acotada:
+
+| Proveedor / canal | IDs de evento |
+| --- | --- |
+| Microsoft-Windows-Security-Auditing / Security | 4624, 4625, 4634, 4648, 4672, 4688, 4697, 4720, 4722, 4724, 4728, 4732, 4756, 4768, 4769, 4771, 4776 |
+| Service Control Manager / System | 7045 |
+| Microsoft-Windows-PowerShell / Microsoft-Windows-PowerShell/Operational | 4103, 4104 |
+| Microsoft-Windows-Sysmon / Microsoft-Windows-Sysmon/Operational | 1, 3, 11, 13, 22 |
+
+Las identidades de Security usan los roles propios de cada evento y los espacios
+de nombres de directorio indicados. En un inicio o cierre de sesión correcto, la
+cuenta que inició sesión es el actor; el servicio que informa permanece como
+identidad de origen separada en 4624. Ante un fallo, el sujeto y la cuenta intentada
+son actor y objetivo. Los cambios de grupo separan al usuario miembro del recurso
+de grupo objetivo. Los eventos 4771 y 4776 no indican un directorio objetivo;
+sus nombres usan el espacio del host que informa. Los campos ausentes permanecen
+ausentes. El evento 4776 nunca inventa una IP a partir del nombre de la estación.
+Los PID de proceso y padre de Security 4688 quedan limitados al registro de origen.
+Solo ProcessGuid y ParentProcessGuid originales de Sysmon establecen una vida de
+proceso; los PID quedan como contexto y nunca sustituyen al GUID. El marcador
+exacto `-` omite el campo proyectado; la evidencia original sigue siendo consultable.
+
+4625 y 4771 indican fallos. 4648 registra un intento, sin demostrar éxito.
+El cambio de contraseña 4724 usa las marcas explícitas de auditoría de éxito o fallo.
+4768, 4769 y 4776 usan tablas finitas de Status documentados; recurren a las marcas
+de auditoría solo cuando falta Status. Si falta el estado, queda desconocido;
+los códigos no enumerados permanecen originales y sin clasificar. La actividad de
+PowerShell y Sysmon no demuestra un resultado de autenticación. Los ID no cubiertos
+quedan sin clasificar; un proveedor distinto o ausente nunca coincide solo por canal.
+
+Consulta las referencias oficiales de campos y resultados en la
+[versión en inglés](../mappings.md#windows-event-log).
