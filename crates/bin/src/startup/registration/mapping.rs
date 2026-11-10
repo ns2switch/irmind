@@ -33,6 +33,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     for mapper in irmind_mod_mapping_dfir::DfirExtractionMapping::all()? {
         registry.register(Box::new(mapper), &ModuleConfig::new())?;
     }
+    #[cfg(feature = "mapping-syslog")]
+    registry.register(
+        Box::new(irmind_mod_mapping_syslog::SyslogExtractionMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     Ok(())
 }
 #[cfg(feature = "mapping-evtx")]
@@ -54,13 +59,17 @@ fn register_evtx(registry: &mut ModuleRegistry) -> Result<()> {
 #[cfg(feature = "mapping-linux")]
 fn register_linux(registry: &mut ModuleRegistry) -> Result<()> {
     use irmind_mod_mapping_linux::{
-        AuditMapping, HttpMapping, SshdMapping, SuMapping, SudoMapping,
+        AuditMapping, AuthExtractionMapping, HttpMapping, SshdMapping, SuMapping, SudoMapping,
     };
     registry.register(Box::new(SshdMapping::new()?), &ModuleConfig::new())?;
     registry.register(Box::new(SudoMapping::new()?), &ModuleConfig::new())?;
     registry.register(Box::new(SuMapping::new()?), &ModuleConfig::new())?;
     registry.register(Box::new(HttpMapping::new()?), &ModuleConfig::new())?;
     registry.register(Box::new(AuditMapping::new()?), &ModuleConfig::new())?;
+    registry.register(
+        Box::new(AuthExtractionMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     Ok(())
 }
 #[cfg(feature = "mapping-json-compat")]
@@ -118,6 +127,10 @@ mod tests {
         ] {
             registry.add_source_decoder(decoder).unwrap();
         }
+        #[cfg(feature = "mapping-syslog")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_syslog::SyslogSourceDecoder))
+            .unwrap();
         register(&mut registry).unwrap();
         let catalog = registry.mapping_catalog().unwrap();
         assert!(catalog.supports_decoder("parser-json", "json-source-v1"));
@@ -125,7 +138,8 @@ mod tests {
         assert_eq!(
             catalog.snapshots().unwrap().len(),
             2 + usize::from(cfg!(feature = "mapping-cloudtrail"))
-                + 5 * usize::from(cfg!(feature = "mapping-linux"))
+                + usize::from(cfg!(feature = "mapping-syslog"))
+                + 6 * usize::from(cfg!(feature = "mapping-linux"))
                 + usize::from(cfg!(feature = "mapping-ecs"))
                 + usize::from(cfg!(feature = "mapping-ocsf"))
                 + 5 * usize::from(cfg!(feature = "mapping-dfir"))

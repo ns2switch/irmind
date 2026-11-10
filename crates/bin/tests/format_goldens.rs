@@ -559,7 +559,11 @@ fn ecs_source_and_mapping_contract_is_independent_of_json_map_features() {
     .unwrap();
 }
 
-#[cfg(any(feature = "mapping-ocsf", feature = "mapping-dfir"))]
+#[cfg(any(
+    feature = "mapping-ocsf",
+    feature = "mapping-dfir",
+    feature = "mapping-syslog"
+))]
 #[path = "support/source_pipeline_goldens.rs"]
 mod source_pipeline_goldens;
 
@@ -581,3 +585,21 @@ fn ocsf_source_and_projection_bytes_are_independent_of_json_map_features() {
 #[cfg(feature = "mapping-dfir")]
 #[path = "support/dfir_source_goldens.rs"]
 mod dfir_source_goldens;
+
+#[cfg(feature = "mapping-syslog")]
+#[test]
+fn syslog_source_and_projection_bytes_are_independent_of_json_map_features() {
+    let mapper = irmind_mod_mapping_syslog::SyslogExtractionMapping::new().unwrap();
+    let sample =
+        b"<34>1 2026-11-01T00:00:00.123456789Z synthetic-host app 42 ID47 - synthetic message\n";
+    let actual = source_pipeline_goldens::digest(
+        &irmind_mod_parser_syslog::SyslogSourceDecoder,
+        &mapper,
+        sample,
+        1,
+    );
+    assert_eq!(
+        actual,
+        "83a7d4584d9a83b95abe71bdb2a0ae02146874b1bacc2f3859368ff1f6b91deb"
+    );
+}

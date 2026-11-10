@@ -48,7 +48,7 @@ Un campo de una definición puede declarar `omit_text = ["", "-"]` para marcador
 
 `parser-linux` decodifica los campos originales mediante `linux-source-v1`. Conserva mensajes originales, instantes exactos y ubicaciones de los miembros; nunca asigna categorías, resultados ni roles. Los instantes clásicos de auth.log/secure siguen requiriendo confirmar año y offset UTC para cada ingesta. La CLI y la TUI usan el mismo detector y flujo de confirmación.
 
-Cinco módulos de mapeo comparten la feature `mapping-linux`. Los módulos sshd, sudo, su y HTTP usan definiciones TOML incluidas con hashes canónicos fijados. Cada uno tiene su manifiesto y un selector de dataset sin solapamientos. auditd usa código nativo porque debe combinar un conjunto acotado de miembros SYSCALL/EXECVE originales; una tabla finita de campos no puede hacerlo. Journald conserva su mapeo de solo extracción mediante el mismo decodificador Linux, sin inventar clasificaciones.
+Seis módulos de mapeo comparten la feature `mapping-linux`. Los módulos sshd, sudo, su y HTTP usan definiciones TOML incluidas con hashes canónicos fijados. Cada uno tiene su manifiesto y un selector de dataset sin solapamientos. auditd usa código nativo porque debe combinar un conjunto acotado de miembros SYSCALL/EXECVE originales; una tabla finita de campos no puede hacerlo. Journald conserva su mapeo de solo extracción mediante el mismo decodificador Linux, sin inventar clasificaciones.
 
 - Los valores `Accepted`, `Failed` e `Invalid` de SSH seleccionan resultados de autenticación explícitos. Los mensajes desconocidos quedan sin clasificar. El usuario de un acceso correcto es el actor; la cuenta intentada en un fallo es el objetivo.
 - Las tablas PAM usan los valores explícitos de sesión `opened` y de autenticación `failure`. Cerrar una sesión no implica un resultado nuevo de autenticación. Una solicitud de comando sudo tiene resultado desconocido: solicitarlo no demuestra que se ejecutara correctamente.
@@ -163,3 +163,26 @@ manifiesto y una identidad de compilación fijada. Los contratos comprueban
 repetición, concurrencia, procedencia, cancelación y determinismo. Los fixtures
 comparan las identidades de búsqueda y los instantes existentes. La ingesta y la
 reconstrucción usan el mismo decodificador y mapeo firmado de cada fuente.
+
+## Extracción de syslog
+
+`parser-syslog` decodifica cabeceras y mensajes RFC 5424 y RFC 3164 mediante
+`syslog-source-v1`, incluidos los flujos gzip acotados. `mapping-syslog` es un
+módulo independiente de solo extracción. Host, aplicación, PID, facility y
+severity siguen siendo consultables sin inferir categoría, resultado ni rol.
+RFC 5424 conserva toda la precisión del instante original. RFC 3164 requiere el
+mismo calendario confirmado por ingesta, incluida la opción explícita de cambio
+de diciembre a enero. Ese contexto sigue firmado con la selección de fuente.
+No se utiliza el reloj del equipo ni la fecha de modificación del fichero.
+
+Los registros gzip conservan su ordinal decodificado y el hash de la fuente,
+sin atribuirles un offset dentro del original comprimido. La ingesta y la
+verificación reproducible usan el mismo decodificador. Las muestras acotadas de
+rechazo siguen siendo contenido no confiable.
+
+Los mensajes de gestión de cuentas y cron de Linux usan un módulo independiente
+de solo extracción en `mapping-linux`. Conserva los alias de usuario, comando,
+host, proceso y PID para `useradd`, `usermod`, `cron`, `crond` y `CRON`, con
+selectores separados de sshd, sudo y su. La extracción nativa acotada lee el
+mensaje original sin asignar categoría, resultado ni vida de proceso. Una
+petición registrada por cron no demuestra que el comando terminara bien.

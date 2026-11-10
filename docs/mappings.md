@@ -49,7 +49,7 @@ In table definitions, a field may declare `omit_text = ["", "-"]` for documented
 
 `parser-linux` decodes original fields through `linux-source-v1`. The decoder preserves original messages, exact timestamps and member locations; it never assigns a category, outcome or entity role. Classic auth.log/secure timestamps still require confirmed per-ingestion year and UTC-offset context. The same detector and confirmation flow serve the CLI and TUI.
 
-Five mapping modules share the `mapping-linux` feature. The sshd, sudo, su and HTTP modules use bundled TOML definitions with fixed canonical hashes. Each has a separate manifest and disjoint dataset selector. The auditd module is native because it must join a bounded set of original SYSCALL/EXECVE members; a finite field table cannot perform that join. Journald keeps its extraction-only mapping through the same Linux decoder, without inventing classifications.
+Six mapping modules share the `mapping-linux` feature. The sshd, sudo, su and HTTP modules use bundled TOML definitions with fixed canonical hashes. Each has a separate manifest and disjoint dataset selector. The auditd module is native because it must join a bounded set of original SYSCALL/EXECVE members; a finite field table cannot perform that join. Journald keeps its extraction-only mapping through the same Linux decoder, without inventing classifications.
 
 - SSH `Accepted`, `Failed` and `Invalid` token values select explicit authentication outcomes. Unknown messages stay unclassified. A successful user is the actor; the attempted account on a failure is the target.
 - PAM session `opened` and authentication `failure` values use explicit outcome tables. Closing a session does not imply a new authentication result. A sudo command request has unknown outcome: requesting a command does not prove that it ran successfully.
@@ -175,3 +175,27 @@ contracts test repeated and concurrent decoding, provenance, cancellation and
 deterministic mapping; parity fixtures check the existing search identities and
 timestamps. Both the ordinary ingestion route and reconstruction use the same
 source decoder and mapping selected for each signed source.
+
+## Syslog extraction
+
+`parser-syslog` decodes RFC 5424 and RFC 3164 headers and messages through
+`syslog-source-v1`, including bounded gzip streams. `mapping-syslog` is a
+separate extraction-only module. Header host, application, PID, facility and
+severity aliases remain searchable; none implies a common-event category,
+outcome or entity role. RFC 5424 retains the timestamp's full source precision.
+RFC 3164 requires the same confirmed per-ingestion calendar as ordinary syslog
+ingestion, including the explicit December-to-January rollover option. The
+calendar remains signed in the source selection. No clock or mtime is used.
+
+Gzip records retain their decoded member ordinal and source hash. They do not
+claim a byte offset inside the compressed original. The common writer uses the
+same source decoder for ingestion and reproducible verification. Bounded
+rejection samples remain untrusted content.
+
+Linux account-management and cron messages use a separate unclassified
+extraction module under `mapping-linux`. It preserves the existing user,
+command, host, process and PID search aliases for `useradd`, `usermod`, `cron`,
+`crond` and `CRON`. Finite selectors keep it disjoint from sshd, sudo and su.
+Its bounded native extraction reads the original message layout; it assigns no
+category, outcome or process lifetime. A request in a cron log does not prove
+that a command succeeded.

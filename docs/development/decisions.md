@@ -627,3 +627,17 @@ a rule name does not become an analyst-confirmed finding.
 
 Consequences: mappings can evolve independently of format decoding. No signed
 format, permission, default model or external production dependency changes.
+
+### Decode syslog headers independently of extraction
+
+Context: syslog must keep the same confirmed calendar and searchable header
+identities when the common writer becomes the only ingestion route.
+
+Decision: `syslog-source-v1` decodes original RFC headers and messages, while a
+separate extraction-only module retains host, application, PID, facility and
+severity aliases. Gzip stays bounded and records no invented compressed offset.
+No category, outcome or role is inferred from application or message text.
+
+Consequences: the source selection still signs per-ingestion year, offset and
+rollover context. Ingestion and reconstruction use the same source decoder and
+mapping. No current signed format or external production dependency changes.

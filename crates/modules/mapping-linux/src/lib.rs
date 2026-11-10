@@ -1,7 +1,9 @@
 #![forbid(unsafe_code)]
 //! Linux mappings are separate modules; only decoding belongs to parser-linux.
 mod audit;
+mod auth_extraction;
 pub use audit::AuditMapping;
+pub use auth_extraction::AuthExtractionMapping;
 use irmind_app::{
     modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
     source_mapping::{MappingError, MappingManifest, MappingOutput, SourceMapper, SourceRecordV1},
