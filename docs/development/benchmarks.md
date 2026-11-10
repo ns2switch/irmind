@@ -1401,3 +1401,25 @@ three in its V2 reference. These layout differences are observations, not an
 isolated causal experiment. The synthetic padding is compressible; these smokes
 do not replace the full 15 GB matrix. The source-pipeline rollout continues with
 these remaining costs documented, without changing the absolute performance gates.
+
+### OCSF source decoder and mapping smoke
+
+The production-path [release run](https://github.com/ns2switch/irmind/actions/runs/42875425300)
+compares three paired 1 GiB OCSF JSON ingestions on one `ubuntu-24.04` runner,
+with matching source hashes, 903,824 accepted records per ingestion, no rejects,
+and verified signed custody. No model or remote service is involved. Timings
+exclude Heaptrack; allocation counts come from a separate instrumented V3 run.
+The measured revision is `585a8c12e691679298023b760d577c2493e18295`.
+
+| Route | Median ingestion | Throughput | Typed overhead |
+| --- | ---: | ---: | ---: |
+| V2 reference | 40.321 s | 25.40 MiB/s | — |
+| Source decoder → OCSF mapping → V3 | 45.966 s | 22.28 MiB/s | +14.0% |
+
+Median V3 counters identify 7.300 s in source decoding, 14.761 s in mapping,
+and 12.693 s in writer projection. These nested/worker timing counters are not
+an additive wall-time breakdown. The native mapping validates original OCSF
+class/category, activity/status and typed fields; the reference does not perform
+that common-event interpretation. This compressible synthetic smoke is not a
+substitute for the full 15 GB matrix. [Raw counters and allocation attribution](benchmark-data/ocsf-source-585a8c1/metadata.json)
+are retained with the run metadata.

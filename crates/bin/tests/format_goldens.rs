@@ -558,3 +558,23 @@ fn ecs_source_and_mapping_contract_is_independent_of_json_map_features() {
     )
     .unwrap();
 }
+
+#[cfg(feature = "mapping-ocsf")]
+#[path = "support/source_pipeline_goldens.rs"]
+mod source_pipeline_goldens;
+
+#[cfg(feature = "mapping-ocsf")]
+#[test]
+fn ocsf_source_and_projection_bytes_are_independent_of_json_map_features() {
+    let mapper = irmind_mod_mapping_ocsf::OcsfMapping::new().unwrap();
+    let actual = source_pipeline_goldens::digest(
+        &irmind_mod_parser_ocsf::OcsfSourceDecoder,
+        &mapper,
+        include_bytes!("../../testkit/fixtures/parser-ocsf/source/events.ndjson"),
+        2,
+    );
+    assert_eq!(
+        actual,
+        "90c05707e91b29ae5b676a583d42c9f991450f5ea08c4ae0094208e768337095"
+    );
+}

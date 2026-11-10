@@ -23,6 +23,23 @@ fuzz_target!(|bytes: &[u8]| {
             },
             &mut |_| Ok(()),
         );
+        if bytes.starts_with(b"PAR1") {
+            use std::io::Write as _;
+            let mut file = tempfile::tempfile().expect("synthetic fuzz file");
+            file.write_all(bytes).expect("bounded synthetic fuzz input");
+            let _ = irmind_mod_parser_ocsf::OcsfSourceDecoder.decode_local_file(
+                irmind_app::source_mapping::SourceFileInput {
+                    metadata: irmind_app::source_mapping::SourceMetadata {
+                        source: &reference,
+                        evidence_hash: sha256(bytes),
+                        time_context: None,
+                        cancel: &cancel,
+                    },
+                    file: &mut file,
+                },
+                &mut |_| Ok(()),
+            );
+        }
         let _ = OcsfParser.detect("fuzz.ndjson", bytes);
         let _ = OcsfParser.parse_indexed_reader_report(
             "fuzz.ndjson",

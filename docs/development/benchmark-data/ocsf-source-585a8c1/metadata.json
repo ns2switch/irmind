@@ -1,0 +1,16 @@
+{
+  "baseline": "585a8c12e691679298023b760d577c2493e18295",
+  "candidate": "585a8c12e691679298023b760d577c2493e18295",
+  "heaptrack": "heaptrack 1.5.0",
+  "runner": "ubuntu-24.04",
+  "build": "release",
+  "release_debug": "2",
+  "release_strip": "none",
+  "repetitions": 3,
+  "minimum_source_bytes": 1073741824,
+  "sources": [
+    "ocsf"
+  ],
+  "first_party_rebuilt_each_revision": true,
+  "method": "Timings without Heaptrack; separate V3 allocation runs. Ingestion uses normal source hashing, mapping, partitioning, Parquet writing and signed custody. Nested timing intervals are labeled inclusive."
+}

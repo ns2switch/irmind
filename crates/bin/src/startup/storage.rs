@@ -81,7 +81,15 @@ pub(super) fn experimental_parsers(
     #[cfg(feature = "mapping-ecs")]
     let catalog = catalog.with_experimental_parser(irmind_mod_parser_ecs::source_log_parser())?;
     #[cfg(feature = "mapping-ocsf")]
-    let catalog = catalog.with_experimental_parser(irmind_mod_parser_ocsf::source_log_parser())?;
+    let catalog = if catalog
+        .available()
+        .iter()
+        .any(|(id, _)| id == "parser-ocsf")
+    {
+        catalog.with_experimental_parser(irmind_mod_parser_ocsf::source_log_parser())?
+    } else {
+        catalog
+    };
     let mappings = registry.mapping_catalog()?;
     #[cfg(feature = "mapping-evtx")]
     let catalog = if mappings
