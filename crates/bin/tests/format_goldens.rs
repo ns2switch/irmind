@@ -342,7 +342,7 @@ fn export_goldens(
     store.export_case(&id, &v3, &cancel).unwrap();
     record(out, "export/v3", &fs::read(v3).unwrap());
     let v4 = root.join("export-v4.bin");
-    irmind_app::export_case_v4(engine, store, &id, &v4, None, false, &cancel).unwrap();
+    irmind_app::export_case_v6(engine, store, &id, &v4, None, false, &cancel).unwrap();
     record(out, "export/v4", &fs::read(v4).unwrap());
 }
 

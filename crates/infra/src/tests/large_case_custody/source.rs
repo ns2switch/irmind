@@ -285,7 +285,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
         (4, 1, 1)
     );
     let with_original = root.path().join("with-original.irmind");
-    irmind_app::export_case_v4(
+    irmind_app::export_case_v6(
         &engine,
         store.as_ref(),
         &case.id,

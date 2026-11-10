@@ -101,7 +101,7 @@ fn v5_recomputes_even_a_resigned_commitment_and_checks_all_derived_file_frames()
     .unwrap();
     engine.seal(&id).unwrap();
     let path = root.path().join("case.irmind");
-    irmind_app::export_case_v4(
+    irmind_app::export_case_v6(
         &engine,
         store.as_ref(),
         &id,

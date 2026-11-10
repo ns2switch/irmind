@@ -7,6 +7,14 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum FixedAppError {
+    #[error(
+        "This case uses a retired format. Use the IRMind version that created it, or re-ingest the verified originals into a new case."
+    )]
+    RetiredCaseFormat,
+    #[error(
+        "This export uses a retired format. Verify it with the IRMind version that created it, or re-ingest the verified originals into a new case."
+    )]
+    RetiredExportFormat,
     #[error("invalid bounded source format")]
     SourceFormat,
     #[error("source record limit exceeded")]

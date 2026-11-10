@@ -1,4 +1,4 @@
-use super::export_v4::MAX_FRAME_BYTES;
+use super::export_current::MAX_FRAME_BYTES;
 use super::{AppError, hex, storage, storage_reason};
 use sha2::{Digest, Sha256};
 use std::fs::File;

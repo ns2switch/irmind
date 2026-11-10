@@ -40,7 +40,7 @@ pub fn export_case(
     exporter.export_case(id, path, cancel)
 }
 
-pub fn export_case_v4(
+pub fn export_case_v6(
     engine: &Engine<'_>,
     exporter: &dyn crate::LargeCaseExporter,
     id: &CaseId,
@@ -59,20 +59,7 @@ pub fn export_case_v4(
             crate::FixedAppError::PolicySealTheCaseBeforeExport,
         ));
     }
-    let entries = engine.audit_log.entries(id)?;
-    if entries.iter().any(|e| e.kind.is_mapped_custody()) {
-        exporter.export_case_v6(id, path, source_root, include_originals, cancel)
-    } else if entries.iter().any(|e| {
-        matches!(
-            e.kind,
-            irmind_domain::AuditEventKind::ParquetArtifactV2
-                | irmind_domain::AuditEventKind::ParquetArtifactsMigrated
-        )
-    }) {
-        exporter.export_case_v5(id, path, source_root, include_originals, cancel)
-    } else {
-        exporter.export_case_v4(id, path, source_root, include_originals, cancel)
-    }
+    exporter.export_case_v6(id, path, source_root, include_originals, cancel)
 }
 
 pub struct SealPreview {

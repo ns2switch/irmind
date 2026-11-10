@@ -28,7 +28,6 @@ pub struct ArtifactCatalog {
 }
 
 pub struct ArtifactCatalogBuilder {
-    lineage: irmind_domain::ArtifactLineage,
     mapped: irmind_domain::MappingLineageV1,
     names: std::collections::BTreeSet<String>,
     artifact_order: Vec<String>,
@@ -36,7 +35,6 @@ pub struct ArtifactCatalogBuilder {
 impl Default for ArtifactCatalogBuilder {
     fn default() -> Self {
         Self {
-            lineage: irmind_domain::ArtifactLineage::new(crate::sha256_stream),
             mapped: irmind_domain::MappingLineageV1::default(),
             names: std::collections::BTreeSet::new(),
             artifact_order: Vec::new(),
@@ -45,11 +43,11 @@ impl Default for ArtifactCatalogBuilder {
 }
 impl ArtifactCatalogBuilder {
     pub fn accept(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
-        use irmind_domain::{
-            Actor, AuditEventKind, EvidenceHash, ParquetArtifact, SourceManifestV1,
-            SourceManifestV2,
-        };
+        use irmind_domain::{AuditEventKind, SourceManifestV2};
         let invalid = || AppError::InvalidChain(entry.seq);
+        if entry.kind.is_retired_case_format() {
+            return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
+        }
         if self.mapped.has_pending()
             && !matches!(
                 entry.kind,
@@ -61,67 +59,17 @@ impl ArtifactCatalogBuilder {
             return Err(invalid());
         }
         if entry.kind.is_mapped_custody() {
-            if self.lineage.has_pending() {
-                return Err(invalid());
-            }
             return self.accept_mapped(entry);
         }
-        if self.lineage.has_pending()
-            && !matches!(
-                entry.kind,
-                AuditEventKind::ParquetArtifactV2 | AuditEventKind::ParquetArtifactsMigrated
-            )
-        {
-            return Err(invalid());
-        }
-        match entry.kind {
-            AuditEventKind::EvidenceIngested | AuditEventKind::GraphIndexed => {
-                let hash = EvidenceHash::parse(entry.evidence.as_deref().ok_or_else(invalid)?)
-                    .map_err(|_| invalid())?;
-                self.lineage
-                    .source(hash, "parser-json", "json-stream-v2", false)
-                    .map_err(|_| invalid())?;
+        if entry.kind == AuditEventKind::SourceManifestV2 {
+            if entry.evidence.is_some() {
+                return Err(invalid());
             }
-            AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2 => {
-                if entry.evidence.is_some() {
-                    return Err(invalid());
-                }
-                let source = SourceManifestV1::decode_signed(entry.kind, &entry.payload)
-                    .map_err(|_| invalid())?
-                    .ok_or_else(invalid)?;
-                if !self.names.insert(source.source) {
-                    return Err(invalid());
-                }
-                let (id, version, manifest) = if entry.kind == AuditEventKind::SourceManifestV2 {
-                    let v = SourceManifestV2::decode(&entry.payload).map_err(|_| invalid())?;
-                    self.mapped.source(v.clone()).map_err(|_| invalid())?;
-                    (v.parser_id, v.parser_version, true)
-                } else {
-                    ("parser-json".into(), "json-stream-v2".into(), false)
-                };
-                self.lineage
-                    .source(source.sha256, &id, &version, manifest)
-                    .map_err(|_| invalid())?;
+            let source = SourceManifestV2::decode(&entry.payload).map_err(|_| invalid())?;
+            if !self.names.insert(source.source.source.clone()) {
+                return Err(invalid());
             }
-            AuditEventKind::ParquetArtifactV1 | AuditEventKind::ParquetArtifactV2 => {
-                if entry.evidence.is_some() {
-                    return Err(invalid());
-                }
-                let artifact =
-                    ParquetArtifact::decode(entry.kind, &entry.payload).map_err(|_| invalid())?;
-                let path = artifact.path().to_owned();
-                self.lineage.artifact(artifact).map_err(|_| invalid())?;
-                self.artifact_order.push(path);
-            }
-            AuditEventKind::ParquetArtifactsMigrated => {
-                if entry.actor != Actor::Analyst || entry.evidence.is_some() {
-                    return Err(invalid());
-                }
-                self.lineage
-                    .migrate(&ParquetMigrationV1::decode(&entry.payload).map_err(|_| invalid())?)
-                    .map_err(|_| invalid())?;
-            }
-            _ => {}
+            self.mapped.source(source).map_err(|_| invalid())?;
         }
         Ok(())
     }
@@ -132,21 +80,8 @@ impl ArtifactCatalogBuilder {
         use irmind_domain::ParquetArtifact;
         let bad = || AppError::InvalidChain(0);
         let mapped = self.mapped.all().map_err(|_| bad())?;
-        if mapped.is_empty() {
-            return Ok(ArtifactCatalog {
-                all: self.lineage.all().map_err(|_| bad())?.to_vec(),
-                active: self.lineage.active().map_err(|_| bad())?,
-            });
-        }
         let mut by_path = std::collections::BTreeMap::new();
-        for artifact in self
-            .lineage
-            .all()
-            .map_err(|_| bad())?
-            .iter()
-            .cloned()
-            .chain(mapped.into_iter().cloned().map(ParquetArtifact::V3))
-        {
+        for artifact in mapped.into_iter().cloned().map(ParquetArtifact::V3) {
             if by_path
                 .insert(artifact.path().to_owned(), artifact)
                 .is_some()
@@ -155,18 +90,11 @@ impl ArtifactCatalogBuilder {
             }
         }
         let active_paths = self
-            .lineage
+            .mapped
             .active()
             .map_err(|_| bad())?
             .iter()
-            .map(|a| a.path().to_owned())
-            .chain(
-                self.mapped
-                    .active()
-                    .map_err(|_| bad())?
-                    .iter()
-                    .map(|a| a.core().path.clone()),
-            )
+            .map(|a| a.core().path.clone())
             .collect::<std::collections::BTreeSet<_>>();
         let mut all = Vec::with_capacity(by_path.len());
         for path in &self.artifact_order {
@@ -180,18 +108,6 @@ impl ArtifactCatalogBuilder {
             .filter(|a| active_paths.contains(a.path()))
             .cloned()
             .collect();
-        let legacy_sources = all
-            .iter()
-            .filter(|a| !matches!(a, ParquetArtifact::V3(_)))
-            .flat_map(|a| a.source_hashes().iter())
-            .collect::<std::collections::BTreeSet<_>>();
-        if all
-            .iter()
-            .filter(|a| matches!(a, ParquetArtifact::V3(_)))
-            .any(|a| a.source_hashes().iter().any(|s| legacy_sources.contains(s)))
-        {
-            return Err(bad());
-        }
         Ok(ArtifactCatalog { all, active })
     }
 }
