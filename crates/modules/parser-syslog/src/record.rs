@@ -16,7 +16,7 @@ struct Row<'a> {
     raw: &'a str,
 }
 
-type Header<'a> = (
+pub(super) type Header<'a> = (
     String,
     &'a str,
     &'a str,
@@ -93,7 +93,7 @@ pub(super) fn parse(
     })
 }
 
-fn priority(line: &str) -> Result<(u8, &str), AppError> {
+pub(super) fn priority(line: &str) -> Result<(u8, &str), AppError> {
     let (pri, rest) = line
         .strip_prefix('<')
         .and_then(|text| text.split_once('>'))
@@ -109,7 +109,7 @@ fn priority(line: &str) -> Result<(u8, &str), AppError> {
     Ok((pri, rest))
 }
 
-fn modern(body: &str) -> Result<Header<'_>, AppError> {
+pub(super) fn modern(body: &str) -> Result<Header<'_>, AppError> {
     let mut parts = body.splitn(6, ' ');
     let time = field(&mut parts, 64)?;
     let host = field(&mut parts, 255)?;
@@ -145,7 +145,7 @@ fn modern(body: &str) -> Result<Header<'_>, AppError> {
     ))
 }
 
-fn classic(body: &str, context: LegacyTimestamp) -> Result<Header<'_>, AppError> {
+pub(super) fn classic(body: &str, context: LegacyTimestamp) -> Result<Header<'_>, AppError> {
     let time = context.parse(body.get(..15).ok_or_else(invalid)?)?;
     let rest = body
         .get(16..)

@@ -42,6 +42,7 @@ pub(super) fn parse(
         bytes: 0,
         limit: MAX_GZIP_BYTES,
         cancel,
+        exceeded: false,
     };
     let decoded = MultiGzDecoder::new(compressed);
     let mut decoded = Bounded {
@@ -49,6 +50,7 @@ pub(super) fn parse(
         bytes: 0,
         limit: MAX_GZIP_BYTES,
         cancel,
+        exceeded: false,
     };
     let result = super::input::parse(parser, source, &mut decoded, hash, cancel, &mut |row| {
         let location = irmind_domain::ParserLocation::new(source, "parser-syslog", 0)
@@ -68,11 +70,29 @@ pub(super) fn parse(
     }
 }
 
-struct Bounded<'a, R> {
+pub(super) struct Bounded<'a, R> {
     inner: R,
     bytes: u64,
     limit: u64,
     cancel: &'a CancellationToken,
+    exceeded: bool,
+}
+pub(super) fn bounded<R: Read>(inner: R, cancel: &CancellationToken) -> Bounded<'_, R> {
+    Bounded {
+        inner,
+        bytes: 0,
+        limit: MAX_GZIP_BYTES,
+        cancel,
+        exceeded: false,
+    }
+}
+impl<R> Bounded<'_, R> {
+    pub(super) fn exceeded(&self) -> bool {
+        self.exceeded
+    }
+    pub(super) fn inner(&self) -> &R {
+        &self.inner
+    }
 }
 impl<R: Read> Read for Bounded<'_, R> {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
@@ -87,6 +107,7 @@ impl<R: Read> Read for Bounded<'_, R> {
         let count = self.inner.read(&mut output[..capacity])?;
         self.bytes = self.bytes.saturating_add(count as u64);
         if self.bytes > self.limit {
+            self.exceeded = true;
             return Err(io::Error::other("gzip size limit exceeded"));
         }
         Ok(count)
@@ -111,6 +132,7 @@ mod tests {
             bytes: 0,
             limit: 4,
             cancel: &cancel,
+            exceeded: false,
         };
         assert!(reader.read_to_end(&mut Vec::new()).is_err());
         cancel.cancel();

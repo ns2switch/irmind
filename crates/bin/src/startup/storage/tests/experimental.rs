@@ -285,3 +285,6 @@ mod profile;
 mod dfir;
 #[cfg(feature = "mapping-ocsf")]
 mod ocsf;
+
+#[cfg(feature = "mapping-syslog")]
+mod syslog;

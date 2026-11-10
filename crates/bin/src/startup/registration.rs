@@ -4,7 +4,8 @@
     feature = "mapping-linux",
     feature = "mapping-ecs",
     feature = "mapping-ocsf",
-    feature = "mapping-dfir"
+    feature = "mapping-dfir",
+    feature = "mapping-syslog",
 ))]
 mod mapping;
 #[cfg(feature = "llm-anthropic")]
@@ -142,7 +143,8 @@ fn register_parsers(
         feature = "mapping-linux",
         feature = "mapping-ecs",
         feature = "mapping-ocsf",
-        feature = "mapping-dfir"
+        feature = "mapping-dfir",
+        feature = "mapping-syslog",
     ))]
     if experimental {
         mapping::register(registry)?;

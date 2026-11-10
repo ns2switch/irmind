@@ -119,7 +119,7 @@ fn parse_row(
     }
 }
 
-fn frame(
+pub(super) fn frame(
     reader: &mut impl BufRead,
     cancel: &CancellationToken,
 ) -> Result<(Vec<u8>, u64), AppError> {

@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 mod indexed;
+mod source_decode;
+pub use source_decode::{SyslogSourceDecoder, source_log_parser};
 
 use irmind_app::{
     AppError, CancellationToken, EventParser, GraphRecord, LogParser, ParseReport,
@@ -28,7 +30,7 @@ pub struct SyslogParser {
 pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-syslog",
     version: "0.1.0",
-    ports: &[ModulePort::EventParser],
+    ports: &[ModulePort::EventParser, ModulePort::SourceDecoder],
     tools: &[],
     config: &[],
 };
@@ -43,6 +45,7 @@ impl Module for SyslogParser {
         config: &ModuleConfig,
     ) -> Result<(), AppError> {
         let _ = config;
+        registry.add_source_decoder(std::sync::Arc::new(SyslogSourceDecoder))?;
         registry.add_parser(self)
     }
 }
