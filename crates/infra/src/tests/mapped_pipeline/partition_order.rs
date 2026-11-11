@@ -39,9 +39,7 @@ fn disordered_sources_allocate_host_partitions_by_the_shared_stable_order() {
     let catalog = irmind_app::artifact_catalog(&store.entries(&case.id).unwrap()).unwrap();
     let mut values = std::collections::BTreeSet::new();
     for artifact in catalog.active {
-        let ParquetArtifact::V3(artifact) = artifact else {
-            panic!("current envelope required");
-        };
+        let ParquetArtifact::V3(artifact) = artifact;
         assert!(!artifact.core().path.contains("endpoint-"));
         let scope = artifact
             .core()

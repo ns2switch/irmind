@@ -2,17 +2,17 @@ use super::{AppError, ParquetArtifact, Path, StagedArtifact, fs, invalid_source,
 use irmind_domain::{EvidenceHash, ParquetArtifactV3, ParquetLayoutV1};
 use std::collections::BTreeSet;
 
-pub(super) fn parents(sources: &[ParquetArtifact]) -> Result<Vec<ParquetArtifactV3>, AppError> {
+pub(super) fn parents(sources: &[ParquetArtifact]) -> Vec<ParquetArtifactV3> {
     sources
         .iter()
-        .map(|source| match source {
-            ParquetArtifact::V3(value) => Ok(value.clone()),
-            _ => Err(invalid_source()),
+        .map(|source| {
+            let ParquetArtifact::V3(value) = source;
+            value.clone()
         })
         .collect()
 }
 pub(super) fn validate(sources: &[ParquetArtifact]) -> Result<Vec<EvidenceHash>, AppError> {
-    let parents = parents(sources)?;
+    let parents = parents(sources);
     let bindings = ParquetLayoutV1::preserved_bindings(&parents).map_err(|_| invalid_source())?;
     let mut paths = BTreeSet::new();
     let mut ids = BTreeSet::new();
@@ -32,7 +32,7 @@ pub(super) fn stage(
     case_dir: &Path,
     sources: &[ParquetArtifact],
 ) -> Result<(StagedArtifact, irmind_domain::ArtifactPipelineV1), AppError> {
-    let parents = parents(sources)?;
+    let parents = parents(sources);
     let metadata = ParquetLayoutV1::replacement(&parents, 0, EvidenceHash::from_bytes([0; 32]))
         .map_err(|_| invalid_source())?;
     let target = case_dir.join(&metadata.core().path);

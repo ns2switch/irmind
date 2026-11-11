@@ -13,7 +13,6 @@ pub use mapping::*;
 
 const SOURCE_TAG: &[u8] = b"irmind-source-manifest-v1\0";
 const SOURCE_V2_TAG: &[u8] = b"irmind-source-manifest-v2\0";
-const ARTIFACT_TAG: &[u8] = b"irmind-parquet-artifact-v1\0";
 const MAX_PAYLOAD_BYTES: usize = 16_384;
 pub(super) const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
 
@@ -149,23 +148,10 @@ impl SourceManifestV2 {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ParquetArtifactV1 {
-    pub path: String,
-    pub size: u64,
-    pub sha256: EvidenceHash,
-    pub parser_version: String,
-    pub schema_version: String,
-    pub partition_date: String,
-    pub partition_account: String,
-    pub partition_region: String,
-    pub source_hashes: Vec<EvidenceHash>,
-}
-
 impl SourceManifestV1 {
     pub fn decode_signed(kind: AuditEventKind, payload: &str) -> Result<Option<Self>, DomainError> {
         match kind {
-            AuditEventKind::SourceManifestV1 => Self::decode(payload).map(Some),
+            AuditEventKind::SourceManifestV1 => Err(DomainError::InvalidManifest),
             AuditEventKind::SourceManifestV2 => {
                 SourceManifestV2::decode(payload).map(|manifest| Some(manifest.source))
             }
@@ -215,98 +201,6 @@ impl SourceManifestV1 {
         }
         Ok(())
     }
-}
-
-impl ParquetArtifactV1 {
-    pub fn encode(&self) -> Result<String, DomainError> {
-        self.validate()?;
-        let mut bytes = ARTIFACT_TAG.to_vec();
-        put(&mut bytes, self.path.as_bytes());
-        bytes.extend_from_slice(&self.size.to_be_bytes());
-        put(&mut bytes, self.sha256.as_str().as_bytes());
-        for value in [
-            &self.parser_version,
-            &self.schema_version,
-            &self.partition_date,
-            &self.partition_account,
-            &self.partition_region,
-        ] {
-            put(&mut bytes, value.as_bytes());
-        }
-        bytes.extend_from_slice(&(self.source_hashes.len() as u64).to_be_bytes());
-        for hash in &self.source_hashes {
-            put(&mut bytes, hash.as_str().as_bytes());
-        }
-        encode_payload(&bytes)
-    }
-
-    pub fn decode(payload: &str) -> Result<Self, DomainError> {
-        let bytes = decode_payload(payload, ARTIFACT_TAG)?;
-        let mut reader = Reader::new(&bytes[ARTIFACT_TAG.len()..]);
-        let path = reader.string()?;
-        let size = reader.u64()?;
-        let sha256 = EvidenceHash::parse(&reader.string()?)?;
-        let parser_version = reader.string()?;
-        let schema_version = reader.string()?;
-        let partition_date = reader.string()?;
-        let partition_account = reader.string()?;
-        let partition_region = reader.string()?;
-        let count = usize::try_from(reader.u64()?).map_err(|_| DomainError::InvalidManifest)?;
-        if count == 0 || count > 128 {
-            return Err(DomainError::InvalidManifest);
-        }
-        let mut source_hashes = Vec::with_capacity(count);
-        for _ in 0..count {
-            source_hashes.push(EvidenceHash::parse(&reader.string()?)?);
-        }
-        reader.end()?;
-        let value = Self {
-            path,
-            size,
-            sha256,
-            parser_version,
-            schema_version,
-            partition_date,
-            partition_account,
-            partition_region,
-            source_hashes,
-        };
-        value.validate()?;
-        Ok(value)
-    }
-
-    pub fn validate(&self) -> Result<(), DomainError> {
-        let hashes_sorted = self.source_hashes.windows(2).all(|pair| pair[0] < pair[1]);
-        let partition_path = format!(
-            "date={}/account={}/region={}/",
-            self.partition_date, self.partition_account, self.partition_region
-        );
-        if !valid_relative_path(&self.path)
-            || !self.path.starts_with(&partition_path)
-            || !self.path.ends_with(".parquet")
-            || self.parser_version.is_empty()
-            || self.parser_version.len() > 128
-            || self.schema_version.is_empty()
-            || self.schema_version.len() > 128
-            || !valid_partition(&self.partition_date)
-            || !valid_partition(&self.partition_account)
-            || !valid_partition(&self.partition_region)
-            || self.source_hashes.is_empty()
-            || self.source_hashes.len() > 128
-            || !hashes_sorted
-        {
-            return Err(DomainError::InvalidManifest);
-        }
-        Ok(())
-    }
-}
-
-fn valid_partition(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= 128
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
 pub(crate) fn valid_source(source: &str) -> bool {
@@ -545,31 +439,5 @@ mod tests {
             unsafe_source.source = path.into();
             assert!(unsafe_source.encode().is_err());
         }
-    }
-
-    #[test]
-    fn artifact_round_trip_rejects_noncanonical_sources() {
-        let source = EvidenceHash::parse(&"a".repeat(64)).unwrap();
-        let artifact = ParquetArtifactV1 {
-            path: "date=2026-10-28/account=demo/region=eu-west-1/part.parquet".into(),
-            size: 123,
-            sha256: source.clone(),
-            parser_version: "json-cloudtrail-v5".into(),
-            schema_version: "irmind-parquet-v1".into(),
-            partition_date: "2026-10-28".into(),
-            partition_account: "demo".into(),
-            partition_region: "eu-west-1".into(),
-            source_hashes: vec![source.clone()],
-        };
-        assert_eq!(
-            ParquetArtifactV1::decode(&artifact.encode().unwrap()),
-            Ok(artifact.clone())
-        );
-        let mut invalid = artifact;
-        invalid.path = "date=2026-10-28/account=other/region=eu-west-1/part.parquet".into();
-        assert!(invalid.encode().is_err());
-        invalid.path = "date=2026-10-28/account=demo/region=eu-west-1/part.parquet".into();
-        invalid.source_hashes.push(source);
-        assert!(invalid.encode().is_err());
     }
 }

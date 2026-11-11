@@ -39,9 +39,7 @@ fn direct_physical_recipe_is_a_portable_golden_with_current_build_bindings() {
     let actual = outputs
         .iter()
         .map(|output| {
-            let ParquetArtifact::V3(mapped) = output else {
-                panic!("direct output must carry V3 bindings");
-            };
+            let ParquetArtifact::V3(mapped) = output;
             assert_eq!(
                 mapped.core().builder_version,
                 irmind_domain::COMMON_EVENT_DIRECT_BUILDER

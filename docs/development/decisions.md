@@ -731,3 +731,20 @@ remain explicitly unclassified; their unspecified role is not an old format.
 Consequences: current query limits, sampling, time budgets, partial-result
 markers, hash checks and physical golden bytes stay unchanged. Retired export
 seeds are removed; the two current V6 wire seeds remain pinned and authenticated.
+
+
+### Remove historical artifact envelopes while retaining current nested cores
+
+Context: current V3 envelopes embed the canonical source and physical metadata
+cores that were introduced under earlier names. Those encodings remain part of
+the current format; the standalone historical artifact envelopes are obsolete.
+
+Decision: remove standalone V1/V2 artifact decoding and construction, old
+physical schema IDs and their golden fixtures. Keep the nested acquisition and
+physical core bytes unchanged. Compaction validates a V3 pipeline before
+publishing its physical core, and queries accept only the current schema IDs.
+
+Consequences: a retired artifact event still produces the explicit version
+error at the case boundary, before interpreting its payload. Current common
+core, mapped envelope, direct physical, layout, seal and V6 golden fixtures stay
+unchanged. Invalid metadata, source links, row counts and hashes still fail.

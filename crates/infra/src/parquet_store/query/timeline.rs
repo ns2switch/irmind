@@ -13,7 +13,6 @@ impl QueryStore<'_> {
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<Vec<TimelineEvent>, AppError> {
-        super::require_current(artifacts)?;
         let rules = time_rules(filter);
         let hits = self.timeline_hits(
             ScanSpec {

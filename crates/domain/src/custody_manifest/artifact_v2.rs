@@ -11,9 +11,6 @@ pub const ARTIFACT_V2_STABLE_ORDER: &str = "instant-source-offset-record-v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ArtifactSchemaV2 {
-    Events,
-    Entities,
-    Coobservations,
     CommonEvents,
     CommonEntities,
     CommonCoobservations,
@@ -22,9 +19,6 @@ pub enum ArtifactSchemaV2 {
 impl ArtifactSchemaV2 {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Events => "irmind-events-v3",
-            Self::Entities => "irmind-entities-v3",
-            Self::Coobservations => "irmind-coobservations-v2",
             Self::CommonEvents => "irmind-events-v4",
             Self::CommonEntities => "irmind-entities-v4",
             Self::CommonCoobservations => "irmind-coobservations-v3",
@@ -40,9 +34,6 @@ impl ArtifactSchemaV2 {
 
     pub fn parse(value: &str) -> Result<Self, DomainError> {
         match value {
-            "irmind-events-v3" => Ok(Self::Events),
-            "irmind-entities-v3" => Ok(Self::Entities),
-            "irmind-coobservations-v2" => Ok(Self::Coobservations),
             "irmind-events-v4" => Ok(Self::CommonEvents),
             "irmind-entities-v4" => Ok(Self::CommonEntities),
             "irmind-coobservations-v3" => Ok(Self::CommonCoobservations),
@@ -51,7 +42,7 @@ impl ArtifactSchemaV2 {
     }
 }
 
-/// Additive signed envelope. No V1 field, wire value or decoder is reused for V2.
+/// Canonical acquisition and physical metadata embedded in the current V3 envelope.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParquetArtifactV2 {
     pub path: String,

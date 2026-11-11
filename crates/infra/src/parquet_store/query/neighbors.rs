@@ -10,7 +10,6 @@ impl QueryStore<'_> {
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        super::require_current(artifacts)?;
         self.scoped_neighbors(id, artifacts, filter, entity, limit, cancel)
     }
 }
