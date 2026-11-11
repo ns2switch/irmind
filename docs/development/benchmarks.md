@@ -1531,3 +1531,49 @@ At four workers, the candidate reduced ingestion by 10.8% on the 1 GiB workload 
 
 
 Disordered mapped groups sort independent source spools concurrently under the same adaptive worker cap. Space reservation covers every active sort; each sort retains its row-count, byte-count and hash checks. The coordinator still consumes sources in canonical order and assigns all partitions and physical file boundaries. Parallel completion remains enabled after those boundaries have been fixed.
+
+### Independent source sorts under the shared worker budget
+
+The [paired release sweep](https://github.com/ns2switch/irmind/actions/runs/43000350075)
+compares `a10ec39` with `8fcd563` on the same four-CPU runner. The input is
+515 disordered endpoint files, 1,076,424,160 bytes and 64 hosts. Both versions
+retain sequential canonical appends and parallel partition completion.
+
+| Setting | Ingest wall (s) | Peak RSS (MiB) | Sampled staging peak (bytes) |
+| --- | ---: | ---: | ---: |
+| Reference, four | 98.847 | 280.6 | 58,917,110 |
+| Candidate, one | 117.676 | 251.4 | 40,225,561 |
+| Candidate, automatic (three) | 80.254 | 270.9 | 58,662,648 |
+| Candidate, four | 72.581 | 280.2 | 78,216,864 |
+
+Four workers reduced ingestion by 26.6% against the paired reference; the
+candidate's one-to-four-worker speedup was 1.62 times. All settings wrote
+160,699,746 artifact bytes, including 24,366,105 co-observation bytes. These are
+single measurements; sampled staging and process high-water RSS cover the whole
+benchmark, while ingestion excludes generation and subsequent verification.
+[Exact counters and commits](benchmark-data/current-source-sort-workers.json)
+are available separately. The older phase timer does not isolate independent
+sort time, so its zero sort counter is not a measured absence of sorting.
+
+The [preceding full 15 GB matrix](https://github.com/ns2switch/irmind/actions/runs/42990643490)
+used `8fcd563`, before independent sorts were parallelized:
+
+| Corpus | Hosts | Ingest wall (s) | Absolute target (s) | Result |
+| --- | ---: | ---: | ---: | --- |
+| Cloud | — | 506.504 | 900 | Pass |
+| Endpoint chronological | 1 | 424.240 | 900 | Pass |
+| Endpoint chronological | 64 | 424.839 | 900 | Pass |
+| Endpoint chronological | 1,024 | 318.693 | 900 | Pass |
+| Endpoint chronological | 1,025 | 510.431 | 900 | Pass |
+| Endpoint stress | 1 | 1,363.082 | 1,350 | Fail |
+| Endpoint stress | 64 | 1,410.313 | 1,350 | Fail |
+| Endpoint stress | 1,024 | 1,295.413 | 1,350 | Pass |
+| Endpoint stress | 1,025 | 1,294.628 | 1,350 | Pass; tracked exception remains |
+
+All ordinary queries completed within their deadline. The deliberate worst-case
+cloud path retained its partial-result marker at the budget. HuntEval checks
+found all expected events, entities and paths in each provider. This matrix does
+not establish the candidate's 15 GB performance; its full rerun remains required.
+[Machine-readable measurements](benchmark-data/current-v3-15gb-before-sort.json)
+include per-query counters and the recorded phases. Scenario names containing
+`v2` identify the frozen input generator; the writer in this run was mapped V3.

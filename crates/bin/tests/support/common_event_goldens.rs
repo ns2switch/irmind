@@ -206,3 +206,89 @@ fn linux_mapping_contracts_also_run_with_insertion_ordered_json() {
         .unwrap();
     }
 }
+
+#[test]
+fn direct_mapped_parquet_bytes_are_feature_independent() {
+    let actual = direct_physical_fixture();
+    let expected: BTreeMap<String, serde_json::Value> =
+        serde_json::from_str(include_str!("../fixtures/formats-common-direct-v1.json")).unwrap();
+    assert_eq!(actual, expected);
+}
+#[test]
+#[ignore = "manual generator for the current direct physical fixture"]
+fn regenerate_direct_physical_goldens() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/formats-common-direct-v1.json");
+    fs::write(
+        path,
+        serde_json::to_string_pretty(&direct_physical_fixture()).unwrap() + "\n",
+    )
+    .unwrap();
+}
+fn direct_physical_fixture() -> BTreeMap<String, serde_json::Value> {
+    use irmind_app::{MappedIngestRequest, PartitionLimits, mapped_ingest::CommittedArtifacts};
+    let root = tempfile::tempdir().unwrap();
+    let bytes = br#"{"Records":[{"eventTime":"2026-11-01T00:00:00.123456789Z","eventName":"Observe","sourceIPAddress":"203.0.113.77"},{"eventName":"Unknown","userIdentity":{"userName":"alice"}}]}"#;
+    fs::write(root.path().join("synthetic.json"), bytes).unwrap();
+    let catalog = Arc::new(
+        irmind_app::source_mapping::MappingCatalog::freeze(
+            vec![Arc::new(irmind_mod_parser_json::JsonSourceDecoder)],
+            vec![Arc::new(StableMapping::new())],
+        )
+        .unwrap(),
+    );
+    let parser = catalog
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap();
+    let store = ParquetStore::open_mapped(root.path(), catalog).unwrap();
+    let id = CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+    let paths = ["synthetic.json".into()];
+    let prepared = store
+        .prepare_mapped_ingest(
+            MappedIngestRequest {
+                case_id: &id,
+                source_root: root.path(),
+                relative_paths: &paths,
+                copy_original: false,
+                parser: &parser,
+                committed_artifacts: CommittedArtifacts::Slice(&[]),
+                limits: PartitionLimits::default(),
+            },
+            &CancellationToken::new(),
+        )
+        .unwrap()
+        .unwrap();
+    let manifests = prepared
+        .metadata()
+        .sources
+        .iter()
+        .map(|source| {
+            let mut manifest = source.manifest.clone();
+            manifest.modified_unix_seconds = None;
+            irmind_domain::SourceManifestV2 {
+                source: manifest,
+                parser_id: "parser-json".into(),
+                parser_version: "json-source-v1".into(),
+                confidence: 90,
+                selection: irmind_domain::ParserSelectionMode::Automatic,
+                timestamp_context: None,
+                rejected_records: source.report.rejected,
+                rejected_sample: source.report.samples.clone(),
+            }
+        })
+        .collect::<Vec<_>>();
+    prepared
+        .metadata()
+        .bind(&manifests)
+        .unwrap()
+        .artifacts
+        .into_iter()
+        .map(|artifact| {
+            (
+                artifact.core().path.clone(),
+                serde_json::json!({"size":artifact.core().size,
+            "sha256":artifact.core().sha256.as_str(), "envelope":artifact.encode().unwrap()}),
+            )
+        })
+        .collect()
+}
