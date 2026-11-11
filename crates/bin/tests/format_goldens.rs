@@ -171,24 +171,8 @@ fn one_parser_golden(
     parser: &dyn StreamingEventParser,
     bytes: &[u8],
 ) {
-    let directory = tempfile::tempdir().unwrap();
-    let root = directory.path();
-    let store = ParquetStore::open(root).unwrap();
-    let id = CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
     let cancel = CancellationToken::new();
     let source = format!("{name}.log");
-    let path = root.join(&source);
-    fs::write(&path, bytes).unwrap();
-    // Windows requires a writable handle for setting file timestamps.
-    fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(&path)
-        .unwrap()
-        .set_modified(
-            std::time::UNIX_EPOCH + std::time::Duration::from_secs(FixedClock.now().unwrap()),
-        )
-        .unwrap();
     let rows = normalized_rows(parser, &source, bytes, &cancel);
     assert!(!rows.is_empty(), "{name}");
     record(
@@ -196,43 +180,6 @@ fn one_parser_golden(
         &format!("parser/{name}"),
         &serde_json::to_vec(&rows).unwrap(),
     );
-    let prepared = store
-        .prepare_local(&id, root, &source, false, parser, &cancel)
-        .unwrap();
-    record(
-        out,
-        &format!("manifest/{name}"),
-        prepared.manifest.encode().unwrap().as_bytes(),
-    );
-    let manifest_v2 = irmind_domain::SourceManifestV2 {
-        source: prepared.manifest.clone(),
-        parser_id: parser.identity().name.into(),
-        parser_version: parser.identity().version.into(),
-        confidence: 90,
-        selection: irmind_domain::ParserSelectionMode::Automatic,
-        timestamp_context: parser.timestamp_context().map(str::to_owned),
-        rejected_records: 0,
-        rejected_sample: vec![],
-    };
-    record(
-        out,
-        &format!("manifest-v2/{name}"),
-        manifest_v2.encode().unwrap().as_bytes(),
-    );
-    for artifact in &prepared.artifacts {
-        store.verify_artifact(&id, artifact, &cancel).unwrap();
-        record(
-            out,
-            &format!(
-                "artifact/{name}/{}/{}/{}/{}",
-                artifact.schema_version(),
-                artifact.partition_date(),
-                artifact.partition_account(),
-                artifact.partition_region()
-            ),
-            artifact.encode().unwrap().as_bytes(),
-        );
-    }
 }
 
 fn engine(store: &Arc<LocalStore>) -> Engine<'static> {
@@ -374,7 +321,7 @@ fn signed_and_reconstructed_format_goldens_are_unchanged() {
 
 #[test]
 #[cfg(feature = "parser-syslog")]
-fn syslog_signed_and_reconstructed_format_goldens_are_unchanged() {
+fn syslog_normalized_projection_goldens_are_unchanged() {
     use irmind_mod_parser_syslog::{LegacyTimestamp, SyslogParser};
     let mut actual = Goldens::new();
     let modern = SyslogParser::from_version("syslog-v1").unwrap();
@@ -411,7 +358,7 @@ fn syslog_signed_and_reconstructed_format_goldens_are_unchanged() {
 
 #[test]
 #[cfg(feature = "parser-linux")]
-fn linux_signed_and_reconstructed_format_goldens_are_unchanged() {
+fn linux_normalized_projection_goldens_are_unchanged() {
     let mut actual = Goldens::new();
     let parser = irmind_mod_parser_linux::LinuxParser::from_version(
         "linux-v1:year=2026;offset=0;rollover=1;basis=analyst",
@@ -447,57 +394,6 @@ mod indexed_parser_contracts;
 
 #[path = "support/json_order_contracts.rs"]
 mod json_order_contracts;
-
-#[test]
-fn historical_envelope_codecs_and_normalized_rows_remain_unchanged() {
-    let historical: Goldens =
-        serde_json::from_str(include_str!("fixtures/formats-v1.json")).unwrap();
-    let current: Goldens =
-        serde_json::from_str(include_str!("fixtures/formats-readers-v3.json")).unwrap();
-    for (key, value) in &historical {
-        if key.starts_with("parser/")
-            || key.starts_with("manifest/")
-            || key.starts_with("entry/")
-            || key.starts_with("seal/")
-            || key.starts_with("configuration/")
-            || key.starts_with("operation/")
-        {
-            assert_eq!(current.get(key), Some(value), "historical payload {key}");
-        }
-        if !key.ends_with("/bytes") {
-            continue;
-        }
-        let decode = || {
-            String::from_utf8(
-                value
-                    .as_bytes()
-                    .chunks_exact(2)
-                    .map(|p| u8::from_str_radix(std::str::from_utf8(p).unwrap(), 16).unwrap())
-                    .collect(),
-            )
-            .unwrap()
-        };
-        if key.starts_with("manifest-v2/") {
-            let wire = decode();
-            assert_eq!(
-                irmind_domain::SourceManifestV2::decode(&wire)
-                    .unwrap()
-                    .encode()
-                    .unwrap(),
-                wire
-            );
-        } else if key.starts_with("artifact/") {
-            let wire = decode();
-            assert_eq!(
-                irmind_domain::ParquetArtifactV1::decode(&wire)
-                    .unwrap()
-                    .encode()
-                    .unwrap(),
-                wire
-            );
-        }
-    }
-}
 
 #[cfg(all(feature = "parser-zeek", feature = "parser-suricata"))]
 #[test]

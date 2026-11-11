@@ -698,3 +698,20 @@ Consequences: there is no new append recipe or signed format. Worker-count
 parity, bounded memory, cancellation, rollback and the absolute release gates
 remain required. The native EVTX chunk trial did not justify enabling helper
 parallelism; the distributed helper remains sequential on every platform.
+
+### Retire per-source writer construction
+
+Context: source decoding and identified mappings now cover every compiled parser.
+The old local preparation API still exposed a second physical construction path.
+
+Decision: remove per-source and legacy batch preparation, their writer factory
+and obsolete projection/emission helpers. Keep only direct mapped preparation
+for new artifacts. Keep the V2-shaped core used inside the current V3 envelope;
+it is a component of that format, not an alternate ingestion route.
+
+Consequences: the current direct writer keeps its physical recipe, sequential
+canonical appends and parallel completion. Tests use actual decoder selection,
+mapping profiles and bound V3 artifacts. Current direct physical golden bytes,
+V6 wire goldens, offsets, spool authentication, cancellation and rollback remain
+covered. Old-generation fixture generators are removed, along with their unused
+base64 dependency. Removal of remaining historical schema readers is separate.

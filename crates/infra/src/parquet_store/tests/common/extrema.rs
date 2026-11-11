@@ -18,22 +18,22 @@ fn homogeneous_and_many_scope_batches_keep_exact_counts_and_extrema() {
         .join("\n");
     fs::write(root.path().join("mapped.ndjson"), records).unwrap();
     let paths = ["mapped.ndjson".into()];
-    let source = store
-        .prepare_local_batch(
-            irmind_app::LocalBatchRequest {
-                case_id: &id,
-                source_root: root.path(),
-                relative_paths: &paths,
-                copy_original: false,
-                parser: &mapped::Mapped,
-                committed_artifacts: &[],
-                limits: irmind_app::PartitionLimits::default(),
-            },
-            &CancellationToken::new(),
-        )
-        .unwrap()
-        .pop()
-        .unwrap();
+    let source = crate::parquet_store::fixtures::successive_sources(
+        &store,
+        irmind_app::MappedIngestRequest {
+            case_id: &id,
+            source_root: root.path(),
+            relative_paths: &paths,
+            copy_original: false,
+            parser: &crate::parquet_store::fixtures::parser(),
+            committed_artifacts: irmind_app::mapped_ingest::CommittedArtifacts::Slice(&[]),
+            limits: irmind_app::PartitionLimits::default(),
+        },
+        &CancellationToken::new(),
+    )
+    .unwrap()
+    .pop()
+    .unwrap();
     let names = BTreeMap::from([(
         source.manifest.sha256.as_str().to_owned(),
         "mapped.ndjson".into(),
