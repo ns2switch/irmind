@@ -1,4 +1,4 @@
-Traducción de docs/mappings.md en el commit e5e742ba24ac5c6089b52c54d46c23336303f759; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/mappings.md en el commit 41af054135b56720ad74ef70ce644230fe097995; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos de mapeo de fuentes
 
