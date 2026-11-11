@@ -265,3 +265,17 @@ Los mapeos opcionales son independientes de los parsers y conectores. Las tablas
 ### Mapeo de eventos comunes Windows
 
 La feature `mapping-evtx` compila mapeos TOML independientes para Security, System, PowerShell y Sysmon. Usan los campos originales del decodificador EVTX aislado. El escritor sigue siendo opcional durante la incorporación de decodificadores. No requieren credenciales ni permisos adicionales. Consulta la [cobertura de Windows](mappings.md#registro-de-eventos-de-windows).
+
+## Elasticsearch y Elastic Security
+
+**Estado:** Experimental. Solo se han validado respuestas sintéticas de contrato.
+
+**Uso:** Busca eventos de Elasticsearch y lee alertas de Elastic Security con Query DSL generado. Usa la misma API HTTPS en despliegues propios y en Elastic Cloud. El modelo no envía KQL, Lucene, ES|QL ni scripts.
+
+**Permisos:** Crea una API key dedicada con el privilegio de índice `read` solo en los índices de eventos configurados y en `.alerts-security.alerts-<space-id>`. No concedas escritura, administración ni acceso global a todos los espacios de alertas. Guarda la API key codificada como `IRMIND_ELASTIC_API_KEY` en `/settings keystore`.
+
+**Configuración:** En `/settings connectors`, indica el origen HTTPS en `IRMIND_ELASTIC_URL`, un nombre de origen único en `IRMIND_ELASTIC_SOURCE_ID`, la lista de índices en `IRMIND_ELASTIC_INDICES` y el identificador exacto del espacio en `IRMIND_ELASTIC_ALERT_SPACE`. Los índices admiten nombres literales o prefijos literales terminados en `*`. `IRMIND_ELASTIC_ACCOUNT_FIELD` identifica la cuenta, por ejemplo `cloud.account.id`. Incluye el origen y la cuenta en el alcance del caso y de la organización antes de habilitarlo. Los campos opcionales `IRMIND_ELASTIC_CA_PEM` y `IRMIND_ELASTIC_CA_SHA256` mantienen la validación compartida de la CA.
+
+**Límites:** El servidor impone índice, cuenta y ventana UTC. Para alertas, también impone `kibana.alert.uuid` y el espacio. El modelo solo compara campos estructurados con `eq`, `not_eq` o `prefix`, con un máximo de 20 resultados o grupos y ventanas de 24 horas. La respuesta HTTP se limita a 5 MB, con timeout de 45 segundos, sin redirecciones y con validación completa del certificado y del nombre de host. Se conservan los indicadores de timeout y fallos de shards del proveedor en la evidencia firmada.
+
+Referencias oficiales: [API de búsqueda](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-search), [alias de alertas](https://www.elastic.co/docs/solutions/security/detect-and-alert/query-alert-indices) y [campos de alertas](https://www.elastic.co/docs/reference/security/fields-and-object-schemas/alert-schema).

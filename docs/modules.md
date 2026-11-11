@@ -297,3 +297,17 @@ Optional source mappings are separate from parsers and connectors. Bundled Cloud
 ### Windows common-event mapping
 
 The `mapping-evtx` feature compiles independent bundled TOML mappings for Security, System, PowerShell and Sysmon. They use original fields from the isolated EVTX decoder. The writer remains opt-in during decoder rollout. No additional credentials or permissions are required. See [Windows mapping coverage](mappings.md#windows-event-log).
+
+## Elasticsearch and Elastic Security
+
+**Status:** Experimental. Only synthetic contract responses are validated.
+
+**Purpose:** Search Elasticsearch events and read Elastic Security alerts through a generated Query DSL request. Self-managed deployments and Elastic Cloud use the same HTTPS API. The model cannot submit KQL, Lucene, ES|QL or scripts.
+
+**Permissions:** Create a dedicated API key with the index privilege `read` on only the configured event indices and `.alerts-security.alerts-<space-id>`. Do not grant write, management or wildcard access to all alert spaces. Store the encoded API key as `IRMIND_ELASTIC_API_KEY` in `/settings keystore`.
+
+**Configure:** In `/settings connectors`, set `IRMIND_ELASTIC_URL` to the HTTPS origin, `IRMIND_ELASTIC_SOURCE_ID` to a unique source name, `IRMIND_ELASTIC_INDICES` to a comma-separated list of literal indices or literal prefixes ending in `*`, and `IRMIND_ELASTIC_ALERT_SPACE` to the exact space ID. Set `IRMIND_ELASTIC_ACCOUNT_FIELD` to the keyword field that identifies the account in your data, for example `cloud.account.id`. Add the source and account to the case and organization scopes before enabling it. Optional `IRMIND_ELASTIC_CA_PEM` and `IRMIND_ELASTIC_CA_SHA256` use the shared connector CA validation.
+
+**Limits:** The server query always fixes the index, account and UTC window; alert reads additionally fix `kibana.alert.uuid` and the space. The model can compare `event_name`, `user`, `source_ip` or `host` using `eq`, `not_eq` or `prefix`, and request events, `count_by`, `top` or `distinct`, with at most 20 results. Windows are at most 24 hours. HTTP responses are bounded to 5 MB with a 45-second timeout, no redirects and full certificate/hostname verification. Timeout and shard-failure markers remain visible in the signed response; a partial provider response is never relabeled complete.
+
+Official references: [search API](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-search), [alert index aliases](https://www.elastic.co/docs/solutions/security/detect-and-alert/query-alert-indices) and [alert fields](https://www.elastic.co/docs/reference/security/fields-and-object-schemas/alert-schema). Alert requests use `fields` rather than `_source`.

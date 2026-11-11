@@ -2,6 +2,13 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum AdapterPolicyError {
+    #[error(
+        "invalid Elasticsearch connector configuration; check the HTTPS origin, index patterns, field names and API key"
+    )]
+    InvalidElasticConfiguration,
+    #[error("invalid structured Elasticsearch query or mismatched source")]
+    InvalidElasticQuery,
+
     #[error("policy denied: AWS credential account differs from case scope")]
     AWSCredentialAccountDiffersFromCaseScope,
     #[error("policy denied: AWS credentials do not use the dedicated role")]

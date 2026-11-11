@@ -62,6 +62,7 @@ pub(crate) fn collect_egress_overrides(cli: &Cli, saved: &PersistentConfig) -> V
 fn connector_overrides(cli: &Cli, saved: &PersistentConfig, rows: &mut Vec<EgressOverride>) {
     for (module, env_name, flag) in [
         ("siem-splunk", "IRMIND_ENABLE_SPLUNK", cli.enable_splunk),
+        ("siem-elastic", "IRMIND_ENABLE_ELASTIC", cli.enable_elastic),
         ("cloud-aws", "IRMIND_ENABLE_AWS", cli.enable_aws),
         (
             "storage-s3",
