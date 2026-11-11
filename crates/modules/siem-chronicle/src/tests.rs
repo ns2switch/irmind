@@ -199,3 +199,5 @@ fn token_cache_is_memory_only_and_errors_do_not_leak_authentication_data() {
         server.finish().unwrap();
     }
 }
+
+mod pipeline;

@@ -295,3 +295,12 @@ Referencias oficiales: [API de búsqueda](https://www.elastic.co/docs/api/doc/el
 **Límites:** Hasta 20 eventos o grupos, ventana de 24 horas, timeout HTTP de 45 segundos y respuesta de 5 MB. No sigue redirecciones. Conserva los indicadores de truncado del proveedor en la evidencia firmada. El modo limitado a una cuenta rechaza las lecturas de detecciones cuya API no impone ese filtro. La API es preliminar y puede cambiar.
 
 Referencia: [método oficial de búsqueda UDM](https://docs.cloud.google.com/chronicle/docs/reference/rest/v1alpha/projects.locations.instances/udmSearch). Los resultados se tratan como evidencia no confiable; los valores de consulta se escapan y los errores no incluyen la clave.
+
+Los eventos UDM conservan sus campos originales, instante preciso y posición en
+la respuesta. El módulo separado `mapping-udm` valida ProtoJSON y solo mapea
+tipos y roles documentados. No interpreta una acción `BLOCK` como fallo de
+autenticación. Las IP múltiples siguen siendo consultables en la proyección de
+extracción; un campo que no cabe en el contexto tipado escalar incluye un aviso
+de cobertura. La [referencia UDM](https://docs.cloud.google.com/chronicle/docs/reference/udm-field-list)
+documenta estos campos repetidos. El decodificador y el mapeo siguen disponibles
+para verificar sin conexión aunque se deshabilite el conector remoto.

@@ -19,6 +19,12 @@ ring = "=0.17.14"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 
 [dev-dependencies]
+irmind-infra = { path = "../../infra", version = "0.1.0" }
+irmind-security = { path = "../../security", version = "0.1.0" }
+irmind-mod-parser-json = { path = "../parser-json", version = "0.1.0" }
+irmind-mod-mapping-udm = { path = "../mapping-udm", version = "0.1.0" }
+ed25519-dalek = "2"
+tempfile = "3"
 irmind-testkit = { path = "../../testkit", version = "0.1.0" }
 
 [lints]
