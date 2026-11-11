@@ -1,15 +1,30 @@
-use super::super::staging::{Input, MAX_STAGED_ROW, StagedSource};
+use super::super::super::local::stream::{VerifiedInput, initial_hash};
+use super::super::staging::{Input, MAX_STAGED_ROW, StagedSource, source_sample};
 use super::{AppError, CancellationToken, MappedIngestRequest, ParquetStore, invalid_source};
 use crate::parquet_store::writer::direct::DirectWriting;
 use crate::parquet_store::{RecordRow, storage};
+use irmind_domain::EvidenceHash;
+use std::collections::BTreeMap;
 use std::io::{BufRead, Read as _, Seek as _};
 
-pub(super) fn stage(
+pub(super) enum Plan {
+    Stream(Input, EvidenceHash),
+    Sorted(Box<StagedSource>),
+}
+#[derive(Clone, Copy)]
+pub(super) struct OrderHints<'a> {
+    pub(super) ordered: &'a BTreeMap<String, EvidenceHash>,
+    pub(super) first_disordered: (&'a str, &'a EvidenceHash),
+}
+type Initial = (std::fs::Metadata, [u8; 32], u64);
+
+pub(super) fn plan(
     store: &ParquetStore,
     request: &MappedIngestRequest<'_>,
     inputs: Vec<Input>,
+    hints: OrderHints<'_>,
     cancel: &CancellationToken,
-) -> Result<Vec<StagedSource>, AppError> {
+) -> Result<Vec<Plan>, AppError> {
     // The source scheduler keeps serial-only decoders in canonical order.
     let serial = inputs.iter().try_fold(false, |old, input| {
         let id = request.parser.identity_for_source(&input.path)?;
@@ -29,11 +44,8 @@ pub(super) fn stage(
                 .into_iter()
                 .map(|mut input| {
                     scope.spawn(move || {
-                        let initial = crate::parquet_store::local::stream::initial_hash(
-                            &mut input.file,
-                            cancel,
-                            store.profile.as_deref(),
-                        )?;
+                        let initial =
+                            initial_hash(&mut input.file, cancel, store.profile.as_deref())?;
                         Ok::<_, AppError>((input, initial))
                     })
                 })
@@ -45,37 +57,25 @@ pub(super) fn stage(
         })?;
         return hashed
             .into_iter()
-            .map(|(input, initial)| {
-                let path = input.path.clone();
-                hash_failure(
-                    store.stage_hashed_source(
-                        request.case_id,
-                        input,
-                        request.parser,
-                        request.copy_original,
-                        cancel,
-                        initial,
-                    ),
-                    path,
-                )
-            })
+            .map(|(input, initial)| plan_hashed(store, request, input, hints, cancel, initial))
             .collect();
     }
-    parallel_stage(store, request, inputs, cancel)
+    parallel_plan(store, request, inputs, hints, cancel)
 }
-fn parallel_stage(
+fn parallel_plan(
     store: &ParquetStore,
     request: &MappedIngestRequest<'_>,
     inputs: Vec<Input>,
+    hints: OrderHints<'_>,
     cancel: &CancellationToken,
-) -> Result<Vec<StagedSource>, AppError> {
+) -> Result<Vec<Plan>, AppError> {
     let operation = cancel.child_token();
     std::thread::scope(|scope| {
         let handles = inputs
             .into_iter()
             .map(|input| {
                 let operation = &operation;
-                scope.spawn(move || stage_one(store, request, input, operation))
+                scope.spawn(move || plan_one(store, request, input, hints, operation))
             })
             .collect::<Vec<_>>();
         let mut output = Vec::new();
@@ -152,19 +152,49 @@ pub(super) fn acquisition(
     })
 }
 
-fn stage_one(
+fn plan_one(
     store: &ParquetStore,
     request: &MappedIngestRequest<'_>,
     mut input: Input,
+    hints: OrderHints<'_>,
     cancel: &CancellationToken,
-) -> Result<StagedSource, AppError> {
+) -> Result<Plan, AppError> {
+    if let Some(hash) = hints.ordered.get(&input.path) {
+        return Ok(Plan::Stream(input, hash.clone()));
+    }
+    let initial = initial_hash(&mut input.file, cancel, store.profile.as_deref())?;
+    plan_hashed(store, request, input, hints, cancel, initial)
+}
+
+fn plan_hashed(
+    store: &ParquetStore,
+    request: &MappedIngestRequest<'_>,
+    mut input: Input,
+    hints: OrderHints<'_>,
+    cancel: &CancellationToken,
+    initial: Initial,
+) -> Result<Plan, AppError> {
     let path = input.path.clone();
-    let initial = crate::parquet_store::local::stream::initial_hash(
-        &mut input.file,
-        cancel,
-        store.profile.as_deref(),
-    )?;
-    hash_failure(
+    let hash = EvidenceHash::from_bytes(initial.1);
+    if let Some(expected) = hints.ordered.get(&path) {
+        if expected != &hash {
+            return Err(source_changed(path)?);
+        }
+        return Ok(Plan::Stream(input, hash));
+    }
+    let (first_path, first_hash) = hints.first_disordered;
+    if path == first_path && &hash != first_hash {
+        return Err(source_changed(path)?);
+    }
+    if path != first_path
+        && hash_failure(
+            probe_order(store, request, &mut input, &initial, &hash, cancel),
+            &path,
+        )?
+    {
+        return Ok(Plan::Stream(input, hash));
+    }
+    let staged = hash_failure(
         store.stage_hashed_source(
             request.case_id,
             input,
@@ -173,21 +203,67 @@ fn stage_one(
             cancel,
             initial,
         ),
-        path,
-    )
+        &path,
+    )?;
+    Ok(Plan::Sorted(Box::new(staged)))
 }
-fn hash_failure(
-    result: Result<StagedSource, AppError>,
-    path: String,
-) -> Result<StagedSource, AppError> {
+
+/// Classify with the same normalized sort keys, but never persist record rows.
+fn probe_order(
+    store: &ParquetStore,
+    request: &MappedIngestRequest<'_>,
+    input: &mut Input,
+    initial: &Initial,
+    hash: &EvidenceHash,
+    cancel: &CancellationToken,
+) -> Result<bool, AppError> {
+    let sample = source_sample(&mut input.file)?;
+    let mut previous = None;
+    let mut disorder = false;
+    let result = store.parse_normalized(
+        request.case_id,
+        VerifiedInput {
+            source: &mut input.file,
+            sample: &sample,
+            relative_path: &input.path,
+            hash: initial.1,
+            hash_value: hash,
+            size: initial.2,
+            cancel,
+            parser: request.parser,
+            precise_time: true,
+            decode_budget: input.decode_budget,
+        },
+        &mut |row| {
+            let key = row.sort_key();
+            if let Some(last) = previous
+                && irmind_domain::compare_record_keys(last, key, false)
+                    .map_err(|_| invalid_source())?
+                    .is_gt()
+            {
+                disorder = true;
+                return Err(AppError::Cancelled);
+            }
+            previous = Some(key);
+            Ok(())
+        },
+    );
     match result {
-        Err(AppError::EvidenceMismatch(_)) => Err(AppError::SourceFailure(
-            irmind_app::RejectedSource::try_new(
-                path,
-                irmind_app::SourceFailureReason::Hash,
-                vec![],
-            )?,
-        )),
+        Ok(_) => Ok(true),
+        Err(AppError::Cancelled) if disorder && !cancel.is_cancelled() => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+pub(super) fn source_changed(path: String) -> Result<AppError, AppError> {
+    Ok(AppError::SourceFailure(
+        irmind_app::RejectedSource::try_new(path, irmind_app::SourceFailureReason::Hash, vec![])?,
+    ))
+}
+
+fn hash_failure<T>(result: Result<T, AppError>, path: &str) -> Result<T, AppError> {
+    match result {
+        Err(AppError::EvidenceMismatch(_)) => Err(source_changed(path.to_owned())?),
         other => other,
     }
 }

@@ -9,6 +9,7 @@ pub(crate) struct ParquetProfile {
     row: AtomicU64,
     parquet: AtomicU64,
     partition_finalize: AtomicU64,
+    staged_sources: AtomicU64,
     query_verify: AtomicU64,
     query_scan: AtomicU64,
     query_normalize: AtomicU64,
@@ -41,6 +42,15 @@ impl ParquetProfile {
     pub(super) fn record_parquet(&self, duration: Duration) {
         self.parquet
             .fetch_add(Self::nanos(duration), Ordering::Relaxed);
+    }
+
+    pub(super) fn record_staged_source(&self) {
+        self.staged_sources.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn staged_sources(&self) -> u64 {
+        self.staged_sources.load(Ordering::Relaxed)
     }
 
     pub(super) fn record_partition_finalize(&self, duration: Duration) {

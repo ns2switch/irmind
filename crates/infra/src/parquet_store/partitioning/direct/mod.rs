@@ -1,4 +1,5 @@
 //! Preparation holds unsigned final files until the application commits a group.
+mod fallback;
 mod prepared;
 mod read;
 #[cfg(test)]
@@ -8,6 +9,11 @@ use crate::parquet_store::writer::direct::DirectWriting;
 use irmind_app::{MappedIngestRequest, PreparedMappedGroup, PreparedMappedIngest};
 use std::collections::BTreeSet;
 const RAW_GROUP_TARGET: u64 = 512 * 1024 * 1024;
+
+struct Speculation {
+    sources: Vec<irmind_app::MappedSourceAcquisition>,
+    disorder: Option<(String, irmind_domain::EvidenceHash)>,
+}
 
 impl ParquetStore {
     pub(in crate::parquet_store) fn prepare_direct(
@@ -41,35 +47,29 @@ impl ParquetStore {
             .collect::<std::collections::BTreeMap<_, _>>();
         let mut writing =
             DirectWriting::new(hash.clone(), identity, routes.clone(), self.profile.clone());
-        let mut sources = Vec::new();
-        let mut sorted_fallback = false;
-        for paths in request.relative_paths.chunks(workers) {
-            let inputs = self.direct_inputs(request, paths, workers)?;
-            match self.stream_direct_chunk(request, inputs, &mut writing, &mut allocator, cancel)? {
-                super::ordered::DirectChunk::Ordered(chunk) => sources.extend(chunk),
-                super::ordered::DirectChunk::NeedsSort => {
-                    sorted_fallback = true;
-                    break;
-                }
-            }
-        }
-        if sorted_fallback {
+        let Speculation {
+            mut sources,
+            disorder,
+        } = self.speculate_group(request, workers, &mut writing, &mut allocator, cancel)?;
+        if let Some((path, source_hash)) = disorder {
             drop(writing);
             writing = DirectWriting::new(hash, identity, routes, self.profile.clone());
             allocator = super::Allocator::from_signed_iter(
                 request.committed_artifacts.iter(),
                 request.limits,
             )?;
-            sources.clear();
-            for paths in request.relative_paths.chunks(workers) {
-                let inputs = self.direct_inputs(request, paths, workers)?;
-                let mut staged = read::stage(self, request, inputs, cancel)?;
-                self.sort_staged_sources(request.case_id, &mut staged, cancel)?;
-                for source in staged {
-                    read::replay(self, request, &source, &mut writing, &mut allocator, cancel)?;
-                    sources.push(read::acquisition(source)?);
-                }
+            sources = fallback::Replay {
+                store: self,
+                request,
+                cancel,
             }
+            .group(
+                sources,
+                (&path, &source_hash),
+                workers,
+                &mut writing,
+                &mut allocator,
+            )?;
         }
         self.validate_direct_sources(request, &sources, cancel)?;
         let staged = writing.finish(&self.case_dir(request.case_id)?, workers, cancel)?;
@@ -90,6 +90,34 @@ impl ParquetStore {
             self.profile.clone(),
         ))))
     }
+    fn speculate_group(
+        &self,
+        request: &MappedIngestRequest<'_>,
+        workers: usize,
+        writing: &mut DirectWriting,
+        allocator: &mut super::Allocator,
+        cancel: &CancellationToken,
+    ) -> Result<Speculation, AppError> {
+        let mut sources = Vec::new();
+        let mut disorder = None;
+        for paths in request.relative_paths.chunks(workers) {
+            let inputs = self.direct_inputs(request, paths, workers)?;
+            match self.stream_direct_chunk(request, inputs, writing, allocator, cancel)? {
+                super::ordered::DirectChunk::Ordered(chunk) => sources.extend(chunk),
+                super::ordered::DirectChunk::NeedsSort {
+                    path,
+                    hash,
+                    ordered,
+                } => {
+                    sources.extend(ordered);
+                    disorder = Some((path, hash));
+                    break;
+                }
+            }
+        }
+        Ok(Speculation { sources, disorder })
+    }
+
     fn direct_inputs(
         &self,
         request: &MappedIngestRequest<'_>,
