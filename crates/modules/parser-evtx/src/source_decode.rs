@@ -63,7 +63,7 @@ impl SourceDecoder for EvtxParser {
         };
         let workers = budget
             .workers()
-            .min((budget.queued_bytes() / (8 * 1024 * 1024)).max(1))
+            .min((budget.queued_bytes() / (32 * 1024 * 1024)).max(1))
             .min(64);
         if input.metadata.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
