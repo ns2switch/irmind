@@ -1,4 +1,9 @@
-use crate::*;
+use crate::{
+    Actor, AnalystApprovalVerifier, AppError, Signature, Signer, Verifier, VerifyingKey, storage,
+    storage_reason,
+};
+#[cfg(test)]
+use ed25519_dalek::{Signer as _, SigningKey};
 
 pub(crate) fn verify_signature(
     public_key: &[u8],
@@ -15,59 +20,13 @@ pub(crate) fn verify_signature(
     key.verify_strict(message, &Signature::from_bytes(&signature))
         .map_err(storage)
 }
-pub struct LocalSigner {
+#[cfg(test)]
+pub(crate) struct LocalSigner {
     pub(crate) key: SigningKey,
     pub(crate) actor: Actor,
 }
 
-impl LocalSigner {
-    pub fn load_or_create(actor: Actor) -> Result<Self, AppError> {
-        let key = load_key(&actor, true)?;
-        if matches!(actor, Actor::Agent(_))
-            && let Ok(analyst) = load_key(&Actor::Analyst, false)
-            && key.verifying_key() == analyst.verifying_key()
-        {
-            return Err(AppError::Fixed(
-                irmind_app::FixedAppError::AdapterSignature(
-                    irmind_app::AdapterSignatureError::AgentAndAnalystKeysMustDiffer,
-                ),
-            ));
-        }
-        Ok(Self { key, actor })
-    }
-
-    pub fn public_key_for_actor(actor: &Actor) -> Result<Vec<u8>, AppError> {
-        Ok(load_key(actor, false)?.verifying_key().to_bytes().to_vec())
-    }
-}
-
-fn load_key(actor: &Actor, create: bool) -> Result<SigningKey, AppError> {
-    let name = match actor {
-        Actor::Analyst => "local-analyst".to_owned(),
-        Actor::Agent(id) => format!("local-agent-{}", id.as_str()),
-    };
-    let entry = keyring::Entry::new("irmind", &name)
-        .map_err(|_| storage_reason("system keyring unavailable"))?;
-    match entry.get_password() {
-        Ok(value) => {
-            let bytes =
-                hex::decode(value).map_err(|_| storage_reason("invalid signing key in keyring"))?;
-            let key: [u8; 32] = bytes
-                .try_into()
-                .map_err(|_| storage_reason("keyring key must be 32 bytes"))?;
-            Ok(SigningKey::from_bytes(&key))
-        }
-        Err(keyring::Error::NoEntry) if create => {
-            let key = SigningKey::generate(&mut rand::rngs::OsRng);
-            entry
-                .set_password(&hex::encode(key.to_bytes()))
-                .map_err(|_| storage_reason("system keyring unavailable"))?;
-            Ok(key)
-        }
-        Err(_) => Err(storage_reason("system keyring unavailable")),
-    }
-}
-
+#[cfg(test)]
 impl Signer for LocalSigner {
     fn actor(&self) -> Actor {
         self.actor.clone()
