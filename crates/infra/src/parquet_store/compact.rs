@@ -23,7 +23,7 @@ impl ParquetStore {
         let mut ordered = validate_sources(sources)?;
         ordered.sort_by(|left, right| left.path().cmp(right.path()));
         let case_dir = self.case_dir(id)?;
-        let mut staged = mapped::stage(&case_dir, &ordered)?;
+        let (mut staged, pipeline) = mapped::stage(&case_dir, &ordered)?;
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
         #[cfg(unix)]
@@ -34,17 +34,12 @@ impl ParquetStore {
         let output = options.open(&staged.temporary).map_err(storage)?;
         irmind_fs::private_file(&staged.temporary).map_err(storage)?;
         let (size, digest) = write_compact(&case_dir, &staged.temporary, &ordered, output, cancel)?;
-        let ParquetArtifact::V3(value) = &mut staged.manifest else {
-            return Err(invalid_source());
-        };
-        let mut core = value.core().clone();
-        core.size = size;
-        core.sha256 = EvidenceHash::from_bytes(digest);
-        *value = irmind_domain::ParquetArtifactV3::try_new(core, value.pipeline().clone())
+        staged.manifest.size = size;
+        staged.manifest.sha256 = EvidenceHash::from_bytes(digest);
+        let artifact = irmind_domain::ParquetArtifactV3::try_new(staged.manifest.clone(), pipeline)
             .map_err(|_| invalid_source())?;
-        self.finish_artifacts(id, vec![staged])?
-            .pop()
-            .ok_or_else(invalid_source)
+        self.finish_artifacts(id, vec![staged])?;
+        Ok(artifact.into())
     }
 }
 

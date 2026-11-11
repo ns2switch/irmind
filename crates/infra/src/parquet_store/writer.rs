@@ -1,7 +1,7 @@
 use super::{
     AppError, ArrayRef, ArrowWriter, BTreeMap, CancellationToken, Compression, EvidenceHash, File,
-    OpenOptions, ParquetArtifact, ParquetStore, Path, PathBuf, RecordBatch, StringArray,
-    UInt64Array, WriterProperties, fs, invalid_source, storage,
+    OpenOptions, ParquetStore, Path, PathBuf, RecordBatch, StringArray, UInt64Array,
+    WriterProperties, fs, invalid_source, storage,
 };
 #[cfg(test)]
 use irmind_app::GraphRecord;
@@ -48,7 +48,7 @@ pub(super) use row::{RecordRow, safe_partition};
 pub(super) struct StagedArtifact {
     pub rows: Option<u64>,
     pub temporary: PathBuf,
-    pub manifest: ParquetArtifact,
+    pub manifest: irmind_domain::ParquetArtifactV2,
 }
 
 pub(super) struct ArtifactSink {
