@@ -1487,3 +1487,27 @@ The [paired endpoint release sweep](https://github.com/ns2switch/irmind/actions/
 | Candidate, four workers | 38.712 | 273.7 | 0.424 |
 
 All settings wrote 196,741,347 artifact bytes. The four-worker candidate was 2.0% faster than the same-runner reference. Candidate finalization took 0.639 s at one worker and 0.293 s at four. Single runs per setting; the result does not establish an improvement for every partition distribution.
+
+### Bounded queues when a group contains disordered sources
+
+The [paired release sweep](https://github.com/ns2switch/irmind/actions/runs/42933264116)
+used four logical CPUs and 515 disordered synthetic endpoint files (1,076,424,160
+bytes, 64 hosts). All settings wrote 160,699,746 bytes of mapped V3 artifacts,
+including 24,366,105 bytes of co-observations. This corpus exercises the sort
+fallback for every source. Separate mixed-order tests check that ordered
+sources do not create normalized spools during fallback.
+
+| Scheduling | Ingest wall (s) | Peak RSS (MiB) | Sampled staging peak (bytes) | Slowest query p95 (s) |
+| --- | ---: | ---: | ---: | ---: |
+| Reference, four workers | 100.502 | 259.1 | 71,026,983 | 0.600 |
+| Candidate, one worker | 108.881 | 257.4 | 50,686,719 | 1.723 |
+| Candidate, automatic (three) | 96.088 | 273.3 | 63,757,281 | 0.752 |
+| Candidate, four workers | 92.743 | 278.7 | 70,396,245 | 0.622 |
+
+The four-worker candidate took 7.7% less wall time than its reference and
+14.8% less than the one-worker candidate. Peak RSS was 19.7 MiB higher than
+the reference. Staging was sampled every 100 ms; compilation is outside the
+measurement. An [earlier variant](https://github.com/ns2switch/irmind/actions/runs/42930749194)
+without the bounded prefix replayed the decoder at the first order break and
+took 95.952 s versus its own reference's 92.659 s. Both are single sweeps on
+separate runners; compare the pairs, not the absolute times between jobs.
