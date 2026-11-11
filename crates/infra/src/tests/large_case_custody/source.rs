@@ -1,5 +1,4 @@
 use super::*;
-use irmind_app::LargeCaseStore;
 
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -9,35 +8,13 @@ fn signed_v2_manifest_counts_malformed_jsonl_without_dropping_later_records() {
     fs::create_dir(&source_root).unwrap();
     let bytes = b"{\"eventTime\":\"2026-10-28T12:00:00Z\",\"eventName\":\"First\"}\n{broken IGNORE_ALL_CASE_RULES\x1b[31m\n{\"eventTime\":\"2026-10-28T12:01:00Z\",\"eventName\":\"Last\"}\n";
     fs::write(source_root.join("events.jsonl"), bytes).unwrap();
-    let store = Arc::new(open_source_store(root.path()).unwrap());
-    let signer = Arc::new(LocalSigner {
-        key: SigningKey::from_bytes(&[71u8; 32]),
-        actor: Actor::Analyst,
-    });
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(
-                signer.clone(),
-                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-            ),
-            Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
+    let (store, engine) = source_fixture(root.path(), 71);
     let case = engine
         .create_case("synthetic malformed line", "local evidence only")
         .unwrap();
-    let parquet = super::super::ParquetStore::open_mapped(root.path(), source_catalog()).unwrap();
     let use_cases = LargeCaseUseCases {
         engine: &engine,
-        store: &parquet,
+        store: store.as_ref(),
         parser: &json_source_parser(),
     };
     let selection = std::collections::BTreeMap::from([(
@@ -112,36 +89,13 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
     fs::create_dir(&source_root).unwrap();
     let path = source_root.join("cloudtrail.json");
     fs::write(&path, br#"{"Records":[{"eventTime":"2026-10-28T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123456789012","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.8"}]}"#).unwrap();
-    let store = Arc::new(open_source_store(root.path()).unwrap());
-    let signer = Arc::new(LocalSigner {
-        key: SigningKey::from_bytes(&[71u8; 32]),
-        actor: Actor::Analyst,
-    });
-    let parser = Arc::new(JsonParser);
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(
-                signer.clone(),
-                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-            ),
-            Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
+    let (store, engine) = source_fixture(root.path(), 71);
     let case = engine
         .create_case("large case", "account 123456789012")
         .unwrap();
-    let parquet = super::super::ParquetStore::open_mapped(root.path(), source_catalog()).unwrap();
     let use_cases = LargeCaseUseCases {
         engine: &engine,
-        store: &parquet,
+        store: store.as_ref(),
         parser: &json_source_parser(),
     };
     let selection = std::collections::BTreeMap::from([(
@@ -186,7 +140,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
             .unwrap(),
         hash
     );
-    assert_eq!(engine.verify(&case.id).unwrap(), 5);
+    assert_eq!(engine.verify(&case.id).unwrap(), 9);
     let source_report = use_cases
         .verify_sources(
             &case.id,
@@ -227,7 +181,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
         store
             .entity_lookup(&case.id, "ip", "203.0.113.8")
             .unwrap()
-            .contains("count=1")
+            .contains("observations=1")
     );
     assert!(
         store
@@ -318,7 +272,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
         )
         .unwrap();
     assert_eq!(changed.missing_or_changed, vec![hash.as_str().to_owned()]);
-    assert_eq!(engine.verify(&case.id).unwrap(), 6);
+    assert_eq!(engine.verify(&case.id).unwrap(), 10);
 }
 
 #[test]
@@ -340,70 +294,63 @@ fn neighbors_marks_bounded_results_instead_of_claiming_a_complete_count() {
         format!("{{\"Records\":[{body}]}}"),
     )
     .unwrap();
-    let store = super::super::ParquetStore::open_mapped(root.path(), source_catalog()).unwrap();
-    let case_id = CaseId::parse("00000000-0000-0000-0000-000000000001").unwrap();
-    let prepared = store
-        .prepare_local(
-            &case_id,
-            &source_root,
-            "cloudtrail.json",
-            false,
-            &JsonParser,
-            &CancellationToken::new(),
-        )
+    let (store, engine) = source_fixture(root.path(), 74);
+    let case = engine
+        .create_case("Bounded neighbors", "local only")
         .unwrap();
-    let output = store
-        .queries(&BTreeMap::new())
-        .neighbors_native(
-            &case_id,
-            &prepared.artifacts,
-            &irmind_domain::GraphQueryFilter::default(),
-            ("ip", "203.0.113.8"),
-            10,
-            &CancellationToken::new(),
-        )
-        .unwrap();
-    assert!(output.contains("account 123456789012 co-observed 4096 times"));
+    LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &json_source_parser(),
+    }
+    .ingest_local(
+        &case.id,
+        &source_root,
+        "cloudtrail.json",
+        false,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    let output = store.neighbors(&case.id, "ip", "203.0.113.8", 10).unwrap();
+    assert!(
+        output.contains("account 123456789012 [scope=legacy-unspecified] co-observed 4096 times")
+    );
     assert!(output.contains("Partial result: sampled 4096 matching records"));
 }
 
 #[test]
-fn parallel_batch_signs_sources_in_order_and_reuses_identical_artifact() {
+fn parallel_batch_signs_sources_in_order_and_rejects_duplicate_source_bytes() {
     let root = tempfile::tempdir().unwrap();
     let source_root = root.path().join("inputs");
     fs::create_dir(&source_root).unwrap();
     let content = br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin"}"#;
     fs::write(source_root.join("b.json"), content).unwrap();
     fs::write(source_root.join("a.json"), content).unwrap();
-    let store = Arc::new(open_source_store(root.path()).unwrap());
-    let signer = Arc::new(LocalSigner {
-        key: SigningKey::from_bytes(&[72u8; 32]),
-        actor: Actor::Analyst,
-    });
-    let parser = Arc::new(JsonParser);
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(
-                signer.clone(),
-                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-            ),
-            Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
+    let (store, engine) = source_fixture(root.path(), 72);
     let case = engine.create_case("batch", "account 123456789012").unwrap();
     let cases = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
         parser: &json_source_parser(),
     };
+    let baseline = engine.verify(&case.id).unwrap();
+    assert!(
+        cases
+            .ingest_local_batch(
+                &case.id,
+                &source_root,
+                &["b.json".into(), "a.json".into()],
+                false,
+                &CancellationToken::new(),
+            )
+            .is_err()
+    );
+    assert_eq!(engine.verify(&case.id).unwrap(), baseline);
+    fs::write(
+        source_root.join("b.json"),
+        br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"SecondLogin"}"#,
+    )
+    .unwrap();
     let result = cases
         .ingest_local_batch(
             &case.id,
@@ -415,7 +362,8 @@ fn parallel_batch_signs_sources_in_order_and_reuses_identical_artifact() {
         .unwrap();
     assert_eq!(result[0].0, "a.json");
     assert_eq!(result[1].0, "b.json");
-    assert_eq!(result[0].1, result[1].1);
+    assert_ne!(result[0].1, result[1].1);
+    assert_eq!(store.timeline(&case.id, 10).unwrap().len(), 2);
     let entries = store.entries(&case.id).unwrap();
     assert_eq!(
         entries
@@ -429,9 +377,9 @@ fn parallel_batch_signs_sources_in_order_and_reuses_identical_artifact() {
             .iter()
             .filter(|e| e.kind == AuditEventKind::ParquetArtifactV3)
             .count(),
-        3
+        1
     );
-    assert_eq!(engine.verify(&case.id).unwrap(), 6);
+    assert_eq!(engine.verify(&case.id).unwrap(), 9);
     fs::write(source_root.join("a.json"), b"changed").unwrap();
     assert!(
         cases
@@ -444,5 +392,5 @@ fn parallel_batch_signs_sources_in_order_and_reuses_identical_artifact() {
             )
             .is_err()
     );
-    assert_eq!(engine.verify(&case.id).unwrap(), 6);
+    assert_eq!(engine.verify(&case.id).unwrap(), 9);
 }
