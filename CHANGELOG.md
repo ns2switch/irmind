@@ -4,6 +4,14 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+### Fixed
+
+- Count oversized whitespace-prefixed source records as rejected and preserve subsequent source ordinals and offsets. This corrects the development source-decoder pipeline; v0.2.0 is not affected by this regression.
+- Apply declarative JSON field budgets to array elements as well as object members. The affected source-decoder path is new for v0.3; v0.2.0 already applies the aggregate budget and is not affected.
+- Mark auditd terminator-only groups as partial. This corrects the development raw-source decoder; v0.2.0 already marks groups without substantive records partial and is not affected.
+
+### Added and changed
+
 - Use the direct mapped V3 ingestion pipeline in CLI, TUI, demo and object storage; remove the obsolete common-writer preference.
 
 **Format impact — planned v0.3.0: breaking.** Mapped V3 artifacts and export V6 replace retired case/export layouts; retired parser and mapping interpreters are not retained. Before upgrading, keep the version that created an existing case or re-ingest verified originals into a new case. The source-decoder rollout and cleanup are in progress; this is not a release announcement.

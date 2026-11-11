@@ -4,19 +4,21 @@ Traducción de SECURITY.md en el commit 8da2130e1c826feb8708ab2882aabe9a6bd06e62
 
 # Política de seguridad
 
-Esta página es para quienes quieren comunicar una vulnerabilidad de IRMind. El proyecto está en desarrollo y **no está listo para incidentes reales ni datos sensibles**. Las correcciones de seguridad se dirigen a la última versión preliminar 0.1.x y a la rama principal de desarrollo. Las versiones anteriores deben actualizarse; una versión preliminar no supone soporte de producción.
+Esta página es para quienes quieren comunicar una vulnerabilidad de IRMind. El proyecto está en desarrollo y **no está listo para incidentes reales ni datos sensibles**. Las correcciones se dirigen a la última versión preliminar y a la rama principal de desarrollo. Las versiones anteriores deben actualizarse; una versión preliminar no supone soporte de producción.
 
-## Comunicar en privado
+## Comunicar un problema
 
-No publiques vulnerabilidades, detalles de explotación, datos reales de incidentes ni secretos en issues o PR. En GitHub, usa **Security → Advisories → Report a vulnerability** para enviar un informe privado. Incluye la versión o commit afectado, el impacto, pasos para reproducirlo con datos sintéticos y una forma de contacto.
+Abre un [issue en GitHub](https://github.com/ns2switch/irmind/issues/new/choose) con la versión o commit afectado, el comportamiento esperado y un ejemplo mínimo sintético. No incluyas credenciales, evidencia de incidentes reales, información personal ni detalles operativos de un entorno real.
 
-Si no aparece esa opción, abre un issue pidiendo que se habilite **sin detalles técnicos de la vulnerabilidad**. Este archivo no activa por sí mismo el reporte privado.
+Si necesitas un canal de contacto privado, abre un issue solicitándolo sin detalles técnicos. Un mantenedor acordará un canal adecuado. No envíes secretos ni evidencia real para demostrar un problema.
 
-## Divulgación coordinada
+## Correcciones y publicación antes de la 1.0
 
-Mantén privados los informes y los pasos de reproducción hasta que se publique una versión corregida. Usa un GitHub Security Advisory privado y su fork privado temporal para coordinar el arreglo. No abras issues, PRs, commits ni comentarios públicos que describan una debilidad sin resolver en la política, la custodia, las firmas, el aislamiento del contenido o el manejo de secretos. Tras publicar la corrección, añade la entrada del changelog y, cuando corresponda, el aviso coordinado.
+Durante el desarrollo pre-1.0, las correcciones se publican mediante PR públicas ordinarias, los controles habituales de CI y `main`. La siguiente versión incluye una entrada técnica breve en el changelog e identifica las versiones publicadas afectadas cuando se conocen. El proyecto no crea ni publica GitHub Security Advisories ni forks privados temporales para las correcciones.
 
-Los informes detallados del analista y los registros de su entorno se conservan en privado. Las PRs públicas describen el comportamiento, las pruebas, los benchmarks release y las decisiones de diseño sin información personal del equipo ni credenciales.
+Esta política de publicación no cambia ningún control de ejecución. Siguen siendo obligatorios el techo de la política, las aprobaciones del analista, ContentGuard, la procedencia, las firmas, los hashes, la verificación de custodia y TLS, el aislamiento y los límites de recursos. Las correcciones conservan sus pruebas de regresión y pasan los controles habituales de integración.
+
+Los informes detallados del analista y los registros de su entorno siguen siendo privados. Las PR públicas describen el comportamiento, las pruebas, los benchmarks release y las decisiones de diseño sin información personal del equipo ni credenciales.
 
 ## Plazos orientativos
 
@@ -25,9 +27,9 @@ Los informes detallados del analista y los registros de su entorno se conservan 
 | Acuse de recibo | 3 días laborables |
 | Evaluación inicial y respuesta | 7 días laborables |
 | Actualizaciones mientras siga abierto | Al menos cada 14 días |
-| Corrección y divulgación coordinada | Objetivo inicial de 90 días desde el informe; comunicaremos ampliaciones |
+| Evaluación y planificación de la corrección | Objetivo inicial de 90 días desde el informe; comunicaremos ampliaciones |
 
-Son objetivos de respuesta, no una garantía de corrección en una fecha fija. Coordinaremos un aviso de seguridad con quien informe cuando exista una mitigación verificable. No solicitamos ni aceptamos evidencia real ni secretos para reproducir un fallo.
+Son objetivos de respuesta, no una garantía de corrección en una fecha fija. Informaremos a quien comunique el problema sobre la evaluación y las correcciones. No solicitamos ni aceptamos evidencia real ni secretos para reproducir un fallo.
 
 Consulta el [modelo de seguridad](docs/es/security-model.md) para las garantías y riesgos residuales.
 
