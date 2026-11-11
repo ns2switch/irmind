@@ -35,7 +35,7 @@ pub(in crate::parquet_store::writer) fn events(
     rows: &[RecordRow],
 ) -> Result<RecordBatch, AppError> {
     let indices = (0..rows.len()).collect::<Vec<_>>();
-    let base = super::super::batch::record_batch(rows)?;
+    let base = base_events(rows)?;
     let base = super::super::precise::columns(&base, rows, &indices)?;
     let common = selected(rows, &indices)?;
     let mut columns = classification(&common);
@@ -177,4 +177,54 @@ fn association(pairs: &[Pair<'_>]) -> Vec<(&'static str, ArrayRef)> {
         ),
         ("identity_scope", strings(pairs, |p| p.2.scope.as_str())),
     ]
+}
+
+fn base_events(rows: &[RecordRow]) -> Result<RecordBatch, AppError> {
+    RecordBatch::try_from_iter(vec![
+        (
+            "source_hash",
+            Arc::new(StringArray::from(
+                rows.iter().map(|r| r.hash.as_str()).collect::<Vec<_>>(),
+            )) as ArrayRef,
+        ),
+        (
+            "record_index",
+            Arc::new(UInt64Array::from(
+                rows.iter().map(|r| r.index).collect::<Vec<_>>(),
+            )) as ArrayRef,
+        ),
+        (
+            "event_time",
+            Arc::new(StringArray::from(
+                rows.iter().map(|r| r.at.as_str()).collect::<Vec<_>>(),
+            )) as ArrayRef,
+        ),
+        (
+            "event",
+            Arc::new(StringArray::from(
+                rows.iter().map(|r| r.event.as_str()).collect::<Vec<_>>(),
+            )) as ArrayRef,
+        ),
+        (
+            "text",
+            Arc::new(StringArray::from(
+                rows.iter().map(|r| r.text.as_str()).collect::<Vec<_>>(),
+            )) as ArrayRef,
+        ),
+        (
+            "entities",
+            Arc::new(StringArray::from(
+                rows.iter().map(|r| r.entities.as_str()).collect::<Vec<_>>(),
+            )) as ArrayRef,
+        ),
+        (
+            "relations",
+            Arc::new(StringArray::from(
+                rows.iter()
+                    .map(|r| r.relations.as_str())
+                    .collect::<Vec<_>>(),
+            )) as ArrayRef,
+        ),
+    ])
+    .map_err(storage)
 }

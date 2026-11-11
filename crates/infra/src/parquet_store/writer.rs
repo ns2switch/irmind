@@ -1,17 +1,16 @@
 use super::{
     AppError, ArrayRef, ArrowWriter, BTreeMap, CancellationToken, Compression, EvidenceHash, File,
-    GraphRecord, OpenOptions, ParquetArtifact, ParquetStore, Path, PathBuf, RecordBatch,
-    StringArray, UInt64Array, WriterProperties, fs, invalid_source, storage,
+    OpenOptions, ParquetArtifact, ParquetStore, Path, PathBuf, RecordBatch, StringArray,
+    UInt64Array, WriterProperties, fs, invalid_source, storage,
 };
-use irmind_domain::ParquetArtifactV1;
+#[cfg(test)]
+use irmind_app::GraphRecord;
 use std::sync::Arc;
 
-mod batch;
 pub(super) mod common;
 pub(in crate::parquet_store) mod direct;
 pub(super) mod precise;
 mod staged_time;
-use batch::{coobservation_batch, entity_batch, record_batch};
 use parquet::schema::types::ColumnPath;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, serde::Serialize, serde::Deserialize)]
@@ -58,16 +57,12 @@ pub(super) struct ArtifactSink {
     partition: Partition,
     writer: Option<ArrowWriter<File>>,
     kind: ArtifactKind,
-    precise: bool,
-    common: bool,
-    direct: bool,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 enum ArtifactKind {
     Events,
     Entities,
-    LegacyEntities,
     Coobservations,
 }
 
@@ -75,25 +70,19 @@ impl ArtifactKind {
     fn suffix(self) -> &'static str {
         match self {
             Self::Events => "events",
-            Self::Entities | Self::LegacyEntities => "entities",
+            Self::Entities => "entities",
             Self::Coobservations => "coobservations",
         }
     }
 
-    fn schema(self) -> &'static str {
+    fn schema(self) -> irmind_domain::ArtifactSchemaV2 {
+        use irmind_domain::ArtifactSchemaV2::{CommonCoobservations, CommonEntities, CommonEvents};
         match self {
-            Self::Events => "irmind-events-v2",
-            Self::Entities => "irmind-entities-v2",
-            Self::LegacyEntities => "irmind-entities-v1",
-            Self::Coobservations => "irmind-coobservations-v1",
+            Self::Events => CommonEvents,
+            Self::Entities => CommonEntities,
+            Self::Coobservations => CommonCoobservations,
         }
     }
-}
-
-pub(super) struct PartitionSinks {
-    events: ArtifactSink,
-    entities: ArtifactSink,
-    coobservations: Option<ArtifactSink>,
 }
 
 impl Drop for ArtifactSink {
@@ -113,35 +102,7 @@ impl ArtifactSink {
         batch: &RecordBatch,
         kind: ArtifactKind,
     ) -> Result<Self, AppError> {
-        Self::configured(case_dir, hash, partition, batch, kind, false)
-    }
-
-    fn configured(
-        case_dir: &Path,
-        hash: &EvidenceHash,
-        partition: Partition,
-        batch: &RecordBatch,
-        kind: ArtifactKind,
-        direct: bool,
-    ) -> Result<Self, AppError> {
-        let precise = matches!(
-            batch
-                .schema()
-                .field_with_name("event_time")
-                .map(arrow::datatypes::Field::data_type),
-            Ok(arrow::datatypes::DataType::Timestamp(_, _))
-        );
-        let common = batch
-            .schema()
-            .metadata()
-            .get("irmind.common.schema")
-            .is_some_and(|id| id == irmind_domain::COMMON_EVENT_V1);
-        let (part, name) = Self::location(&partition, hash, kind, precise, common)?;
-        let name = if direct {
-            name.replace(".common.", ".direct.common.")
-        } else {
-            name
-        };
+        let (part, name) = Self::location(&partition, hash, kind)?;
         let dir = case_dir.join(&part);
         fs::create_dir_all(&dir).map_err(storage)?;
         irmind_fs::private_dir(&dir).map_err(storage)?;
@@ -158,14 +119,7 @@ impl ArtifactSink {
             irmind_fs::private_file(&temporary).map_err(storage)?;
             let mut properties = WriterProperties::builder()
                 .set_compression(Compression::SNAPPY)
-                .set_max_row_group_row_count(Some(
-                    if direct || matches!(kind, ArtifactKind::Events | ArtifactKind::LegacyEntities)
-                    {
-                        8192
-                    } else {
-                        1024
-                    },
-                ));
+                .set_max_row_group_row_count(Some(8192));
             if matches!(kind, ArtifactKind::Entities | ArtifactKind::Coobservations) {
                 properties = properties
                     .set_column_bloom_filter_enabled(ColumnPath::from("entity_value"), true)
@@ -180,9 +134,6 @@ impl ArtifactSink {
                 partition,
                 writer: Some(writer),
                 kind,
-                precise,
-                common,
-                direct,
             })
         })();
         if result.is_err() {
@@ -195,87 +146,40 @@ impl ArtifactSink {
         partition: &Partition,
         hash: &EvidenceHash,
         kind: ArtifactKind,
-        precise: bool,
-        common: bool,
     ) -> Result<(String, String), AppError> {
-        let part = if let Some(scope) = &partition.scope {
-            scope
-                .path_prefix()
-                .map_err(|_| invalid_source())?
-                .trim_end_matches('/')
-                .to_owned()
-        } else if precise {
-            format!("date={}", partition.date)
-        } else {
-            format!(
-                "date={}/account={}/region={}",
-                partition.date, partition.account, partition.region
-            )
-        };
-        let name = if partition.scope.is_some() {
-            format!(
-                "{}.part-{}.{}.parquet",
-                hash.as_str(),
-                partition.segment,
-                kind.suffix()
-            )
-        } else if precise {
-            let key = format!("{}\0{}", partition.account, partition.region);
-            format!(
-                "{}.{}.{}.parquet",
-                hash.as_str(),
-                irmind_app::hex(&irmind_app::sha256(key.as_bytes())),
-                kind.suffix()
-            )
-        } else {
-            format!("{}.{}.parquet", hash.as_str(), kind.suffix())
-        };
-        let name = if common {
-            name.strip_suffix(".parquet")
-                .map(|prefix| format!("{prefix}.common.parquet"))
-                .ok_or_else(invalid_source)?
-        } else {
-            name
-        };
-        let name = if let Some(route) = &partition.mapping_route {
-            if route.len() != 64
-                || !route
-                    .bytes()
-                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-            {
-                return Err(invalid_source());
-            }
-            name.strip_suffix(".parquet")
-                .map(|n| format!("{n}.map-{route}.parquet"))
-                .ok_or_else(invalid_source)?
-        } else {
-            name
-        };
-        Ok((part, name))
+        let prefix = partition
+            .scope
+            .as_ref()
+            .ok_or_else(invalid_source)?
+            .path_prefix()
+            .map_err(|_| invalid_source())?;
+        let route = partition
+            .mapping_route
+            .as_deref()
+            .ok_or_else(invalid_source)?;
+        if route.len() != 64
+            || !route
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err(invalid_source());
+        }
+        let name = format!(
+            "{}.part-{}.{}.direct.common.map-{route}.parquet",
+            hash.as_str(),
+            partition.segment,
+            kind.suffix()
+        );
+        Ok((prefix.trim_end_matches('/').into(), name))
     }
 
     fn append(&mut self, batch: &RecordBatch) -> Result<(), AppError> {
         let writer = self.writer.as_mut().ok_or_else(invalid_source)?;
         writer.write(batch).map_err(storage)?;
-        if (self.direct && writer.memory_size() >= super::BATCH_BYTES)
-            || (!self.direct
-                && (matches!(
-                    self.kind,
-                    ArtifactKind::Entities | ArtifactKind::Coobservations
-                ) || (self.partition.scope.is_some()
-                    && writer.memory_size() >= super::BATCH_BYTES)))
-        {
+        if writer.memory_size() >= super::BATCH_BYTES {
             writer.flush().map_err(storage)?;
         }
         Ok(())
-    }
-
-    fn finish(
-        self,
-        hash: &EvidenceHash,
-        parser: irmind_app::ParserIdentity<'_>,
-    ) -> Result<StagedArtifact, AppError> {
-        self.finish_cancelable(hash, parser, &CancellationToken::new())
     }
 
     fn finish_cancelable(
@@ -295,23 +199,7 @@ impl ArtifactSink {
             .map_err(storage)?;
         file.sync_all().map_err(storage)?;
         let (digest, size) = ParquetStore::hash_reader(&mut file, cancel)?;
-        let manifest = if self.precise {
-            precise::manifest(&self, hash, parser, size, &digest)?
-        } else {
-            ParquetArtifactV1 {
-                path: self.relative_path.clone(),
-                size,
-                sha256: EvidenceHash::parse(&irmind_app::hex(&digest))
-                    .map_err(|_| invalid_source())?,
-                parser_version: parser.version.into(),
-                schema_version: self.kind.schema().into(),
-                partition_date: self.partition.date.clone(),
-                partition_account: self.partition.account.clone(),
-                partition_region: self.partition.region.clone(),
-                source_hashes: vec![hash.clone()],
-            }
-            .into()
-        };
+        let manifest = precise::manifest(&self, hash, parser, size, &digest)?;
         Ok(StagedArtifact {
             rows: Some(u64::try_from(metadata.file_metadata().num_rows()).map_err(storage)?),
             temporary: self.temporary.take().ok_or_else(invalid_source)?,
@@ -326,119 +214,13 @@ impl Drop for StagedArtifact {
     }
 }
 
-pub(super) fn batch_to_parquet(
-    case_dir: &Path,
-    hash: &EvidenceHash,
-    grouped: &mut BTreeMap<Partition, Vec<RecordRow>>,
-    open: &mut BTreeMap<Partition, PartitionSinks>,
-    legacy_entities: bool,
-) -> Result<(), AppError> {
-    for (partition, rows) in std::mem::take(grouped) {
-        if rows.is_empty() {
-            continue;
-        }
-        let (events, entities, coobservations) = table_batches(&rows, legacy_entities)?;
-        if !open.contains_key(&partition) {
-            if open.len() >= 64 {
-                return Err(AppError::Policy(
-                    "source spans too many Parquet partitions".into(),
-                ));
-            }
-            open.insert(
-                partition.clone(),
-                PartitionSinks {
-                    events: ArtifactSink::new(
-                        case_dir,
-                        hash,
-                        partition.clone(),
-                        &events,
-                        ArtifactKind::Events,
-                    )?,
-                    entities: ArtifactSink::new(
-                        case_dir,
-                        hash,
-                        partition.clone(),
-                        &entities,
-                        if legacy_entities {
-                            ArtifactKind::LegacyEntities
-                        } else {
-                            ArtifactKind::Entities
-                        },
-                    )?,
-                    coobservations: coobservations
-                        .as_ref()
-                        .map(|batch| {
-                            ArtifactSink::new(
-                                case_dir,
-                                hash,
-                                partition.clone(),
-                                batch,
-                                ArtifactKind::Coobservations,
-                            )
-                        })
-                        .transpose()?,
-                },
-            );
-        }
-        let sinks = open.get_mut(&partition).ok_or_else(invalid_source)?;
-        sinks.events.append(&events)?;
-        sinks.entities.append(&entities)?;
-        if let (Some(sink), Some(batch)) = (&mut sinks.coobservations, &coobservations) {
-            sink.append(batch)?;
-        }
-    }
-    Ok(())
-}
-
-pub(super) fn finish_parquet(
-    open: BTreeMap<Partition, PartitionSinks>,
-    hash: &EvidenceHash,
-    parser: irmind_app::ParserIdentity<'_>,
-) -> Result<Vec<StagedArtifact>, AppError> {
-    let mut artifacts = Vec::new();
-    for sinks in open.into_values() {
-        artifacts.push(sinks.events.finish(hash, parser)?);
-        artifacts.push(sinks.entities.finish(hash, parser)?);
-        if let Some(coobservations) = sinks.coobservations {
-            artifacts.push(coobservations.finish(hash, parser)?);
-        }
-    }
-    Ok(artifacts)
-}
-
-fn table_batches(
-    rows: &[RecordRow],
-    legacy_entities: bool,
-) -> Result<(RecordBatch, RecordBatch, Option<RecordBatch>), AppError> {
-    let common = rows.first().is_some_and(|row| row.common.is_some());
-    if rows.iter().any(|row| row.common.is_some() != common) {
+fn table_batches(rows: &[RecordRow]) -> Result<(RecordBatch, RecordBatch, RecordBatch), AppError> {
+    if rows.is_empty() || rows.iter().any(|row| row.common.is_none()) {
         return Err(invalid_source());
     }
-    if common {
-        if legacy_entities {
-            return Err(invalid_source());
-        }
-        return Ok((
-            common::events(rows)?,
-            common::entities(rows, false)?,
-            Some(common::entities(rows, true)?),
-        ));
-    }
-    let mut events = record_batch(rows)?;
-    let mut entities = entity_batch(rows, !legacy_entities)?;
-    let mut coobservations = (!legacy_entities)
-        .then(|| coobservation_batch(rows))
-        .transpose()?;
-    if rows[0].precise {
-        events = precise::columns(&events, rows, &(0..rows.len()).collect::<Vec<_>>())?;
-        let pairs = batch::pairs(rows, true)
-            .into_iter()
-            .map(|(row, _)| row)
-            .collect::<Vec<_>>();
-        entities = precise::columns(&entities, rows, &pairs)?;
-        coobservations = coobservations
-            .map(|batch| precise::columns(&batch, rows, &pairs))
-            .transpose()?;
-    }
-    Ok((events, entities, coobservations))
+    Ok((
+        common::events(rows)?,
+        common::entities(rows, false)?,
+        common::entities(rows, true)?,
+    ))
 }

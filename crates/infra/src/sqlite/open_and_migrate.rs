@@ -5,33 +5,22 @@ use super::{
 
 impl LocalStore {
     pub fn open(root: &Path) -> Result<Self, AppError> {
-        Self::open_store(root, false)
-    }
-
-    /// Precise artifact construction with compatible reads of existing V1 cases.
-    pub fn open_precise(root: &Path) -> Result<Self, AppError> {
-        Self::open_store(root, true)
+        Self::open_store(root, ParquetStore::open(root)?)
     }
 
     pub fn open_mapped(
         root: &Path,
         catalog: std::sync::Arc<irmind_app::source_mapping::MappingCatalog>,
     ) -> Result<Self, AppError> {
-        let mut store = Self::open_precise(root)?;
-        store.parquet = ParquetStore::open_mapped(root, catalog)?;
-        Ok(store)
+        Self::open_store(root, ParquetStore::open_mapped(root, catalog)?)
     }
 
-    fn open_store(root: &Path, precise: bool) -> Result<Self, AppError> {
+    fn open_store(root: &Path, parquet: ParquetStore) -> Result<Self, AppError> {
         let (evidence_dir, seal_dir, lock_dir) = Self::prepare_directories(root)?;
         let db = Self::open_database(root)?;
         let store = Self {
             db: Mutex::new(db),
-            parquet: if precise {
-                ParquetStore::open_precise(root)?
-            } else {
-                ParquetStore::open(root)?
-            },
+            parquet,
             graph_catalog: Mutex::new(std::collections::HashMap::new()),
             evidence_dir,
             seal_dir,

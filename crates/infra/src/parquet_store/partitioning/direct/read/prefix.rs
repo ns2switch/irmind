@@ -27,9 +27,9 @@ pub(super) fn plan_source(
         spool: None,
         must_replay: false,
     };
-    let (report, mapping) = match store.parse_normalized(
+    let (report, mapping) = match store.decode_mapped(
         request.case_id,
-        VerifiedInput {
+        &mut VerifiedInput {
             source: &mut input.file,
             sample: &sample,
             relative_path: &input.path,
@@ -38,7 +38,6 @@ pub(super) fn plan_source(
             size: initial.2,
             cancel,
             parser: request.parser,
-            precise_time: true,
             decode_budget: input.decode_budget,
         },
         &mut |row| prefix.push(row, store, request.case_id, input.budget, cancel),
@@ -72,7 +71,6 @@ pub(super) fn plan_source(
     Ok(Plan::Sorted(Box::new(StagedSource {
         mapping,
         spool: completed.file,
-        source: input.file,
         manifest,
         report,
         sample_hash: irmind_app::sha256(&sample),

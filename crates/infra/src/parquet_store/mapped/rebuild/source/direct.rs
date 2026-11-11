@@ -1,10 +1,11 @@
 //! Reproduce the exact bounded source group recorded by the direct recipe.
 use super::{
-    AppError, Arc, CancellationToken, CaseId, Inputs, LargeCaseStore, LogParser, ParquetArtifact,
+    AppError, CancellationToken, CaseId, Inputs, LargeCaseStore, ParquetArtifact,
     ParquetArtifactV3, ParquetStore, Path, SourceManifestV2, invalid_source, original_location,
 };
-use irmind_app::MappedIngestRequest;
+use irmind_app::{LogParser, MappedIngestRequest};
 use irmind_domain::{MappingProfileV1, SourceRecordSetV1};
+use std::sync::Arc;
 
 impl ParquetStore {
     pub(super) fn rebuild_direct_group(

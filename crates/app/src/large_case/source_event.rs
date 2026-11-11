@@ -5,7 +5,7 @@ use super::{
 impl LargeCaseUseCases<'_, '_> {
     pub(super) fn source_event(
         &self,
-        prepared: &crate::PreparedSource,
+        prepared: &crate::MappedSourceAcquisition,
         selection: Option<&ParserSelection>,
     ) -> Result<(AuditEventKind, String), AppError> {
         let identity = self.parser.identity_for_source(&prepared.manifest.source)?;
@@ -43,8 +43,8 @@ impl LargeCaseUseCases<'_, '_> {
                     .clone()
                     .unwrap_or_else(|| "normalized-utc".into()),
             ),
-            rejected_records: prepared.parse_report.rejected,
-            rejected_sample: prepared.parse_report.samples.clone(),
+            rejected_records: prepared.report.rejected,
+            rejected_sample: prepared.report.samples.clone(),
         };
         Ok((
             AuditEventKind::SourceManifestV2,

@@ -367,15 +367,6 @@ pub trait LogParser: EventParser + StreamingEventParser {
     fn detect(&self, source_name: &str, sample: &[u8]) -> Option<ParserConfidence>;
 }
 
-pub struct PreparedSource {
-    pub mapping: Option<crate::source_mapping::PreparedMappingSource>,
-    pub manifest: SourceManifestV1,
-    pub artifacts: Vec<ParquetArtifact>,
-    pub records: usize,
-    pub format_sample_sha256: [u8; 32],
-    pub parse_report: ParseReport,
-}
-
 /// The local adapter owns all paths and derived files. The application signs
 /// the returned manifests before any derived file is exposed to model tools.
 pub trait LargeCaseStore: Send + Sync {
@@ -385,40 +376,6 @@ pub trait LargeCaseStore: Send + Sync {
         _cancel: &CancellationToken,
     ) -> Result<Option<Box<dyn crate::PreparedMappedIngest>>, AppError> {
         Ok(None)
-    }
-
-    /// Prepare a canonical bounded batch against the verified signed snapshot.
-    fn prepare_local_batch(
-        &self,
-        request: crate::LocalBatchRequest<'_>,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<PreparedSource>, AppError> {
-        request.validate()?;
-        let mut prepared = Vec::new();
-        for path in request.relative_paths {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            let source = self.prepare_local(
-                request.case_id,
-                request.source_root,
-                path,
-                request.copy_original,
-                request.parser,
-                cancel,
-            )?;
-            if source
-                .artifacts
-                .iter()
-                .any(|a| matches!(a, ParquetArtifact::V2(_)))
-            {
-                return Err(AppError::Fixed(
-                    crate::FixedAppError::PolicyPartitionBatchUnavailable,
-                ));
-            }
-            prepared.push(source);
-        }
-        Ok(prepared)
     }
 
     /// Creates a private, automatically removed object spool under this case's
@@ -435,25 +392,6 @@ pub trait LargeCaseStore: Send + Sync {
     fn clean_orphan_spools(&self, _case_id: &CaseId) -> Result<usize, AppError> {
         Ok(0)
     }
-
-    fn prepare_local(
-        &self,
-        case_id: &CaseId,
-        source_root: &Path,
-        relative_path: &str,
-        copy_original: bool,
-        parser: &dyn StreamingEventParser,
-        cancel: &CancellationToken,
-    ) -> Result<PreparedSource, AppError>;
-
-    fn prepare_legacy_evidence(
-        &self,
-        case_id: &CaseId,
-        hash: &str,
-        bytes: &[u8],
-        parser: &dyn StreamingEventParser,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<ParquetArtifact>, AppError>;
 
     fn compact_artifacts(
         &self,

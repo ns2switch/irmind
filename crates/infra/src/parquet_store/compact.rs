@@ -20,10 +20,10 @@ impl ParquetStore {
         sources: &[ParquetArtifact],
         cancel: &CancellationToken,
     ) -> Result<ParquetArtifact, AppError> {
-        let (mut ordered, hashes) = validate_sources(sources)?;
+        let mut ordered = validate_sources(sources)?;
         ordered.sort_by(|left, right| left.path().cmp(right.path()));
         let case_dir = self.case_dir(id)?;
-        let mut staged = manifest::stage(&case_dir, &ordered, hashes)?;
+        let mut staged = mapped::stage(&case_dir, &ordered)?;
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
         #[cfg(unix)]
@@ -34,25 +34,14 @@ impl ParquetStore {
         let output = options.open(&staged.temporary).map_err(storage)?;
         irmind_fs::private_file(&staged.temporary).map_err(storage)?;
         let (size, digest) = write_compact(&case_dir, &staged.temporary, &ordered, output, cancel)?;
-        match &mut staged.manifest {
-            ParquetArtifact::V1(v) => {
-                v.size = size;
-                v.sha256 =
-                    EvidenceHash::parse(&irmind_app::hex(&digest)).map_err(|_| invalid_source())?;
-            }
-            ParquetArtifact::V3(v) => {
-                let mut core = v.core().clone();
-                core.size = size;
-                core.sha256 = EvidenceHash::from_bytes(digest);
-                *v = irmind_domain::ParquetArtifactV3::try_new(core, v.pipeline().clone())
-                    .map_err(|_| invalid_source())?;
-            }
-            ParquetArtifact::V2(v) => {
-                v.size = size;
-                v.sha256 =
-                    EvidenceHash::parse(&irmind_app::hex(&digest)).map_err(|_| invalid_source())?;
-            }
-        }
+        let ParquetArtifact::V3(value) = &mut staged.manifest else {
+            return Err(invalid_source());
+        };
+        let mut core = value.core().clone();
+        core.size = size;
+        core.sha256 = EvidenceHash::from_bytes(digest);
+        *value = irmind_domain::ParquetArtifactV3::try_new(core, value.pipeline().clone())
+            .map_err(|_| invalid_source())?;
         self.finish_artifacts(id, vec![staged])?
             .pop()
             .ok_or_else(invalid_source)
@@ -85,15 +74,7 @@ pub(super) fn write_inputs(
     temporary_paths: &std::collections::BTreeMap<String, std::path::PathBuf>,
 ) -> Result<(u64, [u8; 32]), AppError> {
     let schema = sources.first().ok_or_else(invalid_source)?.schema_version();
-    let optimized = matches!(
-        schema,
-        "irmind-entities-v2"
-            | "irmind-coobservations-v1"
-            | "irmind-entities-v3"
-            | "irmind-coobservations-v2"
-            | "irmind-entities-v4"
-            | "irmind-coobservations-v3"
-    );
+    let optimized = matches!(schema, "irmind-entities-v4" | "irmind-coobservations-v3");
     let properties = compact_properties(optimized);
     let mut output = Some(output);
     let mut writer: Option<ArrowWriter<File>> = None;
@@ -115,8 +96,7 @@ pub(super) fn write_inputs(
         super::format::validate_schema(source, builder.schema().as_ref())?;
         super::format::validate_row_count(source, builder.metadata().file_metadata().num_rows())?;
         // Record-batch readers expose only column metadata. Keep the validated
-        // common schema metadata when constructing a replacement file; old
-        // builders retain their historical construction unchanged.
+        // common schema metadata when constructing a replacement file.
         let common_schema = source
             .precise_metadata()
             .is_some_and(|v| v.schema.is_common())

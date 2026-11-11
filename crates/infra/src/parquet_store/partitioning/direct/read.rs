@@ -149,7 +149,7 @@ pub(super) fn acquisition(
         manifest: source.manifest,
         report: source.report,
         format_sample_sha256: source.sample_hash,
-        decoded: source.mapping.ok_or_else(invalid_source)?,
+        decoded: source.mapping,
     })
 }
 

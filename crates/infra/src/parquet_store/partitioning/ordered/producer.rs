@@ -1,31 +1,26 @@
 //! Bounded parser workers. Only the coordinator assigns signed partitions.
 use super::super::super::local::{stream, verify_source_unchanged};
 use super::super::super::{
-    AppError, BATCH_BYTES, BATCH_ROWS, CancellationToken, File, ParquetStore, ParseReport,
-    RecordRow, SourceManifestV1, invalid_source, storage,
+    AppError, BATCH_BYTES, BATCH_ROWS, CancellationToken, ParquetStore, ParseReport, RecordRow,
+    SourceManifestV1, invalid_source,
 };
-use super::super::staging::StagedSource;
 use super::super::staging::{Input, MAX_STAGED_ROW, no_space, source_sample};
-use irmind_app::LocalBatchRequest;
-use std::io::{Seek as _, SeekFrom, Write};
+use irmind_app::MappedIngestRequest;
+use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{SyncSender, TrySendError};
 use std::time::Duration;
 
 pub(in crate::parquet_store::partitioning) struct ParsedSource {
     pub(in crate::parquet_store::partitioning) mapping:
-        Option<irmind_app::source_mapping::DecodedSourceCommitmentV1>,
-    pub(in crate::parquet_store::partitioning) source: File,
+        irmind_app::source_mapping::DecodedSourceCommitmentV1,
     pub(in crate::parquet_store::partitioning) manifest: SourceManifestV1,
-    pub(in crate::parquet_store::partitioning) report: Option<ParseReport>,
-    pub(in crate::parquet_store::partitioning) initial: Option<(std::fs::Metadata, [u8; 32], u64)>,
+    pub(in crate::parquet_store::partitioning) report: ParseReport,
     pub(in crate::parquet_store::partitioning) sample_hash: [u8; 32],
-    pub(in crate::parquet_store::partitioning) budget: u64,
 }
 
 pub(super) enum ProducedSource {
     Ordered(ParsedSource),
-    Disordered(StagedSource),
     NeedsSort {
         path: String,
         hash: irmind_domain::EvidenceHash,
@@ -36,38 +31,6 @@ pub(super) struct ProducerOutput<'a> {
     pub(super) sender: &'a SyncSender<RowBatch>,
     pub(super) restart: &'a AtomicBool,
     pub(super) start: super::scheduling::Start,
-    pub(super) spool_on_disorder: bool,
-}
-
-impl ParsedSource {
-    fn prepared(
-        self,
-        store: &ParquetStore,
-        request: &LocalBatchRequest<'_>,
-        cancel: &CancellationToken,
-    ) -> Result<ProducedSource, AppError> {
-        if self.report.is_some() {
-            return Ok(ProducedSource::Ordered(self));
-        }
-        let mut source = self.source;
-        source.seek(SeekFrom::Start(0)).map_err(storage)?;
-        let input = Input {
-            file: source,
-            path: self.manifest.source,
-            budget: self.budget,
-            decode_budget: irmind_app::source_mapping::DecodeBudget::sequential(),
-        };
-        let initial = self.initial.ok_or_else(invalid_source)?;
-        let staged = store.stage_hashed_source(
-            request.case_id,
-            input,
-            request.parser,
-            request.copy_original,
-            cancel,
-            initial,
-        )?;
-        Ok(ProducedSource::Disordered(staged))
-    }
 }
 
 pub(super) struct RowBatch {
@@ -79,7 +42,7 @@ impl ParquetStore {
     pub(super) fn produce_ordered_rows(
         &self,
         mut input: Input,
-        request: &LocalBatchRequest<'_>,
+        request: &MappedIngestRequest<'_>,
         cancel: &CancellationToken,
         output: ProducerOutput<'_>,
     ) -> Result<ProducedSource, AppError> {
@@ -87,7 +50,6 @@ impl ParquetStore {
             sender,
             restart,
             start,
-            spool_on_disorder,
         } = output;
         let copied = request.copy_original;
         let (metadata, hash, size) =
@@ -104,9 +66,9 @@ impl ParquetStore {
         let mut stopped_for_restart = false;
         let mut mapping = None;
         let result = self
-            .parse_normalized(
+            .decode_mapped(
                 request.case_id,
-                stream::VerifiedInput {
+                &mut stream::VerifiedInput {
                     source: &mut input.file,
                     sample: &sample,
                     relative_path: &input.path,
@@ -115,13 +77,12 @@ impl ParquetStore {
                     size,
                     cancel,
                     parser: request.parser,
-                    precise_time: true,
                     decode_budget: input.decode_budget,
                 },
                 &mut |row| rows.emit(row, &mut stopped_for_restart),
             )
             .and_then(|(report, decoded)| {
-                mapping = decoded;
+                mapping = Some(decoded);
                 let finished = rows.finish();
                 if finished.is_err() && restart.load(Ordering::Acquire) && !cancel.is_cancelled() {
                     stopped_for_restart = true;
@@ -134,7 +95,7 @@ impl ParquetStore {
                 Ok(report)
             });
         let report = completed_report(result, stopped_for_restart, cancel)?;
-        if report.is_none() && !spool_on_disorder {
+        if report.is_none() {
             return Ok(ProducedSource::NeedsSort {
                 path: input.path,
                 hash: value,
@@ -142,16 +103,12 @@ impl ParquetStore {
         }
         drop(rows);
         drop(stage);
-        ParsedSource {
-            mapping,
-            source: input.file,
+        Ok(ProducedSource::Ordered(ParsedSource {
+            mapping: mapping.ok_or_else(invalid_source)?,
             manifest: Self::source_manifest(&input.path, &metadata, size, value, copied)?,
-            report,
+            report: report.ok_or_else(invalid_source)?,
             sample_hash: irmind_app::sha256(&sample),
-            budget: input.budget,
-            initial: Some((metadata, hash, size)),
-        }
-        .prepared(self, request, cancel)
+        }))
     }
 }
 

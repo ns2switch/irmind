@@ -125,14 +125,14 @@ impl DirectWriting {
             let mut rows = grouped.remove(&partition).ok_or_else(invalid_source)?;
             let started = Instant::now();
             stable_rows(&mut rows, &self.sources)?;
-            let (events, entities, coobs) = table_batches(&rows, false)?;
+            let (events, entities, coobs) = table_batches(&rows)?;
             if let Some(profile) = &self.profile {
                 profile.record_row(started.elapsed());
             }
             self.inflight = events
                 .get_array_memory_size()
                 .saturating_add(entities.get_array_memory_size())
-                .saturating_add(coobs.as_ref().map_or(0, RecordBatch::get_array_memory_size));
+                .saturating_add(coobs.get_array_memory_size());
             if self.inflight > WRITER_MEMORY {
                 return Err(AppError::Policy(
                     "direct row batch exceeds the bounded writer budget".into(),
@@ -144,15 +144,13 @@ impl DirectWriting {
             ] {
                 self.append(dir, &partition, kind, &batch, cancel)?;
             }
-            if let Some(batch) = coobs {
-                self.append(
-                    dir,
-                    &partition,
-                    ArtifactKind::Coobservations,
-                    &batch,
-                    cancel,
-                )?;
-            }
+            self.append(
+                dir,
+                &partition,
+                ArtifactKind::Coobservations,
+                &coobs,
+                cancel,
+            )?;
         }
         self.buffered = 0;
         self.inflight = 0;
@@ -262,7 +260,7 @@ impl DirectWriting {
         let mut partition = key.0.clone();
         partition.segment = *segment;
         *segment = segment.checked_add(1).ok_or_else(invalid_source)?;
-        let sink = ArtifactSink::configured(dir, &self.hash, partition, batch, key.1, true)?;
+        let sink = ArtifactSink::new(dir, &self.hash, partition, batch, key.1)?;
         self.open.insert(
             key.clone(),
             Live {

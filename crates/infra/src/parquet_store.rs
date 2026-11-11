@@ -3,10 +3,7 @@
 
 use arrow::array::{ArrayRef, StringArray, UInt64Array};
 use arrow::record_batch::RecordBatch;
-use irmind_app::{
-    AppError, CancellationToken, GraphRecord, LargeCaseStore, ParseReport, PreparedSource,
-    StreamingEventParser,
-};
+use irmind_app::{AppError, CancellationToken, LargeCaseStore, ParseReport, StreamingEventParser};
 use irmind_domain::{CaseId, EvidenceHash, ParquetArtifact, SourceManifestV1};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
@@ -37,9 +34,9 @@ mod store_bridge;
 mod time_cell;
 mod workers;
 mod writer;
-use writer::{
-    Partition, PartitionSinks, RecordRow, StagedArtifact, batch_to_parquet, finish_parquet,
-};
+#[cfg(test)]
+use irmind_app::GraphRecord;
+use writer::{RecordRow, StagedArtifact};
 
 const READ_CHUNK: usize = 1024 * 1024;
 const BATCH_ROWS: usize = 8192;
@@ -69,18 +66,10 @@ pub struct ParquetStore {
     finish_lock: std::sync::Mutex<()>,
     workers: workers::WorkerSettings,
     profile: Option<Arc<ParquetProfile>>,
-    legacy_entities: bool,
-    precise_time: bool,
     mapping_catalog: Option<Arc<irmind_app::source_mapping::MappingCatalog>>,
 }
 
 impl ParquetStore {
-    pub fn open_precise(data_root: &Path) -> Result<Self, AppError> {
-        let mut store = Self::open(data_root)?;
-        store.precise_time = true;
-        Ok(store)
-    }
-
     pub fn open(data_root: &Path) -> Result<Self, AppError> {
         #[cfg(windows)]
         let data_root = &fs::canonicalize(data_root).map_err(storage)?;
@@ -92,8 +81,6 @@ impl ParquetStore {
             finish_lock: std::sync::Mutex::new(()),
             workers: workers::WorkerSettings::default(),
             profile: None,
-            legacy_entities: false,
-            precise_time: false,
             mapping_catalog: None,
         })
     }

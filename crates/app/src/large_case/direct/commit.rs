@@ -3,7 +3,7 @@ use super::{
     RejectedSource, invalid_manifest, rejection_events,
 };
 use crate::PreparedMappedGroup;
-use crate::{PreparedMappedIngest, PreparedSource};
+use crate::PreparedMappedIngest;
 use irmind_domain::{MappingProfileRecordV1, SourceManifestV2};
 pub(super) struct CommitContext<'a> {
     pub(super) id: &'a crate::CaseId,
@@ -85,16 +85,8 @@ impl LargeCaseUseCases<'_, '_> {
             {
                 return Err(invalid_manifest());
             }
-            let temporary = PreparedSource {
-                mapping: None,
-                manifest: source.manifest.clone(),
-                artifacts: vec![],
-                records: source.report.accepted,
-                format_sample_sha256: source.format_sample_sha256,
-                parse_report: source.report.clone(),
-            };
             let (kind, payload) =
-                self.source_event(&temporary, request.selections.get(&source.manifest.source))?;
+                self.source_event(source, request.selections.get(&source.manifest.source))?;
             sources.push(SourceManifestV2::decode(&payload).map_err(|_| invalid_manifest())?);
             events.push((AuditOrigin::System, kind, payload));
         }

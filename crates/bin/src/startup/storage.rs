@@ -4,7 +4,7 @@ use std::path::Path;
 
 /// Open the local repository before its registered mapping catalog is composed.
 pub(super) fn open(root: &Path) -> Result<LocalStore, AppError> {
-    LocalStore::open_precise(root)
+    LocalStore::open(root)
 }
 
 #[cfg(all(test, feature = "keystore-file", feature = "parser-json"))]
