@@ -1,11 +1,16 @@
 #![forbid(unsafe_code)]
-use irmind_app::{CancellationToken, LargeCaseStore};
+#[path = "source_pipeline/mod.rs"]
+mod source_pipeline;
+use irmind_app::{
+    CancellationToken, LargeCaseStore, MappedIngestRequest, PartitionLimits,
+    mapped_ingest::CommittedArtifacts,
+};
 use irmind_domain::CaseId;
-use irmind_infra::ParquetStore;
 use irmind_mod_parser_evtx::EvtxParser;
+use std::sync::Arc;
 use std::{
     fs::{self, File},
-    io::{Read as _, Write as _},
+    io::Write as _,
     path::Path,
     time::Instant,
 };
@@ -68,28 +73,33 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let sources = root.path().join("sources");
     fs::create_dir(&sources)?;
     let size = corpus(&sources.join("synthetic.evtx"))?;
-    let parser = EvtxParser::new(&helper, root.path());
+    let parser = Arc::new(EvtxParser::new(&helper, root.path()));
     if let Some(reason) = parser.unavailable_reason() {
         return Err(reason.into());
     }
-    let store = ParquetStore::open_precise(root.path())?;
+    let store = source_pipeline::store(root.path(), parser.clone())?;
+    let selected = source_pipeline::selection(parser.clone());
     let id = CaseId::parse("88888888-8888-8888-8888-888888888888")
         .map_err(|_| std::io::Error::other("invalid synthetic case id"))?;
     let start = Instant::now();
-    let prepared = store.prepare_local(
-        &id,
-        &sources,
-        "synthetic.evtx",
-        false,
-        &parser,
-        &CancellationToken::new(),
-    )?;
+    let prepared = store
+        .prepare_mapped_ingest(
+            MappedIngestRequest {
+                case_id: &id,
+                source_root: &sources,
+                relative_paths: &["synthetic.evtx".into()],
+                copy_original: false,
+                parser: &selected,
+                committed_artifacts: CommittedArtifacts::Slice(&[]),
+                limits: PartitionLimits::default(),
+            },
+            &CancellationToken::new(),
+        )?
+        .ok_or("mapped preparation unavailable")?;
     let seconds = start.elapsed().as_secs_f64();
-    let mut sample = [0; 128];
-    File::open(sources.join("synthetic.evtx"))?.read_exact(&mut sample)?;
     println!(
         "{}",
-        serde_json::json!({"profile":"release","source_bytes":size,"seconds":seconds,"mib_per_second":f64::from(u32::try_from(size)?)/1_048_576.0/seconds,"records":prepared.records,"artifacts":prepared.artifacts.len(),"scope":"authenticated source hash, isolated decode, normalization, precise Parquet conversion; signing excluded","corpus":"repeated synthetic Security mapping chunks"})
+        serde_json::json!({"profile":"release","source_bytes":size,"seconds":seconds,"mib_per_second":f64::from(u32::try_from(size)?)/1_048_576.0/seconds,"records":prepared.metadata().sources.iter().map(|source| source.report.accepted).sum::<usize>(),"artifacts":prepared.metadata().projections.len(),"scope":"authenticated source hash, isolated decode, source decoding, identified mapping and direct V3 conversion; signing excluded","corpus":"repeated synthetic Security mapping chunks"})
     );
     Ok(())
 }

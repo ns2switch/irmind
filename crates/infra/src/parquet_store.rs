@@ -34,8 +34,6 @@ mod store_bridge;
 mod time_cell;
 mod workers;
 mod writer;
-#[cfg(test)]
-use irmind_app::GraphRecord;
 use writer::{RecordRow, StagedArtifact};
 
 const READ_CHUNK: usize = 1024 * 1024;
@@ -343,5 +341,7 @@ impl<R: Read> Read for HashingReader<R> {
     }
 }
 
+#[cfg(test)]
+mod fixtures;
 #[cfg(test)]
 mod tests;

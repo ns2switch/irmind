@@ -30,7 +30,7 @@ fn row(n: usize) -> RecordRow {
 #[test]
 fn binary_merge_levels_keep_global_order_and_clean_every_run() {
     let dir = tempfile::tempdir().unwrap();
-    let store = ParquetStore::open_precise(dir.path()).unwrap();
+    let store = crate::parquet_store::fixtures::store(dir.path());
     let cancel = CancellationToken::new();
     let mut levels = Vec::new();
     for n in [9, 4, 8, 1, 2, 0, 7] {
@@ -62,7 +62,7 @@ fn binary_merge_levels_keep_global_order_and_clean_every_run() {
 #[test]
 fn cancellation_during_merge_drops_private_runs() {
     let dir = tempfile::tempdir().unwrap();
-    let store = ParquetStore::open_precise(dir.path()).unwrap();
+    let store = crate::parquet_store::fixtures::store(dir.path());
     let cancel = CancellationToken::new();
     let a = sorted_run(&store, &case(), vec![row(1)], &cancel).unwrap();
     let b = sorted_run(&store, &case(), vec![row(0)], &cancel).unwrap();
@@ -96,8 +96,8 @@ fn natural_runs_and_external_sort_produce_identical_normalized_bytes() {
             writeln!(bytes, "{record}").unwrap();
         }
         std::fs::write(inputs.path().join("events.json"), bytes).unwrap();
-        let store = ParquetStore::open_precise(a.path()).unwrap();
-        let reference = ParquetStore::open_precise(b.path()).unwrap();
+        let store = crate::parquet_store::fixtures::store(a.path());
+        let reference = crate::parquet_store::fixtures::store(b.path());
         let paths = ["events.json".into()];
         let cancel = CancellationToken::new();
         let mut source = stage_for_sort(&store, inputs.path(), &paths, &cancel);
@@ -149,7 +149,7 @@ fn stage_for_sort(
         .stage_source(
             &case(),
             inputs.remove(0),
-            &irmind_mod_parser_json::JsonParser,
+            &crate::parquet_store::fixtures::parser(),
             false,
             cancel,
         )
@@ -165,7 +165,7 @@ fn natural_run_integrity_errors_and_cancellation_fail_closed_and_clean_up() {
         b"{\"eventTime\":\"2026-11-01T00:00:02Z\"}\n{\"eventTime\":\"2026-11-01T00:00:01Z\"}\n",
     )
     .unwrap();
-    let store = ParquetStore::open_precise(root.path()).unwrap();
+    let store = crate::parquet_store::fixtures::store(root.path());
     let paths = ["events.json".into()];
     let cancel = CancellationToken::new();
     let mut source = stage_for_sort(&store, inputs.path(), &paths, &cancel);
@@ -203,7 +203,10 @@ fn independent_source_sorts_keep_identical_bytes_and_clean_runs_across_worker_ca
     let mut reference = None;
     for workers in [1, 2, 4] {
         let root = tempfile::tempdir().unwrap();
-        let store = crate::LocalStore::open_precise(root.path()).unwrap();
+        let catalog = crate::parquet_store::fixtures::store(root.path())
+            .mapping_catalog
+            .unwrap();
+        let store = crate::LocalStore::open_mapped(root.path(), catalog).unwrap();
         store.set_parallel_worker_limit(std::num::NonZeroU16::new(workers));
         let paths = ["events.json".into()];
         let mut sources = (0..4)

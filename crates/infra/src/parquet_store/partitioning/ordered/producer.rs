@@ -20,7 +20,7 @@ pub(in crate::parquet_store::partitioning) struct ParsedSource {
 }
 
 pub(super) enum ProducedSource {
-    Ordered(ParsedSource),
+    Ordered(Box<ParsedSource>),
     NeedsSort {
         path: String,
         hash: irmind_domain::EvidenceHash,
@@ -103,12 +103,12 @@ impl ParquetStore {
         }
         drop(rows);
         drop(stage);
-        Ok(ProducedSource::Ordered(ParsedSource {
+        Ok(ProducedSource::Ordered(Box::new(ParsedSource {
             mapping: mapping.ok_or_else(invalid_source)?,
             manifest: Self::source_manifest(&input.path, &metadata, size, value, copied)?,
             report: report.ok_or_else(invalid_source)?,
             sample_hash: irmind_app::sha256(&sample),
-        }))
+        })))
     }
 }
 

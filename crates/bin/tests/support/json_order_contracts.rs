@@ -96,34 +96,3 @@ fn json_ndjson_fast_path_keeps_released_lexical_extraction() {
 fn json_single_object_fast_path_keeps_released_lexical_extraction() {
     assert_fast_json_order("synthetic.json", true);
 }
-
-#[test]
-fn fast_single_object_reproduces_the_pre_fix_released_v1_event_hash() {
-    let root = tempfile::tempdir().unwrap();
-    let bytes = include_bytes!("../../../testkit/fixtures/artifact-v2-partitions/b.json");
-    fs::write(root.path().join("b.json"), bytes).unwrap();
-    let store = ParquetStore::open(root.path()).unwrap();
-    let id = CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
-    let prepared = store
-        .prepare_local(
-            &id,
-            root.path(),
-            "b.json",
-            false,
-            &JsonParser,
-            &CancellationToken::new(),
-        )
-        .unwrap();
-    let events = prepared
-        .artifacts
-        .iter()
-        .filter(|artifact| artifact.schema_version().starts_with("irmind-events-"))
-        .collect::<Vec<_>>();
-    assert_eq!(events.len(), 1);
-    // Captured before the correction with the released lexical dependency graph.
-    assert_eq!(
-        events[0].sha256().as_str(),
-        "87c852208cfe1a67633e3dd4489729f9e6728fb7dfdf35ddc261f7dd9c1f4dab"
-    );
-    assert_eq!(JsonParser.streaming_version(), "json-stream-v3");
-}

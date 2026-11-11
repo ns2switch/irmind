@@ -9,20 +9,20 @@ fn scoped_roles_and_pid_lifetimes_survive_compaction_and_reconstruction() {
     fs::write(root.path().join("a.json"),br#"{"eventTime":"2026-11-01T00:00:00.000001Z","eventName":"Login","source_ip":"203.0.113.1","destination_ip":"203.0.113.1","pid":42}"#).unwrap();
     fs::write(root.path().join("b.json"),br#"{"eventTime":"2026-11-01T00:00:00.000002Z","eventName":"Login","source_ip":"203.0.113.2","pid":42}"#).unwrap();
     let paths = ["a.json".into(), "b.json".into()];
-    let prepared = store
-        .prepare_local_batch(
-            irmind_app::LocalBatchRequest {
-                case_id: &id,
-                source_root: root.path(),
-                relative_paths: &paths,
-                copy_original: false,
-                parser: &mapped::Mapped,
-                committed_artifacts: &[],
-                limits: irmind_app::PartitionLimits::default(),
-            },
-            &CancellationToken::new(),
-        )
-        .unwrap();
+    let prepared = crate::parquet_store::fixtures::successive_sources(
+        &store,
+        irmind_app::MappedIngestRequest {
+            case_id: &id,
+            source_root: root.path(),
+            relative_paths: &paths,
+            copy_original: false,
+            parser: &crate::parquet_store::fixtures::parser(),
+            committed_artifacts: irmind_app::mapped_ingest::CommittedArtifacts::Slice(&[]),
+            limits: irmind_app::PartitionLimits::default(),
+        },
+        &CancellationToken::new(),
+    )
+    .unwrap();
     let names = prepared
         .iter()
         .zip(paths)
@@ -76,6 +76,10 @@ fn scoped_roles_and_pid_lifetimes_survive_compaction_and_reconstruction() {
         )
         .unwrap();
     assert!(path.contains("no co-observation path"), "{path}");
-    assert!(prepared.iter().all(|p| p.mapping.is_some()));
+    assert!(
+        prepared
+            .iter()
+            .all(|p| p.mapping.records() == p.records as u64)
+    );
     mapped::assert_rebuild(root.path(), &["a.json".into(), "b.json".into()], true);
 }

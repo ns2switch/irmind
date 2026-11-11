@@ -3,13 +3,11 @@ use super::*;
 #[test]
 #[ignore = "weekly evaluation requires the pinned external HuntEval source and private answers"]
 fn hunteval_reference_corpus() -> Result<(), String> {
-    for precise in [false, true] {
-        reference_corpus(precise)?;
-    }
+    reference_corpus()?;
     Ok(())
 }
 
-fn reference_corpus(precise: bool) -> Result<(), String> {
+fn reference_corpus() -> Result<(), String> {
     let source = root_from_environment().ok_or("IRMIND_HUNTEVAL_ROOT is required")?;
     let episodes = load_episodes(&source);
     let mut metrics = BTreeMap::new();
@@ -18,10 +16,7 @@ fn reference_corpus(precise: bool) -> Result<(), String> {
         let input = root.path().join("source");
         fs::create_dir(&input).unwrap();
         let names = stage_sources(&input, std::slice::from_ref(episode));
-        let mut local = open_source_store(&root.path().join("case")).unwrap();
-        if precise {
-            local.parquet = crate::ParquetStore::open_precise(&root.path().join("case")).unwrap();
-        }
+        let local = open_source_store(&root.path().join("case")).unwrap();
         let store = Arc::new(local);
         let signer = Arc::new(LocalSigner {
             key: SigningKey::from_bytes(&[75u8; 32]),
@@ -75,13 +70,6 @@ fn reference_corpus(precise: bool) -> Result<(), String> {
             &mut metrics,
         );
     }
-    report_metrics(
-        if precise {
-            "reference-v2"
-        } else {
-            "reference-v1"
-        },
-        &metrics,
-    );
+    report_metrics("current", &metrics);
     Ok(())
 }
