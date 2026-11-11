@@ -15,6 +15,11 @@ const WORKER_MIB: usize = 512;
 pub(super) struct WorkerSettings(AtomicU16);
 
 impl WorkerSettings {
+    pub(super) fn set_limit(&self, limit: Option<NonZeroU16>) {
+        self.0
+            .store(limit.map_or(0, NonZeroU16::get), Ordering::Relaxed);
+    }
+
     pub(super) fn count(&self) -> usize {
         let available = std::thread::available_parallelism().map_or(1, usize::from);
         let configured = NonZeroU16::new(self.0.load(Ordering::Relaxed));
@@ -25,10 +30,7 @@ impl WorkerSettings {
 impl LocalStore {
     /// Set the execution cap from the verified session configuration.
     pub fn set_parallel_worker_limit(&self, limit: Option<NonZeroU16>) {
-        self.parquet
-            .workers
-            .0
-            .store(limit.map_or(0, NonZeroU16::get), Ordering::Relaxed);
+        self.parquet.workers.set_limit(limit);
     }
 }
 
