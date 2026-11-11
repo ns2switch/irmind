@@ -2500,6 +2500,7 @@ dependencies = [
  "irmind-mod-mapping-network",
  "irmind-mod-mapping-ocsf",
  "irmind-mod-mapping-syslog",
+ "irmind-mod-mapping-udm",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
@@ -2514,6 +2515,7 @@ dependencies = [
  "irmind-mod-parser-syslog",
  "irmind-mod-parser-velociraptor",
  "irmind-mod-parser-zeek",
+ "irmind-mod-siem-chronicle",
  "irmind-mod-siem-elastic",
  "irmind-mod-siem-splunk",
  "irmind-mod-storage-object",
@@ -2933,6 +2935,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-udm"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-siem-chronicle",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-parser-chainsaw"
 version = "0.1.0"
 dependencies = [
@@ -3094,6 +3108,30 @@ dependencies = [
  "irmind-testkit",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-siem-chronicle"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "ed25519-dalek",
+ "irmind-app",
+ "irmind-domain",
+ "irmind-http",
+ "irmind-infra",
+ "irmind-mod-mapping-udm",
+ "irmind-mod-parser-json",
+ "irmind-security",
+ "irmind-testkit",
+ "reqwest",
+ "ring",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "zeroize",
 ]
 
 [[package]]

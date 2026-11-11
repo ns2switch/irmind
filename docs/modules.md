@@ -327,3 +327,12 @@ Official references: [search API](https://www.elastic.co/docs/api/doc/elasticsea
 **Limits:** At most 20 events or aggregation buckets, a 24-hour window, a 45-second HTTP timeout and a 5 MB response. Redirects are disabled. Provider truncation markers remain in the signed response. Account-scoped mode does not read detections through an API that cannot enforce an account filter. Query support is limited to the same field comparisons and aggregations as the other SIEM connectors. This API is pre-GA and may change.
 
 The implementation follows the official [UDM search method](https://docs.cloud.google.com/chronicle/docs/reference/rest/v1alpha/projects.locations.instances/udmSearch). Results are untrusted evidence; generated query values are escaped, and configuration errors never include the service-account key.
+
+Returned UDM events keep their original fields, precise timestamp and result
+ordinal. The separate `mapping-udm` module validates ProtoJSON values and maps
+only documented event types and noun roles. It does not infer authentication
+failure from a `BLOCK` security action. Multiple IPs remain searchable in the
+extraction projection; a field that cannot fit the scalar typed context carries
+a coverage diagnostic. The [UDM field reference](https://docs.cloud.google.com/chronicle/docs/reference/udm-field-list)
+describes these repeated fields. Stateless decoding and mapping remain available
+for offline case verification after disabling the remote connector.

@@ -14,7 +14,7 @@ pub enum AdapterPolicyError {
     #[error("invalid structured Google SecOps query or mismatched source")]
     InvalidChronicleQuery,
     #[error(
-        "Google SecOps cannot restrict detection reads by event account; configure an explicitly authorized instance scope to read detections"
+        "Google SecOps detection reads are unavailable in event-account scope: this API cannot enforce that account filter"
     )]
     ChronicleDetectionScopeUnsupported,
 

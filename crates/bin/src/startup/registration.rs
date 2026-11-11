@@ -389,13 +389,6 @@ fn register_security_products(
     registry: &mut ModuleRegistry,
     config_issues: &mut BTreeMap<&'static str, String>,
 ) -> Result<()> {
-    let _ = (
-        &secrets,
-        &registry,
-        &config_issues,
-        saved,
-        allow_environment,
-    );
     register_chronicle(
         cli,
         saved,
