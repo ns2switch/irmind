@@ -1463,3 +1463,27 @@ The [isolated EVTX trial](https://github.com/ns2switch/irmind/actions/runs/42926
 | Windows | All available, within the cap | 87.19 | 157.1 / 6.9 |
 
 No limits were reached. Every Windows run used one network witness. The trial preserved frame bytes and passed the native containment tests. The Windows regression and the small macOS difference do not justify enabling the trial for shipped helpers. Linux remains sequential under its existing seccomp policy.
+
+The [four-CPU Windows release sweep](https://github.com/ns2switch/irmind/actions/runs/42929482449) used a single 4 GiB NDJSON file (2,652,851 records). Each run passed normal disk preflight, verified the artifacts, and wrote 194,200,266 artifact bytes.
+
+| Scheduling | Ingest wall (s) | Peak working set (MiB) |
+| --- | ---: | ---: |
+| Reference, sequential record decoder | 94.292 | 65.5 |
+| Candidate, one worker | 90.144 | 66.7 |
+| Candidate, automatic (three) | 86.635 | 66.4 |
+| Candidate, four workers | 87.076 | 70.9 |
+
+Four workers reduced wall time by 7.7% against the reference. Automatic and four-worker runs differ by less than half a second in this sweep; this does not establish a ranking.
+
+### Parallel completion of independent partition writers
+
+The [paired endpoint release sweep](https://github.com/ns2switch/irmind/actions/runs/42928749774) used 1,076,450,200 bytes of chronological input on four logical CPUs. It moved final row-group compression, sync and hashing to bounded workers after file boundaries were fixed. Appends and eviction still follow the original recipe.
+
+| Scheduling | Ingest wall (s) | Peak RSS (MiB) | Slowest query p95 (s) |
+| --- | ---: | ---: | ---: |
+| Reference, four workers | 39.516 | 278.2 | 0.426 |
+| Candidate, one worker | 55.753 | 250.7 | 1.053 |
+| Candidate, automatic (three) | 42.883 | 266.6 | 0.543 |
+| Candidate, four workers | 38.712 | 273.7 | 0.424 |
+
+All settings wrote 196,741,347 artifact bytes. The four-worker candidate was 2.0% faster than the same-runner reference. Candidate finalization took 0.639 s at one worker and 0.293 s at four. Single runs per setting; the result does not establish an improvement for every partition distribution.
