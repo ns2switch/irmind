@@ -4,7 +4,7 @@ use crate::parquet_store::ParquetProfile;
 use irmind_app::{LargeCaseUseCases, SourceDecoder as _};
 use std::time::Instant;
 mod corpus;
-mod custody;
+use super::benchmark_custody as custody;
 mod mapped;
 mod measurements;
 mod scenario;

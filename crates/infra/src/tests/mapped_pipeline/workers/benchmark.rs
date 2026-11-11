@@ -15,7 +15,13 @@ fn benchmark_single_ndjson_release() -> Result<(), &'static str> {
     fs::create_dir(&sources).unwrap();
     let name = "synthetic.ndjson";
     let records = write_ndjson(&sources.join(name), size);
-    let (store, engine, catalog) = fixture(&root.path().join("case"));
+    let ProfiledFixture {
+        store,
+        engine,
+        catalog,
+        profile,
+        custody,
+    } = profiled_fixture(&root.path().join("case"));
     let cap = std::env::var("IRMIND_BENCH_WORKERS")
         .ok()
         .map(|value| value.parse::<NonZeroU16>().unwrap());
@@ -32,11 +38,14 @@ fn benchmark_single_ndjson_release() -> Result<(), &'static str> {
         parser: &parser,
     };
     let cancel = CancellationToken::new();
+    custody.reset();
     let started = Instant::now();
     ingest
         .ingest_local_batch(&case.id, &sources, &[name.into()], false, &cancel)
         .unwrap();
     let seconds = started.elapsed().as_secs_f64();
+    report_phases(&profile);
+    custody.report();
     let entries = store.entries(&case.id).unwrap();
     let index = irmind_app::artifact_catalog(&entries).unwrap();
     let rows = index
@@ -82,4 +91,63 @@ fn write_ndjson(path: &Path, size: u64) -> u64 {
     writer.flush().unwrap();
     assert_eq!(fs::metadata(path).unwrap().len(), size);
     records
+}
+
+struct ProfiledFixture {
+    store: Arc<LocalStore>,
+    engine: Engine<'static>,
+    catalog: Arc<MappingCatalog>,
+    profile: Arc<crate::parquet_store::ParquetProfile>,
+    custody: Arc<crate::tests::benchmark_custody::Timings>,
+}
+fn profiled_fixture(root: &Path) -> ProfiledFixture {
+    let catalog = Arc::new(
+        MappingCatalog::freeze(
+            vec![Arc::new(JsonSourceDecoder)],
+            vec![Arc::new(JsonCompatibilityMapping::new().unwrap())],
+        )
+        .unwrap(),
+    );
+    let profile = Arc::new(crate::parquet_store::ParquetProfile::default());
+    let mut local = LocalStore::open_mapped(root, catalog.clone()).unwrap();
+    local.parquet.profile = Some(profile.clone());
+    let store = Arc::new(local);
+    let signer = Arc::new(LocalSigner {
+        key: SigningKey::from_bytes(&[88; 32]),
+        actor: Actor::Analyst,
+    });
+    let mut ports = EnginePorts::new(
+        store.clone(),
+        store.clone(),
+        store.clone(),
+        store.clone(),
+        CryptoPorts::new(
+            signer.clone(),
+            Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+        ),
+        Arc::new(MandatoryGuard::new().unwrap()),
+        Arc::new(JsonParser),
+    );
+    let custody = crate::tests::benchmark_custody::attach(&mut ports);
+    let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock)).unwrap();
+    ProfiledFixture {
+        store,
+        engine,
+        catalog,
+        profile,
+        custody,
+    }
+}
+fn report_phases(profile: &crate::parquet_store::ParquetProfile) {
+    let [hash, row, parquet, _, _] = profile.snapshot().map(|v| v.as_secs_f64());
+    let [producer, consumer, writes, encode, sync, artifact_hash] =
+        profile.concurrency_snapshot().map(|v| v.as_secs_f64());
+    let mapping = profile.mapping_snapshot().map(|v| v.as_secs_f64());
+    println!(
+        "WORKER_PHASE hash_read_seconds={hash:.6} row_preparation_seconds={row:.6} canonical_write_seconds={parquet:.6} parquet_encode_and_io_seconds={encode:.6} file_write_seconds={writes:.6} file_sync_seconds={sync:.6} artifact_hash_seconds={artifact_hash:.6} producer_queue_wait_seconds={producer:.6} consumer_queue_wait_seconds={consumer:.6} validate_map_seconds={:.6} projection_seconds={:.6} input_commit_seconds={:.6}",
+        mapping[0], mapping[1], mapping[2]
+    );
+    println!(
+        "WORKER_PHASE_METHOD cumulative stage wall timers can overlap; file writes are included in canonical writes; queue waits are elapsed off-CPU waits, not decoding time"
+    );
 }

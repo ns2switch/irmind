@@ -2,7 +2,7 @@
 use super::*;
 use irmind_app::{AuditLog, CaseLock, CaseMutation, SignedOperation, Signer, Verifier};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Default)]
 pub(super) struct Timings {

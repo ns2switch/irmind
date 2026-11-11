@@ -43,7 +43,9 @@ impl Partition {
     }
 }
 
+mod profiled_file;
 mod row;
+use profiled_file::ProfiledFile;
 pub(super) use row::RecordRow;
 pub(super) struct StagedArtifact {
     pub rows: Option<u64>,
@@ -55,8 +57,9 @@ pub(super) struct ArtifactSink {
     temporary: Option<PathBuf>,
     relative_path: String,
     partition: Partition,
-    writer: Option<ArrowWriter<File>>,
+    writer: Option<ArrowWriter<ProfiledFile>>,
     kind: ArtifactKind,
+    profile: Option<Arc<super::ParquetProfile>>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
@@ -101,6 +104,7 @@ impl ArtifactSink {
         partition: Partition,
         batch: &RecordBatch,
         kind: ArtifactKind,
+        profile: Option<Arc<super::ParquetProfile>>,
     ) -> Result<Self, AppError> {
         let (part, name) = Self::location(&partition, hash, kind)?;
         let dir = case_dir.join(&part);
@@ -126,14 +130,19 @@ impl ArtifactSink {
                     .set_column_bloom_filter_fpp(ColumnPath::from("entity_value"), 0.01);
             }
             let properties = properties.build();
-            let writer =
-                ArrowWriter::try_new(file, batch.schema(), Some(properties)).map_err(storage)?;
+            let writer = ArrowWriter::try_new(
+                ProfiledFile::new(file, profile.clone()),
+                batch.schema(),
+                Some(properties),
+            )
+            .map_err(storage)?;
             Ok(Self {
                 temporary: Some(temporary.clone()),
                 relative_path: format!("{part}/{name}"),
                 partition,
                 writer: Some(writer),
                 kind,
+                profile,
             })
         })();
         if result.is_err() {
@@ -174,10 +183,14 @@ impl ArtifactSink {
     }
 
     fn append(&mut self, batch: &RecordBatch) -> Result<(), AppError> {
+        let started = self.profile.as_ref().map(|_| std::time::Instant::now());
         let writer = self.writer.as_mut().ok_or_else(invalid_source)?;
         writer.write(batch).map_err(storage)?;
         if writer.memory_size() >= super::BATCH_BYTES {
             writer.flush().map_err(storage)?;
+        }
+        if let (Some(profile), Some(started)) = (&self.profile, started) {
+            profile.record_concurrency(super::profile::ConcurrencyPhase::Encode, started.elapsed());
         }
         Ok(())
     }
@@ -189,7 +202,11 @@ impl ArtifactSink {
         cancel: &CancellationToken,
     ) -> Result<StagedArtifact, AppError> {
         let writer = self.writer.take().ok_or_else(invalid_source)?;
+        let started = self.profile.as_ref().map(|_| std::time::Instant::now());
         let metadata = writer.close().map_err(storage)?;
+        if let (Some(profile), Some(started)) = (&self.profile, started) {
+            profile.record_concurrency(super::profile::ConcurrencyPhase::Encode, started.elapsed());
+        }
         let temporary = self.temporary.as_ref().ok_or_else(invalid_source)?;
         // Windows FlushFileBuffers requires a writable handle.
         let mut file = OpenOptions::new()
@@ -197,8 +214,19 @@ impl ArtifactSink {
             .write(true)
             .open(temporary)
             .map_err(storage)?;
+        let started = self.profile.as_ref().map(|_| std::time::Instant::now());
         file.sync_all().map_err(storage)?;
+        if let (Some(profile), Some(started)) = (&self.profile, started) {
+            profile.record_concurrency(super::profile::ConcurrencyPhase::Sync, started.elapsed());
+        }
+        let started = self.profile.as_ref().map(|_| std::time::Instant::now());
         let (digest, size) = ParquetStore::hash_reader(&mut file, cancel)?;
+        if let (Some(profile), Some(started)) = (&self.profile, started) {
+            profile.record_concurrency(
+                super::profile::ConcurrencyPhase::ArtifactHash,
+                started.elapsed(),
+            );
+        }
         let manifest = precise::manifest(&self, hash, parser, size, &digest)?;
         Ok(StagedArtifact {
             rows: Some(u64::try_from(metadata.file_metadata().num_rows()).map_err(storage)?),
