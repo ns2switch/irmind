@@ -48,6 +48,9 @@ fn disordered_sources_keep_parallel_authenticated_fallback_parsing() {
         ..Default::default()
     });
     let store = store(data.path(), parser.clone());
+    // This rendezvous exercises two concurrent producers, even on two-core
+    // runners where the normal leave-one-core-free default is sequential.
+    store.workers.set_limit(std::num::NonZeroU16::new(2));
     let token = CancellationToken::new();
     let id = case();
     let paths = ["a.json".into(), "b.json".into()];
