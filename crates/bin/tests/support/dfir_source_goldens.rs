@@ -1,7 +1,7 @@
 use super::*;
 use irmind_app::SourceDecoder;
 
-fn fixtures() -> Vec<(&'static str, Arc<dyn SourceDecoder>, &'static [u8])> {
+pub(super) fn fixtures() -> Vec<(&'static str, Arc<dyn SourceDecoder>, &'static [u8])> {
     vec![
         (
             "parser-velociraptor",
