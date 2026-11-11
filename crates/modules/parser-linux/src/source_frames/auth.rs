@@ -20,7 +20,7 @@ pub(super) fn decode(
             return Err(AppError::ParserTimeContextRequired {
                 source_name: meta.source.reference().into(),
                 requirement: crate::time::requirement(
-                    &crate::LinuxParser::default(),
+                    &crate::LinuxParser,
                     meta.source.reference(),
                     line.as_bytes(),
                 )?

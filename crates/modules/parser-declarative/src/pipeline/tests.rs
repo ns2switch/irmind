@@ -53,28 +53,13 @@ fn all_formats_preserve_extraction_with_independent_original_source_fields() {
     for (definition, bytes) in CASES {
         let pipeline = crate::DeclarativeCompiler.compile(definition).unwrap();
         let (report, rows) = decode(&pipeline, bytes);
-        let mut historical = Vec::new();
-        let old = crate::DeclarativeParser::from_toml(definition)
-            .unwrap()
-            .parse_source(
-                "synthetic.log",
-                &mut Cursor::new(bytes),
-                irmind_app::sha256(bytes),
-                &CancellationToken::new(),
-                &mut |row| {
-                    row.inspect(|r| historical.push(r.clone()));
-                    Ok(())
-                },
-            )
-            .unwrap();
-        assert_eq!(
-            (report.accepted, report.rejected),
-            (old.accepted, old.rejected)
-        );
+        assert_eq!(report.rejected, 0);
         assert!(!rows.is_empty());
-        for (source, expected) in rows.iter().zip(historical) {
+        for source in &rows {
             let output = pipeline.extraction_mapper().map(source).unwrap();
-            assert_eq!(output.record().indexed.record, expected);
+            assert!(!output.record().indexed.record.at.is_empty());
+            assert!(!output.record().indexed.record.entities.is_empty());
+            assert_eq!(output.record().indexed.time, source.timestamp());
             assert_eq!(output.record().common.event().categories().bits(), 0);
             assert_eq!(
                 source.origin().parser(),

@@ -87,7 +87,7 @@ pub use custody::{SealPreview, export_case, export_case_v6, verify_export, verif
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::{GraphRecord, GraphRelation, IndexedGraphRecord, TimelineEvent};
 mod indexed_parser;
-pub use indexed_parser::{IndexedProjection, indexed_rfc3339, parse_indexed_report};
+pub use indexed_parser::indexed_rfc3339;
 pub use keystore::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
 pub use large_case::{LargeCaseUseCases, ParserSelection, SourceCheckMode, SourceCheckReport};
 mod partition_preparation;

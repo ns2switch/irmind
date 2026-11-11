@@ -439,6 +439,6 @@ fn current_object_pipeline(root: &std::path::Path) -> (Arc<LocalStore>, ModuleRe
 fn current_object_parsers(registry: &ModuleRegistry) -> irmind_app::modules::ParserCatalog {
     registry
         .parser_catalog()
-        .with_experimental_parser(irmind_mod_parser_json::source_log_parser())
+        .with_source_parser(irmind_mod_parser_json::source_log_parser())
         .unwrap()
 }

@@ -19,8 +19,8 @@ fn signed_per_file_contexts_rebuild_independently_and_old_manifests_keep_their_b
     let sources = root.path().join("sources");
     fs::create_dir(&sources).unwrap();
     let store = Arc::new(current_sources::open(&root.path().join("case")));
-    let parser = Arc::new(SyslogParser::default());
-    let engine = engine(&store, &parser);
+    let _parser = Arc::new(SyslogParser);
+    let engine = engine(&store);
     let case = engine.create_case("Per-ingestion time", "local").unwrap();
     let catalog = catalog();
     for (file, year) in [("a.log", 2025), ("b.log", 2027)] {
@@ -110,9 +110,9 @@ fn missing_context_is_audited_and_late_detection_rolls_back_the_source() {
     let sources = root.path().join("sources");
     fs::create_dir(&sources).unwrap();
     let store = Arc::new(current_sources::open(&root.path().join("case")));
-    let parser = Arc::new(SyslogParser::default());
+    let parser = Arc::new(SyslogParser);
     let source_parser = irmind_mod_parser_syslog::source_log_parser();
-    let engine = engine(&store, &parser);
+    let engine = engine(&store);
     let case = engine.create_case("No inferred defaults", "local").unwrap();
     let catalog = catalog();
     let error = catalog
@@ -168,9 +168,9 @@ fn hints_come_only_from_verified_records_of_the_same_host_and_are_not_defaults()
     let sources = root.path().join("sources");
     fs::create_dir(&sources).unwrap();
     let store = Arc::new(current_sources::open(&root.path().join("case")));
-    let parser = Arc::new(SyslogParser::default());
+    let parser = Arc::new(SyslogParser);
     let source_parser = irmind_mod_parser_syslog::source_log_parser();
-    let engine = engine(&store, &parser);
+    let engine = engine(&store);
     let case = engine.create_case("Temporal hints", "local").unwrap();
     let catalog = catalog();
     let bytes = b"<34>1 2028-01-01T00:00:01+02:00 synthetic-host app 1 ID - modern\n";
@@ -253,8 +253,8 @@ fn previously_signed_global_settings_can_be_removed_explicitly_without_rewriting
     };
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(current_sources::open(&root.path().join("case")));
-    let parser = Arc::new(SyslogParser::default());
-    let engine = engine(&store, &parser);
+    let _parser = Arc::new(SyslogParser);
+    let engine = engine(&store);
     let config = irmind_infra::TomlConfigurationStore::new(root.path());
     for (field, value) in [("LEGACY_YEAR", "2026"), ("LEGACY_UTC_OFFSET_MINUTES", "60")] {
         engine

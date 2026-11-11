@@ -1,6 +1,6 @@
 use super::*;
 use irmind_app::{
-    CancellationToken, LogParser, SourceDecoder,
+    CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
 use irmind_domain::EventOutcome;
@@ -9,7 +9,6 @@ struct Fixture {
     name: &'static str,
     bytes: &'static [u8],
     decoder: Arc<dyn SourceDecoder>,
-    legacy: Arc<dyn LogParser>,
 }
 fn fixtures() -> Vec<Fixture> {
     vec![
@@ -18,14 +17,12 @@ fn fixtures() -> Vec<Fixture> {
             name: "conn.log",
             bytes: include_bytes!("../../../testkit/fixtures/parser-zeek/source/events.log"),
             decoder: Arc::new(irmind_mod_parser_zeek::ZeekSourceDecoder),
-            legacy: Arc::new(irmind_mod_parser_zeek::ZeekParser),
         },
         Fixture {
             parser: "parser-suricata",
             name: "eve.jsonl",
             bytes: include_bytes!("../../../testkit/fixtures/parser-suricata/source/eve.jsonl"),
             decoder: Arc::new(irmind_mod_parser_suricata::SuricataSourceDecoder),
-            legacy: Arc::new(irmind_mod_parser_suricata::SuricataParser),
         },
     ]
 }
@@ -69,29 +66,16 @@ fn every_decoder_and_extraction_module_passes_the_shared_contract() {
 #[test]
 fn original_aliases_events_time_and_relations_survive_without_classifying() {
     for f in fixtures() {
-        let mut legacy = Vec::new();
-        f.legacy
-            .parse_indexed_reader_report(
-                f.name,
-                &mut std::io::Cursor::new(f.bytes),
-                irmind_app::sha256(f.bytes),
-                &CancellationToken::new(),
-                &mut |row| {
-                    row.inspect(|r| legacy.push(r.clone()));
-                    Ok(())
-                },
-            )
-            .unwrap();
         let (report, sources) = decoded(&f, f.bytes);
         assert_eq!((report.accepted, report.rejected), (2, 0));
         let mapper = NetworkExtractionMapping::new(f.parser).unwrap();
-        for (source, old) in sources.iter().zip(legacy) {
+        for source in &sources {
             let out = mapper.map(source).unwrap();
             let graph = &out.record().indexed;
-            assert_eq!(graph.record.entities, old.record.entities, "{}", f.parser);
-            assert_eq!(graph.record.event, old.record.event, "{}", f.parser);
-            assert_eq!(graph.record.relations, old.record.relations, "{}", f.parser);
-            assert_eq!(graph.time, old.time, "{}", f.parser);
+            assert!(!graph.record.entities.is_empty(), "{}", f.parser);
+            assert!(!graph.record.event.is_empty(), "{}", f.parser);
+            assert_eq!(graph.time, source.timestamp(), "{}", f.parser);
+            assert_eq!(graph.source_offset, source.origin().offset());
             assert_eq!(out.record().common.event().categories().bits(), 0);
             assert_eq!(out.record().common.event().outcome(), EventOutcome::Unknown);
             assert!(out.record().common.observations().values().is_empty());
@@ -121,7 +105,6 @@ fn zeek_json_preserves_decimal_microseconds_custom_fields_and_roles_are_not_infe
         name: "dns.jsonl",
         bytes,
         decoder: Arc::new(irmind_mod_parser_zeek::ZeekSourceDecoder),
-        legacy: Arc::new(irmind_mod_parser_zeek::ZeekParser),
     };
     let (report, rows) = decoded(&f, bytes);
     assert_eq!((report.accepted, report.rejected), (1, 0));

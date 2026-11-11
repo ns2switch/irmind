@@ -9,11 +9,10 @@ use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,
     LargeCaseUseCases, LogParser as _, ParserSelection, Signer, StreamingEventParser,
-    modules::{ModuleConfig, ModuleRegistry},
 };
 use irmind_domain::{Actor, AuditEventKind, ExecutionMode, ParserSelectionMode};
 use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
-use irmind_mod_parser_syslog::{LegacyTimestamp, SyslogParser};
+use irmind_mod_parser_syslog::SyslogParser;
 use std::{collections::BTreeMap, fs, sync::Arc};
 
 struct SyntheticSigner(SigningKey);
@@ -29,7 +28,7 @@ impl Signer for SyntheticSigner {
     }
 }
 
-fn engine(store: &Arc<LocalStore>, parser: &Arc<SyslogParser>) -> Engine<'static> {
+fn engine(store: &Arc<LocalStore>) -> Engine<'static> {
     let signer = Arc::new(SyntheticSigner(SigningKey::from_bytes(&[35; 32])));
     Engine::new(
         EnginePorts::new(
@@ -42,7 +41,7 @@ fn engine(store: &Arc<LocalStore>, parser: &Arc<SyslogParser>) -> Engine<'static
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
-            parser.clone(),
+            current_sources::event_parser(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -58,9 +57,9 @@ fn detected_syslog_is_signed_queryable_and_reproducible_without_expected_answers
     let bytes = include_bytes!("../../testkit/fixtures/parser-syslog/source/events.log");
     fs::write(sources.join("events.log"), bytes).unwrap();
     let store = Arc::new(current_sources::open(&root.path().join("case")));
-    let parser = Arc::new(SyslogParser::default());
+    let parser = Arc::new(SyslogParser);
     let source_parser = irmind_mod_parser_syslog::source_log_parser();
-    let engine = engine(&store, &parser);
+    let engine = engine(&store);
     let case = engine.create_case("Synthetic syslog", "local").unwrap();
     let selected = BTreeMap::from([(
         "events.log".to_owned(),
@@ -130,31 +129,6 @@ fn detected_syslog_is_signed_queryable_and_reproducible_without_expected_answers
 }
 
 #[test]
-fn signed_context_resolves_after_the_active_year_changes() {
-    let old = SyslogParser::new(Some(LegacyTimestamp::new(2026, 60).unwrap()));
-    let version = old.identity().version.to_owned();
-    let mut registry = ModuleRegistry::new();
-    registry
-        .register(
-            Box::new(SyslogParser::new(Some(
-                LegacyTimestamp::new(2027, 0).unwrap(),
-            ))),
-            &ModuleConfig::new(),
-        )
-        .unwrap();
-    let catalog = registry.parser_catalog().with_resolver(Arc::new(
-        irmind_mod_parser_syslog::HistoricalResolver::new(None),
-    ));
-    let restored = catalog.get_version("parser-syslog", &version).unwrap();
-    assert_eq!(restored.timestamp_context(), old.timestamp_context());
-    assert!(
-        catalog
-            .get_version("parser-syslog", "syslog-v1:year=02026;offset=60")
-            .is_err()
-    );
-}
-
-#[test]
 #[ignore = "manual 1 GiB end-to-end parser benchmark"]
 fn syslog_one_gib_ingestion_throughput() -> Result<(), &'static str> {
     use std::io::{Read as _, Write as _};
@@ -181,9 +155,9 @@ fn syslog_one_gib_ingestion_throughput() -> Result<(), &'static str> {
     output.flush().unwrap();
     drop(output);
     let store = Arc::new(current_sources::open(&root.path().join("case")));
-    let parser = Arc::new(SyslogParser::default());
+    let parser = Arc::new(SyslogParser);
     let source_parser = irmind_mod_parser_syslog::source_log_parser();
-    let engine = engine(&store, &parser);
+    let engine = engine(&store);
     let case = engine
         .create_case("Synthetic syslog benchmark", "local")
         .unwrap();
@@ -249,9 +223,9 @@ fn corrupt_gzip_never_commits_a_partial_custody_batch() {
         .write_all(&bytes)
         .unwrap();
     let store = Arc::new(current_sources::open(&root.path().join("case")));
-    let parser = Arc::new(SyslogParser::default());
+    let parser = Arc::new(SyslogParser);
     let source_parser = irmind_mod_parser_syslog::source_log_parser();
-    let engine = engine(&store, &parser);
+    let engine = engine(&store);
     let case = engine
         .create_case("Synthetic corrupt gzip", "local")
         .unwrap();

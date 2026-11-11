@@ -96,9 +96,14 @@ fn declarative_formats_pass_the_common_streaming_contract() {
     ] {
         irmind_testkit::run_log_parser_contract(
             &DeclarativeParser::from_toml(definition).unwrap(),
+            crate::pipeline::compile(definition)
+                .unwrap()
+                .decoder()
+                .as_ref(),
             source,
             fixture,
             expected,
+            None,
         )
         .unwrap();
     }

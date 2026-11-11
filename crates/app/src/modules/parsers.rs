@@ -1,9 +1,11 @@
 use crate::{
-    AppError, CancellationToken, GraphRecord, LogParser, ParserConfidence, ParserIdentity,
-    SignedEntry, StreamingEventParser, Tainted,
+    AppError, LogParser, ParserConfidence, ParserIdentity, SignedEntry, StreamingEventParser,
 };
-use irmind_domain::{AuditEventKind, SourceManifestV1, SourceManifestV2};
-use std::{collections::BTreeMap, io::Read, sync::Arc};
+use irmind_domain::{AuditEventKind, SourceManifestV2};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 /// Local resolution of an immutable parser version already approved in the case.
 pub trait ParserResolver: Send + Sync {
@@ -27,24 +29,21 @@ pub enum ParserChoice {
 pub struct ParserCatalog {
     pub(super) parsers: BTreeMap<String, Arc<dyn LogParser>>,
     pub(super) unavailable: BTreeMap<String, String>,
-    pub(super) experimental: BTreeMap<String, Arc<dyn LogParser>>,
+    pub(super) source_selected: BTreeSet<String>,
     pub(super) resolver: Option<Arc<dyn ParserResolver>>,
 }
 
 impl ParserCatalog {
-    /// Prefer a recognized raw decoder only for new, explicitly experimental ingestion.
-    pub fn with_experimental_parser(
-        mut self,
-        parser: Arc<dyn LogParser>,
-    ) -> Result<Self, AppError> {
+    /// Bind the detector to its sole current original-field decoder identity.
+    pub fn with_source_parser(mut self, parser: Arc<dyn LogParser>) -> Result<Self, AppError> {
         let id = parser.identity().name.to_owned();
         self.ensure_available(&id)?;
-        if !self.parsers.contains_key(&id) || self.experimental.contains_key(&id) {
+        if !self.parsers.contains_key(&id) || !self.source_selected.insert(id.clone()) {
             return Err(AppError::Policy(
-                "invalid experimental parser registration".into(),
+                "invalid or duplicate source parser registration".into(),
             ));
         }
-        self.experimental.insert(id, parser);
+        self.parsers.insert(id, parser);
         Ok(self)
     }
 
@@ -74,11 +73,6 @@ impl ParserCatalog {
 
     pub fn get_version(&self, id: &str, version: &str) -> Result<Arc<dyn LogParser>, AppError> {
         self.ensure_available(id)?;
-        if let Some(parser) = self.experimental.get(id)
-            && parser.identity().version == version
-        {
-            return Ok(parser.clone());
-        }
         let parser = match self.get(id) {
             Ok(parser) if parser.identity().version == version => parser,
             _ => self
@@ -117,42 +111,15 @@ impl ParserCatalog {
         self.parsers
             .iter()
             .filter(|(id, _)| !self.unavailable.contains_key(id.as_str()))
-            .map(|(id, parser)| {
-                let active = self.experimental.get(id).unwrap_or(parser);
-                (id.clone(), active.identity().version.to_owned())
-            })
+            .map(|(id, parser)| (id.clone(), parser.identity().version.to_owned()))
             .collect()
     }
 
-    /// Rebuild a case with exactly the parser and version recorded for each
-    /// source. Old V1 manifests used the JSON parser exclusively.
+    /// Rebuild with the decoder identity recorded in each current source manifest.
     pub fn rebuild_router(&self, entries: &[SignedEntry]) -> Result<RebuildParser, AppError> {
         let mut sources = BTreeMap::new();
         for entry in entries {
             let (source, id, version) = match entry.kind {
-                AuditEventKind::GraphIndexed => {
-                    let hash = entry
-                        .evidence
-                        .as_deref()
-                        .ok_or(AppError::InvalidChain(entry.seq))?;
-                    if sources.contains_key(&format!("legacy/{hash}.json")) {
-                        continue;
-                    }
-                    (
-                        format!("legacy/{hash}.json"),
-                        "parser-json".to_owned(),
-                        "json-stream-v2".to_owned(),
-                    )
-                }
-                AuditEventKind::SourceManifestV1 => {
-                    let manifest = SourceManifestV1::decode(&entry.payload)
-                        .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                    (
-                        manifest.source,
-                        "parser-json".to_owned(),
-                        "json-stream-v2".to_owned(),
-                    )
-                }
                 AuditEventKind::SourceManifestV2 => {
                     let manifest = SourceManifestV2::decode(&entry.payload)
                         .map_err(|_| AppError::InvalidChain(entry.seq))?;
@@ -185,46 +152,6 @@ impl StreamingEventParser for RebuildParser {
             .source_parallelism(source)
     }
 
-    fn partition_profile_for_source(
-        &self,
-        source: &str,
-        record: &GraphRecord,
-    ) -> Result<crate::PartitionProfile, AppError> {
-        self.sources
-            .get(source)
-            .ok_or(AppError::Fixed(
-                crate::FixedAppError::PolicyMissingSignedParserSelection,
-            ))?
-            .partition_profile_for_source(source, record)
-    }
-
-    fn parse_indexed_reader_report(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<crate::IndexedGraphRecord>) -> Result<(), AppError>,
-    ) -> Result<crate::ParseReport, AppError> {
-        self.sources
-            .get(source)
-            .ok_or_else(|| AppError::Policy("source has no signed parser selection".into()))?
-            .parse_indexed_reader_report(source, reader, evidence_hash, cancel, emit)
-    }
-
-    fn parse_indexed_local_file_report(
-        &self,
-        source: &str,
-        file: &mut std::fs::File,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<crate::IndexedGraphRecord>) -> Result<(), AppError>,
-    ) -> Result<crate::ParseReport, AppError> {
-        self.sources
-            .get(source)
-            .ok_or_else(|| AppError::Policy("source has no signed parser selection".into()))?
-            .parse_indexed_local_file_report(source, file, evidence_hash, cancel, emit)
-    }
     fn streaming_version(&self) -> &'static str {
         "signed-parser-router-v1"
     }
@@ -252,52 +179,6 @@ impl StreamingEventParser for RebuildParser {
             .ok_or(AppError::Policy(
                 "source has no signed parser selection".into(),
             ))
-    }
-
-    fn parse_reader(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        self.sources
-            .get(source)
-            .ok_or(AppError::Policy(
-                "source has no signed parser selection".into(),
-            ))?
-            .parse_reader(source, reader, evidence_hash, cancel, emit)
-    }
-
-    fn parse_reader_report(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<crate::ParseReport, AppError> {
-        self.sources
-            .get(source)
-            .ok_or_else(|| AppError::Policy("source has no signed parser selection".into()))?
-            .parse_reader_report(source, reader, evidence_hash, cancel, emit)
-    }
-
-    fn parse_local_file_report(
-        &self,
-        source: &str,
-        file: &mut std::fs::File,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<crate::ParseReport, AppError> {
-        self.sources
-            .get(source)
-            .ok_or(AppError::Policy(
-                "source has no signed parser selection".into(),
-            ))?
-            .parse_local_file_report(source, file, evidence_hash, cancel, emit)
     }
 }
 

@@ -1,6 +1,6 @@
 use super::*;
 use irmind_app::{
-    CancellationToken, SourceDecoder, StreamingEventParser,
+    CancellationToken, EventParser, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata},
 };
 use irmind_domain::Tainted;
@@ -14,7 +14,7 @@ fn compatibility_mapping_keeps_cloud_and_generic_lookup_identities_without_class
         let cancel = CancellationToken::new();
         let hash = irmind_app::sha256(data);
         let mut legacy = Vec::new();
-        irmind_mod_parser_json::JsonParser.parse_reader_report("input.json", &mut std::io::Cursor::new(data), hash, &cancel,
+        irmind_mod_parser_json::JsonParser.parse_each("input.json", data, &cancel,
             &mut |r| { r.inspect(|record| legacy.push(record.clone())); Ok(()) }).unwrap();
         let mapper = JsonCompatibilityMapping::new().unwrap();
         let mut outputs = Vec::new();

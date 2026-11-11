@@ -1,87 +1,81 @@
-use irmind_app::{AppError, CancellationToken, GraphRelation, LogParser, Provenance, sha256};
+//! Detector and original-field decoder contracts; projections belong to mappings.
+use irmind_app::source_mapping::{SourceInput, SourceMetadata, SourceRecordV1, SourceReferenceV1};
+use irmind_app::{AppError, CancellationToken, LogParser, ParserTimeContext, SourceDecoder};
 use std::io::Cursor;
 
-type Row = (
-    usize,
-    String,
-    String,
-    String,
-    Vec<(String, String)>,
-    Vec<GraphRelation>,
-    Provenance,
-);
-
-/// Offline streaming contract for a small public synthetic fixture.
+/// Offline contract for a bounded public synthetic fixture.
 pub fn run_log_parser_contract(
     parser: &dyn LogParser,
+    decoder: &dyn SourceDecoder,
     source: &str,
     fixture: &[u8],
     expected: usize,
+    context: Option<&ParserTimeContext>,
 ) -> Result<(), AppError> {
     if fixture.len() > 64 * 1024
         || expected == 0
         || expected > 100
-        || parser.identity().name.is_empty()
-        || parser.identity().version.is_empty()
+        || decoder.identity().name.is_empty()
+        || decoder.identity().version.is_empty()
         || parser.detect(source, fixture).is_none()
     {
         return Err(contract_error());
     }
-    let first = parse(parser, source, fixture, expected)?;
-    let second = parse(parser, source, fixture, expected)?;
-    if first != second {
+    let first = parse(decoder, source, fixture, expected, context)?;
+    if first != parse(decoder, source, fixture, expected, context)? {
         return Err(contract_error());
     }
     let cancel = CancellationToken::new();
     cancel.cancel();
+    let reference = SourceReferenceV1::file(source).map_err(|_| contract_error())?;
     let mut emitted = false;
-    if !matches!(
-        parser.parse_reader_report(
-            source,
-            &mut Cursor::new(fixture),
-            sha256(fixture),
-            &cancel,
-            &mut |_| {
-                emitted = true;
-                Ok(())
-            }
-        ),
-        Err(AppError::Cancelled)
-    ) || emitted
-    {
+    let result = decoder.decode_reader(
+        SourceInput {
+            metadata: SourceMetadata {
+                source: &reference,
+                evidence_hash: irmind_app::sha256(fixture),
+                time_context: context,
+                cancel: &cancel,
+            },
+            reader: &mut Cursor::new(fixture),
+        },
+        &mut |_| {
+            emitted = true;
+            Ok(())
+        },
+    );
+    if !matches!(result, Err(AppError::Cancelled)) || emitted {
         return Err(contract_error());
     }
     Ok(())
 }
 
 fn parse(
-    parser: &dyn LogParser,
+    decoder: &dyn SourceDecoder,
     source: &str,
     fixture: &[u8],
     expected: usize,
-) -> Result<Vec<Row>, AppError> {
-    let hash = sha256(fixture);
+    context: Option<&ParserTimeContext>,
+) -> Result<Vec<SourceRecordV1>, AppError> {
+    let hash = irmind_app::sha256(fixture);
+    let cancel = CancellationToken::new();
+    let reference = SourceReferenceV1::file(source).map_err(|_| contract_error())?;
     let mut rows = Vec::new();
-    let report = parser.parse_reader_report(
-        source,
-        &mut Cursor::new(fixture),
-        hash,
-        &CancellationToken::new(),
+    let report = decoder.decode_reader(
+        SourceInput {
+            metadata: SourceMetadata {
+                source: &reference,
+                evidence_hash: hash,
+                time_context: context,
+                cancel: &cancel,
+            },
+            reader: &mut Cursor::new(fixture),
+        },
         &mut |row| {
             if rows.len() >= expected || row.provenance().evidence_hash() != &hash {
                 return Err(contract_error());
             }
-            row.inspect(|record| {
-                rows.push((
-                    record.index,
-                    record.at.clone(),
-                    record.event.clone(),
-                    record.text.clone(),
-                    record.entities.clone(),
-                    record.relations.clone(),
-                    row.provenance().clone(),
-                ));
-            });
+            row.inspect(|record| rows.push(record.clone()));
             Ok(())
         },
     )?;
@@ -91,75 +85,30 @@ fn parse(
     Ok(rows)
 }
 fn contract_error() -> AppError {
-    AppError::Policy("streaming parser contract failed".into())
+    AppError::Policy("source parser contract failed".into())
 }
 
-/// Contract for binary parsers that require the authenticated regular-file route.
-/// Detection still sees at most 64 KiB; no system-temporary copy is made.
-pub fn run_seekable_log_parser_contract(
-    parser: &dyn LogParser,
+/// Feed a synthetic reader through the real current decoder with explicit provenance.
+pub fn decode_source(
+    decoder: &dyn SourceDecoder,
     source: &str,
-    file: &mut std::fs::File,
-    expected: usize,
-) -> Result<(), AppError> {
-    use std::io::{Read as _, Seek as _};
-    if file.metadata().map_err(|_| contract_error())?.len() > 1024 * 1024
-        || expected == 0
-        || expected > 100
-    {
-        return Err(contract_error());
-    }
-    file.rewind().map_err(|_| contract_error())?;
-    let mut fixture = Vec::new();
-    file.read_to_end(&mut fixture)
-        .map_err(|_| contract_error())?;
-    let sample = &fixture[..fixture.len().min(64 * 1024)];
-    if parser.detect(source, sample).is_none() {
-        return Err(contract_error());
-    }
-    let hash = sha256(&fixture);
-    let mut previous = None;
-    for _ in 0..2 {
-        file.rewind().map_err(|_| contract_error())?;
-        let mut rows = Vec::new();
-        let report = parser.parse_local_file_report(
-            source,
-            file,
-            hash,
-            &CancellationToken::new(),
-            &mut |row| {
-                if rows.len() >= expected || row.provenance().evidence_hash() != &hash {
-                    return Err(contract_error());
-                }
-                row.inspect(|r| {
-                    rows.push((
-                        r.index,
-                        r.at.clone(),
-                        r.event.clone(),
-                        r.text.clone(),
-                        r.entities.clone(),
-                        r.relations.clone(),
-                        row.provenance().clone(),
-                    ));
-                });
-                Ok(())
+    reader: &mut dyn std::io::Read,
+    evidence_hash: [u8; 32],
+    cancel: &CancellationToken,
+    context: Option<&ParserTimeContext>,
+    emit: &mut dyn FnMut(irmind_domain::Tainted<SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<irmind_app::ParseReport, AppError> {
+    let reference = SourceReferenceV1::file(source).map_err(|_| contract_error())?;
+    decoder.decode_reader(
+        SourceInput {
+            metadata: SourceMetadata {
+                source: &reference,
+                evidence_hash,
+                time_context: context,
+                cancel,
             },
-        )?;
-        if report.accepted != expected || report.rejected != 0 || rows.len() != expected {
-            return Err(contract_error());
-        }
-        if previous.as_ref().is_some_and(|old| old != &rows) {
-            return Err(contract_error());
-        }
-        previous = Some(rows);
-    }
-    let cancel = CancellationToken::new();
-    cancel.cancel();
-    if !matches!(
-        parser.parse_local_file_report(source, file, hash, &cancel, &mut |_| Err(contract_error())),
-        Err(AppError::Cancelled)
-    ) {
-        return Err(contract_error());
-    }
-    Ok(())
+            reader,
+        },
+        emit,
+    )
 }

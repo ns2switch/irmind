@@ -212,37 +212,39 @@ fn newline_json_stream_has_stable_record_pointers() {
 fn streamed_file_records_keep_parser_and_byte_offset_provenance() {
     let bytes = b"{\"eventName\":\"First\"}\n{\"eventName\":\"Second\"}\n";
     let mut offsets = Vec::new();
-    JsonParser
-        .parse_reader(
-            "events.jsonl",
-            &mut bytes.as_slice(),
-            sha256(bytes),
-            &irmind_app::CancellationToken::new(),
-            &mut |record| {
-                let location = record.provenance().parser_location().unwrap();
-                assert_eq!(location.source(), "events.jsonl");
-                assert_eq!(location.parser_id(), "parser-json");
-                offsets.push(location.byte_offset());
-                Ok(())
-            },
-        )
-        .unwrap();
+    irmind_testkit::decode_source(
+        &JsonSourceDecoder,
+        "events.jsonl",
+        &mut bytes.as_slice(),
+        sha256(bytes),
+        &irmind_app::CancellationToken::new(),
+        None,
+        &mut |record| {
+            let location = record.provenance().parser_location().unwrap();
+            assert_eq!(location.source(), "events.jsonl");
+            assert_eq!(location.parser_id(), "parser-json");
+            offsets.push(location.byte_offset());
+            Ok(())
+        },
+    )
+    .unwrap();
     assert_eq!(offsets, [0, 22]);
 
     let array = b"[{\"eventName\":\"A\"},{\"eventName\":\"B\"}]";
     offsets.clear();
-    JsonParser
-        .parse_reader(
-            "array.json",
-            &mut array.as_slice(),
-            sha256(array),
-            &irmind_app::CancellationToken::new(),
-            &mut |record| {
-                offsets.push(record.provenance().parser_location().unwrap().byte_offset());
-                Ok(())
-            },
-        )
-        .unwrap();
+    irmind_testkit::decode_source(
+        &JsonSourceDecoder,
+        "array.json",
+        &mut array.as_slice(),
+        sha256(array),
+        &irmind_app::CancellationToken::new(),
+        None,
+        &mut |record| {
+            offsets.push(record.provenance().parser_location().unwrap().byte_offset());
+            Ok(())
+        },
+    )
+    .unwrap();
     assert_eq!(offsets, [1, 19]);
 }
 
@@ -250,14 +252,24 @@ fn streamed_file_records_keep_parser_and_byte_offset_provenance() {
 fn malformed_jsonl_row_is_counted_and_later_row_survives() {
     let bytes = b"{\"eventName\":\"First\"}\n{broken\n{\"eventName\":\"Last\"}\n";
     let mut names = Vec::new();
-    let report = StreamingEventParser::parse_reader_report(
-        &JsonParser,
+    let report = irmind_testkit::decode_source(
+        &JsonSourceDecoder,
         "events.jsonl",
         &mut bytes.as_slice(),
         sha256(bytes),
         &irmind_app::CancellationToken::new(),
+        None,
         &mut |record| {
-            record.inspect(|value| names.push(value.event.clone()));
+            record.inspect(|value| {
+                names.push(
+                    value
+                        .fields()
+                        .field("eventName")
+                        .and_then(irmind_domain::SourceValue::as_text)
+                        .unwrap()
+                        .to_owned(),
+                );
+            });
             Ok(())
         },
     )
@@ -309,21 +321,28 @@ fn streaming_reader_recognizes_exported_cloud_formats() {
     ];
     for (source, json, event) in cases {
         let mut parsed = Vec::new();
-        let count = JsonParser
-            .parse_reader(
-                source,
-                &mut json.as_bytes(),
-                sha256(json.as_bytes()),
-                &irmind_app::CancellationToken::new(),
-                &mut |record| {
-                    record.inspect(|value| parsed.push((value.at.clone(), value.event.clone())));
-                    Ok(())
-                },
-            )
-            .unwrap();
-        assert_eq!(count, 1, "{source}");
+        let count = irmind_testkit::decode_source(
+            &JsonSourceDecoder,
+            source,
+            &mut json.as_bytes(),
+            sha256(json.as_bytes()),
+            &irmind_app::CancellationToken::new(),
+            None,
+            &mut |record| {
+                record.inspect(|value| {
+                    parsed.push((
+                        value.timestamp().unwrap().to_rfc3339(),
+                        irmind_app::source_mapping::json::render_source_fields(value.fields())
+                            .unwrap(),
+                    ));
+                });
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(count.accepted, 1, "{source}");
         assert_eq!(parsed[0].0, "2026-10-23T12:00:00Z", "{source}");
-        assert_eq!(parsed[0].1, event, "{source}");
+        assert!(parsed[0].1.contains(event), "{source}");
     }
 }
 
@@ -332,17 +351,20 @@ fn streaming_reader_rejects_oversized_record_before_emitting_it() {
     let long_value = "x".repeat(4 * 1024 * 1024);
     let json = format!("{{\"message\":\"{long_value}\"}}");
     let mut emitted = 0;
-    let result = JsonParser.parse_reader(
+    let result = irmind_testkit::decode_source(
+        &JsonSourceDecoder,
         "oversized.json",
         &mut json.as_bytes(),
         sha256(json.as_bytes()),
         &irmind_app::CancellationToken::new(),
+        None,
         &mut |_| {
             emitted += 1;
             Ok(())
         },
     );
-    assert!(result.is_err());
+    let report = result.unwrap();
+    assert_eq!((report.accepted, report.rejected), (0, 1));
     assert_eq!(emitted, 0);
 }
 
@@ -359,10 +381,9 @@ fn normalized_json_and_capped_entity_selection_ignore_object_insertion_order() {
     let parse = |input: &str| {
         let mut rows = Vec::new();
         JsonParser
-            .parse_reader(
+            .parse_each(
                 "synthetic.json",
-                &mut input.as_bytes(),
-                [0; 32],
+                input.as_bytes(),
                 &irmind_app::CancellationToken::new(),
                 &mut |record| {
                     record.inspect(|row| rows.push(row.clone()));

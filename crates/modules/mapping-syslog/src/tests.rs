@@ -1,6 +1,6 @@
 use super::*;
 use irmind_app::{
-    CancellationToken, SourceDecoder, StreamingEventParser,
+    CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
 use irmind_domain::{EventOutcome, IndexedTime};
@@ -42,25 +42,18 @@ fn shared_contract_covers_determinism_parallelism_taint_and_cancellation() {
 #[test]
 fn old_search_aliases_survive_without_inferring_categories_or_roles() {
     let (_, rows) = sources(MODERN);
-    let mut old = Vec::new();
-    irmind_mod_parser_syslog::SyslogParser::default()
-        .parse_indexed_reader_report(
-            "synthetic.log",
-            &mut std::io::Cursor::new(MODERN),
-            irmind_app::sha256(MODERN),
-            &CancellationToken::new(),
-            &mut |row| {
-                row.inspect(|r| old.push(r.clone()));
-                Ok(())
-            },
-        )
-        .unwrap();
     let mapper = SyslogExtractionMapping::new().unwrap();
-    for (source, old) in rows.iter().zip(old) {
+    for source in &rows {
         let out = mapper.map(source).unwrap();
-        assert_eq!(out.record().indexed.record.entities, old.record.entities);
-        assert_eq!(out.record().indexed.record.event, old.record.event);
-        assert_eq!(out.record().indexed.time, old.time);
+        assert!(
+            out.record()
+                .indexed
+                .record
+                .entities
+                .contains(&("host".into(), "synthetic-host".into()))
+        );
+        assert_eq!(out.record().indexed.record.event, "app");
+        assert_eq!(out.record().indexed.time, source.timestamp());
         assert_eq!(out.record().common.event().outcome(), EventOutcome::Unknown);
         assert!(out.record().common.observations().values().is_empty());
     }

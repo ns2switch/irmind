@@ -1,5 +1,7 @@
 # Approved ports for mixed artifact ingestion
 
+> Historical design: the current ingestion path uses `SourceDecoder` and separately identified mappings. Legacy execution callbacks and artifact migration routes described here have been retired. See [the source/mapping design](source-mapping-design.md) and [current architecture](architecture.md).
+
 This document records the documented application contracts for artifact-V2 step (b). The [approved design](parquet-artifact-v2-design.md#parser-transition) calls for additive typed parser metadata and review of the exact port changes before implementation. [Step (a)](https://github.com/ns2switch/irmind/pull/167) defines the checked time and envelope. The versioned storage boundary and both additive parser callbacks are implemented in [PR #168](https://github.com/ns2switch/irmind/pull/168). The historical signed formats and dependencies stay unchanged.
 
 ## Why an application contract needs to change

@@ -172,14 +172,6 @@ impl PreparedStartup {
         let resolver = Some(
             definitions.resolver(Arc::new(irmind_mod_parser_declarative::DeclarativeCompiler)),
         );
-        #[cfg(feature = "parser-linux")]
-        let resolver: Option<Arc<dyn irmind_app::modules::ParserResolver>> = Some(Arc::new(
-            irmind_mod_parser_linux::HistoricalResolver::new(resolver),
-        ));
-        #[cfg(feature = "parser-syslog")]
-        let resolver: Option<Arc<dyn irmind_app::modules::ParserResolver>> = Some(Arc::new(
-            irmind_mod_parser_syslog::HistoricalResolver::new(resolver),
-        ));
         resolver.map_or_else(
             || registry.parser_catalog(),
             |resolver| registry.parser_catalog().with_resolver(resolver),
@@ -299,7 +291,7 @@ impl PreparedStartup {
                     self.store.clone(),
                     CryptoPorts::new(self.active.signer.clone(), self.verifier.clone()),
                     self.guard.clone(),
-                    registry.parser().unwrap_or_else(|_| Arc::new(JsonParser)),
+                    Arc::new(JsonParser),
                 ),
                 ExecutionMode::Attended,
                 Arc::new(SystemClock),

@@ -4,43 +4,63 @@ use std::io::{Cursor, Read};
 
 const LIMIT: usize = 4 * 1024 * 1024;
 
-fn run(source: &str, bytes: &[u8], direct: bool) -> (String, Vec<String>) {
+fn run(source: &str, bytes: &[u8], parallel: bool) -> (String, Vec<String>) {
     let mut events = Vec::new();
-    let mut emit = |row: Tainted<GraphRecord>| {
-        row.inspect(|row| events.push(row.event.clone()));
+    let result = decode(source, &mut Cursor::new(bytes), parallel, &mut |row| {
+        row.inspect(|row| {
+            events.push(
+                row.fields()
+                    .field("eventName")
+                    .and_then(irmind_domain::SourceValue::as_text)
+                    .unwrap()
+                    .to_owned(),
+            );
+        });
         Ok(())
-    };
-    let result = if direct {
-        JsonParser
-            .parse_reader(
-                source,
-                &mut Cursor::new(bytes),
-                sha256(bytes),
-                &CancellationToken::new(),
-                &mut emit,
-            )
-            .map(|n| format!("direct accepted={n}"))
-    } else {
-        JsonParser
-            .parse_reader_report(
-                source,
-                &mut Cursor::new(bytes),
-                sha256(bytes),
-                &CancellationToken::new(),
-                &mut emit,
-            )
-            .map(|r| {
+    });
+    (
+        result.map_or_else(
+            |error| format!("ERR {error}"),
+            |r| {
                 format!(
                     "report accepted={} rejected={} samples={}",
                     r.accepted,
                     r.rejected,
                     r.samples.len()
                 )
-            })
-    };
-    (
-        result.unwrap_or_else(|error| format!("ERR {error}")),
+            },
+        ),
         events,
+    )
+}
+
+fn decode(
+    source: &str,
+    reader: &mut dyn Read,
+    parallel: bool,
+    emit: &mut dyn FnMut(Tainted<irmind_domain::SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<irmind_app::ParseReport, AppError> {
+    use irmind_app::{
+        SourceDecoder,
+        source_mapping::{DecodeBudget, DecodeInput, SourceInput, SourceMetadata},
+    };
+    let source = irmind_domain::SourceReferenceV1::file(source).unwrap();
+    let cancel = CancellationToken::new();
+    JsonSourceDecoder.decode_with_budget(
+        DecodeInput::Reader(SourceInput {
+            metadata: SourceMetadata {
+                source: &source,
+                evidence_hash: [0; 32],
+                time_context: None,
+                cancel: &cancel,
+            },
+            reader,
+        }),
+        DecodeBudget::new(
+            std::num::NonZeroUsize::new(if parallel { 4 } else { 1 }).unwrap(),
+            8 * 1024 * 1024,
+        ),
+        emit,
     )
 }
 
@@ -113,7 +133,7 @@ impl Read for Repeated<'_> {
 }
 
 #[test]
-fn streamed_cloudtrail_5_50_200_mib_matches_document_reader() {
+fn streamed_cloudtrail_5_50_200_mib_preserves_fields_offsets_and_parallel_bytes() {
     let row = format!(
         "{{\"eventTime\":\"2026-11-01T00:00:00Z\",\"eventName\":\"Synthetic\",\"payload\":\"{}\"}},",
         "x".repeat(2048)
@@ -132,34 +152,28 @@ fn streamed_cloudtrail_5_50_200_mib_matches_document_reader() {
                 .chain(Cursor::new(format!("{last}]}}")));
             let mut emitted = 0;
             let mut digest = [0u8; 32];
-            let mut emit = |record: Tainted<GraphRecord>| {
-                emitted += 1;
-                record.inspect(|row| {
-                    digest = sha256(&[digest.as_slice(), row.text.as_bytes()].concat());
+            let expected = irmind_app::source_mapping::json::decode_json_fields(
+                last.as_bytes(),
+                irmind_app::source_mapping::json::SourceJsonLimits::default(),
+            )
+            .unwrap();
+            let mut emit = |record: Tainted<irmind_domain::SourceRecordV1>| {
+                record.inspect(|record| {
+                    assert_eq!(record.fields(), &expected);
+                    assert_eq!(record.origin().record(), emitted as u64);
+                    assert_eq!(
+                        record.origin().offset(),
+                        Some((b"{\"Records\":[".len() + emitted * row.len()) as u64)
+                    );
+                    let mut canonical = Vec::new();
+                    record.feed_canonical(&mut |part| canonical.extend_from_slice(part));
+                    digest = sha256(&[digest.as_slice(), &canonical].concat());
                 });
+                emitted += 1;
                 Ok(())
             };
-            if direct {
-                let result = JsonParser.parse_reader(
-                    "large.json",
-                    &mut input,
-                    [0; 32],
-                    &CancellationToken::new(),
-                    &mut emit,
-                );
-                assert_eq!(result.unwrap(), n);
-                assert_eq!(emitted, n);
-            } else {
-                let result = JsonParser.parse_reader_report(
-                    "large.json",
-                    &mut input,
-                    [0; 32],
-                    &CancellationToken::new(),
-                    &mut emit,
-                );
-                assert_eq!(result.unwrap().accepted, n);
-                assert_eq!(emitted, n);
-            }
+            let report = decode("large.json", &mut input, direct, &mut emit).unwrap();
+            assert_eq!((report.accepted, report.rejected, emitted), (n, 0, n));
             digests.push(digest);
         }
         assert_eq!(digests[0], digests[1]);

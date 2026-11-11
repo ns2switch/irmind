@@ -1,11 +1,13 @@
+#![allow(clippy::unwrap_used)]
 use super::*;
 use arrow::{
     array::{Array, ArrayRef, Int64Array, StringArray, StructArray},
     datatypes::{DataType, Field, Schema},
     record_batch::RecordBatch,
 };
+use irmind_app::{CancellationToken, ParseReport, SourceDecoder};
 use parquet::arrow::ArrowWriter;
-use std::io::{Seek, SeekFrom};
+use std::io::{Cursor, Seek, SeekFrom};
 use std::sync::Arc;
 
 fn event(class_uid: u64, category_uid: u64) -> String {
@@ -46,10 +48,13 @@ fn six_supported_classes_detect_and_map() -> Result<(), AppError> {
             Some(95)
         );
         let mut records = Vec::new();
-        OcsfParser.parse_each(
+        irmind_testkit::decode_source(
+            &OcsfSourceDecoder,
             "episode.ndjson",
-            input.as_bytes(),
+            &mut input.as_bytes(),
+            [0; 32],
             &CancellationToken::new(),
+            None,
             &mut |record| {
                 records.push(record);
                 Ok(())
@@ -57,13 +62,30 @@ fn six_supported_classes_detect_and_map() -> Result<(), AppError> {
         )?;
         assert_eq!(records.len(), 1);
         records[0].inspect(|record| {
-            assert_eq!(record.at, "2026-01-02T03:04:05Z");
-            assert!(
-                record
-                    .entities
-                    .contains(&("host".into(), "lab-host".into()))
+            assert_eq!(
+                record.timestamp().unwrap().to_rfc3339(),
+                "2026-01-02T03:04:05.000Z"
             );
-            assert!(record.text.contains("retained"));
+            assert_eq!(
+                record
+                    .fields()
+                    .field("device")
+                    .unwrap()
+                    .field("hostname")
+                    .unwrap()
+                    .as_text(),
+                Some("lab-host")
+            );
+            assert_eq!(
+                record
+                    .fields()
+                    .field("unmapped")
+                    .unwrap()
+                    .field("marker")
+                    .unwrap()
+                    .as_text(),
+                Some("retained")
+            );
         });
     }
     Ok(())
@@ -73,11 +95,13 @@ fn six_supported_classes_detect_and_map() -> Result<(), AppError> {
 fn malformed_line_is_counted_without_losing_later_event() -> Result<(), AppError> {
     let input = format!("{{bad}}\n{}\n", event(3002, 3));
     let mut records = Vec::new();
-    let report = OcsfParser.parse_reader_report(
+    let report = irmind_testkit::decode_source(
+        &OcsfSourceDecoder,
         "episode.ndjson",
         &mut Cursor::new(input),
         [8; 32],
         &CancellationToken::new(),
+        None,
         &mut |record| {
             records.push(record);
             Ok(())
@@ -102,11 +126,13 @@ fn multiline_json_is_detected_and_parsed() -> Result<(), AppError> {
         Some(95)
     );
     let mut records = Vec::new();
-    let report = OcsfParser.parse_reader_report(
+    let report = irmind_testkit::decode_source(
+        &OcsfSourceDecoder,
         "episode.json",
         &mut Cursor::new(input),
         [4; 32],
         &CancellationToken::new(),
+        None,
         &mut |record| {
             records.push(record);
             Ok(())
@@ -119,11 +145,13 @@ fn multiline_json_is_detected_and_parsed() -> Result<(), AppError> {
 #[test]
 fn incomplete_line_does_not_swallow_the_next_record() -> Result<(), AppError> {
     let input = format!("{{\"class_uid\":\n{}\n", event(3002, 3));
-    let report = OcsfParser.parse_reader_report(
+    let report = irmind_testkit::decode_source(
+        &OcsfSourceDecoder,
         "episode.ndjson",
         &mut Cursor::new(input),
         [5; 32],
         &CancellationToken::new(),
+        None,
         &mut |_| Ok(()),
     )?;
     assert_eq!((report.accepted, report.rejected), (1, 1));
@@ -140,11 +168,13 @@ fn excessive_field_count_is_rejected() -> Result<(), AppError> {
     for index in 0..1024 {
         object.insert(format!("extra_{index}"), serde_json::Value::Null);
     }
-    let report = OcsfParser.parse_reader_report(
+    let report = irmind_testkit::decode_source(
+        &OcsfSourceDecoder,
         "episode.ndjson",
         &mut Cursor::new(value.to_string()),
         [6; 32],
         &CancellationToken::new(),
+        None,
         &mut |_| Ok(()),
     )?;
     assert_eq!((report.accepted, report.rejected), (0, 1));
@@ -186,7 +216,7 @@ fn local_parquet_file_is_read_without_creating_a_spool() -> Result<(), Box<dyn s
     writer.close()?;
     file.seek(SeekFrom::Start(0))?;
     let mut records = Vec::new();
-    let report = OcsfParser.parse_local_file_report(
+    let report = decode_file(
         "episode.parquet",
         &mut file,
         [9; 32],
@@ -204,14 +234,17 @@ fn local_parquet_file_is_read_without_creating_a_spool() -> Result<(), Box<dyn s
 
 #[test]
 fn nonseekable_parquet_is_rejected_without_implicit_system_spool() {
-    let result = OcsfParser.parse_reader_report(
+    let result = irmind_testkit::decode_source(
+        &OcsfSourceDecoder,
         "remote.parquet",
         &mut Cursor::new(b"PAR1synthetic"),
         [0; 32],
         &CancellationToken::new(),
+        None,
         &mut |_| Ok(()),
     );
-    assert!(matches!(result, Err(AppError::Policy(_))));
+    let report = result.unwrap();
+    assert_eq!((report.accepted, report.rejected), (0, 1));
 }
 
 #[test]
@@ -223,7 +256,7 @@ fn oversized_parquet_footer_is_rejected_before_decoder_allocation()
     let mut file = tempfile::tempfile()?;
     std::io::Write::write_all(&mut file, &forged)?;
     file.seek(SeekFrom::Start(0))?;
-    let result = OcsfParser.parse_local_file_report(
+    let result = decode_file(
         "forged.parquet",
         &mut file,
         [0; 32],
@@ -262,7 +295,7 @@ fn oversized_parquet_row_keeps_only_a_bounded_sample() -> Result<(), Box<dyn std
     writer.write(&batch)?;
     writer.close()?;
     file.seek(SeekFrom::Start(0))?;
-    let report = OcsfParser.parse_local_file_report(
+    let report = decode_file(
         "oversized.parquet",
         &mut file,
         [7; 32],
@@ -276,3 +309,27 @@ fn oversized_parquet_row_keeps_only_a_bounded_sample() -> Result<(), Box<dyn std
 }
 
 mod source_decode;
+
+fn decode_file(
+    source: &str,
+    file: &mut std::fs::File,
+    hash: [u8; 32],
+    cancel: &CancellationToken,
+    emit: &mut dyn FnMut(
+        irmind_domain::Tainted<irmind_domain::SourceRecordV1>,
+    ) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
+    use irmind_app::source_mapping::{SourceFileInput, SourceMetadata, SourceReferenceV1};
+    OcsfSourceDecoder.decode_local_file(
+        SourceFileInput {
+            metadata: SourceMetadata {
+                source: &SourceReferenceV1::file(source).unwrap(),
+                evidence_hash: hash,
+                time_context: None,
+                cancel,
+            },
+            file,
+        },
+        emit,
+    )
+}

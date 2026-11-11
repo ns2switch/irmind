@@ -198,13 +198,13 @@ impl<'a> State<'a> {
 }
 pub fn source_log_parser() -> Arc<dyn irmind_app::LogParser> {
     fn detect(source: &str, sample: &[u8]) -> Option<irmind_app::ParserConfidence> {
-        irmind_app::LogParser::detect(&super::LinuxParser::default(), source, sample)
+        irmind_app::LogParser::detect(&super::LinuxParser, source, sample)
     }
     fn time(
         source: &str,
         sample: &[u8],
     ) -> Result<Option<irmind_app::ParserTimeRequirement>, AppError> {
-        super::time::requirement(&super::LinuxParser::default(), source, sample)
+        super::time::requirement(&super::LinuxParser, source, sample)
     }
     Arc::new(
         irmind_app::source_mapping::SourceDecoderSelection::new(Arc::new(LinuxSourceDecoder))

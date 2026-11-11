@@ -1,8 +1,8 @@
 use super::config::{Module, ModuleConfig, ModuleManifest, ModulePort};
 use super::parsers::{ParserCatalog, ParserChoice};
 use crate::{
-    AppError, CloudAuditPort, EdrPort, Engine, EventParser, InternalIntelPort, LlmPort, LogParser,
-    ObjectSource, SiemPort, ThreatIntelPort, hex, sha256,
+    AppError, CloudAuditPort, EdrPort, Engine, InternalIntelPort, LlmPort, LogParser, ObjectSource,
+    SiemPort, ThreatIntelPort, hex, sha256,
 };
 use irmind_domain::Tool;
 use std::collections::{BTreeMap, BTreeSet};
@@ -219,15 +219,6 @@ impl ModuleRegistry {
         Ok(())
     }
 
-    pub fn parser(&self) -> Result<Arc<dyn EventParser>, AppError> {
-        self.parser
-            .clone()
-            .map(|parser| parser as Arc<dyn EventParser>)
-            .ok_or(AppError::Fixed(
-                crate::FixedAppError::PolicyEventParserIsNotRegistered,
-            ))
-    }
-
     /// Retain format recognition while refusing selection after a failed startup probe.
     /// The reason must be bounded, non-secret diagnostic text.
     pub fn mark_parser_unavailable(&mut self, id: &str, reason: String) -> Result<(), AppError> {
@@ -254,7 +245,7 @@ impl ModuleRegistry {
         ParserCatalog {
             parsers: self.parsers.clone(),
             unavailable: self.unavailable_parsers.clone(),
-            experimental: BTreeMap::new(),
+            source_selected: BTreeSet::new(),
             resolver: None,
         }
     }

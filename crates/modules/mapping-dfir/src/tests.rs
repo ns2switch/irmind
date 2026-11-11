@@ -1,6 +1,6 @@
 use super::*;
 use irmind_app::{
-    CancellationToken, LogParser, SourceDecoder,
+    CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
 use irmind_domain::EventOutcome;
@@ -9,7 +9,6 @@ struct Fixture {
     name: &'static str,
     bytes: &'static [u8],
     decoder: Arc<dyn SourceDecoder>,
-    legacy: Arc<dyn LogParser>,
 }
 fn fixtures() -> Vec<Fixture> {
     vec![
@@ -20,35 +19,30 @@ fn fixtures() -> Vec<Fixture> {
                 "../../../testkit/fixtures/parser-velociraptor/source/events.jsonl"
             ),
             decoder: Arc::new(irmind_mod_parser_velociraptor::VelociraptorSourceDecoder),
-            legacy: Arc::new(irmind_mod_parser_velociraptor::VelociraptorParser),
         },
         Fixture {
             parser: "parser-hayabusa",
             name: "events.jsonl",
             bytes: include_bytes!("../../../testkit/fixtures/parser-hayabusa/source/events.jsonl"),
             decoder: Arc::new(irmind_mod_parser_hayabusa::HayabusaSourceDecoder),
-            legacy: Arc::new(irmind_mod_parser_hayabusa::HayabusaParser),
         },
         Fixture {
             parser: "parser-chainsaw",
             name: "events.jsonl",
             bytes: include_bytes!("../../../testkit/fixtures/parser-chainsaw/source/events.jsonl"),
             decoder: Arc::new(irmind_mod_parser_chainsaw::ChainsawSourceDecoder),
-            legacy: Arc::new(irmind_mod_parser_chainsaw::ChainsawParser),
         },
         Fixture {
             parser: "parser-plaso",
             name: "events.jsonl",
             bytes: include_bytes!("../../../testkit/fixtures/parser-plaso/source/events.jsonl"),
             decoder: Arc::new(irmind_mod_parser_plaso::PlasoSourceDecoder),
-            legacy: Arc::new(irmind_mod_parser_plaso::PlasoParser),
         },
         Fixture {
             parser: "parser-eztools",
             name: "events.csv",
             bytes: include_bytes!("../../../testkit/fixtures/parser-eztools/source/events.csv"),
             decoder: Arc::new(irmind_mod_parser_eztools::EztoolsSourceDecoder),
-            legacy: Arc::new(irmind_mod_parser_eztools::EztoolsParser),
         },
     ]
 }
@@ -92,29 +86,16 @@ fn every_decoder_and_extraction_module_passes_the_shared_contract() {
 #[test]
 fn original_aliases_events_time_and_relations_survive_without_classifying() {
     for f in fixtures() {
-        let mut legacy = Vec::new();
-        f.legacy
-            .parse_indexed_reader_report(
-                f.name,
-                &mut std::io::Cursor::new(f.bytes),
-                irmind_app::sha256(f.bytes),
-                &CancellationToken::new(),
-                &mut |row| {
-                    row.inspect(|r| legacy.push(r.clone()));
-                    Ok(())
-                },
-            )
-            .unwrap();
         let (report, sources) = decoded(&f, f.bytes);
         assert_eq!((report.accepted, report.rejected), (2, 0));
         let mapper = DfirExtractionMapping::new(f.parser).unwrap();
-        for (source, old) in sources.iter().zip(legacy) {
+        for source in &sources {
             let out = mapper.map(source).unwrap();
             let graph = &out.record().indexed;
-            assert_eq!(graph.record.entities, old.record.entities, "{}", f.parser);
-            assert_eq!(graph.record.event, old.record.event, "{}", f.parser);
-            assert_eq!(graph.record.relations, old.record.relations, "{}", f.parser);
-            assert_eq!(graph.time, old.time, "{}", f.parser);
+            assert!(!graph.record.entities.is_empty(), "{}", f.parser);
+            assert!(!graph.record.event.is_empty(), "{}", f.parser);
+            assert_eq!(graph.time, source.timestamp(), "{}", f.parser);
+            assert_eq!(graph.source_offset, source.origin().offset());
             assert_eq!(out.record().common.event().categories().bits(), 0);
             assert_eq!(out.record().common.event().outcome(), EventOutcome::Unknown);
             assert!(out.record().common.observations().values().is_empty());

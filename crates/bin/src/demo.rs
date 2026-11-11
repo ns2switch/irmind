@@ -37,7 +37,7 @@ fn demo_storage(root: &Path) -> Result<(Arc<LocalStore>, ParserCatalog), AppErro
     )?;
     let parsers = registry
         .parser_catalog()
-        .with_experimental_parser(irmind_mod_parser_json::source_log_parser())?;
+        .with_source_parser(irmind_mod_parser_json::source_log_parser())?;
     let store = LocalStore::open_mapped(root, Arc::new(registry.mapping_catalog()?))?;
     Ok((Arc::new(store), parsers))
 }

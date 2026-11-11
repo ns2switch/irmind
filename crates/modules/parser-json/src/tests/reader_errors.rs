@@ -19,15 +19,16 @@ impl Read for FailingEnd {
 fn source_read_error_after_complete_root_is_not_a_successful_report() {
     let mut source = FailingEnd(Cursor::new(br#"{"Records":[{"eventName":"A"}]}"#));
     assert!(
-        JsonParser
-            .parse_reader_report(
-                "source.json",
-                &mut source,
-                [0; 32],
-                &CancellationToken::new(),
-                &mut |_| Ok(())
-            )
-            .is_err()
+        irmind_testkit::decode_source(
+            &JsonSourceDecoder,
+            "source.json",
+            &mut source,
+            [0; 32],
+            &CancellationToken::new(),
+            None,
+            &mut |_| Ok(())
+        )
+        .is_err()
     );
 }
 
@@ -37,11 +38,13 @@ fn wrapped_array_does_not_disable_limits_on_later_metadata() {
         "{{\"Records\":[],\"metadata\":\"{}\"}}",
         "x".repeat(4 * 1024 * 1024)
     );
-    let result = JsonParser.parse_reader_report(
+    let result = irmind_testkit::decode_source(
+        &JsonSourceDecoder,
         "source.json",
         &mut text.as_bytes(),
         [0; 32],
         &CancellationToken::new(),
+        None,
         &mut |_| Ok(()),
     );
     assert!(result.is_err());
@@ -53,15 +56,16 @@ fn explicitly_line_delimited_json_rejects_whitespace_prefix_without_losing_next_
     let mut input = io::repeat(b' ')
         .take(5 * 1024 * 1024)
         .chain(Cursor::new(row.repeat(2)));
-    let report = JsonParser
-        .parse_reader_report(
-            "source.ndjson",
-            &mut input,
-            [0; 32],
-            &CancellationToken::new(),
-            &mut |_| Ok(()),
-        )
-        .unwrap();
+    let report = irmind_testkit::decode_source(
+        &JsonSourceDecoder,
+        "source.ndjson",
+        &mut input,
+        [0; 32],
+        &CancellationToken::new(),
+        None,
+        &mut |_| Ok(()),
+    )
+    .unwrap();
     assert_eq!(
         (report.accepted, report.rejected, report.samples.len()),
         (1, 1, 1)
@@ -74,11 +78,13 @@ fn cancelled_large_document_probe_does_not_emit_or_report_success() {
     token.cancel();
     let mut input = io::repeat(b' ').take(200 * 1024 * 1024);
     assert!(matches!(
-        JsonParser.parse_reader_report(
+        irmind_testkit::decode_source(
+            &JsonSourceDecoder,
             "source.json",
             &mut input,
             [0; 32],
             &token,
+            None,
             &mut |_| panic!("cancelled input must not emit")
         ),
         Err(AppError::Cancelled)
@@ -92,7 +98,7 @@ fn catalog_does_not_reinterpret_retired_parser_versions() {
         .register(Box::new(JsonParser), &ModuleConfig::new())
         .unwrap();
     let catalog = registry.parser_catalog();
-    assert!(catalog.get_version("parser-json", "json-stream-v3").is_ok());
+    assert!(catalog.get_version("parser-json", "json-source-v1").is_ok());
     let Err(error) = catalog.get_version("parser-json", "json-stream-v2") else {
         panic!("retired reader must not alias the current parser");
     };

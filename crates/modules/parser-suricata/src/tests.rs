@@ -1,15 +1,20 @@
+#![allow(clippy::unwrap_used)]
 use super::*;
+use irmind_app::{CancellationToken, ParseReport};
+use irmind_domain::SourceRecordV1;
 
 const EVE: &[u8] = include_bytes!("../../../testkit/fixtures/parser-suricata/source/eve.jsonl");
 
-fn records(bytes: &[u8]) -> Result<(ParseReport, Vec<GraphRecord>), AppError> {
+fn records(bytes: &[u8]) -> Result<(ParseReport, Vec<SourceRecordV1>), AppError> {
     let mut found = Vec::new();
     let mut input = bytes;
-    let report = SuricataParser.parse_reader_report(
+    let report = irmind_testkit::decode_source(
+        &SuricataSourceDecoder,
         "eve.jsonl",
         &mut input,
         [8; 32],
         &CancellationToken::new(),
+        None,
         &mut |record| {
             record.inspect(|value| found.push(value.clone()));
             Ok(())
@@ -34,27 +39,39 @@ fn detects_eve_by_content() {
 }
 
 #[test]
-fn links_alert_and_tls_without_confirming_finding() -> Result<(), AppError> {
+fn original_alert_and_tls_share_flow_without_being_interpreted() -> Result<(), AppError> {
     let (report, rows) = records(EVE)?;
     assert_eq!((report.accepted, report.rejected), (2, 0));
-    assert_eq!(rows[0].event, "suricata_alert");
-    assert!(rows[0].at.ends_with(".123456Z"));
-    assert!(rows[0].text.contains("2026-10-23T00:00:00.123456+0000"));
-    assert!(rows[0].entities.contains(&(
-        "finding".into(),
-        "Synthetic suspicious TLS connection".into()
-    )));
-    assert_eq!(rows[1].event, "suricata_tls");
-    assert!(
-        rows.iter()
-            .all(|row| row.entities.contains(&("flow".into(), "9001001".into())))
+    assert_eq!(
+        rows[0].fields().field("event_type").unwrap().as_text(),
+        Some("alert")
     );
     assert!(
         rows[0]
-            .relations
-            .iter()
-            .any(|edge| edge.relation == "triggered")
+            .timestamp()
+            .unwrap()
+            .to_rfc3339()
+            .ends_with(".123456Z")
     );
+    assert_eq!(
+        rows[0].fields().field("timestamp").unwrap().as_text(),
+        Some("2026-10-23T00:00:00.123456+0000")
+    );
+    assert_eq!(
+        rows[0]
+            .fields()
+            .field("alert")
+            .unwrap()
+            .field("signature")
+            .unwrap()
+            .as_text(),
+        Some("Synthetic suspicious TLS connection")
+    );
+    assert_eq!(
+        rows[1].fields().field("event_type").unwrap().as_text(),
+        Some("tls")
+    );
+    assert!(rows.iter().all(|row| matches!(row.fields().field("flow_id"), Some(irmind_domain::SourceValue::Number(n)) if n.as_str()=="9001001")));
     Ok(())
 }
 
@@ -66,7 +83,10 @@ fn all_supported_types_map_to_events() -> Result<(), AppError> {
         );
         let (report, rows) = records(line.as_bytes())?;
         assert_eq!(report.accepted, 1, "{kind}");
-        assert_eq!(rows[0].event, format!("suricata_{kind}"));
+        assert_eq!(
+            rows[0].fields().field("event_type").unwrap().as_text(),
+            Some(kind)
+        );
     }
     Ok(())
 }
@@ -77,7 +97,7 @@ fn malformed_record_does_not_hide_next_record() -> Result<(), AppError> {
     input.extend_from_slice(EVE);
     let (report, rows) = records(&input)?;
     assert_eq!((report.accepted, report.rejected), (2, 1));
-    assert_eq!(rows[0].index, 1);
+    assert_eq!(rows[0].annotations().members()[0].ordinal, 1);
     assert!(!report.samples.is_empty());
     Ok(())
 }
@@ -90,7 +110,7 @@ fn oversized_and_deep_records_do_not_hide_next_record() -> Result<(), AppError> 
     input.extend_from_slice(EVE);
     let (report, rows) = records(&input)?;
     assert_eq!((report.accepted, report.rejected), (2, 2));
-    assert_eq!(rows[0].index, 2);
+    assert_eq!(rows[0].annotations().members()[0].ordinal, 2);
     Ok(())
 }
 
@@ -99,9 +119,15 @@ fn cancellation_stops_before_consuming_input() {
     let cancel = CancellationToken::new();
     cancel.cancel();
     let mut input = EVE;
-    let result =
-        SuricataParser
-            .parse_reader_report("eve.jsonl", &mut input, [8; 32], &cancel, &mut |_| Ok(()));
+    let result = irmind_testkit::decode_source(
+        &SuricataSourceDecoder,
+        "eve.jsonl",
+        &mut input,
+        [8; 32],
+        &cancel,
+        None,
+        &mut |_| Ok(()),
+    );
     assert!(matches!(result, Err(AppError::Cancelled)));
 }
 
@@ -115,13 +141,15 @@ fn oversized_whitespace_first_lines_are_counted_without_losing_later_records()
             .chain(std::io::Cursor::new(b"\n"))
             .chain(std::io::Cursor::new(EVE));
         let mut indexes = Vec::new();
-        let report = SuricataParser.parse_reader_report(
+        let report = irmind_testkit::decode_source(
+            &SuricataSourceDecoder,
             "source.log",
             &mut reader,
             [6; 32],
             &CancellationToken::new(),
+            None,
             &mut |record| {
-                record.inspect(|row| indexes.push(row.index));
+                record.inspect(|row| indexes.push(row.annotations().members()[0].ordinal));
                 Ok(())
             },
         )?;
@@ -141,21 +169,20 @@ fn indexed_events_keep_microseconds_and_request_host_partitioning() -> Result<()
         irmind_app::SourceParallelism::Concurrent
     );
     let mut count = 0;
-    parser.parse_indexed_reader_report(
+    irmind_testkit::decode_source(
+        &SuricataSourceDecoder,
         "source.log",
         &mut std::io::Cursor::new(EVE),
         [7; 32],
         &CancellationToken::new(),
+        None,
         &mut |record| {
             record.inspect(|row| {
-                assert!(row.source_offset.is_some());
-                let time = row.time.as_ref().unwrap();
+                assert!(row.origin().offset().is_some());
+                let time = row.timestamp().unwrap();
                 assert_eq!(time.precision(), irmind_app::TimePrecision::Microsecond);
                 assert_ne!(time.instant().unix_micros().rem_euclid(1_000_000), 0);
-                assert_eq!(
-                    parser.partition_profile(&row.record),
-                    irmind_app::PartitionProfile::EndpointHost
-                );
+                assert!(row.fields().field("event.outcome").is_none());
                 count += 1;
             });
             assert!(record.provenance().parser_location().is_some());
@@ -168,7 +195,14 @@ fn indexed_events_keep_microseconds_and_request_host_partitioning() -> Result<()
 
 #[test]
 fn shared_streaming_contract() -> Result<(), AppError> {
-    irmind_testkit::run_log_parser_contract(&SuricataParser, "source.log", EVE, 2)
+    irmind_testkit::run_log_parser_contract(
+        &SuricataParser,
+        &SuricataSourceDecoder,
+        "source.log",
+        EVE,
+        2,
+        None,
+    )
 }
 
 #[test]
@@ -191,9 +225,15 @@ fn explicitly_zero_microseconds_are_not_downgraded() -> Result<(), AppError> {
     let input =
         br#"{"timestamp":"2026-10-23T00:00:00.000000+0000","flow_id":1,"event_type":"flow"}"#;
     let (_, rows) = records(input)?;
-    assert!(rows[0].at.ends_with(".000000Z"));
+    assert!(
+        rows[0]
+            .timestamp()
+            .unwrap()
+            .to_rfc3339()
+            .ends_with(".000000Z")
+    );
     assert_eq!(
-        irmind_app::indexed_rfc3339(&rows[0].at, false, false)?.precision(),
+        rows[0].timestamp().unwrap().precision(),
         irmind_app::TimePrecision::Microsecond
     );
     Ok(())

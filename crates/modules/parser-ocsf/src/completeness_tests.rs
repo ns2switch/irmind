@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::wildcard_imports)]
 use crate::*;
-use irmind_app::{CancellationToken, StreamingEventParser};
+use irmind_app::CancellationToken;
 use std::io::{Cursor, Read};
 #[test]
 fn oversized_whitespace_prefixed_record_is_counted() {
@@ -12,18 +12,19 @@ fn oversized_whitespace_prefixed_record_is_counted() {
             .chain(std::io::repeat(b' ').take(mib * 1024 * 1024))
             .chain(Cursor::new(row.repeat(2)));
         let mut count = 0;
-        let report = OcsfParser
-            .parse_reader_report(
-                "synthetic.ndjson",
-                &mut input,
-                [0; 32],
-                &CancellationToken::new(),
-                &mut |_| {
-                    count += 1;
-                    Ok(())
-                },
-            )
-            .unwrap();
+        let report = irmind_testkit::decode_source(
+            &OcsfSourceDecoder,
+            "synthetic.ndjson",
+            &mut input,
+            [0; 32],
+            &CancellationToken::new(),
+            None,
+            &mut |_| {
+                count += 1;
+                Ok(())
+            },
+        )
+        .unwrap();
         assert_eq!((report.accepted, report.rejected, count), (2, 1, 2));
     }
 }
@@ -48,11 +49,13 @@ fn cancellation_during_a_newline_free_record_stops_the_reader() {
         token: token.clone(),
         reads: 0,
     };
-    let result = OcsfParser.parse_reader_report(
+    let result = irmind_testkit::decode_source(
+        &OcsfSourceDecoder,
         "synthetic.ndjson",
         &mut reader,
         [0; 32],
         &token,
+        None,
         &mut |_| Ok(()),
     );
     assert!(matches!(result, Err(irmind_app::AppError::Cancelled)));

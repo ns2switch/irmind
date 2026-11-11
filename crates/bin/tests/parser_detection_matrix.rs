@@ -88,12 +88,12 @@ mod matrix {
         registry.register(Box::new(EztoolsParser), &ModuleConfig::new())?;
         #[cfg(feature = "parser-linux")]
         registry.register(
-            Box::new(irmind_mod_parser_linux::LinuxParser::default()),
+            Box::new(irmind_mod_parser_linux::LinuxParser),
             &ModuleConfig::new(),
         )?;
         #[cfg(feature = "parser-syslog")]
         registry.register(
-            Box::new(irmind_mod_parser_syslog::SyslogParser::default()),
+            Box::new(irmind_mod_parser_syslog::SyslogParser),
             &ModuleConfig::new(),
         )?;
 
@@ -284,7 +284,7 @@ mod matrix {
     fn assert_additional_scores(name: &str, sample: &[u8], expected: &str) {
         #[cfg(feature = "parser-syslog")]
         assert_eq!(
-            irmind_mod_parser_syslog::SyslogParser::default()
+            irmind_mod_parser_syslog::SyslogParser
                 .detect(name, sample)
                 .map(irmind_app::ParserConfidence::value),
             if expected == "parser-syslog" {
@@ -295,7 +295,7 @@ mod matrix {
         );
         #[cfg(feature = "parser-linux")]
         assert_eq!(
-            irmind_mod_parser_linux::LinuxParser::default()
+            irmind_mod_parser_linux::LinuxParser
                 .detect(name, sample)
                 .map(irmind_app::ParserConfidence::value),
             if expected == "parser-linux" {

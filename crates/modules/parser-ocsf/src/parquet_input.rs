@@ -1,93 +1,10 @@
-use crate::{policy_error, record};
-use irmind_app::{AppError, CancellationToken, GraphRecord, ParseReport};
-use irmind_domain::{ParserLocation, Provenance, SourceKind, Tainted};
-use parquet::file::reader::{FileReader, SerializedFileReader};
-use std::fs::File;
+use crate::policy_error;
+use irmind_app::AppError;
 use std::io::{Read, Seek, SeekFrom};
 
 pub(super) const MAX_PARQUET_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-const MAX_RECORDS: usize = 10_000_000;
 const MAX_METADATA_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_ROW_GROUP_BYTES: i64 = 256 * 1024 * 1024;
-const MAX_ROW_BYTES: usize = 4 * 1024 * 1024;
-
-pub(super) fn parse(
-    source: &str,
-    file: &mut File,
-    evidence_hash: [u8; 32],
-    cancel: &CancellationToken,
-    emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-) -> Result<ParseReport, AppError> {
-    if cancel.is_cancelled() {
-        return Err(AppError::Cancelled);
-    }
-    let size = file
-        .metadata()
-        .map_err(|_| policy_error("cannot inspect OCSF Parquet"))?
-        .len();
-    if size > MAX_PARQUET_BYTES {
-        return Err(policy_error("OCSF Parquet exceeds 2 GiB per file"));
-    }
-    validate_footer(file, size)?;
-    let reader = SerializedFileReader::new(
-        file.try_clone()
-            .map_err(|_| policy_error("cannot open OCSF Parquet"))?,
-    )
-    .map_err(|_| policy_error("invalid OCSF Parquet structure"))?;
-    validate_row_groups(reader.metadata())?;
-    let rows = reader
-        .get_row_iter(None)
-        .map_err(|_| policy_error("cannot read OCSF Parquet rows"))?;
-    let mut report = ParseReport {
-        accepted: 0,
-        rejected: 0,
-        samples: Vec::new(),
-    };
-    for (index, row) in rows.enumerate() {
-        if index >= MAX_RECORDS {
-            return Err(policy_error("OCSF Parquet exceeds record limit"));
-        }
-        if index.is_multiple_of(256) && cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        let row = row.map_err(|_| policy_error("corrupt OCSF Parquet row"))?;
-        let mut value = row.to_json_value();
-        value.sort_all_objects();
-        let encoded = value.to_string();
-        if encoded.len() > MAX_ROW_BYTES {
-            reject_row(&mut report, &encoded);
-            continue;
-        }
-        if let Ok(record) = record::parse(index, &value) {
-            let location = ParserLocation::new(source, "parser-ocsf", 0)
-                .map_err(|_| policy_error("invalid OCSF source path"))?;
-            emit(
-                Tainted::from_external(
-                    record,
-                    Provenance::new(evidence_hash, Some(index as u64), SourceKind::File),
-                )
-                .with_parser_location(location),
-            )?;
-            report.accepted += 1;
-        } else {
-            reject_row(&mut report, &encoded);
-        }
-    }
-    Ok(report)
-}
-
-fn reject_row(report: &mut ParseReport, encoded: &str) {
-    report.rejected += 1;
-    if report.samples.len() < 3 {
-        report.samples.push(
-            encoded
-                .chars()
-                .flat_map(char::escape_default)
-                .take(256)
-                .collect(),
-        );
-    }
-}
 
 pub(super) fn validate_row_groups(
     metadata: &parquet::file::metadata::ParquetMetaData,

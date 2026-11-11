@@ -1,20 +1,4 @@
-use super::{AppError, GraphRecord, LegacyTimestamp, timestamp};
-use serde::Serialize;
-
-#[derive(Serialize)]
-struct Row<'a> {
-    timestamp: String,
-    timestamp_inferred: bool,
-    host: &'a str,
-    process: &'a str,
-    pid: Option<&'a str>,
-    facility: u8,
-    severity: u8,
-    message_id: Option<&'a str>,
-    structured_data: Option<&'a str>,
-    message: &'a str,
-    raw: &'a str,
-}
+use super::{AppError, LegacyTimestamp, timestamp};
 
 pub(super) type Header<'a> = (
     String,
@@ -36,61 +20,6 @@ pub(super) fn detect(line: &str) -> Option<u8> {
         LegacyTimestamp::new(2000, 0).ok()?.parse(time).ok()?;
         (rest.as_bytes().get(15) == Some(&b' ')).then_some(90)
     }
-}
-
-pub(super) fn parse(
-    line: &str,
-    legacy: Option<LegacyTimestamp>,
-    index: usize,
-) -> Result<GraphRecord, AppError> {
-    let (pri, rest) = priority(line)?;
-    let inferred = !rest.starts_with("1 ");
-    let (at, host, app, pid, message_id, structured_data, message) =
-        if let Some(body) = rest.strip_prefix("1 ") {
-            modern(body)?
-        } else {
-            classic(rest, legacy.ok_or_else(super::invalid)?)?
-        };
-    let mut entities = Vec::new();
-    for (kind, value) in [
-        ("host", host),
-        ("process", app),
-        ("pid", pid.unwrap_or("-")),
-    ] {
-        if value != "-" && !value.is_empty() {
-            entities.push((kind.into(), value.into()));
-        }
-    }
-    entities.sort();
-    let row = Row {
-        timestamp: at.clone(),
-        timestamp_inferred: inferred,
-        host,
-        process: app,
-        pid,
-        facility: pri / 8,
-        severity: pri % 8,
-        message_id,
-        structured_data,
-        message,
-        raw: line,
-    };
-    let indexed = if at.is_empty() {
-        String::new()
-    } else {
-        chrono::DateTime::parse_from_rfc3339(&at)
-            .map_err(|_| invalid())?
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string()
-    };
-    Ok(GraphRecord {
-        index,
-        at: indexed,
-        event: if app == "-" { "syslog" } else { app }.into(),
-        text: serde_json::to_string(&row).map_err(|_| invalid())?,
-        entities,
-        relations: Vec::new(),
-    })
 }
 
 pub(super) fn priority(line: &str) -> Result<(u8, &str), AppError> {

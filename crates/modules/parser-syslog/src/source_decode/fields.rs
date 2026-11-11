@@ -90,7 +90,7 @@ fn classic<'a>(
 ) -> Result<(crate::record::Header<'a>, Option<ParserCalendar>), AppError> {
     let current = calendar.ok_or_else(|| {
         let requirement = crate::time_context::requirement(
-            &crate::SyslogParser::default(),
+            &crate::SyslogParser,
             metadata.source.reference(),
             line.as_bytes(),
         );

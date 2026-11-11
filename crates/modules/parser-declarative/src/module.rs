@@ -1,10 +1,8 @@
 use crate::{AppError, error};
 use irmind_app::{
-    CancellationToken, EventParser, GraphRecord, LogParser, ParserConfidence, StreamingEventParser,
+    LogParser, ParserConfidence, StreamingEventParser,
     modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
-use irmind_domain::Tainted;
-use std::io::Read;
 
 pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-declarative",
@@ -50,40 +48,13 @@ impl Module for DeclarativeModule {
 }
 
 struct Unconfigured;
-impl EventParser for Unconfigured {
-    fn version(&self) -> &'static str {
-        "declarative-v2"
-    }
-    fn parse_each(
-        &self,
-        _: &str,
-        _: &[u8],
-        _: &CancellationToken,
-        _: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        Err(error(
-            "select an approved declarative definition before parsing",
-        ))
-    }
-}
+
 impl StreamingEventParser for Unconfigured {
     fn parser_name(&self) -> &'static str {
         "parser-declarative"
     }
     fn streaming_version(&self) -> &'static str {
         "declarative-v2"
-    }
-    fn parse_reader(
-        &self,
-        _: &str,
-        _: &mut dyn Read,
-        _: [u8; 32],
-        _: &CancellationToken,
-        _: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        Err(error(
-            "select an approved declarative definition before parsing",
-        ))
     }
 }
 impl LogParser for Unconfigured {

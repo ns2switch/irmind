@@ -1,8 +1,7 @@
-use chrono::{DateTime, Utc};
-use irmind_app::{AppError, GraphRecord};
-use irmind_domain::UtcTimestamp;
 use serde::Deserialize;
 
+// Borrowed columns retain the detector's input-type checks. Underscored
+// columns are validated by deserialization and never normalized here.
 #[derive(Deserialize)]
 struct Row<'a> {
     #[serde(borrow)]
@@ -12,14 +11,14 @@ struct Row<'a> {
     parser: Option<&'a str>,
     #[serde(borrow)]
     data_type: Option<&'a str>,
-    #[serde(borrow)]
-    user: Option<&'a str>,
-    #[serde(borrow)]
-    hostname: Option<&'a str>,
-    #[serde(borrow)]
-    filename: Option<&'a str>,
-    #[serde(borrow)]
-    source_short: Option<&'a str>,
+    #[serde(rename = "user", borrow)]
+    _user: Option<&'a str>,
+    #[serde(rename = "hostname", borrow)]
+    _hostname: Option<&'a str>,
+    #[serde(rename = "filename", borrow)]
+    _filename: Option<&'a str>,
+    #[serde(rename = "source_short", borrow)]
+    _source_short: Option<&'a str>,
 }
 
 pub(super) fn detect(sample: &[u8]) -> Option<u8> {
@@ -33,41 +32,4 @@ pub(super) fn detect(sample: &[u8]) -> Option<u8> {
     } else {
         None
     }
-}
-pub(super) fn parse(line: &[u8], index: usize) -> Result<GraphRecord, AppError> {
-    let row: Row<'_> = serde_json::from_slice(line).map_err(|_| bad())?;
-    let parsed = if let Some(datetime) = row.datetime {
-        DateTime::parse_from_rfc3339(datetime)
-            .map_err(|_| bad())?
-            .with_timezone(&Utc)
-    } else {
-        DateTime::from_timestamp_micros(row.timestamp.ok_or_else(bad)?).ok_or_else(bad)?
-    };
-    let at = parsed.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    UtcTimestamp::parse(&at).map_err(|_| bad())?;
-    let mut entities = Vec::new();
-    for (kind, value) in [
-        ("host", row.hostname),
-        ("user", row.user),
-        ("file", row.filename),
-        ("source", row.source_short),
-    ] {
-        if let Some(value) = value.filter(|text| !text.is_empty() && text.len() <= 4096) {
-            entities.push((kind.into(), value.into()));
-        }
-    }
-    entities.sort();
-    entities.dedup();
-    let event = row.data_type.or(row.parser).ok_or_else(bad)?;
-    Ok(GraphRecord {
-        index,
-        at,
-        event: event.into(),
-        text: String::from_utf8_lossy(line).into_owned(),
-        entities,
-        relations: Vec::new(),
-    })
-}
-fn bad() -> AppError {
-    AppError::Policy("invalid plaso json_line result".into())
 }

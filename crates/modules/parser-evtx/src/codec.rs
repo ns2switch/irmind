@@ -1,6 +1,5 @@
 use super::{bad, strict};
-use irmind_app::{AppError, IndexedGraphRecord, ParseReport};
-use irmind_domain::Tainted;
+use irmind_app::{AppError, ParseReport};
 use serde::Deserialize;
 
 pub(super) const PROTOCOL: &str = "irmind-evtx-ndjson-v1";
@@ -44,15 +43,12 @@ pub(super) fn probe(bytes: &[u8]) -> Result<(), AppError> {
 }
 pub(super) struct DecodedRecord {
     pub accepted_index: u64,
-    pub index: u64,
     pub record_id: u64,
     pub offset: u64,
     pub timestamp: String,
     pub event: serde_json::Value,
 }
-pub(super) struct State<'a> {
-    source: &'a str,
-    hash: [u8; 32],
+pub(super) struct State {
     size: u64,
     ready: bool,
     complete: bool,
@@ -61,11 +57,9 @@ pub(super) struct State<'a> {
     decoder_accepted: u64,
     decoder_rejected: u64,
 }
-impl<'a> State<'a> {
-    pub(super) fn new(source: &'a str, hash: [u8; 32], size: u64) -> Self {
+impl State {
+    pub(super) fn new(size: u64) -> Self {
         Self {
-            source,
-            hash,
             size,
             ready: false,
             complete: false,
@@ -78,29 +72,6 @@ impl<'a> State<'a> {
             decoder_accepted: 0,
             decoder_rejected: 0,
         }
-    }
-    pub(super) fn frame(
-        &mut self,
-        bytes: &[u8],
-        emit: &mut dyn FnMut(Tainted<IndexedGraphRecord>) -> Result<(), AppError>,
-    ) -> Result<(), AppError> {
-        let (source, hash) = (self.source, self.hash);
-        self.project_frame(bytes, &mut |row| {
-            if let Ok(record) = super::normalize::record(
-                source,
-                hash,
-                row.index,
-                row.record_id,
-                row.offset,
-                &row.timestamp,
-                &row.event,
-            ) {
-                emit(record)?;
-                Ok(true)
-            } else {
-                Ok(false)
-            }
-        })
     }
     pub(super) fn project_frame(
         &mut self,
@@ -129,7 +100,6 @@ impl<'a> State<'a> {
                 self.decoder_accepted += 1;
                 if project(DecodedRecord {
                     accepted_index: self.report.accepted as u64,
-                    index: self.seen - 1,
                     record_id,
                     offset,
                     timestamp,
@@ -223,7 +193,7 @@ mod budget_tests {
     use super::*;
     #[test]
     fn exact_record_ceiling_is_accepted_and_the_next_record_is_an_error() {
-        let mut state = State::new("source.evtx", [0; 32], 69632);
+        let mut state = State::new(69632);
         state.seen = 7_999_999;
         state.next().unwrap();
         let message = state.next().unwrap_err().to_string();

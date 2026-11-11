@@ -1,6 +1,5 @@
 use super::{AppError, LegacyTimestamp, SyslogParser};
-use chrono::{Datelike, FixedOffset};
-use irmind_app::{ParserTimeBasis, ParserTimeContext, ParserTimeRequirement};
+use irmind_app::{ParserTimeContext, ParserTimeRequirement};
 use irmind_domain::{ParserLocation, Provenance, SourceKind, Tainted};
 use serde::Deserialize;
 use std::borrow::Cow;
@@ -9,12 +8,12 @@ use std::borrow::Cow;
 struct StoredRow<'a> {
     #[serde(borrow)]
     raw: Cow<'a, str>,
-    #[serde(borrow)]
-    timestamp: Option<Cow<'a, str>>,
+    #[serde(borrow, rename = "timestamp")]
+    _timestamp: Option<Cow<'a, str>>,
 }
 
 pub(super) fn requirement(
-    parser: &SyslogParser,
+    _parser: &SyslogParser,
     source: &str,
     sample: &[u8],
 ) -> Result<Option<ParserTimeRequirement>, AppError> {
@@ -45,26 +44,36 @@ pub(super) fn requirement(
     let Some(score) = super::record::detect(raw) else {
         return Ok(None);
     };
-    let context = parser.legacy.unwrap_or(LegacyTimestamp::new(2000, 0)?);
-    let Ok(row) = super::record::parse(raw, Some(context), 0) else {
+    // A leap-year calendar checks framing only; it never supplies an inferred year.
+    let (_, rest) = super::record::priority(raw)?;
+    let header = if let Some(body) = rest.strip_prefix("1 ") {
+        super::record::modern(body)
+    } else {
+        super::record::classic(rest, LegacyTimestamp::new(2000, 0)?)
+    };
+    let Ok((_, host, _, _, _, _, _)) = header else {
         return Ok(None);
     };
-    let hosts = row
-        .entities
-        .into_iter()
-        .filter(|(kind, _)| kind == "host")
-        .take(1)
-        .map(|(_, host)| {
-            let location =
-                ParserLocation::new(source, "parser-syslog", 0).map_err(|_| super::invalid())?;
-            Ok(Tainted::from_external(
-                host,
+    let hosts = if host == "-" || host.is_empty() {
+        Vec::new()
+    } else {
+        let location =
+            ParserLocation::new(source, "parser-syslog", 0).map_err(|_| super::invalid())?;
+        vec![
+            Tainted::from_external(
+                host.to_owned(),
                 Provenance::new(irmind_app::sha256(sample), Some(0), SourceKind::File),
             )
-            .with_parser_location(location))
-        })
-        .collect::<Result<Vec<_>, AppError>>()?;
-    let observed = observed_time(parser, score, raw, stored.as_ref())?;
+            .with_parser_location(location),
+        ]
+    };
+    let observed = if score == 95 {
+        raw.split_ascii_whitespace()
+            .nth(1)
+            .and_then(ParserTimeContext::from_timestamp_hint)
+    } else {
+        None
+    };
     Ok(Some(ParserTimeRequirement {
         required: score == 90,
         hosts,
@@ -80,44 +89,4 @@ pub(super) fn month(line: &str) -> Option<u8> {
     .iter()
     .position(|name| rest.get(..3) == Some(*name))
     .and_then(|index| u8::try_from(index + 1).ok())
-}
-
-fn observed_time(
-    parser: &SyslogParser,
-    score: u8,
-    raw: &str,
-    stored: Option<&StoredRow<'_>>,
-) -> Result<Option<ParserTimeContext>, AppError> {
-    let observed = if score == 95 {
-        raw.split_ascii_whitespace()
-            .nth(1)
-            .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
-            .and_then(|at| {
-                ParserTimeContext::new(
-                    u16::try_from(at.year()).ok()?,
-                    i16::try_from(at.offset().local_minus_utc() / 60).ok()?,
-                    true,
-                    ParserTimeBasis::ConfirmedSuggestion,
-                )
-                .ok()
-            })
-    } else if let Some(legacy) = parser.legacy {
-        let year = stored
-            .and_then(|row| row.timestamp.as_deref())
-            .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
-            .and_then(|at| {
-                FixedOffset::east_opt(legacy.offset_minutes() * 60)
-                    .map(|offset| at.with_timezone(&offset).year())
-            })
-            .unwrap_or(legacy.year());
-        Some(ParserTimeContext::new(
-            u16::try_from(year).map_err(|_| super::invalid())?,
-            i16::try_from(legacy.offset_minutes()).map_err(|_| super::invalid())?,
-            true,
-            ParserTimeBasis::ConfirmedSuggestion,
-        )?)
-    } else {
-        None
-    };
-    Ok(observed)
 }

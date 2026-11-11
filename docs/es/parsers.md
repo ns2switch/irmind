@@ -19,8 +19,8 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | Windows EVTX | EVTX binario: Security, System, PowerShell y Sysmon | Cabecera EVTX y checksum válidos; 95 | UTC con precisión de 100 ns, host, usuario, proceso, IP/puerto y offsets reales | disponible; experimental |
 | Linux | auth.log/secure, auditd, journald JSON y HTTP common/combined | Etiquetas de autenticación, cabecera audit, campos de journald o cabecera HTTP completa | Tiempo, host, usuario, proceso, comando, IP/puertos, acción y resultado; grupos audit parciales | experimental |
 | Syslog | RFC 5424/RFC 3164, texto o gzip acotado | PRI y forma de cabecera/instante, no extensión | Host, aplicación, PID, facility, severity, mensaje y tiempo completo | experimental |
-| Zeek | TSV o JSON de red | Cabecera o campos reconocidos; 95 en los fixtures conn/DNS | Tiempo preciso V2, extremos, correlación UID y host explícito del sensor | experimental |
-| Suricata EVE | JSONL de alertas, flujo y protocolos | Tipo compatible, instante y flow ID; 95 | Tiempo preciso V2, extremos, correlación y detecciones sin confirmar | experimental |
+| Zeek | TSV o JSON de red | Cabecera o campos reconocidos; 95 en los fixtures conn/DNS | Tiempo preciso, extremos, correlación UID y host explícito del sensor | experimental |
+| Suricata EVE | JSONL de alertas, flujo y protocolos | Tipo compatible, instante y flow ID; 95 | Tiempo preciso, extremos, correlación y detecciones sin confirmar | experimental |
 | Declarativo | CSV, JSON, NDJSON o regex acotada | Cabecera exacta, campos JSON o regex; máximo 70 % | Mapeo explícito descrito abajo | experimental |
 
 ## Lectores actuales y casos existentes
@@ -95,4 +95,4 @@ Al compilar desde el código, compila el ejecutable principal y fija `CARGO_TARG
 
 ### Exportaciones de red
 
-Zeek y Suricata son módulos experimentales compilados por defecto. Los artefactos V2 conservan la precisión temporal y usan el perfil de partición por host. En Zeek, `sensor_host` identifica explícitamente el sensor; `host` de HTTP es un dominio. No se deduce el host de la IP ni del nombre del fichero. Ambos lectores cuentan las líneas sobredimensionadas y continúan con los registros posteriores. Consulta los [módulos](modules.md) para sus límites.
+Zeek y Suricata son módulos experimentales compilados por defecto. La ingesta V3 actual conserva la precisión temporal y usan el perfil de partición por host. En Zeek, `sensor_host` identifica explícitamente el sensor; `host` de HTTP es un dominio. No se deduce el host de la IP ni del nombre del fichero. Ambos lectores cuentan las líneas sobredimensionadas y continúan con los registros posteriores. Consulta los [módulos](modules.md) para sus límites.

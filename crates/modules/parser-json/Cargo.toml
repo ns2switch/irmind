@@ -11,5 +11,8 @@ irmind-domain = { path = "../../domain", version = "0.1.0" }
 serde = "1"
 serde_json = "1"
 
+[dev-dependencies]
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+
 [lints]
 workspace = true

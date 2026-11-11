@@ -17,8 +17,8 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | ECS | NDJSON | ECS version and timestamp/characteristic fields | Event, host, user, source, destination, process, file, URL | experimental |
 | OCSF | JSON/NDJSON or local Parquet | Class, category and schema metadata; Parquet needs confirmation | Authentication, API, network, process, file and findings | experimental |
 | DFIR tools | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Format markers or exact CSV headers | Time, host, user, process, action and available entities | experimental |
-| Zeek | TSV headers or JSON for conn, dns, http, ssl, files, x509, notice and weird | Bounded header/field match; 95 for conn/DNS fixtures | Precise V2 time, source/destination endpoints, UID correlation, explicit sensor host | experimental |
-| Suricata EVE | alert, flow, dns, http, tls, fileinfo and anomaly JSONL | Supported event type, timestamp and flow ID; 95 | Precise V2 time, flow correlation, endpoints, unconfirmed detections and explicit host | experimental |
+| Zeek | TSV headers or JSON for conn, dns, http, ssl, files, x509, notice and weird | Bounded header/field match; 95 for conn/DNS fixtures | Precise time, source/destination endpoints, UID correlation, explicit sensor host | experimental |
+| Suricata EVE | alert, flow, dns, http, tls, fileinfo and anomaly JSONL | Supported event type, timestamp and flow ID; 95 | Precise time, flow correlation, endpoints, unconfirmed detections and explicit host | experimental |
 | Declarative | CSV, JSON, NDJSON or bounded regex | Exact header, required JSON pointers or sample regex; at most 70% | Explicit mapping described below | experimental |
 
 ## Current readers and existing cases
@@ -93,4 +93,4 @@ For a source build, build the main executable normally, set `CARGO_TARGET_DIR` t
 
 ### Network exports
 
-Zeek and Suricata are experimental modules compiled by default. Artifact V2 preserves subsecond time and uses the endpoint-host partition profile. Zeek's explicit `sensor_host` supplies the collector host; its HTTP `host` remains a domain. A missing sensor host is never inferred from an IP or filename. Correlation IDs are source observations, not confirmed attack paths. See [Zeek](modules.md#zeek-parser) and [Suricata](modules.md#suricata-eve-parser) for supported records and limits. Both readers count oversized lines, retain bounded rejected samples and continue with subsequent well-framed records.
+Zeek and Suricata are experimental modules compiled by default. Current V3 ingestion preserves subsecond time and uses the endpoint-host partition profile. Zeek's explicit `sensor_host` supplies the collector host; its HTTP `host` remains a domain. A missing sensor host is never inferred from an IP or filename. Correlation IDs are source observations, not confirmed attack paths. See [Zeek](modules.md#zeek-parser) and [Suricata](modules.md#suricata-eve-parser) for supported records and limits. Both readers count oversized lines, retain bounded rejected samples and continue with subsequent well-framed records.
