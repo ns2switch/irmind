@@ -909,3 +909,27 @@ Consequences: ordinary event-account searches keep their mandatory account
 predicate and cannot fetch detections. Model tools cannot change configuration.
 Instance mode makes tenant-wide coverage explicit; it grants no write action or
 ability to exceed the organization ceiling.
+## Experimental Elastic and Google SecOps reads
+
+Context: SIEM results need the same identified decoding, pure mapping and signed
+artifact pipeline as local sources. Provider-neutral query arguments must not
+become free-form provider expressions.
+
+Decision: Elastic uses an explicit read-only API key and generated Query DSL,
+with fixed index patterns, account, alert space and time filters. Google SecOps
+uses explicitly injected service-account JSON, fixed regional resources and
+escaped structured YARA-L queries with a mandatory account predicate in the default
+`event-account` mode. Use the
+already locked `ring = 0.17.14` for RS256 assertions instead of adding a separate
+JWT algorithm-selection library. OAuth audience, scope and destination are fixed.
+Credentials never come from ambient provider discovery.
+
+Consequences: raw responses remain signed evidence. Identified Elastic/UDM source
+decoders and separate mapping modules produce current V3 artifacts and support
+offline verification after disabling remote access. UDM repeated fields carry
+coverage diagnostics where the scalar common context cannot represent them;
+all validated IP values remain searchable. A security action does not imply an
+authentication outcome. Event-account mode cannot read detections through an API
+without an account filter. Both connectors remain experimental and have only
+synthetic contract validation. Insertion-ordered JSON CI also tests these source
+and mapping paths.
