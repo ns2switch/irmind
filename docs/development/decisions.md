@@ -1,5 +1,15 @@
 # Design decisions
 
+## Pre-1.0 fix publication
+
+Context: security-advisory and temporary-fork coordination delayed development fixes.
+
+Decision: publish fixes through ordinary public PRs, normal CI and main, then the next release, with a neutral technical changelog entry and known published-version exposure. Do not create or publish Security Advisories or temporary private forks. External reporters can use the issue/contact process in [SECURITY.md](../../SECURITY.md).
+
+Consequences: this supersedes the former coordinated-disclosure rule. It changes publication only; validation, taint, policy, approvals, signing, custody, TLS, isolation and resource limits remain mandatory. Analyst reports and environment-specific details remain private.
+
+The source-decoder corrections precede their first release in v0.3. The affected raw decoders were absent from v0.2.0, whose legacy readers already enforce these contracts. Retain the current valid-input goldens and wire layouts; development snapshots are subject to the pre-1.0 format policy and exact implementation bindings.
+
 ## Pre-1.0 format policy
 
 Context: pre-release compatibility layers obscure current implementation boundaries and delay source decoding and mapping work. Formats are still being designed.
