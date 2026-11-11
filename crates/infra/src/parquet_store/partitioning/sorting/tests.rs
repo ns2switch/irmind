@@ -246,3 +246,55 @@ fn natural_run_integrity_errors_and_cancellation_fail_closed_and_clean_up() {
         0
     );
 }
+
+#[test]
+fn independent_source_sorts_keep_identical_bytes_and_clean_runs_across_worker_caps() {
+    let input = tempfile::tempdir().unwrap();
+    let mut bytes = String::new();
+    for n in 0..90 {
+        writeln!(
+            bytes,
+            "{{\"eventTime\":\"2026-11-01T00:00:0{}Z\",\"eventName\":\"row-{n}\"}}",
+            n % 10
+        )
+        .unwrap();
+    }
+    std::fs::write(input.path().join("events.json"), bytes).unwrap();
+    let cancel = CancellationToken::new();
+    let mut reference = None;
+    for workers in [1, 2, 4] {
+        let root = tempfile::tempdir().unwrap();
+        let store = crate::LocalStore::open_precise(root.path()).unwrap();
+        store.set_parallel_worker_limit(std::num::NonZeroU16::new(workers));
+        let paths = ["events.json".into()];
+        let mut sources = (0..4)
+            .map(|_| stage_for_sort(&store.parquet, input.path(), &paths, &cancel))
+            .collect::<Vec<_>>();
+        store
+            .parquet
+            .sort_staged_sources(&case(), &mut sources, &cancel)
+            .unwrap();
+        let actual = sources
+            .iter()
+            .map(|source| {
+                (
+                    source.normalized_hash,
+                    std::fs::read(source.spool.path()).unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        if let Some(expected) = &reference {
+            assert_eq!(&actual, expected);
+        } else {
+            reference = Some(actual);
+        }
+        assert!(sources.iter().all(|source| !source.needs_sort));
+        drop(sources);
+        assert_eq!(
+            std::fs::read_dir(store.parquet.spool_dir(&case()).unwrap())
+                .unwrap()
+                .count(),
+            0
+        );
+    }
+}

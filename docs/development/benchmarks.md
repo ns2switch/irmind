@@ -1511,3 +1511,23 @@ measurement. An [earlier variant](https://github.com/ns2switch/irmind/actions/ru
 without the bounded prefix replayed the decoder at the first order break and
 took 95.952 s versus its own reference's 92.659 s. Both are single sweeps on
 separate runners; compare the pairs, not the absolute times between jobs.
+
+### NDJSON source framing in the sole-writer rollout
+
+The [1 GiB Linux sweep](https://github.com/ns2switch/irmind/actions/runs/42989218819) and [4 GiB Windows sweep](https://github.com/ns2switch/irmind/actions/runs/42985241365) each compare reference and candidate on the same four-CPU runner. The reference already includes record workers and parallel partition completion. Candidate `8fcd563f597bf829ae445724bd483fccf3d88015` retains the existing physical recipe and decodes complete NDJSON frames with their logical source offsets.
+
+| Input / runner | Setting | Ingest wall (s) | Peak process memory (MiB) |
+| --- | --- | ---: | ---: |
+| 1 GiB / Linux | Reference, four | 16.355 | 94.8 |
+| 1 GiB / Linux | One worker | 16.912 | 86.4 |
+| 1 GiB / Linux | Automatic, three | 15.075 | 87.5 |
+| 1 GiB / Linux | 4 workers | 14.593 | 94.1 |
+| 4 GiB / Windows | Reference, four | 83.463 | 78.6 |
+| 4 GiB / Windows | One worker | 94.130 | 66.6 |
+| 4 GiB / Windows | Automatic, three | 85.333 | 72.8 |
+| 4 GiB / Windows | 4 workers | 80.974 | 80.7 |
+
+At four workers, the candidate reduced ingestion by 10.8% on the 1 GiB workload and 3.0% on the 4 GiB workload relative to its same-runner reference. All settings accepted 663,212 / 2,652,851 records and wrote 48,510,482 / 194,200,266 artifact bytes respectively. Each setting has one measurement. Ingestion timing excludes input generation and subsequent verification; peak memory covers the complete benchmark process. The [machine-readable results](benchmark-data/current-ndjson-workers.json) retain the commits and exact counters. Worker-count tests separately compare complete artifact hashes and signed chains from the same initial case and clock.
+
+
+Disordered mapped groups sort independent source spools concurrently under the same adaptive worker cap. Space reservation covers every active sort; each sort retains its row-count, byte-count and hash checks. The coordinator still consumes sources in canonical order and assigns all partitions and physical file boundaries. Parallel completion remains enabled after those boundaries have been fixed.
