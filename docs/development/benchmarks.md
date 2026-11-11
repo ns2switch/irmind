@@ -1641,3 +1641,40 @@ counters every 20 ms and includes generation and verification; ingestion wall
 time excludes those phases. Small differences between settings are single-run
 observations, not evidence of helper scaling.
 [Machine-readable results](benchmark-data/current-mapped-evtx-workers.json).
+
+
+### Contained EVTX chunk workers
+
+The [native release sweep](https://github.com/ns2switch/irmind/actions/runs/43104017908)
+processes one 1 GiB synthetic EVTX through the contained helper, source decoder,
+identified mapping, direct V3 writer and signed custody. All records are accepted,
+no limit is reached, and final full verification succeeds. Windows executes one
+network witness per session. These are single measurements per setting; compare
+worker settings within the same job, not wall times from different jobs.
+
+| System | Requested workers | Ingest s | Main peak MiB | Helper peak MiB |
+| --- | ---: | ---: | ---: | ---: |
+| Linux | 1 | 35.887 | 73.91 | 3.45 |
+| Linux | 4 | 39.455 | 91.26 | 6.29 |
+| Linux | None | 39.233 | 77.92 | 5.16 |
+| Windows | 1 | 24.024 | 68.10 | 6.00 |
+| Windows | 4 | 25.385 | 67.70 | 7.34 |
+| Windows | None | 25.575 | 67.27 | 6.54 |
+| Darwin | 1 | 58.297 | 358.95 | 7.41 |
+| Darwin | 4 | 59.764 | 358.20 | 9.08 |
+| Darwin | 3 | 54.655 | 358.97 | 9.19 |
+| Darwin | None | 46.905 | 358.33 | 8.77 |
+
+Linux and Windows runners expose four cores; the macOS runner exposes three,
+so a request for four is capped at three. Automatic selection reserves one core.
+Linux and Windows sample OS process high-water counters; macOS samples resident
+size with `ps`, which is not an OS high-water measurement. Memory includes the
+separate verification phase. Ingestion time excludes verification and generation.
+
+Parallel chunk decoding does not improve total ingestion at four workers in this
+run: Linux is 0.91x and Windows 0.95x as fast as one worker. The three-core macOS
+samples vary and do not establish scaling. Bounded batching avoids per-record
+channel hand-offs but leaves canonical mapping, writing and custody work in the
+main pipeline. Queue, mapping, encoding and file-write counters are needed to
+separate those costs before attributing the remaining serial fraction.
+[Full measurements](benchmark-data/evtx-parallel-native-workers.json).
