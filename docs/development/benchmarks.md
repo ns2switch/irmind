@@ -1436,3 +1436,30 @@ The [same-runner release sweep](https://github.com/ns2switch/irmind/actions/runs
 | Adaptive, cap four (all CPUs) | 44.391 | 1.49× | 109.9 | 0.389 |
 
 One run per setting. The four-worker cap matched the fixed reference's elapsed time. Automatic mode took 8.3% longer while leaving a logical CPU available. This sweep measures scheduling across files, not decoding a single large file.
+
+### Record workers in a single source
+
+The [release sweep on one four-CPU Linux runner](https://github.com/ns2switch/irmind/actions/runs/42927078536) ingested one 1 GiB NDJSON file (663,212 records). All settings wrote 48,510,482 bytes of mapped V3 artifacts.
+
+| Scheduling | Ingest wall (s) | Peak RSS (MiB) |
+| --- | ---: | ---: |
+| Reference, sequential record decoder | 20.091 | 72.4 |
+| Candidate, one worker | 19.390 | 64.7 |
+| Candidate, automatic (three) | 19.257 | 72.6 |
+| Candidate, four workers | 18.898 | 72.2 |
+
+Four workers were 5.9% faster than the reference and 2.5% faster than one worker in the candidate. These are single runs. The result includes hashing, mapping, Parquet, and signed custody, so it does not isolate decoding throughput.
+
+The [isolated EVTX trial](https://github.com/ns2switch/irmind/actions/runs/42926652010) used a single 1 GiB synthetic source with 1,048,576 records. It compared the same native broker path and V2 test writer on each runner. The process and helper peaks are separate, not summed.
+
+| System | Helper worker setting | Ingest (s) | Parent / helper peak (MiB) |
+| --- | --- | ---: | ---: |
+| Linux | One (unchanged) | 36.17 | 289.1 / 3.4 |
+| macOS | One | 49.90 | 183.2 / 7.6 |
+| macOS | Cap four | 49.64 | 182.9 / 8.0 |
+| macOS | All available, within the cap | 47.79 | 182.7 / 8.1 |
+| Windows | One | 78.49 | 155.9 / 6.1 |
+| Windows | Cap four | 89.28 | 156.6 / 6.9 |
+| Windows | All available, within the cap | 87.19 | 157.1 / 6.9 |
+
+No limits were reached. Every Windows run used one network witness. The trial preserved frame bytes and passed the native containment tests. The Windows regression and the small macOS difference do not justify enabling the trial for shipped helpers. Linux remains sequential under its existing seccomp policy.

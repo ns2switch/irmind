@@ -297,18 +297,26 @@ jobs:
 
   worker_sweep:
     if: ${{ inputs.worker_sweep }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.worker_workload == 'ndjson-4gib' && 'windows-latest' || 'ubuntu-24.04' }}
     timeout-minutes: 90
+    env:
+      RUSTFLAGS: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false, fetch-depth: 0}
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: worker-sweep-linux
+          key: worker-sweep-${{ runner.os }}
           save-if: ${{ github.ref_name == 'main' }}
-      - run: sudo apt-get update && sudo apt-get install -y mold time
+      - name: Configure the Linux linker and RSS measurement
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y mold time
+          echo 'RUSTFLAGS=-C link-arg=-fuse-ld=mold' >> "$GITHUB_ENV"
       - name: Compare fixed and adaptive workers
+        shell: bash
         env:
           BASE_REF: ${{ inputs.compare_base }}
           WORKER_WORKLOAD: ${{ inputs.worker_workload }}
