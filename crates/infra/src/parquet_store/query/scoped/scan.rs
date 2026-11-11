@@ -34,7 +34,7 @@ impl QueryStore<'_> {
             Predicate::Equal("entity_kind", selected.kind.into()),
             Predicate::Equal("entity_value", selected.value.into()),
         ]);
-        spec.schema = "irmind-coobservations-v1";
+        spec.schema = "irmind-coobservations-v3";
         spec.columns = &[
             "entity_kind",
             "entity_value",

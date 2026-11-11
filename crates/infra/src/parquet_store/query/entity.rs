@@ -25,7 +25,7 @@ impl QueryStore<'_> {
                 id,
                 artifacts,
                 filter,
-                schema: "irmind-entities-v1",
+                schema: "irmind-entities-v4",
                 columns: &["event_time", "event", "source_hash", "record_index"],
                 predicates: &rules,
                 deadline: Instant::now() + QUERY_DEADLINE,
@@ -70,47 +70,10 @@ impl QueryStore<'_> {
         value: &str,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        if super::scoped::available(artifacts) {
-            return self.scoped_entity(id, artifacts, filter, kind, value, cancel);
+        super::require_current(artifacts)?;
+        if artifacts.is_empty() {
+            return Ok(format!("{kind} {value}: count=0; first=; last="));
         }
-
-        let mut rules = time_rules(filter);
-        rules.extend([
-            Predicate::Equal("entity_kind", kind.into()),
-            Predicate::Equal("entity_value", value.into()),
-        ]);
-        let (mut count, mut first, mut last) = (
-            0u64,
-            None::<super::super::time_cell::TimeCell>,
-            None::<super::super::time_cell::TimeCell>,
-        );
-        let status = self.scan_artifacts(
-            ScanSpec {
-                id,
-                artifacts,
-                filter,
-                schema: "irmind-entities-v1",
-                columns: &["event_time"],
-                predicates: &rules,
-                deadline: Instant::now() + QUERY_DEADLINE,
-                cancel,
-            },
-            |batch| {
-                super::extrema::accumulate(
-                    batch,
-                    &mut count,
-                    &mut first,
-                    &mut last,
-                    self.store.profile.as_deref(),
-                )?;
-                Ok(ScanFlow::Continue)
-            },
-        )?;
-        complete(status)?;
-        Ok(format!(
-            "{kind} {value}: count={count}; first={}; last={}",
-            first.map_or_else(String::new, |t| t.display()),
-            last.map_or_else(String::new, |t| t.display())
-        ))
+        self.scoped_entity(id, artifacts, filter, kind, value, cancel)
     }
 }

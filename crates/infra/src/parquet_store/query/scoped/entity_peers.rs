@@ -1,4 +1,4 @@
-//! Original entity-only artifacts remain readable without inventing roles.
+//! Typed entity fallback for a selected inventory without complete co-observations.
 use super::scan::{Candidates, subject};
 use super::{Node, Selection};
 use crate::parquet_store::query::{MAX_NEIGHBOR_RECORDS, QueryStore, number, text, time_rules};
@@ -30,7 +30,7 @@ impl QueryStore<'_> {
         let mut sampled = false;
         let status = self.scan_artifacts(
             ScanSpec {
-                schema: "irmind-entities-v1",
+                schema: "irmind-entities-v4",
                 columns: COLUMNS,
                 predicates: &rules,
                 ..spec
@@ -78,7 +78,7 @@ impl QueryStore<'_> {
         let status = self.scan_artifacts(
             ScanSpec {
                 filter: &filter,
-                schema: "irmind-entities-v1",
+                schema: "irmind-entities-v4",
                 columns: COLUMNS,
                 predicates: &time_rules(&filter),
                 ..spec

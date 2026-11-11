@@ -3,7 +3,6 @@ use crate::parquet_store::scan::{Predicate, ScanFlow, ScanSpec, ScanStatus};
 use arrow::array::{StringArray, UInt64Array};
 use arrow::record_batch::RecordBatch;
 use irmind_domain::GraphQueryFilter;
-use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 pub(crate) struct QueryStore<'a> {
@@ -27,6 +26,7 @@ impl QueryStore<'_> {
         spec: ScanSpec<'_>,
         visit: impl FnMut(&RecordBatch) -> Result<ScanFlow, AppError>,
     ) -> Result<ScanStatus, AppError> {
+        require_current(spec.artifacts)?;
         self.store.scan_artifacts(spec, self.source_names, visit)
     }
 }
@@ -44,12 +44,6 @@ use coobservations::coobservation_available;
 
 pub(super) const QUERY_DEADLINE: Duration = Duration::from_secs(10);
 pub(super) const MAX_NEIGHBOR_RECORDS: usize = 4096;
-
-pub(super) struct TargetScan {
-    pub records: HashMap<String, HashSet<u64>>,
-    pub sampled: bool,
-    pub status: ScanStatus,
-}
 
 #[derive(Clone, Eq, PartialEq)]
 pub(super) struct EventHit {
@@ -146,4 +140,17 @@ fn ordered(rows: &mut Vec<EventHit>, limit: usize, newest: bool) -> Result<(), A
     rows.dedup_by(|a, b| a.hash == b.hash && a.index == b.index);
     rows.truncate(limit);
     Ok(())
+}
+
+fn require_current(artifacts: &[ParquetArtifact]) -> Result<(), AppError> {
+    if artifacts
+        .iter()
+        .all(|a| matches!(a, ParquetArtifact::V3(_)))
+    {
+        Ok(())
+    } else {
+        Err(AppError::Fixed(
+            irmind_app::FixedAppError::RetiredCaseFormat,
+        ))
+    }
 }

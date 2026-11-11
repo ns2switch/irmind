@@ -3,6 +3,7 @@ use super::Partition;
 use super::{AppError, EvidenceHash, GraphRecord, invalid_source, storage};
 #[cfg(test)]
 use chrono::{DateTime, SecondsFormat, Utc};
+#[cfg(test)]
 use serde_json::Value;
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(in crate::parquet_store) struct RecordRow {
@@ -137,6 +138,7 @@ impl RecordRow {
     }
 }
 
+#[cfg(test)]
 pub(super) fn first_string<'a>(value: &'a Value, pointers: &[&str]) -> &'a str {
     pointers
         .iter()
@@ -161,6 +163,7 @@ pub(in crate::parquet_store) fn safe_partition(value: &str) -> String {
     )
 }
 
+#[cfg(test)]
 pub(in crate::parquet_store) fn raw_host(value: &Value) -> &str {
     first_string(
         value,

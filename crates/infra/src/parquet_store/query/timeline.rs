@@ -13,13 +13,14 @@ impl QueryStore<'_> {
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<Vec<TimelineEvent>, AppError> {
+        super::require_current(artifacts)?;
         let rules = time_rules(filter);
         let hits = self.timeline_hits(
             ScanSpec {
                 id,
                 artifacts,
                 filter,
-                schema: "irmind-events-v2",
+                schema: "irmind-events-v4",
                 columns: &["event_time", "event", "source_hash", "record_index"],
                 predicates: &rules,
                 deadline: Instant::now() + QUERY_DEADLINE,
