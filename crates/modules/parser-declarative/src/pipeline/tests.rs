@@ -212,3 +212,21 @@ fn extraction_descriptor_has_a_fixed_golden_digest() {
     );
     assert!(irmind_app::definition_mapping_descriptor(&hash, b"unknown-build").is_err());
 }
+
+#[test]
+fn definition_field_limit_also_bounds_array_values_in_the_source_decoder() {
+    let definition = CASES[1].0.to_owned() + "\n[limits]\nfields = 6\n";
+    let pipeline = compile(&definition).unwrap();
+    let valid = br#"{"custom_event":{"time":"2026-11-01T00:00:00Z","host":"test","action":"login"},"unused":[1]}"#;
+    let invalid = br#"{"custom_event":{"time":"2026-11-01T00:00:00Z","host":"test","action":"login"},"unused":[1,2,3]}"#;
+    let (accepted, rows) = decode(&pipeline, valid);
+    assert_eq!(
+        (accepted.accepted, accepted.rejected, rows.len()),
+        (1, 0, 1)
+    );
+    let (rejected, rows) = decode(&pipeline, invalid);
+    assert_eq!(
+        (rejected.accepted, rejected.rejected, rows.len()),
+        (0, 1, 0)
+    );
+}

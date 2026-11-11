@@ -94,8 +94,9 @@ fn lines(
             }
             let start = offset;
             offset = offset.checked_add(consumed).ok_or_else(limit)?;
-            if !bytes.iter().all(u8::is_ascii_whitespace) {
-                return Ok(Some((bytes, start, false)));
+            let oversized = consumed > irmind_domain::SOURCE_MAX_BYTES as u64;
+            if oversized || !bytes.iter().all(u8::is_ascii_whitespace) {
+                return Ok(Some((bytes, start, oversized)));
             }
         },
         emit,

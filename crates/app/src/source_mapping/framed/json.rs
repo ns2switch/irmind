@@ -54,8 +54,9 @@ pub fn decode_json_source(
                     }
                     let start = offset;
                     offset += size;
-                    if !bytes.iter().all(u8::is_ascii_whitespace) {
-                        return Ok(Some((bytes, Some(start), false)));
+                    let oversized = size > irmind_domain::SOURCE_MAX_BYTES as u64;
+                    if oversized || !bytes.iter().all(u8::is_ascii_whitespace) {
+                        return Ok(Some((bytes, Some(start), oversized)));
                     }
                 }
             },
@@ -131,3 +132,7 @@ fn line_frame(
         }
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests;

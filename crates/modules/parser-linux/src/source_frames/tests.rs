@@ -216,3 +216,10 @@ fn journal_message_words_and_colons_do_not_select_the_auth_framer() {
     );
     assert!(rows[0].fields().field("outcome").is_none());
 }
+
+#[test]
+fn an_orphan_audit_terminator_is_a_partial_event() {
+    let (report, rows) = decoded(b"type=EOE msg=audit(1793491200.1:1):\n", None);
+    assert_eq!((report.accepted, report.rejected), (1, 0));
+    assert!(rows[0].annotations().partial());
+}

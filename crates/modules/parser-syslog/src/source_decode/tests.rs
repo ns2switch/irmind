@@ -81,3 +81,17 @@ fn gzip_is_streamed_without_invented_compressed_record_offsets() {
     assert_eq!(rows[0].annotations().members()[0].offset, None);
     assert_eq!(rows[0].format().id(), "syslog-gzip");
 }
+
+#[test]
+fn oversized_whitespace_prefix_is_counted_without_losing_later_rows() {
+    let raw = b"<34>1 2026-11-01T00:00:00Z host app 42 - - synthetic\n";
+    let prefix = 1024 * 1024 + 1;
+    let input = [raw.as_slice(), &vec![b' '; prefix], raw, raw].concat();
+    let (report, rows) = records(&input, None).unwrap();
+    assert_eq!((report.accepted, report.rejected), (2, 1));
+    assert_eq!(rows[1].annotations().members()[0].ordinal, 2);
+    assert_eq!(
+        rows[1].origin().offset(),
+        Some((prefix + 2 * raw.len()) as u64)
+    );
+}

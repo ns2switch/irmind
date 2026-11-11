@@ -193,7 +193,12 @@ impl Decoder {
                         bytes: parser.definition.limits.record_bytes,
                         depth: parser.definition.limits.depth,
                         fields: parser.definition.limits.fields,
-                        ..Default::default()
+                        nodes: parser
+                            .definition
+                            .limits
+                            .fields
+                            .saturating_add(1)
+                            .min(irmind_domain::SOURCE_MAX_NODES),
                     },
                 )
                 .map_err(|_| error("invalid JSON source or parser limit"));
