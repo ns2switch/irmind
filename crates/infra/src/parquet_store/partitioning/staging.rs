@@ -4,8 +4,9 @@ use super::super::{
     SourceManifestV1, StreamingEventParser, invalid_source, storage,
 };
 use super::temporary::DiskLease;
-use sha2::{Digest, Sha256};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom};
+mod row_spool;
+pub(super) use row_spool::RowSpool;
 
 const EXPANSION_RESERVATION: u64 = 16;
 const MARGIN: u64 = 64 * 1024 * 1024;
@@ -92,17 +93,9 @@ impl ParquetStore {
         let value = irmind_domain::EvidenceHash::parse(&irmind_app::hex(&hash))
             .map_err(|_| invalid_source())?;
         let sample = source_sample(&mut input.file)?;
-        let mut spool = self.create_normalized_spool(case)?;
-        if let Some(profile) = &self.profile {
-            profile.record_staged_source();
-        }
-        let mut writer = std::io::BufWriter::new(spool.as_file_mut());
-        let mut bytes = 0u64;
-        let mut normalized_hash = Sha256::new();
-        let mut accepted = 0usize;
+        let mut spool = RowSpool::new(self, case, input.budget)?;
         let mut position = None;
         let mut needs_sort = false;
-        let mut disk = DiskLease::new(self.profile.clone());
         let (report, mapping) = self.parse_normalized(
             case,
             stream::VerifiedInput {
@@ -128,41 +121,21 @@ impl ParquetStore {
                         .is_gt();
                 }
                 position = Some(key);
-                let encoded = serde_json::to_vec(&row).map_err(storage)?;
-                let count = u64::try_from(encoded.len()).map_err(storage)? + 1;
-                bytes = bytes.checked_add(count).ok_or_else(no_space)?;
-                if count > MAX_STAGED_ROW || bytes > input.budget {
-                    return Err(no_space());
-                }
-                normalized_hash.update(&encoded);
-                normalized_hash.update(b"\n");
-                accepted = accepted.checked_add(1).ok_or_else(invalid_source)?;
-                writer.write_all(&encoded).map_err(storage)?;
-                writer.write_all(b"\n").map_err(storage)?;
-                disk.add(count)?;
-                Ok(())
+                spool.push(&row)
             },
         )?;
-        writer.flush().map_err(storage)?;
-        drop(writer);
-        if report.accepted == 0 || report.accepted != accepted {
-            return Err(invalid_source());
-        }
+        let completed = spool.finish(report.accepted)?;
         verify_source_unchanged(&input.file, &metadata, &value)?;
-        spool
-            .as_file_mut()
-            .seek(SeekFrom::Start(0))
-            .map_err(storage)?;
         Ok(StagedSource {
             mapping,
-            spool,
+            spool: completed.file,
             source: input.file,
             manifest: Self::source_manifest(&input.path, &metadata, size, value, copied)?,
             report,
             sample_hash: irmind_app::sha256(&sample),
-            normalized_hash: normalized_hash.finalize().into(),
+            normalized_hash: completed.hash,
             needs_sort,
-            disk,
+            disk: completed.disk,
         })
     }
 }
