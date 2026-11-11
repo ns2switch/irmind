@@ -93,6 +93,8 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | OpenRouter | LLM | `llm-openrouter` | experimental | [Módulos](docs/es/modules.md) |
 | Splunk | SIEM | `siem-splunk` | experimental | [Módulos](docs/es/modules.md) |
 | Elasticsearch / Elastic Security | SIEM | `siem-elastic` | experimental | [Elastic](docs/es/modules.md#elasticsearch-y-elastic-security) |
+
+| Google SecOps (Chronicle) | SIEM | `siem-chronicle` | experimental | [Chronicle](docs/es/modules.md#google-secops-chronicle) |
 | AWS CloudTrail e IAM | nube | `cloud-aws` | experimental | [Módulos](docs/es/modules.md) |
 | Almacenamiento S3 | almacenamiento en nube | `storage-s3` | experimental | [Objetos](docs/es/modules.md#almacenamiento-de-objetos-en-la-nube-s3-gcs-y-azure-blob) |
 | Almacenamiento GCS | almacenamiento en nube | `storage-gcs` | experimental | [Objetos](docs/es/modules.md#almacenamiento-de-objetos-en-la-nube-s3-gcs-y-azure-blob) |

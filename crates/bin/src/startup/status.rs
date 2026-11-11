@@ -132,6 +132,11 @@ fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
 
 fn append_product_statuses(cli: &Cli, builder: &mut StatusBuilder<'_>) {
     builder.push(
+        "siem-chronicle",
+        cfg!(feature = "siem-chronicle"),
+        cli.enable_chronicle,
+    );
+    builder.push(
         "siem-elastic",
         cfg!(feature = "siem-elastic"),
         cli.enable_elastic,

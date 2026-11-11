@@ -39,6 +39,8 @@ pub(super) fn label(id: &str) -> &'static str {
         "llm-openrouter" => "OpenRouter",
         "siem-splunk" => "Splunk",
         "siem-elastic" => "Elasticsearch / Elastic Security",
+
+        "siem-chronicle" => "Google SecOps (Chronicle)",
         "edr-crowdstrike" => "CrowdStrike",
         "edr-sentinelone" => "SentinelOne",
         "cloud-aws" => "AWS CloudTrail",

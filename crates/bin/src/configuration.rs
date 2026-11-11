@@ -24,6 +24,8 @@ pub(super) fn compiled_manifests() -> Vec<&'static ModuleManifest> {
         &irmind_mod_siem_splunk::MANIFEST,
         #[cfg(feature = "siem-elastic")]
         &irmind_mod_siem_elastic::MANIFEST,
+        #[cfg(feature = "siem-chronicle")]
+        &irmind_mod_siem_chronicle::MANIFEST,
         #[cfg(feature = "cloud-aws")]
         &irmind_mod_cloud_aws::MANIFEST,
         #[cfg(feature = "storage-s3")]
@@ -51,6 +53,11 @@ pub(super) fn selection_overrides(cli: &Cli) -> HashSet<String> {
     for (id, env_name, flagged) in [
         ("siem-splunk", "IRMIND_ENABLE_SPLUNK", cli.enable_splunk),
         ("siem-elastic", "IRMIND_ENABLE_ELASTIC", cli.enable_elastic),
+        (
+            "siem-chronicle",
+            "IRMIND_ENABLE_CHRONICLE",
+            cli.enable_chronicle,
+        ),
         ("cloud-aws", "IRMIND_ENABLE_AWS", cli.enable_aws),
         (
             "storage-s3",
@@ -165,6 +172,12 @@ pub(super) fn resolve_cli(
     }
     resolve!(enable_splunk, "IRMIND_ENABLE_SPLUNK", "siem-splunk");
     resolve!(enable_elastic, "IRMIND_ENABLE_ELASTIC", "siem-elastic");
+
+    resolve!(
+        enable_chronicle,
+        "IRMIND_ENABLE_CHRONICLE",
+        "siem-chronicle"
+    );
     resolve!(enable_aws, "IRMIND_ENABLE_AWS", "cloud-aws");
     resolve!(enable_storage_s3, "IRMIND_ENABLE_STORAGE_S3", "storage-s3");
     resolve!(
@@ -202,6 +215,8 @@ fn restore_saved_cli(cli: &mut Cli, saved: &PersistentConfig) {
     cli.policy = saved.policy_path.as_ref().map(Into::into);
     cli.enable_splunk = enabled("siem-splunk");
     cli.enable_elastic = enabled("siem-elastic");
+
+    cli.enable_chronicle = enabled("siem-chronicle");
     cli.enable_aws = enabled("cloud-aws");
     cli.enable_storage_s3 = enabled("storage-s3");
     cli.enable_storage_gcs = enabled("storage-gcs");

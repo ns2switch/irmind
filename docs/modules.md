@@ -313,3 +313,17 @@ The `mapping-evtx` feature compiles independent bundled TOML mappings for Securi
 Event responses are preserved as signed raw evidence, then decoded and mapped by the identified ECS mapping into current Parquet artifacts. Nanosecond timestamps and source hit ordinals remain available. Aggregations stay signed tool results rather than fabricated events. Offline verification keeps the stateless decoder and mapping available when the remote connector is disabled.
 
 Official references: [search API](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-search), [alert index aliases](https://www.elastic.co/docs/solutions/security/detect-and-alert/query-alert-indices) and [alert fields](https://www.elastic.co/docs/reference/security/fields-and-object-schemas/alert-schema). Alert requests use `fields` rather than `_source`.
+
+## Google SecOps (Chronicle)
+
+**Status:** Experimental. Contract tests use synthetic recordings; no live tenant validation is claimed.
+
+**Purpose:** Search UDM events through Google SecOps API `v1alpha`, using a structured query. The connector generates YARA-L 2.0; the model cannot supply query text. Credentials come only from the configured secret backend.
+
+**Permissions:** Grant `chronicle.events.udmSearch` on the configured instance and authorize the `https://www.googleapis.com/auth/chronicle` OAuth scope. Use a dedicated read-only service account. Store its JSON key as `IRMIND_CHRONICLE_SERVICE_ACCOUNT_JSON` in `/settings keystore`. Ambient Google credentials are never discovered. Rotate and remove the key when it is no longer needed.
+
+**Configure:** In `/settings connectors`, set `IRMIND_CHRONICLE_URL` to the instance's regional HTTPS origin, such as `https://europe-west2-chronicle.googleapis.com/`. Set `IRMIND_CHRONICLE_PROJECT`, `IRMIND_CHRONICLE_LOCATION`, `IRMIND_CHRONICLE_INSTANCE`, and a unique `IRMIND_CHRONICLE_SOURCE_ID`. Set `IRMIND_CHRONICLE_ACCOUNT_FIELD` to the UDM field that actually identifies the account in your telemetry. The query always includes that account predicate and the case's UTC window. Include the source and account in the case and organization scopes before enabling the connector. Configuration changes use the existing signed confirmation flow.
+
+**Limits:** At most 20 events or aggregation buckets, a 24-hour window, a 45-second HTTP timeout and a 5 MB response. Redirects are disabled. Provider truncation markers remain in the signed response. Account-scoped mode does not read detections through an API that cannot enforce an account filter. Query support is limited to the same field comparisons and aggregations as the other SIEM connectors. This API is pre-GA and may change.
+
+The implementation follows the official [UDM search method](https://docs.cloud.google.com/chronicle/docs/reference/rest/v1alpha/projects.locations.instances/udmSearch). Results are untrusted evidence; generated query values are escaped, and configuration errors never include the service-account key.

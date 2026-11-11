@@ -281,3 +281,17 @@ La feature `mapping-evtx` compila mapeos TOML independientes para Security, Syst
 Las respuestas de eventos se conservan como evidencia cruda firmada y pasan por el decodificador y el mapeo ECS identificados para generar artefactos Parquet. Se conservan los nanosegundos y la posición del resultado. Las agregaciones siguen siendo resultados firmados, no eventos inventados. El decodificador y el mapeo permanecen disponibles para verificar sin conexión aunque el conector remoto esté deshabilitado.
 
 Referencias oficiales: [API de búsqueda](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-search), [alias de alertas](https://www.elastic.co/docs/solutions/security/detect-and-alert/query-alert-indices) y [campos de alertas](https://www.elastic.co/docs/reference/security/fields-and-object-schemas/alert-schema).
+
+## Google SecOps (Chronicle)
+
+**Estado:** Experimental. Los contratos usan respuestas sintéticas; no se afirma validación contra un servicio real.
+
+**Uso:** Busca eventos UDM mediante la API `v1alpha` de Google SecOps. El conector genera YARA-L 2.0 a partir de la consulta estructurada; el modelo no proporciona texto de consulta libre.
+
+**Permisos:** Concede `chronicle.events.udmSearch` sobre la instancia configurada y autoriza el ámbito OAuth `https://www.googleapis.com/auth/chronicle`. Usa una cuenta de servicio dedicada de solo lectura. Guarda su clave JSON como `IRMIND_CHRONICLE_SERVICE_ACCOUNT_JSON` en `/settings keystore`. Nunca se buscan credenciales ambientales de Google. Rota y elimina la clave cuando deje de ser necesaria.
+
+**Configuración:** En `/settings connectors`, indica el origen regional HTTPS en `IRMIND_CHRONICLE_URL`, por ejemplo `https://europe-west2-chronicle.googleapis.com/`. Configura `IRMIND_CHRONICLE_PROJECT`, `IRMIND_CHRONICLE_LOCATION`, `IRMIND_CHRONICLE_INSTANCE` e `IRMIND_CHRONICLE_SOURCE_ID`. `IRMIND_CHRONICLE_ACCOUNT_FIELD` debe identificar realmente la cuenta en tu telemetría UDM. Todas las consultas imponen esa cuenta y la ventana UTC del caso en el servidor. Incluye el origen y la cuenta en los alcances del caso y de la organización antes de habilitarlo. Se mantienen la confirmación y la operación firmada de configuración.
+
+**Límites:** Hasta 20 eventos o grupos, ventana de 24 horas, timeout HTTP de 45 segundos y respuesta de 5 MB. No sigue redirecciones. Conserva los indicadores de truncado del proveedor en la evidencia firmada. El modo limitado a una cuenta rechaza las lecturas de detecciones cuya API no impone ese filtro. La API es preliminar y puede cambiar.
+
+Referencia: [método oficial de búsqueda UDM](https://docs.cloud.google.com/chronicle/docs/reference/rest/v1alpha/projects.locations.instances/udmSearch). Los resultados se tratan como evidencia no confiable; los valores de consulta se escapan y los errores no incluyen la clave.
