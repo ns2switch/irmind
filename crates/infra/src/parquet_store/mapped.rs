@@ -1,5 +1,7 @@
 //! Frozen source decoding and pure mapping, before any signed output exists.
 mod decode;
+mod ordered_pool;
+mod prepare;
 mod projection;
 mod rebuild;
 use super::{AppError, ParquetStore};

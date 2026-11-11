@@ -362,3 +362,56 @@ fn buffered_commitment_rejects_changes_on_both_sides_of_the_read_boundary() {
 }
 
 mod offsets;
+
+#[test]
+fn prepared_records_preserve_canonical_tuples_and_commitments() {
+    let source = SourceReferenceV1::file("logs/record.json").unwrap();
+    let cancel = CancellationToken::new();
+    let catalog = MappingCatalog::freeze(vec![Arc::new(Decoder)], vec![]).unwrap();
+    let mut sequential = accumulator(&source, &cancel, &catalog);
+    let mut parallel = accumulator(&source, &cancel, &catalog);
+    let mut a = Cursor::new(Vec::new());
+    let mut b = Cursor::new(Vec::new());
+    let preparer = parallel.preparer();
+    // Preparation may complete backwards; only ordered commit mutates accounting.
+    let later = preparer.prepare(record(1, 20)).unwrap();
+    let first = preparer.prepare(record(0, 0)).unwrap();
+    for (n, offset) in [(0, 0), (1, 20)] {
+        sequential.accept(&record(n, offset), &mut a).unwrap();
+    }
+    parallel.accept_prepared(first, &mut b).unwrap();
+    parallel.accept_prepared(later, &mut b).unwrap();
+    assert_eq!(a.get_ref(), b.get_ref());
+    let a = sequential.finish(&mut a, &report(2)).unwrap();
+    let b = parallel.finish(&mut b, &report(2)).unwrap();
+    assert_eq!(a.commitment(), b.commitment());
+    assert_eq!(a.records(), b.records());
+    assert_eq!(a.routes(), b.routes());
+}
+
+#[test]
+fn prepared_records_remain_bound_to_catalog_source_order_and_cancellation() {
+    let source = SourceReferenceV1::file("logs/record.json").unwrap();
+    let cancel = CancellationToken::new();
+    let catalog = MappingCatalog::freeze(vec![Arc::new(Decoder)], vec![]).unwrap();
+    let other = MappingCatalog::freeze(vec![Arc::new(Decoder)], vec![]).unwrap();
+    let mut acc = accumulator(&source, &cancel, &catalog);
+    let other_acc = accumulator(&source, &cancel, &other);
+    let mut spool = Cursor::new(Vec::new());
+    let foreign = other_acc.preparer().prepare(record(0, 0)).unwrap();
+    assert!(acc.accept_prepared(foreign, &mut spool).is_err());
+    assert!(spool.get_ref().is_empty());
+    assert!(acc.preparer().prepare(record(0, 100)).is_err());
+    let preparer = acc.preparer();
+    let first = preparer.prepare(record(0, 0)).unwrap();
+    let repeated = preparer.prepare(record(0, 0)).unwrap();
+    let next = preparer.prepare(record(1, 20)).unwrap();
+    acc.accept_prepared(first, &mut spool).unwrap();
+    assert!(acc.accept_prepared(repeated, &mut spool).is_err());
+    cancel.cancel();
+    assert!(matches!(
+        acc.accept_prepared(next, &mut spool),
+        Err(AppError::Cancelled)
+    ));
+    assert_eq!(spool.get_ref().len(), 49);
+}
