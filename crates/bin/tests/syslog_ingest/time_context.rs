@@ -5,13 +5,7 @@ use irmind_app::{
 };
 
 fn catalog() -> ParserCatalog {
-    let mut registry = ModuleRegistry::new();
-    registry
-        .register(Box::new(SyslogParser::default()), &ModuleConfig::new())
-        .unwrap();
-    registry.parser_catalog().with_resolver(Arc::new(
-        irmind_mod_parser_syslog::HistoricalResolver::new(None),
-    ))
+    current_sources::catalog()
 }
 fn context(year: u16) -> ParserTimeContext {
     ParserTimeContext::new(year, 60, true, ParserTimeBasis::Analyst).unwrap()
@@ -24,7 +18,7 @@ fn signed_per_file_contexts_rebuild_independently_and_old_manifests_keep_their_b
     let root = tempfile::tempdir().unwrap();
     let sources = root.path().join("sources");
     fs::create_dir(&sources).unwrap();
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("case")));
     let parser = Arc::new(SyslogParser::default());
     let engine = engine(&store, &parser);
     let case = engine.create_case("Per-ingestion time", "local").unwrap();
@@ -70,15 +64,15 @@ fn signed_per_file_contexts_rebuild_independently_and_old_manifests_keep_their_b
         .collect::<Vec<_>>();
     assert_eq!(manifests.len(), 2);
     for (source, year) in manifests.iter().zip([2025, 2027]) {
-        assert!(
-            source
-                .timestamp_context
-                .as_ref()
-                .unwrap()
-                .contains(&format!(
-                    "first_year={year};offset_minutes=60;rollover=december-january;basis=analyst"
-                ))
-        );
+        let context = irmind_app::source_mapping::decode_source_time_context(
+            source.timestamp_context.as_deref(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(context.year(), year);
+        assert_eq!(context.offset_minutes(), 60);
+        assert!(context.rollover());
+        assert_eq!(context.basis(), ParserTimeBasis::Analyst);
         assert_eq!(source.confidence, 90);
     }
     let router = catalog.rebuild_router(&before).unwrap();
@@ -115,8 +109,9 @@ fn missing_context_is_audited_and_late_detection_rolls_back_the_source() {
     let root = tempfile::tempdir().unwrap();
     let sources = root.path().join("sources");
     fs::create_dir(&sources).unwrap();
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("case")));
     let parser = Arc::new(SyslogParser::default());
+    let source_parser = irmind_mod_parser_syslog::source_log_parser();
     let engine = engine(&store, &parser);
     let case = engine.create_case("No inferred defaults", "local").unwrap();
     let catalog = catalog();
@@ -150,7 +145,7 @@ fn missing_context_is_audited_and_late_detection_rolls_back_the_source() {
     let error = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: source_parser.as_ref(),
     }
     .ingest_local_batch_selected(
         &case.id,
@@ -172,8 +167,9 @@ fn hints_come_only_from_verified_records_of_the_same_host_and_are_not_defaults()
     let root = tempfile::tempdir().unwrap();
     let sources = root.path().join("sources");
     fs::create_dir(&sources).unwrap();
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("case")));
     let parser = Arc::new(SyslogParser::default());
+    let source_parser = irmind_mod_parser_syslog::source_log_parser();
     let engine = engine(&store, &parser);
     let case = engine.create_case("Temporal hints", "local").unwrap();
     let catalog = catalog();
@@ -182,7 +178,7 @@ fn hints_come_only_from_verified_records_of_the_same_host_and_are_not_defaults()
     LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: source_parser.as_ref(),
     }
     .ingest_local_batch_selected(
         &case.id,
@@ -256,7 +252,7 @@ fn previously_signed_global_settings_can_be_removed_explicitly_without_rewriting
         ],
     };
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("case")));
     let parser = Arc::new(SyslogParser::default());
     let engine = engine(&store, &parser);
     let config = irmind_infra::TomlConfigurationStore::new(root.path());

@@ -10,7 +10,7 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
     let choice = render_keystore_setup(&mut setup_terminal, false).unwrap();
     assert_eq!((choice.signer, choice.secrets), ("file", "file"));
     assert!(screen(&setup_terminal).contains("Step 1 of 4"));
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let store = Arc::new(current_sources::open(root.path()));
     let file_backend = FileKeystore::open(
         root.path(),
         &SecretString::from("synthetic TUI passphrase".to_owned()),

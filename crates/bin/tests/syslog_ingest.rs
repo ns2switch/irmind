@@ -2,6 +2,9 @@
 #![cfg(feature = "parser-syslog")]
 #![allow(clippy::unwrap_used)]
 
+#[path = "support/current_sources.rs"]
+mod current_sources;
+
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,
@@ -54,8 +57,9 @@ fn detected_syslog_is_signed_queryable_and_reproducible_without_expected_answers
     fs::create_dir(&sources).unwrap();
     let bytes = include_bytes!("../../testkit/fixtures/parser-syslog/source/events.log");
     fs::write(sources.join("events.log"), bytes).unwrap();
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("case")));
     let parser = Arc::new(SyslogParser::default());
+    let source_parser = irmind_mod_parser_syslog::source_log_parser();
     let engine = engine(&store, &parser);
     let case = engine.create_case("Synthetic syslog", "local").unwrap();
     let selected = BTreeMap::from([(
@@ -64,7 +68,10 @@ fn detected_syslog_is_signed_queryable_and_reproducible_without_expected_answers
             parser_id: "parser-syslog".into(),
             confidence: 95,
             mode: ParserSelectionMode::Automatic,
-            parser_version: parser.identity().version.into(),
+            parser_version: irmind_mod_parser_syslog::source_log_parser()
+                .identity()
+                .version
+                .into(),
             timestamp_context: parser.timestamp_context().map(str::to_owned),
             format_sample_sha256: irmind_app::sha256(bytes),
         },
@@ -72,7 +79,7 @@ fn detected_syslog_is_signed_queryable_and_reproducible_without_expected_answers
     let cases = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: source_parser.as_ref(),
     };
     cases
         .ingest_local_batch_selected(
@@ -173,8 +180,9 @@ fn syslog_one_gib_ingestion_throughput() -> Result<(), &'static str> {
     }
     output.flush().unwrap();
     drop(output);
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("case")));
     let parser = Arc::new(SyslogParser::default());
+    let source_parser = irmind_mod_parser_syslog::source_log_parser();
     let engine = engine(&store, &parser);
     let case = engine
         .create_case("Synthetic syslog benchmark", "local")
@@ -182,7 +190,7 @@ fn syslog_one_gib_ingestion_throughput() -> Result<(), &'static str> {
     let cases = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: source_parser.as_ref(),
     };
     let started = std::time::Instant::now();
     let mut sample = Vec::new();
@@ -215,7 +223,10 @@ fn syslog_one_gib_ingestion_throughput() -> Result<(), &'static str> {
 fn selection(parser: &SyslogParser, sample: &[u8]) -> ParserSelection {
     ParserSelection {
         parser_id: parser.identity().name.into(),
-        parser_version: parser.identity().version.into(),
+        parser_version: irmind_mod_parser_syslog::source_log_parser()
+            .identity()
+            .version
+            .into(),
         confidence: parser.detect("synthetic.log", sample).unwrap().value(),
         mode: ParserSelectionMode::Automatic,
         timestamp_context: parser.timestamp_context().map(str::to_owned),
@@ -237,8 +248,9 @@ fn corrupt_gzip_never_commits_a_partial_custody_batch() {
         .unwrap()
         .write_all(&bytes)
         .unwrap();
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("case")));
     let parser = Arc::new(SyslogParser::default());
+    let source_parser = irmind_mod_parser_syslog::source_log_parser();
     let engine = engine(&store, &parser);
     let case = engine
         .create_case("Synthetic corrupt gzip", "local")
@@ -247,22 +259,27 @@ fn corrupt_gzip_never_commits_a_partial_custody_batch() {
     let cases = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: parser.as_ref(),
+        parser: source_parser.as_ref(),
     };
     let chosen = BTreeMap::from([("broken.gz".into(), selection(&parser, &bytes))]);
-    assert!(
-        cases
-            .ingest_local_batch_selected(
-                &case.id,
-                &sources,
-                &["broken.gz".into()],
-                true,
-                &chosen,
-                &CancellationToken::new()
-            )
-            .is_err()
-    );
-    assert_eq!(store.entries(&case.id).unwrap().len(), before);
+    let ingested = cases
+        .ingest_local_batch_selected(
+            &case.id,
+            &sources,
+            &["broken.gz".into()],
+            true,
+            &chosen,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    assert!(ingested.is_empty());
+    let entries = store.entries(&case.id).unwrap();
+    assert_eq!(entries.len(), before + 1);
+    assert_eq!(entries.last().unwrap().kind, AuditEventKind::ToolError);
+    assert!(!entries.iter().any(|entry| matches!(
+        entry.kind,
+        AuditEventKind::SourceManifestV2 | AuditEventKind::ParquetArtifactV3
+    )));
     assert!(
         irmind_app::EvidenceStore::evidence_hashes(store.as_ref(), &case.id)
             .unwrap()

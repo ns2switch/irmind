@@ -2,6 +2,9 @@
 #![cfg(feature = "parser-json")]
 #![allow(clippy::unwrap_used)]
 
+#[path = "support/current_sources.rs"]
+mod current_sources;
+
 use crossterm::event::KeyCode;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
