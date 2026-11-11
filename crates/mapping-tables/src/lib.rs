@@ -15,7 +15,6 @@ pub struct TableMapping {
     fields: Vec<fields::CompiledField>,
     partition: fields::CompiledPartition,
     action: Option<irmind_app::source_mapping::SourcePath>,
-    project_action: bool,
 }
 struct CompiledRule {
     selector: SourceSelector,

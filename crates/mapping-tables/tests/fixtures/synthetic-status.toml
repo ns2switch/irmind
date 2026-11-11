@@ -1,3 +1,4 @@
+interpreter = "irmind-mapping-tables-v2"
 id = "mapping-synthetic-status"
 version = "1"
 target_schema = "irmind-common-event-v1"

@@ -6,11 +6,11 @@ A parser decodes original fields into `SourceRecordV1`. A mapping interprets tho
 
 ## Definition and identity
 
-`irmind-mod-mapping-tables` uses only the existing TOML/Serde stack. It accepts at most 64 KiB of input and canonical definition content. Unknown keys and values fail validation. The canonical definition is a strictly typed JSON structure with fixed field order; map insertion-order features cannot change its digest. TOML formatting does not determine its identity.
+`irmind-mapping-tables` uses only the existing TOML/Serde stack. It accepts at most 64 KiB of input and canonical definition content. Unknown keys and values fail validation. The canonical definition is a strictly typed JSON structure with fixed field order; map insertion-order features cannot change its digest. TOML formatting does not determine its identity.
 
-A definition names its ID/version, `irmind-common-event-v1` target, `irmind-source-record-v1` input contract, parser and explicit parser versions. Optional exact format, dataset, provider, channel and record-type selectors restrict it. The immutable mapping identity includes the canonical definition SHA-256 and interpreter contract `irmind-mapping-tables-v1`.
+A definition names its ID/version, `irmind-common-event-v1` target, `irmind-source-record-v1` input contract, parser and explicit parser versions. Optional exact format, dataset, provider, channel and record-type selectors restrict it. The immutable mapping identity includes the canonical definition SHA-256 and explicit current interpreter contract `irmind-mapping-tables-v2`.
 
-The [synthetic fixture](../../crates/modules/mapping-tables/tests/fixtures/synthetic-status.toml) demonstrates finite status rules and the same IP value in source/destination roles. It is test data, not a bundled forensic rule.
+The [synthetic fixture](../../crates/mapping-tables/tests/fixtures/synthetic-status.toml) demonstrates finite status rules and the same IP value in source/destination roles. It is test data, not a bundled forensic rule.
 
 ## Closed operations
 
@@ -33,3 +33,5 @@ Bundled definitions require a digest pinned by the trusted binary. Installed def
 Signed operations retain immutable historical content. A new ingestion uses the latest active selection; reconstruction uses the exact signed historical authorization and locally supported interpreter. An export carries the necessary proof without exporting unrelated global operations. Metadata authentication does not execute the definition.
 
 The pure interpreter shares the decoder/mapping contract suite with native modules. Tests cover repeated/parallel execution, provenance, cancellation at the wrapper, finite statuses, same-value roles, absent values, native/declarative equivalence, overlap rejection, tampering and export verification without a keyring.
+
+Pre-1.0 builds execute only the current interpreter. Definitions with a missing or retired interpreter are not activated. Opaque signed definition metadata can still be authenticated without executing a definition.

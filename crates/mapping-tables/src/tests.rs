@@ -246,24 +246,14 @@ fn rule_fields_and_original_action_use_only_explicit_segmented_paths() {
 }
 
 #[test]
-fn optional_primary_conditions_preserve_historical_canonical_definition_bytes() {
-    assert_eq!(
-        TableMapping::review(DEFINITION)
-            .unwrap()
-            .identity()
-            .implementation()
-            .as_str(),
-        "e701dd829adddc20501f273c4b7e465e2e55c23439dafd44203331208baf7b95"
-    );
+fn current_primary_conditions_bind_the_selector_and_definition_identity() {
     let narrowed = DEFINITION.replacen(
         "[[rules]]",
         "[[when]]\npath = [\"source_version\"]\npredicate = { op = \"present\" }\n\n[[rules]]",
         1,
     );
     let broad = mapper(DEFINITION);
-    let narrow = mapper(&format!(
-        "interpreter = \"irmind-mapping-tables-v2\"\n{narrowed}"
-    ));
+    let narrow = mapper(&narrowed);
     assert_ne!(broad.manifest().identity(), narrow.manifest().identity());
     assert!(
         !narrow.manifest().selectors()[0].matches(&source(SourceValue::object(vec![]).unwrap()))
@@ -271,7 +261,7 @@ fn optional_primary_conditions_preserve_historical_canonical_definition_bytes() 
 }
 
 #[test]
-fn interpreter_versions_preserve_old_display_projection_and_bind_the_new_one() {
+fn current_interpreter_binds_display_projection_and_rejects_retired_or_missing_interpreters() {
     let definition = DEFINITION.replacen(
         "[[rules]]",
         "action = [\"original_action\"]\n\n[[rules]]",
@@ -284,14 +274,19 @@ fn interpreter_versions_preserve_old_display_projection_and_bind_the_new_one() {
         )])
         .unwrap(),
     );
-    let historical = mapper(&definition).map(&record).unwrap();
-    let current = mapper(&format!(
-        "interpreter = \"irmind-mapping-tables-v2\"\n{definition}"
-    ))
-    .map(&record)
-    .unwrap();
-    assert_eq!(historical.record().common, current.record().common);
-    assert_eq!(historical.record().indexed.record.event, "");
+    let current = mapper(&definition).map(&record).unwrap();
     assert_eq!(current.record().indexed.record.event, "OriginalAction");
-    assert!(TableMapping::review(&format!("interpreter = \"unknown\"\n{definition}")).is_err());
+    for retired in ["irmind-mapping-tables-v1", "unknown"] {
+        assert!(
+            TableMapping::review(&definition.replace("irmind-mapping-tables-v2", retired)).is_err()
+        );
+    }
+    assert!(
+        TableMapping::review(&definition.replacen(
+            "interpreter = \"irmind-mapping-tables-v2\"\n",
+            "",
+            1
+        ))
+        .is_err()
+    );
 }

@@ -1,5 +1,5 @@
 #![no_main]
-use irmind_mod_mapping_tables::TableMapping;
+use irmind_mapping_tables::TableMapping;
 use libfuzzer_sys::fuzz_target;
 fuzz_target!(|bytes: &[u8]| {
     if bytes.len() > 65_536 {

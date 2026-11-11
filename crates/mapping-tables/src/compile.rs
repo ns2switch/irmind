@@ -61,7 +61,7 @@ impl TableMapping {
         definition: Definition,
         provenance: MappingProvenance,
     ) -> Result<Self, MappingError> {
-        let project_action = validate_interpreter(&definition, &provenance)?;
+        validate_interpreter(&definition, &provenance)?;
         if definition.source_contract != SOURCE_RECORD_V1
             || definition.rules.len() > 256
             || definition.fields.len() > 64
@@ -131,14 +131,13 @@ impl TableMapping {
             fields: fields::compile_fields(definition.fields)?,
             partition: fields::CompiledPartition::compile(&definition.partition)?,
             action: definition.action.as_deref().map(fields::path).transpose()?,
-            project_action,
         })
     }
 }
 fn validate_interpreter(
     d: &Definition,
     provenance: &MappingProvenance,
-) -> Result<bool, MappingError> {
+) -> Result<(), MappingError> {
     let expected = d.interpreter()?;
     let actual = match provenance {
         MappingProvenance::BundledDefinition { interpreter, .. }
@@ -148,7 +147,7 @@ fn validate_interpreter(
     if actual != expected {
         return Err(MappingError::InvalidDefinition);
     }
-    Ok(expected == "irmind-mapping-tables-v2")
+    Ok(())
 }
 fn compile_rule(
     definition: &Definition,

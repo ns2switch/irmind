@@ -5,18 +5,16 @@ use irmind_domain::{CommonField, EntityRole, EventOutcome};
 use std::fmt::Write as _;
 const BASE: &str = include_str!("../tests/fixtures/synthetic-status.toml");
 fn definition(values: &[String]) -> String {
-    format!(
-        "interpreter = \"irmind-mapping-tables-v2\"\n{}",
-        BASE.replacen(
-            "conversion = \"ip\"",
-            &format!(
-                "conversion = \"ip\"\nomit_text = {}",
-                serde_json::to_string(values).unwrap()
-            ),
-            1
-        )
+    BASE.replacen(
+        "conversion = \"ip\"",
+        &format!(
+            "conversion = \"ip\"\nomit_text = {}",
+            serde_json::to_string(values).unwrap()
+        ),
+        1,
     )
 }
+
 fn record(client: Option<SourceValue>) -> SourceRecordV1 {
     let mut fields = vec![
         ("status".into(), SourceValue::Text("failed".into())),
@@ -123,7 +121,7 @@ fn finite_lists_reject_duplicates_controls_and_utf8_byte_overflow() {
 #[test]
 fn no_unicode_folding_or_implicit_zero_pid_omission() {
     let text = format!(
-        "interpreter = \"irmind-mapping-tables-v2\"\n{BASE}\n[[fields]]\nsource = [\"actor\"]\ntarget = \"user.name\"\nomit_text = [\"é\"]\n[[fields]]\nsource = [\"pid\"]\ntarget = \"process.pid\"\nomit_text = [\"\"]\n"
+        "{BASE}\n[[fields]]\nsource = [\"actor\"]\ntarget = \"user.name\"\nomit_text = [\"é\"]\n[[fields]]\nsource = [\"pid\"]\ntarget = \"process.pid\"\nomit_text = [\"\"]\n"
     );
     let mapper = mapper(&text);
     for (actor, present) in [("é", false), ("e\u{301}", true)] {
@@ -160,7 +158,7 @@ fn no_unicode_folding_or_implicit_zero_pid_omission() {
 #[test]
 fn omitted_pam_actor_keeps_the_target_and_two_present_roles_remain_distinct() {
     let text = format!(
-        "interpreter = \"irmind-mapping-tables-v2\"\n{BASE}\n[[fields]]\nsource=[\"logname\"]\ntarget=\"user.name\"\nomit_text=[\"\"]\nobservation={{kind=\"user\",role=\"actor\"}}\n[[fields]]\nsource=[\"target\"]\ntarget=\"user.target.name\"\nobservation={{kind=\"user\",role=\"target\"}}\n"
+        "{BASE}\n[[fields]]\nsource=[\"logname\"]\ntarget=\"user.name\"\nomit_text=[\"\"]\nobservation={{kind=\"user\",role=\"actor\"}}\n[[fields]]\nsource=[\"target\"]\ntarget=\"user.target.name\"\nobservation={{kind=\"user\",role=\"target\"}}\n"
     );
     let mapper = mapper(&text);
     for name in ["", "alice"] {
@@ -182,8 +180,7 @@ fn omitted_pam_actor_keeps_the_target_and_two_present_roles_remain_distinct() {
 }
 #[test]
 fn current_interpreter_identity_and_empty_list_canonical_bytes_stay_fixed() {
-    let absent =
-        TableMapping::review(&format!("interpreter=\"irmind-mapping-tables-v2\"\n{BASE}")).unwrap();
+    let absent = TableMapping::review(BASE).unwrap();
     let empty = TableMapping::review(&definition(&[])).unwrap();
     assert_eq!(absent, empty);
     let listed = TableMapping::review(&definition(&["-".into()])).unwrap();
@@ -198,7 +195,7 @@ fn current_interpreter_identity_and_empty_list_canonical_bytes_stay_fixed() {
 #[test]
 fn literal_comparisons_count_toward_the_existing_operation_budget() {
     let header = BASE.split("[[rules]]").next().unwrap();
-    let mut text = format!("interpreter=\"irmind-mapping-tables-v2\"\n{header}");
+    let mut text = header.to_string();
     for i in 0..100 {
         write!(text, "\n[[rules]]\n[[rules.when]]\npath=[\"status\"]\npredicate={{op=\"text\",value=\"{i}\"}}\n").unwrap();
         for target in ["source.ip", "destination.ip"] {
@@ -225,7 +222,7 @@ fn omission_does_not_suppress_unlisted_port_or_hash_validation_errors() {
         ),
     ] {
         let definition = format!(
-            "interpreter = \"irmind-mapping-tables-v2\"\n{BASE}\n[[fields]]\nsource=[\"extra\"]\ntarget=\"{field}\"\nconversion=\"{conversion}\"\nomit_text=[\"-\"]\n"
+            "{BASE}\n[[fields]]\nsource=[\"extra\"]\ntarget=\"{field}\"\nconversion=\"{conversion}\"\nomit_text=[\"-\"]\n"
         );
         let source = source(SourceValue::object(vec![("extra".into(), value)]).unwrap());
         assert!(mapper(&definition).map(&source).is_err());

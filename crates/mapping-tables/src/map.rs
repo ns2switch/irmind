@@ -62,9 +62,7 @@ impl TableMapping {
         .map_err(|_| MappingError::UnsupportedSourceValue)?;
         let unmapped = MappingOutput::unclassified(source, MappingDiagnostic::Unclassified)?;
         let mut indexed = unmapped.into_record().indexed;
-        if self.project_action {
-            indexed.record.event = common.event().action().unwrap_or_default().into();
-        }
+        indexed.record.event = common.event().action().unwrap_or_default().into();
         MappingOutput::try_new(
             source,
             indexed,

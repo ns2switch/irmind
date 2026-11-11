@@ -3,9 +3,10 @@ use super::*;
 use irmind_app::source_mapping::{MappingCatalog, verify_mapping_installation};
 use irmind_app::{LargeCaseUseCases, ParserSelection, SourceDecoder, SourceMapper};
 use irmind_domain::ParserSelectionMode;
-use irmind_mod_mapping_tables::TableMapping;
+use irmind_mapping_tables::TableMapping;
 use irmind_mod_parser_json::JsonSourceDecoder;
 const DEFINITION: &str = r#"
+interpreter = "irmind-mapping-tables-v2"
 id = "mapping-synthetic-status"
 version = "1"
 target_schema = "irmind-common-event-v1"
