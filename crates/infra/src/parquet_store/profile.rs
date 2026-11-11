@@ -17,11 +17,22 @@ pub(crate) struct ParquetProfile {
     pub(super) staging_live: AtomicU64,
     partition_phases: [AtomicU64; 5],
     mapping_phases: [AtomicU64; 3],
+    concurrency_phases: [AtomicU64; 6],
 }
 
 impl ParquetProfile {
     fn nanos(duration: Duration) -> u64 {
         u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
+    }
+
+    pub(super) fn record_concurrency(&self, phase: ConcurrencyPhase, duration: Duration) {
+        self.concurrency_phases[phase as usize].fetch_add(Self::nanos(duration), Ordering::Relaxed);
+    }
+    #[cfg(test)]
+    pub(crate) fn concurrency_snapshot(&self) -> [Duration; 6] {
+        std::array::from_fn(|i| {
+            Duration::from_nanos(self.concurrency_phases[i].load(Ordering::Relaxed))
+        })
     }
 
     pub(super) fn record_hash(&self, duration: Duration) {
@@ -211,4 +222,14 @@ impl Drop for MappingTimer<'_> {
             Ordering::Relaxed,
         );
     }
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum ConcurrencyPhase {
+    ProducerQueue,
+    ConsumerQueue,
+    FileWrite,
+    Encode,
+    Sync,
+    ArtifactHash,
 }

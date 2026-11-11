@@ -62,7 +62,14 @@ impl ParquetStore {
         let value = irmind_domain::EvidenceHash::parse(&irmind_app::hex(&hash))
             .map_err(|_| invalid_source())?;
         let sample = source_sample(&mut input.file)?;
-        let mut rows = RowBuffer::new(sender, input.budget, value.clone(), cancel, restart);
+        let mut rows = RowBuffer::new(
+            sender,
+            input.budget,
+            value.clone(),
+            cancel,
+            restart,
+            self.profile.as_deref(),
+        );
         let mut stopped_for_restart = false;
         let mut mapping = None;
         let result = self
@@ -125,6 +132,7 @@ fn completed_report(
 }
 
 struct RowBuffer<'a> {
+    profile: Option<&'a crate::parquet_store::ParquetProfile>,
     sender: &'a SyncSender<RowBatch>,
     cancel: &'a CancellationToken,
     restart: &'a AtomicBool,
@@ -145,8 +153,10 @@ impl<'a> RowBuffer<'a> {
         hash: irmind_domain::EvidenceHash,
         cancel: &'a CancellationToken,
         restart: &'a AtomicBool,
+        profile: Option<&'a crate::parquet_store::ParquetProfile>,
     ) -> Self {
         Self {
+            profile,
             sender,
             cancel,
             restart,
@@ -227,7 +237,14 @@ impl<'a> RowBuffer<'a> {
                     Err(TrySendError::Disconnected(_)) => return Err(AppError::Cancelled),
                     Err(TrySendError::Full(value)) => {
                         batch = value;
+                        let started = std::time::Instant::now();
                         std::thread::sleep(Duration::from_millis(10));
+                        if let Some(profile) = self.profile {
+                            profile.record_concurrency(
+                                crate::parquet_store::profile::ConcurrencyPhase::ProducerQueue,
+                                started.elapsed(),
+                            );
+                        }
                     }
                 }
             }
@@ -301,7 +318,7 @@ mod tests {
         .unwrap();
         let cancel = CancellationToken::new();
         let restart = AtomicBool::new(false);
-        let mut buffer = RowBuffer::new(&sender, 0, hash, &cancel, &restart);
+        let mut buffer = RowBuffer::new(&sender, 0, hash, &cancel, &restart, None);
         assert!(matches!(
             buffer.push(row),
             Err(AppError::Fixed(

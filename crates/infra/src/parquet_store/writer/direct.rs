@@ -255,7 +255,14 @@ impl DirectWriting {
         let mut partition = key.0.clone();
         partition.segment = *segment;
         *segment = segment.checked_add(1).ok_or_else(invalid_source)?;
-        let sink = ArtifactSink::new(dir, &self.hash, partition, batch, key.1)?;
+        let sink = ArtifactSink::new(
+            dir,
+            &self.hash,
+            partition,
+            batch,
+            key.1,
+            self.profile.clone(),
+        )?;
         self.open.insert(
             key.clone(),
             Live {
