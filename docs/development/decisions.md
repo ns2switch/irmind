@@ -819,3 +819,21 @@ Context: all bundled table mappings name the current V2 interpreter. The V1 exec
 Decision: execute only explicitly declared `irmind-mapping-tables-v2` definitions. Remove the V1 display branch, its historical canonical fixture assertion and the redundant adapter facade. Keep the pure `irmind-mapping-tables` implementation, current V2 canonical behavior, finite predicates, operation budgets, `omit_text`, process-lifetime validation and installation-proof tests.
 
 Consequences: missing or retired interpreter declarations cannot activate a mapping. Existing bounded signed metadata can still be authenticated without executing a definition. This does not introduce a historical execution route or change current case, artifact, seal or export bytes. The remaining unused graph construction contracts are described separately in [the API-removal proposal](retired-graph-port-removal.md).
+
+
+## Signing backends own keystore access
+
+Context: the composition root uses the `os` and `file` keystore modules. An older
+public `LocalSigner` loader in infrastructure had no production caller and
+repeated system-keystore access outside those modules.
+
+Decision: remove that loader, infrastructure's keyring/dbus dependencies and its
+unused persistent-keyring feature forwarding. Keep the current signer and
+verifier ports and the modular backend implementations unchanged. Restrict the
+in-memory signing fixture to infrastructure tests. The helper also drops its
+unused direct testkit development dependency.
+
+Consequences: backend selection stays explicit and unavailable backends fail
+closed. Current signatures, custody/export bytes, verification and native backend
+contract tests stay pinned. The file-only minimum build no longer acquires a
+system-keyring dependency through infrastructure.

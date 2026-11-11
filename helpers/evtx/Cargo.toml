@@ -27,7 +27,6 @@ irmind-security = { path = "../../crates/security", version = "0.1.0" }
 ed25519-dalek = "2"
 irmind-app = { path = "../../crates/app", version = "0.1.0" }
 irmind-mod-parser-evtx = { path = "../../crates/modules/parser-evtx", version = "0.1.0" }
-irmind-testkit = { path = "../../crates/testkit", version = "0.1.0" }
 tempfile = "3"
 
 [lints.rust]

@@ -15,7 +15,9 @@ pub use config_toml::TomlConfigurationStore;
 use irmind_fs::{private_dir, private_file};
 pub use parquet_store::ParquetStore;
 
-use ed25519_dalek::{Signature, Signer as _, SigningKey, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey};
+#[cfg(test)]
+use ed25519_dalek::{Signer as _, SigningKey};
 use fs4::fs_std::FileExt as _;
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CaseExporter, CaseLock, CaseMutation, CaseSeal,
@@ -56,8 +58,10 @@ struct HeldCaseFile {
 impl CaseLock for HeldCaseFile {}
 
 pub use seal::{LocalExportVerifier, verify_export, verify_export_expected};
+#[cfg(test)]
+pub(crate) use signing::LocalSigner;
 use signing::verify_signature;
-pub use signing::{LocalAnalystVerifier, LocalSigner, LocalVerifier};
+pub use signing::{LocalAnalystVerifier, LocalVerifier};
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::panic, clippy::wildcard_imports)]
