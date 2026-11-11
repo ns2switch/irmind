@@ -10,7 +10,7 @@ use std::{
 };
 
 enum Frame {
-    Record(Vec<u8>, bool),
+    Records(Vec<(Vec<u8>, bool)>),
     End,
     Error(io::Error),
 }
@@ -47,12 +47,8 @@ pub(super) fn chunks<R: Read + Seek + Send>(
             let settings = Arc::clone(settings);
             thread::Builder::new().spawn_scoped(scope, move || {
                 while let Ok(chunk) = jobs.recv() {
-                    if let Err(error) = decode(chunk, &settings, size, &mut |bytes, valid| {
-                        frames
-                            .send(Frame::Record(bytes, valid))
-                            .map_err(|_| invalid())
-                    })
-                    .and_then(|()| frames.send(Frame::End).map_err(|_| invalid()))
+                    if let Err(error) = decode_batched(chunk, &settings, size, &frames)
+                        .and_then(|()| frames.send(Frame::End).map_err(|_| invalid()))
                     {
                         let _ = frames.send(Frame::Error(error));
                         return;
@@ -94,9 +90,11 @@ fn ordered<R: Read + Seek + Send>(
             }
             loop {
                 match slot.receive.recv().map_err(|_| invalid())? {
-                    Frame::Record(bytes, valid) => {
+                    Frame::Records(records) => {
                         let mut counts = (accepted, rejected);
-                        append(writer, &mut counts, &bytes, valid)?;
+                        for (bytes, valid) in records {
+                            append(writer, &mut counts, &bytes, valid)?;
+                        }
                         (accepted, rejected) = counts;
                     }
                     Frame::End => break,
@@ -113,6 +111,34 @@ fn ordered<R: Read + Seek + Send>(
         }
     }
     Ok((accepted, rejected))
+}
+// Batch only transport, not protocol frames: file order, frame bounds and bytes stay unchanged.
+// Each channel holds one batch; a batch is at most 512 KiB or one already-bounded frame.
+fn decode_batched(
+    chunk: EvtxChunkData,
+    settings: &Arc<ParserSettings>,
+    size: u64,
+    frames: &SyncSender<Frame>,
+) -> io::Result<()> {
+    let mut records = Vec::new();
+    let mut pending = 0usize;
+    decode(chunk, settings, size, &mut |bytes, valid| {
+        if pending.saturating_add(bytes.len()) > 512 * 1024 && !records.is_empty() {
+            frames
+                .send(Frame::Records(std::mem::take(&mut records)))
+                .map_err(|_| invalid())?;
+            pending = 0;
+        }
+        pending += bytes.len();
+        records.push((bytes, valid));
+        Ok(())
+    })?;
+    if !records.is_empty() {
+        frames
+            .send(Frame::Records(records))
+            .map_err(|_| invalid())?;
+    }
+    Ok(())
 }
 fn decode(
     mut chunk: EvtxChunkData,
