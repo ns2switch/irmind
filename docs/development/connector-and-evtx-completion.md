@@ -91,6 +91,32 @@ retrieval needs a documented endpoint that enforces the required namespace,
 account and window, or an explicit narrower configuration contract before it is
 enabled. Unsupported alert operations fail clearly before transferring data.
 
+### Explicit namespace scope for detection reads
+
+A configuration can declare `scope_mode = "instance"` instead of the default
+`scope_mode = "event-account"`. In instance mode, `account` in the existing SIEM
+scope means the configured Google Cloud project hosting the SecOps instance.
+The connector requires an exact match and fixes the full instance resource in
+every endpoint. This is a tenant-wide source, not a claim to filter AWS, Azure
+or GCP event accounts within that tenant. The settings confirmation explicitly
+states that all event accounts in that instance are in scope; the organization
+ceiling and case must both authorize the hosting project and source.
+
+Only instance mode enables detection reads. `siem_get_alert` retrieves the exact
+requested detection ID from `legacySearchDetections`, with a configured rule ID,
+server-enforced start/end time, bounded page/result/body counts, and a truncation
+marker if the bounded scan cannot find the requested ID. It never reports a
+missing detection when the scan was partial. IAM additionally requires
+`chronicle.legacies.legacySearchDetections`. Event-account mode still forces its
+UDM account predicate for searches and refuses detection reads before HTTP;
+it never changes scope mode or removes a predicate automatically.
+
+No new policy port or signed format is needed: instance mode uses a declared
+source and the existing explicit account identifier. Switching modes is an
+audited, analyst-confirmed egress configuration change. Tests cover wrong
+hosting project, another instance/resource, missing window, event-account alert
+rejection, exact detection selection and bounded partial results.
+
 UDM search records are decoded to `SourceRecordV1` with original field types and
 explicit provenance. A separate mapping owns the UDM-to-common-event mapping.
 No borrowed ECS compatibility projection invents UDM field meaning.
