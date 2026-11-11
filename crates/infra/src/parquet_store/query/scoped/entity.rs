@@ -234,7 +234,7 @@ impl QueryStore<'_> {
         let mut view = View::new(kind, value);
         let status = self.scan_artifacts(
             ScanSpec {
-                schema: "irmind-entities-v1",
+                schema: "irmind-entities-v4",
                 columns: &[
                     "event_time",
                     "identity_scope",

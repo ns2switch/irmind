@@ -25,7 +25,7 @@ impl QueryStore<'_> {
                 id,
                 artifacts,
                 filter,
-                schema: "irmind-events-v2",
+                schema: "irmind-events-v4",
                 columns: &["event_time", "event", "source_hash", "record_index"],
                 predicates: &rules,
                 deadline: Instant::now() + QUERY_DEADLINE,
@@ -59,6 +59,7 @@ impl QueryStore<'_> {
         index: usize,
         cancel: &CancellationToken,
     ) -> Result<Option<String>, AppError> {
+        super::require_current(artifacts)?;
         let selected = artifacts
             .iter()
             .filter(|artifact| {
@@ -75,7 +76,7 @@ impl QueryStore<'_> {
                 id,
                 artifacts: &selected,
                 filter: &GraphQueryFilter::default(),
-                schema: "irmind-events-v2",
+                schema: "irmind-events-v4",
                 columns: &["text"],
                 predicates: &[
                     Predicate::Equal("source_hash", hash.into()),
@@ -114,7 +115,7 @@ impl QueryStore<'_> {
                 id,
                 artifacts,
                 filter: &GraphQueryFilter::default(),
-                schema: "irmind-events-v2",
+                schema: "irmind-events-v4",
                 columns: &["event_time", "event_category_bits", "event_outcome"],
                 predicates: &[],
                 deadline: Instant::now() + QUERY_DEADLINE,
@@ -154,8 +155,7 @@ impl QueryStore<'_> {
             a.precise_metadata().is_some_and(|v| {
                 matches!(
                     v.builder_version.as_str(),
-                    crate::parquet_store::partitioning::BUILDER
-                        | crate::parquet_store::common_format::BUILDER
+                    crate::parquet_store::common_format::BUILDER
                         | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
                 )
             })
@@ -182,9 +182,7 @@ fn partition_coverage(artifacts: &[ParquetArtifact]) -> String {
         };
         if !matches!(
             v.builder_version.as_str(),
-            crate::parquet_store::partitioning::BUILDER
-                | crate::parquet_store::common_format::BUILDER
-                | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
+            crate::parquet_store::common_format::BUILDER | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
         ) || !matches!(
             v.schema,
             ArtifactSchemaV2::Events | ArtifactSchemaV2::CommonEvents

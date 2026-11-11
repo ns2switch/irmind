@@ -770,3 +770,19 @@ mapping profiles and bound V3 artifacts. Current direct physical golden bytes,
 V6 wire goldens, offsets, spool authentication, cancellation and rollback remain
 covered. Old-generation fixture generators are removed, along with their unused
 base64 dependency. Removal of remaining historical schema readers is separate.
+
+### Query only current physical Parquet families
+
+Context: direct mapped artifacts use event/identity/co-observation schemas with
+validated roles, scope and precise timestamps. The older physical readers and
+schema aliases no longer serve a supported ingestion path.
+
+Decision: request exact current schema IDs, reject retired artifact envelopes,
+and remove whole-second reader shortcuts, legacy host joins and alternate
+unscoped graph algorithms. Keep the typed entity fallback when a current
+inventory lacks complete co-observation coverage. Extraction-only observations
+remain explicitly unclassified; their unspecified role is not an old format.
+
+Consequences: current query limits, sampling, time budgets, partial-result
+markers, hash checks and physical golden bytes stay unchanged. Retired export
+seeds are removed; the two current V6 wire seeds remain pinned and authenticated.
