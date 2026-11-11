@@ -11,29 +11,7 @@ fn signed_bundles_replace_base_files_for_queries_and_rebuild_exactly() {
             "{{\"eventTime\":\"2026-10-28T12:00:00Z\",\"eventName\":\"ConsoleLogin\",\"sourceIPAddress\":\"{ip}\"}}"
         )).unwrap();
     }
-    let store = Arc::new(open_source_store(root.path()).unwrap());
-    let signer = Arc::new(LocalSigner {
-        key: SigningKey::from_bytes(&[75u8; 32]),
-        actor: Actor::Analyst,
-    });
-    let parser = Arc::new(JsonParser);
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(
-                signer.clone(),
-                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-            ),
-            Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
+    let (store, engine) = source_fixture(root.path(), 75);
     let case = engine
         .create_case("bundles", "account 123456789012")
         .unwrap();
@@ -85,8 +63,9 @@ fn signed_bundles_replace_base_files_for_queries_and_rebuild_exactly() {
         store
             .entity_lookup(&case.id, "ip", "203.0.113.10")
             .unwrap()
-            .contains("count=1")
+            .contains("observations=1")
     );
+    assert_derived_hash_is_checked(&store, &case.id);
     let external = rusqlite::Connection::open(root.path().join("irmind.db")).unwrap();
     external
         .execute_batch("DROP TRIGGER audit_no_update")
@@ -99,4 +78,21 @@ fn signed_bundles_replace_base_files_for_queries_and_rebuild_exactly() {
         .unwrap();
     assert!(store.graph_summary(&case.id).is_err());
     assert!(engine.verify(&case.id).is_err());
+}
+
+fn assert_derived_hash_is_checked(store: &LocalStore, id: &CaseId) {
+    let active = irmind_app::artifact_catalog(&store.entries(id).unwrap())
+        .unwrap()
+        .active;
+    let path = store.parquet.case_dir(id).unwrap().join(active[0].path());
+    let original = fs::read(&path).unwrap();
+    let mut changed = original.clone();
+    changed[0] ^= 1;
+    fs::write(&path, changed).unwrap();
+    assert!(matches!(
+        store.graph_summary(id),
+        Err(AppError::EvidenceMismatch(_))
+    ));
+    fs::write(&path, original).unwrap();
+    assert_eq!(store.timeline(id, 10).unwrap().len(), 2);
 }

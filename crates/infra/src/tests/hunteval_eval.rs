@@ -340,20 +340,38 @@ fn private_answers_are_never_ingested_or_displayed() {
             .unwrap()
             .contains(secret_marker)
     );
+    assert_public_case_inventory(&store.entries(&case.id).unwrap(), secret_marker);
+}
+
+#[cfg(test)]
+mod source_staging;
+
+fn assert_public_case_inventory(entries: &[irmind_app::SignedEntry], secret_marker: &str) {
     let mut partitions = Vec::new();
-    for entry in store.entries(&case.id).unwrap() {
+    for entry in entries {
         assert!(!entry.payload.contains(secret_marker));
         assert!(!entry.payload.contains("ground-truth.json"));
-        if entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV1 {
-            let artifact = irmind_domain::ParquetArtifactV1::decode(&entry.payload).unwrap();
-            assert_eq!(artifact.partition_date, "2026-01-10");
-            assert_eq!(artifact.partition_region, "aws");
-            partitions.push(artifact.partition_account);
+        if entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV3 {
+            use irmind_domain::{ScopePartitionKey, ScopePartitionValue};
+            let artifact = irmind_domain::ParquetArtifactV3::decode(&entry.payload).unwrap();
+            let partition = &artifact.core().partition;
+            assert_eq!(partition.date, "2026-01-10");
+            assert!(
+                partition
+                    .scopes
+                    .iter()
+                    .any(|scope| scope.key == ScopePartitionKey::Region
+                        && scope.value == ScopePartitionValue::Ordinary("aws".into()))
+            );
+            for scope in &partition.scopes {
+                if scope.key == ScopePartitionKey::Account
+                    && let ScopePartitionValue::Ordinary(value) = &scope.value
+                {
+                    partitions.push(value.clone());
+                }
+            }
         }
     }
     assert!(partitions.contains(&"111122223333".to_owned()));
     assert!(partitions.contains(&"444455556666".to_owned()));
 }
-
-#[cfg(test)]
-mod source_staging;

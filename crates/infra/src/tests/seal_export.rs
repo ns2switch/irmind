@@ -75,7 +75,7 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
     );
     let timeline = store.timeline(&case.id, 20).unwrap();
     assert_eq!(timeline.len(), 1);
-    assert_eq!(timeline[0].event, "AssumeRole");
+    assert_eq!(timeline[0].event, "AssumeRole [second precision]");
     assert_eq!(timeline[0].evidence_hash, hash);
     engine.seal(&case.id).unwrap();
     let last = store.last_entry(&case.id).unwrap().unwrap();

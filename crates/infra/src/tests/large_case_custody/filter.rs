@@ -5,29 +5,7 @@ use irmind_app::GraphQueryFilter;
 fn parquet_filters_prune_partitions_and_exact_utc_window() {
     let root = tempfile::tempdir().unwrap();
     let inputs = write_source(root.path());
-    let store = Arc::new(open_source_store(&root.path().join("case")).unwrap());
-    let signer = Arc::new(LocalSigner {
-        key: SigningKey::from_bytes(&[75u8; 32]),
-        actor: Actor::Analyst,
-    });
-    let parser = Arc::new(JsonParser);
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(
-                signer.clone(),
-                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
-            ),
-            Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
-        ),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
+    let (store, engine) = source_fixture(&root.path().join("case"), 75);
     let case = engine
         .create_case(
             "filtered case",
@@ -57,7 +35,7 @@ fn parquet_filters_prune_partitions_and_exact_utc_window() {
     .unwrap();
     let rows = store.timeline_filtered(&case.id, &filter, 10).unwrap();
     assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].event, "BetaEvent");
+    assert_eq!(rows[0].event, "BetaEvent [second precision]");
     assert_latest_timeline(&store, &case.id);
     let search = store
         .text_search_filtered(&case.id, &filter, "Event", 10)
@@ -68,7 +46,7 @@ fn parquet_filters_prune_partitions_and_exact_utc_window() {
         store
             .entity_lookup_filtered(&case.id, &filter, "ip", "203.0.113.2")
             .unwrap()
-            .contains("count=1")
+            .contains("observations=1")
     );
     let out_of_scope =
         GraphQueryFilter::parse(None, None, Some("333333333333"), None, None).unwrap();
@@ -82,14 +60,17 @@ fn parquet_filters_prune_partitions_and_exact_utc_window() {
 
 fn assert_latest_timeline(store: &LocalStore, id: &CaseId) {
     let latest = store.timeline(id, 1).unwrap();
-    assert_eq!(latest[0].event, "GammaEvent");
+    assert_eq!(latest[0].event, "GammaEvent [second precision]");
     let latest = store.timeline(id, 2).unwrap();
     assert_eq!(
         latest
             .iter()
             .map(|row| row.event.as_str())
             .collect::<Vec<_>>(),
-        ["GammaEvent", "BetaEvent"]
+        [
+            "GammaEvent [second precision]",
+            "BetaEvent [second precision]"
+        ]
     );
     let latest = store.timeline(id, 3).unwrap();
     assert_eq!(
@@ -97,7 +78,11 @@ fn assert_latest_timeline(store: &LocalStore, id: &CaseId) {
             .iter()
             .map(|row| row.event.as_str())
             .collect::<Vec<_>>(),
-        ["GammaEvent", "BetaEvent", "AlphaEvent"]
+        [
+            "GammaEvent [second precision]",
+            "BetaEvent [second precision]",
+            "AlphaEvent [second precision]"
+        ]
     );
 }
 

@@ -305,7 +305,9 @@ fn cloudtrail_assume_role_edge_is_verified_and_queryable() {
             10,
         )
         .unwrap();
-    assert!(neighbors.contains("role arn:aws:iam::123456789012:role/Admin co-observed"));
+    assert!(neighbors.contains(
+        "role arn:aws:iam::123456789012:role/Admin [scope=legacy-unspecified] co-observed"
+    ));
     assert!(
         store
             .raw_record(&case.id, &hash, 0)
@@ -347,9 +349,11 @@ fn cloudtrail_session_and_access_key_edges_are_verified_and_queryable() {
     let hash = ingest_synthetic(&engine, store.as_ref(), &case.id, bytes, "cloudtrail.json");
     let actor = "arn:aws:sts::123456789012:assumed-role/Analyst/session";
     let neighbors = store.neighbors(&case.id, "identity", actor, 10).unwrap();
-    assert!(neighbors.contains("ip 198.51.100.9 co-observed"));
-    assert!(neighbors.contains("key ASIAABCDEFGHIJKLMNOP co-observed"));
-    assert!(neighbors.contains("role arn:aws:iam::123456789012:role/Analyst co-observed"));
+    assert!(neighbors.contains(r#"ip 198.51.100.9 [scope={"kind":"global"}] co-observed"#));
+    assert!(neighbors.contains("key ASIAABCDEFGHIJKLMNOP [scope=legacy-unspecified] co-observed"));
+    assert!(neighbors.contains(
+        "role arn:aws:iam::123456789012:role/Analyst [scope=legacy-unspecified] co-observed"
+    ));
     assert!(
         store
             .raw_record(&case.id, &hash, 0)

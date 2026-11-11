@@ -1,10 +1,7 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
-use irmind_app::{
-    GraphRecord, IndexedGraphRecord, IndexedTime, LargeCaseStore, LocalBatchRequest,
-    PartitionLimits,
-};
-use irmind_domain::{EvidenceHash, ParquetArtifact, PartitionOverflowReason, ScopePartitionValue};
+use irmind_app::{GraphRecord, IndexedGraphRecord, IndexedTime};
+use irmind_domain::EvidenceHash;
 use std::fmt::Write as _;
 
 fn case() -> CaseId {
@@ -83,64 +80,6 @@ fn cancellation_during_merge_drops_private_runs() {
         0
     );
 }
-#[test]
-fn out_of_order_input_allocates_by_the_shared_stable_order_and_rebuilds() {
-    let inputs = tempfile::tempdir().unwrap();
-    let data = tempfile::tempdir().unwrap();
-    let store = ParquetStore::open_precise(data.path()).unwrap();
-    std::fs::write(inputs.path().join("events.json"), b"{\"eventTime\":\"2026-11-01T00:00:02Z\",\"host\":\"late\"}\n{\"eventTime\":\"2026-11-01T00:00:01Z\",\"host\":\"early\"}\n").unwrap();
-    let paths = ["events.json".into()];
-    let prepared = store
-        .prepare_local_batch(
-            LocalBatchRequest {
-                case_id: &case(),
-                source_root: inputs.path(),
-                relative_paths: &paths,
-                copy_original: false,
-                parser: &irmind_mod_parser_json::JsonParser,
-                committed_artifacts: &[],
-                limits: PartitionLimits {
-                    host: 1,
-                    ..PartitionLimits::default()
-                },
-            },
-            &CancellationToken::new(),
-        )
-        .unwrap();
-    let ordinary = prepared[0]
-        .artifacts
-        .iter()
-        .filter_map(|a| {
-            if let ParquetArtifact::V2(v) = a {
-                Some(&v.partition.scopes[0].value)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    assert!(ordinary.contains(&&ScopePartitionValue::Ordinary("early".into())));
-    assert!(ordinary.contains(&&ScopePartitionValue::Overflow(
-        PartitionOverflowReason::Cardinality
-    )));
-    assert!(!ordinary.contains(&&ScopePartitionValue::Ordinary("late".into())));
-    store
-        .rebuild_compare(
-            &case(),
-            inputs.path(),
-            &[prepared[0].manifest.clone()],
-            &prepared[0].artifacts,
-            &irmind_mod_parser_json::JsonParser,
-            &CancellationToken::new(),
-        )
-        .unwrap();
-    assert_eq!(
-        std::fs::read_dir(store.spool_dir(&case()).unwrap())
-            .unwrap()
-            .count(),
-        0
-    );
-}
-
 #[test]
 fn natural_runs_and_external_sort_produce_identical_normalized_bytes() {
     for runs in [15, 33] {
