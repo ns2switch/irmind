@@ -12,7 +12,7 @@ const fn public(name: &'static str, required: bool) -> ConfigField {
 pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: "siem-elastic",
     version: "0.1.0",
-    ports: &[ModulePort::Siem],
+    ports: &[ModulePort::Siem, ModulePort::SourceDecoder],
     tools: &[Tool::SiemSearch, Tool::SiemGetAlert],
     config: &[
         public("IRMIND_ELASTIC_URL", true),

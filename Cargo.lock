@@ -3100,13 +3100,19 @@ dependencies = [
 name = "irmind-mod-siem-elastic"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek",
  "irmind-app",
  "irmind-domain",
  "irmind-http",
+ "irmind-infra",
+ "irmind-mod-mapping-ecs",
+ "irmind-mod-parser-json",
+ "irmind-security",
  "irmind-testkit",
  "reqwest",
  "secrecy",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 

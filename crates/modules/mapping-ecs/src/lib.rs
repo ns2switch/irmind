@@ -24,18 +24,34 @@ pub struct EcsMapping {
 }
 impl EcsMapping {
     pub fn new() -> Result<Self, MappingError> {
+        Self::for_source("mapping-ecs", "parser-ecs", "ecs-source-v1", "ecs")
+    }
+    pub fn for_elastic() -> Result<Self, MappingError> {
+        Self::for_source(
+            "mapping-elastic-ecs",
+            "siem-elastic",
+            "elastic-source-v1",
+            "elastic-search",
+        )
+    }
+    fn for_source(
+        id: &str,
+        parser: &str,
+        version: &str,
+        format: &str,
+    ) -> Result<Self, MappingError> {
         let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
-            "mapping-ecs",
+            id,
             &format!("ecs-9.5-v1-{}", digest.as_str()),
             COMMON_EVENT_V1,
             digest,
         )
         .map_err(|_| MappingError::InvalidManifest)?;
         let selector = SourceSelector::try_new(
-            "parser-ecs",
-            BTreeSet::from(["ecs-source-v1".into()]),
-            Some(("ecs".into(), "ecs-source-v1".into())),
+            parser,
+            BTreeSet::from([version.into()]),
+            Some((format.into(), version.into())),
             BTreeMap::new(),
             Vec::new(),
         )?;
@@ -64,7 +80,7 @@ impl SourceMapper for EcsMapping {
         {
             return Err(MappingError::UnsupportedSourceValue);
         }
-        let view = view::View(source.fields());
+        let view = view::View::for_source(source)?;
         let (header, mut diagnostics) = header::project(&view)?;
         let context = context::project(&view)?;
         let observations = roles::project(source, &context)?;
@@ -104,9 +120,20 @@ static MODULE: ModuleManifest = ModuleManifest {
     tools: &[],
     config: &[],
 };
+static ELASTIC_MODULE: ModuleManifest = ModuleManifest {
+    id: "mapping-elastic-ecs",
+    version: "0.1.0",
+    ports: &[ModulePort::SourceMapper],
+    tools: &[],
+    config: &[],
+};
 impl Module for EcsMapping {
     fn manifest(&self) -> &'static ModuleManifest {
-        &MODULE
+        if self.manifest.identity().id() == "mapping-elastic-ecs" {
+            &ELASTIC_MODULE
+        } else {
+            &MODULE
+        }
     }
     fn register(
         self: Box<Self>,

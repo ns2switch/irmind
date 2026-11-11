@@ -278,4 +278,6 @@ La feature `mapping-evtx` compila mapeos TOML independientes para Security, Syst
 
 **Límites:** El servidor impone índice, cuenta y ventana UTC. Para alertas, también impone `kibana.alert.uuid` y el espacio. El modelo solo compara campos estructurados con `eq`, `not_eq` o `prefix`, con un máximo de 20 resultados o grupos y ventanas de 24 horas. La respuesta HTTP se limita a 5 MB, con timeout de 45 segundos, sin redirecciones y con validación completa del certificado y del nombre de host. Se conservan los indicadores de timeout y fallos de shards del proveedor en la evidencia firmada.
 
+Las respuestas de eventos se conservan como evidencia cruda firmada y pasan por el decodificador y el mapeo ECS identificados para generar artefactos Parquet. Se conservan los nanosegundos y la posición del resultado. Las agregaciones siguen siendo resultados firmados, no eventos inventados. El decodificador y el mapeo permanecen disponibles para verificar sin conexión aunque el conector remoto esté deshabilitado.
+
 Referencias oficiales: [API de búsqueda](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-search), [alias de alertas](https://www.elastic.co/docs/solutions/security/detect-and-alert/query-alert-indices) y [campos de alertas](https://www.elastic.co/docs/reference/security/fields-and-object-schemas/alert-schema).

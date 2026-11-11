@@ -145,3 +145,5 @@ fn rejects_invalid_configuration_and_never_formats_secrets() {
     assert!(!debug.contains("synthetic-api-key"));
     assert!(!debug.contains("elastic.invalid"));
 }
+
+mod pipeline;

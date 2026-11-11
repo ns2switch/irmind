@@ -48,6 +48,7 @@ impl<'a> Engine<'a> {
             module_fingerprint: "none".into(),
             threat_intel: None,
             siems: Vec::new(),
+            result_decoders: crate::BTreeMap::new(),
             cloud_audits: Vec::new(),
             edrs: Vec::new(),
             internal_intel: Vec::new(),

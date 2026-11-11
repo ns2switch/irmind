@@ -22,6 +22,7 @@ pub struct ModuleRegistry {
     parser_variants: Vec<Arc<dyn LogParser>>,
     unavailable_parsers: BTreeMap<String, String>,
     siems: Vec<Box<dyn SiemPort>>,
+    result_decoders: BTreeMap<String, Arc<dyn crate::SourceDecoder>>,
     edrs: Vec<Box<dyn EdrPort>>,
     cloud_audits: Vec<Box<dyn CloudAuditPort>>,
     internal_intel: Vec<Box<dyn InternalIntelPort>>,
@@ -60,6 +61,16 @@ impl ModuleRegistry {
                 .push(Arc::clone(definition.compiled().decoder()));
             self.source_mappers
                 .push(Arc::clone(definition.compiled().extraction_mapper()));
+        }
+        for port in &staged.siems {
+            if let Some(decoder) = staged
+                .source_decoders
+                .iter()
+                .find(|d| d.identity().name == manifest.id)
+            {
+                self.result_decoders
+                    .insert(port.source_id().into(), Arc::clone(decoder));
+            }
         }
         self.source_decoders.extend(staged.source_decoders);
         self.source_mappers.extend(staged.source_mappers);
@@ -361,6 +372,7 @@ impl ModuleRegistry {
         for port in &self.object_sources {
             engine = engine.with_object_source(port.as_ref())?;
         }
+        engine.result_decoders.clone_from(&self.result_decoders);
         engine.with_module_fingerprint(self.fingerprint())
     }
 
