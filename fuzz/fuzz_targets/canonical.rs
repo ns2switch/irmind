@@ -41,19 +41,7 @@ fuzz_target!(|bytes: &[u8]| {
             );
             assert!(irmind_domain::SealInventoryV2::decode(&(wire + "00")).is_err());
         }
-        if let Ok(migration) = irmind_domain::ParquetMigrationV1::decode(text.trim()) {
-            let wire = migration.encode().unwrap();
-            assert_eq!(
-                irmind_domain::ParquetMigrationV1::decode(&wire).unwrap(),
-                migration
-            );
-            assert!(irmind_domain::ParquetMigrationV1::decode(&(wire + "00")).is_err());
-        }
-        for kind in [
-            irmind_domain::AuditEventKind::ParquetArtifactV1,
-            irmind_domain::AuditEventKind::ParquetArtifactV2,
-            irmind_domain::AuditEventKind::ParquetArtifactV3,
-        ] {
+        for kind in [irmind_domain::AuditEventKind::ParquetArtifactV3] {
             if let Ok(artifact) = irmind_domain::ParquetArtifact::decode(kind, text.trim()) {
                 let wire = artifact
                     .encode()
@@ -76,6 +64,7 @@ fuzz_target!(|bytes: &[u8]| {
                 }
             };
         }
+        check_mapping_codec!(irmind_domain::SourceManifestV2);
         check_mapping_codec!(irmind_domain::SourceRecordSetV1);
         check_mapping_codec!(irmind_domain::MappingProfileRecordV1);
         check_mapping_codec!(irmind_domain::MappingRunV1);

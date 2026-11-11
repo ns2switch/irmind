@@ -5,54 +5,10 @@ use irmind_app::source_mapping::{
     MappingCatalog, MappingError, MappingManifest, MappingOutput, MappingPartition,
     MappingProvenance, SourceRecordV1, SourceSelector, SourceValue,
 };
-use irmind_app::{IndexedGraphRecord, ParserIdentity, SourceMapper, StreamingEventParser};
+use irmind_app::{IndexedGraphRecord, SourceMapper};
 use irmind_domain::EvidenceHash;
-use std::{collections::BTreeSet, io::Read, sync::Arc};
+use std::{collections::BTreeSet, sync::Arc};
 
-/// Metadata selection only. The writer resolves the real source decoder.
-pub(super) struct Mapped;
-impl StreamingEventParser for Mapped {
-    fn identity(&self) -> ParserIdentity<'_> {
-        ParserIdentity {
-            name: "parser-json",
-            version: "json-source-v1",
-        }
-    }
-    fn streaming_version(&self) -> &'static str {
-        "json-source-v1"
-    }
-    fn parser_name(&self) -> &'static str {
-        "parser-json"
-    }
-    fn parse_reader(
-        &self,
-        _: &str,
-        _: &mut dyn Read,
-        _: [u8; 32],
-        _: &CancellationToken,
-        _: &mut dyn FnMut(irmind_domain::Tainted<irmind_app::GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        Err(AppError::Policy(
-            "source decoder selection requires a mapping catalog".into(),
-        ))
-    }
-}
-impl irmind_app::EventParser for Mapped {
-    fn version(&self) -> &'static str {
-        "json-source-v1"
-    }
-    fn parse_each(
-        &self,
-        _: &str,
-        _: &[u8],
-        _: &CancellationToken,
-        _: &mut dyn FnMut(irmind_domain::Tainted<irmind_app::GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        Err(AppError::Policy(
-            "source decoder selection requires a mapping catalog".into(),
-        ))
-    }
-}
 struct Mapper {
     manifest: MappingManifest,
 }
@@ -270,7 +226,7 @@ pub(super) fn assert_rebuild(root: &Path, paths: &[String], compact: bool) {
     let large = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: &Mapped,
+        parser: &crate::parquet_store::fixtures::parser(),
     };
     let cancel = CancellationToken::new();
     // Maintenance compaction combines successive ingests. Initial direct

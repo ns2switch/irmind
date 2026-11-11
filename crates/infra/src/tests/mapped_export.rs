@@ -2,14 +2,7 @@
 use super::*;
 use irmind_app::{LargeCaseStore, LargeCaseUseCases};
 use irmind_domain::AuditEventKind;
-use irmind_domain::{
-    ArtifactPipelineV1, EvidenceHash, MappingBindingV1, MappingCountsV1, MappingInputRefV1,
-    MappingProfileV1, MappingRouteV1, MappingRunV1, ParquetArtifact, ParquetArtifactV3,
-    ParserSelectionMode, SourceFormatIdentityV1, SourceManifestV2, SourceRecordSetV1,
-    SourceReferenceV1,
-};
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder as Reader;
-use std::fs::File;
+use irmind_domain::{ParquetArtifact, ParserSelectionMode, SourceManifestV2};
 
 fn append(
     store: &LocalStore,
@@ -74,50 +67,38 @@ fn ingest(
     let parser = mapping_catalog()
         .decoder_selection("parser-json", "json-source-v1")
         .unwrap();
-    let prepared = store
-        .prepare_local_batch(
-            irmind_app::LocalBatchRequest {
+    let cancel = CancellationToken::new();
+    let mut prepared = store
+        .prepare_mapped_ingest(
+            irmind_app::MappedIngestRequest {
                 case_id: id,
                 source_root: root,
                 relative_paths: &[name.into()],
                 copy_original: true,
                 parser: &parser,
-                committed_artifacts: &[],
+                committed_artifacts: irmind_app::mapped_ingest::CommittedArtifacts::Slice(&[]),
                 limits: irmind_app::PartitionLimits::default(),
             },
-            &CancellationToken::new(),
+            &cancel,
         )
         .unwrap()
-        .pop()
         .unwrap();
+    let source = &prepared.metadata().sources[0];
     let manifest = SourceManifestV2 {
-        source: prepared.manifest,
+        source: source.manifest.clone(),
         parser_id: "parser-json".into(),
         parser_version: "json-source-v1".into(),
         confidence: 90,
         selection: ParserSelectionMode::Automatic,
         timestamp_context: None,
-        rejected_records: 0,
-        rejected_sample: vec![],
+        rejected_records: source.report.rejected,
+        rejected_sample: source.report.samples.clone(),
     };
-    let input = SourceRecordSetV1::from_manifest(
-        &manifest,
-        SourceReferenceV1::file(name).unwrap(),
-        vec![SourceFormatIdentityV1::try_new("json", "source-json-v1").unwrap()],
-        prepared.records as u64,
-        EvidenceHash::from_bytes([9; 32]),
-    )
-    .unwrap();
-    let profile =
-        MappingProfileV1::try_new(vec![MappingInputRefV1::from_set(&input).unwrap()], vec![])
-            .unwrap();
-    let binding = MappingBindingV1::new(
-        MappingInputRefV1::from_set(&input).unwrap(),
-        profile.identity().unwrap(),
-        profile.catalog_identity(),
-        input.decoder().clone(),
-        None,
-    );
+    let bound = prepared
+        .metadata()
+        .bind(std::slice::from_ref(&manifest))
+        .unwrap();
+    prepared.publish(&cancel).unwrap();
     append(
         store,
         signer,
@@ -125,62 +106,50 @@ fn ingest(
         AuditEventKind::SourceManifestV2,
         manifest.encode().unwrap(),
     );
-    append(
-        store,
-        signer,
-        id,
-        AuditEventKind::SourceRecordSetV1,
-        input.encode().unwrap(),
-    );
+    for input in bound.inputs {
+        append(
+            store,
+            signer,
+            id,
+            AuditEventKind::SourceRecordSetV1,
+            input.encode().unwrap(),
+        );
+    }
+    for snapshot in bound.snapshots {
+        append(
+            store,
+            signer,
+            id,
+            AuditEventKind::MappingProfileV1,
+            irmind_domain::MappingProfileRecordV1::Snapshot(snapshot)
+                .encode()
+                .unwrap(),
+        );
+    }
     append(
         store,
         signer,
         id,
         AuditEventKind::MappingProfileV1,
-        profile.encode().unwrap(),
+        bound.profile.encode().unwrap(),
     );
-    let mut artifacts = Vec::new();
-    for artifact in prepared.artifacts {
-        let core = artifact.precise_metadata().unwrap().clone();
-        let reader = Reader::try_new(
-            File::open(store.parquet.case_dir(id).unwrap().join(&core.path)).unwrap(),
-        )
-        .unwrap();
-        let count = u64::try_from(reader.metadata().file_metadata().num_rows()).unwrap();
-        let mapped = ParquetArtifactV3::try_new(
-            core,
-            ArtifactPipelineV1::mapped(vec![binding.clone()], count).unwrap(),
-        )
-        .unwrap();
+    for artifact in bound.artifacts {
         append(
             store,
             signer,
             id,
             AuditEventKind::ParquetArtifactV3,
-            mapped.encode().unwrap(),
+            artifact.encode().unwrap(),
         );
-        artifacts.push(mapped);
     }
-    let receipt = MappingRunV1::between(
-        &profile,
-        vec![
-            MappingRouteV1::try_new(
-                input.source().clone(),
-                None,
-                MappingCountsV1::try_new(input.records(), input.records(), 0, 0).unwrap(),
-            )
-            .unwrap(),
-        ],
-        &artifacts,
-    )
-    .unwrap();
     append(
         store,
         signer,
         id,
         AuditEventKind::MappingRunV1,
-        receipt.encode().unwrap(),
+        bound.receipt.encode().unwrap(),
     );
+    prepared.retain_committed();
 }
 
 #[test]
@@ -203,7 +172,12 @@ fn v6_export_authenticates_retained_parents_receipts_schema_and_public_key() {
         store: store.as_ref(),
         parser: &json_source_parser(),
     };
-    assert_eq!(large.compact_case(&case.id, &cancel).unwrap(), 3);
+    assert_eq!(
+        large
+            .compact_case_with_threshold(&case.id, 2, &cancel)
+            .unwrap(),
+        3
+    );
     let catalog = irmind_app::artifact_catalog(&store.entries(&case.id).unwrap()).unwrap();
     assert_eq!((catalog.all.len(), catalog.active.len()), (9, 3));
     engine.verify(&case.id).unwrap();

@@ -1,32 +1,29 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
-use crate::parquet_store::ParquetStore;
 use arrow::array::TimestampMicrosecondArray;
-use irmind_app::{CancellationToken, LargeCaseStore as _};
+use irmind_app::CancellationToken;
 use irmind_domain::CaseId;
-use irmind_mod_parser_json::JsonParser;
 
 #[test]
 fn cached_source_binding_still_rejects_changed_hashes_and_null_indexes() {
     let source = tempfile::tempdir().unwrap();
     let data = tempfile::tempdir().unwrap();
-    let store = ParquetStore::open_precise(data.path()).unwrap();
+    let store = crate::parquet_store::fixtures::store(data.path());
     let id = CaseId::parse("00000000-0000-0000-0000-000000000026").unwrap();
     std::fs::write(
         source.path().join("input.json"),
         br#"{"eventTime":"2026-11-01T00:00:00Z"}"#,
     )
     .unwrap();
-    let prepared = store
-        .prepare_local(
-            &id,
-            source.path(),
-            "input.json",
-            false,
-            &JsonParser,
-            &CancellationToken::new(),
-        )
-        .unwrap();
+    let prepared = crate::parquet_store::fixtures::one_source(
+        &store,
+        &id,
+        source.path(),
+        "input.json",
+        false,
+        &CancellationToken::new(),
+    )
+    .unwrap();
     let artifact = &prepared.artifacts[0];
     let hash = prepared.manifest.sha256.as_str();
     let foreign = "0".repeat(64);

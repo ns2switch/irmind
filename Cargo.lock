@@ -2599,7 +2599,6 @@ name = "irmind-infra"
 version = "0.1.0"
 dependencies = [
  "arrow",
- "base64 0.22.1",
  "bytes",
  "chrono",
  "dbus",

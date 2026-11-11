@@ -1,9 +1,14 @@
 #![forbid(unsafe_code)]
 //! Release-only conversion of 300 distinct small synthetic EVTX sources.
-use irmind_app::{CancellationToken, LargeCaseStore};
+#[path = "source_pipeline/mod.rs"]
+mod source_pipeline;
+use irmind_app::{
+    CancellationToken, LargeCaseStore, MappedIngestRequest, PartitionLimits,
+    mapped_ingest::CommittedArtifacts,
+};
 use irmind_domain::CaseId;
-use irmind_infra::ParquetStore;
 use irmind_mod_parser_evtx::EvtxParser;
+use std::sync::Arc;
 use std::{
     collections::BTreeSet,
     fs,
@@ -58,31 +63,40 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         )?;
     }
     let startup = Instant::now();
-    let parser = EvtxParser::new(&helper()?, root.path());
+    let parser = Arc::new(EvtxParser::new(&helper()?, root.path()));
     if let Some(reason) = parser.unavailable_reason() {
         return Err(reason.into());
     }
     let startup_seconds = startup.elapsed().as_secs_f64();
     let first_stats = parser.witness_stats();
-    let store = ParquetStore::open_precise(root.path())?;
+    let store = source_pipeline::store(root.path(), parser.clone())?;
+    let selected = source_pipeline::selection(parser.clone());
     let id = CaseId::parse("88888888-8888-8888-8888-888888888888")
         .map_err(|_| "invalid synthetic case ID")?;
     let start = Instant::now();
     let mut hashes = BTreeSet::new();
     let (mut records, mut artifacts, mut source_bytes) = (0, 0, 0);
     for index in 0..FILES {
-        let prepared = store.prepare_local(
-            &id,
-            &sources,
-            &format!("synthetic-{index:03}.evtx"),
-            false,
-            &parser,
-            &CancellationToken::new(),
-        )?;
-        hashes.insert(prepared.manifest.sha256);
-        records += prepared.records;
-        artifacts += prepared.artifacts.len();
-        source_bytes += prepared.manifest.size;
+        let prepared = store
+            .prepare_mapped_ingest(
+                MappedIngestRequest {
+                    case_id: &id,
+                    source_root: &sources,
+                    relative_paths: &[format!("synthetic-{index:03}.evtx")],
+                    copy_original: false,
+                    parser: &selected,
+                    committed_artifacts: CommittedArtifacts::Slice(&[]),
+                    limits: PartitionLimits::default(),
+                },
+                &CancellationToken::new(),
+            )?
+            .ok_or("mapped preparation unavailable")?;
+        for source in &prepared.metadata().sources {
+            hashes.insert(source.manifest.sha256.clone());
+            records += source.report.accepted;
+            source_bytes += source.manifest.size;
+        }
+        artifacts += prepared.metadata().projections.len();
     }
     let collection_seconds = start.elapsed().as_secs_f64();
     let stats = parser.witness_stats();
@@ -97,7 +111,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         serde_json::json!({"profile":"release", "files":FILES,"source_bytes":source_bytes,
         "unique_source_hashes":hashes.len(),"records":records,"artifacts":artifacts,"startup_seconds":startup_seconds,
         "witness_runs":stats.attempts,"witness_seconds":stats.elapsed.as_secs_f64(),"collection_seconds":collection_seconds,
-        "scope":"source hash and re-verification, contained decoding, normalization and precise Parquet; audit signing excluded"})
+        "scope":"source hash and re-verification, contained decoding, source decoding, identified mapping and direct V3 Parquet; audit signing excluded"})
     );
     Ok(())
 }

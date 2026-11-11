@@ -149,20 +149,20 @@ fn resolve_source(
             ordered,
         }),
         (Ok(()), Ok(ProducedSource::Ordered(source)), Ok(DirectChunk::Ordered(mut sources))) => {
-            sources.push(ordered_acquisition(source)?);
+            sources.push(ordered_acquisition(*source));
             Ok(DirectChunk::Ordered(sources))
         }
         _ => Err(invalid_source()),
     }
 }
 
-fn ordered_acquisition(source: ParsedSource) -> Result<MappedSourceAcquisition, AppError> {
-    Ok(MappedSourceAcquisition {
+fn ordered_acquisition(source: ParsedSource) -> MappedSourceAcquisition {
+    MappedSourceAcquisition {
         manifest: source.manifest,
         report: source.report,
         format_sample_sha256: source.sample_hash,
         decoded: source.mapping,
-    })
+    }
 }
 
 fn tag_source_error(

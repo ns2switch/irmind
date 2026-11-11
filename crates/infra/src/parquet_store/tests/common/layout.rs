@@ -1,32 +1,6 @@
 //! Physical reader/compactor tests; signed catalog activation has separate contracts.
 use super::*;
-use irmind_domain::{
-    ArtifactPipelineV1, EvidenceHash, MappingBindingV1, MappingInputRefV1, ParquetArtifactV3,
-    ParquetLayoutV1, SourceDecoderIdentityV1,
-};
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder as Reader;
-
-fn wrap(store: &ParquetStore, id: &CaseId, artifact: &ParquetArtifact) -> ParquetArtifact {
-    let core = artifact.precise_metadata().unwrap().clone();
-    let file = File::open(store.case_dir(id).unwrap().join(&core.path)).unwrap();
-    let reader = Reader::try_new(file).unwrap();
-    let rows = u64::try_from(reader.metadata().file_metadata().num_rows()).unwrap();
-    let source = core.source_hashes[0].clone();
-    let input = MappingInputRefV1::try_new(source.clone(), source.clone(), 2).unwrap();
-    let binding = MappingBindingV1::new(
-        input,
-        source.clone(),
-        EvidenceHash::from_bytes([42; 32]),
-        SourceDecoderIdentityV1::try_new(&core.parser_id, &core.parser_version).unwrap(),
-        None,
-    );
-    ParquetArtifactV3::try_new(
-        core,
-        ArtifactPipelineV1::mapped(vec![binding], rows).unwrap(),
-    )
-    .unwrap()
-    .into()
-}
+use irmind_domain::{ArtifactPipelineV1, ParquetArtifactV3, ParquetLayoutV1};
 
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -41,20 +15,20 @@ fn v3_readers_and_layout_keep_exact_query_results_and_parent_files() {
     }
     let paths = ["a.json".into(), "b.json".into()];
     let token = CancellationToken::new();
-    let prepared = store
-        .prepare_local_batch(
-            irmind_app::LocalBatchRequest {
-                case_id: &id,
-                source_root: root.path(),
-                relative_paths: &paths,
-                copy_original: false,
-                parser: &mapped::Mapped,
-                committed_artifacts: &[],
-                limits: irmind_app::PartitionLimits::default(),
-            },
-            &token,
-        )
-        .unwrap();
+    let prepared = crate::parquet_store::fixtures::successive_sources(
+        &store,
+        irmind_app::MappedIngestRequest {
+            case_id: &id,
+            source_root: root.path(),
+            relative_paths: &paths,
+            copy_original: false,
+            parser: &crate::parquet_store::fixtures::parser(),
+            committed_artifacts: irmind_app::mapped_ingest::CommittedArtifacts::Slice(&[]),
+            limits: irmind_app::PartitionLimits::default(),
+        },
+        &token,
+    )
+    .unwrap();
     let names = prepared
         .iter()
         .zip(paths)
@@ -64,10 +38,7 @@ fn v3_readers_and_layout_keep_exact_query_results_and_parent_files() {
         .iter()
         .flat_map(|p| p.artifacts.clone())
         .collect::<Vec<_>>();
-    let mapped = historical
-        .iter()
-        .map(|a| wrap(&store, &id, a))
-        .collect::<Vec<_>>();
+    let mapped = historical.clone();
     let mut compacted = Vec::new();
     for schema in [
         "irmind-events-v4",
@@ -139,7 +110,7 @@ fn v3_readers_and_layout_keep_exact_query_results_and_parent_files() {
                 .unwrap()
         );
     }
-    let ParquetArtifact::V3(value) = mapped
+    let ParquetArtifact::V3(value) = compacted
         .iter()
         .find(|a| a.schema_version() == "irmind-events-v4")
         .unwrap()
@@ -148,7 +119,15 @@ fn v3_readers_and_layout_keep_exact_query_results_and_parent_files() {
     };
     let changed = ParquetArtifactV3::try_new(
         value.core().clone(),
-        ArtifactPipelineV1::mapped(value.bindings().to_vec(), 2).unwrap(),
+        ArtifactPipelineV1::layout(
+            value.bindings().to_vec(),
+            1,
+            match value.pipeline().derivation() {
+                irmind_domain::ArtifactDerivationV1::Layout { parents } => parents.clone(),
+                irmind_domain::ArtifactDerivationV1::Mapped => unreachable!(),
+            },
+        )
+        .unwrap(),
     )
     .unwrap();
     assert!(

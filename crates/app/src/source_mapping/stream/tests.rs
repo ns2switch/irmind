@@ -24,11 +24,14 @@ impl SourceDecoder for Decoder {
     }
 }
 fn record(n: u64, offset: u64) -> Tainted<SourceRecordV1> {
+    record_with_offset(n, Some(offset))
+}
+fn record_with_offset(n: u64, offset: Option<u64>) -> Tainted<SourceRecordV1> {
     let source = SourceRecordV1::try_new(
         EventOrigin::try_new(
             EvidenceHash::from_bytes([7; 32]),
             n,
-            Some(offset),
+            offset,
             "parser-json",
             "json-source-v1",
         )
@@ -47,9 +50,14 @@ fn record(n: u64, offset: u64) -> Tainted<SourceRecordV1> {
         DecodeAnnotationsV1::default(),
     )
     .unwrap();
-    let provenance = Provenance::new([7; 32], Some(n), SourceKind::File).with_parser_location(
-        ParserLocation::new("logs/record.json", "parser-json", offset).unwrap(),
-    );
+    let provenance = Provenance::new([7; 32], Some(n), SourceKind::File);
+    let provenance = if let Some(offset) = offset {
+        provenance.with_parser_location(
+            ParserLocation::new("logs/record.json", "parser-json", offset).unwrap(),
+        )
+    } else {
+        provenance
+    };
     Tainted::from_external(source, provenance)
 }
 fn accumulator<'a>(
@@ -352,3 +360,5 @@ fn buffered_commitment_rejects_changes_on_both_sides_of_the_read_boundary() {
         assert_eq!(result.is_ok(), position.is_none());
     }
 }
+
+mod offsets;

@@ -142,15 +142,13 @@ pub(super) fn replay(
     }
     Ok(())
 }
-pub(super) fn acquisition(
-    source: StagedSource,
-) -> Result<irmind_app::MappedSourceAcquisition, AppError> {
-    Ok(irmind_app::MappedSourceAcquisition {
+pub(super) fn acquisition(source: StagedSource) -> irmind_app::MappedSourceAcquisition {
+    irmind_app::MappedSourceAcquisition {
         manifest: source.manifest,
         report: source.report,
         format_sample_sha256: source.sample_hash,
         decoded: source.mapping,
-    })
+    }
 }
 
 fn plan_one(
@@ -219,3 +217,6 @@ fn hash_failure<T>(result: Result<T, AppError>, path: &str) -> Result<T, AppErro
         other => other,
     }
 }
+
+#[cfg(test)]
+mod tests;

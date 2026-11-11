@@ -11,32 +11,33 @@ fn mapping_owned_unclassified_projection_writes_checked_schemas_and_precision() 
     let input=br#"{"eventTime":"2026-11-01T00:00:00.123456789Z","eventName":"Failure is just source text","host":"host-a","sourceIPAddress":"203.0.113.77"}"#;
     fs::write(root.path().join("event.json"), input).unwrap();
     let paths = ["event.json".into()];
-    let prepared = store
-        .prepare_local_batch(
-            irmind_app::LocalBatchRequest {
-                case_id: &id,
-                source_root: root.path(),
-                relative_paths: &paths,
-                copy_original: false,
-                parser: &mapped::Mapped,
-                committed_artifacts: &[],
-                limits: irmind_app::PartitionLimits::default(),
-            },
-            &CancellationToken::new(),
-        )
-        .unwrap()
-        .pop()
-        .unwrap();
+    let prepared = crate::parquet_store::fixtures::successive_sources(
+        &store,
+        irmind_app::MappedIngestRequest {
+            case_id: &id,
+            source_root: root.path(),
+            relative_paths: &paths,
+            copy_original: false,
+            parser: &crate::parquet_store::fixtures::parser(),
+            committed_artifacts: irmind_app::mapped_ingest::CommittedArtifacts::Slice(&[]),
+            limits: irmind_app::PartitionLimits::default(),
+        },
+        &CancellationToken::new(),
+    )
+    .unwrap()
+    .pop()
+    .unwrap();
     assert_eq!(prepared.records, 1);
     assert_eq!(prepared.artifacts.len(), 3);
     for artifact in &prepared.artifacts {
-        let ParquetArtifact::V2(envelope) = artifact else {
-            panic!("expected V2")
+        let ParquetArtifact::V3(mapped) = artifact else {
+            panic!("expected mapped V3")
         };
+        let envelope = mapped.core();
         assert!(envelope.schema.is_common());
         assert_eq!(
             envelope.builder_version,
-            crate::parquet_store::common_format::BUILDER
+            irmind_domain::COMMON_EVENT_DIRECT_BUILDER
         );
         let file = File::open(store.case_dir(&id).unwrap().join(&envelope.path)).unwrap();
         let reader =
@@ -70,8 +71,8 @@ fn mapping_owned_unclassified_projection_writes_checked_schemas_and_precision() 
             }
         }
     }
-    let prepared_mapping = prepared.mapping.unwrap();
-    assert!(prepared_mapping.catalog_commitment().is_ok());
+    let prepared_mapping = prepared.mapping;
+    assert!(prepared_mapping.records() == 1 && prepared_mapping.commitment().as_str().len() == 64);
 }
 
 mod compaction;
@@ -90,22 +91,22 @@ fn common_queries_keep_roles_pid_scopes_and_closed_filters() {
     );
     fs::write(root.path().join("mapped.ndjson"), input).unwrap();
     let paths = ["mapped.ndjson".into()];
-    let prepared = store
-        .prepare_local_batch(
-            irmind_app::LocalBatchRequest {
-                case_id: &id,
-                source_root: root.path(),
-                relative_paths: &paths,
-                copy_original: false,
-                parser: &mapped::Mapped,
-                committed_artifacts: &[],
-                limits: irmind_app::PartitionLimits::default(),
-            },
-            &CancellationToken::new(),
-        )
-        .unwrap()
-        .pop()
-        .unwrap();
+    let prepared = crate::parquet_store::fixtures::successive_sources(
+        &store,
+        irmind_app::MappedIngestRequest {
+            case_id: &id,
+            source_root: root.path(),
+            relative_paths: &paths,
+            copy_original: false,
+            parser: &crate::parquet_store::fixtures::parser(),
+            committed_artifacts: irmind_app::mapped_ingest::CommittedArtifacts::Slice(&[]),
+            limits: irmind_app::PartitionLimits::default(),
+        },
+        &CancellationToken::new(),
+    )
+    .unwrap()
+    .pop()
+    .unwrap();
     assert_eq!(prepared.records, 3);
     let names = BTreeMap::from([(
         prepared.manifest.sha256.as_str().into(),
@@ -173,93 +174,6 @@ fn common_queries_keep_roles_pid_scopes_and_closed_filters() {
         .unwrap();
     assert!(path.contains("no co-observation path"), "{path}");
     mapped::assert_rebuild(root.path(), &["mapped.ndjson".into()], false);
-}
-
-#[test]
-#[allow(clippy::too_many_lines)]
-fn mixed_legacy_and_common_queries_keep_old_data_and_explicit_coverage() {
-    let root = tempfile::tempdir().unwrap();
-    let old = ParquetStore::open(root.path()).unwrap();
-    let new = mapped::compat_store(root.path());
-    let id = CaseId::parse("33333333-3333-3333-3333-333333333333").unwrap();
-    fs::write(root.path().join("old.json"), br#"{"eventTime":"2026-11-01T00:00:00Z","eventName":"Old","sourceIPAddress":"203.0.113.77","userIdentity":{"userName":"alice"}}"#).unwrap();
-    let mut legacy = old
-        .prepare_local(
-            &id,
-            root.path(),
-            "old.json",
-            false,
-            &JsonParser,
-            &CancellationToken::new(),
-        )
-        .unwrap();
-    // Exercise the original entity-only layout too: no co-observation index.
-    legacy
-        .artifacts
-        .retain(|a| !a.schema_version().starts_with("irmind-coobservations-"));
-    fs::write(root.path().join("new.json"), br#"{"eventTime":"2026-11-01T00:00:01Z","eventName":"New","sourceIPAddress":"203.0.113.77","userIdentity":{"userName":"bob"}}"#).unwrap();
-    let paths = ["new.json".into()];
-    let common = new
-        .prepare_local_batch(
-            irmind_app::LocalBatchRequest {
-                case_id: &id,
-                source_root: root.path(),
-                relative_paths: &paths,
-                copy_original: false,
-                parser: &mapped::Mapped,
-                committed_artifacts: &legacy.artifacts,
-                limits: irmind_app::PartitionLimits::default(),
-            },
-            &CancellationToken::new(),
-        )
-        .unwrap()
-        .pop()
-        .unwrap();
-    let names = BTreeMap::from([
-        (legacy.manifest.sha256.as_str().into(), "old.json".into()),
-        (common.manifest.sha256.as_str().into(), "new.json".into()),
-    ]);
-    let artifacts = [legacy.artifacts, common.artifacts].concat();
-    let query = new.queries(&names);
-    let cancel = CancellationToken::new();
-    let all = GraphQueryFilter::default();
-    assert_eq!(
-        query
-            .timeline_native(&id, &artifacts, &all, 10, &cancel)
-            .unwrap()
-            .len(),
-        2
-    );
-    let neighbors = query
-        .neighbors_native(&id, &artifacts, &all, ("ip", "203.0.113.77"), 20, &cancel)
-        .unwrap();
-    assert!(
-        neighbors.contains("alice") && neighbors.contains("bob"),
-        "{neighbors}"
-    );
-    let unknown = GraphQueryFilter::from_args(&BTreeMap::from([(
-        "event_outcome".into(),
-        "unknown".into(),
-    )]))
-    .unwrap();
-    assert_eq!(
-        query
-            .timeline_native(&id, &artifacts, &unknown, 10, &cancel)
-            .unwrap()
-            .len(),
-        1
-    );
-    assert!(
-        unknown
-            .coverage_notice()
-            .unwrap()
-            .contains("does not prove absence")
-    );
-    let summary = query.summary_native(&id, &artifacts, &cancel).unwrap();
-    assert!(
-        summary.contains("common records=1/2") && summary.contains("categorized=0/2"),
-        "{summary}"
-    );
 }
 
 mod layout;

@@ -1,13 +1,14 @@
 #![forbid(unsafe_code)]
 //! Release-only signed ingestion of bounded, synthetic Security.evtx sources.
 mod large_support;
+#[path = "source_pipeline/mod.rs"]
+mod source_pipeline;
 use irmind_app::{
     AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,
-    LargeCaseUseCases, LogParser as _, ParserSelection, ParserSelectionMode, StreamingEventParser,
-    sha256,
+    LargeCaseUseCases, LogParser as _, ParserSelection, ParserSelectionMode, sha256,
 };
 use irmind_domain::ExecutionMode;
-use irmind_infra::{LocalStore, LocalVerifier, ParquetStore, SystemClock};
+use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
 use irmind_mod_parser_evtx::EvtxParser;
 use irmind_security::MandatoryGuard;
 use std::{collections::BTreeMap, fs::File, io::Read as _, path::Path, sync::Arc, time::Instant};
@@ -20,7 +21,7 @@ fn selection(path: &Path, parser: &EvtxParser) -> Result<ParserSelection, large_
         .ok_or("synthetic EVTX detection failed")?;
     Ok(ParserSelection {
         parser_id: "parser-evtx".into(),
-        parser_version: parser.streaming_version().into(),
+        parser_version: irmind_app::SourceDecoder::identity(parser).version.into(),
         confidence: confidence.value(),
         mode: ParserSelectionMode::Automatic,
         timestamp_context: None,
@@ -32,7 +33,15 @@ fn setup(
     root: &Path,
     parser: Arc<EvtxParser>,
 ) -> Result<(Engine<'static>, Arc<LocalStore>), large_support::Error> {
-    let local = Arc::new(LocalStore::open(root)?);
+    let local = Arc::new(source_pipeline::store(root, parser.clone())?);
+    let args = std::env::args().collect::<Vec<_>>();
+    if let Some(value) = args.windows(2).find(|v| v[0] == "--workers") {
+        let requested = value[1].parse::<u16>()?;
+        if !(1..=256).contains(&requested) {
+            return Err("workers must be between 1 and 256".into());
+        }
+        local.set_parallel_worker_limit(std::num::NonZeroU16::new(requested));
+    }
     let signer = Arc::new(large_support::SyntheticSigner::new());
     let engine = Engine::new(
         EnginePorts::new(
@@ -72,11 +81,11 @@ fn ingest(
         "Synthetic large Windows Security logs",
         "local evidence only",
     )?;
-    let parquet = ParquetStore::open_precise(root)?;
+    let selected = source_pipeline::selection(parser.clone());
     let use_cases = LargeCaseUseCases {
         engine: &engine,
-        store: &parquet,
-        parser: parser.as_ref(),
+        store: local.as_ref(),
+        parser: &selected,
     };
     let sources = root.join("sources");
     let selections = names
@@ -127,7 +136,7 @@ fn ingest(
         "signed_entries":local.entries(&case.id)?.len(), "witness_runs":parser.witness_stats().attempts,
         "limits_reached":false, "record_limit_per_file":irmind_evtx::MAX_RECORDS,
         "per_file_budgets":caps, "decode_timeout_seconds":600,
-        "scope":"source hashing, contained decoding, normalization, V2 Parquet and signed custody; final full verification timed separately"})
+        "scope":"source hashing, contained decoding, source decoding, identified mapping, direct V3 Parquet and signed custody; final full verification timed separately"})
     );
     Ok(())
 }
