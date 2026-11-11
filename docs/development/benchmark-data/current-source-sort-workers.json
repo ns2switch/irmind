@@ -1,0 +1,126 @@
+{
+  "run": "https://github.com/ns2switch/irmind/actions/runs/43000350075",
+  "commits_and_cores": "reference=8fcd563f597bf829ae445724bd483fccf3d88015 candidate=a10ec399ddbe7b1f89b34d99e22185a1dc8f1ae9 available_cores=4",
+  "measurements": [
+    {
+      "setting": "reference-four",
+      "PARQUET_INGEST": {
+        "bytes": "1076424160",
+        "files": "515",
+        "hash_seconds": "0.965",
+        "conversion_seconds": "0.000",
+        "row_seconds": "4.145",
+        "parquet_seconds": "9.348",
+        "wall_seconds": "98.847",
+        "parquet_bytes": "160699746",
+        "coobservation_bytes": "24366105"
+      },
+      "PARQUET_INGEST_EXACT": {
+        "wall_ns": "98846996859"
+      },
+      "PARQUET_FINALIZE": {
+        "seconds": "0.179768",
+        "normalized_staged_sources": "515"
+      },
+      "WORKER_SWEEP": {
+        "peak_rss_kib": "287368",
+        "elapsed_seconds": "106.22"
+      },
+      "PARQUET_SCENARIO": {
+        "name": "endpoint-v2-64",
+        "size": "1gb",
+        "normalized_stage_peak_bytes": "58917110"
+      }
+    },
+    {
+      "setting": "cap-1",
+      "PARQUET_INGEST": {
+        "bytes": "1076424160",
+        "files": "515",
+        "hash_seconds": "0.834",
+        "conversion_seconds": "0.000",
+        "row_seconds": "4.184",
+        "parquet_seconds": "9.431",
+        "wall_seconds": "117.676",
+        "parquet_bytes": "160699746",
+        "coobservation_bytes": "24366105"
+      },
+      "PARQUET_INGEST_EXACT": {
+        "wall_ns": "117675520094"
+      },
+      "PARQUET_FINALIZE": {
+        "seconds": "0.349542",
+        "normalized_staged_sources": "515"
+      },
+      "WORKER_SWEEP": {
+        "peak_rss_kib": "257384",
+        "elapsed_seconds": "133.47"
+      },
+      "PARQUET_SCENARIO": {
+        "name": "endpoint-v2-64",
+        "size": "1gb",
+        "normalized_stage_peak_bytes": "40225561"
+      }
+    },
+    {
+      "setting": "automatic",
+      "PARQUET_INGEST": {
+        "bytes": "1076424160",
+        "files": "515",
+        "hash_seconds": "0.920",
+        "conversion_seconds": "0.000",
+        "row_seconds": "4.228",
+        "parquet_seconds": "9.570",
+        "wall_seconds": "80.254",
+        "parquet_bytes": "160699746",
+        "coobservation_bytes": "24366105"
+      },
+      "PARQUET_INGEST_EXACT": {
+        "wall_ns": "80253944653"
+      },
+      "PARQUET_FINALIZE": {
+        "seconds": "0.187705",
+        "normalized_staged_sources": "515"
+      },
+      "WORKER_SWEEP": {
+        "peak_rss_kib": "277440",
+        "elapsed_seconds": "88.53"
+      },
+      "PARQUET_SCENARIO": {
+        "name": "endpoint-v2-64",
+        "size": "1gb",
+        "normalized_stage_peak_bytes": "58662648"
+      }
+    },
+    {
+      "setting": "cap-4",
+      "PARQUET_INGEST": {
+        "bytes": "1076424160",
+        "files": "515",
+        "hash_seconds": "0.983",
+        "conversion_seconds": "0.000",
+        "row_seconds": "4.094",
+        "parquet_seconds": "9.174",
+        "wall_seconds": "72.581",
+        "parquet_bytes": "160699746",
+        "coobservation_bytes": "24366105"
+      },
+      "PARQUET_INGEST_EXACT": {
+        "wall_ns": "72581232401"
+      },
+      "PARQUET_FINALIZE": {
+        "seconds": "0.168950",
+        "normalized_staged_sources": "515"
+      },
+      "WORKER_SWEEP": {
+        "peak_rss_kib": "286876",
+        "elapsed_seconds": "79.88"
+      },
+      "PARQUET_SCENARIO": {
+        "name": "endpoint-v2-64",
+        "size": "1gb",
+        "normalized_stage_peak_bytes": "78216864"
+      }
+    }
+  ]
+}
