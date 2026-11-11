@@ -236,12 +236,21 @@ fn fallback_rejects_a_disordered_source_changed_after_the_order_probe() {
     let mutable = root.path().join("b.ndjson");
     fs::write(
         &mutable,
+        // More rows than the bounded preparation window ensure that the fake
+        // decoder observes the order-probe callback failure before it returns.
+        // It then replaces the opened source before the fallback hash check.
         br#"{"eventTime":"2026-11-01T00:00:01Z","eventName":"SyntheticLate"}
-{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticEarly"}"#,
+{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticEarly"}
+{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail1"}
+{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail2"}
+{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail3"}
+{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail4"}
+{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail5"}
+{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail6"}"#,
     )
     .unwrap();
     let (store, engine, catalog) =
-        fixture_decoder(root.path(), Arc::new(ReplaceDisordered(mutable)));
+        fixture_decoder(root.path(), Arc::new(ReplaceDisordered(mutable.clone())));
     let case = engine
         .create_case("Source order retry", "local only")
         .unwrap();
@@ -257,6 +266,11 @@ fn fallback_rejects_a_disordered_source_changed_after_the_order_probe() {
     let accepted = use_cases
         .ingest_local_batch(&case.id, root.path(), &paths, false, &token)
         .unwrap();
+    assert!(
+        fs::read_to_string(&mutable)
+            .unwrap()
+            .contains("SyntheticReplacement")
+    );
     assert_eq!(accepted.len(), 1);
     assert_eq!(accepted[0].0, "a.ndjson");
     let entries = store.entries(&case.id).unwrap();

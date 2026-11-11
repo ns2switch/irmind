@@ -18,7 +18,6 @@ impl ParquetStore {
         let catalog = self.mapping_catalog.as_deref().ok_or_else(invalid_source)?;
         let parser = input.parser;
         let logical = parser.logical_source(input.relative_path);
-        let hash_value = input.hash_value;
         let reference = SourceReferenceV1::file(logical).map_err(|_| invalid_source())?;
         let time = decode_source_time_context(input.parser.timestamp_context())?;
         let metadata = SourceMetadata {
@@ -44,40 +43,19 @@ impl ParquetStore {
         let routes = projection_routes(catalog)?;
         let mut acc = SourceRecordAccumulator::new(metadata, id, input.size, catalog)?;
         let mut tuple_writer = std::io::BufWriter::new(tuples.as_file_mut());
-        let mut callback = |source| {
-            let mapped = {
-                let _timer = self
-                    .profile
-                    .as_ref()
-                    .map(|p| p.mapping_timer(super::super::profile::MappingPhase::ValidateAndMap));
-                acc.accept(&source, &mut tuple_writer)?
-            };
-            // SourceRecordSetV1 commits fixed 49-byte tuples; this includes
-            // buffered bytes as well as tuples already flushed to the spool.
-            tuple_disk.add(49)?;
-            let timer = self
-                .profile
-                .as_ref()
-                .map(|p| p.mapping_timer(super::super::profile::MappingPhase::Project));
-            let mut row = None;
-            let route = routes
-                .get(&mapped.identity)
-                .ok_or_else(invalid_source)?
-                .clone();
-            mapped.output.inspect(|output| {
-                row = Some(RecordRow::from_mapping(
-                    output,
-                    mapped.output.provenance(),
-                    id,
-                    hash_value,
-                    route,
-                ));
-            });
-            let row = row.ok_or_else(invalid_source)??;
-            drop(timer);
-            emit(row)
-        };
-        let report = decode_source(input, decoder, metadata, &mut callback)?;
+        let report = super::prepare::decode_projected(
+            self,
+            input,
+            decoder,
+            metadata,
+            &routes,
+            super::prepare::OrderedOutput {
+                acc: &mut acc,
+                spool: &mut tuple_writer,
+                disk: &mut tuple_disk,
+                emit,
+            },
+        )?;
         tuple_writer.flush().map_err(storage)?;
         drop(tuple_writer);
         let _timer = self
@@ -88,12 +66,12 @@ impl ParquetStore {
         Ok((report, commitment))
     }
 }
-fn decode_source(
+pub(super) fn decode_source(
     input: &mut VerifiedInput<'_>,
     decoder: &dyn irmind_app::SourceDecoder,
     metadata: SourceMetadata<'_>,
     emit: &mut dyn FnMut(
-        irmind_domain::Tainted<irmind_domain::SourceRecordV1>,
+        Option<irmind_domain::Tainted<irmind_domain::SourceRecordV1>>,
     ) -> Result<(), AppError>,
 ) -> Result<irmind_app::ParseReport, AppError> {
     let logical = metadata.source.reference();
@@ -107,11 +85,14 @@ fn decode_source(
             }),
             input.decode_budget,
             &mut |record| {
-                let result = emit(record);
+                let result = emit(Some(record));
                 callback_failed |= result.is_err();
                 result
             },
         );
+        let pending = emit(None);
+        callback_failed |= pending.is_err();
+        pending?;
         let report = source_result(
             input.relative_path,
             input.sample,
@@ -132,13 +113,16 @@ fn decode_source(
             }),
             input.decode_budget,
             &mut |record| {
-                let outcome = emit(record);
+                let outcome = emit(Some(record));
                 if outcome.is_err() {
                     callback_failed = true;
                 }
                 outcome
             },
         );
+        let pending = emit(None);
+        callback_failed |= pending.is_err();
+        pending?;
         if reader.io_failed {
             return Err(storage("source read failed"));
         }

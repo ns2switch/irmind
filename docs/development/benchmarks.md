@@ -1678,3 +1678,46 @@ channel hand-offs but leaves canonical mapping, writing and custody work in the
 main pipeline. Queue, mapping, encoding and file-write counters are needed to
 separate those costs before attributing the remaining serial fraction.
 [Full measurements](benchmark-data/evtx-parallel-native-workers.json).
+### Current mapped single-file worker profile
+
+The [paired release run](https://github.com/ns2switch/irmind/actions/runs/43113820302)
+uses one 1 GiB NDJSON source, 663,212 accepted records and a four-core Linux
+runner. Each setting has three alternating reference/candidate pairs. Every run
+checks all rows and performs full artifact reconstruction. The candidate adds
+profiling only; it is not an ingestion optimization.
+
+| Variant | Workers | Median ingestion s | Maximum RSS MiB |
+| --- | ---: | ---: | ---: |
+| Reference | 1 | 20.899 | 71.05 |
+| Reference | 4 | 19.799 | 75.41 |
+| Reference | auto (3) | 20.212 | 75.14 |
+| Instrumented | 1 | 21.192 | 69.79 |
+| Instrumented | 4 | 19.884 | 78.71 |
+| Instrumented | auto (3) | 19.949 | 75.84 |
+
+All variants produce 48,510,482 artifact bytes. RSS includes generation and full
+verification; ingestion timing excludes them. Instrumentation changes the median
+by 1.4% at one worker and 0.4% at four. The instrumented speedup is 1.07x.
+
+| Instrumented phase | One worker s | Four workers s |
+| --- | ---: | ---: |
+| Initial source read and hash | 0.926 | 0.926 |
+| Validation, mapping and source tuple preparation | 4.488 | 5.163 |
+| Checked row projection | 2.829 | 2.977 |
+| Arrow row preparation | 0.795 | 0.889 |
+| Canonical writer | 3.298 | 3.718 |
+| Parquet encoding and I/O, within writer | 3.168 | 3.570 |
+| File writes, within encoding | 0.024 | 0.027 |
+| Fsync | 0.015 | 0.016 |
+| Artifact hashing | 0.047 | 0.050 |
+| Writer waiting for producer queues | 11.670 | 9.412 |
+| Producers waiting for full queues | 0.000 | 0.000 |
+| Final source commitment | 0.125 | 0.125 |
+
+Signing, signature checks and audit append together take less than 0.002 s.
+Counters measure overlapping elapsed stage times; they cannot be summed into
+exclusive CPU percentages. The writer is waiting rather than applying backpressure.
+Mapping/projection remain serial within a source and consume about 8.14 s at
+four workers. Their bounded parallel preparation is the next measured change;
+canonical source commitments, partition assignment and publication stay ordered.
+[Machine-readable samples](benchmark-data/mapped-worker-stage-profile.json).

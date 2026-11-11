@@ -1,5 +1,6 @@
 //! Streaming input accounting uses a caller-owned private tuple spool, not a decoded cache.
 mod commitment;
+mod prepared;
 mod validation;
 use super::{
     MappingCatalog, MappingDiagnostic, MappingIdentityV1, MappingOutput, SourceMetadata,
@@ -10,6 +11,7 @@ use irmind_domain::{
     EvidenceHash, MappingCountsV1, MappingRouteV1, SourceDecoderIdentityV1, SourceFormatIdentityV1,
     SourceRecordSetV1, Tainted,
 };
+pub use prepared::{PreparedSourceRecord, SourceRecordPreparer};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -124,8 +126,24 @@ impl<'a> SourceRecordAccumulator<'a> {
             .map(source)
             .map_err(super::MappingError::into_app)?;
         let bytes = commitment::spool_tuple(source);
-        spool.write_all(&bytes).map_err(|_| invalid())?;
-        self.spool_hash.update(&bytes);
+        self.append_mapping(source, format, identity.as_ref(), &output, &bytes, spool)?;
+        Ok(MappedSourceRecord {
+            identity,
+            output: Tainted::from_external(output, tainted.provenance().clone()),
+        })
+    }
+
+    fn append_mapping(
+        &mut self,
+        source: &SourceRecordV1,
+        format: SourceFormatIdentityV1,
+        identity: Option<&MappingIdentityV1>,
+        output: &MappingOutput,
+        bytes: &[u8],
+        spool: &mut dyn Write,
+    ) -> Result<(), AppError> {
+        spool.write_all(bytes).map_err(|_| invalid())?;
+        self.spool_hash.update(bytes);
         self.records += 1;
         self.previous = Some(source.origin().record());
         self.offset = source
@@ -134,13 +152,10 @@ impl<'a> SourceRecordAccumulator<'a> {
             .map_or(OffsetState::Unavailable, OffsetState::Known);
         self.formats.insert(format);
         self.routes
-            .entry(identity.clone())
+            .entry(identity.cloned())
             .or_default()
-            .add(&output);
-        Ok(MappedSourceRecord {
-            identity,
-            output: Tainted::from_external(output, tainted.provenance().clone()),
-        })
+            .add(output);
+        Ok(())
     }
     pub fn finish<S: Read + Seek>(
         self,
