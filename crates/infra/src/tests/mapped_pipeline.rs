@@ -118,8 +118,7 @@ fn mapped_pipeline_binds_raw_inputs_and_maps_before_writing_and_exporting() {
 }
 
 #[test]
-fn mapped_store_preserves_the_published_route_without_a_registered_raw_decoder() {
-    use irmind_app::{LargeCaseStore, LocalBatchRequest};
+fn missing_store_decoder_fails_before_signing_or_projecting_a_source() {
     let root = tempfile::tempdir().unwrap();
     let source = root.path().join("source");
     fs::create_dir(&source).unwrap();
@@ -128,38 +127,33 @@ fn mapped_store_preserves_the_published_route_without_a_registered_raw_decoder()
         br#"{"eventTime":"2026-11-01T00:00:00Z","user":"synthetic"}"#,
     )
     .unwrap();
-    fs::create_dir(root.path().join("mapped")).unwrap();
-    fs::create_dir(root.path().join("legacy")).unwrap();
-    let mapped = ParquetStore::open_mapped(
-        &root.path().join("mapped"),
-        Arc::new(MappingCatalog::default()),
-    )
-    .unwrap();
-    let legacy = ParquetStore::open_precise(&root.path().join("legacy")).unwrap();
-    let id = CaseId::parse("22222222-2222-2222-2222-222222222222").unwrap();
-    let run = |store: &ParquetStore| {
-        store
-            .prepare_local_batch(
-                LocalBatchRequest {
-                    case_id: &id,
-                    source_root: &source,
-                    relative_paths: &["event.json".into()],
-                    copy_original: false,
-                    parser: &json_source_parser(),
-                    committed_artifacts: &[],
-                    limits: irmind_app::PartitionLimits::default(),
-                },
-                &CancellationToken::new(),
-            )
+    let (store, engine, _) = fixture_catalog(root.path(), Arc::new(MappingCatalog::default()));
+    let case = engine.create_case("Missing decoder", "local only").unwrap();
+    let baseline = engine.verify(&case.id).unwrap();
+    let result = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &json_source_parser(),
+    }
+    .ingest_local(
+        &case.id,
+        &source,
+        "event.json",
+        false,
+        &CancellationToken::new(),
+    );
+    assert!(result.is_err());
+    assert_eq!(engine.verify(&case.id).unwrap(), baseline);
+    assert!(
+        !store
+            .entries(&case.id)
             .unwrap()
-            .pop()
-            .unwrap()
-    };
-    let first = run(&mapped);
-    let second = run(&legacy);
-    assert_eq!(first.artifacts, second.artifacts);
-    assert!(first.mapping.is_none());
-    assert!(second.mapping.is_none());
+            .iter()
+            .any(|entry| matches!(
+                entry.kind,
+                AuditEventKind::SourceManifestV2 | AuditEventKind::ParquetArtifactV3
+            ))
+    );
 }
 
 fn fixture<'a>(root: &Path) -> (Arc<LocalStore>, Engine<'a>, Arc<MappingCatalog>) {
@@ -226,3 +220,5 @@ mod direct_faults;
 mod cloudtrail;
 
 mod workers;
+
+mod partition_order;

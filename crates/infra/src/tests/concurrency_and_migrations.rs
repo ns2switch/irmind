@@ -106,7 +106,22 @@ fn concurrent_ingest_serializes_a_case() {
             });
         }
     });
-    assert_eq!(engine.verify(&case.id).unwrap(), 17);
+    assert_eq!(engine.verify(&case.id).unwrap(), 30);
+    let entries = store.entries(&case.id).unwrap();
+    assert_eq!(
+        entries
+            .iter()
+            .filter(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV2)
+            .count(),
+        4
+    );
+    assert_eq!(
+        entries
+            .iter()
+            .filter(|entry| entry.kind == irmind_domain::AuditEventKind::SourceRecordSetV1)
+            .count(),
+        4
+    );
 }
 
 #[test]

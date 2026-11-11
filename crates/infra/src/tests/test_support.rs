@@ -1,24 +1,7 @@
 use super::*;
 
-pub(super) fn source_catalog() -> Arc<irmind_app::source_mapping::MappingCatalog> {
-    Arc::new(
-        irmind_app::source_mapping::MappingCatalog::freeze(
-            vec![Arc::new(irmind_mod_parser_json::JsonSourceDecoder)],
-            vec![Arc::new(
-                irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap(),
-            )],
-        )
-        .unwrap(),
-    )
-}
-pub(super) fn open_source_store(root: &Path) -> Result<LocalStore, AppError> {
-    LocalStore::open_mapped(root, source_catalog())
-}
-pub(super) fn json_source_parser() -> irmind_app::source_mapping::SourceDecoderSelection {
-    source_catalog()
-        .decoder_selection("parser-json", "json-source-v1")
-        .unwrap()
-}
+mod source_case;
+pub(super) use source_case::{json_source_parser, open_source_store, source_fixture};
 
 mod selected_ingest;
 pub(super) use selected_ingest::ingest_selected;
