@@ -2514,6 +2514,7 @@ dependencies = [
  "irmind-mod-parser-syslog",
  "irmind-mod-parser-velociraptor",
  "irmind-mod-parser-zeek",
+ "irmind-mod-siem-elastic",
  "irmind-mod-siem-splunk",
  "irmind-mod-storage-object",
  "irmind-mod-ti-misp",
@@ -3093,6 +3094,20 @@ dependencies = [
  "irmind-testkit",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-siem-elastic"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-http",
+ "irmind-testkit",
+ "reqwest",
+ "secrecy",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

@@ -91,6 +91,7 @@ The normal build includes every current product module and both keystores. None 
 | DeepSeek | LLM | `llm-deepseek` | experimental | [LLM setup](docs/modules.md#deepseek) |
 | OpenRouter | LLM | `llm-openrouter` | experimental | [LLM setup](docs/modules.md#openrouter) |
 | Splunk | SIEM | `siem-splunk` | experimental | [Splunk](docs/modules.md#splunk) |
+| Elasticsearch / Elastic Security | SIEM | `siem-elastic` | experimental | [Elastic](docs/modules.md#elasticsearch-and-elastic-security) |
 | AWS CloudTrail and IAM | cloud | `cloud-aws` | experimental | [AWS](docs/modules.md#aws-cloudtrail-and-iam) |
 | S3 object storage | cloud storage | `storage-s3` | experimental | [Object storage](docs/modules.md#cloud-object-storage-s3-gcs-azure-blob) |
 | GCS object storage | cloud storage | `storage-gcs` | experimental | [Object storage](docs/modules.md#cloud-object-storage-s3-gcs-azure-blob) |
