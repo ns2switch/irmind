@@ -53,7 +53,12 @@ fn run() -> io::Result<()> {
     }
     #[cfg(windows)]
     if args[0] == "--network-witness-v1" {
-        return irmind_process_containment::network_witness(&file);
+        return std::thread::scope(|scope| {
+            scope
+                .spawn(|| irmind_process_containment::network_witness(&file))
+                .join()
+                .map_err(|_| io::Error::other("EVTX thread network witness failed"))?
+        });
     }
     irmind_process_containment::enter(&file)?;
     if args[0] == "--probe-v1" {
@@ -64,9 +69,21 @@ fn run() -> io::Result<()> {
     irmind_evtx::decode_with_workers(file, &mut io::stdout().lock(), workers.unwrap_or(1))
 }
 fn probe(file: &mut File, executable: &std::path::Path) -> io::Result<()> {
-    std::thread::spawn(irmind_process_containment::verify_entry)
-        .join()
-        .map_err(|_| io::Error::other("EVTX thread isolation probe failed"))??;
+    std::thread::scope(|scope| {
+        scope
+            .spawn(|| {
+                #[cfg(windows)]
+                {
+                    irmind_process_containment::enter(file)
+                }
+                #[cfg(not(windows))]
+                {
+                    irmind_process_containment::verify_entry()
+                }
+            })
+            .join()
+            .map_err(|_| io::Error::other("EVTX thread isolation probe failed"))?
+    })?;
 
     let mut byte = [0u8; 1];
     file.read_exact(&mut byte)?;

@@ -202,7 +202,7 @@ jobs:
 
   absolute_targets:
     needs: current_v3
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && !inputs.worker_sweep && !inputs.evtx_sweep }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
