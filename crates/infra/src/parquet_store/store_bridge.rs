@@ -1,6 +1,6 @@
 use super::{
-    AppError, CancellationToken, CaseId, LargeCaseStore, ParquetArtifact, Path, PreparedSource,
-    SourceManifestV1, StreamingEventParser,
+    AppError, CancellationToken, CaseId, LargeCaseStore, ParquetArtifact, Path, SourceManifestV1,
+    StreamingEventParser,
 };
 
 impl LargeCaseStore for crate::LocalStore {
@@ -10,14 +10,6 @@ impl LargeCaseStore for crate::LocalStore {
         cancel: &CancellationToken,
     ) -> Result<Option<Box<dyn irmind_app::PreparedMappedIngest>>, AppError> {
         self.parquet.prepare_mapped_ingest(request, cancel)
-    }
-
-    fn prepare_local_batch(
-        &self,
-        request: irmind_app::LocalBatchRequest<'_>,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<PreparedSource>, AppError> {
-        self.parquet.prepare_local_batch(request, cancel)
     }
 
     fn create_object_spool(
@@ -32,37 +24,6 @@ impl LargeCaseStore for crate::LocalStore {
         // Validate signatures before using the inventory to protect files.
         self.signed_parquet_artifacts(case_id)?;
         self.parquet.clean_orphan_spools(case_id)
-    }
-
-    fn prepare_local(
-        &self,
-        case_id: &CaseId,
-        source_root: &Path,
-        relative_path: &str,
-        copy_original: bool,
-        parser: &dyn StreamingEventParser,
-        cancel: &CancellationToken,
-    ) -> Result<PreparedSource, AppError> {
-        self.parquet.prepare_local(
-            case_id,
-            source_root,
-            relative_path,
-            copy_original,
-            parser,
-            cancel,
-        )
-    }
-
-    fn prepare_legacy_evidence(
-        &self,
-        case_id: &CaseId,
-        hash: &str,
-        bytes: &[u8],
-        parser: &dyn StreamingEventParser,
-        cancel: &CancellationToken,
-    ) -> Result<Vec<ParquetArtifact>, AppError> {
-        self.parquet
-            .prepare_legacy_evidence(case_id, hash, bytes, parser, cancel)
     }
 
     fn compact_artifacts(

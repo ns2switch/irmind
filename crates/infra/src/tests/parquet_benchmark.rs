@@ -178,7 +178,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         projection.as_secs_f64(),
         commitment.as_secs_f64()
     );
-    let [hash_time, conversion_time, row_time, parquet_time, _, _] = profile.snapshot();
+    let [hash_time, row_time, parquet_time, _, _] = profile.snapshot();
     println!(
         "PARQUET_FINALIZE seconds={:.6} normalized_staged_sources={}",
         profile.partition_finalize_time().as_secs_f64(),
@@ -197,9 +197,8 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         profile.temporary_disk_peak()
     );
     println!(
-        "PARQUET_INGEST bytes={total_bytes} files={files} hash_seconds={:.3} conversion_seconds={:.3} row_seconds={:.3} parquet_seconds={:.3} wall_seconds={:.3} parquet_bytes={disk_bytes} coobservation_bytes={coobservation_bytes}",
+        "PARQUET_INGEST bytes={total_bytes} files={files} hash_seconds={:.3} row_seconds={:.3} parquet_seconds={:.3} wall_seconds={:.3} parquet_bytes={disk_bytes} coobservation_bytes={coobservation_bytes}",
         hash_time.as_secs_f64(),
-        conversion_time.as_secs_f64(),
         row_time.as_secs_f64(),
         parquet_time.as_secs_f64(),
         ingest_time.as_secs_f64()
@@ -230,7 +229,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     );
     let cold_target = cold.is_ok();
     let query_target = measurements::report_queries(store.as_ref(), &case.id, scenario, &profile);
-    let [_, _, _, _, verify_time, scan_time] = profile.snapshot();
+    let [_, _, _, verify_time, scan_time] = profile.snapshot();
     println!(
         "PARQUET_QUERY_PHASE verify_seconds={:.3} scan_seconds={:.3}",
         verify_time.as_secs_f64(),

@@ -158,6 +158,10 @@ fn sort_source(
     source: &mut StagedSource,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
+    let _sort = store
+        .profile
+        .as_ref()
+        .map(|p| p.measure(super::super::PartitionPhase::Sort));
     let final_run = match natural::try_sort(store, case, source, cancel)? {
         Some(run) => run,
         None => external_sort(store, case, source, cancel)?,

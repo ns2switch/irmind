@@ -12,8 +12,8 @@ pub(crate) use audit::{isolate_untrusted, remote_tool_error, run_async, safe_mar
 pub use local::{
     AuditLog, CaseExporter, CaseLock, CaseMutation, Clock, ContentGuard, EventParser,
     EvidenceGraph, EvidenceStore, ExportVerification, ExportVerifier, LargeCaseExporter,
-    LargeCaseStore, LogParser, ParseReport, ParserConfidence, ParserIdentity, PreparedSource,
-    Repository, Screened, Signer, SourceParallelism, StreamingEventParser, Verifier, startup_check,
+    LargeCaseStore, LogParser, ParseReport, ParserConfidence, ParserIdentity, Repository, Screened,
+    Signer, SourceParallelism, StreamingEventParser, Verifier, startup_check,
 };
 pub use model::{
     CompletionMessage, CompletionRequest, LlmPort, MessageRole, ModelEvent, ModelPricing,

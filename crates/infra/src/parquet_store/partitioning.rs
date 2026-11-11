@@ -1,6 +1,4 @@
 mod attempt;
-mod batch;
-mod consolidate;
 mod direct;
 mod normalize;
 mod ordered;
@@ -9,7 +7,6 @@ mod staging;
 pub(in crate::parquet_store) mod temporary;
 #[cfg(test)]
 mod tests;
-pub(super) use batch::supported_builder;
 pub(super) use normalize::normalize;
 
 use super::{AppError, ParquetArtifact, invalid_source};
@@ -54,19 +51,7 @@ impl Allocator {
         for artifact in artifacts {
             artifact.validate().map_err(|_| invalid_source())?;
             if let Some(v) = artifact.precise_metadata() {
-                if v.builder_version == super::writer::precise::BUILDER {
-                    if !v.partition.scopes.is_empty() || v.partition.all_scope_overflow {
-                        return Err(invalid_source());
-                    }
-                    continue;
-                }
-                if !matches!(
-                    v.builder_version.as_str(),
-                    BUILDER
-                        | super::common_format::BUILDER
-                        | irmind_domain::COMMON_EVENT_DIRECT_BUILDER
-                        | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
-                ) {
+                if !supported_builder(&v.builder_version) {
                     return Err(invalid_source());
                 }
                 out.observe(&v.partition)?;
@@ -193,4 +178,11 @@ pub(super) fn replay_limits(artifacts: &[ParquetArtifact]) -> Result<PartitionLi
         region: allocation.cap(Key::Region),
         host: allocation.cap(Key::Host),
     })
+}
+
+pub(super) fn supported_builder(version: &str) -> bool {
+    matches!(
+        version,
+        irmind_domain::COMMON_EVENT_DIRECT_BUILDER | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
+    )
 }

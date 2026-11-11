@@ -1,4 +1,7 @@
-use super::{AppError, EvidenceHash, GraphRecord, Partition, invalid_source, storage};
+use super::Partition;
+#[cfg(test)]
+use super::{AppError, EvidenceHash, GraphRecord, invalid_source, storage};
+#[cfg(test)]
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::Value;
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -25,6 +28,7 @@ pub(in crate::parquet_store) struct RecordRow {
 }
 
 impl RecordRow {
+    #[cfg(test)]
     pub(in crate::parquet_store) fn from_record(
         record: &GraphRecord,
         hash: &EvidenceHash,
@@ -175,6 +179,7 @@ pub(in crate::parquet_store) fn raw_host(value: &Value) -> &str {
     )
 }
 
+#[cfg(test)]
 fn legacy_partition(at: &str, account: &str, region: &str) -> Partition {
     Partition {
         date: if at.is_empty() {
