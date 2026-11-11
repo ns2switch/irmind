@@ -12,13 +12,14 @@ import time
 from evtx_memory import processes
 
 
-def measure(executable, mib, work, batch_files, single=False, dense=False):
+def measure(executable, mib, work, batch_files, single=False, dense=False, workers=None):
     initial_free = shutil.disk_usage(work).free
     with tempfile.TemporaryDirectory(prefix='evtx-large-', dir=work) as directory:
         output = Path(directory) / 'result.jsonl'
         error = Path(directory) / 'error.txt'
         with output.open('wb') as stdout, error.open('wb') as stderr:
             command = [str(executable), str(mib), '--batch-files', str(batch_files)]
+            if workers is not None: command.extend(['--workers', str(workers)])
             if single: command.append('--single-source')
             if dense: command.append('--dense-source')
             process = subprocess.Popen(command, cwd=directory, stdout=stdout, stderr=stderr)
@@ -48,6 +49,7 @@ def measure(executable, mib, work, batch_files, single=False, dense=False):
             result.update({'corpus_mib': mib, 'single_source': single, 'dense_source': dense, 'parent_peak_bytes': peaks['parent'],
                            'helper_peak_bytes': peaks['helper'], 'observed_children': len(child_peaks),
                            'memory_method': '20 ms sampling of OS process high-water resident/working-set counters; per-process maximum, not sum',
+                           'requested_workers': workers, 'available_cores': os.cpu_count(),
                            'initial_free_disk_bytes': initial_free, 'os': platform.system(), 'architecture': platform.machine()})
             return result
         finally:
@@ -62,6 +64,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--extended', action='store_true')
+    parser.add_argument('--worker-sweep', action='store_true', help='Measure a single 1 GiB source at one, four, all and automatic workers')
     parser.add_argument('--batch-files', type=int, choices=(1, 4), default=int(os.environ.get('EVTX_BATCH_FILES', '4')))
     args = parser.parse_args()
     if args.batch_files not in (1, 4):
@@ -73,8 +76,12 @@ def main():
         corpora.append((1024, True, False))
         if platform.system() == 'Linux': corpora.append((4096, True, False))
         corpora.extend([(100, True, True), (1024, True, True), (4096, True, True)])
-    for mib, single, dense in corpora:
-        result = measure(executable, mib, Path.cwd(), args.batch_files, single, dense)
+    settings = [(mib, single, dense, None) for mib, single, dense in corpora]
+    if args.worker_sweep:
+        caps = list(dict.fromkeys([1, 4, min(os.cpu_count() or 1, 256), None]))
+        settings = [(1024, True, False, cap) for cap in caps]
+    for mib, single, dense, workers in settings:
+        result = measure(executable, mib, Path.cwd(), args.batch_files, single, dense, workers)
         print(json.dumps(result, sort_keys=True), flush=True)
         results.append(result)
         args.output.write_text(json.dumps({'results': results}, indent=2) + '\n')
