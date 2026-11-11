@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 #[derive(Default)]
 pub(crate) struct ParquetProfile {
     hash: AtomicU64,
-    conversion: AtomicU64,
     row: AtomicU64,
     parquet: AtomicU64,
     partition_finalize: AtomicU64,
@@ -27,11 +26,6 @@ impl ParquetProfile {
 
     pub(super) fn record_hash(&self, duration: Duration) {
         self.hash
-            .fetch_add(Self::nanos(duration), Ordering::Relaxed);
-    }
-
-    pub(super) fn record_conversion(&self, duration: Duration) {
-        self.conversion
             .fetch_add(Self::nanos(duration), Ordering::Relaxed);
     }
 
@@ -141,10 +135,9 @@ impl ParquetProfile {
     }
 
     #[cfg(test)]
-    pub(crate) fn snapshot(&self) -> [Duration; 6] {
+    pub(crate) fn snapshot(&self) -> [Duration; 5] {
         [
             Duration::from_nanos(self.hash.load(Ordering::Relaxed)),
-            Duration::from_nanos(self.conversion.load(Ordering::Relaxed)),
             Duration::from_nanos(self.row.load(Ordering::Relaxed)),
             Duration::from_nanos(self.parquet.load(Ordering::Relaxed)),
             Duration::from_nanos(self.query_verify.load(Ordering::Relaxed)),

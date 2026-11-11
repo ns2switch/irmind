@@ -20,9 +20,8 @@ pub(super) struct Input {
 }
 
 pub(super) struct StagedSource {
-    pub mapping: Option<irmind_app::source_mapping::DecodedSourceCommitmentV1>,
+    pub mapping: irmind_app::source_mapping::DecodedSourceCommitmentV1,
     pub spool: tempfile::NamedTempFile,
-    pub source: File,
     pub manifest: SourceManifestV1,
     pub report: ParseReport,
     pub sample_hash: [u8; 32],
@@ -96,9 +95,9 @@ impl ParquetStore {
         let mut spool = RowSpool::new(self, case, input.budget)?;
         let mut position = None;
         let mut needs_sort = false;
-        let (report, mapping) = self.parse_normalized(
+        let (report, mapping) = self.decode_mapped(
             case,
-            stream::VerifiedInput {
+            &mut stream::VerifiedInput {
                 source: &mut input.file,
                 sample: &sample,
                 relative_path: &input.path,
@@ -107,7 +106,6 @@ impl ParquetStore {
                 size,
                 cancel,
                 parser,
-                precise_time: true,
                 decode_budget: input.decode_budget,
             },
             &mut |row| {
@@ -129,7 +127,6 @@ impl ParquetStore {
         Ok(StagedSource {
             mapping,
             spool: completed.file,
-            source: input.file,
             manifest: Self::source_manifest(&input.path, &metadata, size, value, copied)?,
             report,
             sample_hash: irmind_app::sha256(&sample),
@@ -157,94 +154,4 @@ pub(super) fn check_space(available: u64, required: u64) -> Result<(), AppError>
 }
 pub(super) fn no_space() -> AppError {
     AppError::Fixed(irmind_app::FixedAppError::StorageNormalizedStagingSpace)
-}
-
-pub(super) fn normalized_row(
-    record: &irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
-    parser: &dyn StreamingEventParser,
-    source: &str,
-    hash: &irmind_domain::EvidenceHash,
-    offset_mode: &mut Option<bool>,
-    size: u64,
-) -> Result<RecordRow, AppError> {
-    let mut row = None;
-    record.inspect(|indexed| {
-        row = Some((|| {
-            stream::validate_offset(offset_mode, indexed.source_offset, size)?;
-            validate_time(indexed.time)?;
-            let mut row = RecordRow::from_partitioned(indexed, hash)?;
-            row.profile = profile(parser, source, &indexed.record)?;
-            Ok(row)
-        })());
-    });
-    row.ok_or_else(invalid_source)?
-}
-
-impl ParquetStore {
-    pub(in crate::parquet_store) fn parse_normalized(
-        &self,
-        case: &CaseId,
-        mut input: stream::VerifiedInput<'_>,
-        emit: &mut dyn FnMut(RecordRow) -> Result<(), AppError>,
-    ) -> Result<
-        (
-            ParseReport,
-            Option<irmind_app::source_mapping::DecodedSourceCommitmentV1>,
-        ),
-        AppError,
-    > {
-        let id = input.parser.identity_for_source(input.relative_path)?;
-        if self
-            .mapping_catalog
-            .as_ref()
-            .is_some_and(|catalog| catalog.supports_decoder(id.name, id.version))
-        {
-            let (report, mapped) = self.decode_mapped(case, &mut input, emit)?;
-            return Ok((report, Some(mapped)));
-        }
-        Ok((parse_legacy_normalized(input, emit)?, None))
-    }
-}
-
-fn parse_legacy_normalized(
-    input: stream::VerifiedInput<'_>,
-    emit: &mut dyn FnMut(RecordRow) -> Result<(), AppError>,
-) -> Result<ParseReport, AppError> {
-    let (parser, source, hash, size) = (
-        input.parser,
-        input.relative_path,
-        input.hash_value,
-        input.size,
-    );
-    let mut offset = None;
-    stream::parse_and_verify(input, &mut |record| {
-        emit(normalized_row(
-            &record,
-            parser,
-            source,
-            hash,
-            &mut offset,
-            size,
-        )?)
-    })
-}
-
-fn validate_time(time: Option<irmind_app::IndexedTime>) -> Result<(), AppError> {
-    if time.is_some_and(|time| time.precision() == irmind_app::TimePrecision::Unknown) {
-        return Err(AppError::Fixed(
-            irmind_app::FixedAppError::PolicyInvalidIndexedTimestamp,
-        ));
-    }
-    Ok(())
-}
-fn profile(
-    parser: &dyn StreamingEventParser,
-    source: &str,
-    record: &irmind_app::GraphRecord,
-) -> Result<u8, AppError> {
-    Ok(match parser.partition_profile_for_source(source, record)? {
-        irmind_app::PartitionProfile::Unpartitioned => 0,
-        irmind_app::PartitionProfile::CloudAccountRegion => 1,
-        irmind_app::PartitionProfile::EndpointHost => 2,
-    })
 }

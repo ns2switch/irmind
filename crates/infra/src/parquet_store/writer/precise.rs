@@ -1,27 +1,15 @@
+#[cfg(test)]
 use super::row::{first_string, raw_host};
 use super::{
-    AppError, Arc, ArrayRef, ArtifactKind, ArtifactSink, EvidenceHash, ParquetArtifact,
-    RecordBatch, RecordRow, StringArray, UInt64Array, invalid_source, storage,
+    AppError, Arc, ArrayRef, ArtifactSink, EvidenceHash, ParquetArtifact, RecordBatch, RecordRow,
+    StringArray, UInt64Array, invalid_source, storage,
 };
 use arrow::array::{BooleanArray, TimestampMicrosecondArray, UInt8Array, UInt16Array};
 use arrow::datatypes::Schema;
-use irmind_domain::{
-    ARTIFACT_V2_MAX_DATE_TUPLES, ARTIFACT_V2_PARTITION_POLICY, ARTIFACT_V2_SCOPE_KEYS,
-    ARTIFACT_V2_STABLE_ORDER, ARTIFACT_V2_TIME_SEMANTICS, ArtifactPartitionV2, ArtifactSchemaV2,
-    ParquetArtifactV2,
-};
+use irmind_domain::{ARTIFACT_V2_STABLE_ORDER, ARTIFACT_V2_TIME_SEMANTICS, ParquetArtifactV2};
 
-pub(crate) const BUILDER: &str = "parquet-builder-v2";
-
+#[cfg(test)]
 impl RecordRow {
-    pub(in crate::parquet_store) fn from_indexed(
-        indexed: &irmind_app::IndexedGraphRecord,
-        hash: &EvidenceHash,
-        precise: bool,
-    ) -> Result<Self, AppError> {
-        Self::indexed_row(indexed, hash, precise, false)
-    }
-
     pub(in crate::parquet_store) fn from_partitioned(
         indexed: &irmind_app::IndexedGraphRecord,
         hash: &EvidenceHash,
@@ -203,46 +191,18 @@ pub(super) fn manifest(
     size: u64,
     digest: &[u8; 32],
 ) -> Result<ParquetArtifact, AppError> {
-    let schema = match (sink.kind, sink.common) {
-        (ArtifactKind::Events, false) => ArtifactSchemaV2::Events,
-        (ArtifactKind::Entities, false) => ArtifactSchemaV2::Entities,
-        (ArtifactKind::Coobservations, false) => ArtifactSchemaV2::Coobservations,
-        (ArtifactKind::Events, true) => ArtifactSchemaV2::CommonEvents,
-        (ArtifactKind::Entities, true) => ArtifactSchemaV2::CommonEntities,
-        (ArtifactKind::Coobservations, true) => ArtifactSchemaV2::CommonCoobservations,
-        (ArtifactKind::LegacyEntities, _) => return Err(invalid_source()),
-    };
     Ok(ParquetArtifactV2 {
         path: sink.relative_path.clone(),
         size,
-        sha256: EvidenceHash::parse(&irmind_app::hex(digest)).map_err(|_| invalid_source())?,
+        sha256: EvidenceHash::from_bytes(*digest),
         parser_id: parser.name.into(),
         parser_version: parser.version.into(),
-        schema,
-        partition: sink
-            .partition
-            .scope
-            .clone()
-            .unwrap_or_else(|| ArtifactPartitionV2 {
-                date: sink.partition.date.clone(),
-                key_set: ARTIFACT_V2_SCOPE_KEYS.into(),
-                policy: ARTIFACT_V2_PARTITION_POLICY.into(),
-                tuple_cap: ARTIFACT_V2_MAX_DATE_TUPLES,
-                all_scope_overflow: false,
-                scopes: Vec::new(),
-            }),
+        schema: sink.kind.schema(),
+        partition: sink.partition.scope.clone().ok_or_else(invalid_source)?,
         source_hashes: vec![hash.clone()],
         time_semantics: ARTIFACT_V2_TIME_SEMANTICS.into(),
         stable_order: ARTIFACT_V2_STABLE_ORDER.into(),
-        builder_version: if sink.direct {
-            irmind_domain::COMMON_EVENT_DIRECT_BUILDER.into()
-        } else if sink.common {
-            crate::parquet_store::common_format::BUILDER.into()
-        } else if sink.partition.scope.is_some() {
-            crate::parquet_store::partitioning::BUILDER.into()
-        } else {
-            BUILDER.into()
-        },
+        builder_version: irmind_domain::COMMON_EVENT_DIRECT_BUILDER.into(),
         superseded_hashes: Vec::new(),
     }
     .into())
