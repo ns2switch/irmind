@@ -110,7 +110,7 @@ fn profiled_fixture(root: &Path) -> ProfiledFixture {
     );
     let profile = Arc::new(crate::parquet_store::ParquetProfile::default());
     let mut local = LocalStore::open_mapped(root, catalog.clone()).unwrap();
-    local.parquet.profile = Some(profile.clone());
+    local.parquet.attach_profile(profile.clone());
     let store = Arc::new(local);
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[88; 32]),

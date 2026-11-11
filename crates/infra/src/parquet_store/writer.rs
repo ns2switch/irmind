@@ -1,5 +1,5 @@
 use super::{
-    AppError, ArrayRef, ArrowWriter, BTreeMap, CancellationToken, Compression, EvidenceHash, File,
+    AppError, ArrayRef, ArrowWriter, BTreeMap, CancellationToken, Compression, EvidenceHash,
     OpenOptions, ParquetStore, Path, PathBuf, RecordBatch, StringArray, UInt64Array,
     WriterProperties, fs, invalid_source, storage,
 };
