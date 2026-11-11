@@ -14,7 +14,9 @@ The [pre-1.0 format decision](decisions.md#pre-10-format-policy) supersedes comp
 6. Use separate PRs for retired formats, dead code/test helpers, dependency/features cleanup across all three workspaces, and repository/CI/design cleanup. Keep current goldens, security tests, fuzzing and dependency-direction checks. Report deleted lines/tests/dependencies, binary size and CI time per PR.
 7. Complete experimental Elastic and Chronicle mappings/connectors, then prepare v0.3.0 with the breaking-format notice, signed assets, attestations, SBOMs and verified installers. Stop before creating its tag.
 
-Decoder rollout: JSON, declarative definitions, Linux inputs and ECS have source pipelines; CloudTrail, Linux authentication/auditd/HTTP and ECS have independent semantic mappings. Remaining families keep their existing ingestion route until their original-field decoders and extraction-preserving mappings are complete. The common writer remains opt-in until that coverage permits the sole-writer cleanup.
+Decoder rollout: JSON, declarative definitions, ECS, OCSF, DFIR formats, syslog, Linux inputs, EVTX, Zeek and Suricata have original-field decoders and identified semantic or extraction-preserving mappings. The cross-source authentication-failure contract covers Windows, Linux and CloudTrail. Use that complete catalog for the sole-writer change; missing decoders fail closed.
+
+Finish multicore ingestion before retiring the old writer. Worker counts follow available CPUs and a global memory budget; canonical append and eviction remain sequential, while independent partition completion runs concurrently. Ordered sources use bounded queues, and disordered sources use private case-local spools. Keep the current constructor and physical goldens. Validate identical signed output at different worker counts and the release 15 GB absolute targets before integrating the sole-writer change.
 
 No old case migrates automatically. No model or connector becomes enabled by default. Obsolete compatibility controls can be removed only with their retired paths; retained-version security guarantees and limits stay unchanged.
 

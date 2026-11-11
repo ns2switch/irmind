@@ -69,7 +69,18 @@ PYWORKLOAD
         harness=crates/infra/src/tests/mapped_pipeline/workers
         mkdir -p "$scratch/reference/$harness"
         cp "$harness/benchmark.rs" "$scratch/reference/$harness/benchmark.rs"
-        printf '\nmod benchmark;\n' >> "$scratch/reference/$harness.rs"
+        python3 - "$scratch/reference/$harness.rs" <<'PYHARNESS'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if not re.search(r"(?m)^mod benchmark;$", text):
+    text += "\nmod benchmark;\n"
+assert len(re.findall(r"(?m)^mod benchmark;$", text)) == 1
+path.write_text(text)
+PYHARNESS
         ;;
     *)
         echo "Unsupported worker workload." >&2

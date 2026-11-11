@@ -684,3 +684,17 @@ present in an authenticated configuration snapshot, startup requires explicit
 configuration recovery. The snapshot hash and its original canonical bytes are
 verified before offering restoration without the retired field; restoration
 records a new signed approval and never rewrites the old operation.
+
+### Keep canonical append and parallel partition completion
+
+Context: the direct writer chooses file cuts from the live encoder state after
+each append. Concurrent append would require a separate physical recipe.
+
+Decision: keep append and eviction sequential in canonical order. Complete
+independent partition writers concurrently after their file cuts are fixed.
+Keep the existing constructor identity, physical goldens and reconstruction.
+
+Consequences: there is no new append recipe or signed format. Worker-count
+parity, bounded memory, cancellation, rollback and the absolute release gates
+remain required. The native EVTX chunk trial did not justify enabling helper
+parallelism; the distributed helper remains sequential on every platform.
