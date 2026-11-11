@@ -88,9 +88,7 @@ pub(super) fn finish_live(
         return Err(AppError::Cancelled);
     }
     let mut output = live.sink.finish_cancelable(hash, parser, cancel)?;
-    let irmind_domain::ParquetArtifact::V2(core) = &mut output.manifest else {
-        return Err(invalid_source());
-    };
+    let core = &mut output.manifest;
     core.source_hashes = live.sources.into_iter().collect();
     Ok(output.rows.is_some_and(|rows| rows > 0).then_some(output))
 }

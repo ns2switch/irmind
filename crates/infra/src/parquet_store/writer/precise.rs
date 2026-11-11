@@ -1,8 +1,8 @@
 #[cfg(test)]
 use super::row::{first_string, raw_host};
 use super::{
-    AppError, Arc, ArrayRef, ArtifactSink, EvidenceHash, ParquetArtifact, RecordBatch, RecordRow,
-    StringArray, UInt64Array, invalid_source, storage,
+    AppError, Arc, ArrayRef, ArtifactSink, EvidenceHash, RecordBatch, RecordRow, StringArray,
+    UInt64Array, invalid_source, storage,
 };
 use arrow::array::{BooleanArray, TimestampMicrosecondArray, UInt8Array, UInt16Array};
 use arrow::datatypes::Schema;
@@ -190,7 +190,7 @@ pub(super) fn manifest(
     parser: irmind_app::ParserIdentity<'_>,
     size: u64,
     digest: &[u8; 32],
-) -> Result<ParquetArtifact, AppError> {
+) -> Result<ParquetArtifactV2, AppError> {
     Ok(ParquetArtifactV2 {
         path: sink.relative_path.clone(),
         size,
@@ -204,6 +204,5 @@ pub(super) fn manifest(
         stable_order: ARTIFACT_V2_STABLE_ORDER.into(),
         builder_version: irmind_domain::COMMON_EVENT_DIRECT_BUILDER.into(),
         superseded_hashes: Vec::new(),
-    }
-    .into())
+    })
 }

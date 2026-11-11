@@ -4,7 +4,6 @@ use super::{
 };
 use crate::parquet_store::{PathBuf, StagedArtifact, storage};
 use irmind_app::source_mapping::{MappedArtifactProjection, MappingCatalog};
-use irmind_domain::ParquetArtifact;
 
 pub(super) fn projections(
     catalog: &MappingCatalog,
@@ -14,9 +13,7 @@ pub(super) fn projections(
     staged
         .iter()
         .map(|output| {
-            let ParquetArtifact::V2(core) = &output.manifest else {
-                return Err(invalid_source());
-            };
+            let core = &output.manifest;
             let route = crate::parquet_store::mapped::route_from_path(&core.path)?
                 .ok_or_else(invalid_source)?;
             let mapping = routes
@@ -79,7 +76,7 @@ impl PreparedMappedIngest for Prepared {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            let target = self.root.join(output.manifest.path());
+            let target = self.root.join(&output.manifest.path);
             if target.try_exists().map_err(storage)? {
                 return Err(invalid_source());
             }

@@ -31,7 +31,7 @@ pub(super) fn validate(sources: &[ParquetArtifact]) -> Result<Vec<EvidenceHash>,
 pub(super) fn stage(
     case_dir: &Path,
     sources: &[ParquetArtifact],
-) -> Result<StagedArtifact, AppError> {
+) -> Result<(StagedArtifact, irmind_domain::ArtifactPipelineV1), AppError> {
     let parents = parents(sources)?;
     let metadata = ParquetLayoutV1::replacement(&parents, 0, EvidenceHash::from_bytes([0; 32]))
         .map_err(|_| invalid_source())?;
@@ -44,9 +44,12 @@ pub(super) fn stage(
         .and_then(|v| v.to_str())
         .ok_or_else(invalid_source)?;
     let temporary = directory.join(format!(".{name}.{}.tmp", rand::random::<u64>()));
-    Ok(StagedArtifact {
-        rows: None,
-        temporary,
-        manifest: metadata.into(),
-    })
+    Ok((
+        StagedArtifact {
+            rows: None,
+            temporary,
+            manifest: metadata.core().clone(),
+        },
+        metadata.pipeline().clone(),
+    ))
 }
