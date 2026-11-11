@@ -15,7 +15,7 @@ def linux_processes():
             continue
 
 
-def windows_processes():
+def windows_processes(names=('large_collection.exe', 'irmind-evtx.exe')):
     import ctypes as c
     from ctypes import wintypes as w
 
@@ -52,7 +52,7 @@ def windows_processes():
     try:
         present = kernel.Process32FirstW(snapshot, c.byref(entry))
         while present:
-            if entry.name.lower() in ('large_collection.exe', 'irmind-evtx.exe'):
+            if entry.name.lower() in names:
                 handle = kernel.OpenProcess(0x410, False, entry.pid)
                 if handle:
                     try:

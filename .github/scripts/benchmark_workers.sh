@@ -7,13 +7,37 @@ if [[ ! "${BASE_REF:-}" =~ ^[0-9a-f]{40}$ ]]; then
 fi
 candidate=$(git rev-parse HEAD)
 root=$(pwd)
-scratch=$(mktemp -d)
+suffix=
+scratch_root=$root
+if [[ "${OS:-}" == Windows_NT ]]; then
+    suffix=.exe
+    scratch_root=$(cygpath -u "${RUNNER_TEMP:-$root}")
+fi
+scratch=$(mktemp -d "$scratch_root/w.XXXXXXXX")
+native_path() {
+    if [[ -n "$suffix" ]]; then
+        cygpath -m "$1"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+shell_path() {
+    if [[ -n "$suffix" ]]; then
+        cygpath -u "$1"
+    else
+        printf '%s\n' "$1"
+    fi
+}
 cleanup() {
     git worktree remove --force "$scratch/reference" || true
     rm -rf -- "$scratch"
 }
 trap cleanup EXIT
 git worktree add --detach "$scratch/reference" "$BASE_REF"
+mkdir "$scratch/runtime"
+export TMPDIR
+TMPDIR=$(native_path "$scratch/runtime")
+export TMP="$TMPDIR" TEMP="$TMPDIR"
 workload=${WORKER_WORKLOAD:-cloud-files}
 case "$workload" in
     cloud-files)
@@ -34,8 +58,8 @@ PYWORKLOAD
         if [[ "$workload" == ndjson-4gib ]]; then
             export IRMIND_BENCH_NDJSON_GIB=4
             # Allow for the 4 GiB input plus normal production disk preflight.
-            free_kib=$(df -Pk "${TMPDIR:-/tmp}" | awk 'NR == 2 {print $4}')
-            if (( free_kib < 134 * 1024 * 1024 )); then
+            free_bytes=$(python3 -c 'import shutil,sys; print(shutil.disk_usage(sys.argv[1]).free)' "$TMPDIR")
+            if (( free_bytes < 134 * 1024 * 1024 * 1024 )); then
                 echo "The 4 GiB workload needs at least 134 GiB free for input and normal ingest preflight." >&2
                 exit 3
             fi
@@ -53,7 +77,8 @@ PYWORKLOAD
 esac
 
 export IRMIND_BENCH_SCENARIO=cloud-v2 IRMIND_BENCH_COMMON_EVENT=1
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$root/target}"
+export CARGO_TARGET_DIR
+CARGO_TARGET_DIR=$(native_path "${CARGO_TARGET_DIR:-$root/target}")
 unset IRMIND_HUNTEVAL_ROOT IRMIND_BENCH_WORKERS
 build_binary() {
     local workspace=$1 target=$2
@@ -76,19 +101,25 @@ print(binaries[0])
 '
 }
 # Never reuse first-party Cargo fingerprints between distinct source trees.
-reference=$(build_binary "$scratch/reference" "$scratch/reference-target")
-cp "$reference" "$scratch/fixed"
+reference=$(build_binary "$scratch/reference" "$(native_path "$scratch/reference-target")")
+cp "$(shell_path "$reference")" "$scratch/fixed$suffix"
 rm -rf -- "$scratch/reference-target"
 current=$(build_binary "$root" "$CARGO_TARGET_DIR")
-cp "$current" "$scratch/adaptive"
-cores=$(nproc)
+cp "$(shell_path "$current")" "$scratch/adaptive$suffix"
+cores=$(python3 -c 'import os; print(os.cpu_count() or 1)')
 printf 'reference=%s candidate=%s available_cores=%s\n' "$BASE_REF" "$candidate" "$cores" |
     tee worker-sweep-metadata.txt
 run() {
     local version=$1 filter=$2 label=$3
-    /usr/bin/time -f 'WORKER_SWEEP peak_rss_kib=%M elapsed_seconds=%e' \
-        "$scratch/$version" "$filter" --ignored --nocapture --test-threads 1 2>&1 |
-        tee "worker-sweep-$label.txt"
+    if [[ -n "$suffix" ]]; then
+        python3 -B scripts/benchmark_windows_peak.py "$(native_path "$scratch/$version$suffix")" \
+            "$filter" --ignored --nocapture --test-threads 1 2>&1 |
+            tee "worker-sweep-$label.txt"
+    else
+        /usr/bin/time -f 'WORKER_SWEEP peak_rss_kib=%M elapsed_seconds=%e' \
+            "$scratch/$version" "$filter" --ignored --nocapture --test-threads 1 2>&1 |
+            tee "worker-sweep-$label.txt"
+    fi
 }
 if [[ "$workload" == cloud-files ]]; then
     run fixed '::parquet_benchmark_1gb' fixed-four
