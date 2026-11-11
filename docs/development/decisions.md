@@ -754,3 +754,19 @@ artifact inventories and signed chains. Release sweeps and the complete
 15 GB matrix remain public in [benchmarks](benchmarks.md). Legacy API removal
 is reviewed separately; this checkpoint changes no parser identity, physical
 recipe, signed format, policy, limit or default model selection.
+### Retire per-source writer construction
+
+Context: source decoding and identified mappings now cover every compiled parser.
+The old local preparation API still exposed a second physical construction path.
+
+Decision: remove per-source and legacy batch preparation, their writer factory
+and obsolete projection/emission helpers. Keep only direct mapped preparation
+for new artifacts. Keep the V2-shaped core used inside the current V3 envelope;
+it is a component of that format, not an alternate ingestion route.
+
+Consequences: the current direct writer keeps its physical recipe, sequential
+canonical appends and parallel completion. Tests use actual decoder selection,
+mapping profiles and bound V3 artifacts. Current direct physical golden bytes,
+V6 wire goldens, offsets, spool authentication, cancellation and rollback remain
+covered. Old-generation fixture generators are removed, along with their unused
+base64 dependency. Removal of remaining historical schema readers is separate.

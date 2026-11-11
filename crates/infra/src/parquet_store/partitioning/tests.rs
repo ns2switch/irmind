@@ -1,7 +1,5 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
-mod batch;
-mod queries;
 fn assign(a: &mut Allocator, host: &str) -> ArtifactPartitionV2 {
     a.assign("2026-11-01", PartitionProfile::EndpointHost, ["", "", host])
         .unwrap()

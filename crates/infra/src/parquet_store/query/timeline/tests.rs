@@ -4,14 +4,13 @@ use super::*;
 use crate::parquet_store::ParquetStore;
 use crate::parquet_store::scan::ScanFlow;
 use irmind_app::LargeCaseStore as _;
-use irmind_mod_parser_json::JsonParser;
 
 #[test]
-fn bounded_mixed_timeline_matches_the_full_scan_in_both_directions() {
+fn bounded_precise_timeline_matches_the_full_scan_in_both_directions() {
     let root = tempfile::tempdir().unwrap();
     let sources = tempfile::tempdir().unwrap();
-    let old = ParquetStore::open(root.path()).unwrap();
-    let new = ParquetStore::open_precise(root.path()).unwrap();
+    let old = crate::parquet_store::fixtures::store(root.path());
+    let new = crate::parquet_store::fixtures::store(root.path());
     let id = CaseId::parse("00000000-0000-0000-0000-000000000022").unwrap();
     let token = CancellationToken::new();
     let mut names = std::collections::BTreeMap::new();
@@ -31,9 +30,15 @@ fn bounded_mixed_timeline_matches_the_full_scan_in_both_directions() {
             serde_json::json!({"eventName":name,"eventTime":at})
         };
         std::fs::write(sources.path().join(name), row.to_string()).unwrap();
-        let p = store
-            .prepare_local(&id, sources.path(), name, false, &JsonParser, &token)
-            .unwrap();
+        let p = crate::parquet_store::fixtures::one_source(
+            store,
+            &id,
+            sources.path(),
+            name,
+            false,
+            &token,
+        )
+        .unwrap();
         names.insert(p.manifest.sha256.as_str().into(), name.into());
         artifacts.extend(p.artifacts);
     }
@@ -45,7 +50,7 @@ fn bounded_mixed_timeline_matches_the_full_scan_in_both_directions() {
                 id: &id,
                 artifacts: &artifacts,
                 filter: &filter,
-                schema: "irmind-events-v2",
+                schema: "irmind-events-v4",
                 columns: &["event_time", "event", "source_hash", "record_index"],
                 predicates: &[],
                 deadline: Instant::now() + QUERY_DEADLINE,
@@ -70,7 +75,7 @@ fn bounded_mixed_timeline_matches_the_full_scan_in_both_directions() {
     // Even an older file that could be pruned must authenticate its statistics.
     let oldest = artifacts
         .iter()
-        .find(|a| a.schema_version() == "irmind-events-v2")
+        .find(|a| a.schema_version() == "irmind-events-v4")
         .unwrap();
     std::fs::write(new.case_dir(&id).unwrap().join(oldest.path()), b"altered").unwrap();
     assert!(matches!(
@@ -80,28 +85,22 @@ fn bounded_mixed_timeline_matches_the_full_scan_in_both_directions() {
 }
 
 #[test]
-fn compacted_style_files_prune_row_groups_in_both_generations_and_directions() {
+fn compacted_style_files_prune_row_groups_in_both_directions() {
     let sources = ordered_sources();
-    for precise in [false, true] {
+    {
         let data = tempfile::tempdir().unwrap();
-        let store = if precise {
-            ParquetStore::open_precise(data.path())
-        } else {
-            ParquetStore::open(data.path())
-        }
-        .unwrap();
+        let store = crate::parquet_store::fixtures::store(data.path());
         let id = CaseId::parse("00000000-0000-0000-0000-000000000023").unwrap();
         let token = CancellationToken::new();
-        let source = store
-            .prepare_local(
-                &id,
-                sources.path(),
-                "events.json",
-                false,
-                &JsonParser,
-                &token,
-            )
-            .unwrap();
+        let source = crate::parquet_store::fixtures::one_source(
+            &store,
+            &id,
+            sources.path(),
+            "events.json",
+            false,
+            &token,
+        )
+        .unwrap();
         let names = [(source.manifest.sha256.as_str().into(), "events.json".into())]
             .into_iter()
             .collect();
@@ -118,7 +117,7 @@ fn compacted_style_files_prune_row_groups_in_both_generations_and_directions() {
                 id: &id,
                 artifacts: &events,
                 filter: &filter,
-                schema: "irmind-events-v2",
+                schema: "irmind-events-v4",
                 columns: &["event_time", "event", "source_hash", "record_index"],
                 predicates: &[],
                 deadline: Instant::now() + QUERY_DEADLINE,
@@ -130,7 +129,7 @@ fn compacted_style_files_prune_row_groups_in_both_generations_and_directions() {
                 .scan_time_ordered_file(spec, &names, newest, None, |batch| {
                     visited += batch.num_rows();
                     for row in 0..batch.num_rows() {
-                        hits.push(EventHit::from_batch(batch, row, precise)?);
+                        hits.push(EventHit::from_batch(batch, row, true)?);
                     }
                     ordered(&mut hits, 10, newest)?;
                     Ok(hits
@@ -139,10 +138,7 @@ fn compacted_style_files_prune_row_groups_in_both_generations_and_directions() {
                 })
                 .unwrap();
             complete(status).unwrap();
-            assert!(
-                visited < 10_000,
-                "visited={visited}; precise={precise}; newest={newest}"
-            );
+            assert!(visited < 10_000, "visited={visited}; newest={newest}");
             let expected = if newest {
                 (19_990..20_000).rev().collect::<Vec<_>>()
             } else {

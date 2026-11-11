@@ -82,7 +82,7 @@ impl Replay<'_, '_> {
                             allocator,
                             self.cancel,
                         )?;
-                        sources.push(read::acquisition(source)?);
+                        sources.push(read::acquisition(source));
                     }
                 }
             }
