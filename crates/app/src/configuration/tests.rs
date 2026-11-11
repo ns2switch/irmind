@@ -343,3 +343,37 @@ fn worker_preference_is_optional_signed_and_bounded() {
         .unwrap();
     assert_eq!(auto.fingerprint().unwrap(), defaults.fingerprint().unwrap());
 }
+
+#[test]
+fn model_configuration_stages_provider_url_and_model_together() {
+    let base = PersistentConfig::default();
+    let update = ConfigChange::ConfigureModel {
+        module: LLM.id.into(),
+        base_field: "IRMIND_LLM_BASE_URL".into(),
+        base_url: "https://model.invalid/".into(),
+        model_field: "IRMIND_MODEL".into(),
+        model: "synthetic-model".into(),
+    };
+    let next = base.changed(update.clone(), &[&LLM]).unwrap();
+    assert_eq!(next.llm_module.as_deref(), Some(LLM.id));
+    assert_eq!(
+        next.modules[LLM.id].values["IRMIND_MODEL"],
+        "synthetic-model"
+    );
+    assert_eq!(
+        next.modules[LLM.id].values["IRMIND_LLM_BASE_URL"],
+        "https://model.invalid/"
+    );
+    assert!(base.active_egress_changed(&next));
+    assert!(base.modules.is_empty());
+    if let ConfigChange::ConfigureModel { model_field, .. } = update {
+        let secret_field = ConfigChange::ConfigureModel {
+            module: LLM.id.into(),
+            base_field: "IRMIND_LLM_API_KEY".into(),
+            base_url: "synthetic".into(),
+            model_field,
+            model: "synthetic".into(),
+        };
+        assert!(base.changed(secret_field, &[&LLM]).is_err());
+    }
+}

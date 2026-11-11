@@ -375,6 +375,17 @@ impl WorkspaceIo for RootWorkspaceIo {
             | ConfigChange::SetTheme(_)
             | ConfigChange::SetMaxParallelWorkers(_) => false,
             ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
+            ConfigChange::ConfigureModel {
+                module,
+                base_field,
+                model_field,
+                ..
+            } => {
+                self.module_overrides.contains("llm")
+                    || self.module_overrides.contains(module)
+                    || std::env::var_os(base_field).is_some()
+                    || std::env::var_os(model_field).is_some()
+            }
             ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
             ConfigChange::SetValue { module, field, .. } => {
                 std::env::var_os(field).is_some()
@@ -400,7 +411,8 @@ impl WorkspaceIo for RootWorkspaceIo {
         let next = current.changed(change.clone(), &self.manifests)?;
         let active_module = match &change {
             ConfigChange::SelectLlm(Some(id)) => Some(id.as_str()),
-            ConfigChange::SetEnabled {
+            ConfigChange::ConfigureModel { module, .. }
+            | ConfigChange::SetEnabled {
                 module,
                 enabled: true,
             } => Some(module.as_str()),

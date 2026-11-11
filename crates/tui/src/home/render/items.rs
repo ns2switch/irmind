@@ -299,6 +299,9 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
         irmind_app::ConfigChange::SelectLlm(id) => {
             format!("select LLM {}", id.as_deref().unwrap_or("none"))
         }
+        irmind_app::ConfigChange::ConfigureModel { module, model, .. } => {
+            format!("configure {module} model={model}")
+        }
         irmind_app::ConfigChange::SetEnabled { module, enabled } => {
             format!("set {module} enabled={enabled}")
         }

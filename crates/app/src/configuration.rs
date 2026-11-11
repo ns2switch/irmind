@@ -50,6 +50,13 @@ pub struct ProductSettings {
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ConfigChange {
     SelectLlm(Option<String>),
+    ConfigureModel {
+        module: String,
+        base_field: String,
+        base_url: String,
+        model_field: String,
+        model: String,
+    },
     SetEnabled {
         module: String,
         enabled: bool,
@@ -204,6 +211,20 @@ impl PersistentConfig {
                 }
                 next.llm_module = id;
             }
+            ConfigChange::ConfigureModel {
+                module,
+                base_field,
+                base_url,
+                model_field,
+                model,
+            } => {
+                configure_model(
+                    &mut next,
+                    module,
+                    [(base_field, base_url), (model_field, model)],
+                    manifests,
+                )?;
+            }
             ConfigChange::SetEnabled { module, enabled } => {
                 if manifest(&module, manifests)?
                     .ports
@@ -351,3 +372,31 @@ mod session;
 
 #[cfg(test)]
 mod tests;
+
+fn configure_model(
+    next: &mut PersistentConfig,
+    module: String,
+    parameters: [(String, String); 2],
+    manifests: &[&ModuleManifest],
+) -> Result<(), AppError> {
+    let schema = manifest(&module, manifests)?;
+    if !schema.ports.contains(&ModulePort::Llm)
+        || parameters[0].0 == parameters[1].0
+        || !parameters[0].0.ends_with("_BASE_URL")
+        || !parameters[1].0.ends_with("_MODEL")
+        || !parameters.iter().all(|(name, _)| {
+            schema
+                .config
+                .iter()
+                .any(|field| field.name == name && !field.secret)
+        })
+    {
+        return Err(invalid());
+    }
+    let values = &mut next.modules.entry(module.clone()).or_default().values;
+    for (field, value) in parameters {
+        values.insert(field, value);
+    }
+    next.llm_module = Some(module);
+    Ok(())
+}
