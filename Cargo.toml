@@ -35,6 +35,9 @@ incremental = false
 
 [profile.ci]
 inherits = "test"
+opt-level = 1
+debug-assertions = true
+overflow-checks = true
 debug = "line-tables-only"
 incremental = false
 

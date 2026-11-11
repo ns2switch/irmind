@@ -698,3 +698,18 @@ Consequences: there is no new append recipe or signed format. Worker-count
 parity, bounded memory, cancellation, rollback and the absolute release gates
 remain required. The native EVTX chunk trial did not justify enabling helper
 parallelism; the distributed helper remains sequential on every platform.
+
+
+### Optimize the shared CI profile without reducing test coverage
+
+Context: the unoptimized CI profile spends most of its test time validating the
+100,000-artifact inventory and its tampering cases. Release-profile validation
+shows that compiler optimization removes much of this cost.
+
+Decision: use optimization level 1 in the existing CI profile, in both the main
+and contained-helper workspaces. Build, clippy and nextest keep using that same
+profile. Both profiles explicitly retain overflow checks and debug assertions.
+
+Consequences: the inventory sizes, mutations, test selection, lint severity and
+platform gates remain unchanged. Compare the test and build step durations in
+CI; do not present CI-profile timings as release ingestion benchmarks.

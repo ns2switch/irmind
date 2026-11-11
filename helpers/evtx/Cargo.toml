@@ -45,5 +45,8 @@ cognitive_complexity = "warn"
 
 [profile.ci]
 inherits = "dev"
+opt-level = 1
+debug-assertions = true
+overflow-checks = true
 debug = "line-tables-only"
 incremental = false
