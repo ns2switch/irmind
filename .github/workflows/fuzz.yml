@@ -9,6 +9,10 @@ on:
         description: Run only the release EVTX collection and memory benchmark
         type: boolean
         default: false
+      evtx_worker_sweep:
+        description: Measure only a single 1 GiB mapped EVTX source across worker caps
+        type: boolean
+        default: false
       evtx_batch_files:
         description: Sources per signed ingestion request in the EVTX benchmark
         type: choice
@@ -217,8 +221,13 @@ jobs:
           cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --example large_collection
           cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx
       - name: Run signed collections, isolated single files and eight-million-record streaming
+        if: ${{ !inputs.evtx_worker_sweep }}
         run: python3 -B scripts/benchmark_evtx_large.py target/${{ matrix.target }}/release/examples/large_collection${{ matrix.suffix }} --extended --output evtx-large-${{ matrix.platform }}.json
+      - name: Measure one, four, all and automatic workers on the same runner
+        if: ${{ inputs.evtx_worker_sweep }}
+        run: python3 -B scripts/benchmark_evtx_large.py target/${{ matrix.target }}/release/examples/large_collection${{ matrix.suffix }} --worker-sweep --output evtx-large-${{ matrix.platform }}.json
       - name: Check the record bound above eight million synthetic records
+        if: ${{ !inputs.evtx_worker_sweep }}
         shell: bash
         run: target/${{ matrix.target }}/release/examples/large_collection${{ matrix.suffix }} 4096 --record-limit-probe > evtx-large-limit-${{ matrix.platform }}.json
       - name: Attach release measurements
