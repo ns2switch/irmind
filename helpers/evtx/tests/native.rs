@@ -245,3 +245,16 @@ fn decode_file(
         emit,
     )
 }
+
+#[test]
+fn native_parallel_workers_inherit_the_verified_containment_and_keep_protocol_bytes() {
+    let (success, expected, errors) = execute(Mode::Decode);
+    assert!(success, "sequential: {errors}");
+    for count in [1, 2, 4] {
+        let (success, actual, errors) = execute(Mode::DecodeParallel(
+            std::num::NonZeroU8::new(count).unwrap(),
+        ));
+        assert!(success, "parallel {count}: {errors}");
+        assert_eq!(actual, expected);
+    }
+}

@@ -96,6 +96,16 @@ impl EvtxParser {
         cancel: &CancellationToken,
         frame: &mut dyn FnMut(&[u8]) -> Result<(), AppError>,
     ) -> Result<(), AppError> {
+        self.decode_file_workers(file, cancel, 1, frame)
+    }
+
+    fn decode_file_workers(
+        &self,
+        file: &File,
+        cancel: &CancellationToken,
+        workers: usize,
+        frame: &mut dyn FnMut(&[u8]) -> Result<(), AppError>,
+    ) -> Result<(), AppError> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
@@ -110,7 +120,7 @@ impl EvtxParser {
             ));
         }
         let child = program
-            .spawn_cancelable(file, Mode::Decode, &|| cancel.is_cancelled())
+            .spawn_cancelable(file, Mode::DecodeParallel(std::num::NonZeroU8::new(u8::try_from(workers.min(64)).map_err(|_| bad("invalid EVTX worker budget"))?).ok_or_else(|| bad("invalid EVTX worker budget"))?), &|| cancel.is_cancelled())
             .map_err(|_| if cancel.is_cancelled() { AppError::Cancelled } else { bad("cannot start the contained EVTX decoder; check BFE/MpsSvc and the verified sandbox") })?;
         let result = input::run(
             child,

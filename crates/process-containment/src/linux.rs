@@ -13,7 +13,7 @@ fn denied() -> io::Error {
     )
 }
 
-/// Restricts this single-threaded helper before it parses any untrusted records.
+/// Restricts the helper before any worker or untrusted record is created.
 /// Input must be the inherited read-only evidence descriptor, duplicated before entry.
 pub fn enter(input: &File) -> io::Result<()> {
     use rustix::process::{Resource, Rlimit, setrlimit};
@@ -51,6 +51,10 @@ pub fn enter(input: &File) -> io::Result<()> {
     {
         return Err(denied());
     }
+    // clone3 passes an opaque argument pointer. Force libc's inspectable clone
+    // fallback instead; the main filter permits this syscall only so this
+    // independent ENOSYS decision remains the most restrictive result.
+    seccompiler::apply_filter(&clone3_unavailable()?).map_err(|_| denied())?;
     let program = filter(input.as_raw_fd())?;
     seccompiler::apply_filter(&program).map_err(|_| denied())?;
     crate::verify_entry()
@@ -84,9 +88,13 @@ fn filter(input: i32) -> io::Result<seccompiler::BpfProgram> {
         libc::SYS_sched_yield,
         libc::SYS_exit,
         libc::SYS_exit_group,
+        libc::SYS_set_robust_list,
+        libc::SYS_rseq,
+        libc::SYS_clone3,
     ] {
         rules.insert(syscall, Vec::new());
     }
+    rules.insert(libc::SYS_clone, vec![thread_clone()?]);
     let fd = u64::try_from(input).map_err(|_| denied())?;
     for syscall in [
         libc::SYS_read,
@@ -112,3 +120,51 @@ fn filter(input: i32) -> io::Result<seccompiler::BpfProgram> {
     .try_into()
     .map_err(|_| denied())
 }
+
+// No namespace, vfork, independent process or exit-signal bits. Only a thread
+// sharing this process's VM, filesystem, descriptors and signal dispositions.
+const THREAD_REQUIRED: u64 = (libc::CLONE_VM
+    | libc::CLONE_FS
+    | libc::CLONE_FILES
+    | libc::CLONE_SIGHAND
+    | libc::CLONE_THREAD
+    | libc::CLONE_SYSVSEM) as u64;
+const THREAD_ALLOWED: u64 = THREAD_REQUIRED
+    | (libc::CLONE_SETTLS
+        | libc::CLONE_PARENT_SETTID
+        | libc::CLONE_CHILD_SETTID
+        | libc::CLONE_CHILD_CLEARTID) as u64;
+fn thread_clone() -> io::Result<SeccompRule> {
+    SeccompRule::new(vec![
+        SeccompCondition::new(
+            0,
+            SeccompCmpArgLen::Qword,
+            SeccompCmpOp::MaskedEq(THREAD_REQUIRED),
+            THREAD_REQUIRED,
+        )
+        .map_err(|_| denied())?,
+        SeccompCondition::new(
+            0,
+            SeccompCmpArgLen::Qword,
+            SeccompCmpOp::MaskedEq(!THREAD_ALLOWED),
+            0,
+        )
+        .map_err(|_| denied())?,
+    ])
+    .map_err(|_| denied())
+}
+fn clone3_unavailable() -> io::Result<seccompiler::BpfProgram> {
+    SeccompFilter::new(
+        BTreeMap::from([(libc::SYS_clone3, Vec::new())]),
+        SeccompAction::Allow,
+        SeccompAction::Errno(libc::ENOSYS as u32),
+        std::env::consts::ARCH.try_into().map_err(|_| denied())?,
+    )
+    .map_err(|_| denied())?
+    .try_into()
+    .map_err(|_| denied())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic)]
+mod tests;

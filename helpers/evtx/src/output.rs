@@ -15,21 +15,24 @@ impl<'a> Output<'a> {
         }
     }
     pub(super) fn frame(&mut self, frame: &serde_json::Value) -> io::Result<()> {
-        let mut bytes = Frame(Vec::new());
-        serde_json::to_writer(&mut bytes, frame).map_err(|_| limit())?;
-        bytes.write_all(b"\n")?;
+        self.encoded(&encode(frame)?)
+    }
+    pub(super) fn encoded(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.remaining = self
             .remaining
-            .checked_sub(bytes.0.len() as u64)
+            .checked_sub(bytes.len() as u64)
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("EVTX output byte limit reached ({} bytes); entire file rejected; no partial ingestion", self.budget)))?;
-        self.sink.write_all(&bytes.0)
-    }
-    pub(super) fn rejected(&mut self, record: Option<u64>, offset: Option<u64>) -> io::Result<()> {
-        self.frame(&serde_json::json!({"kind":"rejected","record_id":record,"offset":offset,"code":"invalid-record"}))
+        self.sink.write_all(bytes)
     }
     pub(super) fn flush(&mut self) -> io::Result<()> {
         self.sink.flush()
     }
+}
+pub(super) fn encode(frame: &serde_json::Value) -> io::Result<Vec<u8>> {
+    let mut bytes = Frame(Vec::new());
+    serde_json::to_writer(&mut bytes, frame).map_err(|_| limit())?;
+    bytes.write_all(b"\n")?;
+    Ok(bytes.0)
 }
 fn limit() -> io::Error {
     io::Error::new(
