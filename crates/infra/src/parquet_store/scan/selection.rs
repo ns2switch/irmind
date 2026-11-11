@@ -7,23 +7,14 @@ pub(in crate::parquet_store) fn partition_matches(
     if !filter.common().is_empty() && !common::supported(artifact) {
         return false;
     }
-    if let Some(v) = artifact.precise_metadata() {
-        return scope_partition_matches(&v.partition, filter)
-            && filter.time_range().is_none_or(|(from, to)| {
-                artifact.partition_date() == "unknown"
-                    || (artifact.partition_date() >= &from[..10]
-                        && artifact.partition_date() <= &to[..10])
-            });
-    }
-    filter.time_range().is_none_or(|(from, to)| {
-        artifact.partition_date().len() == 10
-            && artifact.partition_date() >= &from[..10]
-            && artifact.partition_date() <= &to[..10]
-    }) && filter.account_or_project().is_none_or(|value| {
-        artifact.partition_account() == super::super::writer::safe_partition(value)
-    }) && filter.region().is_none_or(|value| {
-        artifact.partition_region() == super::super::writer::safe_partition(value)
-    })
+    let ParquetArtifact::V3(value) = artifact;
+    let v = value.core();
+    scope_partition_matches(&v.partition, filter)
+        && filter.time_range().is_none_or(|(from, to)| {
+            artifact.partition_date() == "unknown"
+                || (artifact.partition_date() >= &from[..10]
+                    && artifact.partition_date() <= &to[..10])
+        })
 }
 
 pub(super) fn rules_for_artifact(

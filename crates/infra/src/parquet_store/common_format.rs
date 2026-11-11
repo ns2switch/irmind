@@ -27,7 +27,6 @@ pub(super) fn extra_columns(schema: ArtifactSchemaV2) -> Vec<&'static str> {
             "identity_scope",
             "co_observations",
         ]),
-        _ => {}
     }
     columns
 }

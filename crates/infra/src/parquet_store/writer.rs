@@ -44,7 +44,7 @@ impl Partition {
 }
 
 mod row;
-pub(super) use row::{RecordRow, safe_partition};
+pub(super) use row::RecordRow;
 pub(super) struct StagedArtifact {
     pub rows: Option<u64>,
     pub temporary: PathBuf,

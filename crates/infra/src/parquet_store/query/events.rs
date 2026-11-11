@@ -59,7 +59,6 @@ impl QueryStore<'_> {
         index: usize,
         cancel: &CancellationToken,
     ) -> Result<Option<String>, AppError> {
-        super::require_current(artifacts)?;
         let selected = artifacts
             .iter()
             .filter(|artifact| {
@@ -183,10 +182,8 @@ fn partition_coverage(artifacts: &[ParquetArtifact]) -> String {
         if !matches!(
             v.builder_version.as_str(),
             crate::parquet_store::common_format::BUILDER | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
-        ) || !matches!(
-            v.schema,
-            ArtifactSchemaV2::Events | ArtifactSchemaV2::CommonEvents
-        ) {
+        ) || !matches!(v.schema, ArtifactSchemaV2::CommonEvents)
+        {
             continue;
         }
         files += 1;

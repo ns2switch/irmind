@@ -13,12 +13,11 @@ impl LargeCaseUseCases<'_, '_> {
     ) -> Result<usize, AppError> {
         let mut groups = BTreeMap::<Vec<u8>, Vec<ParquetArtifactV3>>::new();
         for artifact in known.values() {
-            if let ParquetArtifact::V3(mapped) = artifact {
-                groups
-                    .entry(artifact.compaction_key())
-                    .or_default()
-                    .push(mapped.clone());
-            }
+            let ParquetArtifact::V3(mapped) = artifact;
+            groups
+                .entry(artifact.compaction_key())
+                .or_default()
+                .push(mapped.clone());
         }
         let mut compacted = 0;
         for group in groups.values() {
@@ -44,9 +43,7 @@ impl LargeCaseUseCases<'_, '_> {
                     .collect::<Vec<_>>();
                 let bundle = self.store.compact_artifacts(id, &inputs, cancel)?;
                 self.store.verify_artifact(id, &bundle, cancel)?;
-                let ParquetArtifact::V3(child) = &bundle else {
-                    return Err(super::invalid_manifest());
-                };
+                let ParquetArtifact::V3(child) = &bundle;
                 let receipt = ParquetLayoutV1::between(&parents, child)
                     .map_err(|_| super::invalid_manifest())?;
                 if cancel.is_cancelled() {

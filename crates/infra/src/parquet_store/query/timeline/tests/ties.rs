@@ -108,7 +108,6 @@ fn assert_tie_scan(
         .iter()
         .map(|a| match a {
             irmind_domain::ParquetArtifact::V3(v) => v.pipeline().rows(),
-            _ => unreachable!(),
         })
         .sum::<u64>();
     assert_eq!(visited as u64, expected);

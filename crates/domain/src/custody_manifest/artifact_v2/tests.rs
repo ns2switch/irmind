@@ -27,29 +27,14 @@ fn artifact() -> ParquetArtifactV2 {
         sha256: EvidenceHash::parse(&"b".repeat(64)).unwrap(),
         parser_id: "parser-json".into(),
         parser_version: "json-stream-v2".into(),
-        schema: ArtifactSchemaV2::Events,
+        schema: ArtifactSchemaV2::CommonEvents,
         partition,
         source_hashes: vec![EvidenceHash::parse(&"a".repeat(64)).unwrap()],
         time_semantics: ARTIFACT_V2_TIME_SEMANTICS.into(),
         stable_order: ARTIFACT_V2_STABLE_ORDER.into(),
-        builder_version: "parquet-builder-v2".into(),
+        builder_version: "parquet-builder-common-event-direct-v1".into(),
         superseded_hashes: Vec::new(),
     }
-}
-
-#[test]
-fn canonical_v2_matches_independently_encoded_bytes_and_hash() {
-    let artifact = artifact();
-    let golden = include_str!("../../../tests/fixtures/parquet-artifact-v2.hex").trim();
-    assert_eq!(artifact.encode().unwrap(), golden);
-    assert_eq!(ParquetArtifactV2::decode(golden), Ok(artifact));
-    let bytes = decode_payload(golden, TAG).unwrap();
-    let hash = encode_payload(&Sha256::digest(bytes)).unwrap();
-    assert_eq!(
-        hash,
-        include_str!("../../../tests/fixtures/parquet-artifact-v2.sha256").trim()
-    );
-    assert!(crate::ParquetArtifactV1::decode(golden).is_err());
 }
 
 #[test]
@@ -60,7 +45,7 @@ fn unknown_semantics_schema_versions_counts_and_trailing_bytes_fail_closed() {
         (ARTIFACT_V2_STABLE_ORDER, "worker-order"),
         (ARTIFACT_V2_SCOPE_KEYS, "scope-partitions-v9"),
         (ARTIFACT_V2_PARTITION_POLICY, "nfkc-unknown-version"),
-        ("irmind-events-v3", "irmind-events-v2"),
+        ("irmind-events-v4", "irmind-events-v3"),
         ("account", "cluster"),
         ("region", "tenant"),
         ("region", "unknown-key"),
@@ -222,44 +207,6 @@ fn overflow_is_typed_signed_and_cannot_be_impersonated_by_a_host() {
     }
     value.partition.all_scope_overflow = true;
     assert!(value.encode().is_err());
-}
-
-#[test]
-fn independent_overflow_goldens_bind_discriminators_caps_reasons_and_supersession() {
-    for (reason, all_scope, schema, golden) in [
-        (
-            PartitionOverflowReason::Cardinality,
-            false,
-            ArtifactSchemaV2::Entities,
-            include_str!("../../../tests/fixtures/parquet-artifact-v2-cardinality.hex"),
-        ),
-        (
-            PartitionOverflowReason::TupleBudget,
-            true,
-            ArtifactSchemaV2::Coobservations,
-            include_str!("../../../tests/fixtures/parquet-artifact-v2-tuple-budget.hex"),
-        ),
-        (
-            PartitionOverflowReason::UnrepresentableValue,
-            false,
-            ArtifactSchemaV2::Events,
-            include_str!("../../../tests/fixtures/parquet-artifact-v2-unrepresentable-value.hex"),
-        ),
-    ] {
-        let mut expected = artifact();
-        expected.partition.date = "unknown".into();
-        expected.partition.scopes = vec![ScopePartitionV2 {
-            key: ScopePartitionKey::Host,
-            cap: 64,
-            value: ScopePartitionValue::Overflow(reason),
-        }];
-        expected.partition.all_scope_overflow = all_scope;
-        expected.path = format!("{}part.parquet", expected.partition.path_prefix().unwrap());
-        expected.schema = schema;
-        expected.superseded_hashes = vec![EvidenceHash::parse(&"c".repeat(64)).unwrap()];
-        assert_eq!(expected.encode().unwrap(), golden.trim());
-        assert_eq!(ParquetArtifactV2::decode(golden.trim()), Ok(expected));
-    }
 }
 
 #[test]

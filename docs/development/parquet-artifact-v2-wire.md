@@ -1,4 +1,6 @@
-# Artifact V2 foundation and canonical layout
+# Historical artifact V2 foundation and canonical layout
+
+Historical design: standalone V2 artifacts and their fixtures are retired. Current V3 envelopes retain the nested metadata core, with the current common physical schema IDs. See [source mapping](source-mapping-design.md) and the [pre-1.0 decisions](decisions.md).
 
 This page is for maintainers checking the first implementation of the [approved artifact design](parquet-artifact-v2-design.md). It fixes the golden encoding before a writer can publish V2 files. It does not activate V2 ingestion, migrate a case or change an existing signed byte.
 
@@ -45,8 +47,8 @@ Ordinary directory components use lowercase SHA-256 over `irmind-scope-partition
 
 ## Golden evidence and staged compatibility
 
-The independently encoded [731-byte golden](../../crates/domain/tests/fixtures/parquet-artifact-v2.hex) has SHA-256 `6808f98e727835b7ec24137c77c14391efc48ed4cb7832c9457c43e85d779f52`. It describes synthetic cloud event metadata, two ordinary scope pairs and no supersession. A separate Python `struct`/`hashlib` encoding produced the fixture; the Rust encoder must reproduce it exactly. Independent overflow fixtures also bind each reason and a supersession link. Domain tests cover unknown identifiers, trailing data, payload/count bounds, unsafe paths, reserved keys, caps, typed overflow and supersession.
+The independently encoded [731-byte golden](https://github.com/ns2switch/irmind/blob/5905ed7d8334616fd43793a12b0d4aa4b5b45115/crates/domain/tests/fixtures/parquet-artifact-v2.hex) has SHA-256 `6808f98e727835b7ec24137c77c14391efc48ed4cb7832c9457c43e85d779f52`. It describes synthetic cloud event metadata, two ordinary scope pairs and no supersession. A separate Python `struct`/`hashlib` encoding produced the fixture; the Rust encoder must reproduce it exactly. Independent overflow fixtures also bind each reason and a supersession link. Domain tests cover unknown identifiers, trailing data, payload/count bounds, unsafe paths, reserved keys, caps, typed overflow and supersession.
 
-The existing JSON-order CI job also exercises this golden with `serde_json/preserve_order`; historical goldens remain untouched. The canonical fuzz target now covers the V2 decoder and exact timestamp parsers.
+This retired fixture was checked with `serde_json/preserve_order` when V2 was supported. Current golden and fuzz coverage uses the mapped V3 envelope, its nested current metadata cores and exact timestamp parsers.
 
 Until the mixed reader/writer is implemented, the application and V3/V4 export verifiers reject a chain containing V2 rather than silently omitting an artifact. Production ingestion still emits V1. The mixed reader/writer, generic partition coordinator, explicit open-case migration/export V5 and release benchmarks follow in separate PRs. This foundation is not evidence that indexed timelines already preserve subsecond order.

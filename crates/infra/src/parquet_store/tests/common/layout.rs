@@ -55,12 +55,9 @@ fn v3_readers_and_layout_keep_exact_query_results_and_parent_files() {
             .iter()
             .map(|a| match a {
                 ParquetArtifact::V3(v) => v.clone(),
-                _ => unreachable!(),
             })
             .collect::<Vec<_>>();
-        let ParquetArtifact::V3(value) = &child else {
-            unreachable!()
-        };
+        let ParquetArtifact::V3(value) = &child;
         ParquetLayoutV1::between(&parents, value)
             .unwrap()
             .verify(&parents, value)
@@ -113,10 +110,7 @@ fn v3_readers_and_layout_keep_exact_query_results_and_parent_files() {
     let ParquetArtifact::V3(value) = compacted
         .iter()
         .find(|a| a.schema_version() == "irmind-events-v4")
-        .unwrap()
-    else {
-        unreachable!()
-    };
+        .unwrap();
     let changed = ParquetArtifactV3::try_new(
         value.core().clone(),
         ArtifactPipelineV1::layout(

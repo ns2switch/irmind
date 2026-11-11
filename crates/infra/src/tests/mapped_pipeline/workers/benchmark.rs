@@ -44,9 +44,7 @@ fn benchmark_single_ndjson_release() -> Result<(), &'static str> {
         .iter()
         .filter(|a| a.schema_version() == "irmind-events-v4")
         .map(|artifact| {
-            let ParquetArtifact::V3(artifact) = artifact else {
-                panic!("benchmark requires mapped V3 artifacts");
-            };
+            let ParquetArtifact::V3(artifact) = artifact;
             artifact.pipeline().rows()
         })
         .sum::<u64>();

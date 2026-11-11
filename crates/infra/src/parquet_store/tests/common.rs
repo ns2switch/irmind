@@ -30,9 +30,7 @@ fn mapping_owned_unclassified_projection_writes_checked_schemas_and_precision() 
     assert_eq!(prepared.records, 1);
     assert_eq!(prepared.artifacts.len(), 3);
     for artifact in &prepared.artifacts {
-        let ParquetArtifact::V3(mapped) = artifact else {
-            panic!("expected mapped V3")
-        };
+        let ParquetArtifact::V3(mapped) = artifact;
         let envelope = mapped.core();
         assert!(envelope.schema.is_common());
         assert_eq!(

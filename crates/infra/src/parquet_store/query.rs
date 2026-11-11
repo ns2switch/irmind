@@ -26,7 +26,6 @@ impl QueryStore<'_> {
         spec: ScanSpec<'_>,
         visit: impl FnMut(&RecordBatch) -> Result<ScanFlow, AppError>,
     ) -> Result<ScanStatus, AppError> {
-        require_current(spec.artifacts)?;
         self.store.scan_artifacts(spec, self.source_names, visit)
     }
 }
@@ -140,17 +139,4 @@ fn ordered(rows: &mut Vec<EventHit>, limit: usize, newest: bool) -> Result<(), A
     rows.dedup_by(|a, b| a.hash == b.hash && a.index == b.index);
     rows.truncate(limit);
     Ok(())
-}
-
-fn require_current(artifacts: &[ParquetArtifact]) -> Result<(), AppError> {
-    if artifacts
-        .iter()
-        .all(|a| matches!(a, ParquetArtifact::V3(_)))
-    {
-        Ok(())
-    } else {
-        Err(AppError::Fixed(
-            irmind_app::FixedAppError::RetiredCaseFormat,
-        ))
-    }
 }
