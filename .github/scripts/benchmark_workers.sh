@@ -64,18 +64,18 @@ assert len(paths)==1
 print(paths[0])'
 }
 reference=$(build_binary "$scratch/reference" "$(native_path "$scratch/reference-target")")
-cp "$(shell_path "$reference")" "$scratch/reference$suffix"
+cp "$(shell_path "$reference")" "$scratch/bin-reference$suffix"
 rm -rf -- "$scratch/reference-target"
 candidate=$(build_binary "$root" "$CARGO_TARGET_DIR")
-cp "$(shell_path "$candidate")" "$scratch/candidate$suffix"
+cp "$(shell_path "$candidate")" "$scratch/bin-candidate$suffix"
 cores=$(python3 -c 'import os; print(min(os.cpu_count() or 1,256))')
 printf 'reference=%s candidate=%s available_cores=%s profile=release\n' "$BASE_REF" "$(git rev-parse HEAD)" "$cores" | tee worker-sweep-metadata.txt
 run() {
     local version=$1 label=$2
     if [[ -n "$suffix" ]]; then
-        python3 -B scripts/benchmark_windows_peak.py "$(native_path "$scratch/$version$suffix")" "$filter" --ignored --nocapture --test-threads 1 2>&1 | tee "worker-sweep-$label.txt"
+        python3 -B scripts/benchmark_windows_peak.py "$(native_path "$scratch/bin-$version$suffix")" "$filter" --ignored --nocapture --test-threads 1 2>&1 | tee "worker-sweep-$label.txt"
     else
-        /usr/bin/time -f 'WORKER_SWEEP peak_rss_kib=%M elapsed_seconds=%e' "$scratch/$version" "$filter" --ignored --nocapture --test-threads 1 2>&1 | tee "worker-sweep-$label.txt"
+        /usr/bin/time -f 'WORKER_SWEEP peak_rss_kib=%M elapsed_seconds=%e' "$scratch/bin-$version" "$filter" --ignored --nocapture --test-threads 1 2>&1 | tee "worker-sweep-$label.txt"
     fi
 }
 for cap in $(printf '%s\n' 1 4 "$cores" auto | awk '!seen[$0]++'); do
