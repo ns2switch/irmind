@@ -713,3 +713,17 @@ profile. Both profiles explicitly retain overflow checks and debug assertions.
 Consequences: the inventory sizes, mutations, test selection, lint severity and
 platform gates remain unchanged. Compare the test and build step durations in
 CI; do not present CI-profile timings as release ingestion benchmarks.
+
+
+### Install the Linux CI linker from a pinned binary manifest
+
+Context: linker setup must not require an available distribution package mirror.
+
+Decision: install mold 2.42.1 with the checksum manifest in install-action
+`cfdb7ed4ccc7c7dce37759eae89dc5674b469b39`. Keep checksum verification enabled
+and disable compilation fallbacks. The existing linker flags, platforms,
+permissions and validation commands remain unchanged.
+
+Consequences: Linux CI obtains the linker through its verified prebuilt release
+asset. Installing it does not run apt or require elevated privileges. Other
+tooling keeps its existing pinned action revision.
