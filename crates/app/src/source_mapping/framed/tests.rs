@@ -104,3 +104,49 @@ fn time_parser_retains_precision_and_requires_declared_offset_for_naive_text() {
     let time = source_datetime("2026-11-01 01:02:03.123456789 +01:00", None).unwrap();
     assert_eq!(time.to_rfc3339(), "2026-11-01T00:02:03.123456789Z");
 }
+
+#[test]
+fn frame_reservation_includes_decoded_metadata_context() {
+    use std::num::NonZeroUsize;
+    let source = SourceReferenceV1::file("synthetic.csv").unwrap();
+    let cancel = CancellationToken::new();
+    let mut state = SourceFrameEmitter::new(
+        SourceMetadata {
+            source: &source,
+            evidence_hash: [0; 32],
+            time_context: None,
+            cancel: &cancel,
+        },
+        ParserIdentity {
+            name: "parser-synthetic",
+            version: "v1",
+        },
+    );
+    let current = std::thread::current().id();
+    let mut input = 0..8;
+    state
+        .decode_frames(
+            super::super::DecodeBudget::new(NonZeroUsize::new(4).unwrap(), 64 * 1024),
+            || {
+                Ok(input
+                    .next()
+                    .map(|offset| (vec![b'1'], Some(offset), 32 * 1024)))
+            },
+            |_, _| {
+                // Each frame plus its metadata needs its own window, so the
+                // coordinator must process the record without another worker.
+                assert_eq!(std::thread::current().id(), current);
+                Ok(frame(
+                    SourceValue::object(vec![(
+                        "synthetic".into(),
+                        SourceValue::Text("fixture".into()),
+                    )])
+                    .unwrap(),
+                ))
+            },
+            |bytes| *bytes,
+            &mut |_| Ok(()),
+        )
+        .unwrap();
+    assert_eq!(state.finish().accepted, 8);
+}

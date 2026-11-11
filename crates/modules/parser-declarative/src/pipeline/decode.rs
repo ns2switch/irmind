@@ -38,6 +38,7 @@ impl SourceDecoder for Decoder {
             samples: Vec::new(),
         };
         let mut header: Option<Arc<[String]>> = None;
+        let mut header_bytes = 0usize;
         let mut offset = 0u64;
         let mut seen = 0usize;
         decode_ordered(
@@ -64,11 +65,16 @@ impl SourceDecoder for Decoder {
                     && self.0.definition.input.header
                     && header.is_none()
                 {
+                    header_bytes = frame.bytes.len();
                     header = Some(self.0.csv_header(&frame.bytes)?.into());
                     continue;
                 }
                 seen += 1;
-                let weight = frame.bytes.len().saturating_mul(64);
+                let weight = frame
+                    .bytes
+                    .len()
+                    .saturating_add(header_bytes)
+                    .saturating_mul(64);
                 return Ok(Some(((frame, current, header.clone()), weight)));
             },
             |(frame, current, header)| {
