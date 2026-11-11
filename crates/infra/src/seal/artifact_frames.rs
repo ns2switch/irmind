@@ -1,4 +1,4 @@
-//! V5 derived files, keyed by authenticated relative paths.
+//! Current derived-file frames, keyed by authenticated relative paths.
 use super::export_current::write_frame;
 use super::frames::{read_frame, verify_raw};
 use super::{AppError, CancellationToken, CaseId, LocalStore, Path, storage, storage_reason};
@@ -23,19 +23,13 @@ pub(super) struct ArtifactFrame {
 }
 impl ArtifactFrame {
     pub(super) fn from_artifact(artifact: &ParquetArtifact) -> Self {
+        let ParquetArtifact::V3(value) = artifact;
         Self {
             path: artifact.path().into(),
             sha256: artifact.sha256().as_str().into(),
             size: artifact.size(),
-            common_schema: match artifact {
-                ParquetArtifact::V2(v) if v.schema.is_common() => Some(v.schema),
-                ParquetArtifact::V3(v) => Some(v.core().schema),
-                _ => None,
-            },
-            common_rows: match artifact {
-                ParquetArtifact::V3(v) => Some(v.pipeline().rows()),
-                _ => None,
-            },
+            common_schema: Some(value.core().schema),
+            common_rows: Some(value.pipeline().rows()),
         }
     }
 }
@@ -52,8 +46,12 @@ impl LocalStore {
                 entry.kind,
                 irmind_domain::AuditEventKind::ParquetArtifactV1
                     | irmind_domain::AuditEventKind::ParquetArtifactV2
-                    | irmind_domain::AuditEventKind::ParquetArtifactV3
             ) {
+                return Err(AppError::Fixed(
+                    irmind_app::FixedAppError::RetiredCaseFormat,
+                ));
+            }
+            if entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV3 {
                 let artifact = ParquetArtifact::decode(entry.kind, &entry.payload)
                     .map_err(|_| AppError::InvalidChain(entry.seq))?;
                 let frame = ArtifactFrame::from_artifact(&artifact);

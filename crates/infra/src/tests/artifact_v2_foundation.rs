@@ -2,7 +2,7 @@ use super::*;
 use irmind_domain::AuditEventKind;
 
 #[test]
-fn v2_artifact_without_signed_source_links_is_rejected() {
+fn retired_artifact_kind_is_rejected_before_payload_interpretation() {
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(open_source_store(root.path()).unwrap());
     let signer = Arc::new(LocalSigner {
@@ -37,9 +37,7 @@ fn v2_artifact_without_signed_source_links_is_rejected() {
         actor: Actor::Analyst,
         origin: "system".into(),
         kind: AuditEventKind::ParquetArtifactV2,
-        payload: include_str!("../../../domain/tests/fixtures/parquet-artifact-v2.hex")
-            .trim()
-            .into(),
+        payload: "unread-retired-payload".into(),
         evidence: None,
         prev: last.hash,
         hash: [0; 32],

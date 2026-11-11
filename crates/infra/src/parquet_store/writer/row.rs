@@ -146,6 +146,7 @@ pub(super) fn first_string<'a>(value: &'a Value, pointers: &[&str]) -> &'a str {
         .unwrap_or("")
 }
 
+#[cfg(test)]
 pub(in crate::parquet_store) fn safe_partition(value: &str) -> String {
     if value.is_empty() {
         return "unknown".into();

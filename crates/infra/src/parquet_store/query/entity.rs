@@ -70,7 +70,6 @@ impl QueryStore<'_> {
         value: &str,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        super::require_current(artifacts)?;
         if artifacts.is_empty() {
             return Ok(format!("{kind} {value}: count=0; first=; last="));
         }

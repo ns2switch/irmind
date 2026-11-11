@@ -25,11 +25,7 @@ pub(super) fn expected_type(name: &str, precise: bool) -> DataType {
 }
 
 pub(super) fn validate_schema(artifact: &ParquetArtifact, schema: &Schema) -> Result<(), AppError> {
-    let ParquetArtifact::V3(mapped) = artifact else {
-        return Err(AppError::Fixed(
-            irmind_app::FixedAppError::RetiredCaseFormat,
-        ));
-    };
+    let ParquetArtifact::V3(mapped) = artifact;
     let v = mapped.core();
     if !super::partitioning::supported_builder(&v.builder_version) {
         return Err(invalid_source());
@@ -39,9 +35,8 @@ pub(super) fn validate_schema(artifact: &ParquetArtifact, schema: &Schema) -> Re
 }
 
 pub(super) fn validate_row_count(artifact: &ParquetArtifact, rows: i64) -> Result<(), AppError> {
-    if let ParquetArtifact::V3(mapped) = artifact
-        && u64::try_from(rows).ok() != Some(mapped.pipeline().rows())
-    {
+    let ParquetArtifact::V3(mapped) = artifact;
+    if u64::try_from(rows).ok() != Some(mapped.pipeline().rows()) {
         return Err(invalid_source());
     }
     Ok(())
@@ -72,15 +67,13 @@ fn validate_columns(id: irmind_domain::ArtifactSchemaV2, schema: &Schema) -> Res
         "scope_host",
     ];
     match id {
-        irmind_domain::ArtifactSchemaV2::Events | irmind_domain::ArtifactSchemaV2::CommonEvents => {
+        irmind_domain::ArtifactSchemaV2::CommonEvents => {
             names.extend(["event", "text", "entities", "relations"]);
         }
-        irmind_domain::ArtifactSchemaV2::Entities
-        | irmind_domain::ArtifactSchemaV2::CommonEntities => {
+        irmind_domain::ArtifactSchemaV2::CommonEntities => {
             names.extend(["event", "entity_kind", "entity_value"]);
         }
-        irmind_domain::ArtifactSchemaV2::Coobservations
-        | irmind_domain::ArtifactSchemaV2::CommonCoobservations => {
+        irmind_domain::ArtifactSchemaV2::CommonCoobservations => {
             names.extend(["entity_kind", "entity_value", "co_entities"]);
         }
     }

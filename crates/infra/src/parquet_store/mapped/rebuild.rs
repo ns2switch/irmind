@@ -72,10 +72,7 @@ impl ParquetStore {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            let ParquetArtifact::V3(mapped) = artifact else {
-                seed.push(artifact.clone());
-                continue;
-            };
+            let ParquetArtifact::V3(mapped) = artifact;
             self.verify_artifact(case, artifact, cancel)?;
             if rebuilt.contains_key(artifact.path()) {
                 continue;
