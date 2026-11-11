@@ -88,6 +88,7 @@ fn tsv(
     let mut header = Arc::new(crate::stream::TsvHeader::default());
     let mut state = SourceFrameEmitter::new(metadata, ZeekSourceDecoder.identity());
     let mut offset = 0u64;
+    let mut header_bytes = 0usize;
     state.decode_frames(
         budget,
         || loop {
@@ -107,11 +108,22 @@ fn tsv(
                 && bytes.len() <= 4 * 1024 * 1024
                 && Arc::make_mut(&mut header).metadata(&bytes)?
             {
+                header_bytes = header
+                    .fields
+                    .iter()
+                    .chain(&header.types)
+                    .map(String::len)
+                    .sum();
                 continue;
             }
-            return Ok(Some((bytes, Some(start), Arc::clone(&header))));
+            return Ok(Some((
+                bytes,
+                Some(start),
+                (Arc::clone(&header), header_bytes),
+            )));
         },
-        |bytes, header| tsv_frame(bytes, &header),
+        |bytes, (header, _)| tsv_frame(bytes, &header),
+        |(_, header_bytes)| *header_bytes,
         emit,
     )?;
     Ok(state.finish())

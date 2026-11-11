@@ -88,7 +88,13 @@ where
         // The coordinator occupies one of the allocated slots.
         while remaining.len() > batch_size {
             let frames = remaining.by_ref().take(batch_size).collect::<Vec<_>>();
-            tasks.push(scope.spawn(move || decode_batch(frames, cancel, decode)));
+            tasks.push(
+                std::thread::Builder::new()
+                    .spawn_scoped(scope, move || decode_batch(frames, cancel, decode))
+                    .map_err(|_| {
+                        AppError::Storage("cannot start a bounded record worker".into())
+                    })?,
+            );
         }
         let last = decode_batch(remaining, cancel, decode);
         let mut result = Ok(());

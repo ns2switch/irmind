@@ -35,6 +35,7 @@ pub fn decode_json_source(
                 }))
             },
             |bytes, oversized| parse_frame(bytes, oversized, decode),
+            |_| 0,
             emit,
         )?;
         if limited.limit() == 0 {
@@ -59,6 +60,7 @@ pub fn decode_json_source(
                 }
             },
             |bytes, oversized| parse_frame(bytes, oversized, decode),
+            |_| 0,
             emit,
         )?;
     }

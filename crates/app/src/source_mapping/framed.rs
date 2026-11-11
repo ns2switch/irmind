@@ -76,6 +76,7 @@ impl<'a> SourceFrameEmitter<'a> {
         budget: DecodeBudget,
         mut next: impl FnMut() -> Result<Option<(Vec<u8>, Option<u64>, T)>, AppError>,
         decode: impl Fn(&[u8], T) -> Result<DecodedSourceFrame, AppError> + Sync,
+        context_bytes: impl Fn(&T) -> usize,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<(), AppError> {
         let mut seen = self.seen;
@@ -90,7 +91,11 @@ impl<'a> SourceFrameEmitter<'a> {
                     return Err(limit());
                 }
                 seen += 1;
-                let weight = frame.0.len().saturating_mul(64);
+                let weight = frame
+                    .0
+                    .len()
+                    .saturating_add(context_bytes(&frame.2))
+                    .saturating_mul(64);
                 Ok(Some((frame, weight)))
             },
             |(bytes, offset, context)| {

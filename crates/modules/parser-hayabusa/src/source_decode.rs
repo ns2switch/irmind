@@ -70,6 +70,7 @@ fn csv_decode(
     if size == 0 || header.len() > irmind_domain::SOURCE_MAX_BYTES {
         return Err(invalid());
     }
+    let header_bytes = header.len();
     let headers = super::csv::decode_csv(&header)?;
     if headers.len() > 1024 || headers.iter().collect::<BTreeSet<_>>().len() != headers.len() {
         return Err(invalid());
@@ -101,6 +102,7 @@ fn csv_decode(
             csv_fields(&headers, bytes)
                 .and_then(|fields| frame(fields, metadata.time_context, "csv", dataset))
         },
+        |()| header_bytes,
         emit,
     )?;
     Ok(state.finish())
