@@ -1577,3 +1577,67 @@ not establish the candidate's 15 GB performance; its full rerun remains required
 [Machine-readable measurements](benchmark-data/current-v3-15gb-before-sort.json)
 include per-query counters and the recorded phases. Scenario names containing
 `v2` identify the frozen input generator; the writer in this run was mapped V3.
+
+### Complete mapped matrix with parallel independent source sorts
+
+The [nine-scenario release matrix](https://github.com/ns2switch/irmind/actions/runs/43004608708)
+uses source commit `1bbc380`, canonical sequential appends and bounded parallel
+completion. Independent disordered source sorts use the same adaptive worker
+budget. All absolute targets pass. Each scenario is one release measurement on
+Ubuntu 24.04; comparisons with earlier workflow runs are not paired speedups.
+The paired 1 GiB sorting sweep above isolates that change on one runner.
+
+| Corpus | Hosts | Ingest wall (s) | Target (s) | Largest ordinary query p95 (s) |
+| --- | ---: | ---: | ---: | ---: |
+| Cloud | — | 609.711 | 900 | 6.235 |
+| Endpoint chronological | 1 | 340.235 | 900 | 3.923 |
+| Endpoint chronological | 64 | 354.495 | 900 | 3.661 |
+| Endpoint chronological | 1024 | 382.213 | 900 | 4.850 |
+| Endpoint chronological | 1025 | 489.929 | 900 | 6.435 |
+| Endpoint stress | 1 | 1,046.624 | 1,350 | 4.879 |
+| Endpoint stress | 64 | 997.701 | 1,350 | 2.652 |
+| Endpoint stress | 1024 | 1,055.029 | 1,350 | 1.927 |
+| Endpoint stress | 1025 | 989.384 | 1,350 | 2.457 |
+
+All ordinary queries report zero errors and zero time-budget hits. The deliberate
+worst-case cloud path retains its approved partial-result marker at the budget;
+it is measured separately from ordinary queries. Initial ingestion retains zero
+inactive-parent bytes in every scenario. HuntEval checks retain full event,
+entity and path recall with no parse errors for all three providers.
+
+Normalized staging peaks at 426,393,546 bytes (sampled), below the active group's
+reserved disk budget; this is not a process RSS measurement. The source inputs
+are 15,685,641,524 bytes for cloud and about 15,676,080,000 bytes for endpoint.
+[Exact measurements](benchmark-data/current-v3-15gb-parallel-sort.json) include
+phase counters, source and artifact sizes, ordinary and overflow query samples,
+HuntEval recall and the separate worst-case path. A zero legacy sort counter in
+this run does not measure the sort phase; later instrumentation times the actual
+per-source sorts. Scenario names containing `v2` identify the frozen input
+generator. Every scenario here uses direct mapped V3.
+
+### Current mapped EVTX: one 1 GiB file
+
+The [native worker sweep](https://github.com/ns2switch/irmind/actions/runs/43011292588)
+uses the production source decoder, identified mapping, direct V3 writer and
+signed ingestion. Each input contains 1,048,576 synthetic records in
+1,073,745,920 bytes. The contained EVTX helper remains sequential. Worker caps
+control the main pipeline; these measurements do not establish parallel EVTX
+decoding. Each setting is one release measurement on the same four-core runner
+per operating system. Automatic selection uses three workers; four is all cores.
+
+| System | Worker cap | Ingest (s) | MiB/s | Main peak MiB | Helper peak MiB |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Linux | 1 | 27.712 | 36.95 | 84.56 | 3.17 |
+| Linux | 4 | 27.495 | 37.24 | 83.65 | 3.14 |
+| Linux | None | 27.373 | 37.41 | 80.42 | 3.23 |
+| Windows | 1 | 37.670 | 27.18 | 68.65 | 5.99 |
+| Windows | 4 | 35.251 | 29.05 | 66.03 | 6.02 |
+| Windows | None | 37.471 | 27.33 | 69.52 | 6.03 |
+
+Every source is accepted completely and all limits remain unchanged. Final full
+verification passes and is timed separately. Windows performs exactly one
+network witness per session. Peak memory samples the OS process high-water
+counters every 20 ms and includes generation and verification; ingestion wall
+time excludes those phases. Small differences between settings are single-run
+observations, not evidence of helper scaling.
+[Machine-readable results](benchmark-data/current-mapped-evtx-workers.json).

@@ -715,3 +715,18 @@ mapping profiles and bound V3 artifacts. Current direct physical golden bytes,
 V6 wire goldens, offsets, spool authentication, cancellation and rollback remain
 covered. Old-generation fixture generators are removed, along with their unused
 base64 dependency. Removal of remaining historical schema readers is separate.
+
+### Separate bounded-queue scheduling from writer cost in regression tests
+
+Context: the exclusive-producer regression included 40,000 decoded and written
+records within its scheduling deadline. That coupled a deadlock assertion to
+unoptimized writer throughput and unrelated test load.
+
+Decision: test the original exclusive-lease/full-queue cycle directly with the
+production start permits and bounded channels. Keep the existing deadline and a
+separate real-pipeline test for canonical decoder starts, current artifact bytes,
+cancellation and complete rollback.
+
+Consequences: the scheduling test still fails if a later producer can acquire
+its lease before its canonical permit. It does not require a large Parquet write
+to demonstrate a full queue. Production scheduling and limits are unchanged.

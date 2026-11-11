@@ -12,6 +12,7 @@ use std::{
 struct Exclusive {
     leased: AtomicBool,
     fail_last: bool,
+    first_finished: AtomicBool,
 }
 struct Lease<'a>(&'a AtomicBool);
 impl Drop for Lease<'_> {
@@ -47,19 +48,28 @@ impl SourceDecoder for Exclusive {
             std::thread::sleep(Duration::from_millis(2));
         }
         let _lease = Lease(&self.leased);
+        if name == "source-1.json" {
+            assert!(self.first_finished.load(Ordering::Acquire));
+        }
         if self.fail_last && name == "source-1.json" {
             return Err(AppError::Policy(
                 "synthetic exclusive parser failure".into(),
             ));
         }
-        JsonSourceDecoder.decode_reader(input, emit)
+        let result = JsonSourceDecoder.decode_reader(input, emit);
+        if name == "source-0.json" && result.is_ok() {
+            self.first_finished.store(true, Ordering::Release);
+        }
+        result
     }
 }
 
 fn sources() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     let mut text = String::new();
-    for i in 0..20_000 {
+    // Queue saturation is tested separately with the actual bounded start permits.
+    // This integration test covers canonical starts, signed bytes and rollback.
+    for i in 0..32 {
         writeln!(
             text,
             "{{\"eventTime\":\"2026-11-01T00:00:00Z\",\"eventName\":\"Read\",\"id\":{i}}}"
@@ -85,6 +95,7 @@ fn canonical_starts_keep_an_exclusive_later_producer_from_blocking_the_first() {
             let parser = Arc::new(Exclusive {
                 leased: AtomicBool::new(false),
                 fail_last,
+                first_finished: AtomicBool::new(false),
             });
             let store = store(&data_path, parser.clone());
             let paths = ["source-0.json".into(), "source-1.json".into()];
@@ -134,6 +145,7 @@ fn cancelling_a_waiting_serial_batch_releases_every_producer() {
         let parser = Arc::new(Exclusive {
             leased: AtomicBool::new(false),
             fail_last: false,
+            first_finished: AtomicBool::new(false),
         });
         let store = store(data.path(), parser.clone());
         let paths = ["source-0.json".into(), "source-1.json".into()];
@@ -158,6 +170,7 @@ fn serial_scheduling_preserves_the_concurrent_artifact_bytes() {
     let parser = Arc::new(Exclusive {
         leased: AtomicBool::new(false),
         fail_last: false,
+        first_finished: AtomicBool::new(false),
     });
     let serial = store(serial_root.path(), parser);
     let concurrent = store(concurrent_root.path(), Arc::new(JsonSourceDecoder));

@@ -47,3 +47,6 @@ impl Drop for Abort {
         self.0.cancel();
     }
 }
+
+#[cfg(test)]
+mod tests;
