@@ -1,6 +1,28 @@
-//! Pure mapping modules are optional; composition keeps the historical writer.
+//! Compile-time parser features select independently identified pure mappings.
 use super::{ModuleRegistry, Result};
 use irmind_app::modules::ModuleConfig;
+
+#[cfg(feature = "mapping-dfir")]
+const DFIR_PARSERS: &[&str] = &[
+    #[cfg(feature = "parser-velociraptor")]
+    "parser-velociraptor",
+    #[cfg(feature = "parser-hayabusa")]
+    "parser-hayabusa",
+    #[cfg(feature = "parser-chainsaw")]
+    "parser-chainsaw",
+    #[cfg(feature = "parser-plaso")]
+    "parser-plaso",
+    #[cfg(feature = "parser-eztools")]
+    "parser-eztools",
+];
+
+#[cfg(feature = "mapping-network")]
+const NETWORK_PARSERS: &[&str] = &[
+    #[cfg(feature = "parser-zeek")]
+    "parser-zeek",
+    #[cfg(feature = "parser-suricata")]
+    "parser-suricata",
+];
 
 pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     #[cfg(feature = "mapping-json-compat")]
@@ -24,13 +46,9 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
         Box::new(irmind_mod_mapping_ecs::EcsMapping::new()?),
         &ModuleConfig::new(),
     )?;
-    #[cfg(feature = "mapping-ocsf")]
-    registry.register(
-        Box::new(irmind_mod_mapping_ocsf::OcsfMapping::new()?),
-        &ModuleConfig::new(),
-    )?;
     #[cfg(feature = "mapping-dfir")]
-    for mapper in irmind_mod_mapping_dfir::DfirExtractionMapping::all()? {
+    for &parser in DFIR_PARSERS {
+        let mapper = irmind_mod_mapping_dfir::DfirExtractionMapping::new(parser)?;
         registry.register(Box::new(mapper), &ModuleConfig::new())?;
     }
     #[cfg(feature = "mapping-syslog")]
@@ -40,9 +58,16 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     )?;
 
     #[cfg(feature = "mapping-network")]
-    for mapper in irmind_mod_mapping_network::NetworkExtractionMapping::all()? {
+    for &parser in NETWORK_PARSERS {
+        let mapper = irmind_mod_mapping_network::NetworkExtractionMapping::new(parser)?;
         registry.register(Box::new(mapper), &ModuleConfig::new())?;
     }
+
+    #[cfg(feature = "mapping-ocsf")]
+    registry.register(
+        Box::new(irmind_mod_mapping_ocsf::OcsfMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     Ok(())
 }
 #[cfg(feature = "mapping-evtx")]
@@ -117,19 +142,21 @@ mod tests {
                 )))
                 .unwrap();
         }
-        #[cfg(feature = "mapping-ocsf")]
-        registry
-            .add_source_decoder(Arc::new(irmind_mod_parser_ocsf::OcsfSourceDecoder))
-            .unwrap();
         #[cfg(feature = "mapping-dfir")]
-        for decoder in [
-            Arc::new(irmind_mod_parser_velociraptor::VelociraptorSourceDecoder)
-                as Arc<dyn irmind_app::SourceDecoder>,
+        let decoders: Vec<Arc<dyn irmind_app::SourceDecoder>> = vec![
+            #[cfg(feature = "parser-velociraptor")]
+            Arc::new(irmind_mod_parser_velociraptor::VelociraptorSourceDecoder),
+            #[cfg(feature = "parser-hayabusa")]
             Arc::new(irmind_mod_parser_hayabusa::HayabusaSourceDecoder),
+            #[cfg(feature = "parser-chainsaw")]
             Arc::new(irmind_mod_parser_chainsaw::ChainsawSourceDecoder),
+            #[cfg(feature = "parser-plaso")]
             Arc::new(irmind_mod_parser_plaso::PlasoSourceDecoder),
+            #[cfg(feature = "parser-eztools")]
             Arc::new(irmind_mod_parser_eztools::EztoolsSourceDecoder),
-        ] {
+        ];
+        #[cfg(feature = "mapping-dfir")]
+        for decoder in decoders {
             registry.add_source_decoder(decoder).unwrap();
         }
         #[cfg(feature = "mapping-syslog")]
@@ -139,13 +166,20 @@ mod tests {
 
         #[cfg(feature = "mapping-network")]
         {
+            #[cfg(feature = "parser-zeek")]
             registry
                 .add_source_decoder(Arc::new(irmind_mod_parser_zeek::ZeekSourceDecoder))
                 .unwrap();
+            #[cfg(feature = "parser-suricata")]
             registry
                 .add_source_decoder(Arc::new(irmind_mod_parser_suricata::SuricataSourceDecoder))
                 .unwrap();
         }
+
+        #[cfg(feature = "mapping-ocsf")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_ocsf::OcsfSourceDecoder))
+            .unwrap();
         register(&mut registry).unwrap();
         let catalog = registry.mapping_catalog().unwrap();
         assert!(catalog.supports_decoder("parser-json", "json-source-v1"));
@@ -155,10 +189,15 @@ mod tests {
             2 + usize::from(cfg!(feature = "mapping-cloudtrail"))
                 + usize::from(cfg!(feature = "mapping-syslog"))
                 + 6 * usize::from(cfg!(feature = "mapping-linux"))
-                + 2 * usize::from(cfg!(feature = "mapping-network"))
+                + usize::from(cfg!(feature = "parser-zeek"))
+                + usize::from(cfg!(feature = "parser-suricata"))
                 + usize::from(cfg!(feature = "mapping-ecs"))
+                + usize::from(cfg!(feature = "parser-velociraptor"))
+                + usize::from(cfg!(feature = "parser-hayabusa"))
+                + usize::from(cfg!(feature = "parser-chainsaw"))
+                + usize::from(cfg!(feature = "parser-plaso"))
+                + usize::from(cfg!(feature = "parser-eztools"))
                 + usize::from(cfg!(feature = "mapping-ocsf"))
-                + 5 * usize::from(cfg!(feature = "mapping-dfir"))
                 + 20 * usize::from(cfg!(feature = "mapping-evtx"))
         );
     }

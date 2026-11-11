@@ -260,35 +260,10 @@ fn plain_text_filters_cases_live_and_cases_command_filters_status() {
 }
 
 #[test]
-fn experimental_writer_requires_a_visible_confirmation() {
-    let mut state = HomeState::new(Vec::new(), false);
-    state.mode = Mode::Config;
-    state.preference_selected = 4;
-    state.common_writer = crate::home::CommonWriterState::Disabled;
-    assert!(matches!(
-        update(&mut state, KeyCode::Enter),
-        HomeAction::None
-    ));
-    assert!(matches!(
-        state.pending_module_change,
-        Some(ConfigChange::SetExperimentalCommonWriter(true))
-    ));
-    update(&mut state, KeyCode::Down);
-    assert!(matches!(
-        update(&mut state, KeyCode::Enter),
-        HomeAction::ChangeModule(ConfigChange::SetExperimentalCommonWriter(true), true)
-    ));
-    assert!(state.pending_module_change.is_none());
-    update(&mut state, KeyCode::Enter);
-    update(&mut state, KeyCode::Esc);
-    assert!(state.pending_module_change.is_none());
-}
-
-#[test]
 fn worker_limit_is_edited_and_confirmed_as_a_preference() {
     let mut state = HomeState::new(Vec::new(), false);
     state.mode = Mode::Config;
-    state.preference_selected = 5;
+    state.preference_selected = 4;
     assert!(matches!(
         update(&mut state, KeyCode::Enter),
         HomeAction::None

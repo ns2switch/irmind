@@ -31,6 +31,7 @@ enum Approved {
     None,
     Legacy(String),
     Snapshot(PersistentConfig),
+    RetiredWriter(PersistentConfig),
 }
 
 fn last_approved(engine: &Engine<'_>, manifests: &[&ModuleManifest]) -> Result<Approved, AppError> {
@@ -42,7 +43,7 @@ fn last_approved(engine: &Engine<'_>, manifests: &[&ModuleManifest]) -> Result<A
         return Ok(Approved::None);
     };
     if let Some(payload) = entry.operation.strip_prefix(SNAPSHOT_PREFIX) {
-        return parse_snapshot(payload, manifests).map(Approved::Snapshot);
+        return parse_snapshot(payload, manifests);
     }
     let fields = entry.operation.split(':').collect::<Vec<_>>();
     if fields.len() != 4
@@ -56,10 +57,7 @@ fn last_approved(engine: &Engine<'_>, manifests: &[&ModuleManifest]) -> Result<A
     Ok(Approved::Legacy(fields[2].into()))
 }
 
-fn parse_snapshot(
-    payload: &str,
-    manifests: &[&ModuleManifest],
-) -> Result<PersistentConfig, AppError> {
+fn parse_snapshot(payload: &str, manifests: &[&ModuleManifest]) -> Result<Approved, AppError> {
     let fields = payload.split(':').collect::<Vec<_>>();
     if fields.len() != 4
         || !valid_hash(fields[0])
@@ -70,13 +68,44 @@ fn parse_snapshot(
         return Err(mismatch());
     }
     let bytes = hex::decode(fields[3]).map_err(|_| mismatch())?;
+    if hex(&sha256(&bytes)) != fields[1] {
+        return Err(mismatch());
+    }
+    if let Some(config) = retired_writer_snapshot(&bytes, manifests)? {
+        return Ok(Approved::RetiredWriter(config));
+    }
     let config: PersistentConfig = serde_json::from_slice(&bytes).map_err(|_| mismatch())?;
     config.validate(manifests)?;
     let canonical = serde_json::to_vec(&config).map_err(|_| mismatch())?;
-    if bytes != canonical || hex(&sha256(&bytes)) != fields[1] {
+    if bytes != canonical {
         return Err(mismatch());
     }
-    Ok(config)
+    Ok(Approved::Snapshot(config))
+}
+
+fn retired_writer_snapshot(
+    bytes: &[u8],
+    manifests: &[&ModuleManifest],
+) -> Result<Option<PersistentConfig>, AppError> {
+    let mut value: serde_json::Value = serde_json::from_slice(bytes).map_err(|_| mismatch())?;
+    let object = value.as_object_mut().ok_or_else(mismatch)?;
+    let Some(retired) = object.remove("experimental_common_writer") else {
+        return Ok(None);
+    };
+    let enabled = retired.as_bool().ok_or_else(mismatch)?;
+    let config: PersistentConfig = serde_json::from_value(value).map_err(|_| mismatch())?;
+    config.validate(manifests)?;
+    // Authenticate the original struct field order, not serde_json::Map ordering.
+    let canonical = serde_json::to_string(&config).map_err(|_| mismatch())?;
+    let retired_bytes = canonical.replacen(
+        "\"modules\":",
+        &format!("\"experimental_common_writer\":{enabled},\"modules\":"),
+        1,
+    );
+    if bytes != retired_bytes.as_bytes() {
+        return Err(mismatch());
+    }
+    Ok(Some(config))
 }
 
 fn snapshot_operation(
@@ -123,9 +152,6 @@ fn fields(config: &PersistentConfig) -> BTreeMap<String, String> {
     }
     if let Some(value) = config.max_parallel_workers {
         out.insert("max_parallel_workers".into(), value.to_string());
-    }
-    if let Some(value) = config.experimental_common_writer {
-        out.insert("experimental_common_writer".into(), value.to_string());
     }
     for (id, settings) in &config.modules {
         out.insert(
@@ -185,7 +211,7 @@ impl Engine<'_> {
         let saved = match approved {
             Approved::None => Some(PersistentConfig::default()),
             Approved::Legacy(_) => None,
-            Approved::Snapshot(config) => Some(config),
+            Approved::Snapshot(config) | Approved::RetiredWriter(config) => Some(config),
         };
         let differences = saved
             .as_ref()
@@ -227,10 +253,12 @@ impl Engine<'_> {
             return Err(mismatch());
         };
         let approved = review.approved.ok_or_else(mismatch)?;
-        self.append_global_operation_unlocked(format!(
-            "configuration-restored:{}",
-            approved.fingerprint()?
-        ))?;
+        let operation = if matches!(last_approved(self, manifests)?, Approved::RetiredWriter(_)) {
+            snapshot_operation(&approved, &approved, false)?
+        } else {
+            format!("configuration-restored:{}", approved.fingerprint()?)
+        };
+        self.append_global_operation_unlocked(operation)?;
         store.save(&approved)?;
         self.verify_configuration(store, manifests)
     }
@@ -252,11 +280,7 @@ impl Engine<'_> {
         let current = review.current.ok_or_else(invalid)?;
         let approved = review.approved.unwrap_or_default();
         let egress = approved.active_egress_changed(&current) || review.file_missing;
-        if (egress
-            || (current.experimental_common_writer == Some(true)
-                && approved.experimental_common_writer != Some(true)))
-            && !confirmed
-        {
+        if egress && !confirmed {
             return Err(AppError::Fixed(
                 FixedAppError::PolicyConfigurationConfirmationRequired,
             ));
@@ -282,11 +306,7 @@ impl Engine<'_> {
             return Ok(false);
         }
         let egress = current.active_egress_changed(&next);
-        if (egress
-            || (next.experimental_common_writer == Some(true)
-                && current.experimental_common_writer != Some(true)))
-            && !confirmed
-        {
+        if egress && !confirmed {
             return Err(AppError::Fixed(
                 FixedAppError::PolicyConfigurationConfirmationRequired,
             ));

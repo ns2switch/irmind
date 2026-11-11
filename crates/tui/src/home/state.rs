@@ -403,7 +403,7 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
             HomeAction::None
         }
         KeyCode::Down => {
-            state.preference_selected = (state.preference_selected + 1).min(5);
+            state.preference_selected = (state.preference_selected + 1).min(4);
             HomeAction::None
         }
         KeyCode::Enter => {
@@ -419,25 +419,11 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
                     }
                     .into(),
                 ),
-                5 => {
+                4 => {
                     state.worker_limit_input = Some(String::new());
                     return HomeAction::None;
                 }
-                _ => {
-                    if state.common_writer == super::CommonWriterState::Unavailable {
-                        state.notice =
-                            "Common writer unavailable: rebuild with mapping features".into();
-                        return HomeAction::None;
-                    }
-                    if state.common_writer != super::CommonWriterState::Enabled {
-                        state.pending_module_change =
-                            Some(ConfigChange::SetExperimentalCommonWriter(true));
-                        state.selected_option = 0;
-                        state.input.clear();
-                        return HomeAction::None;
-                    }
-                    ConfigChange::SetExperimentalCommonWriter(false)
-                }
+                _ => return HomeAction::None,
             };
             HomeAction::ChangeModule(change, true)
         }

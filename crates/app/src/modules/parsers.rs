@@ -117,7 +117,10 @@ impl ParserCatalog {
         self.parsers
             .iter()
             .filter(|(id, _)| !self.unavailable.contains_key(id.as_str()))
-            .map(|(id, parser)| (id.clone(), parser.identity().version.to_owned()))
+            .map(|(id, parser)| {
+                let active = self.experimental.get(id).unwrap_or(parser);
+                (id.clone(), active.identity().version.to_owned())
+            })
             .collect()
     }
 

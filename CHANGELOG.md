@@ -4,6 +4,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Use the direct mapped V3 ingestion pipeline in CLI, TUI, demo and object storage; remove the obsolete common-writer preference.
+
 **Format impact — planned v0.3.0: breaking.** Mapped V3 artifacts and export V6 replace retired case/export layouts; retired parser and mapping interpreters are not retained. Before upgrading, keep the version that created an existing case or re-ingest verified originals into a new case. The source-decoder rollout and cleanup are in progress; this is not a release announcement.
 
 - Add an experimental typed common-event core, frozen category/outcome/role codes and new physical schemas within artifact V2. SourceDecoder modules preserve original fields; independent source mappings classify supported records. Pre-1.0 minor releases do not promise cross-version readers or migrations.

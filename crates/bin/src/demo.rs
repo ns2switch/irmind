@@ -25,10 +25,21 @@ const EVENTS: &[u8] =
     include_bytes!("../../modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json");
 static DEMO_VERIFICATION_PARSER: JsonParser = JsonParser;
 
-fn demo_parser_catalog() -> Result<ParserCatalog, AppError> {
+fn demo_storage(root: &Path) -> Result<(Arc<LocalStore>, ParserCatalog), AppError> {
     let mut registry = ModuleRegistry::new();
     registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
-    Ok(registry.parser_catalog())
+    registry.register(
+        Box::new(
+            irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new()
+                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+        ),
+        &ModuleConfig::new(),
+    )?;
+    let parsers = registry
+        .parser_catalog()
+        .with_experimental_parser(irmind_mod_parser_json::source_log_parser())?;
+    let store = LocalStore::open_mapped(root, Arc::new(registry.mapping_catalog()?))?;
+    Ok((Arc::new(store), parsers))
 }
 
 mod model;
@@ -239,13 +250,12 @@ fn run_in_directory(
 ) -> Result<()> {
     let source = root.join("events.json");
     std::fs::write(&source, EVENTS)?;
-    let store = Arc::new(LocalStore::open_precise(root)?);
+    let (store, parser_catalog) = demo_storage(root)?;
     let keystore = FileKeystore::ephemeral(root)?;
     let signer = keystore.create(Actor::Analyst)?;
     let agent_id = AgentId::parse("demo-agent").map_err(|_| anyhow!("invalid demo agent ID"))?;
     let _agent = keystore.create(Actor::Agent(agent_id))?;
     let fingerprint = hex(&sha256(&signer.public_key()));
-    let parser_catalog = demo_parser_catalog()?;
     let ports = EnginePorts::new(
         store.clone(),
         store.clone(),
@@ -261,7 +271,7 @@ fn run_in_directory(
     let intel = SyntheticIntel;
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
         .with_threat_intel(&intel)
-        .with_large_case_pipeline(store.clone(), Arc::new(JsonParser))
+        .with_large_case_pipeline(store.clone(), irmind_mod_parser_json::source_log_parser())
         .with_parser_catalog(parser_catalog.clone());
     let case = engine.create_case_with_severity(
         "HuntEval · synthetic AWS IAM episode",

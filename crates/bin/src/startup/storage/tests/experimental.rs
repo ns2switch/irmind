@@ -1,6 +1,6 @@
 use super::*;
 use irmind_app::{
-    ConfigChange, ConfigurationStore, PersistentConfig,
+    PersistentConfig,
     modules::{ModuleConfig, ModuleRegistry, ParserSelectionRequest},
 };
 
@@ -72,60 +72,13 @@ fn registry() -> ModuleRegistry {
 }
 
 #[test]
-fn experimental_enable_is_explicit_signed_and_keeps_default_bytes() {
-    let root = tempfile::tempdir().unwrap();
-    let (store, engine) = setup(root.path(), false);
-    let config = irmind_infra::TomlConfigurationStore::new(root.path());
-    assert!(
-        engine
-            .apply_configuration_change(
-                &config,
-                &[],
-                ConfigChange::SetExperimentalCommonWriter(true),
-                false
-            )
-            .is_err()
-    );
-    assert!(store.global_operations().unwrap().is_empty());
-    assert!(
-        engine
-            .apply_configuration_change(
-                &config,
-                &[],
-                ConfigChange::SetExperimentalCommonWriter(true),
-                true
-            )
-            .unwrap()
-    );
-    assert_eq!(
-        config.load().unwrap().experimental_common_writer,
-        Some(true)
-    );
-    let ops = store.global_operations().unwrap();
-    assert_eq!(ops.len(), 1);
-    assert_eq!(ops[0].actor, Actor::Analyst);
-    engine.verify_global_operations().unwrap();
-}
-
-#[test]
-fn experimental_routes_are_new_ingestion_only_and_export_v6() {
+fn default_source_ingestion_is_mapped_and_exports_v6() {
     let root = tempfile::tempdir().unwrap();
     let (_, engine) = setup(root.path(), false);
     let registry = registry();
-    let config = PersistentConfig {
-        experimental_common_writer: Some(true),
-        ..Default::default()
-    };
+    let config = PersistentConfig::default();
     let catalog =
         super::super::experimental_parsers(registry.parser_catalog(), &config, &registry).unwrap();
-    assert_eq!(
-        catalog
-            .get_version("parser-json", "json-stream-v3")
-            .unwrap()
-            .identity()
-            .version,
-        "json-stream-v3"
-    );
     let bytes = br#"{"Records":[{"eventTime":"2026-11-01T00:00:00Z","eventName":"synthetic"}]}"#;
     let selected = catalog
         .select_source(ParserSelectionRequest {
@@ -137,6 +90,11 @@ fn experimental_routes_are_new_ingestion_only_and_export_v6() {
         })
         .unwrap();
     assert_eq!(selected.selection.parser_version, "json-source-v1");
+    assert!(
+        catalog
+            .available()
+            .contains(&("parser-json".into(), "json-source-v1".into()))
+    );
     assert_journal_selection(&catalog);
     let store = super::super::experimental(root.path(), &config, &registry)
         .unwrap()
@@ -206,10 +164,7 @@ fn linux_auth_context_is_confirmed_signed_and_reproducible_through_the_mapped_wr
             &ModuleConfig::new(),
         )
         .unwrap();
-    let config = PersistentConfig {
-        experimental_common_writer: Some(true),
-        ..Default::default()
-    };
+    let config = PersistentConfig::default();
     let catalog =
         super::super::experimental_parsers(registry.parser_catalog(), &config, &registry).unwrap();
     let bytes = b"Dec 31 23:59:59 host-a sshd[42]: Failed password for alice from 203.0.113.77 port 22 ssh2\nJan  1 00:00:00 host-a sshd[42]: Accepted password for alice from 203.0.113.77 port 22 ssh2\n";
@@ -277,9 +232,6 @@ mod ecs;
     feature = "mapping-cloudtrail"
 ))]
 mod evtx;
-
-#[cfg(any(feature = "mapping-ecs", feature = "mapping-evtx"))]
-mod profile;
 
 #[cfg(feature = "mapping-dfir")]
 mod dfir;

@@ -146,8 +146,8 @@ A keyless local service may use HTTP only on loopback; HTTPS works there too. Re
 
 RFC 3164 time settings belong to an ingestion, not config.toml. Confirm the year, fixed UTC offset and rollover choice in the ingestion form. You may apply one confirmed choice to all files or choose separately. Retired global time fields require explicit signed removal at startup. Previously signed sources keep their recorded interpretation. See [parsers](parsers.md#legacy-syslog-time) and the [automation reference](development/cli.md).
 
-## Experimental common writer
+## Common event storage
 
-V2 remains the default. In /settings preferences, explicitly enable Common writer (experimental) and confirm the warning. The complete approved configuration is recorded in the signed global operational chain before the session restarts. The setting is experimental_common_writer = true in config.toml; editing the file manually still requires the normal signed configuration review. No model or remote connector is enabled by this choice.
+CLI ingestion, the TUI and the demo use the same source decoder, selected mapping and direct V3 writer. There is no writer preference. Each source records its decoder, mapping profile and mapping receipt in the signed case chain. JSON/cloud JSON, ECS, OCSF, EVTX, Linux, syslog, DFIR tool output, network logs and declarative definitions use this pipeline.
 
-The initial supported raw decoders are JSON/cloud JSON and journald. Other parser formats keep their existing V2 route. Ingestion shows a persistent experimental notice. ParquetArtifactV3, export V6 and ParquetLayoutV1 are unstable until default activation: updates may break experimental derived data without a migration. Retain originals and use synthetic cases. Historical V1/V2 formats and default derived bytes do not change.
+A mapping may preserve searchable fields and entities without classifying an event. Missing categories, outcomes and roles are not inferred from message text. New mappings apply to new ingestions. Pre-1.0 formats may change without migration; retain the creating version or re-ingest verified originals into a new case. No model or connector is enabled by the storage format.

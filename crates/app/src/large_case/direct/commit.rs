@@ -1,10 +1,17 @@
 use super::{
     AppError, AuditEventKind, AuditOrigin, EvidenceHash, LargeCaseUseCases, ParquetArtifact,
-    RejectedSource, Request, invalid_manifest, rejection_events,
+    RejectedSource, invalid_manifest, rejection_events,
 };
 use crate::PreparedMappedGroup;
 use crate::{PreparedMappedIngest, PreparedSource};
 use irmind_domain::{MappingProfileRecordV1, SourceManifestV2};
+pub(super) struct CommitContext<'a> {
+    pub(super) id: &'a crate::CaseId,
+    pub(super) selections: &'a std::collections::BTreeMap<String, crate::ParserSelection>,
+    pub(super) known_artifacts: &'a std::collections::BTreeMap<String, ParquetArtifact>,
+    pub(super) cancel: &'a crate::CancellationToken,
+}
+
 type DirectEvents = (
     Vec<SourceManifestV2>,
     Vec<(AuditOrigin, AuditEventKind, String)>,
@@ -14,7 +21,7 @@ pub(super) type Accepted = (String, EvidenceHash, Vec<(String, ParquetArtifact)>
 impl LargeCaseUseCases<'_, '_> {
     pub(super) fn commit_direct(
         &self,
-        request: &Request<'_>,
+        request: &CommitContext<'_>,
         paths: &[String],
         prepared: &mut dyn PreparedMappedIngest,
         rejected: &[RejectedSource],
@@ -52,7 +59,7 @@ impl LargeCaseUseCases<'_, '_> {
     }
     fn direct_events(
         &self,
-        request: &Request<'_>,
+        request: &CommitContext<'_>,
         paths: &[String],
         metadata: &PreparedMappedGroup,
         rejected: &[RejectedSource],

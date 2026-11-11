@@ -2,7 +2,7 @@
 #![allow(clippy::unwrap_used)]
 #![cfg(all(feature = "keystore-file", feature = "parser-json"))]
 
-use irmind_app::{AuditLog, SignerBackend as _, artifact_catalog, hex, sha256};
+use irmind_app::{AuditLog, EvidenceGraph as _, SignerBackend as _, artifact_catalog, hex, sha256};
 use irmind_domain::{Actor, CaseId, ParquetArtifact};
 use irmind_mod_keystore_file::FileKeystore;
 use secrecy::SecretString;
@@ -51,7 +51,7 @@ fn run(root: &Path, args: &[&str]) -> String {
 }
 
 #[test]
-fn automation_ingests_precise_artifacts_by_default_without_an_implicit_migration() {
+fn automation_ingests_mapped_artifacts_and_reopens_without_writing() {
     let root = tempfile::tempdir().unwrap();
     let home = root.path().join("data");
     std::fs::create_dir(&home).unwrap();
@@ -67,12 +67,16 @@ fn automation_ingests_precise_artifacts_by_default_without_an_implicit_migration
     let store = irmind_infra::LocalStore::open(&home).unwrap();
     let before = store.entries(&id).unwrap();
     let catalog = artifact_catalog(&before).unwrap();
-    assert_eq!(catalog.active.len(), 3);
+    assert!(!catalog.active.is_empty());
     assert!(
         catalog
             .active
             .iter()
-            .all(|a| matches!(a, ParquetArtifact::V2(_)))
+            .all(|a| matches!(a, ParquetArtifact::V3(_)))
+    );
+    assert_eq!(
+        store.timeline(&id, 10).unwrap()[0].at,
+        "2026-11-01T00:00:00.000001900Z"
     );
     drop(store);
     run(&home, &["case", "show", id.as_str()]);

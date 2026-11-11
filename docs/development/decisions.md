@@ -664,3 +664,23 @@ Context: a fixed four-source schedule can oversubscribe a small machine and leav
 Decision: the direct mapped writer and parallel Parquet scans use the available logical CPU count minus one by default. A signed local preference can request a specific cap. Each operation reserves 512 MiB for the coordinator and writers and 512 MiB per worker within a 4 GiB scheduling budget. The reservation bounds concurrency; it is not a claim about process RSS. Existing decoder, row group, queue and writer limits still apply.
 
 Consequences: the signed source group and canonical order stay independent of worker count. Disk preflight reserves scratch space for the largest concurrently staged sources. Windows EVTX retains serial helper launch with parallel hashing.
+
+### One source pipeline for all presentations
+
+Context: every compiled parser now has an original-field SourceDecoder and an
+independently identified semantic or extraction-only mapping.
+
+Decision: CLI, TUI, demo and object-storage acquisition use direct V3 preparation
+and the same application-owned atomic signature assembly. Remove the opt-in
+writer setting and its obsolete preference. Parser features include their
+mapping implementation, while minimal builds can exclude individual parsers.
+
+Consequences: an unmapped event remains valid and unclassified. No remote model
+or connector is enabled. Existing current-format golden bytes, source checks,
+rejection accounting, cancellation and atomic publication remain enforced.
+
+The removed experimental-writer preference is no longer configurable. If it is
+present in an authenticated configuration snapshot, startup requires explicit
+configuration recovery. The snapshot hash and its original canonical bytes are
+verified before offering restoration without the retired field; restoration
+records a new signed approval and never rewrites the old operation.

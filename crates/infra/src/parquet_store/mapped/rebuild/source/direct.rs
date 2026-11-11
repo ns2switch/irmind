@@ -15,7 +15,6 @@ impl ParquetStore {
         seed: &[ParquetArtifact],
         cancel: &CancellationToken,
     ) -> Result<Vec<ParquetArtifactV3>, AppError> {
-        let (case, root, workspace) = location;
         let binding = artifact.bindings().first().ok_or_else(invalid_source)?;
         let profile = inputs
             .profiles
@@ -37,35 +36,14 @@ impl ParquetStore {
             selection = selection
                 .with_time_context(&irmind_app::source_mapping::parser_time_context(context)?)?;
         }
-        let alias = crate::parquet_store::TempWorkspace::new(&self.spool_dir(case)?)?;
-        let source_root = if sources
-            .iter()
-            .all(|(_, s)| !s.source.copied && !s.source.source.contains("://"))
-        {
-            root
-        } else {
-            self.prepare_direct_originals(case, root, &alias.path, &sources, cancel)?;
-            &alias.path
-        };
-        let paths = sources
-            .iter()
-            .map(|(_, s)| s.source.source.clone())
-            .collect::<Vec<_>>();
-        let fresh = Self::open_mapped(workspace, Arc::new(catalog))?;
-        let mut prepared = fresh
-            .prepare_mapped_ingest(
-                MappedIngestRequest {
-                    case_id: case,
-                    source_root,
-                    relative_paths: &paths,
-                    copy_original: false,
-                    parser: selection.as_ref(),
-                    committed_artifacts: irmind_app::mapped_ingest::CommittedArtifacts::Slice(seed),
-                    limits: crate::parquet_store::partitioning::replay_limits(seed)?,
-                },
-                cancel,
-            )?
-            .ok_or_else(invalid_source)?;
+        let mut prepared = self.prepare_direct_history(
+            location,
+            &sources,
+            catalog,
+            selection.as_ref(),
+            seed,
+            cancel,
+        )?;
         let manifests = sources
             .iter()
             .map(|(_, s)| (*s).clone())
@@ -86,6 +64,60 @@ impl ParquetStore {
         prepared.publish(cancel)?;
         prepared.retain_committed();
         Ok(bound.artifacts)
+    }
+
+    fn prepare_direct_history(
+        &self,
+        location: (&CaseId, &Path, &Path),
+        sources: &[(&SourceRecordSetV1, &SourceManifestV2)],
+        catalog: irmind_app::source_mapping::MappingCatalog,
+        selection: &dyn LogParser,
+        seed: &[ParquetArtifact],
+        cancel: &CancellationToken,
+    ) -> Result<Box<dyn irmind_app::PreparedMappedIngest>, AppError> {
+        let (case, root, workspace) = location;
+        let alias = crate::parquet_store::TempWorkspace::new(&self.spool_dir(case)?)?;
+        let remote = sources.iter().any(|(_, s)| s.source.source.contains("://"));
+        let (source_root, paths) = if remote {
+            let [(_, source)] = sources else {
+                return Err(invalid_source());
+            };
+            original_location(self, case, root, source)?
+        } else {
+            let original = if sources.iter().all(|(_, s)| !s.source.copied) {
+                root.to_owned()
+            } else {
+                self.prepare_direct_originals(case, root, &alias.path, sources, cancel)?;
+                alias.path.clone()
+            };
+            (
+                original,
+                sources
+                    .iter()
+                    .map(|(_, s)| s.source.source.clone())
+                    .collect(),
+            )
+        };
+        let routed =
+            remote.then(|| irmind_app::SourceParser::new(selection, &sources[0].1.source.source));
+        let parser: &dyn irmind_app::StreamingEventParser = routed
+            .as_ref()
+            .map_or(selection, |p| p as &dyn irmind_app::StreamingEventParser);
+        let fresh = Self::open_mapped(workspace, Arc::new(catalog))?;
+        fresh
+            .prepare_mapped_ingest(
+                MappedIngestRequest {
+                    case_id: case,
+                    source_root: &source_root,
+                    relative_paths: &paths,
+                    copy_original: false,
+                    parser,
+                    committed_artifacts: irmind_app::mapped_ingest::CommittedArtifacts::Slice(seed),
+                    limits: crate::parquet_store::partitioning::replay_limits(seed)?,
+                },
+                cancel,
+            )?
+            .ok_or_else(invalid_source)
     }
 
     fn prepare_direct_originals(

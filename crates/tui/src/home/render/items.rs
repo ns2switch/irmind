@@ -324,9 +324,6 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
         irmind_app::ConfigChange::SetMaxParallelWorkers(limit) => {
             format!("maximum parallel workers={}", worker_limit_label(*limit))
         }
-        irmind_app::ConfigChange::SetExperimentalCommonWriter(enabled) => {
-            format!("experimental common writer={enabled}")
-        }
     }
 }
 
@@ -620,20 +617,6 @@ pub(super) fn preference_items(
         )),
         ListItem::new(format!("Theme: {}", state.theme_choice)),
     ];
-    let theme = Theme::detect();
-    items.push(
-        ListItem::new(format!(
-            "Common writer (experimental): {}",
-            if state.common_writer == crate::home::CommonWriterState::Unavailable {
-                "not compiled"
-            } else if state.common_writer == crate::home::CommonWriterState::Enabled {
-                "on"
-            } else {
-                "off (V2 default)"
-            }
-        ))
-        .style(theme.warning()),
-    );
     items.push(ListItem::new(format!(
         "Maximum parallel workers: {}",
         worker_limit_label(state.max_parallel_workers)
@@ -641,21 +624,6 @@ pub(super) fn preference_items(
     if let Some(input) = &state.worker_limit_input {
         items.push(ListItem::new(format!(
             "New limit (1–256, blank for automatic): [{input}]"
-        )));
-    }
-    if state.pending_module_change.is_some() {
-        items.push(
-            ListItem::new("Experimental V3 / export V6 / ParquetLayoutV1 are unstable.")
-                .style(theme.warning()),
-        );
-        items.push(
-            ListItem::new("Updates can break these cases without migration. Synthetic data only.")
-                .style(theme.warning()),
-        );
-        items.push(ListItem::new(format!(
-            "{} 1. Cancel   {} 2. Enable and sign",
-            if state.selected_option == 0 { ">" } else { " " },
-            if state.selected_option == 1 { ">" } else { " " }
         )));
     }
     items.extend(super::parser_status::items(state, modules));
