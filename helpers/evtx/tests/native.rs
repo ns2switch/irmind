@@ -96,13 +96,26 @@ fn parser_module_passes_seekable_contract_and_preserves_100ns_provenance() {
             "../../crates/testkit/fixtures/parser-evtx/source/{name}.evtx"
         ));
         let mut file = File::open(path).unwrap();
-        irmind_testkit::run_seekable_log_parser_contract(
+        let mut actual = 0;
+        let report = decode_file(
             &parser,
             &format!("{name}.evtx"),
             &mut file,
-            count,
+            &irmind_app::CancellationToken::new(),
+            &mut |record| {
+                record.inspect(|record| {
+                    assert_eq!(record.timestamp().unwrap().instant().submicro_nanos(), 700);
+                    assert!(record.origin().offset().is_some());
+                    assert_eq!(record.origin().record(), actual);
+                });
+                actual += 1;
+                Ok(())
+            },
         )
         .unwrap();
+        assert_eq!(report.accepted, count);
+        assert_eq!(report.rejected, 0);
+        assert_eq!(actual, u64::try_from(count).unwrap());
     }
     drop(parser);
     assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
@@ -143,7 +156,6 @@ fn termination_reaps_a_decoder_blocked_on_its_output_and_removes_runtime() {
 #[test]
 fn parent_cancellation_aborts_without_a_complete_report_and_cleans_up() {
     use irmind_app::CancellationToken;
-    use irmind_app::StreamingEventParser as _;
     let root = tempfile::tempdir().unwrap();
     let parser = irmind_mod_parser_evtx::EvtxParser::new(&support::helper_path(), root.path());
     let mut source = File::open(
@@ -153,26 +165,20 @@ fn parent_cancellation_aborts_without_a_complete_report_and_cleans_up() {
     .unwrap();
     let cancel = CancellationToken::new();
     let mut count = 0;
-    let result = parser.parse_local_file_report(
-        "synthetic.evtx",
-        &mut source,
-        [0; 32],
-        &cancel,
-        &mut |_| {
-            count += 1;
-            cancel.cancel();
-            Ok(())
-        },
-    );
+    let result = decode_file(&parser, "synthetic.evtx", &mut source, &cancel, &mut |_| {
+        count += 1;
+        cancel.cancel();
+        Ok(())
+    });
     assert!(matches!(result, Err(irmind_app::AppError::Cancelled)));
     assert_eq!(count, 1);
     drop(parser);
     assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
 }
 
+// The decoder preserves source fields; mapping/entity assertions run in custody.rs.
 #[test]
-fn normalized_eventdata_fields_are_entities_not_just_preserved_attributes() {
-    use irmind_app::{CancellationToken, StreamingEventParser as _};
+fn eventdata_fields_remain_original_typed_fields_with_100ns_precision() {
     let root = tempfile::tempdir().unwrap();
     let parser = irmind_mod_parser_evtx::EvtxParser::new(&support::helper_path(), root.path());
     let mut file = File::open(
@@ -181,32 +187,61 @@ fn normalized_eventdata_fields_are_entities_not_just_preserved_attributes() {
     )
     .unwrap();
     let mut count = 0;
-    parser
-        .parse_indexed_local_file_report(
-            "Security.evtx",
-            &mut file,
-            [1; 32],
-            &CancellationToken::new(),
-            &mut |row| {
-                row.inspect(|row| {
-                    assert!(
-                        row.record
-                            .entities
-                            .contains(&("user".into(), "synthetic-user".into())),
-                        "{}",
-                        row.record.text
-                    );
-                    assert!(
-                        row.record
-                            .entities
-                            .contains(&("ip".into(), "203.0.113.77".into()))
-                    );
-                    assert_eq!(row.time.unwrap().instant().submicro_nanos(), 700);
-                });
-                count += 1;
-                Ok(())
+    let report = decode_file(
+        &parser,
+        "Security.evtx",
+        &mut file,
+        &irmind_app::CancellationToken::new(),
+        &mut |record| {
+            record.inspect(|record| {
+                let data = record
+                    .fields()
+                    .field("Event")
+                    .unwrap()
+                    .field("EventData")
+                    .unwrap();
+                assert_eq!(
+                    data.field("TargetUserName").unwrap().as_text(),
+                    Some("synthetic-user")
+                );
+                assert_eq!(
+                    data.field("IpAddress").unwrap().as_text(),
+                    Some("203.0.113.77")
+                );
+                assert_eq!(record.timestamp().unwrap().instant().submicro_nanos(), 700);
+            });
+            count += 1;
+            Ok(())
+        },
+    )
+    .unwrap();
+    assert_eq!((count, report.accepted, report.rejected), (14, 14, 0));
+}
+
+fn decode_file(
+    parser: &irmind_mod_parser_evtx::EvtxParser,
+    name: &str,
+    file: &mut File,
+    cancel: &irmind_app::CancellationToken,
+    emit: &mut dyn FnMut(
+        irmind_domain::Tainted<irmind_domain::SourceRecordV1>,
+    ) -> Result<(), irmind_app::AppError>,
+) -> Result<irmind_app::ParseReport, irmind_app::AppError> {
+    use irmind_app::{
+        SourceDecoder as _,
+        source_mapping::{SourceFileInput, SourceMetadata},
+    };
+    let source = irmind_domain::SourceReferenceV1::file(name).unwrap();
+    parser.decode_local_file(
+        SourceFileInput {
+            file,
+            metadata: SourceMetadata {
+                source: &source,
+                evidence_hash: [1; 32],
+                time_context: None,
+                cancel,
             },
-        )
-        .unwrap();
-    assert_eq!(count, 14);
+        },
+        emit,
+    )
 }

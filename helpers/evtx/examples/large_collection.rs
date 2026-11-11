@@ -33,7 +33,7 @@ fn setup(
     root: &Path,
     parser: Arc<EvtxParser>,
 ) -> Result<(Engine<'static>, Arc<LocalStore>), large_support::Error> {
-    let local = Arc::new(source_pipeline::store(root, parser.clone())?);
+    let local = Arc::new(source_pipeline::store(root, parser)?);
     let args = std::env::args().collect::<Vec<_>>();
     if let Some(value) = args.windows(2).find(|v| v[0] == "--workers") {
         let requested = value[1].parse::<u16>()?;
@@ -54,7 +54,7 @@ fn setup(
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new()?),
-            parser,
+            Arc::new(irmind_mod_parser_json::JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

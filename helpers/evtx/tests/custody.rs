@@ -49,7 +49,7 @@ fn setup(root: &Path) -> (Engine<'_>, Arc<LocalStore>, Arc<EvtxParser>) {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
+            Arc::new(irmind_mod_parser_json::JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
