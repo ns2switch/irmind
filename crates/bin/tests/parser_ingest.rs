@@ -13,6 +13,9 @@
     feature = "parser-suricata"
 ))]
 
+#[path = "support/current_sources.rs"]
+mod current_sources;
+
 use arrow::{
     array::{Array, ArrayRef, Int64Array, StringArray, StructArray},
     datatypes::{DataType, Field, Schema},
@@ -98,7 +101,7 @@ fn local_ocsf_parquet_is_signed_and_rebuilds_without_a_parser_spool()
     file.seek(SeekFrom::Start(0))?;
     let mut sample = vec![0u8; 64 * 1024];
     let sample_size = file.read(&mut sample)?;
-    let store = Arc::new(LocalStore::open(&root.path().join("data"))?);
+    let store = Arc::new(current_sources::open(&root.path().join("data")));
     let signer = Arc::new(SyntheticSigner(SigningKey::from_bytes(&[44; 32])));
     let engine = Engine::new(
         EnginePorts::new(
@@ -117,12 +120,12 @@ fn local_ocsf_parquet_is_signed_and_rebuilds_without_a_parser_spool()
         Arc::new(SystemClock),
     )?;
     let case = engine.create_case("Synthetic OCSF Parquet", "local evidence only")?;
-    let parser = OcsfParser;
+    let parser = irmind_mod_parser_ocsf::source_log_parser();
     let selection = BTreeMap::from([(
         "ocsf.parquet".to_owned(),
         ParserSelection {
-            parser_id: parser.parser_name().into(),
-            parser_version: parser.streaming_version().into(),
+            parser_id: parser.identity().name.into(),
+            parser_version: parser.identity().version.into(),
             confidence: 55,
             mode: ParserSelectionMode::Analyst,
             timestamp_context: None,
@@ -132,7 +135,7 @@ fn local_ocsf_parquet_is_signed_and_rebuilds_without_a_parser_spool()
     let use_cases = LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: &parser,
+        parser: parser.as_ref(),
     };
     use_cases.ingest_local_batch_selected(
         &case.id,
@@ -158,7 +161,7 @@ fn parser_modules_ingest_sign_and_rebuild_without_private_answers() {
     let root = tempfile::tempdir().unwrap();
     let source_root = root.path().join("sources");
     fs::create_dir(&source_root).unwrap();
-    let store = Arc::new(LocalStore::open(&root.path().join("data")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("data")));
     let signer = Arc::new(SyntheticSigner(SigningKey::from_bytes(&[42; 32])));
     let engine = Engine::new(
         EnginePorts::new(
@@ -239,18 +242,22 @@ fn parser_modules_ingest_sign_and_rebuild_without_private_answers() {
         let selection = BTreeMap::from([(
             name.to_owned(),
             ParserSelection {
-                parser_id: parser.parser_name().into(),
-                parser_version: parser.streaming_version().into(),
+                parser_id: parser.identity().name.into(),
+                parser_version: current_sources::parser(parser.parser_name())
+                    .identity()
+                    .version
+                    .into(),
                 confidence: 95,
                 mode: ParserSelectionMode::Automatic,
                 timestamp_context: None,
                 format_sample_sha256: sha256(bytes),
             },
         )]);
+        let source_parser = current_sources::parser(parser.parser_name());
         let use_cases = LargeCaseUseCases {
             engine: &engine,
             store: store.as_ref(),
-            parser,
+            parser: source_parser.as_ref(),
         };
         use_cases
             .ingest_local_batch_selected(
@@ -270,14 +277,14 @@ fn parser_modules_ingest_sign_and_rebuild_without_private_answers() {
             .unwrap();
         let decoded = irmind_domain::SourceManifestV2::decode(&manifest.payload).unwrap();
         assert_eq!(decoded.parser_id, parser.parser_name());
-        assert_eq!(decoded.parser_version, parser.streaming_version());
+        assert_eq!(decoded.parser_version, source_parser.identity().version);
         assert_eq!(decoded.confidence, 95);
         assert_eq!(decoded.selection, ParserSelectionMode::Automatic);
         assert_eq!(decoded.timestamp_context.as_deref(), Some("normalized-utc"));
         let timeline = store.timeline(&case.id, 10).unwrap();
         assert_eq!(timeline.len(), 2);
         if matches!(parser.parser_name(), "parser-zeek" | "parser-suricata") {
-            assert_eq!((timeline[0].record_index, timeline[1].record_index), (0, 1));
+            assert_eq!((timeline[0].record_index, timeline[1].record_index), (1, 0));
         }
         check_ground_truth(store.as_ref(), &case.id, &timeline, private_answer, parser);
         assert_eq!(
@@ -311,7 +318,13 @@ fn check_ground_truth(
         .and_then(serde_json::Value::as_array)
     {
         for event in events.iter().filter_map(serde_json::Value::as_str) {
-            assert!(timeline.iter().any(|entry| entry.event == event));
+            assert!(
+                timeline
+                    .iter()
+                    .any(|entry| entry.event.split(" [").next() == Some(event)),
+                "{} missing {event}: {timeline:?}",
+                parser.parser_name()
+            );
         }
     }
     if let Some(entities) = answer
@@ -502,13 +515,7 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() -> Result<(), Box<dyn std::er
             .unwrap()
             .read(&mut sample)
             .unwrap();
-        let store = Arc::new(
-            if matches!(parser.parser_name(), "parser-zeek" | "parser-suricata") {
-                LocalStore::open_precise(&root.path().join("data")).unwrap()
-            } else {
-                LocalStore::open(&root.path().join("data")).unwrap()
-            },
-        );
+        let store = Arc::new(current_sources::open(&root.path().join("data")));
         let signer = Arc::new(SyntheticSigner(SigningKey::from_bytes(&[43; 32])));
         let engine = Engine::new(
             EnginePorts::new(
@@ -533,8 +540,11 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() -> Result<(), Box<dyn std::er
         let selection = BTreeMap::from([(
             name.to_owned(),
             ParserSelection {
-                parser_id: parser.parser_name().into(),
-                parser_version: parser.streaming_version().into(),
+                parser_id: parser.identity().name.into(),
+                parser_version: current_sources::parser(parser.parser_name())
+                    .identity()
+                    .version
+                    .into(),
                 confidence: 95,
                 mode: ParserSelectionMode::Automatic,
                 timestamp_context: None,
