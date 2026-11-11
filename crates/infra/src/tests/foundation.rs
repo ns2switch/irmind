@@ -1,6 +1,27 @@
 use super::*;
 
 #[test]
+fn mapped_store_creates_a_missing_private_data_directory_before_resolving_it() {
+    let root = tempfile::tempdir().unwrap();
+    let data = root.path().join("new-data").join("case-store");
+    assert!(!data.exists());
+    let catalog =
+        Arc::new(irmind_app::source_mapping::MappingCatalog::freeze(vec![], vec![]).unwrap());
+    let store = LocalStore::open_mapped(&data, catalog).unwrap();
+    assert!(data.join("irmind.db").is_file());
+    assert!(data.join("parquet").is_dir());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        assert_eq!(
+            fs::metadata(&data).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+    }
+    drop(store);
+}
+
+#[test]
 fn local_errors_do_not_echo_external_values() {
     assert!(
         !storage("SECRET evidence path")

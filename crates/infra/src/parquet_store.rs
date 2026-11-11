@@ -69,6 +69,8 @@ pub struct ParquetStore {
 
 impl ParquetStore {
     pub fn open(data_root: &Path) -> Result<Self, AppError> {
+        fs::create_dir_all(data_root).map_err(storage)?;
+        irmind_fs::private_dir(data_root).map_err(storage)?;
         #[cfg(windows)]
         let data_root = &fs::canonicalize(data_root).map_err(storage)?;
         let root = data_root.join("parquet");

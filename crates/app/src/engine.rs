@@ -33,26 +33,18 @@ pub fn verify_case_metadata(
     if first.kind != irmind_domain::AuditEventKind::CaseCreated || first.actor != Actor::Analyst {
         return Err(AppError::InvalidChain(first.seq));
     }
-    let mut current = if first.payload.starts_with('{') {
-        let created: CaseCreatedEvent =
-            serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))?;
-        if !matches!(created.version, 2 | 3)
-            || created.title != title
-            || created.severity.as_deref().unwrap_or("medium") != severity.as_str()
-        {
-            return Err(AppError::InvalidChain(first.seq));
-        }
-        created.scope
-    } else {
-        if severity != Severity::Medium {
-            return Err(AppError::InvalidChain(first.seq));
-        }
-        first
-            .payload
-            .strip_prefix(&format!("title={title};scope="))
-            .ok_or(AppError::InvalidChain(first.seq))?
-            .to_owned()
-    };
+    if !first.payload.starts_with('{') {
+        return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
+    }
+    let created: CaseCreatedEvent =
+        serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))?;
+    if created.version != 3 {
+        return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
+    }
+    if created.title != title || created.severity.as_deref() != Some(severity.as_str()) {
+        return Err(AppError::InvalidChain(first.seq));
+    }
+    let mut current = created.scope;
     CaseScope::parse(&current).map_err(|_| AppError::InvalidChain(first.seq))?;
     for entry in entries
         .iter()
@@ -374,5 +366,42 @@ impl Engine<'_> {
             }
         }
         tools
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod format_tests {
+    use super::*;
+    #[test]
+    fn metadata_gate_rejects_retired_case_creation_payloads_without_interpreting_them() {
+        let mut first = SignedEntry {
+            seq: 1,
+            case_id: "22222222-2222-2222-2222-222222222222".into(),
+            at: 0,
+            actor: Actor::Analyst,
+            origin: "analyst".into(),
+            kind: AuditEventKind::CaseCreated,
+            payload: r#"{"version":3,"title":"Synthetic","severity":"medium","scope":"local"}"#
+                .into(),
+            evidence: None,
+            prev: [0; 32],
+            hash: [0; 32],
+            sig: vec![],
+            public_key: vec![],
+        };
+        assert!(
+            verify_case_metadata("Synthetic", Severity::Medium, "local", &[first.clone()]).is_ok()
+        );
+        for retired in [
+            r#"{"version":2,"title":"Synthetic","severity":"medium","scope":"local"}"#,
+            "title=Synthetic;scope=local",
+        ] {
+            first.payload = retired.into();
+            assert!(matches!(
+                verify_case_metadata("Synthetic", Severity::Medium, "local", &[first.clone()]),
+                Err(AppError::Fixed(FixedAppError::RetiredCaseFormat))
+            ));
+        }
     }
 }

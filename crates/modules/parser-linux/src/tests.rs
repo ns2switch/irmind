@@ -162,15 +162,36 @@ fn partial_audit_timeout_limits_and_orphan_eoe_are_visible() {
     for _ in 0..130 {
         input.extend_from_slice(b"type=SYSCALL msg=audit(1793494800.1:1): uid=1000\n");
     }
-    input.extend_from_slice(WEB);
-    let (report, events) = rows(&input, None);
-    assert_eq!(report.rejected, 2);
-    assert_eq!(events.len(), 2);
-    assert!(
-        events
-            .iter()
-            .any(|event| event.fields().field("status").is_some())
+    input.extend_from_slice(
+        b"type=SYSCALL msg=audit(1793494801.1:2): uid=1001\ntype=EOE msg=audit(1793494801.1:2):\n",
     );
+    let (report, events) = rows(&input, None);
+    assert_eq!((report.accepted, report.rejected), (2, 2));
+    assert_eq!(events.len(), 2);
+    let complete = events
+        .iter()
+        .find(|event| {
+            event
+                .fields()
+                .field("serial")
+                .and_then(SourceValue::as_text)
+                == Some("2")
+        })
+        .unwrap();
+    assert!(!complete.annotations().partial());
+    assert_eq!(complete.annotations().members().len(), 2);
+    let bounded = events
+        .iter()
+        .find(|event| {
+            event
+                .fields()
+                .field("serial")
+                .and_then(SourceValue::as_text)
+                == Some("1")
+        })
+        .unwrap();
+    assert!(bounded.annotations().partial());
+    assert_eq!(bounded.annotations().members().len(), 128);
 }
 #[test]
 fn cancellation_and_depth_or_field_limits_fail_closed() {
