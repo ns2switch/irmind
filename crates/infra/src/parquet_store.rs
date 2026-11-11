@@ -163,13 +163,13 @@ impl ParquetStore {
         &self,
         id: &CaseId,
         staged: Vec<StagedArtifact>,
-    ) -> Result<Vec<ParquetArtifact>, AppError> {
+    ) -> Result<Vec<irmind_domain::ParquetArtifactV2>, AppError> {
         let _finish_lock = self.finish_lock.lock().map_err(storage)?;
         let case_dir = self.case_dir(id)?;
         let mut artifacts = Vec::with_capacity(staged.len());
         for artifact in staged {
             artifact.manifest.validate().map_err(|_| invalid_source())?;
-            let target = case_dir.join(artifact.manifest.path());
+            let target = case_dir.join(artifact.manifest.path.as_str());
             if let Some(parent) = target.parent() {
                 fs::create_dir_all(parent).map_err(storage)?;
                 irmind_fs::private_dir(parent).map_err(storage)?;
@@ -177,13 +177,13 @@ impl ParquetStore {
             if target.exists() {
                 let mut file = irmind_fs::open_regular_no_follow(
                     &case_dir,
-                    Path::new(&artifact.manifest.path()),
+                    Path::new(&artifact.manifest.path.as_str()),
                 )
                 .map_err(storage)?;
                 let existing = Self::hash_reader(&mut file, &CancellationToken::new())?;
-                if existing.0 != parse_hash(artifact.manifest.sha256())? {
+                if existing.0 != parse_hash(&artifact.manifest.sha256)? {
                     return Err(AppError::EvidenceMismatch(
-                        artifact.manifest.path().to_owned(),
+                        artifact.manifest.path.as_str().to_owned(),
                     ));
                 }
                 fs::remove_file(&artifact.temporary).map_err(storage)?;

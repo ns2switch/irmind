@@ -1,8 +1,7 @@
 //! One final-file writer per compatible partition/schema with deterministic eviction.
 use super::{
-    AppError, ArtifactKind, ArtifactSink, BTreeMap, CancellationToken, EvidenceHash,
-    ParquetArtifact, Partition, Path, RecordBatch, RecordRow, StagedArtifact, invalid_source,
-    precise, table_batches,
+    AppError, ArtifactKind, ArtifactSink, BTreeMap, CancellationToken, EvidenceHash, Partition,
+    Path, RecordBatch, RecordRow, StagedArtifact, invalid_source, precise, table_batches,
 };
 use crate::parquet_store::partitioning::Allocator;
 mod finalize;
@@ -213,11 +212,7 @@ impl DirectWriting {
             name: &self.parser.0,
             version: &self.parser.1,
         };
-        let ParquetArtifact::V2(mut core) =
-            precise::manifest(&live.sink, &self.hash, parser, 1, &[0; 32])?
-        else {
-            return Err(invalid_source());
-        };
+        let mut core = precise::manifest(&live.sink, &self.hash, parser, 1, &[0; 32])?;
         core.source_hashes = sources.iter().cloned().collect();
         let mapping = key
             .0
@@ -293,7 +288,7 @@ impl DirectWriting {
     fn measure_staging(&self) {
         if let Some(profile) = &self.profile {
             use std::sync::atomic::Ordering;
-            let closed = self.staged.iter().map(|a| a.manifest.size()).sum::<u64>();
+            let closed = self.staged.iter().map(|a| a.manifest.size).sum::<u64>();
             let open = self
                 .open
                 .values()
@@ -353,7 +348,7 @@ impl DirectWriting {
         let started = Instant::now();
         self.finish_partitions(workers, cancel)?;
         self.staged
-            .sort_by(|a, b| a.manifest.path().cmp(b.manifest.path()));
+            .sort_by(|a, b| a.manifest.path.cmp(&b.manifest.path));
         self.measure_staging();
         if let Some(profile) = &self.profile {
             let elapsed = started.elapsed();
