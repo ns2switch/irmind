@@ -18,6 +18,16 @@ Decoder rollout: JSON, declarative definitions, ECS, OCSF, DFIR formats, syslog,
 
 Finish multicore ingestion before retiring the old writer. Worker counts follow available CPUs and a global memory budget; canonical append and eviction remain sequential, while independent partition completion runs concurrently. Ordered sources use bounded queues, and disordered sources use private case-local spools. Keep the current constructor and physical goldens. Validate identical signed output at different worker counts and the release 15 GB absolute targets before integrating the sole-writer change.
 
+The multicore release measurements are recorded in
+[benchmarks](benchmarks.md#record-workers-in-a-single-source) and
+[the complete mapped matrix](benchmarks.md#complete-mapped-matrix-with-parallel-independent-source-sorts).
+Current-format tests compare complete artifact inventories and signed chains at
+worker caps 1, 2, 4 and the available-machine cap. Native decoder contracts also
+compare canonical source bytes, including provenance, across those settings.
+The EVTX parallel-helper trial did not justify enabling it; shipped helpers
+remain sequential, with one Windows network witness per session. Retiring the
+remaining historical APIs and readers is a separate cleanup step.
+
 No old case migrates automatically. No model or connector becomes enabled by default. Obsolete compatibility controls can be removed only with their retired paths; retained-version security guarantees and limits stay unchanged.
 
 The following milestone history records earlier deliveries; compatibility commitments and V2 activation comparisons there do not govern current development.

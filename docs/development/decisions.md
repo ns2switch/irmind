@@ -727,3 +727,20 @@ permissions and validation commands remain unchanged.
 Consequences: Linux CI obtains the linker through its verified prebuilt release
 asset. Installing it does not run apt or require elevated privileges. Other
 tooling keeps its existing pinned action revision.
+
+## Multicore ingestion completion boundary
+
+Context: source framing, hashing, mapping, Parquet completion and file scans
+share a bounded operation budget. More threads must not alter custody bytes.
+
+Decision: retain adaptive CPU/memory worker limits and the signed Preferences
+cap, bounded record windows and ordered-source queues. Keep canonical appends,
+partition admission and eviction sequential; finish independent partitions
+concurrently after their file boundaries are fixed. Keep EVTX helper decoding
+sequential after the native parallel trial failed to show a consistent gain.
+
+Consequences: worker-count contracts cover canonical decoded provenance,
+artifact inventories and signed chains. Release sweeps and the complete
+15 GB matrix remain public in [benchmarks](benchmarks.md). Legacy API removal
+is reviewed separately; this checkpoint changes no parser identity, physical
+recipe, signed format, policy, limit or default model selection.

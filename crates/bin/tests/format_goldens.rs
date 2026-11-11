@@ -587,6 +587,10 @@ fn ocsf_source_and_projection_bytes_are_independent_of_json_map_features() {
 #[path = "support/dfir_source_goldens.rs"]
 mod dfir_source_goldens;
 
+#[cfg(feature = "mapping-dfir")]
+#[path = "support/source_worker_contracts.rs"]
+mod source_worker_contracts;
+
 #[cfg(feature = "mapping-syslog")]
 #[test]
 fn syslog_source_and_projection_bytes_are_independent_of_json_map_features() {
