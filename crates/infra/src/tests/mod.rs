@@ -83,8 +83,8 @@ macro_rules! streaming_test_model {
 }
 
 mod artifact_v2_foundation;
-mod artifact_v2_reader;
 mod foundation;
+mod mapped_precision;
 mod test_support;
 use foundation::{
     FakeExternalIntel, FindingModel, MissingReadModel, ObedientModel, QuietModel,
@@ -93,7 +93,7 @@ use foundation::{
 use test_support::{
     CaptureModel, EdrModel, FakeCloudAudit, FakeInternalIntel, FakeSiem, TestSigner,
     ingest_selected, ingest_synthetic, ingest_synthetic_result, json_source_parser,
-    open_source_store, source_catalog,
+    open_source_store, source_fixture,
 };
 #[allow(clippy::expect_used)]
 mod agent_loop;
