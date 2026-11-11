@@ -22,16 +22,12 @@ fn logical_ndjson_name_preserves_rejection_semantics_through_random_spool_names(
 #[allow(clippy::too_many_lines)]
 fn assert_object(uri: &'static str, bytes: Vec<u8>, count: usize, rejected: u64) {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let (store, registry) = current_object_pipeline(root.path());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[93; 32]),
         actor: Actor::Analyst,
     });
     let parser = Arc::new(JsonParser);
-    let mut registry = ModuleRegistry::new();
-    registry
-        .register(Box::new(JsonParser), &ModuleConfig::new())
-        .unwrap();
     let source = FakeObjectSource {
         uri,
         bytes,
@@ -63,7 +59,7 @@ fn assert_object(uri: &'static str, bytes: Vec<u8>, count: usize, rejected: u64)
     )
     .unwrap()
     .with_large_case_pipeline(store.clone(), parser)
-    .with_parser_catalog(registry.parser_catalog())
+    .with_parser_catalog(current_object_parsers(&registry))
     .with_object_source(&source)
     .unwrap()
     .with_policy(rules, "f".repeat(64))
@@ -107,6 +103,13 @@ fn assert_object(uri: &'static str, bytes: Vec<u8>, count: usize, rejected: u64)
     );
     let events = store.timeline(&case.id, 10).unwrap();
     assert_eq!(events.len(), count);
-    assert_eq!(manifest.parser_version, "json-stream-v3");
+    assert_eq!(manifest.parser_version, "json-source-v1");
+    assert!(
+        irmind_app::artifact_catalog(&entries)
+            .unwrap()
+            .all
+            .iter()
+            .all(|a| matches!(a, irmind_domain::ParquetArtifact::V3(_)))
+    );
     assert!(engine.verify(&case.id).is_ok());
 }

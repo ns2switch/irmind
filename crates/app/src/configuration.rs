@@ -34,9 +34,6 @@ pub struct PersistentConfig {
     /// Local execution preference. Absence preserves existing signed snapshots.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_parallel_workers: Option<u16>,
-    /// Opt-in unstable V3 custody; absence preserves historical configuration bytes.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub experimental_common_writer: Option<bool>,
     #[serde(default)]
     pub modules: BTreeMap<String, ProductSettings>,
 }
@@ -73,7 +70,6 @@ pub enum ConfigChange {
     SetMouseCapture(bool),
     SetTheme(String),
     SetMaxParallelWorkers(Option<u16>),
-    SetExperimentalCommonWriter(bool),
 }
 
 pub trait ConfigurationStore: Send + Sync {
@@ -98,7 +94,6 @@ impl Default for PersistentConfig {
             resume_last_case: None,
             show_hints: None,
             max_parallel_workers: None,
-            experimental_common_writer: None,
             modules: BTreeMap::new(),
         }
     }
@@ -252,9 +247,6 @@ impl PersistentConfig {
             ConfigChange::SetMouseCapture(enabled) => next.mouse_capture = Some(enabled),
             ConfigChange::SetTheme(theme) => next.theme = Some(theme),
             ConfigChange::SetMaxParallelWorkers(limit) => next.max_parallel_workers = limit,
-            ConfigChange::SetExperimentalCommonWriter(enabled) => {
-                next.experimental_common_writer = Some(enabled);
-            }
         }
         next.validate(manifests)?;
         Ok(next)

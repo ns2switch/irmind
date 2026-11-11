@@ -72,13 +72,6 @@ impl CaseWorkflow<'_, '_> {
     ) -> Result<usize, AppError> {
         let path = request.path;
         let forced_parser = request.forced_parser;
-        if self.io_ops.experimental_common_writer() {
-            progress(
-                0,
-                0,
-                "Experimental V3: custody, export V6 and layout receipts are unstable; no migration guarantee",
-            );
-        }
         let files = self.io_ops.input_files(path).map_err(|_| {
             AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
                 irmind_app::AdapterStorageError::CannotListSelectedEvidence,
@@ -96,13 +89,6 @@ impl CaseWorkflow<'_, '_> {
         self.ingest_without_catalog(request, &files, &mut progress)
     }
 
-    fn group_size(&self) -> usize {
-        if self.io_ops.experimental_common_writer() {
-            usize::MAX
-        } else {
-            4
-        }
-    }
     fn ingest_without_catalog(
         &self,
         request: IngestRequest<'_>,
@@ -146,29 +132,13 @@ impl CaseWorkflow<'_, '_> {
                 store,
                 parser,
             };
-            for (group_index, group) in sources.chunks(self.group_size()).enumerate() {
+            for (group_index, group) in sources.chunks(usize::MAX).enumerate() {
                 let ingested =
                     use_cases.ingest_local_batch(id, source_root, group, copy_original, cancel)?;
                 for (offset, (source, _)) in ingested.into_iter().enumerate() {
                     let safe_source = self.engine.guard.screen(&source)?.text;
-                    progress(
-                        group_index * self.group_size() + offset + 1,
-                        total,
-                        &safe_source,
-                    );
+                    progress(group_index * usize::MAX + offset + 1, total, &safe_source);
                 }
-            }
-            let bundles = if self.io_ops.experimental_common_writer() {
-                0
-            } else {
-                use_cases.compact_case(id, cancel)?
-            };
-            if bundles > 0 {
-                progress(
-                    total,
-                    total,
-                    &format!("Created {bundles} signed Parquet bundles"),
-                );
             }
         }
         Ok(total)
@@ -200,13 +170,11 @@ impl CaseWorkflow<'_, '_> {
         ))?;
         let mut done = files.len().saturating_sub(selected.len());
         let mut cursor = 0;
-        let mut last_parser = None;
         while cursor < selected.len() {
             let first = &selected[cursor].1.selection;
             let parser_id = &first.parser_id;
             let end = selected[cursor..]
                 .iter()
-                .take(self.group_size())
                 .take_while(|(_, resolved)| {
                     resolved.selection.parser_id == *parser_id
                         && resolved.selection.parser_version == first.parser_version
@@ -252,42 +220,9 @@ impl CaseWorkflow<'_, '_> {
                 let safe = self.engine.guard.screen(&source)?.text;
                 progress(done, files.len(), &safe);
             }
-            last_parser = Some(parser);
             cursor = end;
         }
-        self.compact_detected(request, last_parser, files.len(), progress)?;
         Ok(done)
-    }
-
-    fn compact_detected(
-        &self,
-        request: IngestRequest<'_>,
-        parser: Option<std::sync::Arc<dyn irmind_app::LogParser>>,
-        count: usize,
-        progress: &mut impl FnMut(usize, usize, &str),
-    ) -> Result<(), AppError> {
-        if self.io_ops.experimental_common_writer() {
-            return Ok(());
-        }
-        let Some(parser) = parser else {
-            return Ok(());
-        };
-        let use_cases = LargeCaseUseCases {
-            engine: self.engine,
-            store: self.io_ops.large_case_store().ok_or(AppError::Policy(
-                "signed Parquet ingestion is unavailable".into(),
-            ))?,
-            parser: parser.as_ref() as &dyn StreamingEventParser,
-        };
-        let bundles = use_cases.compact_case(request.id, request.cancel)?;
-        if bundles > 0 {
-            progress(
-                count,
-                count,
-                &format!("Created {bundles} signed Parquet bundles"),
-            );
-        }
-        Ok(())
     }
 
     fn detect_sources(

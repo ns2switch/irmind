@@ -79,10 +79,7 @@ fn ingest_selected(
         .take(65_536)
         .read_to_end(&mut sample)
         .unwrap();
-    let config = PersistentConfig {
-        experimental_common_writer: Some(true),
-        ..Default::default()
-    };
+    let config = PersistentConfig::default();
     let catalog =
         crate::startup::storage::experimental_parsers(registry.parser_catalog(), &config, registry)
             .unwrap();
@@ -134,10 +131,7 @@ fn authentication_failure_unifies_windows_linux_and_cloudtrail_with_roles_and_cu
         }
     };
     let (_, engine) = setup(data.path(), false);
-    let config = PersistentConfig {
-        experimental_common_writer: Some(true),
-        ..Default::default()
-    };
+    let config = PersistentConfig::default();
     let store = crate::startup::storage::experimental(data.path(), &config, &registry)
         .unwrap()
         .unwrap();
@@ -228,7 +222,6 @@ fn assert_roles(store: &LocalStore, case: &irmind_app::CaseId) {
         .unwrap();
     assert!(operator.contains("observations=1"), "{operator}");
 }
-mod benchmark;
 
 #[test]
 fn unavailable_evtx_does_not_block_other_experimental_decoders() {
@@ -246,10 +239,7 @@ fn unavailable_evtx_does_not_block_other_experimental_decoders() {
     registry
         .mark_parser_unavailable("parser-evtx", "verified isolation unavailable".into())
         .unwrap();
-    let config = PersistentConfig {
-        experimental_common_writer: Some(true),
-        ..Default::default()
-    };
+    let config = PersistentConfig::default();
     let catalog = crate::startup::storage::experimental_parsers(
         registry.parser_catalog(),
         &config,

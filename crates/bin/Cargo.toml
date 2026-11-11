@@ -7,7 +7,7 @@ license.workspace = true
 
 [features]
 default = [
-    "mapping-json-compat", "mapping-journald-compat", "mapping-cloudtrail", "mapping-linux", "mapping-ecs", "mapping-evtx", "mapping-ocsf", "mapping-dfir", "mapping-syslog", "mapping-network",
+    "mapping-json-compat", "mapping-journald-compat", "mapping-cloudtrail", "mapping-linux", "mapping-ecs", "mapping-evtx", "mapping-dfir", "mapping-syslog", "mapping-network", "mapping-ocsf",
     "keystore-os", "keystore-file",
     "parser-json", "parser-syslog", "parser-linux", "parser-evtx",
     "parser-ecs", "parser-ocsf", "parser-declarative",
@@ -19,31 +19,30 @@ default = [
 ]
 mapping-cloudtrail = ["dep:irmind-mod-mapping-cloudtrail", "parser-json"]
 mapping-evtx = ["dep:irmind-mod-mapping-evtx", "parser-evtx"]
-mapping-syslog = ["dep:irmind-mod-mapping-syslog", "parser-syslog"]
-
-mapping-network = ["dep:irmind-mod-mapping-network", "parser-zeek", "parser-suricata"]
-mapping-dfir = ["dep:irmind-mod-mapping-dfir", "parser-velociraptor", "parser-hayabusa", "parser-chainsaw", "parser-plaso", "parser-eztools"]
-mapping-ecs = ["dep:irmind-mod-mapping-ecs", "parser-ecs"]
 mapping-ocsf = ["dep:irmind-mod-mapping-ocsf", "parser-ocsf"]
+mapping-network = ["dep:irmind-mod-mapping-network"]
+mapping-syslog = ["dep:irmind-mod-mapping-syslog", "parser-syslog"]
+mapping-dfir = ["dep:irmind-mod-mapping-dfir"]
+mapping-ecs = ["dep:irmind-mod-mapping-ecs", "parser-ecs"]
 mapping-linux = ["dep:irmind-mod-mapping-linux", "parser-linux"]
 mapping-json-compat = ["dep:irmind-mod-mapping-json-compat", "parser-json"]
 mapping-journald-compat = ["dep:irmind-mod-mapping-journald-compat", "parser-linux"]
 keystore-os = ["dep:irmind-mod-keystore-os"]
 keystore-file = ["dep:irmind-mod-keystore-file"]
-parser-syslog = ["dep:irmind-mod-parser-syslog"]
-parser-evtx = ["dep:irmind-mod-parser-evtx"]
-parser-linux = ["dep:irmind-mod-parser-linux"]
-parser-json = ["dep:irmind-mod-parser-json"]
+parser-syslog = ["dep:irmind-mod-parser-syslog", "mapping-syslog"]
+parser-evtx = ["dep:irmind-mod-parser-evtx", "mapping-evtx"]
+parser-linux = ["dep:irmind-mod-parser-linux", "mapping-linux", "mapping-journald-compat"]
+parser-json = ["dep:irmind-mod-parser-json", "mapping-json-compat"]
 parser-declarative = ["dep:irmind-mod-parser-declarative"]
-parser-ecs = ["dep:irmind-mod-parser-ecs"]
-parser-ocsf = ["dep:irmind-mod-parser-ocsf"]
-parser-velociraptor = ["dep:irmind-mod-parser-velociraptor"]
-parser-hayabusa = ["dep:irmind-mod-parser-hayabusa"]
-parser-chainsaw = ["dep:irmind-mod-parser-chainsaw"]
-parser-plaso = ["dep:irmind-mod-parser-plaso"]
-parser-eztools = ["dep:irmind-mod-parser-eztools"]
-parser-zeek = ["dep:irmind-mod-parser-zeek"]
-parser-suricata = ["dep:irmind-mod-parser-suricata"]
+parser-ecs = ["dep:irmind-mod-parser-ecs", "mapping-ecs"]
+parser-ocsf = ["dep:irmind-mod-parser-ocsf", "mapping-ocsf"]
+parser-velociraptor = ["dep:irmind-mod-parser-velociraptor", "mapping-dfir"]
+parser-hayabusa = ["dep:irmind-mod-parser-hayabusa", "mapping-dfir"]
+parser-chainsaw = ["dep:irmind-mod-parser-chainsaw", "mapping-dfir"]
+parser-plaso = ["dep:irmind-mod-parser-plaso", "mapping-dfir"]
+parser-eztools = ["dep:irmind-mod-parser-eztools", "mapping-dfir"]
+parser-zeek = ["dep:irmind-mod-parser-zeek", "mapping-network"]
+parser-suricata = ["dep:irmind-mod-parser-suricata", "mapping-network"]
 persistent-keyring = ["irmind-infra/persistent-keyring"]
 llm-anthropic = ["dep:irmind-mod-llm-anthropic"]
 llm-deepseek = ["dep:irmind-mod-llm-deepseek"]
@@ -59,12 +58,11 @@ storage-gcs = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/gcs"]
 storage-azure = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/azure"]
 
 [dependencies]
-irmind-mod-mapping-syslog = { path = "../modules/mapping-syslog", version = "0.1.0", optional = true }
-
+irmind-mod-mapping-ocsf = { path = "../modules/mapping-ocsf", version = "0.1.0", optional = true }
 irmind-mod-mapping-network = { path = "../modules/mapping-network", version = "0.1.0", optional = true }
+irmind-mod-mapping-syslog = { path = "../modules/mapping-syslog", version = "0.1.0", optional = true }
 irmind-mod-mapping-evtx = { path = "../modules/mapping-evtx", version = "0.1.0", optional = true }
 irmind-mod-mapping-cloudtrail = { path = "../modules/mapping-cloudtrail", version = "0.1.0", optional = true }
-irmind-mod-mapping-ocsf = { path = "../modules/mapping-ocsf", version = "0.1.0", optional = true }
 irmind-mod-mapping-dfir = { path = "../modules/mapping-dfir", version = "0.1.0", optional = true }
 irmind-mod-mapping-ecs = { path = "../modules/mapping-ecs", version = "0.1.0", optional = true }
 irmind-mod-mapping-linux = { path = "../modules/mapping-linux", version = "0.1.0", optional = true }

@@ -127,3 +127,87 @@ fn source_container_metadata_is_validated_on_both_sides_of_the_record_array() {
         assert!(result.is_err());
     }
 }
+
+#[test]
+fn logical_ndjson_rejects_an_oversized_line_and_retains_the_following_offset() {
+    let row = b"{\"eventTime\":\"2026-11-08T00:00:00Z\",\"original\":true}";
+    let mut bytes = row.to_vec();
+    bytes.resize(5 * 1024 * 1024, b' ');
+    bytes.extend_from_slice(row);
+    bytes.push(b'\n');
+    let offset = bytes.len() as u64;
+    bytes.extend_from_slice(row);
+    bytes.push(b'\n');
+    let cancel = CancellationToken::new();
+    let reference =
+        irmind_domain::SourceReferenceV1::file("s3://synthetic/logs/events.ndjson").unwrap();
+    let mut output = Vec::new();
+    let report = JsonSourceDecoder
+        .decode_reader(
+            SourceInput {
+                metadata: SourceMetadata {
+                    source: &reference,
+                    evidence_hash: irmind_app::sha256(&bytes),
+                    time_context: None,
+                    cancel: &cancel,
+                },
+                reader: &mut bytes.as_slice(),
+            },
+            &mut |record| {
+                output.push(record);
+                Ok(())
+            },
+        )
+        .unwrap();
+    assert_eq!((report.accepted, report.rejected, output.len()), (1, 1, 1));
+    assert_eq!(report.samples.len(), 1);
+    assert!(report.samples[0].len() <= 256);
+    output[0].inspect(|record| assert_eq!(record.origin().offset(), Some(offset)));
+}
+
+#[test]
+fn logical_ndjson_keeps_canonical_records_and_rejections_at_every_worker_count() {
+    let mut input = b"\nnot-json\r\n".to_vec();
+    for index in 0..80 {
+        input.extend_from_slice(
+            format!("{{\"eventTime\":\"2026-11-08T00:00:00Z\",\"value\":{index}}}\r\n").as_bytes(),
+        );
+    }
+    input.extend_from_slice(b"{\"eventTime\":\"invalid\"}\n[{\"value\":81},{\"value\":82}]\n");
+    let cancel = CancellationToken::new();
+    let source = irmind_domain::SourceReferenceV1::file("s3://synthetic/events.ndjson").unwrap();
+    let mut expected = None;
+    for workers in [1, 2, 4, 7] {
+        let mut records = Vec::new();
+        let report = JsonSourceDecoder
+            .decode_with_budget(
+                DecodeInput::Reader(SourceInput {
+                    metadata: SourceMetadata {
+                        source: &source,
+                        evidence_hash: irmind_app::sha256(&input),
+                        time_context: None,
+                        cancel: &cancel,
+                    },
+                    reader: &mut input.as_slice(),
+                }),
+                DecodeBudget::new(
+                    std::num::NonZeroUsize::new(workers).unwrap(),
+                    8 * 1024 * 1024,
+                ),
+                &mut |record| {
+                    let mut bytes = Vec::<u8>::new();
+                    record.inspect(|record| record.feed_canonical(&mut |part| bytes.extend(part)));
+                    records.push(bytes);
+                    Ok(())
+                },
+            )
+            .unwrap();
+        assert_eq!((report.accepted, report.rejected), (82, 2));
+        let actual = (records, report.samples);
+        if let Some(expected) = &expected {
+            assert_eq!(&actual, expected);
+        } else {
+            expected = Some(actual);
+        }
+    }
+}

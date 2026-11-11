@@ -1,11 +1,11 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
-use irmind_app::LargeCaseUseCases;
+use irmind_app::{AuditLog as _, LargeCaseUseCases};
 
 #[test]
 fn answer_check_is_local_and_does_not_call_the_model() {
     let temp = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(temp.path()).unwrap());
+    let (store, parser_catalog) = demo_storage(temp.path()).unwrap();
     let keystore = FileKeystore::ephemeral(temp.path()).unwrap();
     let signer = keystore.create(Actor::Analyst).unwrap();
     let ports = EnginePorts::new(
@@ -29,7 +29,7 @@ fn answer_check_is_local_and_does_not_call_the_model() {
         store,
         source: temp.path().join("events.json"),
         fingerprint: String::new(),
-        parser_catalog: demo_parser_catalog().unwrap(),
+        parser_catalog,
     };
     let result = io.demo_check(&engine, &case.id).unwrap().unwrap();
     assert!(result.contains("events 0/3"));
@@ -41,7 +41,7 @@ fn answer_check_is_local_and_does_not_call_the_model() {
 fn scripted_investigation_proposes_a_signed_approval_and_checkable_finding() {
     let temp = tempfile::tempdir().unwrap();
     std::fs::write(temp.path().join("events.json"), EVENTS).unwrap();
-    let store = Arc::new(LocalStore::open(temp.path()).unwrap());
+    let (store, parser_catalog) = demo_storage(temp.path()).unwrap();
     let keystore = FileKeystore::ephemeral(temp.path()).unwrap();
     let signer = keystore.create(Actor::Analyst).unwrap();
     let ports = EnginePorts::new(
@@ -64,11 +64,11 @@ fn scripted_investigation_proposes_a_signed_approval_and_checkable_finding() {
     let case = engine
         .create_case("Synthetic investigation", "local evidence only")
         .unwrap();
-    let parser = JsonParser;
+    let parser = irmind_mod_parser_json::source_log_parser();
     LargeCaseUseCases {
         engine: &engine,
         store: store.as_ref(),
-        parser: &parser,
+        parser: parser.as_ref(),
     }
     .ingest_local_batch(
         &case.id,
@@ -78,6 +78,25 @@ fn scripted_investigation_proposes_a_signed_approval_and_checkable_finding() {
         &CancellationToken::new(),
     )
     .unwrap();
+    let entries = store.entries(&case.id).unwrap();
+    let catalog = irmind_app::artifact_catalog(&entries).unwrap();
+    assert!(!catalog.active.is_empty());
+    assert!(
+        catalog
+            .active
+            .iter()
+            .all(|artifact| matches!(artifact, irmind_domain::ParquetArtifact::V3(_)))
+    );
+    let manifest = entries
+        .iter()
+        .find(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV2)
+        .unwrap();
+    assert_eq!(
+        irmind_domain::SourceManifestV2::decode(&manifest.payload)
+            .unwrap()
+            .parser_version,
+        "json-source-v1"
+    );
     let model = ScriptedModel::new();
     engine
         .investigate(&case.id, "What happened?", &model)
@@ -90,7 +109,7 @@ fn scripted_investigation_proposes_a_signed_approval_and_checkable_finding() {
         store,
         source: temp.path().join("events.json"),
         fingerprint: String::new(),
-        parser_catalog: demo_parser_catalog().unwrap(),
+        parser_catalog,
     };
     let result = io.demo_check(&engine, &case.id).unwrap().unwrap();
     assert!(result.contains("events 3/3"), "{result}");

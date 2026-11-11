@@ -18,10 +18,7 @@ fn syslog_ingestion_signs_confirmed_calendar_and_rebuilds_gzip_without_fake_offs
             &ModuleConfig::new(),
         )
         .unwrap();
-    let config = PersistentConfig {
-        experimental_common_writer: Some(true),
-        ..Default::default()
-    };
+    let config = PersistentConfig::default();
     let catalog =
         super::super::super::experimental_parsers(registry.parser_catalog(), &config, &registry)
             .unwrap();

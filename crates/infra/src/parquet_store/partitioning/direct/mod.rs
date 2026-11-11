@@ -40,7 +40,7 @@ impl ParquetStore {
         self.preflight_direct_group(request, workers, cancel)?;
         let mut allocator =
             super::Allocator::from_signed_iter(request.committed_artifacts.iter(), request.limits)?;
-        let hash = group_identity(request.relative_paths, identity);
+        let hash = group_identity(request, identity);
         let routes = crate::parquet_store::mapped::projection_routes_for_direct(catalog)?
             .into_iter()
             .map(|(mapping, route)| (route, mapping))
@@ -255,11 +255,12 @@ impl ParquetStore {
 }
 
 fn group_identity(
-    paths: &[String],
+    request: &MappedIngestRequest<'_>,
     identity: irmind_app::ParserIdentity<'_>,
 ) -> irmind_domain::EvidenceHash {
     let mut bytes = b"irmind-direct-source-group-v1\0".to_vec();
-    for path in paths {
+    for relative in request.relative_paths {
+        let path = request.parser.logical_source(relative);
         bytes.extend_from_slice(&(path.len() as u64).to_be_bytes());
         bytes.extend_from_slice(path.as_bytes());
     }

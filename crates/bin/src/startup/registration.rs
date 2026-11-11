@@ -1,4 +1,5 @@
 #[cfg(any(
+    feature = "mapping-evtx",
     feature = "mapping-json-compat",
     feature = "mapping-journald-compat",
     feature = "mapping-linux",
@@ -83,14 +84,25 @@ pub(super) fn configured_registry(
     interactive: bool,
     data_root: &std::path::Path,
 ) -> Result<(ModuleRegistry, BTreeMap<&'static str, String>)> {
+    let _ = data_root;
     let mut registry = ModuleRegistry::new();
     let mut config_issues = BTreeMap::<&'static str, String>::new();
-    register_parsers(
-        &mut registry,
-        &mut config_issues,
-        data_root,
-        saved.experimental_common_writer == Some(true),
-    )?;
+    #[cfg(any(
+        feature = "parser-evtx",
+        feature = "parser-json",
+        feature = "parser-ecs",
+        feature = "parser-ocsf",
+        feature = "parser-velociraptor",
+        feature = "parser-hayabusa",
+        feature = "parser-chainsaw",
+        feature = "parser-plaso",
+        feature = "parser-eztools",
+        feature = "parser-syslog",
+        feature = "parser-linux",
+        feature = "parser-zeek",
+        feature = "parser-suricata",
+    ))]
+    register_parsers(&mut registry, &mut config_issues, data_root)?;
 
     register_llm(
         cli,
@@ -131,14 +143,29 @@ pub(super) fn configured_registry(
     Ok((registry, config_issues))
 }
 
+#[cfg(any(
+    feature = "parser-evtx",
+    feature = "parser-json",
+    feature = "parser-ecs",
+    feature = "parser-ocsf",
+    feature = "parser-velociraptor",
+    feature = "parser-hayabusa",
+    feature = "parser-chainsaw",
+    feature = "parser-plaso",
+    feature = "parser-eztools",
+    feature = "parser-syslog",
+    feature = "parser-linux",
+    feature = "parser-zeek",
+    feature = "parser-suricata",
+))]
 fn register_parsers(
     registry: &mut ModuleRegistry,
     issues: &mut BTreeMap<&'static str, String>,
     data_root: &std::path::Path,
-    experimental: bool,
 ) -> Result<()> {
-    let _ = (&issues, data_root, experimental);
+    let _ = (&issues, data_root);
     #[cfg(any(
+        feature = "mapping-evtx",
         feature = "mapping-json-compat",
         feature = "mapping-journald-compat",
         feature = "mapping-linux",
@@ -148,9 +175,7 @@ fn register_parsers(
         feature = "mapping-syslog",
         feature = "mapping-network",
     ))]
-    if experimental {
-        mapping::register(registry)?;
-    }
+    mapping::register(registry)?;
     #[cfg(feature = "parser-zeek")]
     registry.register(Box::new(ZeekParser), &ModuleConfig::new())?;
     #[cfg(feature = "parser-suricata")]

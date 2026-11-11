@@ -117,16 +117,12 @@ fn object_proposal(tool: Tool, max_bytes: &str) -> ProposedCall {
 #[allow(clippy::cognitive_complexity)]
 fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let (store, parser_registry) = current_object_pipeline(root.path());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[93; 32]),
         actor: Actor::Analyst,
     });
     let parser = Arc::new(JsonParser);
-    let mut parser_registry = ModuleRegistry::new();
-    parser_registry
-        .register(Box::new(JsonParser), &ModuleConfig::new())
-        .unwrap();
     let source = FakeObjectSource {
         uri: URI,
         bytes: br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.8"}]}"#.to_vec(),
@@ -158,7 +154,7 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     )
     .unwrap()
     .with_large_case_pipeline(store.clone(), parser)
-    .with_parser_catalog(parser_registry.parser_catalog())
+    .with_parser_catalog(current_object_parsers(&parser_registry))
     .with_object_source(&source)
     .unwrap()
     .with_policy(rules, "f".repeat(64))
@@ -261,7 +257,7 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     assert!(
         entries
             .iter()
-            .any(|entry| entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV1)
+            .any(|entry| entry.kind == irmind_domain::AuditEventKind::ParquetArtifactV3)
     );
 
     let copied_case = engine.create_case("Copied cloud original", &scope).unwrap();
@@ -360,16 +356,12 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
 #[test]
 fn cloud_object_without_a_unique_high_confidence_parser_is_not_converted() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(root.path()).unwrap());
+    let (store, parser_registry) = current_object_pipeline(root.path());
     let signer = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[94; 32]),
         actor: Actor::Analyst,
     });
     let parser = Arc::new(JsonParser);
-    let mut parser_registry = ModuleRegistry::new();
-    parser_registry
-        .register(Box::new(JsonParser), &ModuleConfig::new())
-        .unwrap();
     let source = FakeObjectSource {
         uri: URI,
         bytes: br#"{"unrecognized":"format"}"#.to_vec(),
@@ -395,7 +387,7 @@ fn cloud_object_without_a_unique_high_confidence_parser_is_not_converted() {
     )
     .unwrap()
     .with_large_case_pipeline(store.clone(), parser)
-    .with_parser_catalog(parser_registry.parser_catalog())
+    .with_parser_catalog(current_object_parsers(&parser_registry))
     .with_object_source(&source)
     .unwrap();
     let scope = format!(
@@ -428,3 +420,25 @@ fn cloud_object_without_a_unique_high_confidence_parser_is_not_converted() {
 }
 
 mod completeness;
+
+fn current_object_pipeline(root: &std::path::Path) -> (Arc<LocalStore>, ModuleRegistry) {
+    let mut registry = ModuleRegistry::new();
+    registry
+        .register(Box::new(JsonParser), &ModuleConfig::new())
+        .unwrap();
+    registry
+        .register(
+            Box::new(irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap()),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    let store =
+        LocalStore::open_mapped(root, Arc::new(registry.mapping_catalog().unwrap())).unwrap();
+    (Arc::new(store), registry)
+}
+fn current_object_parsers(registry: &ModuleRegistry) -> irmind_app::modules::ParserCatalog {
+    registry
+        .parser_catalog()
+        .with_experimental_parser(irmind_mod_parser_json::source_log_parser())
+        .unwrap()
+}

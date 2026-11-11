@@ -253,7 +253,7 @@ impl PreparedStartup {
             manifests,
             module_overrides,
             allow_environment,
-            experimental_common_writer: saved.experimental_common_writer == Some(true),
+
             signer_id: active.signer_id,
             secrets_id: active.secrets_id,
             #[cfg(feature = "keystore-file")]

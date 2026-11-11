@@ -6,10 +6,7 @@ fn ocsf_detects_decodes_maps_filters_and_rebuilds_original_fields() {
     let root = tempfile::tempdir().unwrap();
     let (_, engine) = setup(root.path(), false);
     let registry = registry();
-    let config = PersistentConfig {
-        experimental_common_writer: Some(true),
-        ..Default::default()
-    };
+    let config = PersistentConfig::default();
     let catalog =
         super::super::super::experimental_parsers(registry.parser_catalog(), &config, &registry)
             .unwrap();
@@ -89,10 +86,7 @@ fn malformed_seekable_source_is_rejected_without_discarding_other_sources() {
     let root = tempfile::tempdir().unwrap();
     let (_, engine) = setup(root.path(), false);
     let registry = registry();
-    let config = PersistentConfig {
-        experimental_common_writer: Some(true),
-        ..Default::default()
-    };
+    let config = PersistentConfig::default();
     let catalog =
         super::super::super::experimental_parsers(registry.parser_catalog(), &config, &registry)
             .unwrap();

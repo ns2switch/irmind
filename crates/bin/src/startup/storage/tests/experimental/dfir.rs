@@ -60,10 +60,7 @@ fn dfir_sources_are_selected_mapped_signed_and_reproducibly_rebuilt() {
     let root = tempfile::tempdir().unwrap();
     let (_, engine) = setup(root.path(), false);
     let registry = dfir_registry();
-    let config = PersistentConfig {
-        experimental_common_writer: Some(true),
-        ..Default::default()
-    };
+    let config = PersistentConfig::default();
     let catalog =
         super::super::super::experimental_parsers(registry.parser_catalog(), &config, &registry)
             .unwrap();

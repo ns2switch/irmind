@@ -42,6 +42,12 @@ fn decode(
     budget: DecodeBudget,
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
+    if std::path::Path::new(metadata.source.reference())
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("ndjson") || e.eq_ignore_ascii_case("jsonl"))
+    {
+        return lines::decode(SourceInput { metadata, reader }, budget, emit);
+    }
     let mut frames = JsonFrames::new(reader, metadata.cancel);
     let mut seen = 0u64;
     let mut report = ParseReport {
@@ -65,35 +71,51 @@ fn decode(
             Ok(Some((frame, weight)))
         },
         prepare_frame,
-        |(frame, parsed)| {
-            let record = parsed.and_then(|(fields, time)| {
-                materialize_frame(metadata, &frame, report.accepted, fields, time)
-            });
-            match record {
-                Ok(record) => {
-                    let location = ParserLocation::new(
-                        metadata.source.reference(),
-                        "parser-json",
-                        frame.offset(),
-                    )
-                    .map_err(|_| invalid())?;
-                    emit(Tainted::from_external(
-                        record,
-                        Provenance::new(
-                            metadata.evidence_hash,
-                            Some(report.accepted as u64),
-                            metadata.source.kind(),
-                        )
-                        .with_parser_location(location),
-                    ))?;
-                    report.accepted += 1;
-                }
-                Err(_) => reject(&mut report, frame.bytes()),
-            }
-            Ok(())
-        },
+        |prepared| forward_prepared(metadata, prepared, 0, &mut report, emit),
     )?;
     Ok(report)
+}
+
+mod lines;
+type PreparedFrame = (
+    JsonFrame,
+    Result<(SourceValue, Option<IndexedTime>), AppError>,
+);
+
+fn forward_prepared(
+    metadata: SourceMetadata<'_>,
+    (frame, parsed): PreparedFrame,
+    base: u64,
+    report: &mut ParseReport,
+    emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<(), AppError> {
+    if metadata.cancel.is_cancelled() {
+        return Err(AppError::Cancelled);
+    }
+    if report.accepted as u64 + report.rejected >= 10_000_000 {
+        return Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit));
+    }
+    let offset = base.checked_add(frame.offset()).ok_or_else(invalid)?;
+    match parsed.and_then(|(fields, time)| {
+        materialize_frame(metadata, &frame, report.accepted, fields, time, base)
+    }) {
+        Ok(record) => {
+            let location = ParserLocation::new(metadata.source.reference(), "parser-json", offset)
+                .map_err(|_| invalid())?;
+            emit(Tainted::from_external(
+                record,
+                Provenance::new(
+                    metadata.evidence_hash,
+                    Some(report.accepted as u64),
+                    metadata.source.kind(),
+                )
+                .with_parser_location(location),
+            ))?;
+            report.accepted += 1;
+        }
+        Err(_) => reject(report, frame.bytes()),
+    }
+    Ok(())
 }
 
 fn prepare_frame(
@@ -121,11 +143,12 @@ fn materialize_frame(
     index: usize,
     fields: SourceValue,
     timestamp: Option<IndexedTime>,
+    base: u64,
 ) -> Result<SourceRecordV1, AppError> {
     let origin = EventOrigin::try_new(
         EvidenceHash::from_bytes(metadata.evidence_hash),
         index as u64,
-        Some(frame.offset()),
+        Some(base.checked_add(frame.offset()).ok_or_else(invalid)?),
         "parser-json",
         "json-source-v1",
     )

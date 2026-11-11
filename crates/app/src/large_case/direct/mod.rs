@@ -1,5 +1,6 @@
 //! Atomic direct groups. Rejected candidates never determine physical boundaries.
 mod commit;
+mod object;
 use super::{
     AppError, AuditEventKind, AuditOrigin, BTreeMap, CancellationToken, CaseId, EvidenceHash,
     LargeCaseUseCases, ParquetArtifact, ParserSelection, Path, SourceManifestV1, invalid_manifest,
@@ -24,10 +25,11 @@ impl LargeCaseUseCases<'_, '_> {
         let mut pending = pending_paths(request);
         let mut ingested = Vec::new();
         if pending.is_empty() {
-            return Ok(None);
+            self.verify_direct_existing(request, &mut ingested)?;
+            return Ok(Some(ingested));
         }
-        let mut used_direct = false;
         let mut verified_existing = false;
+        let mut used_direct = false;
         while !pending.is_empty() {
             let mut rejected = Vec::new();
             loop {
@@ -46,14 +48,14 @@ impl LargeCaseUseCases<'_, '_> {
                 }
                 let attempt = self.prepare_direct_attempt(request, &paths);
                 match attempt {
-                    Ok(None) if !used_direct && rejected.is_empty() => return Ok(None),
                     Ok(None) => {
-                        self.audit_rejections(request.id, &rejected)?;
-                        return Err(AppError::Policy(
-                            "direct preparation became unavailable".into(),
-                        ));
+                        if used_direct {
+                            return Err(invalid_manifest());
+                        }
+                        return Ok(None);
                     }
                     Ok(Some(mut prepared)) => {
+                        used_direct = true;
                         let accepted = match self.finish_direct_attempt(
                             request,
                             &paths,
@@ -68,7 +70,6 @@ impl LargeCaseUseCases<'_, '_> {
                                 return Err(error);
                             }
                         };
-                        used_direct = true;
                         verified_existing = true;
                         record_accepted(request, &mut pending, &mut ingested, accepted);
                         break;
@@ -152,7 +153,17 @@ impl LargeCaseUseCases<'_, '_> {
             .get(..prepared.metadata().sources.len())
             .filter(|paths| !paths.is_empty())
             .ok_or_else(invalid_manifest)?;
-        self.commit_direct(request, actual, prepared, rejected)
+        self.commit_direct(
+            &commit::CommitContext {
+                id: request.id,
+                selections: request.selections,
+                known_artifacts: request.known_artifacts,
+                cancel: request.cancel,
+            },
+            actual,
+            prepared,
+            rejected,
+        )
     }
     fn prepare_direct_attempt(
         &self,

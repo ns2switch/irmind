@@ -2,7 +2,7 @@ use irmind_app::AppError;
 use irmind_infra::LocalStore;
 use std::path::Path;
 
-/// All presentations write precise artifacts and retain compatible V1 reads.
+/// Open the local repository before its registered mapping catalog is composed.
 pub(super) fn open(root: &Path) -> Result<LocalStore, AppError> {
     LocalStore::open_precise(root)
 }
@@ -10,96 +10,27 @@ pub(super) fn open(root: &Path) -> Result<LocalStore, AppError> {
 #[cfg(all(test, feature = "keystore-file", feature = "parser-json"))]
 mod tests;
 
-/// Reopen only after validating the signed opt-in setting. Defaults use open unchanged.
+/// Bind the current writer and reconstruction to the same registered catalog.
 pub(super) fn experimental(
     root: &Path,
-    config: &irmind_app::PersistentConfig,
+    _config: &irmind_app::PersistentConfig,
     registry: &irmind_app::modules::ModuleRegistry,
 ) -> Result<Option<LocalStore>, AppError> {
-    if config.experimental_common_writer != Some(true) {
-        return Ok(None);
-    }
-    if !cfg!(any(
-        feature = "mapping-json-compat",
-        feature = "mapping-journald-compat",
-        feature = "mapping-linux",
-        feature = "mapping-ecs",
-        feature = "mapping-ocsf",
-        feature = "mapping-dfir",
-        feature = "mapping-syslog",
-        feature = "mapping-network",
-        feature = "mapping-evtx",
-        feature = "parser-declarative"
-    )) {
-        return Err(AppError::Policy(
-            "experimental common writer is not compiled; enable mapping features".into(),
-        ));
-    }
     let catalog = registry.mapping_catalog()?;
-    if !catalog.supports_decoder("parser-json", "json-source-v1")
-        && !catalog.supports_decoder("parser-linux", "linux-source-v1")
-        && !catalog.supports_decoder("parser-ecs", "ecs-source-v1")
-        && !catalog.supports_decoder("parser-ocsf", "ocsf-source-v1")
-        && !catalog.supports_decoder("parser-velociraptor", "velociraptor-source-v1")
-        && !catalog.supports_decoder("parser-syslog", "syslog-source-v1")
-        && !catalog.supports_decoder("parser-zeek", "zeek-source-v1")
-        && !catalog.supports_decoder("parser-suricata", "suricata-source-v1")
-        && !catalog.supports_decoder("parser-evtx", "evtx-source-v1")
-        && !registry
-            .parser_catalog()
-            .available()
-            .iter()
-            .any(|(id, version)| {
-                id.starts_with("parser-declarative-") && catalog.supports_decoder(id, version)
-            })
-    {
-        return Err(AppError::Policy(
-            "experimental common writer is not compiled; enable mapping features".into(),
-        ));
-    }
     LocalStore::open_mapped(root, std::sync::Arc::new(catalog)).map(Some)
 }
 
 pub(super) fn experimental_parsers(
     catalog: irmind_app::modules::ParserCatalog,
-    config: &irmind_app::PersistentConfig,
+    _config: &irmind_app::PersistentConfig,
     registry: &irmind_app::modules::ModuleRegistry,
 ) -> Result<irmind_app::modules::ParserCatalog, AppError> {
-    if config.experimental_common_writer != Some(true) {
-        return Ok(catalog);
-    }
-    if !cfg!(any(
-        feature = "mapping-json-compat",
-        feature = "mapping-journald-compat",
-        feature = "mapping-linux",
-        feature = "mapping-ecs",
-        feature = "mapping-ocsf",
-        feature = "mapping-dfir",
-        feature = "mapping-syslog",
-        feature = "mapping-network",
-        feature = "mapping-evtx",
-        feature = "parser-declarative"
-    )) {
-        return Err(AppError::Policy(
-            "experimental common writer is not compiled; enable mapping features".into(),
-        ));
-    }
     #[cfg(feature = "mapping-json-compat")]
     let catalog = catalog.with_experimental_parser(irmind_mod_parser_json::source_log_parser())?;
     #[cfg(any(feature = "mapping-journald-compat", feature = "mapping-linux"))]
     let catalog = catalog.with_experimental_parser(irmind_mod_parser_linux::source_log_parser())?;
     #[cfg(feature = "mapping-ecs")]
     let catalog = catalog.with_experimental_parser(irmind_mod_parser_ecs::source_log_parser())?;
-    #[cfg(feature = "mapping-ocsf")]
-    let catalog = if catalog
-        .available()
-        .iter()
-        .any(|(id, _)| id == "parser-ocsf")
-    {
-        catalog.with_experimental_parser(irmind_mod_parser_ocsf::source_log_parser())?
-    } else {
-        catalog
-    };
     #[cfg(feature = "mapping-dfir")]
     let catalog = dfir_sources(catalog)?;
     #[cfg(feature = "mapping-syslog")]
@@ -115,6 +46,17 @@ pub(super) fn experimental_parsers(
 
     #[cfg(feature = "mapping-network")]
     let catalog = network_sources(catalog)?;
+
+    #[cfg(feature = "mapping-ocsf")]
+    let catalog = if catalog
+        .available()
+        .iter()
+        .any(|(id, _)| id == "parser-ocsf")
+    {
+        catalog.with_experimental_parser(irmind_mod_parser_ocsf::source_log_parser())?
+    } else {
+        catalog
+    };
     let mappings = registry.mapping_catalog()?;
     #[cfg(feature = "mapping-evtx")]
     let catalog = if mappings
@@ -150,13 +92,19 @@ pub(super) fn experimental_parsers(
 fn dfir_sources(
     mut catalog: irmind_app::modules::ParserCatalog,
 ) -> Result<irmind_app::modules::ParserCatalog, AppError> {
-    for parser in [
+    let parsers: Vec<std::sync::Arc<dyn irmind_app::LogParser>> = vec![
+        #[cfg(feature = "parser-velociraptor")]
         irmind_mod_parser_velociraptor::source_log_parser(),
+        #[cfg(feature = "parser-hayabusa")]
         irmind_mod_parser_hayabusa::source_log_parser(),
+        #[cfg(feature = "parser-chainsaw")]
         irmind_mod_parser_chainsaw::source_log_parser(),
+        #[cfg(feature = "parser-plaso")]
         irmind_mod_parser_plaso::source_log_parser(),
+        #[cfg(feature = "parser-eztools")]
         irmind_mod_parser_eztools::source_log_parser(),
-    ] {
+    ];
+    for parser in parsers {
         if catalog
             .available()
             .iter()
@@ -172,10 +120,13 @@ fn dfir_sources(
 fn network_sources(
     mut catalog: irmind_app::modules::ParserCatalog,
 ) -> Result<irmind_app::modules::ParserCatalog, AppError> {
-    for parser in [
+    let parsers: Vec<std::sync::Arc<dyn irmind_app::LogParser>> = vec![
+        #[cfg(feature = "parser-zeek")]
         irmind_mod_parser_zeek::source_log_parser(),
+        #[cfg(feature = "parser-suricata")]
         irmind_mod_parser_suricata::source_log_parser(),
-    ] {
+    ];
+    for parser in parsers {
         if catalog
             .available()
             .iter()

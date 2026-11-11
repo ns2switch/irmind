@@ -425,32 +425,23 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                     },
                 )
                 .and_then(|count| {
-                    let warning = if workflow.io_ops.experimental_common_writer() {
-                        " · Experimental V3/V6/layout: unstable, no migration guarantee"
-                    } else {
-                        ""
-                    };
-                    let rejected = if workflow.io_ops.experimental_common_writer() {
-                        workflow
-                            .engine
-                            .audit_log
-                            .entries(id)?
-                            .iter()
-                            .filter(|entry| entry.seq > first_seq)
-                            .map(irmind_app::RejectedSource::from_audit)
-                            .collect::<std::result::Result<Vec<_>, _>>()?
-                            .into_iter()
-                            .flatten()
-                            .count()
-                    } else {
-                        0
-                    };
+                    let rejected = workflow
+                        .engine
+                        .audit_log
+                        .entries(id)?
+                        .iter()
+                        .filter(|entry| entry.seq > first_seq)
+                        .map(irmind_app::RejectedSource::from_audit)
+                        .collect::<std::result::Result<Vec<_>, _>>()?
+                        .into_iter()
+                        .flatten()
+                        .count();
                     let rejected = if rejected == 0 {
                         String::new()
                     } else {
                         format!(" · {rejected} rejected; expand the rejection cards for details")
                     };
-                    Ok(format!("Ingested {count} files{rejected}{warning}"))
+                    Ok(format!("Ingested {count} files{rejected}"))
                 })
         });
     }

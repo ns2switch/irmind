@@ -1273,7 +1273,7 @@ verification occur outside the timed region. The sample commitment uses the same
 64 KiB prefix as normal ingestion. The [machine-readable measurements](benchmarks/ecs-source-smoke.json)
 record the implementation commit and the identical source SHA-256 for all runs.
 
-Reproduce from the repository root with `sh scripts/benchmark_ecs_source.sh`.
+Reproduce from the repository root with `sh .github/scripts/benchmark_source_pipeline.sh`.
 
 ## EVTX and ECS: shared source-pipeline smoke
 

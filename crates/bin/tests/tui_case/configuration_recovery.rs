@@ -266,3 +266,54 @@ fn existing_hash_only_configuration_event_keeps_verifying() {
         ConfigurationInspection::Review(_)
     ));
 }
+
+#[test]
+fn retired_writer_setting_requires_explicit_signed_configuration_restore() {
+    let (root, audit, engine, file) = setup();
+    let config = PersistentConfig::default();
+    let bytes = serde_json::to_string(&config).unwrap().replacen(
+        "\"modules\":",
+        "\"experimental_common_writer\":true,\"modules\":",
+        1,
+    );
+    let fingerprint = irmind_app::hex(&irmind_app::sha256(bytes.as_bytes()));
+    let signing = SigningKey::from_bytes(&[121u8; 32]);
+    let mut entry = irmind_app::SignedOperation {
+        case_id: irmind_app::GLOBAL_OPERATION_SCOPE.into(),
+        seq: 1,
+        at: 1,
+        actor: Actor::Analyst,
+        operation: format!(
+            "configuration-approved-v2:{fingerprint}:{fingerprint}:false:{}",
+            irmind_app::hex(bytes.as_bytes())
+        ),
+        prev: [0; 32],
+        hash: [0; 32],
+        sig: Vec::new(),
+        public_key: signing.verifying_key().to_bytes().to_vec(),
+    };
+    entry.hash = irmind_app::sha256(&entry.canonical());
+    entry.sig = signing.sign(&entry.hash).to_bytes().to_vec();
+    audit.append_global_operation(&entry).unwrap();
+    file.save(&config).unwrap();
+    let path = root.path().join("config.toml");
+    std::fs::write(&path, "version = 1\nexperimental_common_writer = true\n").unwrap();
+    let before = std::fs::read(&path).unwrap();
+    let review = engine.inspect_configuration(&file, &[], true).unwrap();
+    assert!(matches!(review, ConfigurationInspection::Review(_)));
+    assert!(engine.verify_configuration(&file, &[]).is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert_eq!(audit.global_operations().unwrap().len(), 1);
+    engine
+        .restore_approved_configuration(&file, &[], true)
+        .unwrap();
+    engine.verify_configuration(&file, &[]).unwrap();
+    engine.verify_global_operations().unwrap();
+    assert!(file.load().unwrap() == config);
+    assert_eq!(audit.global_operations().unwrap().len(), 2);
+    assert!(
+        !std::fs::read_to_string(path)
+            .unwrap()
+            .contains("experimental_common_writer")
+    );
+}

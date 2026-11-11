@@ -2,7 +2,7 @@
 
 For analysts and contributors, this page explains how optional common-event mappings interpret decoded logs. Parsers decode formats; mappings classify events and assign entity roles. A classification never grants permission or confirms a finding.
 
-The common writer is currently experimental and opt-in during the decoder rollout. Pre-1.0 formats may change between minor versions without migration; keep the creating IRMind version or re-ingest verified originals into a new case. New mappings apply to new ingestions; re-ingest verified originals into a new case to change a source's interpretation. See the [pipeline design](development/source-mapping-design.md) and [security model](security-model.md).
+CLI ingestion, the TUI and the demo use the common writer. Every compiled parser has a source decoder and a selected mapping; an extraction-only mapping keeps an event unclassified. Pre-1.0 formats may change between minor versions without migration; keep the creating IRMind version or re-ingest verified originals into a new case. New mappings apply to new ingestions; re-ingest verified originals into a new case to change a source's interpretation. See the [pipeline design](development/source-mapping-design.md) and [security model](security-model.md).
 
 | Module | Input | Implementation | Cargo feature | Status |
 | --- | --- | --- | --- | --- |
@@ -15,6 +15,11 @@ The common writer is currently experimental and opt-in during the decoder rollou
 | Linux authentication | auth.log and secure: sshd, sudo and su | Bundled, hash-pinned TOML | `mapping-linux` | Experimental; synthetic contracts |
 | Linux auditd | Original grouped SYSCALL and EXECVE members | Native, bounded cross-member projection | `mapping-linux` | Experimental; synthetic contracts |
 | HTTP access | nginx and Apache common/combined | Bundled, hash-pinned TOML | `mapping-linux` | Experimental; synthetic contracts |
+| Linux account and cron logs | useradd, usermod and cron/crond | Native, extraction-only | `mapping-linux` | Experimental; no inferred categories or roles |
+| DFIR tool output | Velociraptor, Hayabusa, Chainsaw, plaso and EZTools | Separate native extraction modules | `mapping-dfir` | Experimental; no inferred categories or roles |
+| Syslog | RFC 5424 and confirmed RFC 3164, plain or gzip | Native, extraction-only | `mapping-syslog` | Experimental; no inferred categories or roles |
+| Network | Zeek and Suricata EVE | Separate native extraction modules | `mapping-network` | Experimental; no inferred categories or roles |
+| Declarative formats | Approved local parser definitions | Definition-pinned extraction module | `parser-declarative` | Experimental; no inferred categories or roles |
 
 ## CloudTrail
 

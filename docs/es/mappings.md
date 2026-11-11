@@ -1,10 +1,10 @@
-Traducción de docs/mappings.md en el commit 8fc0e9687a6b4627edb67b0b484f19a72db967ef; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/mappings.md en el commit e5e742ba24ac5c6089b52c54d46c23336303f759; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos de mapeo de fuentes
 
 Esta página explica a analistas y colaboradores cómo los mapeos opcionales interpretan los logs decodificados. Los parsers leen el formato; los mapeos clasifican eventos y asignan roles a las entidades. Clasificar no concede permisos ni confirma un hallazgo.
 
-El escritor común es experimental y opcional durante la incorporación de decodificadores. Antes de la 1.0, los formatos pueden cambiar entre versiones menores sin migración: conserva la versión creadora de IRMind o reingiere los originales verificados en un caso nuevo. Los mapeos nuevos se aplican a ingestas nuevas; para cambiar la interpretación, reingiere los originales verificados en un caso nuevo. Consulta el [diseño del pipeline](../development/source-mapping-design.md) y el [modelo de seguridad](security-model.md).
+La CLI, la TUI y la demo usan el escritor común. Cada parser compilado tiene un decodificador y un mapeo seleccionado; un mapeo de extracción conserva el evento sin clasificar. Antes de la 1.0, los formatos pueden cambiar entre versiones menores sin migración: conserva la versión creadora de IRMind o reingiere los originales verificados en un caso nuevo. Los mapeos nuevos se aplican a ingestas nuevas; para cambiar la interpretación, reingiere los originales verificados en un caso nuevo. Consulta el [diseño del pipeline](../development/source-mapping-design.md) y el [modelo de seguridad](security-model.md).
 
 | Módulo | Entrada | Implementación | Feature de Cargo | Estado |
 | --- | --- | --- | --- | --- |
@@ -16,6 +16,12 @@ El escritor común es experimental y opcional durante la incorporación de decod
 | Autenticación Linux | auth.log y secure: sshd, sudo y su | TOML incluido, con hash fijado | `mapping-linux` | Experimental; contratos sintéticos |
 | Linux auditd | Miembros originales agrupados SYSCALL y EXECVE | Nativo, proyección acotada entre miembros | `mapping-linux` | Experimental; contratos sintéticos |
 | Acceso HTTP | Common/combined de nginx y Apache | TOML incluido, con hash fijado | `mapping-linux` | Experimental; contratos sintéticos |
+
+| Salidas DFIR | Velociraptor, Hayabusa, Chainsaw, plaso y EZTools | Módulos nativos separados de extracción | `mapping-dfir` | Experimental; sin inferencias |
+| Syslog | RFC 5424 y RFC 3164 confirmado, texto o gzip | Extracción nativa | `mapping-syslog` | Experimental; sin inferencias |
+| Red | Zeek y Suricata EVE | Módulos nativos separados de extracción | `mapping-network` | Experimental; sin inferencias |
+| Linux de cuentas y cron | useradd, usermod y cron/crond | Extracción nativa | `mapping-linux` | Experimental; sin inferencias |
+| Declarativo | Definiciones locales aprobadas | Extracción fijada por la definición | `parser-declarative` | Experimental; sin inferencias |
 
 ## CloudTrail
 

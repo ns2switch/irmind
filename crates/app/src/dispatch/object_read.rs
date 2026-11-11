@@ -1,9 +1,9 @@
 use crate::{
     AppError, AuditEventKind, AuditOrigin, AuthorizedCall, CancellationToken, CaseId, Engine,
-    LargeCaseUseCases, LogParser, ObjectEntry, ObjectSourceOutput, ParserSelection, PreparedSource,
+    LargeCaseUseCases, LogParser, ObjectEntry, ObjectSourceOutput, ParserSelection,
 };
 use futures_util::StreamExt as _;
-use irmind_domain::{EvidenceHash, ParserSelectionMode, SourceManifestV1, UtcTimestamp};
+use irmind_domain::{EvidenceHash, SourceManifestV1, UtcTimestamp};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use std::collections::BTreeMap;
@@ -272,44 +272,33 @@ impl Engine<'_> {
             let routed = crate::SourceParser::new(parser.as_ref(), &logical_source);
             let index = crate::large_case::read_manifest_index(&local.audit_log.entries(&id)?)?;
             let paths = [relative.clone()];
-            let mut prepared: PreparedSource = store
-                .prepare_local_batch(
-                    crate::LocalBatchRequest {
+            let mut prepared = store
+                .prepare_mapped_ingest(
+                    crate::MappedIngestRequest {
                         case_id: &id,
                         source_root: &root,
                         relative_paths: &paths,
                         copy_original: manifest.copied,
                         parser: &routed,
-                        committed_artifacts: &index.artifacts,
+                        committed_artifacts: crate::mapped_ingest::CommittedArtifacts::Slice(
+                            &index.artifacts,
+                        ),
                         limits: crate::PartitionLimits::default(),
                     },
                     &cancel,
                 )?
-                .pop()
-                .ok_or(AppError::RemoteTool)?;
-            if prepared.manifest.sha256 != manifest.sha256
-                || prepared.manifest.size != manifest.size
-            {
-                return Err(AppError::EvidenceMismatch(manifest.sha256.as_str().into()));
-            }
-            prepared.manifest = manifest;
-            let mut known = index
-                .artifacts
-                .into_iter()
-                .map(|item| (item.path().to_owned(), item))
-                .collect();
+                .ok_or_else(|| {
+                    AppError::Policy(
+                        "source ingestion requires the current mapping pipeline".into(),
+                    )
+                })?;
             let large = LargeCaseUseCases {
                 engine: &local,
                 store: store.as_ref(),
                 parser: &routed,
             };
-            let hash = large.sign_prepared_with_selection(
-                &id,
-                prepared,
-                Some(&selection),
-                &cancel,
-                &mut known,
-            )?;
+            let hash =
+                large.sign_mapped_object(&id, manifest, &selection, prepared.as_mut(), &cancel)?;
             local.audit(
                 &id,
                 AuditOrigin::System,
@@ -338,33 +327,14 @@ fn select_object_parser(
         .take(64 * 1024)
         .read_to_end(&mut sample)
         .map_err(|_| AppError::RemoteTool)?;
-    let selected = match catalog.detect(source, &sample) {
-        crate::modules::ParserChoice::Auto(candidate) => candidate,
-        crate::modules::ParserChoice::NeedsAnalyst(candidates) => {
-            return Err(AppError::ParserSelection {
-                source_name: source.into(),
-                candidates: candidates
-                    .into_iter()
-                    .map(|candidate| (candidate.id, candidate.confidence.value()))
-                    .collect(),
-            });
-        }
-        crate::modules::ParserChoice::Unsupported => {
-            return Err(AppError::Policy(
-                "cloud object format is unsupported".into(),
-            ));
-        }
-    };
-    let parser = catalog.get(&selected.id)?;
-    let selection = ParserSelection {
-        parser_id: selected.id,
-        parser_version: parser.identity().version.into(),
-        confidence: selected.confidence.value(),
-        mode: ParserSelectionMode::Automatic,
-        timestamp_context: parser.timestamp_context().map(str::to_owned),
-        format_sample_sha256: crate::sha256(&sample),
-    };
-    Ok((parser, selection))
+    let selected = catalog.select_source(crate::modules::ParserSelectionRequest {
+        source,
+        sample: &sample,
+        parser_override: None,
+        forced: false,
+        time_context: None,
+    })?;
+    Ok((selected.parser, selected.selection))
 }
 
 fn require_signed_listing(

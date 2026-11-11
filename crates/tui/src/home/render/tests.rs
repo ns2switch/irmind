@@ -383,16 +383,3 @@ fn assistants_hide_the_background_composer() {
     );
     insta::assert_snapshot!("home_model_provider", screen);
 }
-
-#[test]
-fn experimental_writer_warning_has_a_visible_snapshot() {
-    let mut state = settings_fixture_state();
-    state.mode = Mode::Config;
-    state.common_writer = crate::home::CommonWriterState::Disabled;
-    state.preference_selected = 4;
-    state.pending_module_change = Some(irmind_app::ConfigChange::SetExperimentalCommonWriter(true));
-    insta::assert_snapshot!(
-        "experimental_writer_confirmation",
-        snapshot_screen(&state, items::preference_items(&state, &state.modules))
-    );
-}
