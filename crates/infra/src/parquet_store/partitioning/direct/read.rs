@@ -1,3 +1,4 @@
+mod prefix;
 use super::super::super::local::stream::{VerifiedInput, initial_hash};
 use super::super::staging::{Input, MAX_STAGED_ROW, StagedSource, source_sample};
 use super::{AppError, CancellationToken, MappedIngestRequest, ParquetStore, invalid_source};
@@ -169,7 +170,7 @@ fn plan_one(
 fn plan_hashed(
     store: &ParquetStore,
     request: &MappedIngestRequest<'_>,
-    mut input: Input,
+    input: Input,
     hints: OrderHints<'_>,
     cancel: &CancellationToken,
     initial: Initial,
@@ -186,13 +187,11 @@ fn plan_hashed(
     if path == first_path && &hash != first_hash {
         return Err(source_changed(path)?);
     }
-    if path != first_path
-        && hash_failure(
-            probe_order(store, request, &mut input, &initial, &hash, cancel),
+    if path != first_path {
+        return hash_failure(
+            prefix::plan_source(store, request, input, initial, hash, cancel),
             &path,
-        )?
-    {
-        return Ok(Plan::Stream(input, hash));
+        );
     }
     let staged = hash_failure(
         store.stage_hashed_source(
@@ -206,53 +205,6 @@ fn plan_hashed(
         &path,
     )?;
     Ok(Plan::Sorted(Box::new(staged)))
-}
-
-/// Classify with the same normalized sort keys, but never persist record rows.
-fn probe_order(
-    store: &ParquetStore,
-    request: &MappedIngestRequest<'_>,
-    input: &mut Input,
-    initial: &Initial,
-    hash: &EvidenceHash,
-    cancel: &CancellationToken,
-) -> Result<bool, AppError> {
-    let sample = source_sample(&mut input.file)?;
-    let mut previous = None;
-    let mut disorder = false;
-    let result = store.parse_normalized(
-        request.case_id,
-        VerifiedInput {
-            source: &mut input.file,
-            sample: &sample,
-            relative_path: &input.path,
-            hash: initial.1,
-            hash_value: hash,
-            size: initial.2,
-            cancel,
-            parser: request.parser,
-            precise_time: true,
-            decode_budget: input.decode_budget,
-        },
-        &mut |row| {
-            let key = row.sort_key();
-            if let Some(last) = previous
-                && irmind_domain::compare_record_keys(last, key, false)
-                    .map_err(|_| invalid_source())?
-                    .is_gt()
-            {
-                disorder = true;
-                return Err(AppError::Cancelled);
-            }
-            previous = Some(key);
-            Ok(())
-        },
-    );
-    match result {
-        Ok(_) => Ok(true),
-        Err(AppError::Cancelled) if disorder && !cancel.is_cancelled() => Ok(false),
-        Err(error) => Err(error),
-    }
 }
 
 pub(super) fn source_changed(path: String) -> Result<AppError, AppError> {

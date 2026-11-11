@@ -274,3 +274,74 @@ fn fallback_rejects_a_disordered_source_changed_after_the_order_probe() {
         1
     );
 }
+
+struct CountSourceReads(Arc<std::sync::Mutex<BTreeMap<String, usize>>>);
+impl irmind_app::SourceDecoder for CountSourceReads {
+    fn identity(&self) -> ParserIdentity<'_> {
+        JsonSourceDecoder.identity()
+    }
+
+    fn decode_reader(
+        &self,
+        input: SourceInput<'_>,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        *self
+            .0
+            .lock()
+            .unwrap()
+            .entry(input.metadata.source.reference().into())
+            .or_default() += 1;
+        JsonSourceDecoder.decode_reader(input, emit)
+    }
+}
+
+#[test]
+fn a_short_disordered_prefix_spills_without_redecoding_the_source() {
+    let root = tempfile::tempdir().unwrap();
+    let paths = ["a.ndjson".to_string(), "b.ndjson".to_string()];
+    for (name, first_second) in paths.iter().zip([2, 3]) {
+        fs::write(
+            root.path().join(name),
+            format!(
+                r#"{{"eventTime":"2026-11-01T00:00:0{first_second}Z","eventName":"SyntheticLater"}}
+{{"eventTime":"2026-11-01T00:00:01Z","eventName":"SyntheticEarlier"}}"#
+            ),
+        )
+        .unwrap();
+    }
+    let calls = Arc::new(std::sync::Mutex::new(BTreeMap::new()));
+    let (store, engine, catalog) =
+        fixture_decoder(root.path(), Arc::new(CountSourceReads(calls.clone())));
+    store.set_parallel_worker_limit(std::num::NonZeroU16::new(1));
+    let case = engine
+        .create_case("Bounded prefix spill", "local only")
+        .unwrap();
+    let parser = catalog
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap();
+    let use_cases = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &parser,
+    };
+    let token = CancellationToken::new();
+    assert_eq!(
+        use_cases
+            .ingest_local_batch(&case.id, root.path(), &paths, false, &token)
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        *calls.lock().unwrap(),
+        BTreeMap::from([("a.ndjson".into(), 2), ("b.ndjson".into(), 1)])
+    );
+    engine.verify(&case.id).unwrap();
+    assert_eq!(
+        use_cases
+            .verify_parquet_rebuild(&case.id, root.path(), &token)
+            .unwrap(),
+        2
+    );
+}
