@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "measurements": [
+    {
+      "run": 42989218819,
+      "reference": "062eb03ad1ba146149dfc03a8e58461fd9dc7b71",
+      "candidate": "8fcd563f597bf829ae445724bd483fccf3d88015",
+      "bytes": 1073741824,
+      "records": 663212,
+      "artifact_bytes": 48510482,
+      "cpus": 4,
+      "measurements": [
+        {
+          "workers": "reference-four",
+          "ingest_seconds": 16.355053,
+          "peak_rss_kib": 97052
+        },
+        {
+          "workers": 1,
+          "ingest_seconds": 16.911834,
+          "peak_rss_kib": 88424
+        },
+        {
+          "workers": "auto-three",
+          "ingest_seconds": 15.075114,
+          "peak_rss_kib": 89624
+        },
+        {
+          "workers": 4,
+          "ingest_seconds": 14.592571,
+          "peak_rss_kib": 96408
+        }
+      ],
+      "runner": "ubuntu-24.04",
+      "url": "https://github.com/ns2switch/irmind/actions/runs/42989218819"
+    },
+    {
+      "run": 42985241365,
+      "reference": "062eb03ad1ba146149dfc03a8e58461fd9dc7b71",
+      "candidate": "8fcd563f597bf829ae445724bd483fccf3d88015",
+      "bytes": 4294967296,
+      "records": 2652851,
+      "artifact_bytes": 194200266,
+      "cpus": 4,
+      "measurements": [
+        {
+          "workers": "reference-four",
+          "ingest_seconds": 83.463469,
+          "peak_rss_kib": 80516
+        },
+        {
+          "workers": 1,
+          "ingest_seconds": 94.130145,
+          "peak_rss_kib": 68208
+        },
+        {
+          "workers": "auto-three",
+          "ingest_seconds": 85.333103,
+          "peak_rss_kib": 74568
+        },
+        {
+          "workers": 4,
+          "ingest_seconds": 80.974082,
+          "peak_rss_kib": 82632
+        }
+      ],
+      "runner": "windows-latest",
+      "url": "https://github.com/ns2switch/irmind/actions/runs/42985241365"
+    }
+  ]
+}

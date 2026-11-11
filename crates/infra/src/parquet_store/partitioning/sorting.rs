@@ -18,32 +18,58 @@ impl ParquetStore {
         staged: &mut [StagedSource],
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
-        let max_bytes = staged
-            .iter()
-            .filter(|s| s.needs_sort)
-            .map(|s| {
-                s.spool
-                    .as_file()
-                    .metadata()
-                    .map(|m| m.len())
-                    .map_err(storage)
-            })
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .max();
-        if let Some(bytes) = max_bytes {
-            let required = bytes
-                .checked_mul(2)
-                .and_then(|n| n.checked_add(64 * 1024 * 1024))
-                .ok_or_else(invalid_source)?;
+        let mut sources = staged
+            .iter_mut()
+            .filter(|source| source.needs_sort)
+            .collect::<Vec<_>>();
+        let workers = self.workers.count();
+        for group in sources.chunks_mut(workers) {
+            let required = group
+                .iter()
+                .try_fold(64_u64 * 1024 * 1024, |bytes, source| {
+                    let size = source.spool.as_file().metadata().map_err(storage)?.len();
+                    size.checked_mul(2)
+                        .and_then(|size| bytes.checked_add(size))
+                        .ok_or_else(invalid_source)
+                })?;
             super::staging::check_space(
                 fs4::available_space(self.spool_dir(case)?).map_err(storage)?,
                 required,
             )?;
-        }
-        // One external sort at a time, after the parallel parser stage.
-        for source in staged.iter_mut().filter(|s| s.needs_sort) {
-            sort_source(self, case, source, cancel)?;
+            let operation = cancel.child_token();
+            std::thread::scope(|scope| {
+                let jobs = group
+                    .iter_mut()
+                    .map(|source| {
+                        let operation = &operation;
+                        scope.spawn(move || {
+                            let result = sort_source(self, case, source, operation);
+                            if result.is_err() {
+                                operation.cancel();
+                            }
+                            result
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                let mut failure = None;
+                for job in jobs {
+                    let result = job
+                        .join()
+                        .map_err(|_| invalid_source())
+                        .and_then(|result| result);
+                    if let Err(error) = result {
+                        operation.cancel();
+                        failure = Some(match failure {
+                            None => error,
+                            Some(previous) => super::attempt::prefer_failure(previous, error),
+                        });
+                    }
+                }
+                match failure {
+                    Some(error) => Err(error),
+                    None => Ok(()),
+                }
+            })?;
         }
         Ok(())
     }
