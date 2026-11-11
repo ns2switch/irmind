@@ -20,15 +20,8 @@ pub(super) fn verify_export_v6(
 ) -> Result<ExportVerification, AppError> {
     let version = 6;
     let mut input = File::open(path).map_err(storage)?;
-    if input.metadata().map_err(storage)?.len() > MAX_PACKAGE_FILE_BYTES {
-        return Err(storage_reason("export package exceeds size limit"));
-    }
-    let mut magic = [0u8; MAGIC_V6.len()];
-    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V6 {
-        return Err(AppError::Fixed(
-            irmind_app::FixedAppError::RetiredExportFormat,
-        ));
-    }
+    let size = input.metadata().map_err(storage)?.len();
+    read_package_magic(&mut input, size)?;
     let header: HeaderV6 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
     if header.version != version {
         return Err(storage_reason("unsupported export version"));
@@ -342,3 +335,19 @@ impl ChainState {
             .map_err(|_| AppError::InvalidChain(last.seq))
     }
 }
+
+fn read_package_magic(input: &mut impl Read, size: u64) -> Result<(), AppError> {
+    if size > MAX_PACKAGE_FILE_BYTES {
+        return Err(storage_reason("export package exceeds size limit"));
+    }
+    let mut magic = [0u8; MAGIC_V6.len()];
+    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V6 {
+        return Err(AppError::Fixed(
+            irmind_app::FixedAppError::RetiredExportFormat,
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests;

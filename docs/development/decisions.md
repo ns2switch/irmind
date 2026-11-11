@@ -698,3 +698,18 @@ Consequences: there is no new append recipe or signed format. Worker-count
 parity, bounded memory, cancellation, rollback and the absolute release gates
 remain required. The native EVTX chunk trial did not justify enabling helper
 parallelism; the distributed helper remains sequential on every platform.
+
+
+### Test the export first-read boundary without allocating a huge file
+
+Context: extending a file to the 2 TB export boundary is sparse on common Unix
+filesystems but can reserve physical disk space on Windows.
+
+Decision: share the existing length-and-magic gate with a unit test that passes
+virtual lengths and a reader that fails on any read. Keep the same size limit,
+error and ordering. Test the exact allowed boundary with valid magic as well.
+
+Consequences: all platforms exercise the limit and prove oversized packages are
+rejected before reading payload bytes. The complete exported-package and tamper
+tests still exercise the filesystem entry point. No sparse-file tool or elevated
+permission is required by the test.
