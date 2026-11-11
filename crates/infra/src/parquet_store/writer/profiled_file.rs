@@ -31,6 +31,9 @@ impl Write for ProfiledFile {
     fn write_all(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.measure(|file| file.write_all(bytes))
     }
+    fn write_vectored(&mut self, buffers: &[io::IoSlice<'_>]) -> io::Result<usize> {
+        self.measure(|file| file.write_vectored(buffers))
+    }
     fn flush(&mut self) -> io::Result<()> {
         self.measure(Write::flush)
     }
