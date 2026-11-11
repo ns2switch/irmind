@@ -198,3 +198,79 @@ fn parent_cancellation_during_a_source_failure_stays_an_operation_cancellation()
             .is_empty()
     );
 }
+
+struct ReplaceDisordered(PathBuf);
+impl irmind_app::SourceDecoder for ReplaceDisordered {
+    fn identity(&self) -> ParserIdentity<'_> {
+        JsonSourceDecoder.identity()
+    }
+
+    fn decode_reader(
+        &self,
+        input: SourceInput<'_>,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        let replace = input.metadata.source.reference() == "b.ndjson";
+        let cancel = input.metadata.cancel;
+        let result = JsonSourceDecoder.decode_reader(input, emit);
+        if replace && !cancel.is_cancelled() && matches!(result, Err(AppError::Cancelled)) {
+            fs::write(
+                &self.0,
+                br#"{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticReplacement"}"#,
+            )
+            .unwrap();
+        }
+        result
+    }
+}
+
+#[test]
+fn fallback_rejects_a_disordered_source_changed_after_the_order_probe() {
+    let root = tempfile::tempdir().unwrap();
+    let paths = ["a.ndjson".into(), "b.ndjson".into()];
+    fs::write(
+        root.path().join("a.ndjson"),
+        br#"{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticOrdered"}"#,
+    )
+    .unwrap();
+    let mutable = root.path().join("b.ndjson");
+    fs::write(
+        &mutable,
+        br#"{"eventTime":"2026-11-01T00:00:01Z","eventName":"SyntheticLate"}
+{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticEarly"}"#,
+    )
+    .unwrap();
+    let (store, engine, catalog) =
+        fixture_decoder(root.path(), Arc::new(ReplaceDisordered(mutable)));
+    let case = engine
+        .create_case("Source order retry", "local only")
+        .unwrap();
+    let parser = catalog
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap();
+    let use_cases = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &parser,
+    };
+    let token = CancellationToken::new();
+    let accepted = use_cases
+        .ingest_local_batch(&case.id, root.path(), &paths, false, &token)
+        .unwrap();
+    assert_eq!(accepted.len(), 1);
+    assert_eq!(accepted[0].0, "a.ndjson");
+    let entries = store.entries(&case.id).unwrap();
+    let rejected = entries
+        .iter()
+        .filter_map(|entry| RejectedSource::from_audit(entry).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(rejected.len(), 1);
+    assert_eq!(rejected[0].reason(), SourceFailureReason::Hash);
+    engine.verify(&case.id).unwrap();
+    assert_eq!(
+        use_cases
+            .verify_parquet_rebuild(&case.id, root.path(), &token)
+            .unwrap(),
+        1
+    );
+}

@@ -26,6 +26,17 @@ pub(in crate::parquet_store::partitioning) struct ParsedSource {
 pub(super) enum ProducedSource {
     Ordered(ParsedSource),
     Disordered(StagedSource),
+    NeedsSort {
+        path: String,
+        hash: irmind_domain::EvidenceHash,
+    },
+}
+
+pub(super) struct ProducerOutput<'a> {
+    pub(super) sender: &'a SyncSender<RowBatch>,
+    pub(super) restart: &'a AtomicBool,
+    pub(super) start: super::scheduling::Start,
+    pub(super) spool_on_disorder: bool,
 }
 
 impl ParsedSource {
@@ -70,10 +81,14 @@ impl ParquetStore {
         mut input: Input,
         request: &LocalBatchRequest<'_>,
         cancel: &CancellationToken,
-        sender: &SyncSender<RowBatch>,
-        restart: &AtomicBool,
-        start: super::scheduling::Start,
+        output: ProducerOutput<'_>,
     ) -> Result<ProducedSource, AppError> {
+        let ProducerOutput {
+            sender,
+            restart,
+            start,
+            spool_on_disorder,
+        } = output;
         let copied = request.copy_original;
         let (metadata, hash, size) =
             stream::initial_hash(&mut input.file, cancel, self.profile.as_deref())?;
@@ -103,28 +118,7 @@ impl ParquetStore {
                     precise_time: true,
                     decode_budget: input.decode_budget,
                 },
-                &mut |row| {
-                    if cancel.is_cancelled() {
-                        return Err(AppError::Cancelled);
-                    }
-                    if restart.load(Ordering::Acquire) {
-                        stopped_for_restart = true;
-                        return Err(AppError::Cancelled);
-                    }
-                    let result = rows.push(row);
-                    if rows.disordered {
-                        restart.store(true, Ordering::Release);
-                    }
-                    if result
-                        .as_ref()
-                        .is_err_and(|e| matches!(e, AppError::Cancelled))
-                        && restart.load(Ordering::Acquire)
-                        && !cancel.is_cancelled()
-                    {
-                        stopped_for_restart = true;
-                    }
-                    result
-                },
+                &mut |row| rows.emit(row, &mut stopped_for_restart),
             )
             .and_then(|(report, decoded)| {
                 mapping = decoded;
@@ -140,6 +134,12 @@ impl ParquetStore {
                 Ok(report)
             });
         let report = completed_report(result, stopped_for_restart, cancel)?;
+        if report.is_none() && !spool_on_disorder {
+            return Ok(ProducedSource::NeedsSort {
+                path: input.path,
+                hash: value,
+            });
+        }
         drop(rows);
         drop(stage);
         ParsedSource {
@@ -202,6 +202,29 @@ impl<'a> RowBuffer<'a> {
             disordered: false,
             hash,
         }
+    }
+
+    fn emit(&mut self, row: RecordRow, stopped_for_restart: &mut bool) -> Result<(), AppError> {
+        if self.cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        if self.restart.load(Ordering::Acquire) {
+            *stopped_for_restart = true;
+            return Err(AppError::Cancelled);
+        }
+        let result = self.push(row);
+        if self.disordered {
+            self.restart.store(true, Ordering::Release);
+        }
+        if result
+            .as_ref()
+            .is_err_and(|error| matches!(error, AppError::Cancelled))
+            && self.restart.load(Ordering::Acquire)
+            && !self.cancel.is_cancelled()
+        {
+            *stopped_for_restart = true;
+        }
+        result
     }
 
     fn push(&mut self, row: RecordRow) -> Result<(), AppError> {

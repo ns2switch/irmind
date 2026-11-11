@@ -10,7 +10,7 @@ on:
         description: Corpus for the worker sweep
         type: choice
         default: cloud-files
-        options: [cloud-files, endpoint-files, ndjson-1gib, ndjson-4gib]
+        options: [cloud-files, endpoint-files, endpoint-disorder, ndjson-1gib, ndjson-4gib]
       pipeline_profile:
         description: Profile the production pipeline and allocation calls against a pinned baseline
         type: boolean

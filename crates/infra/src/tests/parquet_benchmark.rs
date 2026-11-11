@@ -25,7 +25,13 @@ fn parquet_worker_benchmark_1gib() -> Result<(), &'static str> {
     if cfg!(debug_assertions) {
         return Err("worker benchmark requires a release build");
     }
-    benchmark(1_030, 1, "1gb");
+    let scenario = Scenario::from_environment();
+    let (files, multiplier) = if scenario.hosts.is_some() && !scenario.chronological {
+        (515, 2)
+    } else {
+        (1_030, 1)
+    };
+    run_benchmark(files, multiplier, "1gb", &scenario);
     Ok(())
 }
 
@@ -191,7 +197,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         layout_started.elapsed().as_secs_f64()
     );
     let ingest_time = started.elapsed();
-    if files == 1_030 {
+    if matches!(files, 515 | 1_030) {
         assert!(total_bytes >= 1 << 30);
     }
     let (staging_peak, staging_errors) = staging_probe.finish();
@@ -212,8 +218,9 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
     }
     let [hash_time, conversion_time, row_time, parquet_time, _, _] = profile.snapshot();
     println!(
-        "PARQUET_FINALIZE seconds={:.6}",
-        profile.partition_finalize_time().as_secs_f64()
+        "PARQUET_FINALIZE seconds={:.6} normalized_staged_sources={}",
+        profile.partition_finalize_time().as_secs_f64(),
+        profile.staged_sources()
     );
     let disk_bytes = directory_bytes(&root.path().join("case/parquet"));
     let coobservation_bytes = measurements::report_storage(

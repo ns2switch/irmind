@@ -9,7 +9,7 @@ use super::batch::{PreparedPartition, Writing};
 use super::staging::Input;
 use irmind_app::LocalBatchRequest;
 pub(super) use producer::ParsedSource;
-use producer::{ProducedSource, RowBatch};
+use producer::{ProducedSource, ProducerOutput, RowBatch};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, sync_channel};
 use std::sync::{
     Arc,
@@ -66,9 +66,12 @@ impl ParquetStore {
                             input,
                             request,
                             cancel,
-                            &sender,
-                            &worker_restart,
-                            start,
+                            ProducerOutput {
+                                sender: &sender,
+                                restart: &worker_restart,
+                                start,
+                                spool_on_disorder: true,
+                            },
                         );
                         if result.is_ok() {
                             abort.0 = CancellationToken::new();

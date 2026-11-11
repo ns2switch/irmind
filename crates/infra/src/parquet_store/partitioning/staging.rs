@@ -93,6 +93,9 @@ impl ParquetStore {
             .map_err(|_| invalid_source())?;
         let sample = source_sample(&mut input.file)?;
         let mut spool = self.create_normalized_spool(case)?;
+        if let Some(profile) = &self.profile {
+            profile.record_staged_source();
+        }
         let mut writer = std::io::BufWriter::new(spool.as_file_mut());
         let mut bytes = 0u64;
         let mut normalized_hash = Sha256::new();

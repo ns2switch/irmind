@@ -1,15 +1,19 @@
 //! Canonical consumption of bounded parser queues into final writers.
 use super::{
     Allocator, AppError, Arc, AtomicBool, CancellationToken, Duration, Input, LocalBatchRequest,
-    ParquetStore, ParsedSource, ProducedSource, Receiver, RecvTimeoutError, RowBatch,
-    invalid_source, scheduling, sync_channel,
+    ParquetStore, ParsedSource, ProducedSource, ProducerOutput, Receiver, RecvTimeoutError,
+    RowBatch, invalid_source, scheduling, sync_channel,
 };
 use crate::parquet_store::writer::direct::DirectWriting;
 use irmind_app::{MappedIngestRequest, MappedSourceAcquisition};
 
 pub(in crate::parquet_store::partitioning) enum DirectChunk {
     Ordered(Vec<MappedSourceAcquisition>),
-    NeedsSort,
+    NeedsSort {
+        path: String,
+        hash: irmind_domain::EvidenceHash,
+        ordered: Vec<MappedSourceAcquisition>,
+    },
 }
 impl ParquetStore {
     pub(in crate::parquet_store::partitioning) fn stream_direct_chunk(
@@ -41,9 +45,12 @@ impl ParquetStore {
                             input,
                             batch,
                             operation,
-                            &sender,
-                            &worker_restart,
-                            start,
+                            ProducerOutput {
+                                sender: &sender,
+                                restart: &worker_restart,
+                                start,
+                                spool_on_disorder: false,
+                            },
                         );
                         tag_source_error(result, path)
                     });
@@ -60,22 +67,7 @@ impl ParquetStore {
                     });
                     drop(receiver);
                     let parsed = worker.join().map_err(|_| invalid_source()).and_then(|v| v);
-                    result = match (consumed, parsed, result) {
-                        (Err(error), _, _) if !matches!(error, AppError::Cancelled) => Err(error),
-                        (_, Err(error), _) | (Err(error), _, _) => Err(error),
-                        (Ok(()), Ok(ProducedSource::Disordered(_)), _) => {
-                            Ok(DirectChunk::NeedsSort)
-                        }
-                        (
-                            Ok(()),
-                            Ok(ProducedSource::Ordered(source)),
-                            Ok(DirectChunk::Ordered(mut sources)),
-                        ) => {
-                            sources.push(ordered_acquisition(source)?);
-                            Ok(DirectChunk::Ordered(sources))
-                        }
-                        _ => Err(invalid_source()),
-                    };
+                    result = resolve_source(consumed, parsed, result);
                     if !matches!(result, Ok(DirectChunk::Ordered(_))) {
                         operation.cancel();
                     }
@@ -140,6 +132,31 @@ impl ParquetStore {
         }
     }
 }
+fn resolve_source(
+    consumed: Result<(), AppError>,
+    parsed: Result<ProducedSource, AppError>,
+    result: Result<DirectChunk, AppError>,
+) -> Result<DirectChunk, AppError> {
+    match (consumed, parsed, result) {
+        (Err(error), _, _) if !matches!(error, AppError::Cancelled) => Err(error),
+        (_, Err(error), _) | (Err(error), _, _) => Err(error),
+        (
+            Ok(()),
+            Ok(ProducedSource::NeedsSort { path, hash }),
+            Ok(DirectChunk::Ordered(ordered)),
+        ) => Ok(DirectChunk::NeedsSort {
+            path,
+            hash,
+            ordered,
+        }),
+        (Ok(()), Ok(ProducedSource::Ordered(source)), Ok(DirectChunk::Ordered(mut sources))) => {
+            sources.push(ordered_acquisition(source)?);
+            Ok(DirectChunk::Ordered(sources))
+        }
+        _ => Err(invalid_source()),
+    }
+}
+
 fn ordered_acquisition(mut source: ParsedSource) -> Result<MappedSourceAcquisition, AppError> {
     Ok(MappedSourceAcquisition {
         manifest: source.manifest,

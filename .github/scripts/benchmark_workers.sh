@@ -40,9 +40,9 @@ TMPDIR=$(native_path "$scratch/runtime")
 export TMP="$TMPDIR" TEMP="$TMPDIR"
 workload=${WORKER_WORKLOAD:-cloud-files}
 case "$workload" in
-    cloud-files|endpoint-files)
+    cloud-files|endpoint-files|endpoint-disorder)
         # The fixed-worker reference needs the same 1 GiB corpus as the candidate.
-        python3 - "$scratch/reference/crates/infra/src/tests/parquet_benchmark.rs" <<'PYWORKLOAD'
+        python3 - "$scratch/reference/crates/infra/src/tests/parquet_benchmark.rs" "$workload" <<'PYWORKLOAD'
 from pathlib import Path
 import sys
 
@@ -50,7 +50,8 @@ path = Path(sys.argv[1])
 text = path.read_text()
 old = 'benchmark(1_000, 1, "1gb");'
 assert text.count(old) == 1
-path.write_text(text.replace(old, 'benchmark(1_030, 1, "1gb");'))
+new = 'benchmark(515, 2, "1gb");' if sys.argv[2] == 'endpoint-disorder' else 'benchmark(1_030, 1, "1gb");'
+path.write_text(text.replace(old, new))
 PYWORKLOAD
         ;;
     ndjson-1gib|ndjson-4gib)
@@ -77,9 +78,10 @@ PYWORKLOAD
 esac
 
 export IRMIND_BENCH_SCENARIO=cloud-v2 IRMIND_BENCH_COMMON_EVENT=1
-if [[ "$workload" == endpoint-files ]]; then
-    export IRMIND_BENCH_SCENARIO=endpoint-v2-64-chronological
-fi
+case "$workload" in
+    endpoint-files) export IRMIND_BENCH_SCENARIO=endpoint-v2-64-chronological ;;
+    endpoint-disorder) export IRMIND_BENCH_SCENARIO=endpoint-v2-64 ;;
+esac
 export CARGO_TARGET_DIR
 CARGO_TARGET_DIR=$(native_path "${CARGO_TARGET_DIR:-$root/target}")
 unset IRMIND_HUNTEVAL_ROOT IRMIND_BENCH_WORKERS
@@ -124,7 +126,7 @@ run() {
             tee "worker-sweep-$label.txt"
     fi
 }
-if [[ "$workload" == *-files ]]; then
+if [[ "$workload" == *-files || "$workload" == endpoint-disorder ]]; then
     IRMIND_BENCH_WORKERS=4 run fixed '::parquet_benchmark_1gb' reference-four
     filter='::parquet_worker_benchmark_1gib'
 else
