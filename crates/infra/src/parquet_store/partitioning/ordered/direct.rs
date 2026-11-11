@@ -1,8 +1,8 @@
 //! Canonical consumption of bounded parser queues into final writers.
 use super::{
-    Allocator, AppError, Arc, AtomicBool, CancellationToken, Duration, Input, LocalBatchRequest,
-    ParquetStore, ParsedSource, ProducedSource, ProducerOutput, Receiver, RecvTimeoutError,
-    RowBatch, invalid_source, scheduling, sync_channel,
+    Allocator, AppError, Arc, AtomicBool, CancellationToken, Duration, Input, ParquetStore,
+    ParsedSource, ProducedSource, ProducerOutput, Receiver, RecvTimeoutError, RowBatch,
+    invalid_source, scheduling, sync_channel,
 };
 use crate::parquet_store::writer::direct::DirectWriting;
 use irmind_app::{MappedIngestRequest, MappedSourceAcquisition};
@@ -26,7 +26,7 @@ impl ParquetStore {
     ) -> Result<DirectChunk, AppError> {
         let serial = self.direct_serial(request, &inputs)?;
         let operation = cancel.child_token();
-        let batch = producer_request(request);
+        let batch = request;
         std::thread::scope(|scope| {
             let _abort = scheduling::Abort(operation.clone());
             let workers = inputs
@@ -49,7 +49,6 @@ impl ParquetStore {
                                 sender: &sender,
                                 restart: &worker_restart,
                                 start,
-                                spool_on_disorder: false,
                             },
                         );
                         tag_source_error(result, path)
@@ -157,12 +156,12 @@ fn resolve_source(
     }
 }
 
-fn ordered_acquisition(mut source: ParsedSource) -> Result<MappedSourceAcquisition, AppError> {
+fn ordered_acquisition(source: ParsedSource) -> Result<MappedSourceAcquisition, AppError> {
     Ok(MappedSourceAcquisition {
         manifest: source.manifest,
-        report: source.report.take().ok_or_else(invalid_source)?,
+        report: source.report,
         format_sample_sha256: source.sample_hash,
-        decoded: source.mapping.take().ok_or_else(invalid_source)?,
+        decoded: source.mapping,
     })
 }
 
@@ -179,18 +178,5 @@ fn tag_source_error(
             )?,
         )),
         other => other,
-    }
-}
-
-fn producer_request<'a>(request: &MappedIngestRequest<'a>) -> LocalBatchRequest<'a> {
-    LocalBatchRequest {
-        case_id: request.case_id,
-        source_root: request.source_root,
-        relative_paths: request.relative_paths,
-        copy_original: request.copy_original,
-        parser: request.parser,
-        // Only the coordinator allocates partitions from the validated inventory.
-        committed_artifacts: &[],
-        limits: request.limits,
     }
 }

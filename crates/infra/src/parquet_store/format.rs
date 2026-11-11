@@ -33,19 +33,17 @@ pub(super) fn expected_type(name: &str, precise: bool) -> DataType {
 }
 
 pub(super) fn validate_schema(artifact: &ParquetArtifact, schema: &Schema) -> Result<(), AppError> {
-    if let Some(v) = artifact.precise_metadata() {
-        if !(super::partitioning::supported_builder(&v.builder_version)
-            || matches!(artifact, ParquetArtifact::V3(_))
-                && v.builder_version == irmind_domain::PARQUET_LAYOUT_BUILDER_V1)
-            || (v.builder_version == super::writer::precise::BUILDER
-                && (!v.partition.scopes.is_empty() || v.partition.all_scope_overflow))
-        {
-            return Err(invalid_source());
-        }
-        super::common_format::validate_metadata(v.schema, schema, &v.builder_version)?;
-        validate_columns(v.schema, schema)?;
+    let ParquetArtifact::V3(mapped) = artifact else {
+        return Err(AppError::Fixed(
+            irmind_app::FixedAppError::RetiredCaseFormat,
+        ));
+    };
+    let v = mapped.core();
+    if !super::partitioning::supported_builder(&v.builder_version) {
+        return Err(invalid_source());
     }
-    Ok(())
+    super::common_format::validate_metadata(v.schema, schema, &v.builder_version)?;
+    validate_columns(v.schema, schema)
 }
 
 pub(super) fn validate_row_count(artifact: &ParquetArtifact, rows: i64) -> Result<(), AppError> {
