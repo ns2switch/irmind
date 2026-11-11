@@ -14,7 +14,7 @@ use std::{
     sync::Mutex,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use zeroize::{Zeroize as _, Zeroizing};
+use zeroize::Zeroizing;
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const SCOPE: &str = "https://www.googleapis.com/auth/chronicle";
 
@@ -31,31 +31,28 @@ struct Token {
 struct ServiceAccount {
     r#type: String,
     client_email: String,
-    private_key: String,
+    #[serde(deserialize_with = "secret_field")]
+    private_key: SecretString,
     token_uri: String,
-}
-impl Drop for ServiceAccount {
-    fn drop(&mut self) {
-        self.private_key.zeroize();
-    }
 }
 #[derive(Deserialize)]
 struct TokenResponse {
-    access_token: String,
+    #[serde(deserialize_with = "secret_field")]
+    access_token: SecretString,
     token_type: String,
     expires_in: u32,
 }
-impl Drop for TokenResponse {
-    fn drop(&mut self) {
-        self.access_token.zeroize();
-    }
+fn secret_field<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<SecretString, D::Error> {
+    String::deserialize(deserializer).map(SecretString::from)
 }
 impl Credentials {
     pub(super) fn new(raw: &SecretString) -> Result<Self, AppError> {
         if raw.expose_secret().len() > 64 * 1024 {
             return Err(invalid_config());
         }
-        let mut account: ServiceAccount =
+        let account: ServiceAccount =
             serde_json::from_str(raw.expose_secret()).map_err(|_| invalid_config())?;
         if account.r#type != "service_account"
             || account.token_uri != TOKEN_URL
@@ -68,10 +65,10 @@ impl Credentials {
         {
             return Err(invalid_config());
         }
-        let key = SecretString::from(std::mem::take(&mut account.private_key));
+        let key = account.private_key;
         let _ = parse_key(&key)?;
         Ok(Self {
-            email: account.client_email.clone(),
+            email: account.client_email,
             key,
             token: Mutex::new(None),
         })
@@ -115,17 +112,21 @@ impl Credentials {
                     _ => AppError::RemoteTool,
                 })?,
         );
-        let mut token: TokenResponse =
+        let token: TokenResponse =
             serde_json::from_slice(&raw).map_err(|_| AppError::RemoteTool)?;
         if token.token_type != "Bearer"
             || !(60..=3600).contains(&token.expires_in)
-            || token.access_token.is_empty()
-            || token.access_token.len() > 8192
-            || !token.access_token.bytes().all(|b| b.is_ascii_graphic())
+            || token.access_token.expose_secret().is_empty()
+            || token.access_token.expose_secret().len() > 8192
+            || !token
+                .access_token
+                .expose_secret()
+                .bytes()
+                .all(|b| b.is_ascii_graphic())
         {
             return Err(AppError::RemoteTool);
         }
-        let secret = SecretString::from(std::mem::take(&mut token.access_token));
+        let secret = token.access_token;
         let expires = Instant::now()
             .checked_add(Duration::from_secs(u64::from(token.expires_in - 30)))
             .ok_or(AppError::RemoteTool)?;
