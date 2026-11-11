@@ -81,7 +81,12 @@ run() {
 for cap in $(printf '%s\n' 1 4 "$cores" auto | awk '!seen[$0]++'); do
     if [[ "$cap" == auto ]]; then unset IRMIND_BENCH_WORKERS; else export IRMIND_BENCH_WORKERS=$cap; fi
     for pair in 1 2 3; do
-        run reference "reference-$cap-$pair"
-        run candidate "candidate-$cap-$pair"
+        if (( pair % 2 )); then
+            run reference "reference-$cap-$pair"
+            run candidate "candidate-$cap-$pair"
+        else
+            run candidate "candidate-$cap-$pair"
+            run reference "reference-$cap-$pair"
+        fi
     done
 done

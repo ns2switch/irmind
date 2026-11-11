@@ -119,14 +119,14 @@ impl ParquetStore {
                 return Err(AppError::Cancelled);
             }
             let started = std::time::Instant::now();
-            let received = receiver.recv_timeout(Duration::from_millis(10));
+            let outcome = receiver.recv_timeout(Duration::from_millis(10));
             if let Some(profile) = &self.profile {
                 profile.record_concurrency(
                     crate::parquet_store::profile::ConcurrencyPhase::ConsumerQueue,
                     started.elapsed(),
                 );
             }
-            match received {
+            match outcome {
                 Ok(batch) => {
                     writing.register_source(&batch.hash, source)?;
                     for row in batch.rows {
