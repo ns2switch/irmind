@@ -3,6 +3,7 @@ mod listing;
 mod local;
 mod object_read;
 mod remote;
+mod result_source;
 
 use crate::{
     AppError, AuditEventKind, AuthorizedCall, BTreeMap, CancellationToken, Case, CaseId, Decision,

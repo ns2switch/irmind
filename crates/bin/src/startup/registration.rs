@@ -396,25 +396,15 @@ fn register_security_products(
         saved,
         allow_environment,
     );
-    #[cfg(feature = "siem-elastic")]
-    if cli.enable_elastic {
-        register_configured!(
-            registry,
-            irmind_mod_siem_elastic::Elastic,
-            irmind_mod_siem_elastic::MANIFEST,
-            secrets,
-            saved,
-            allow_environment,
-            interactive,
-            config_issues
-        );
-    }
-    #[cfg(not(feature = "siem-elastic"))]
-    if cli.enable_elastic && !interactive {
-        return Err(anyhow!(
-            "this binary was built without the siem-elastic feature"
-        ));
-    }
+    register_elastic(
+        cli,
+        saved,
+        secrets,
+        allow_environment,
+        interactive,
+        registry,
+        config_issues,
+    )?;
     #[cfg(feature = "siem-splunk")]
     if cli.enable_splunk {
         register_configured!(
@@ -546,5 +536,57 @@ fn register_edr_and_intel(
             "this binary was built without the ti-virustotal feature"
         ));
     }
+    Ok(())
+}
+
+fn register_elastic(
+    cli: &Cli,
+    saved: &PersistentConfig,
+    secrets: &dyn SecretBackend,
+    allow_environment: bool,
+    interactive: bool,
+    registry: &mut ModuleRegistry,
+    config_issues: &mut BTreeMap<&'static str, String>,
+) -> Result<()> {
+    let _ = (
+        &secrets,
+        &registry,
+        &config_issues,
+        saved,
+        allow_environment,
+    );
+    #[cfg(feature = "siem-elastic")]
+    if cli.enable_elastic {
+        register_configured!(
+            registry,
+            irmind_mod_siem_elastic::Elastic,
+            irmind_mod_siem_elastic::MANIFEST,
+            secrets,
+            saved,
+            allow_environment,
+            interactive,
+            config_issues
+        );
+    }
+    #[cfg(not(feature = "siem-elastic"))]
+    if cli.enable_elastic && !interactive {
+        return Err(anyhow!(
+            "this binary was built without the siem-elastic feature"
+        ));
+    }
+    #[cfg(feature = "siem-elastic")]
+    if registry.manifest("siem-elastic").is_none() {
+        registry.add_source_decoder(std::sync::Arc::new(
+            irmind_mod_siem_elastic::ElasticSourceDecoder,
+        ))?;
+    }
+    #[cfg(feature = "siem-elastic")]
+    registry.register(
+        Box::new(
+            irmind_mod_mapping_ecs::EcsMapping::for_elastic()
+                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+        ),
+        &irmind_app::modules::ModuleConfig::new(),
+    )?;
     Ok(())
 }

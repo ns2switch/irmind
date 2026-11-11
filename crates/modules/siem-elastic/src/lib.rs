@@ -3,6 +3,7 @@
 mod config;
 mod query;
 mod response;
+mod source;
 pub use config::MANIFEST;
 use irmind_app::{
     AppError, CancellationToken, SiemPort, async_trait,
@@ -11,6 +12,7 @@ use irmind_app::{
 use irmind_domain::{AuthorizedCall, Tool};
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::Value;
+pub use source::ElasticSourceDecoder;
 
 pub struct Elastic {
     client: reqwest::Client,
@@ -35,6 +37,7 @@ impl Module for Elastic {
         registry: &mut ModuleRegistry,
         _: &ModuleConfig,
     ) -> Result<(), AppError> {
+        registry.add_source_decoder(std::sync::Arc::new(ElasticSourceDecoder))?;
         registry.add_siem(self)
     }
 }
