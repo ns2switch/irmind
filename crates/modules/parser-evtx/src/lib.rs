@@ -90,15 +90,6 @@ impl EvtxParser {
         }
         result
     }
-    fn decode_file(
-        &self,
-        file: &File,
-        cancel: &CancellationToken,
-        frame: &mut dyn FnMut(&[u8]) -> Result<(), AppError>,
-    ) -> Result<(), AppError> {
-        self.decode_file_workers(file, cancel, 1, frame)
-    }
-
     fn decode_file_workers(
         &self,
         file: &File,

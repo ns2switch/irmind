@@ -27,6 +27,14 @@ impl Signer for SyntheticSigner {
 }
 
 fn setup(root: &Path) -> (Engine<'_>, Arc<LocalStore>, Arc<EvtxParser>) {
+    setup_with_clock(root, Arc::new(SystemClock))
+}
+
+fn setup_with_clock(
+    root: &Path,
+    clock: Arc<dyn irmind_app::Clock>,
+) -> (Engine<'_>, Arc<LocalStore>, Arc<EvtxParser>) {
+    std::fs::create_dir_all(root).unwrap();
     let parser = Arc::new(EvtxParser::new(&support::helper_path(), root));
     assert!(
         parser.unavailable_reason().is_none(),
@@ -52,7 +60,7 @@ fn setup(root: &Path) -> (Engine<'_>, Arc<LocalStore>, Arc<EvtxParser>) {
             Arc::new(irmind_mod_parser_json::JsonParser),
         ),
         ExecutionMode::Attended,
-        Arc::new(SystemClock),
+        clock,
     )
     .unwrap();
     (engine, store, parser)
@@ -311,4 +319,76 @@ fn store_source_has_records(store: &LocalStore, case: &irmind_app::CaseId, name:
         .raw_record(case, manifest.source.sha256.as_str(), 0)
         .unwrap()
         .contains("Event")
+}
+
+#[test]
+fn helper_workers_preserve_parquet_commitments_and_every_signed_entry() {
+    let root = tempfile::tempdir().unwrap();
+    let inputs = root.path().join("inputs");
+    std::fs::create_dir(&inputs).unwrap();
+    let fixture =
+        include_bytes!("../../../crates/testkit/fixtures/parser-evtx/source/Security.evtx");
+    let mut bytes = fixture[..4096].to_vec();
+    bytes[16..24].copy_from_slice(&7u64.to_le_bytes());
+    bytes[42..44].copy_from_slice(&8u16.to_le_bytes());
+    let crc = evtx::checksum_ieee(&bytes[..120]);
+    bytes[124..128].copy_from_slice(&crc.to_le_bytes());
+    for _ in 0..8 {
+        bytes.extend_from_slice(&fixture[4096..]);
+    }
+    std::fs::write(inputs.join("collection.evtx"), bytes).unwrap();
+    let seed = root.path().join("seed");
+    let (engine, store, parser) = setup_with_clock(
+        &seed,
+        Arc::new(irmind_testkit::FixedClock::new(1_793_491_200)),
+    );
+    let case = engine
+        .create_case("Synthetic worker equivalence", "local only")
+        .unwrap();
+    drop((engine, store, parser));
+    let mut expected = None;
+    for workers in [1, 2, 4, 256] {
+        let run = root.path().join(format!("workers-{workers}"));
+        std::fs::create_dir(&run).unwrap();
+        std::fs::copy(seed.join("irmind.db"), run.join("irmind.db")).unwrap();
+        let (engine, store, parser) = setup_with_clock(
+            &run,
+            Arc::new(irmind_testkit::FixedClock::new(1_793_491_200)),
+        );
+        store.set_parallel_worker_limit(std::num::NonZeroU16::new(workers));
+        let selected = SourceDecoderSelection::new(parser);
+        let use_cases = LargeCaseUseCases {
+            engine: &engine,
+            store: store.as_ref(),
+            parser: &selected,
+        };
+        use_cases
+            .ingest_local_batch(
+                &case.id,
+                &inputs,
+                &["collection.evtx".into()],
+                false,
+                &CancellationToken::new(),
+            )
+            .unwrap();
+        engine.verify(&case.id).unwrap();
+        assert_eq!(
+            use_cases
+                .verify_parquet_rebuild(&case.id, &inputs, &CancellationToken::new())
+                .unwrap(),
+            1
+        );
+        let entries = store.entries(&case.id).unwrap();
+        let inventory = irmind_app::artifact_catalog(&entries).unwrap().active;
+        let actual = (
+            entries.iter().map(|entry| entry.hash).collect::<Vec<_>>(),
+            inventory,
+        );
+        assert!(!actual.1.is_empty());
+        if let Some(expected) = &expected {
+            assert_eq!(&actual, expected, "worker cap {workers}");
+        } else {
+            expected = Some(actual);
+        }
+    }
 }

@@ -1,5 +1,7 @@
 """Development-only process memory sampling; no third-party packages."""
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -67,5 +69,17 @@ def windows_processes(names=('large_collection.exe', 'irmind-evtx.exe')):
         kernel.CloseHandle(snapshot)
 
 
+def macos_processes():
+    output = subprocess.check_output(['ps', '-axo', 'pid=,ppid=,rss=,comm='], text=True)
+    for line in output.splitlines():
+        fields = line.split(maxsplit=3)
+        if len(fields) == 4:
+            yield int(fields[0]), int(fields[1]), Path(fields[3]).name, int(fields[2]) * 1024
+
+
 def processes():
-    return windows_processes() if os.name == 'nt' else linux_processes()
+    if os.name == 'nt':
+        return windows_processes()
+    if sys.platform == 'darwin':
+        return macos_processes()
+    return linux_processes()

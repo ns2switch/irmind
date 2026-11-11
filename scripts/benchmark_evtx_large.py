@@ -48,7 +48,7 @@ def measure(executable, mib, work, batch_files, single=False, dense=False, worke
                 raise RuntimeError('benchmark memory could not be measured for both processes')
             result.update({'corpus_mib': mib, 'single_source': single, 'dense_source': dense, 'parent_peak_bytes': peaks['parent'],
                            'helper_peak_bytes': peaks['helper'], 'observed_children': len(child_peaks),
-                           'memory_method': '20 ms sampling of OS process high-water resident/working-set counters; per-process maximum, not sum',
+                           'memory_method': ('20 ms sampling of resident bytes via ps; sampled peak, not a high-water counter' if platform.system() == 'Darwin' else '20 ms sampling of OS process high-water resident/working-set counters; per-process maximum, not sum'),
                            'requested_workers': workers, 'available_cores': os.cpu_count(),
                            'initial_free_disk_bytes': initial_free, 'os': platform.system(), 'architecture': platform.machine()})
             return result
