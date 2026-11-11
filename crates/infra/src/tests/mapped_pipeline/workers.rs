@@ -8,7 +8,7 @@ fn worker_caps_preserve_parquet_and_the_complete_signed_chain() {
     let inputs = root.path().join("sources");
     fs::create_dir(&inputs).unwrap();
     let paths = write_sources(&inputs);
-    compare_worker_counts(root.path(), &inputs, &paths);
+    compare_worker_counts(root.path(), &inputs, &paths, paths.len());
 }
 
 #[test]
@@ -28,10 +28,22 @@ fn one_ndjson_source_preserves_signed_bytes_with_parallel_record_decoding() {
     }
     out.flush().unwrap();
     drop(out);
-    compare_worker_counts(root.path(), &inputs, &[name.into()]);
+    compare_worker_counts(root.path(), &inputs, &[name.into()], 1);
 }
 
-fn compare_worker_counts(root: &Path, inputs: &Path, paths: &[String]) {
+#[test]
+fn mixed_order_and_rejected_sources_keep_the_same_chain_at_each_worker_cap() {
+    let root = tempfile::tempdir().unwrap();
+    let inputs = root.path().join("sources");
+    fs::create_dir(&inputs).unwrap();
+    let paths = write_sources(&inputs);
+    for index in [3, 10] {
+        fs::write(inputs.join(&paths[index]), b"{invalid synthetic source").unwrap();
+    }
+    compare_worker_counts(root.path(), &inputs, &paths, paths.len() - 2);
+}
+
+fn compare_worker_counts(root: &Path, inputs: &Path, paths: &[String], accepted: usize) {
     let seed = root.join("seed");
     let (_, engine, catalog) = fixture(&seed);
     let case = engine
@@ -60,14 +72,14 @@ fn compare_worker_counts(root: &Path, inputs: &Path, paths: &[String]) {
                 .ingest_local_batch(&case.id, inputs, paths, false, &cancel)
                 .unwrap()
                 .len(),
-            paths.len()
+            accepted
         );
         engine.verify(&case.id).unwrap();
         assert_eq!(
             ingest
                 .verify_parquet_rebuild(&case.id, inputs, &cancel)
                 .unwrap(),
-            paths.len()
+            accepted
         );
         let entries = store.entries(&case.id).unwrap();
         let hashes = entries.iter().map(|entry| entry.hash).collect::<Vec<_>>();
