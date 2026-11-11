@@ -25,6 +25,8 @@ pub(super) struct Cli {
     #[arg(long)]
     pub(super) enable_elastic: bool,
     #[arg(long)]
+    pub(super) enable_chronicle: bool,
+    #[arg(long)]
     pub(super) enable_misp: bool,
     #[arg(long)]
     pub(super) enable_aws: bool,

@@ -9,6 +9,15 @@ pub enum AdapterPolicyError {
     #[error("invalid structured Elasticsearch query or mismatched source")]
     InvalidElasticQuery,
 
+    #[error("invalid Google SecOps connector or service-account configuration")]
+    InvalidChronicleConfiguration,
+    #[error("invalid structured Google SecOps query or mismatched source")]
+    InvalidChronicleQuery,
+    #[error(
+        "Google SecOps cannot restrict detection reads by event account; configure an explicitly authorized instance scope to read detections"
+    )]
+    ChronicleDetectionScopeUnsupported,
+
     #[error("policy denied: AWS credential account differs from case scope")]
     AWSCredentialAccountDiffersFromCaseScope,
     #[error("policy denied: AWS credentials do not use the dedicated role")]

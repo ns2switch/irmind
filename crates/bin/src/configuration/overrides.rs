@@ -63,6 +63,11 @@ fn connector_overrides(cli: &Cli, saved: &PersistentConfig, rows: &mut Vec<Egres
     for (module, env_name, flag) in [
         ("siem-splunk", "IRMIND_ENABLE_SPLUNK", cli.enable_splunk),
         ("siem-elastic", "IRMIND_ENABLE_ELASTIC", cli.enable_elastic),
+        (
+            "siem-chronicle",
+            "IRMIND_ENABLE_CHRONICLE",
+            cli.enable_chronicle,
+        ),
         ("cloud-aws", "IRMIND_ENABLE_AWS", cli.enable_aws),
         (
             "storage-s3",

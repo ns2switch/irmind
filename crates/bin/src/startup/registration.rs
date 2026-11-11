@@ -396,6 +396,15 @@ fn register_security_products(
         saved,
         allow_environment,
     );
+    register_chronicle(
+        cli,
+        saved,
+        secrets,
+        allow_environment,
+        interactive,
+        registry,
+        config_issues,
+    )?;
     register_elastic(
         cli,
         saved,
@@ -584,6 +593,58 @@ fn register_elastic(
     registry.register(
         Box::new(
             irmind_mod_mapping_ecs::EcsMapping::for_elastic()
+                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+        ),
+        &irmind_app::modules::ModuleConfig::new(),
+    )?;
+    Ok(())
+}
+
+fn register_chronicle(
+    cli: &Cli,
+    saved: &PersistentConfig,
+    secrets: &dyn SecretBackend,
+    allow_environment: bool,
+    interactive: bool,
+    registry: &mut ModuleRegistry,
+    config_issues: &mut BTreeMap<&'static str, String>,
+) -> Result<()> {
+    let _ = (
+        &secrets,
+        &registry,
+        &config_issues,
+        saved,
+        allow_environment,
+    );
+    #[cfg(feature = "siem-chronicle")]
+    if cli.enable_chronicle {
+        register_configured!(
+            registry,
+            irmind_mod_siem_chronicle::Chronicle,
+            irmind_mod_siem_chronicle::MANIFEST,
+            secrets,
+            saved,
+            allow_environment,
+            interactive,
+            config_issues
+        );
+    }
+    #[cfg(not(feature = "siem-chronicle"))]
+    if cli.enable_chronicle && !interactive {
+        return Err(anyhow!(
+            "this binary was built without the siem-chronicle feature"
+        ));
+    }
+    #[cfg(feature = "siem-chronicle")]
+    if registry.manifest("siem-chronicle").is_none() {
+        registry.add_source_decoder(std::sync::Arc::new(
+            irmind_mod_siem_chronicle::ChronicleSourceDecoder,
+        ))?;
+    }
+    #[cfg(feature = "siem-chronicle")]
+    registry.register(
+        Box::new(
+            irmind_mod_mapping_udm::UdmMapping::new()
                 .map_err(irmind_app::source_mapping::MappingError::into_app)?,
         ),
         &irmind_app::modules::ModuleConfig::new(),
