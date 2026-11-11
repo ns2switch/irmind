@@ -132,7 +132,6 @@ impl Engine<'_> {
         let _case_lock = self.repo.lock_case(id)?;
         let case = self.repo.get_case(id)?;
         let entries = self.audit_log.entries(id)?;
-        verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
         let mut previous = [0; 32];
         for (index, entry) in entries.iter().enumerate() {
             if index.is_multiple_of(256) && cancel.is_cancelled() {
@@ -140,6 +139,7 @@ impl Engine<'_> {
             }
             previous = self.verify_chain_entry(id, index, previous, entry)?;
         }
+        verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
         crate::large_case::read_manifest_index(&entries)?;
         self.verify_seal_metadata(id, &case, &entries)?;
         self.pending_requests_unlocked(&case, &entries)?;
@@ -197,7 +197,6 @@ impl Engine<'_> {
         self.clear_verified_checkpoint(id)?;
         let case = self.repo.get_case(id)?;
         let entries = self.audit_log.entries(id)?;
-        verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
         let mut prev = [0u8; 32];
         for (index, entry) in entries.iter().enumerate() {
             if index % 256 == 0 && cancel.is_cancelled() {
@@ -205,6 +204,7 @@ impl Engine<'_> {
             }
             prev = self.verify_chain_entry(id, index, prev, entry)?;
         }
+        verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
         self.verify_mapping_events(entries.iter().map(|e| (e.kind, e.payload.as_str())))?;
         let manifest = crate::large_case::read_manifest_index(&entries)?;
         let source_hashes = manifest
