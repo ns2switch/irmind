@@ -1402,6 +1402,7 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "irmind-infra",
+ "irmind-mod-mapping-evtx",
  "irmind-mod-parser-evtx",
  "irmind-process-containment",
  "irmind-security",
@@ -1454,6 +1455,26 @@ dependencies = [
  "tempfile",
  "toml",
  "unicode-normalization",
+]
+
+[[package]]
+name = "irmind-mapping-tables"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
+name = "irmind-mod-mapping-evtx"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mapping-tables",
 ]
 
 [[package]]
