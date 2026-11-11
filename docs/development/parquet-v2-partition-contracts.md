@@ -1,5 +1,7 @@
 # Approved deterministic partition preparation
 
+> Historical design: the current ingestion path uses `SourceDecoder` and separately identified mappings. Legacy execution callbacks and artifact migration routes described here have been retired. See [the source/mapping design](source-mapping-design.md) and [current architecture](architecture.md).
+
 This document is for the analyst reviewing the exact application boundary needed for artifact-V2 step (c). The [approved design](parquet-artifact-v2-design.md#generic-scope-partitions) already defines normalization, signed caps, overflow and safe paths. This proposal does not implement them or change a signed format. It follows the [mixed reader/writer](https://github.com/ns2switch/irmind/pull/168).
 
 ## Why per-file preparation needs a batch boundary

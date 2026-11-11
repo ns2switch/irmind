@@ -15,8 +15,8 @@
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CaseMutation, Clock, ConfigChange, ConfigurationStore,
-    CryptoPorts, Engine, EnginePorts, LargeCaseStore, PersistentConfig, SignedEntry, Signer,
-    StreamingEventParser, hex, sha256,
+    CryptoPorts, Engine, EnginePorts, EventParser, LargeCaseStore, PersistentConfig, SignedEntry,
+    Signer, SourceDecoder, hex, sha256,
 };
 use irmind_domain::{Actor, AuditEventKind, Case, CaseId, ExecutionMode, Severity};
 use irmind_infra::{LocalStore, LocalVerifier, ParquetStore, TomlConfigurationStore};
@@ -58,56 +58,57 @@ fn record(out: &mut Goldens, name: &str, bytes: &[u8]) {
     );
 }
 
-fn parsers() -> Vec<(&'static str, Box<dyn StreamingEventParser>, &'static [u8])> {
+fn decoders() -> Vec<(&'static str, Arc<dyn SourceDecoder>, &'static [u8])> {
     vec![
         (
             "json",
-            Box::new(JsonParser),
+            Arc::new(irmind_mod_parser_json::JsonSourceDecoder),
             include_bytes!("../../modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json"),
         ),
         (
             "ecs",
-            Box::new(irmind_mod_parser_ecs::EcsParser),
+            Arc::new(irmind_mod_parser_ecs::EcsSourceDecoder),
             include_bytes!("../../testkit/fixtures/parser-ecs/source/events.ndjson"),
         ),
         (
             "ocsf",
-            Box::new(irmind_mod_parser_ocsf::OcsfParser),
+            Arc::new(irmind_mod_parser_ocsf::OcsfSourceDecoder),
             include_bytes!("../../testkit/fixtures/parser-ocsf/source/events.ndjson"),
         ),
         (
             "velociraptor",
-            Box::new(irmind_mod_parser_velociraptor::VelociraptorParser),
+            Arc::new(irmind_mod_parser_velociraptor::VelociraptorSourceDecoder),
             include_bytes!("../../testkit/fixtures/parser-velociraptor/source/events.jsonl"),
         ),
         (
             "hayabusa",
-            Box::new(irmind_mod_parser_hayabusa::HayabusaParser),
+            Arc::new(irmind_mod_parser_hayabusa::HayabusaSourceDecoder),
             include_bytes!("../../testkit/fixtures/parser-hayabusa/source/events.jsonl"),
         ),
         (
             "chainsaw",
-            Box::new(irmind_mod_parser_chainsaw::ChainsawParser),
+            Arc::new(irmind_mod_parser_chainsaw::ChainsawSourceDecoder),
             include_bytes!("../../testkit/fixtures/parser-chainsaw/source/events.jsonl"),
         ),
         (
             "plaso",
-            Box::new(irmind_mod_parser_plaso::PlasoParser),
+            Arc::new(irmind_mod_parser_plaso::PlasoSourceDecoder),
             include_bytes!("../../testkit/fixtures/parser-plaso/source/events.jsonl"),
         ),
         (
             "eztools",
-            Box::new(irmind_mod_parser_eztools::EztoolsParser),
+            Arc::new(irmind_mod_parser_eztools::EztoolsSourceDecoder),
             include_bytes!("../../testkit/fixtures/parser-eztools/source/events.csv"),
         ),
         (
             "declarative",
-            Box::new(
-                irmind_mod_parser_declarative::DeclarativeParser::from_toml(include_str!(
-                    "../../../docs/examples/parsers/nested-ndjson.toml"
-                ))
-                .unwrap(),
-            ),
+            irmind_app::DefinitionCompiler::compile(
+                &irmind_mod_parser_declarative::DeclarativeCompiler,
+                include_str!("../../../docs/examples/parsers/nested-ndjson.toml"),
+            )
+            .unwrap()
+            .decoder()
+            .clone(),
             include_bytes!("../../testkit/fixtures/parser-declarative/source/events.ndjson"),
         ),
     ]
@@ -124,14 +125,14 @@ type Row = (
 );
 
 fn normalized_rows(
-    parser: &dyn StreamingEventParser,
+    parser: &dyn EventParser,
     source: &str,
     bytes: &[u8],
     cancel: &CancellationToken,
 ) -> Vec<Row> {
     let mut rows = Vec::new();
     parser
-        .parse_reader(source, &mut &bytes[..], sha256(bytes), cancel, &mut |row| {
+        .parse_each(source, bytes, cancel, &mut |row| {
             row.inspect(|row| {
                 rows.push((
                     row.index,
@@ -160,17 +161,15 @@ fn normalized_rows(
 }
 
 fn parser_goldens(out: &mut Goldens) {
-    for (name, parser, bytes) in parsers() {
-        one_parser_golden(out, name, parser.as_ref(), bytes);
-    }
+    one_parser_golden(
+        out,
+        "json",
+        &JsonParser,
+        include_bytes!("../../modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json"),
+    );
 }
 
-fn one_parser_golden(
-    out: &mut Goldens,
-    name: &str,
-    parser: &dyn StreamingEventParser,
-    bytes: &[u8],
-) {
+fn one_parser_golden(out: &mut Goldens, name: &str, parser: &dyn EventParser, bytes: &[u8]) {
     let cancel = CancellationToken::new();
     let source = format!("{name}.log");
     let rows = normalized_rows(parser, &source, bytes, &cancel);
@@ -319,104 +318,11 @@ fn signed_and_reconstructed_format_goldens_are_unchanged() {
     }
 }
 
-#[test]
-#[cfg(feature = "parser-syslog")]
-fn syslog_normalized_projection_goldens_are_unchanged() {
-    use irmind_mod_parser_syslog::{LegacyTimestamp, SyslogParser};
-    let mut actual = Goldens::new();
-    let modern = SyslogParser::from_version("syslog-v1").unwrap();
-    let classic = SyslogParser::new(Some(LegacyTimestamp::new(2026, 60).unwrap()));
-    for (name, parser, bytes) in [
-        (
-            "syslog",
-            &modern,
-            include_bytes!("../../testkit/fixtures/parser-syslog/source/events.log").as_slice(),
-        ),
-        (
-            "syslog-classic",
-            &classic,
-            include_bytes!("../../../fuzz/seeds/parser_syslog/classic.log").as_slice(),
-        ),
-        (
-            "syslog-gzip",
-            &modern,
-            include_bytes!("../../../fuzz/seeds/parser_syslog/compressed.gz").as_slice(),
-        ),
-    ] {
-        one_parser_golden(&mut actual, name, parser, bytes);
-    }
-    let expected: Goldens =
-        serde_json::from_str(include_str!("fixtures/formats-syslog-v1.json")).unwrap();
-    assert_eq!(
-        actual.keys().collect::<Vec<_>>(),
-        expected.keys().collect::<Vec<_>>()
-    );
-    for (key, value) in &expected {
-        assert_eq!(actual.get(key), Some(value), "syslog format golden {key}");
-    }
-}
-
-#[test]
-#[cfg(feature = "parser-linux")]
-fn linux_normalized_projection_goldens_are_unchanged() {
-    let mut actual = Goldens::new();
-    let parser = irmind_mod_parser_linux::LinuxParser::from_version(
-        "linux-v1:year=2026;offset=0;rollover=1;basis=analyst",
-    )
-    .unwrap();
-    for (name, bytes) in [
-        (
-            "linux-auth",
-            include_bytes!("../../testkit/fixtures/parser-linux/source/auth.log").as_slice(),
-        ),
-        (
-            "linux-audit",
-            include_bytes!("../../testkit/fixtures/parser-linux/source/audit.log").as_slice(),
-        ),
-        (
-            "linux-journal",
-            include_bytes!("../../testkit/fixtures/parser-linux/source/journal.jsonl").as_slice(),
-        ),
-        (
-            "linux-http",
-            include_bytes!("../../testkit/fixtures/parser-linux/source/access.log").as_slice(),
-        ),
-    ] {
-        one_parser_golden(&mut actual, name, &parser, bytes);
-    }
-    let expected: Goldens =
-        serde_json::from_str(include_str!("fixtures/formats-linux-v1.json")).unwrap();
-    assert_eq!(actual, expected);
-}
-
 #[path = "support/indexed_parser_contracts.rs"]
 mod indexed_parser_contracts;
 
 #[path = "support/json_order_contracts.rs"]
 mod json_order_contracts;
-
-#[cfg(all(feature = "parser-zeek", feature = "parser-suricata"))]
-#[test]
-fn network_normalization_is_independent_of_json_map_features() {
-    for (name, parser, bytes, expected) in [
-        (
-            "zeek",
-            &irmind_mod_parser_zeek::ZeekParser as &dyn StreamingEventParser,
-            include_bytes!("../../testkit/fixtures/parser-zeek/source/dns.jsonl").as_slice(),
-            "544f20aaadd59aa0d6391265a2ee6b46b0d2f725e4e6e5cc4003718e5e25d97e",
-        ),
-        (
-            "suricata",
-            &irmind_mod_parser_suricata::SuricataParser as &dyn StreamingEventParser,
-            include_bytes!("../../testkit/fixtures/parser-suricata/source/eve.jsonl").as_slice(),
-            "3d0c0fb9ce7281db84155bbd92d040deb39723c62e1670a81978c4e6a36afbef",
-        ),
-    ] {
-        let rows = normalized_rows(parser, "source.log", bytes, &CancellationToken::new());
-        let encoded = serde_json::to_vec(&rows).unwrap();
-        assert_eq!(hex(&sha256(&encoded)), expected, "{name}");
-    }
-}
 
 #[test]
 fn declarative_source_pipeline_is_independent_of_json_map_features() {

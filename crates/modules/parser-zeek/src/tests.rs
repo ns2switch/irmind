@@ -1,16 +1,21 @@
+#![allow(clippy::unwrap_used)]
 use super::*;
+use irmind_app::{CancellationToken, ParseReport};
+use irmind_domain::SourceRecordV1;
 
 const TSV: &[u8] = include_bytes!("../../../testkit/fixtures/parser-zeek/source/events.log");
 const JSON: &[u8] = include_bytes!("../../../testkit/fixtures/parser-zeek/source/dns.jsonl");
 
-fn records(source: &str, bytes: &[u8]) -> Result<(ParseReport, Vec<GraphRecord>), AppError> {
+fn records(source: &str, bytes: &[u8]) -> Result<(ParseReport, Vec<SourceRecordV1>), AppError> {
     let mut found = Vec::new();
     let mut input = bytes;
-    let report = ZeekParser.parse_reader_report(
+    let report = irmind_testkit::decode_source(
+        &ZeekSourceDecoder,
         source,
         &mut input,
         [7; 32],
         &CancellationToken::new(),
+        None,
         &mut |record| {
             record.inspect(|value| found.push(value.clone()));
             Ok(())
@@ -41,30 +46,41 @@ fn detects_tsv_and_json_by_content() {
 }
 
 #[test]
-fn tsv_and_json_keep_full_timestamp_and_uid() -> Result<(), AppError> {
+fn tsv_and_json_keep_full_timestamp_uid_and_original_fields() -> Result<(), AppError> {
     let (report, rows) = records("events.log", TSV)?;
     assert_eq!((report.accepted, report.rejected), (2, 0));
-    assert_eq!(rows[0].event, "zeek_conn");
-    assert!(rows[0].at.ends_with(".123456Z"));
-    assert!(rows[0].text.contains("1790000000.123456"));
     assert!(
         rows[0]
-            .entities
-            .contains(&("uid".into(), "CsyntheticZeek1".into()))
+            .timestamp()
+            .unwrap()
+            .to_rfc3339()
+            .ends_with(".123456Z")
+    );
+    let columns = rows[0].fields().field("columns").unwrap();
+    assert_eq!(
+        columns.field("ts").unwrap().as_text(),
+        Some("1790000000.123456")
+    );
+    assert_eq!(
+        columns.field("uid").unwrap().as_text(),
+        Some("CsyntheticZeek1")
     );
     let (report, dns) = records("dns.jsonl", JSON)?;
     assert_eq!(report.accepted, 1);
-    assert_eq!(dns[0].event, "zeek_dns");
-    assert!(dns[0].at.ends_with(".123458Z"));
     assert!(
         dns[0]
-            .entities
-            .contains(&("uid".into(), "CsyntheticZeek1".into()))
+            .timestamp()
+            .unwrap()
+            .to_rfc3339()
+            .ends_with(".123458Z")
     );
-    assert!(
-        dns[0]
-            .entities
-            .contains(&("domain".into(), "synthetic.example.test".into()))
+    assert_eq!(
+        dns[0].fields().field("uid").unwrap().as_text(),
+        Some("CsyntheticZeek1")
+    );
+    assert_eq!(
+        dns[0].fields().field("query").unwrap().as_text(),
+        Some("synthetic.example.test")
     );
     Ok(())
 }
@@ -78,7 +94,7 @@ fn malformed_row_does_not_hide_next_record() -> Result<(), AppError> {
     );
     let (report, rows) = records("events.log", &input)?;
     assert_eq!((report.accepted, report.rejected), (3, 1));
-    assert_eq!(rows[2].index, 3);
+    assert_eq!(rows[2].annotations().members()[0].ordinal, 3);
     assert!(!report.samples.is_empty());
     Ok(())
 }
@@ -93,7 +109,7 @@ fn oversized_row_is_bounded_and_next_row_survives() -> Result<(), AppError> {
     );
     let (report, rows) = records("events.log", &input)?;
     assert_eq!((report.accepted, report.rejected), (3, 1));
-    assert_eq!(rows[2].index, 3);
+    assert_eq!(rows[2].annotations().members()[0].ordinal, 3);
     Ok(())
 }
 
@@ -114,7 +130,13 @@ fn known_json_logs_map_to_one_event_each() -> Result<(), AppError> {
         );
         let (report, rows) = records(&format!("{kind}.log"), line.as_bytes())?;
         assert_eq!(report.accepted, 1, "{kind}");
-        assert_eq!(rows[0].event, format!("zeek_{kind}"));
+        assert!(rows[0].fields().field("uid").is_some());
+        assert!(
+            rows[0]
+                .fields()
+                .field(field.split('"').nth(1).unwrap())
+                .is_some()
+        );
     }
     Ok(())
 }
@@ -124,8 +146,15 @@ fn cancellation_stops_before_consuming_input() {
     let cancel = CancellationToken::new();
     cancel.cancel();
     let mut input = TSV;
-    let result =
-        ZeekParser.parse_reader_report("events.log", &mut input, [7; 32], &cancel, &mut |_| Ok(()));
+    let result = irmind_testkit::decode_source(
+        &ZeekSourceDecoder,
+        "events.log",
+        &mut input,
+        [7; 32],
+        &cancel,
+        None,
+        &mut |_| Ok(()),
+    );
     assert!(matches!(result, Err(AppError::Cancelled)));
 }
 
@@ -139,13 +168,15 @@ fn oversized_whitespace_first_lines_are_counted_without_losing_later_records()
             .chain(std::io::Cursor::new(b"\n"))
             .chain(std::io::Cursor::new(JSON));
         let mut indexes = Vec::new();
-        let report = ZeekParser.parse_reader_report(
+        let report = irmind_testkit::decode_source(
+            &ZeekSourceDecoder,
             "source.log",
             &mut reader,
             [6; 32],
             &CancellationToken::new(),
+            None,
             &mut |record| {
-                record.inspect(|row| indexes.push(row.index));
+                record.inspect(|row| indexes.push(row.annotations().members()[0].ordinal));
                 Ok(())
             },
         )?;
@@ -165,21 +196,20 @@ fn indexed_events_keep_microseconds_and_request_host_partitioning() -> Result<()
         irmind_app::SourceParallelism::Concurrent
     );
     let mut count = 0;
-    parser.parse_indexed_reader_report(
+    irmind_testkit::decode_source(
+        &ZeekSourceDecoder,
         "source.log",
         &mut std::io::Cursor::new(JSON),
         [7; 32],
         &CancellationToken::new(),
+        None,
         &mut |record| {
             record.inspect(|row| {
-                assert!(row.source_offset.is_some());
-                let time = row.time.as_ref().unwrap();
+                assert!(row.origin().offset().is_some());
+                let time = row.timestamp().unwrap();
                 assert_eq!(time.precision(), irmind_app::TimePrecision::Microsecond);
                 assert_ne!(time.instant().unix_micros().rem_euclid(1_000_000), 0);
-                assert_eq!(
-                    parser.partition_profile(&row.record),
-                    irmind_app::PartitionProfile::EndpointHost
-                );
+                assert!(row.fields().field("event.outcome").is_none());
                 count += 1;
             });
             assert!(record.provenance().parser_location().is_some());
@@ -192,7 +222,14 @@ fn indexed_events_keep_microseconds_and_request_host_partitioning() -> Result<()
 
 #[test]
 fn shared_streaming_contract() -> Result<(), AppError> {
-    irmind_testkit::run_log_parser_contract(&ZeekParser, "source.log", JSON, 1)
+    irmind_testkit::run_log_parser_contract(
+        &ZeekParser,
+        &ZeekSourceDecoder,
+        "source.log",
+        JSON,
+        1,
+        None,
+    )
 }
 
 #[test]
@@ -200,7 +237,13 @@ fn numeric_json_time_retains_explicit_microsecond_precision() -> Result<(), AppE
     let input = br#"{"ts":1790000000.123000,"uid":"Cmicro","id.orig_h":"192.0.2.1"}"#;
     let (report, rows) = records("source.log", input)?;
     assert_eq!(report.accepted, 1);
-    assert!(rows[0].at.ends_with(".123000Z"));
+    assert!(
+        rows[0]
+            .timestamp()
+            .unwrap()
+            .to_rfc3339()
+            .ends_with(".123000Z")
+    );
     Ok(())
 }
 
@@ -208,12 +251,11 @@ fn numeric_json_time_retains_explicit_microsecond_precision() -> Result<(), AppE
 fn http_host_is_not_a_sensor_hostname() -> Result<(), AppError> {
     let input=br#"{"ts":1790000000.123456,"uid":"Chttp","id.orig_h":"192.0.2.1","method":"GET","host":"web.example.test"}"#;
     let (_, rows) = records("http.log", input)?;
-    assert!(!rows[0].entities.iter().any(|(kind, _)| kind == "host"));
-    assert!(
-        rows[0]
-            .entities
-            .contains(&("domain".into(), "web.example.test".into()))
+    assert_eq!(
+        rows[0].fields().field("host").unwrap().as_text(),
+        Some("web.example.test")
     );
+    assert!(rows[0].fields().field("sensor_hostname").is_none());
     Ok(())
 }
 
@@ -235,6 +277,6 @@ fn escaped_json_strings_are_valid_bounded_data() -> Result<(), AppError> {
 #[test]
 fn filename_does_not_override_json_record_shape() -> Result<(), AppError> {
     let (_, rows) = records("ssl.log", JSON)?;
-    assert_eq!(rows[0].event, "zeek_dns");
+    assert!(rows[0].fields().field("query").is_some());
     Ok(())
 }

@@ -383,26 +383,36 @@ fn unattended_sessions_cannot_approve_definition_changes() {
 #[test]
 fn synthetic_episode_maps_expected_entities_without_ingesting_private_answers() {
     let source = include_bytes!("../../testkit/fixtures/parser-declarative/source/events.ndjson");
-    let parser = DeclarativeCompiler
+    let pipeline = DeclarativeCompiler
         .compile(include_str!(
             "../../../docs/examples/parsers/nested-ndjson.toml"
         ))
-        .unwrap()
-        .selector()
-        .clone();
-    let mut rows = Vec::new();
-    let report = parser
-        .parse_reader_report(
-            "events.ndjson",
-            &mut std::io::Cursor::new(source),
-            sha256(source),
-            &CancellationToken::new(),
-            &mut |row| {
-                row.inspect(|record| rows.push(record.clone()));
-                Ok(())
-            },
-        )
         .unwrap();
+    let mut rows = Vec::new();
+    let report = irmind_testkit::decode_source(
+        pipeline.decoder().as_ref(),
+        "events.ndjson",
+        &mut &source[..],
+        sha256(source),
+        &CancellationToken::new(),
+        None,
+        &mut |row| {
+            row.inspect(|record| {
+                rows.push(
+                    pipeline
+                        .extraction_mapper()
+                        .map(record)
+                        .unwrap()
+                        .record()
+                        .indexed
+                        .record
+                        .clone(),
+                );
+            });
+            Ok(())
+        },
+    )
+    .unwrap();
     assert_eq!(report.accepted, 2);
     // Expected answers are accessed by this evaluator only, after public parsing.
     let answers: serde_json::Value = serde_json::from_str(include_str!(

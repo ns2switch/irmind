@@ -1480,7 +1480,6 @@ dependencies = [
 name = "irmind-mod-parser-evtx"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "irmind-app",
  "irmind-domain",
  "irmind-process-containment",

@@ -24,6 +24,18 @@ shared filesystem and protocol crates support adapters without depending on them
 
 Remote ports are async and accept a `CancellationToken`. Local ports stay synchronous; a long local operation runs off the UI thread and checks cancellation between batches. Case locks and SQLite WAL coordinate concurrent activity for one case.
 
+## One evidence source
+
+```text
+bounded detection and confirmed temporal context
+  → SourceDecoder (original fields, exact time and provenance)
+  → frozen SourceMapper selection (validated events and extraction)
+  → bounded ordered writer (current V3 artifacts)
+  → signed source manifest, mapping receipt and artifact inventory
+```
+
+The custody-side `StreamingEventParser` name now denotes metadata only: it supplies the selected identity, logical source, scheduling and temporal context. It cannot decode a file. Mappings choose the partition profile; parsers do not reconstruct a normalized record to choose it. Current golden fixtures cover the signed pipeline and physical output. Append and eviction follow canonical order; partition completion runs in bounded parallel workers.
+
 ## One model-proposed call
 
 ```text

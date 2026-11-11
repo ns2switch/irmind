@@ -1,5 +1,6 @@
 use super::*;
 use crate::{ParseReport, source_mapping::SourceInput};
+use irmind_domain::Tainted;
 struct Decoder;
 impl SourceDecoder for Decoder {
     fn identity(&self) -> ParserIdentity<'_> {

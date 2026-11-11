@@ -26,11 +26,11 @@ pub(super) fn experimental_parsers(
     registry: &irmind_app::modules::ModuleRegistry,
 ) -> Result<irmind_app::modules::ParserCatalog, AppError> {
     #[cfg(feature = "mapping-json-compat")]
-    let catalog = catalog.with_experimental_parser(irmind_mod_parser_json::source_log_parser())?;
+    let catalog = catalog.with_source_parser(irmind_mod_parser_json::source_log_parser())?;
     #[cfg(any(feature = "mapping-journald-compat", feature = "mapping-linux"))]
-    let catalog = catalog.with_experimental_parser(irmind_mod_parser_linux::source_log_parser())?;
+    let catalog = catalog.with_source_parser(irmind_mod_parser_linux::source_log_parser())?;
     #[cfg(feature = "mapping-ecs")]
-    let catalog = catalog.with_experimental_parser(irmind_mod_parser_ecs::source_log_parser())?;
+    let catalog = catalog.with_source_parser(irmind_mod_parser_ecs::source_log_parser())?;
     #[cfg(feature = "mapping-dfir")]
     let catalog = dfir_sources(catalog)?;
     #[cfg(feature = "mapping-syslog")]
@@ -39,7 +39,7 @@ pub(super) fn experimental_parsers(
         .iter()
         .any(|(id, _)| id == "parser-syslog")
     {
-        catalog.with_experimental_parser(irmind_mod_parser_syslog::source_log_parser())?
+        catalog.with_source_parser(irmind_mod_parser_syslog::source_log_parser())?
     } else {
         catalog
     };
@@ -53,7 +53,7 @@ pub(super) fn experimental_parsers(
         .iter()
         .any(|(id, _)| id == "parser-ocsf")
     {
-        catalog.with_experimental_parser(irmind_mod_parser_ocsf::source_log_parser())?
+        catalog.with_source_parser(irmind_mod_parser_ocsf::source_log_parser())?
     } else {
         catalog
     };
@@ -66,7 +66,7 @@ pub(super) fn experimental_parsers(
             .iter()
             .any(|(id, _)| id == "parser-evtx")
     {
-        catalog.with_experimental_parser(std::sync::Arc::new(
+        catalog.with_source_parser(std::sync::Arc::new(
             mappings
                 .decoder_selection("parser-evtx", irmind_mod_parser_evtx::SOURCE_VERSION)
                 .map_err(irmind_app::source_mapping::MappingError::into_app)?
@@ -82,7 +82,7 @@ pub(super) fn experimental_parsers(
                 .decoder_selection(&id, &version)
                 .map_err(irmind_app::source_mapping::MappingError::into_app)?
                 .with_selector(catalog.get(&id)?)?;
-            catalog = catalog.with_experimental_parser(std::sync::Arc::new(selector))?;
+            catalog = catalog.with_source_parser(std::sync::Arc::new(selector))?;
         }
     }
     Ok(catalog)
@@ -110,7 +110,7 @@ fn dfir_sources(
             .iter()
             .any(|(id, _)| id == parser.identity().name)
         {
-            catalog = catalog.with_experimental_parser(parser)?;
+            catalog = catalog.with_source_parser(parser)?;
         }
     }
     Ok(catalog)
@@ -132,7 +132,7 @@ fn network_sources(
             .iter()
             .any(|(id, _)| id == parser.identity().name)
         {
-            catalog = catalog.with_experimental_parser(parser)?;
+            catalog = catalog.with_source_parser(parser)?;
         }
     }
     Ok(catalog)

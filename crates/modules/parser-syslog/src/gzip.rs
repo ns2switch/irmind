@@ -1,4 +1,4 @@
-use super::{AppError, CancellationToken, GraphRecord, ParseReport, SyslogParser, Tainted};
+use super::CancellationToken;
 use flate2::read::MultiGzDecoder;
 use std::io::{self, Cursor, Read};
 
@@ -11,63 +11,6 @@ pub(super) fn sample(input: &[u8]) -> Vec<u8> {
         .take(4096)
         .read_to_end(&mut output);
     output
-}
-
-pub(super) fn parse(
-    parser: &SyslogParser,
-    source: &str,
-    reader: &mut dyn Read,
-    hash: [u8; 32],
-    cancel: &CancellationToken,
-    emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-) -> Result<ParseReport, AppError> {
-    let mut prefix = [0; 2];
-    let mut used = 0;
-    while used < prefix.len() {
-        if cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        let count = reader.read(&mut prefix[used..]).map_err(|_| failure())?;
-        if count == 0 {
-            break;
-        }
-        used += count;
-    }
-    let replay = Cursor::new(&prefix[..used]).chain(reader);
-    if prefix != [0x1f, 0x8b] || used < 2 {
-        return super::input::parse(parser, source, &mut { replay }, hash, cancel, emit);
-    }
-    let compressed = Bounded {
-        inner: replay,
-        bytes: 0,
-        limit: MAX_GZIP_BYTES,
-        cancel,
-        exceeded: false,
-    };
-    let decoded = MultiGzDecoder::new(compressed);
-    let mut decoded = Bounded {
-        inner: decoded,
-        bytes: 0,
-        limit: MAX_GZIP_BYTES,
-        cancel,
-        exceeded: false,
-    };
-    let result = super::input::parse(parser, source, &mut decoded, hash, cancel, &mut |row| {
-        let location = irmind_domain::ParserLocation::new(source, "parser-syslog", 0)
-            .map_err(|_| failure())?;
-        emit(row.with_parser_location(location))
-    });
-    if cancel.is_cancelled() {
-        Err(AppError::Cancelled)
-    } else {
-        result.map_err(|error| {
-            if matches!(error, AppError::Storage(_)) {
-                failure()
-            } else {
-                error
-            }
-        })
-    }
 }
 
 pub(super) struct Bounded<'a, R> {
@@ -112,12 +55,6 @@ impl<R: Read> Read for Bounded<'_, R> {
         }
         Ok(count)
     }
-}
-
-fn failure() -> AppError {
-    AppError::Storage(
-        "invalid or oversized gzip syslog source (2 GiB compressed/decompressed limit)".into(),
-    )
 }
 
 #[cfg(test)]

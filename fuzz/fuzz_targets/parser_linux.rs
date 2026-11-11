@@ -1,5 +1,8 @@
 #![no_main]
-use irmind_app::{CancellationToken, LogParser as _, ParserTimeBasis, ParserTimeContext, sha256};
+use irmind_app::{
+    CancellationToken, LogParser as _, ParserTimeBasis, ParserTimeContext, SourceDecoder as _,
+    sha256,
+};
 use irmind_mod_parser_linux::LinuxParser;
 use libfuzzer_sys::fuzz_target;
 fuzz_target!(|bytes: &[u8]| {
@@ -20,11 +23,21 @@ fuzz_target!(|bytes: &[u8]| {
     for selected in [&parser as &dyn irmind_app::LogParser, configured.as_ref()] {
         let _ = selected.detect("synthetic.log", bytes);
         let _ = selected.time_context_requirement("synthetic.log", bytes);
-        let _ = selected.parse_indexed_reader_report(
-            "synthetic.log",
-            &mut bytes.as_ref(),
-            sha256(bytes),
-            &CancellationToken::new(),
+    }
+    let source =
+        irmind_app::source_mapping::SourceReferenceV1::file("synthetic.log").expect("fixed source");
+    let cancel = CancellationToken::new();
+    for time_context in [None, Some(&context)] {
+        let _ = irmind_mod_parser_linux::LinuxSourceDecoder.decode_reader(
+            irmind_app::source_mapping::SourceInput {
+                metadata: irmind_app::source_mapping::SourceMetadata {
+                    source: &source,
+                    evidence_hash: sha256(bytes),
+                    time_context,
+                    cancel: &cancel,
+                },
+                reader: &mut bytes.as_ref(),
+            },
             &mut |_| Ok(()),
         );
     }

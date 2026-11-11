@@ -11,7 +11,6 @@ use irmind_app::{
 };
 use irmind_domain::{Actor, AuditEventKind, ExecutionMode, SourceManifestV2};
 use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
-use irmind_mod_parser_linux::LinuxParser;
 use std::{collections::BTreeMap, fs, sync::Arc};
 
 struct SyntheticSigner(SigningKey);
@@ -39,7 +38,7 @@ fn engine(store: &Arc<LocalStore>) -> Engine<'static> {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
-            Arc::new(LinuxParser::default()),
+            current_sources::event_parser(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -273,35 +272,47 @@ mod benchmark;
 #[test]
 #[cfg(feature = "parser-declarative")]
 fn custom_http_export_definition_is_bounded_and_needs_analyst_selection() {
-    use irmind_app::{EventParser as _, LogParser as _};
-    let parser = irmind_mod_parser_declarative::DeclarativeParser::from_toml(include_str!(
-        "../../../docs/examples/parsers/nginx-apache-custom.toml"
-    ))
-    .unwrap();
+    use irmind_app::DefinitionCompiler as _;
+    let pipeline = irmind_mod_parser_declarative::DeclarativeCompiler
+        .compile(include_str!(
+            "../../../docs/examples/parsers/nginx-apache-custom.toml"
+        ))
+        .unwrap();
     let bytes = br#"{"custom_http":{"time":"2026-11-01T01:00:00Z","host":"synthetic-web","user":"synthetic-user","client":"203.0.113.77","method":"GET","status":"200"}}"#;
-    assert_eq!(parser.detect("synthetic.json", bytes).unwrap().value(), 70);
-    let mut hosts = vec![];
     assert_eq!(
-        parser
-            .parse_each(
-                "synthetic.json",
-                bytes,
-                &CancellationToken::new(),
-                &mut |record| {
-                    record.inspect(|record| {
-                        hosts.extend(
-                            record
-                                .entities
-                                .iter()
-                                .filter(|(kind, _)| kind == "host")
-                                .map(|(_, value)| value.clone()),
-                        );
-                    });
-                    Ok(())
-                }
-            )
-            .unwrap(),
-        1
+        pipeline
+            .selector()
+            .detect("synthetic.json", bytes)
+            .unwrap()
+            .value(),
+        70
     );
+    let mut hosts = vec![];
+    let report = irmind_testkit::decode_source(
+        pipeline.decoder().as_ref(),
+        "synthetic.json",
+        &mut &bytes[..],
+        irmind_app::sha256(bytes),
+        &CancellationToken::new(),
+        None,
+        &mut |record| {
+            record.inspect(|source| {
+                let mapped = pipeline.extraction_mapper().map(source).unwrap();
+                hosts.extend(
+                    mapped
+                        .record()
+                        .indexed
+                        .record
+                        .entities
+                        .iter()
+                        .filter(|(kind, _)| kind == "host")
+                        .map(|(_, value)| value.clone()),
+                );
+            });
+            Ok(())
+        },
+    )
+    .unwrap();
+    assert_eq!(report.accepted, 1);
     assert_eq!(hosts, ["synthetic-web"]);
 }

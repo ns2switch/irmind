@@ -11,7 +11,7 @@ fn registry() -> ModuleRegistry {
         .unwrap();
     registry
         .register(
-            Box::new(irmind_mod_parser_linux::LinuxParser::default()),
+            Box::new(irmind_mod_parser_linux::LinuxParser),
             &ModuleConfig::new(),
         )
         .unwrap();

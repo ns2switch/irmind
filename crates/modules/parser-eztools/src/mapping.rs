@@ -1,6 +1,4 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
-use irmind_app::{AppError, GraphRecord};
-use irmind_domain::UtcTimestamp;
+use irmind_app::AppError;
 
 // Match exact column names, never filename substrings. These signatures are
 // intentionally narrow; unknown exports require analyst selection or a parser update.
@@ -81,76 +79,6 @@ fn decode(bytes: &[u8]) -> Result<csv::StringRecord, AppError> {
         .next()
         .ok_or_else(bad)?
         .map_err(|_| bad())
-}
-pub(super) fn parse_csv(
-    index: usize,
-    headers: &csv::StringRecord,
-    row: &csv::StringRecord,
-) -> Result<GraphRecord, AppError> {
-    let tool = tool_for_headers(headers).ok_or_else(bad)?;
-    let field = |name: &str| {
-        headers
-            .iter()
-            .position(|header| header == name)
-            .and_then(|i| row.get(i))
-    };
-    let raw = [
-        "RunTime",
-        "LastRun",
-        "FileKeyLastWriteTimestamp",
-        "LastModifiedTimeUTC",
-        "Created0x10",
-        "SourceCreated",
-        "LastWriteTimestamp",
-        "Timestamp",
-        "TimeCreated",
-    ]
-    .iter()
-    .find_map(|key| field(key).filter(|value| !value.is_empty()))
-    .ok_or_else(bad)?;
-    let at = timestamp(raw)?;
-    let mut entities = Vec::new();
-    for (kind, key) in [
-        ("host", "Computer"),
-        ("user", "UserName"),
-        ("process", "ExecutableName"),
-        ("process", "Application"),
-        ("file", "SourceFilename"),
-        ("file", "FullPath"),
-        ("file", "Path"),
-        ("file", "FileName"),
-        ("registry", "KeyPath"),
-    ] {
-        if let Some(value) = field(key).filter(|text| !text.is_empty() && text.len() <= 4096) {
-            entities.push((kind.into(), value.into()));
-        }
-    }
-    entities.sort();
-    entities.dedup();
-    let mut normalized = serde_json::json!({"tool": tool, "columns": headers.iter().zip(row.iter()).collect::<std::collections::BTreeMap<_, _>>()});
-    normalized.sort_all_objects();
-    Ok(GraphRecord {
-        index,
-        at,
-        event: tool.into(),
-        text: normalized.to_string(),
-        entities,
-        relations: Vec::new(),
-    })
-}
-fn timestamp(raw: &str) -> Result<String, AppError> {
-    let instant = if let Ok(value) = DateTime::parse_from_rfc3339(raw) {
-        value.with_timezone(&Utc)
-    } else if let Ok(value) = DateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S%.f %:z") {
-        value.with_timezone(&Utc)
-    } else if let Ok(value) = NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S%.f") {
-        value.and_utc()
-    } else {
-        return Err(bad());
-    };
-    let at = instant.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    UtcTimestamp::parse(&at).map_err(|_| bad())?;
-    Ok(at)
 }
 fn bad() -> AppError {
     AppError::Policy("invalid EZTools CSV row".into())

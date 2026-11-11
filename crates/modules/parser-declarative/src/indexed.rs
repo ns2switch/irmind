@@ -1,18 +1,5 @@
-use irmind_app::{AppError, GraphRecord, IndexedProjection, IndexedTime, TimePrecision};
-use serde::Deserialize;
-#[derive(Deserialize)]
-struct Row<'a> {
-    #[serde(borrow)]
-    time: &'a str,
-}
-pub(super) fn project(
-    parser: &crate::DeclarativeParser,
-    record: &GraphRecord,
-) -> Result<IndexedProjection, AppError> {
-    let row: Row<'_> = serde_json::from_str(&record.text)
-        .map_err(|_| AppError::Fixed(irmind_app::FixedAppError::PolicyInvalidIndexedTimestamp))?;
-    Ok((Some(timestamp(parser, row.time, &record.at)?), None))
-}
+use irmind_app::{AppError, IndexedTime, TimePrecision};
+
 pub(super) fn timestamp(
     parser: &crate::DeclarativeParser,
     value: &str,

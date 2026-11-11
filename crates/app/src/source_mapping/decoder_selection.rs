@@ -1,10 +1,9 @@
 //! Metadata for the existing custody/scheduling API; it never normalizes a record.
 use crate::{
-    AppError, CancellationToken, EventParser, GraphRecord, LogParser, ParserConfidence,
-    ParserIdentity, SourceDecoder, SourceParallelism, StreamingEventParser,
+    AppError, LogParser, ParserConfidence, ParserIdentity, SourceDecoder, SourceParallelism,
+    StreamingEventParser,
 };
-use irmind_domain::Tainted;
-use std::{io::Read, sync::Arc};
+use std::sync::Arc;
 
 type Detector = fn(&str, &[u8]) -> Option<ParserConfidence>;
 type TimeDetector = fn(&str, &[u8]) -> Result<Option<crate::ParserTimeRequirement>, AppError>;
@@ -69,31 +68,8 @@ impl StreamingEventParser for SourceDecoderSelection {
     fn prefers_local_file(&self, source: &str, sample: &[u8]) -> bool {
         self.decoder.needs_random_access(source, sample)
     }
-    fn parse_reader(
-        &self,
-        _: &str,
-        _: &mut dyn Read,
-        _: [u8; 32],
-        _: &CancellationToken,
-        _: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        Err(unsupported())
-    }
 }
-impl EventParser for SourceDecoderSelection {
-    fn version(&self) -> &'static str {
-        "source-decoder-selection-v1"
-    }
-    fn parse_each(
-        &self,
-        _: &str,
-        _: &[u8],
-        _: &CancellationToken,
-        _: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        Err(unsupported())
-    }
-}
+
 impl LogParser for SourceDecoderSelection {
     fn description(&self) -> &str {
         self.selector

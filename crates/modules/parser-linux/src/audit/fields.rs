@@ -1,8 +1,5 @@
 use super::super::{AppError, bad};
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, BTreeSet},
-};
+use std::collections::{BTreeMap, BTreeSet};
 type Values<'a> = BTreeMap<&'a str, &'a str>;
 type Tokens<'a> = (Values<'a>, BTreeSet<&'a str>);
 
@@ -67,10 +64,6 @@ impl<'a> Line<'a> {
     }
     pub(super) fn is_quoted(&self, name: &str) -> bool {
         self.quoted.contains(name)
-    }
-    pub(super) fn decoded(&self, name: &str) -> Option<Cow<'a, str>> {
-        self.field(name)
-            .map(|value| super::encoding::text(value, self.quoted.contains(name)))
     }
     pub(super) fn field(&self, key: &str) -> Option<&'a str> {
         self.fields.get(key).copied()

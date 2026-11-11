@@ -1,5 +1,7 @@
 # Explicit Parquet migration and export V5 boundaries
 
+> Historical design: the current ingestion path uses `SourceDecoder` and separately identified mappings. Legacy execution callbacks and artifact migration routes described here have been retired. See [the source/mapping design](source-mapping-design.md) and [current architecture](architecture.md).
+
 This page is for maintainers implementing explicit migration of open cases and mixed-version exports. It complements the [artifact V2 design](parquet-artifact-v2-design.md#compatibility-and-migration) without changing existing source, audit-entry or seal encodings.
 
 ## Application boundary

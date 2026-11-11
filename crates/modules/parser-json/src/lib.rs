@@ -1,5 +1,4 @@
 #![forbid(unsafe_code)]
-mod indexed;
 mod source_decode;
 pub use source_decode::JsonSourceDecoder;
 
@@ -13,100 +12,18 @@ use irmind_domain::{Provenance, SourceKind, Tainted, classify_field};
 use serde_json::Value;
 
 mod hunteval;
-mod profile;
 mod stream;
-pub use profile::{ParserProfile, ParserTiming};
-use std::io::Read;
 use std::sync::Arc;
 
 pub struct JsonParser;
 
-impl JsonParser {
-    /// Parse a pre-hashed source in bounded memory. The caller must rehash the
-    /// same opened source while parsing and compare it with `evidence_hash`
-    /// before committing derived records or custody metadata.
-    pub fn parse_reader(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &irmind_app::CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        stream::parse_reader(source, reader, evidence_hash, cancel, emit)
-    }
-}
-
 impl StreamingEventParser for JsonParser {
-    fn partition_profile(&self, record: &GraphRecord) -> irmind_app::PartitionProfile {
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(&record.text) else {
-            return irmind_app::PartitionProfile::Unpartitioned;
-        };
-        if [
-            "eventSource",
-            "recipientAccountId",
-            "protoPayload",
-            "subscriptionId",
-            "account_id",
-        ]
-        .iter()
-        .any(|k| value.get(k).is_some())
-        {
-            irmind_app::PartitionProfile::CloudAccountRegion
-        } else if value.get("host").is_some_and(serde_json::Value::is_string)
-            || record.entities.iter().any(|(kind, _)| kind == "host")
-        {
-            irmind_app::PartitionProfile::EndpointHost
-        } else {
-            irmind_app::PartitionProfile::Unpartitioned
-        }
-    }
-
     fn parser_name(&self) -> &'static str {
         "parser-json"
     }
 
     fn streaming_version(&self) -> &'static str {
-        "json-stream-v3"
-    }
-
-    fn parse_reader(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &irmind_app::CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        stream::parse_reader(source, reader, evidence_hash, cancel, emit)
-    }
-
-    fn parse_reader_report(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &irmind_app::CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<irmind_app::ParseReport, AppError> {
-        stream::parse_reader_report(source, reader, evidence_hash, cancel, emit)
-    }
-
-    fn parse_indexed_reader_report(
-        &self,
-        source: &str,
-        reader: &mut dyn std::io::Read,
-        evidence_hash: [u8; 32],
-        cancel: &irmind_app::CancellationToken,
-        emit: &mut dyn FnMut(
-            irmind_domain::Tainted<irmind_app::IndexedGraphRecord>,
-        ) -> Result<(), irmind_app::AppError>,
-    ) -> Result<irmind_app::ParseReport, irmind_app::AppError> {
-        irmind_app::parse_indexed_report(
-            |forward| self.parse_reader_report(source, reader, evidence_hash, cancel, forward),
-            crate::indexed::project,
-            emit,
-        )
+        "json-source-v1"
     }
 }
 
@@ -151,16 +68,6 @@ impl LogParser for JsonParser {
     }
 }
 
-pub struct ProfiledJsonParser {
-    profile: Arc<ParserProfile>,
-}
-
-impl ProfiledJsonParser {
-    pub fn new(profile: Arc<ParserProfile>) -> Self {
-        Self { profile }
-    }
-}
-
 static MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-json",
     version: "0.1.0",
@@ -195,23 +102,7 @@ impl EventParser for JsonParser {
         cancel: &irmind_app::CancellationToken,
         emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
     ) -> Result<usize, AppError> {
-        parse_each_checked(source, bytes, cancel, emit, None)
-    }
-}
-
-impl EventParser for ProfiledJsonParser {
-    fn version(&self) -> &'static str {
-        "json-cloudtrail-v5"
-    }
-
-    fn parse_each(
-        &self,
-        source: &str,
-        bytes: &[u8],
-        cancel: &irmind_app::CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError> {
-        parse_each_checked(source, bytes, cancel, emit, Some(&self.profile))
+        parse_each_checked(source, bytes, cancel, emit)
     }
 }
 
@@ -220,7 +111,6 @@ fn parse_each_checked(
     bytes: &[u8],
     cancel: &irmind_app::CancellationToken,
     emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    profile: Option<&ParserProfile>,
 ) -> Result<usize, AppError> {
     if bytes.len() > 50 * 1024 * 1024 {
         return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
@@ -231,7 +121,7 @@ fn parse_each_checked(
     if !matches!(first, Some(b'{' | b'[')) {
         return Ok(0);
     }
-    stream::parse_each(source, bytes, cancel, emit, profile)
+    stream::parse_each(source, bytes, cancel, emit)
 }
 
 fn parse_record(

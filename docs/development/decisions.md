@@ -803,3 +803,11 @@ Consequences: a retired artifact event still produces the explicit version
 error at the case boundary, before interpreting its payload. Current common
 core, mapped envelope, direct physical, layout, seal and V6 golden fixtures stay
 unchanged. Invalid metadata, source links, row counts and hashes still fail.
+
+## Sole source-decoding execution route
+
+**Context.** Every bundled parser now has a bounded original-field decoder and an identified mapping. The former streaming callbacks duplicate framing, extraction and historical reconstruction paths.
+
+**Decision.** File and object ingestion execute only `SourceDecoder` followed by the selected `SourceMapper`. The existing custody-side `StreamingEventParser` contract retains selection, provenance, scheduling and time-context metadata, without decoding callbacks. Native historical-version resolvers and their execution tests are retired under the pre-1.0 policy. Installed current declarative definitions still resolve their authenticated identities. The agreed small-buffer `EventParser` port remains separate.
+
+**Consequences.** Current decoder versions, mapping algorithms, artifact builder recipes and signed format golden bytes remain unchanged. Native mapping build identities continue to include the exact shared source tree and lockfile; their content hashes therefore track this build, as designed. Detector contracts, bounded malformed-record recovery, cancellation, exact time/offset tests and fuzz targets exercise the actual source-decoding route. Mapping tests and current pipeline golden fixtures cover extraction and interpretation in their owning modules. Canonical append and eviction remain sequential; bounded partition completion remains parallel.

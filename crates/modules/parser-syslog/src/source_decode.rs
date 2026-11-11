@@ -180,9 +180,9 @@ fn limit() -> AppError {
 pub fn source_log_parser() -> Arc<dyn LogParser> {
     Arc::new(
         SourceDecoderSelection::new(Arc::new(SyslogSourceDecoder))
-            .with_detector(|source, sample| crate::SyslogParser::default().detect(source, sample))
+            .with_detector(|source, sample| crate::SyslogParser.detect(source, sample))
             .with_time_detector(|source, sample| {
-                crate::SyslogParser::default().time_context_requirement(source, sample)
+                crate::SyslogParser.time_context_requirement(source, sample)
             }),
     )
 }

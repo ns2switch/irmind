@@ -54,7 +54,7 @@ fn registry() -> ModuleRegistry {
     {
         registry
             .register(
-                Box::new(irmind_mod_parser_syslog::SyslogParser::default()),
+                Box::new(irmind_mod_parser_syslog::SyslogParser),
                 &ModuleConfig::new(),
             )
             .unwrap();
@@ -194,7 +194,7 @@ fn registry() -> ModuleRegistry {
         };
         registry
             .register(
-                Box::new(irmind_mod_parser_linux::LinuxParser::default()),
+                Box::new(irmind_mod_parser_linux::LinuxParser),
                 &ModuleConfig::new(),
             )
             .unwrap();
@@ -240,73 +240,73 @@ pub(super) fn catalog() -> ParserCatalog {
     #[cfg(feature = "parser-json")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_json::source_log_parser())
+            .with_source_parser(irmind_mod_parser_json::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-ecs")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_ecs::source_log_parser())
+            .with_source_parser(irmind_mod_parser_ecs::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-ocsf")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_ocsf::source_log_parser())
+            .with_source_parser(irmind_mod_parser_ocsf::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-syslog")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_syslog::source_log_parser())
+            .with_source_parser(irmind_mod_parser_syslog::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-linux")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_linux::source_log_parser())
+            .with_source_parser(irmind_mod_parser_linux::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-velociraptor")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_velociraptor::source_log_parser())
+            .with_source_parser(irmind_mod_parser_velociraptor::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-hayabusa")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_hayabusa::source_log_parser())
+            .with_source_parser(irmind_mod_parser_hayabusa::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-chainsaw")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_chainsaw::source_log_parser())
+            .with_source_parser(irmind_mod_parser_chainsaw::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-plaso")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_plaso::source_log_parser())
+            .with_source_parser(irmind_mod_parser_plaso::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-eztools")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_eztools::source_log_parser())
+            .with_source_parser(irmind_mod_parser_eztools::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-zeek")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_zeek::source_log_parser())
+            .with_source_parser(irmind_mod_parser_zeek::source_log_parser())
             .unwrap();
     }
     #[cfg(feature = "parser-suricata")]
     {
         catalog = catalog
-            .with_experimental_parser(irmind_mod_parser_suricata::source_log_parser())
+            .with_source_parser(irmind_mod_parser_suricata::source_log_parser())
             .unwrap();
     }
     catalog
@@ -321,4 +321,19 @@ pub(super) fn parser(id: &str) -> Arc<dyn irmind_app::LogParser> {
         .unwrap()
         .1;
     catalog.get_version(id, &version).unwrap()
+}
+
+#[cfg(not(feature = "parser-json"))]
+#[path = "../../src/disabled_parser.rs"]
+mod disabled_buffer_parser;
+
+pub(super) fn event_parser() -> Arc<dyn irmind_app::EventParser> {
+    #[cfg(feature = "parser-json")]
+    {
+        Arc::new(irmind_mod_parser_json::JsonParser)
+    }
+    #[cfg(not(feature = "parser-json"))]
+    {
+        Arc::new(disabled_buffer_parser::JsonParser)
+    }
 }

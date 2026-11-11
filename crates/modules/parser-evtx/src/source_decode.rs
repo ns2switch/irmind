@@ -50,11 +50,7 @@ impl SourceDecoder for EvtxParser {
             return Err(AppError::Cancelled);
         }
         let size = input.file.metadata().map_err(|_| invalid())?.len();
-        let mut state = codec::State::new(
-            input.metadata.source.reference(),
-            input.metadata.evidence_hash,
-            size,
-        );
+        let mut state = codec::State::new(size);
         let result = self
             .decode_file(input.file, input.metadata.cancel, &mut |bytes| {
                 state.project_frame(bytes, &mut |row| {
@@ -192,7 +188,7 @@ pub(super) fn fuzz(bytes: &[u8]) {
         time_context: None,
         cancel: &cancel,
     };
-    let mut state = codec::State::new("synthetic.evtx", [0; 32], 69632);
+    let mut state = codec::State::new(69632);
     for line in bytes.split(|byte| *byte == b'\n').take(128) {
         let _ = state.project_frame(line, &mut |row| Ok(decode(row, metadata).is_ok()));
     }

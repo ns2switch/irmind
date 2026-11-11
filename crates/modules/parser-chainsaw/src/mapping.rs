@@ -1,22 +1,21 @@
-use chrono::{DateTime, Utc};
-use irmind_app::{AppError, GraphRecord};
-use irmind_domain::UtcTimestamp;
 use serde::Deserialize;
 
+// Borrowed columns retain the detector's input-type checks. Underscored
+// columns are validated by deserialization and never normalized here.
 #[derive(Deserialize)]
 struct Row<'a> {
     #[serde(borrow, alias = "Rule", alias = "rule")]
     rule: Option<&'a str>,
-    #[serde(borrow)]
-    group: Option<&'a str>,
+    #[serde(rename = "group", borrow)]
+    _group: Option<&'a str>,
     #[serde(borrow)]
     kind: Option<&'a str>,
     #[serde(borrow, alias = "Timestamp", alias = "timestamp")]
     timestamp: Option<&'a str>,
-    #[serde(borrow, alias = "Computer", alias = "computer")]
-    computer: Option<&'a str>,
-    #[serde(borrow, alias = "User", alias = "user")]
-    user: Option<&'a str>,
+    #[serde(rename = "computer", borrow, alias = "Computer", alias = "computer")]
+    _computer: Option<&'a str>,
+    #[serde(rename = "user", borrow, alias = "User", alias = "user")]
+    _user: Option<&'a str>,
     #[serde(borrow, rename = "Event")]
     event: Option<Event<'a>>,
     #[serde(borrow)]
@@ -24,41 +23,41 @@ struct Row<'a> {
 }
 #[derive(Deserialize)]
 struct Document<'a> {
-    #[serde(borrow)]
-    data: Option<DocumentData<'a>>,
+    #[serde(rename = "data", borrow)]
+    _data: Option<DocumentData<'a>>,
 }
 #[derive(Deserialize)]
 struct DocumentData<'a> {
     #[serde(borrow, rename = "Event")]
-    event: Option<Event<'a>>,
+    _event: Option<Event<'a>>,
 }
 #[derive(Deserialize)]
 struct Event<'a> {
     #[serde(borrow, rename = "System")]
-    system: Option<System<'a>>,
+    _system: Option<System<'a>>,
     #[serde(borrow, rename = "EventData")]
-    data: Option<EventData<'a>>,
+    _data: Option<EventData<'a>>,
 }
 #[derive(Deserialize)]
 struct System<'a> {
     #[serde(borrow, rename = "Computer")]
-    computer: Option<&'a str>,
+    _computer: Option<&'a str>,
     #[serde(rename = "TimeCreated")]
-    time: Option<Time<'a>>,
+    _time: Option<Time<'a>>,
     #[serde(rename = "EventID")]
-    event_id: Option<u64>,
+    _event_id: Option<u64>,
 }
 #[derive(Deserialize)]
 struct EventData<'a> {
     #[serde(borrow, rename = "SubjectUserName")]
-    user: Option<&'a str>,
+    _user: Option<&'a str>,
     #[serde(borrow, rename = "NewProcessName")]
-    process: Option<&'a str>,
+    _process: Option<&'a str>,
 }
 #[derive(Deserialize)]
 struct Time<'a> {
     #[serde(borrow, rename = "SystemTime")]
-    system_time: Option<&'a str>,
+    _system_time: Option<&'a str>,
 }
 
 pub(super) fn detect(sample: &[u8]) -> Option<u8> {
@@ -82,69 +81,4 @@ pub(super) fn detect(sample: &[u8]) -> Option<u8> {
     } else {
         None
     }
-}
-
-pub(super) fn parse(line: &[u8], index: usize) -> Result<GraphRecord, AppError> {
-    let row: Row<'_> = serde_json::from_slice(line).map_err(|_| bad())?;
-    let event = row
-        .event
-        .as_ref()
-        .or_else(|| row.document.as_ref()?.data.as_ref()?.event.as_ref());
-    let system = event.and_then(|event| event.system.as_ref());
-    let data = event.and_then(|event| event.data.as_ref());
-    let timestamp = row
-        .timestamp
-        .or_else(|| system?.time.as_ref()?.system_time)
-        .ok_or_else(bad)?;
-    let parsed = DateTime::parse_from_rfc3339(timestamp).map_err(|_| bad())?;
-    let at = parsed
-        .with_timezone(&Utc)
-        .format("%Y-%m-%dT%H:%M:%SZ")
-        .to_string();
-    UtcTimestamp::parse(&at).map_err(|_| bad())?;
-    let mut entities = Vec::new();
-    for (kind, value) in [
-        (
-            "host",
-            row.computer.or_else(|| system.and_then(|s| s.computer)),
-        ),
-        ("user", row.user.or_else(|| data.and_then(|d| d.user))),
-        ("process", data.and_then(|d| d.process)),
-        ("rule", row.rule.or(row.group)),
-    ] {
-        if let Some(value) = value.filter(|text| !text.is_empty() && text.len() <= 4096) {
-            entities.push((kind.into(), value.into()));
-        }
-    }
-    if let Some(id) = system.and_then(|s| s.event_id) {
-        entities.push(("event_id".into(), id.to_string()));
-    }
-    entities.sort();
-    entities.dedup();
-    Ok(GraphRecord {
-        index,
-        at,
-        event: row.rule.or(row.group).unwrap_or("chainsaw_match").into(),
-        text: String::from_utf8_lossy(line).into_owned(),
-        entities,
-        relations: Vec::new(),
-    })
-}
-fn bad() -> AppError {
-    AppError::Policy("invalid Chainsaw result".into())
-}
-
-pub(super) fn indexed_project(
-    record: &GraphRecord,
-) -> Result<irmind_app::IndexedProjection, AppError> {
-    let row: Row<'_> = serde_json::from_str(&record.text).map_err(|_| bad())?;
-    let event = row
-        .event
-        .as_ref()
-        .or_else(|| row.document.as_ref()?.data.as_ref()?.event.as_ref());
-    let raw = row
-        .timestamp
-        .or_else(|| event?.system.as_ref()?.time.as_ref()?.system_time)
-        .ok_or_else(bad)?;
-    Ok((Some(irmind_app::indexed_rfc3339(raw, false, false)?), None))
 }

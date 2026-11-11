@@ -1,5 +1,5 @@
-use super::{AppError, GraphRecord, bad, record::Record};
-use chrono::{DateTime, Utc};
+use super::{AppError, bad};
+use chrono::DateTime;
 
 pub(super) struct Access<'a> {
     pub(super) ip: &'a str,
@@ -10,23 +10,6 @@ pub(super) struct Access<'a> {
 }
 pub(super) fn detect(line: &str) -> bool {
     fields(line).is_ok()
-}
-pub(super) fn parse(line: &str, index: usize) -> Result<GraphRecord, AppError> {
-    let row = fields(line)?;
-    let at = DateTime::parse_from_str(row.time, "%d/%b/%Y:%H:%M:%S %z")
-        .map_err(|_| invalid())?
-        .with_timezone(&Utc);
-    let mut record = Record::new(at, "http_access", line);
-    record.source_ip = Some(row.ip);
-    record.user = (row.user != "-").then_some(row.user);
-    record.http_method = row.request.split_ascii_whitespace().next();
-    record.url = row.request.split_ascii_whitespace().nth(1);
-    record.outcome = if row.status.starts_with(['4', '5']) {
-        "failure"
-    } else {
-        "success"
-    };
-    record.graph(index)
 }
 pub(super) fn fields(line: &str) -> Result<Access<'_>, AppError> {
     let mut parts = line.splitn(4, ' ');

@@ -3,8 +3,6 @@ use crate::{
     SignedEntry, SignedOperation, Tainted, TimelineEvent,
 };
 use irmind_domain::{ParquetArtifact, SourceManifestV1};
-use std::fs::File;
-use std::io::Read;
 use std::path::Path;
 pub trait CaseLock: Send {}
 
@@ -201,17 +199,16 @@ pub enum SourceParallelism {
     Serial,
 }
 
-/// Parser for large, pre-hashed sources. The caller verifies the same reader
-/// again while parsing before it commits any signed manifest entry.
+/// Selection and provenance metadata retained by the local custody API.
+/// `SourceDecoder` is the only execution route for evidence-file decoding.
 pub trait StreamingEventParser: Send + Sync {
-    /// Preserve logical provenance when a private local spool supplies the bytes.
+    /// Logical provenance when a private local spool supplies the bytes.
     fn logical_source<'a>(&'a self, source: &'a str) -> &'a str {
         source
     }
     fn source_parallelism(&self, _source: &str) -> Result<SourceParallelism, AppError> {
         Ok(SourceParallelism::Concurrent)
     }
-
     fn streaming_version(&self) -> &'static str;
     fn parser_name(&self) -> &'static str;
     fn identity(&self) -> ParserIdentity<'_> {
@@ -226,91 +223,14 @@ pub trait StreamingEventParser: Send + Sync {
             version: self.version_for_source(source)?,
         })
     }
-    fn partition_profile(&self, _record: &GraphRecord) -> crate::PartitionProfile {
-        crate::PartitionProfile::Unpartitioned
-    }
-    fn partition_profile_for_source(
-        &self,
-        _source: &str,
-        record: &GraphRecord,
-    ) -> Result<crate::PartitionProfile, AppError> {
-        Ok(self.partition_profile(record))
-    }
-
     fn timestamp_context(&self) -> Option<&str> {
         None
     }
-
-    /// A parser may request random access only when the bounded source sample
-    /// identifies a format that needs it. Other parsers stay streaming.
     fn prefers_local_file(&self, _source: &str, _sample: &[u8]) -> bool {
         false
     }
     fn version_for_source(&self, _source: &str) -> Result<&'static str, AppError> {
         Ok(self.streaming_version())
-    }
-    fn parse_reader(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError>;
-
-    fn parse_reader_report(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<ParseReport, AppError> {
-        let accepted = self.parse_reader(source, reader, evidence_hash, cancel, emit)?;
-        Ok(ParseReport {
-            accepted,
-            rejected: 0,
-            samples: Vec::new(),
-        })
-    }
-
-    /// Optional local-file route. The caller rehashes the complete file after
-    /// parsing and rejects any change before signing the source manifest.
-    fn parse_local_file_report(
-        &self,
-        source: &str,
-        file: &mut File,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<ParseReport, AppError> {
-        self.parse_reader_report(source, file, evidence_hash, cancel, emit)
-    }
-
-    fn parse_indexed_reader_report(
-        &self,
-        source: &str,
-        reader: &mut dyn Read,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<crate::IndexedGraphRecord>) -> Result<(), AppError>,
-    ) -> Result<ParseReport, AppError> {
-        self.parse_reader_report(source, reader, evidence_hash, cancel, &mut |record| {
-            emit(crate::indexed_parser::lift_legacy_indexed(&record)?)
-        })
-    }
-
-    fn parse_indexed_local_file_report(
-        &self,
-        source: &str,
-        file: &mut File,
-        evidence_hash: [u8; 32],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<crate::IndexedGraphRecord>) -> Result<(), AppError>,
-    ) -> Result<ParseReport, AppError> {
-        self.parse_local_file_report(source, file, evidence_hash, cancel, &mut |record| {
-            emit(crate::indexed_parser::lift_legacy_indexed(&record)?)
-        })
     }
 }
 
@@ -347,7 +267,7 @@ impl ParserConfidence {
 
 /// Format-specific, bounded evidence decoder. `detect` receives at most 64 KiB
 /// from the caller and must remain pure and cheap.
-pub trait LogParser: EventParser + StreamingEventParser {
+pub trait LogParser: StreamingEventParser {
     fn time_context_requirement(
         &self,
         _source_name: &str,

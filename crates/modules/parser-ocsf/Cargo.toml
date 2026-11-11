@@ -10,11 +10,12 @@ irmind-app = { path = "../../app", version = "0.1.0" }
 irmind-domain = { path = "../../domain", version = "0.1.0" }
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 serde_json = "1"
-parquet = { version = "=59.3.0", default-features = false, features = ["arrow", "snap", "json"] }
+parquet = { version = "=59.3.0", default-features = false, features = ["arrow", "snap"] }
 
 [lints]
 workspace = true
 
 [dev-dependencies]
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
 arrow = { version = "=59.3.0", default-features = false }
 tempfile = "3"

@@ -8,7 +8,7 @@ fn syslog_ingestion_signs_confirmed_calendar_and_rebuilds_gzip_without_fake_offs
     let mut registry = registry();
     registry
         .register(
-            Box::new(irmind_mod_parser_syslog::SyslogParser::default()),
+            Box::new(irmind_mod_parser_syslog::SyslogParser),
             &ModuleConfig::new(),
         )
         .unwrap();

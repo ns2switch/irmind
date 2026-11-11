@@ -1,4 +1,5 @@
-use super::{AppError, CancellationToken, ParseReport, bad};
+use super::{AppError, CancellationToken, bad};
+use irmind_app::ParseReport;
 use std::io::BufRead;
 pub(super) const MAX_LINE: usize = 1024 * 1024;
 pub(super) const MAX_RECORDS: usize = 10_000_000;

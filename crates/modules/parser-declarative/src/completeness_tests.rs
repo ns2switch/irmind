@@ -1,6 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::wildcard_imports)]
-use crate::*;
-use irmind_app::{CancellationToken, StreamingEventParser};
+use irmind_app::CancellationToken;
 use std::io::{Cursor, Read};
 #[test]
 fn oversized_whitespace_prefixed_record_is_counted() {
@@ -21,7 +20,7 @@ action = "/action"
 format = "rfc3339"
 default_timezone = "UTC"
 "#;
-    let parser = DeclarativeParser::from_toml(definition).unwrap();
+    let pipeline = crate::pipeline::compile(definition).unwrap();
     let raw = br#"{"time":"2026-10-23T10:00:00Z","host":"synthetic","action":"login"}"#;
     let row = [raw.as_slice(), b"\n"].concat();
     for mib in [5, 50, 200] {
@@ -29,18 +28,19 @@ default_timezone = "UTC"
             .chain(std::io::repeat(b' ').take(mib * 1024 * 1024))
             .chain(Cursor::new(row.repeat(2)));
         let mut count = 0;
-        let report = parser
-            .parse_reader_report(
-                "synthetic.ndjson",
-                &mut input,
-                [0; 32],
-                &CancellationToken::new(),
-                &mut |_| {
-                    count += 1;
-                    Ok(())
-                },
-            )
-            .unwrap();
+        let report = irmind_testkit::decode_source(
+            pipeline.decoder().as_ref(),
+            "synthetic.ndjson",
+            &mut input,
+            [0; 32],
+            &CancellationToken::new(),
+            None,
+            &mut |_| {
+                count += 1;
+                Ok(())
+            },
+        )
+        .unwrap();
         assert_eq!((report.accepted, report.rejected, count), (2, 1, 2));
     }
 }
@@ -60,20 +60,21 @@ fn csv_and_regex_count_an_oversized_whitespace_prefixed_record() {
         ),
     ];
     for (definition, header, row) in examples {
-        let parser = DeclarativeParser::from_toml(definition).unwrap();
+        let pipeline = crate::pipeline::compile(definition).unwrap();
         let mut input = Cursor::new(header.as_bytes())
             .chain(Cursor::new(row.as_bytes()))
             .chain(std::io::repeat(b' ').take(5 * 1024 * 1024))
             .chain(Cursor::new(row.repeat(2)));
-        let report = parser
-            .parse_reader_report(
-                "synthetic",
-                &mut input,
-                [0; 32],
-                &CancellationToken::new(),
-                &mut |_| Ok(()),
-            )
-            .unwrap();
+        let report = irmind_testkit::decode_source(
+            pipeline.decoder().as_ref(),
+            "synthetic",
+            &mut input,
+            [0; 32],
+            &CancellationToken::new(),
+            None,
+            &mut |_| Ok(()),
+        )
+        .unwrap();
         assert_eq!((report.accepted, report.rejected), (2, 1));
     }
 }

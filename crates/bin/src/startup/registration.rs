@@ -199,12 +199,12 @@ fn register_parsers(
 
     #[cfg(feature = "parser-linux")]
     registry.register(
-        Box::new(irmind_mod_parser_linux::LinuxParser::default()),
+        Box::new(irmind_mod_parser_linux::LinuxParser),
         &ModuleConfig::new(),
     )?;
     #[cfg(feature = "parser-syslog")]
     registry.register(
-        Box::new(irmind_mod_parser_syslog::SyslogParser::default()),
+        Box::new(irmind_mod_parser_syslog::SyslogParser),
         &ModuleConfig::new(),
     )?;
 

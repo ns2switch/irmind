@@ -3,6 +3,7 @@ use irmind_app::{
     SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1, SourceValue},
 };
+use std::io::Cursor;
 fn decode(
     bytes: &[u8],
     cancel: &CancellationToken,

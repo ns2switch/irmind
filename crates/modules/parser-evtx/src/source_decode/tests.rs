@@ -16,7 +16,6 @@ fn metadata<'a>(
 fn frame(event: serde_json::Value) -> codec::DecodedRecord {
     codec::DecodedRecord {
         accepted_index: 0,
-        index: 3,
         record_id: 91,
         offset: 4608,
         timestamp: "2026-11-01T00:00:00.1234567Z".into(),
@@ -98,4 +97,49 @@ fn source_limits_and_cancellation_are_enforced() {
         ),
         Err(AppError::Cancelled)
     ));
+}
+
+#[test]
+fn event_ids_are_decoded_as_original_fields_without_interpretation() {
+    use irmind_app::source_mapping::{SourceMetadata, SourceReferenceV1};
+    let source = SourceReferenceV1::file("source.evtx").unwrap();
+    let cancel = CancellationToken::new();
+    for (channel, ids) in [
+        (
+            "Security",
+            vec![
+                4624, 4625, 4634, 4648, 4672, 4688, 4697, 4698, 4720, 4732, 4768, 4769, 4776, 1102,
+            ],
+        ),
+        ("System", vec![7045]),
+        ("PowerShell", vec![4103, 4104]),
+        ("Sysmon", vec![1, 3, 7, 8, 10, 11, 12, 13, 22, 23]),
+    ] {
+        for id in ids {
+            let row = decode(codec::DecodedRecord {
+                accepted_index: 0, record_id: 1, offset: 4608,
+                timestamp: "2026-11-01T00:00:00.0000007Z".into(),
+                event: json!({"Event":{"System":{"EventID":id,"Channel":channel,"Computer":"synthetic-endpoint"},"EventData":{"TargetUserName":"synthetic-user","IpAddress":"203.0.113.77"}}}),
+            }, SourceMetadata { source: &source, evidence_hash: [1;32], time_context: None, cancel: &cancel }).unwrap();
+            assert_eq!(
+                row.provenance().parser_location().unwrap().byte_offset(),
+                4608
+            );
+            row.inspect(|r| {
+                assert_eq!(r.timestamp().unwrap().instant().submicro_nanos(), 700);
+                assert_eq!(
+                    r.fields()
+                        .field("Event")
+                        .unwrap()
+                        .field("System")
+                        .unwrap()
+                        .field("Channel")
+                        .unwrap()
+                        .as_text(),
+                    Some(channel)
+                );
+                assert!(r.fields().field("outcome").is_none());
+            });
+        }
+    }
 }

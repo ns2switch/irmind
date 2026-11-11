@@ -2610,17 +2610,11 @@ dependencies = [
  "irmind-domain",
  "irmind-fs",
  "irmind-mod-mapping-cloudtrail",
- "irmind-mod-mapping-ecs",
- "irmind-mod-mapping-evtx",
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
- "irmind-mod-mapping-ocsf",
  "irmind-mod-mapping-tables",
- "irmind-mod-parser-ecs",
- "irmind-mod-parser-evtx",
  "irmind-mod-parser-json",
  "irmind-mod-parser-linux",
- "irmind-mod-parser-ocsf",
  "irmind-security",
  "irmind-testkit",
  "keyring",
@@ -2950,9 +2944,9 @@ dependencies = [
 name = "irmind-mod-parser-chainsaw"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "irmind-app",
  "irmind-domain",
+ "irmind-testkit",
  "serde",
  "serde_json",
 ]
@@ -2977,7 +2971,6 @@ dependencies = [
 name = "irmind-mod-parser-ecs"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "irmind-app",
  "irmind-domain",
  "serde_json",
@@ -2987,7 +2980,6 @@ dependencies = [
 name = "irmind-mod-parser-evtx"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "irmind-app",
  "irmind-domain",
  "irmind-process-containment",
@@ -3000,22 +2992,20 @@ dependencies = [
 name = "irmind-mod-parser-eztools"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "csv",
  "irmind-app",
  "irmind-domain",
- "serde",
- "serde_json",
+ "irmind-testkit",
 ]
 
 [[package]]
 name = "irmind-mod-parser-hayabusa"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "csv",
  "irmind-app",
  "irmind-domain",
+ "irmind-testkit",
  "serde",
  "serde_json",
 ]
@@ -3026,6 +3016,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-testkit",
  "serde",
  "serde_json",
 ]
@@ -3050,6 +3041,7 @@ dependencies = [
  "chrono",
  "irmind-app",
  "irmind-domain",
+ "irmind-testkit",
  "parquet",
  "serde_json",
  "tempfile",
@@ -3059,9 +3051,9 @@ dependencies = [
 name = "irmind-mod-parser-plaso"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "irmind-app",
  "irmind-domain",
+ "irmind-testkit",
  "serde",
  "serde_json",
 ]
@@ -3094,9 +3086,9 @@ dependencies = [
 name = "irmind-mod-parser-velociraptor"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "irmind-app",
  "irmind-domain",
+ "irmind-testkit",
  "serde",
  "serde_json",
 ]
@@ -3833,7 +3825,6 @@ dependencies = [
  "num-integer",
  "num-traits",
  "seq-macro",
- "serde_json",
  "snap",
  "twox-hash",
 ]

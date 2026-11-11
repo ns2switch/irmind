@@ -1,6 +1,5 @@
 use super::{AppError, LinuxParser, ParserTimeContext, ParserTimeRequirement, bad};
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
-use irmind_app::ParserTimeBasis;
 use irmind_domain::{ParserLocation, Provenance, SourceKind, Tainted};
 use serde::Deserialize;
 use std::borrow::Cow;
@@ -47,12 +46,12 @@ pub(super) fn month(raw: &str) -> Option<u8> {
 struct Stored<'a> {
     #[serde(borrow)]
     raw: Cow<'a, str>,
-    #[serde(borrow)]
-    timestamp: Option<Cow<'a, str>>,
+    #[serde(borrow, rename = "timestamp")]
+    _timestamp: Option<Cow<'a, str>>,
 }
 
 pub(super) fn requirement(
-    parser: &LinuxParser,
+    _parser: &LinuxParser,
     source: &str,
     sample: &[u8],
 ) -> Result<Option<ParserTimeRequirement>, AppError> {
@@ -75,25 +74,7 @@ pub(super) fn requirement(
         .trim_end_matches('\r');
     if let Some(header) = super::auth::header(raw) {
         let observed = if header.classic {
-            parser.context.and_then(|context| {
-                let year = stored
-                    .as_ref()
-                    .and_then(|row| row.timestamp.as_deref())
-                    .and_then(|time| DateTime::parse_from_rfc3339(time).ok())
-                    .and_then(|at| {
-                        use chrono::Datelike as _;
-                        FixedOffset::east_opt(i32::from(context.offset_minutes()) * 60)
-                            .and_then(|offset| u16::try_from(at.with_timezone(&offset).year()).ok())
-                    })
-                    .unwrap_or(context.year());
-                ParserTimeContext::new(
-                    year,
-                    context.offset_minutes(),
-                    true,
-                    ParserTimeBasis::ConfirmedSuggestion,
-                )
-                .ok()
-            })
+            None
         } else {
             ParserTimeContext::from_timestamp_hint(header.time)
         };

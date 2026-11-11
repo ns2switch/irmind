@@ -85,12 +85,11 @@ fn csv_quoted_newlines_and_exact_negative_epoch_fractions_are_preserved() {
 
 #[test]
 fn cancellation_stops_before_read_and_between_records() {
-    let parser = DeclarativeParser::from_toml(SIMPLE).unwrap();
     let cancel = CancellationToken::new();
     cancel.cancel();
     assert!(matches!(
-        parser.parse_source(
-            "events.json",
+        read(
+            SIMPLE,
             &mut Cursor::new(EVENT),
             [0; 32],
             &cancel,
@@ -100,8 +99,8 @@ fn cancellation_stops_before_read_and_between_records() {
     ));
     let cancel = CancellationToken::new();
     let mut count = 0;
-    let result = parser.parse_source(
-        "events.json",
+    let result = read(
+        SIMPLE,
         &mut Cursor::new(format!("{EVENT}\n{EVENT}\n")),
         [0; 32],
         &cancel,
