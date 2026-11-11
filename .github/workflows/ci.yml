@@ -181,6 +181,12 @@ jobs:
         run: |
           cargo nextest run -p irmind --test format_goldens --all-features --features serde_json/preserve_order --cargo-profile ci --locked
           cargo nextest run -p irmind-mapping-tables -p irmind-mod-mapping-cloudtrail -p irmind-mod-parser-evtx -p irmind-mod-mapping-evtx --lib --features serde_json/preserve_order --cargo-profile ci --locked
+          cargo nextest run --lib --features serde_json/preserve_order --cargo-profile ci --locked \
+            -p irmind-mod-parser-json -p irmind-mod-parser-ecs -p irmind-mod-parser-ocsf \
+            -p irmind-mod-parser-velociraptor -p irmind-mod-parser-hayabusa \
+            -p irmind-mod-parser-chainsaw -p irmind-mod-parser-plaso -p irmind-mod-parser-eztools \
+            -p irmind-mod-parser-zeek -p irmind-mod-parser-suricata -p irmind-mod-parser-linux \
+            -p irmind-mod-parser-syslog -p irmind-mod-parser-declarative
   evtx_linux_compatibility:
     needs: [dco, linux]
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true }}
