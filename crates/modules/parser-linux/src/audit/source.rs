@@ -117,6 +117,10 @@ fn finish(key: &Key, group: Group, partial: bool) -> Result<DecodedAudit, AppErr
         false,
     )
     .map_err(|_| invalid())?;
+    let only_terminators = group
+        .fields
+        .iter()
+        .all(|row| row.field("type").and_then(SourceValue::as_text) == Some("EOE"));
     let fields = object(vec![
         ("node", text(&key.0)),
         ("serial", text(&key.3.to_string())),
@@ -125,7 +129,7 @@ fn finish(key: &Key, group: Group, partial: bool) -> Result<DecodedAudit, AppErr
     Ok(DecodedAudit {
         fields,
         timestamp,
-        partial: partial || group.invalid,
+        partial: partial || group.invalid || only_terminators,
         members: group.members,
     })
 }

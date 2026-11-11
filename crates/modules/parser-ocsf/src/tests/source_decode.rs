@@ -207,3 +207,16 @@ fn local_parquet_uses_the_original_handle_without_a_temporary_copy_or_fake_offse
     assert_eq!(rows[0].origin().offset(), None);
     assert_eq!(rows[0].annotations().members()[0].offset, None);
 }
+
+#[test]
+fn oversized_whitespace_prefix_is_counted_without_losing_later_rows() {
+    let row = format!("{}\n", event(3002, 3));
+    let input = format!("{row}{}{row}{row}", " ".repeat(5 * 1024 * 1024));
+    let (report, rows) = decoded("synthetic.ndjson", input.as_bytes());
+    assert_eq!((report.accepted, report.rejected), (2, 1));
+    assert_eq!(rows[1].annotations().members()[0].ordinal, 2);
+    assert_eq!(
+        rows[1].origin().offset(),
+        Some((5 * 1024 * 1024 + 2 * row.len()) as u64)
+    );
+}

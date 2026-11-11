@@ -107,7 +107,7 @@ fn lines(
             if offset > 50 * 1024 * 1024 * 1024 {
                 return Err(limit());
             }
-            if bytes.iter().all(u8::is_ascii_whitespace) {
+            if size <= 1024 * 1024 && bytes.iter().all(u8::is_ascii_whitespace) {
                 continue;
             }
             if seen >= 10_000_000 {

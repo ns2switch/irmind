@@ -101,7 +101,7 @@ fn tsv(
             if offset > 50 * 1024 * 1024 * 1024 {
                 return Err(limit());
             }
-            if bytes.iter().all(u8::is_ascii_whitespace) {
+            if size <= 4 * 1024 * 1024 && bytes.iter().all(u8::is_ascii_whitespace) {
                 continue;
             }
             if bytes.first() == Some(&b'#')
@@ -189,3 +189,7 @@ pub fn source_log_parser() -> Arc<dyn LogParser> {
             .with_detector(|source, sample| crate::ZeekParser.detect(source, sample)),
     )
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests;
