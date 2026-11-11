@@ -6,14 +6,13 @@ use parquet::file::properties::ReaderProperties;
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use parquet::file::serialized_reader::ReadOptionsBuilder;
 
-#[cfg(windows)]
 #[test]
 fn concurrent_identical_sources_publish_all_three_artifacts() {
     for _ in 0..16 {
         let root = tempfile::tempdir().unwrap();
         let sources = root.path().join("sources");
         fs::create_dir(&sources).unwrap();
-        let content = br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin"}"#;
+        let content = br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin","source_ip":"203.0.113.4","destination_ip":"203.0.113.5"}"#;
         fs::write(sources.join("a.json"), content).unwrap();
         fs::write(sources.join("b.json"), content).unwrap();
         let id = CaseId::parse("99999999-9999-9999-9999-999999999999").unwrap();
@@ -42,9 +41,44 @@ fn concurrent_identical_sources_publish_all_three_artifacts() {
             [a.join().unwrap(), b.join().unwrap()]
         });
         for outcome in outcomes {
-            assert_eq!(outcome.unwrap().artifacts.len(), 3);
+            let prepared = outcome.unwrap();
+            assert_eq!(prepared.artifacts.len(), 3);
+            for artifact in &prepared.artifacts {
+                store
+                    .verify_artifact(&id, artifact, &CancellationToken::new())
+                    .unwrap();
+            }
         }
     }
+}
+
+#[test]
+fn source_without_entities_publishes_a_verified_event_artifact() {
+    let root = tempfile::tempdir().unwrap();
+    let sources = root.path().join("sources");
+    fs::create_dir(&sources).unwrap();
+    fs::write(
+        sources.join("event.json"),
+        br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"ConsoleLogin"}"#,
+    )
+    .unwrap();
+    let id = CaseId::parse("99999999-9999-9999-9999-999999999999").unwrap();
+    let store = crate::parquet_store::fixtures::store(root.path());
+    let prepared = crate::parquet_store::fixtures::one_source(
+        &store,
+        &id,
+        &sources,
+        "event.json",
+        false,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    assert_eq!(prepared.records, 1);
+    assert_eq!(prepared.artifacts.len(), 1);
+    assert_eq!(prepared.artifacts[0].schema_version(), "irmind-events-v4");
+    store
+        .verify_artifact(&id, &prepared.artifacts[0], &CancellationToken::new())
+        .unwrap();
 }
 
 #[test]
