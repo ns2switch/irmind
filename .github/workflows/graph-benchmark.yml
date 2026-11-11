@@ -2,6 +2,10 @@ name: Synthetic graph benchmark
 on:
   workflow_dispatch:
     inputs:
+      evtx_sweep:
+        description: Measure a single 1 GiB EVTX source at one, four and all workers
+        type: boolean
+        default: false
       worker_sweep:
         description: Compare current mapped writer worker settings on one runner
         type: boolean
@@ -28,7 +32,7 @@ env:
   HUNTEVAL_COMMIT: 4cbb555a56bc17cb03b988ad2f15b1374eecf183
 jobs:
   worker_sweep:
-    if: ${{ inputs.worker_sweep }}
+    if: ${{ inputs.worker_sweep && !inputs.evtx_sweep }}
     runs-on: ${{ inputs.worker_workload == 'ndjson-4gib' && 'windows-latest' || 'ubuntu-24.04' }}
     timeout-minutes: 90
     env:
@@ -60,8 +64,43 @@ jobs:
           path: worker-sweep-*.txt
           if-no-files-found: warn
 
+  evtx_sweep:
+    if: ${{ inputs.evtx_sweep }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: evtx-parallel-release-${{ runner.os }}
+          save-if: ${{ github.ref_name == 'main' }}
+      - name: Build the release helper and current signed-ingestion benchmark
+        shell: bash
+        run: cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx --example large_collection
+      - name: Measure identical 1 GiB sources with one, four, all and automatic workers
+        shell: bash
+        run: |
+          set -euo pipefail
+          suffix=
+          if [[ "$RUNNER_OS" == Windows ]]; then suffix=.exe; fi
+          python3 -B scripts/benchmark_evtx_large.py "helpers/evtx/target/release/examples/large_collection$suffix" --worker-sweep --output evtx-worker-sweep.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: evtx-workers-${{ runner.os }}
+          path: evtx-worker-sweep.json
+          if-no-files-found: error
+
   current_v3:
-    if: ${{ !inputs.worker_sweep }}
+    if: ${{ !inputs.worker_sweep && !inputs.evtx_sweep }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
@@ -113,6 +152,7 @@ jobs:
           fi
 
   hunt_eval:
+    if: ${{ !inputs.worker_sweep && !inputs.evtx_sweep }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
