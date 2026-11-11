@@ -161,6 +161,45 @@ fn compiled_credential_fields() -> Vec<&'static str> {
     fields
 }
 
+impl RootWorkspaceIo {
+    fn configuration_is_overridden(&self, change: &ConfigChange) -> bool {
+        match change {
+            ConfigChange::SetResumeLastCase(_)
+            | ConfigChange::SetShowHints(_)
+            | ConfigChange::SetMouseCapture(_)
+            | ConfigChange::SetTheme(_)
+            | ConfigChange::SetMaxParallelWorkers(_) => false,
+            ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
+            ConfigChange::ConfigureModel {
+                module,
+                base_field,
+                model_field,
+                ..
+            } => {
+                self.module_overrides.contains("llm")
+                    || self.module_overrides.contains(module)
+                    || std::env::var_os(base_field).is_some()
+                    || std::env::var_os(model_field).is_some()
+            }
+            ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
+            ConfigChange::SetValue { module, field, .. } => {
+                std::env::var_os(field).is_some()
+                    || self.module_overrides.contains(module)
+                    || (self.module_overrides.contains("llm")
+                        && self.manifests.iter().any(|manifest| {
+                            manifest.id == module
+                                && manifest
+                                    .ports
+                                    .contains(&irmind_app::modules::ModulePort::Llm)
+                        }))
+            }
+            ConfigChange::SetCertificateAuthority {
+                module, path_field, ..
+            } => std::env::var_os(path_field).is_some() || self.module_overrides.contains(module),
+        }
+    }
+}
+
 impl WorkspaceIo for RootWorkspaceIo {
     fn definition_store(&self) -> Option<&dyn irmind_app::ParserDefinitionStore> {
         Some(&self.definition_store)
@@ -368,29 +407,7 @@ impl WorkspaceIo for RootWorkspaceIo {
                 "the CA file changed after its fingerprint was shown"
             ));
         }
-        let overridden = match &change {
-            ConfigChange::SetResumeLastCase(_)
-            | ConfigChange::SetShowHints(_)
-            | ConfigChange::SetMouseCapture(_)
-            | ConfigChange::SetTheme(_)
-            | ConfigChange::SetMaxParallelWorkers(_) => false,
-            ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
-            ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
-            ConfigChange::SetValue { module, field, .. } => {
-                std::env::var_os(field).is_some()
-                    || self.module_overrides.contains(module)
-                    || (self.module_overrides.contains("llm")
-                        && self.manifests.iter().any(|manifest| {
-                            manifest.id == module
-                                && manifest
-                                    .ports
-                                    .contains(&irmind_app::modules::ModulePort::Llm)
-                        }))
-            }
-            ConfigChange::SetCertificateAuthority {
-                module, path_field, ..
-            } => std::env::var_os(path_field).is_some() || self.module_overrides.contains(module),
-        };
+        let overridden = self.configuration_is_overridden(&change);
         if overridden {
             return Err(anyhow!(
                 "this setting is overridden by a flag or environment variable"
@@ -400,7 +417,8 @@ impl WorkspaceIo for RootWorkspaceIo {
         let next = current.changed(change.clone(), &self.manifests)?;
         let active_module = match &change {
             ConfigChange::SelectLlm(Some(id)) => Some(id.as_str()),
-            ConfigChange::SetEnabled {
+            ConfigChange::ConfigureModel { module, .. }
+            | ConfigChange::SetEnabled {
                 module,
                 enabled: true,
             } => Some(module.as_str()),

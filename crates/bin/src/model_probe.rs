@@ -41,7 +41,18 @@ pub(super) fn test_model_connection(
 ) -> Result<String> {
     let port = construct_port(provider, base_url, model, supplied_key, secrets)?;
     let cancel = CancellationToken::new();
-    let request = CompletionRequest {
+    let request = connection_probe_request();
+    let runtime = runtime()?;
+    runtime.block_on(async {
+        let events = port.complete(request, &cancel).await?;
+        let _ = collect_model_stream(events, &cancel).await?;
+        Ok::<(), irmind_app::AppError>(())
+    })?;
+    Ok("Connection succeeded with synthetic text; no case data was sent".into())
+}
+
+fn connection_probe_request() -> CompletionRequest {
+    CompletionRequest {
         messages: vec![CompletionMessage {
             role: MessageRole::User,
             content:
@@ -51,16 +62,9 @@ pub(super) fn test_model_connection(
             tool_call_id: None,
         }],
         tools: Vec::new(),
-        max_output_tokens: 8,
-        remaining_case_tokens: 8,
-    };
-    let runtime = runtime()?;
-    runtime.block_on(async {
-        let events = port.complete(request, &cancel).await?;
-        let _ = collect_model_stream(events, &cancel).await?;
-        Ok::<(), irmind_app::AppError>(())
-    })?;
-    Ok("Connection succeeded with synthetic text; no case data was sent".into())
+        max_output_tokens: 64,
+        remaining_case_tokens: 64,
+    }
 }
 
 fn construct_port(
@@ -146,4 +150,19 @@ fn runtime() -> Result<tokio::runtime::Runtime> {
     Ok(tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?)
+}
+
+#[cfg(test)]
+mod probe_tests {
+    use super::*;
+    #[test]
+    fn connection_probe_has_a_small_budget_without_tools_or_case_context() {
+        let request = connection_probe_request();
+        assert_eq!(request.max_output_tokens, 64);
+        assert_eq!(request.remaining_case_tokens, 64);
+        assert!(request.tools.is_empty());
+        assert_eq!(request.messages.len(), 1);
+        assert_eq!(request.messages[0].role, MessageRole::User);
+        assert!(request.messages[0].content.contains("no case data"));
+    }
 }
