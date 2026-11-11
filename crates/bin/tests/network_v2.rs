@@ -5,14 +5,16 @@
     feature = "parser-json"
 ))]
 #![allow(clippy::unwrap_used)]
+#[path = "support/current_sources.rs"]
+mod current_sources;
+
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,
-    LargeCaseUseCases, Signer, StreamingEventParser,
-    modules::{ModuleConfig, ModuleRegistry, ParserSelectionRequest},
+    LargeCaseUseCases, Signer, StreamingEventParser, modules::ParserSelectionRequest,
 };
-use irmind_domain::{Actor, AuditEventKind, ExecutionMode, ParquetArtifactV2, SourceManifestV2};
-use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
+use irmind_domain::{Actor, AuditEventKind, ExecutionMode, ParquetArtifactV3, SourceManifestV2};
+use irmind_infra::{LocalVerifier, SystemClock};
 use std::{collections::BTreeMap, fs, sync::Arc};
 struct SyntheticSigner(SigningKey);
 impl Signer for SyntheticSigner {
@@ -28,11 +30,11 @@ impl Signer for SyntheticSigner {
 }
 #[test]
 #[allow(clippy::too_many_lines)]
-fn detected_network_sources_write_precise_v2_and_reconstruct() {
+fn detected_network_sources_write_precise_v3_and_reconstruct() {
     let root = tempfile::tempdir().unwrap();
     let originals = root.path().join("sources");
     fs::create_dir(&originals).unwrap();
-    let store = Arc::new(LocalStore::open_precise(&root.path().join("data")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("data")));
     let signer = Arc::new(SyntheticSigner(SigningKey::from_bytes(&[48; 32])));
     let engine = Engine::new(
         EnginePorts::new(
@@ -52,20 +54,7 @@ fn detected_network_sources_write_precise_v2_and_reconstruct() {
     )
     .unwrap();
     let case = engine.create_case("Synthetic network V2", "local").unwrap();
-    let mut registry = ModuleRegistry::new();
-    registry
-        .register(
-            Box::new(irmind_mod_parser_zeek::ZeekParser),
-            &ModuleConfig::new(),
-        )
-        .unwrap();
-    registry
-        .register(
-            Box::new(irmind_mod_parser_suricata::SuricataParser),
-            &ModuleConfig::new(),
-        )
-        .unwrap();
-    let catalog = registry.parser_catalog();
+    let catalog = current_sources::catalog();
     let sources: [(&str, &[u8]); 3] = [
         (
             "conn.log",
@@ -123,8 +112,8 @@ fn detected_network_sources_write_precise_v2_and_reconstruct() {
     );
     let artifacts = entries
         .iter()
-        .filter(|e| e.kind == AuditEventKind::ParquetArtifactV2)
-        .map(|e| ParquetArtifactV2::decode(&e.payload).unwrap())
+        .filter(|e| e.kind == AuditEventKind::ParquetArtifactV3)
+        .map(|e| ParquetArtifactV3::decode(&e.payload).unwrap())
         .collect::<Vec<_>>();
     assert!(!artifacts.is_empty());
     assert!(
@@ -142,15 +131,19 @@ fn detected_network_sources_write_precise_v2_and_reconstruct() {
         assert!(
             artifacts
                 .iter()
-                .any(|a| a.parser_id == parser.parser_name())
+                .any(|a| a.core().parser_id == parser.parser_name())
         );
     }
     engine.verify(&case.id).unwrap();
-    assert!(artifacts.iter().any(|a| a.partition.scopes.iter().any(|p| {
-        p.key == irmind_domain::ScopePartitionKey::Host
-            && matches!(
+    assert!(
+        artifacts
+            .iter()
+            .any(|a| a.core().partition.scopes.iter().any(|p| {
+                p.key == irmind_domain::ScopePartitionKey::Host
+                    && matches!(
             &p.value, irmind_domain::ScopePartitionValue::Ordinary(value) if value == "sensor-a")
-    })));
+            }))
+    );
     let filter = irmind_domain::GraphQueryFilter::parse_with_host(
         None,
         None,

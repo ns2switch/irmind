@@ -189,8 +189,13 @@ impl WorkspaceIo for TestIo {
         Some(self.0.as_ref())
     }
     fn streaming_parser(&self) -> Option<&dyn irmind_app::StreamingEventParser> {
-        static PARSER: JsonParser = JsonParser;
-        Some(&PARSER)
+        static PARSER: std::sync::OnceLock<Arc<dyn irmind_app::LogParser>> =
+            std::sync::OnceLock::new();
+        Some(
+            PARSER
+                .get_or_init(irmind_mod_parser_json::source_log_parser)
+                .as_ref(),
+        )
     }
     fn keystore_status(&self) -> anyhow::Result<irmind_tui::KeystoreStatus> {
         Ok(irmind_tui::KeystoreStatus {
