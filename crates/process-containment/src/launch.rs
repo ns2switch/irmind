@@ -17,12 +17,16 @@ use unix as native;
 pub enum Mode {
     Probe,
     Decode,
+    DecodeParallel(std::num::NonZeroU8),
 }
 impl Mode {
-    pub(crate) fn arg(self) -> &'static str {
+    pub(crate) fn arg(self) -> String {
         match self {
-            Self::Probe => "--probe-v1",
-            Self::Decode => "--protocol-v1",
+            Self::Probe => "--probe-v1".into(),
+            Self::Decode => "--protocol-v1".into(),
+            Self::DecodeParallel(workers) => {
+                format!("--protocol-v1-workers={}", workers.get().min(64))
+            }
         }
     }
 }

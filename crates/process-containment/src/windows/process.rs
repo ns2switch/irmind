@@ -31,12 +31,12 @@ pub(crate) struct Child {
 }
 
 pub(crate) fn spawn(program: &Prepared, input: &File, mode: Mode) -> io::Result<Child> {
-    spawn_command(program, input, mode.arg())
+    spawn_command(program, input, &mode.arg())
 }
 pub(crate) fn spawn_witness(program: &Prepared, input: &File) -> io::Result<Child> {
     spawn_command(program, input, "--network-witness-v1")
 }
-fn spawn_command(program: &Prepared, input: &File, argument: &'static str) -> io::Result<Child> {
+fn spawn_command(program: &Prepared, input: &File, argument: &str) -> io::Result<Child> {
     let pipes = pipes::Pipes::new(input)?;
     let job = job::create()?;
     let mut attributes = attributes::Attributes::new(program.identity(), &pipes)?;

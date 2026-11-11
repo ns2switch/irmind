@@ -47,3 +47,64 @@ fn invalid_headers_chunks_and_partial_files_are_rejected() {
     bytes[6000] ^= 1;
     assert!(irmind_evtx::decode(Cursor::new(bytes), &mut Vec::new()).is_err());
 }
+
+fn many_chunks() -> Vec<u8> {
+    let fixture =
+        include_bytes!("../../../crates/testkit/fixtures/parser-evtx/source/Security.evtx");
+    let mut bytes = fixture[..4096].to_vec();
+    bytes[16..24].copy_from_slice(&7u64.to_le_bytes());
+    bytes[42..44].copy_from_slice(&8u16.to_le_bytes());
+    let crc = evtx::checksum_ieee(&bytes[..120]);
+    bytes[124..128].copy_from_slice(&crc.to_le_bytes());
+    for _ in 0..8 {
+        bytes.extend_from_slice(&fixture[4096..]);
+    }
+    bytes
+}
+#[test]
+fn chunk_parallelism_keeps_every_protocol_byte_and_physical_offset_identical() {
+    let bytes = many_chunks();
+    let mut expected = Vec::new();
+    irmind_evtx::decode(Cursor::new(&bytes), &mut expected).unwrap();
+    for workers in [1, 2, 4, 8] {
+        let mut output = Vec::new();
+        irmind_evtx::decode_with_workers(Cursor::new(&bytes), &mut output, workers).unwrap();
+        assert_eq!(output, expected, "worker count {workers}");
+    }
+}
+#[test]
+fn sink_failure_disconnects_all_bounded_producers_before_joining() {
+    use std::{
+        io::{self, Write},
+        sync::mpsc,
+        time::Duration,
+    };
+    struct Broken {
+        remaining: usize,
+    }
+    impl Write for Broken {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if bytes.len() > self.remaining {
+                return Err(io::ErrorKind::BrokenPipe.into());
+            }
+            self.remaining -= bytes.len();
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    let (send, receive) = mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+        let result = irmind_evtx::decode_with_workers(
+            Cursor::new(many_chunks()),
+            &mut Broken { remaining: 1024 },
+            4,
+        );
+        send.send(result.map_err(|e| e.kind())).unwrap();
+    });
+    assert_eq!(
+        receive.recv_timeout(Duration::from_secs(5)).unwrap(),
+        Err(io::ErrorKind::BrokenPipe)
+    );
+}

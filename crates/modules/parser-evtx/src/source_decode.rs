@@ -46,13 +46,32 @@ impl SourceDecoder for EvtxParser {
         input: SourceFileInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
+        self.decode_with_budget(
+            irmind_app::source_mapping::DecodeInput::File(input),
+            irmind_app::source_mapping::DecodeBudget::sequential(),
+            emit,
+        )
+    }
+    fn decode_with_budget(
+        &self,
+        input: irmind_app::source_mapping::DecodeInput<'_>,
+        budget: irmind_app::source_mapping::DecodeBudget,
+        emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        let irmind_app::source_mapping::DecodeInput::File(input) = input else {
+            return self.decode_reader(input.into_reader(), emit);
+        };
+        let workers = budget
+            .workers()
+            .min((budget.queued_bytes() / (8 * 1024 * 1024)).max(1))
+            .min(64);
         if input.metadata.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
         let size = input.file.metadata().map_err(|_| invalid())?.len();
         let mut state = codec::State::new(size);
         let result = self
-            .decode_file(input.file, input.metadata.cancel, &mut |bytes| {
+            .decode_file_workers(input.file, input.metadata.cancel, workers, &mut |bytes| {
                 state.project_frame(bytes, &mut |row| {
                     let Ok(record) = decode(row, input.metadata) else {
                         return Ok(false);

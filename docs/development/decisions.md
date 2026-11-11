@@ -841,3 +841,22 @@ system-keyring dependency through infrastructure.
 Retirement also removes fifteen fixed error variants whose only references were
 their declarations. They described removed writers, indexes and migrations.
 Current error messages and rejection paths are unchanged.
+
+## Bounded EVTX chunk workers
+
+Context: source-level concurrency cannot accelerate one EVTX file, and the Linux
+helper previously prohibited thread creation along with process creation.
+
+Decision: decode independent owned chunks with standard-library worker threads,
+using bounded per-worker channels and canonical chunk/record output order.
+Pass only a validated worker count through the fixed launcher protocol. Linux
+permits only same-process thread clone flags and the required thread lifecycle
+syscalls; opaque clone3 falls back through ENOSYS to the inspected clone form.
+Landlock, seccomp, network/file/process restrictions and all existing resource
+limits remain enforced and inherited. No Rayon feature or new package is added.
+
+Consequences: one worker keeps the sequential decoder; multiple workers must
+produce identical protocol bytes, provenance and signed artifacts. Windows
+keeps serial source scheduling and its one verified network witness per session.
+A sink error disconnects all bounded producers before joining. Native probes
+also verify restrictions from a child thread before the parser is available.
