@@ -4,7 +4,6 @@ use super::{
     AppError, Instant, ParquetStore, RecordBatch, ScanSpec, ScanStatus, projection, row_filter,
     row_group_matches, rules_for_artifact, storage,
 };
-mod keys;
 use parquet::arrow::arrow_reader::{
     ArrowReaderMetadata, ArrowReaderOptions, ParquetRecordBatchReaderBuilder,
 };
@@ -61,13 +60,6 @@ impl ParquetStore {
             if Instant::now() >= spec.deadline {
                 return Ok(ScanStatus::Deadline);
             }
-            if !precise
-                && let Some(cutoff) = &cutoff
-                && bound == TimeBound::Known(cutoff.0.time.map(irmind_app::IndexedTime::instant))
-                && keys::cannot_beat(&file, &metadata, &spec, names, group, &cutoff.0)?
-            {
-                continue;
-            }
             let reader = group_reader(&file, &metadata, &columns, &rules, group)?;
             for batch in reader {
                 if spec.cancel.is_cancelled() {
@@ -85,12 +77,7 @@ impl ParquetStore {
                     super::super::time_cell::validate_times(&batch)?;
                 }
                 let batch = super::super::format::normalize_batch(&batch, artifact, names, false)?;
-                let batch = super::common::projection_defaults(batch, &spec, artifact)?;
                 drop(normalize);
-                let (batch, status) = self.filter_legacy_host(spec, names, batch)?;
-                if status == ScanStatus::Deadline {
-                    return Ok(status);
-                }
                 cutoff = visit(&batch)?;
             }
         }

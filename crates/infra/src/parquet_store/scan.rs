@@ -16,7 +16,6 @@ mod common;
 mod selection;
 pub(super) use selection::partition_matches;
 use selection::{required_columns, rules_for_artifact};
-mod host;
 mod predicate;
 mod time_bounds;
 mod time_ordered;
@@ -105,11 +104,6 @@ impl ParquetStore {
                         match message {
                             ScanMessage::Batch(batch) => {
                                 super::time_cell::validate_source_units(&batch, &mut source_units)?;
-                                let (batch, host_status) =
-                                    self.filter_legacy_host(spec, source_names, batch)?;
-                                if host_status == ScanStatus::Deadline {
-                                    return Ok(host_status);
-                                }
                                 if visit(&batch)? == ScanFlow::Stop {
                                     return Ok(ScanStatus::Stopped);
                                 }
@@ -204,7 +198,7 @@ impl ParquetStore {
             super::time_cell::validate_times(batch)?;
         }
         let normalized = super::format::normalize_batch(batch, artifact, source_names, false)?;
-        common::projection_defaults(normalized, spec, artifact)
+        Ok(normalized)
     }
 }
 
@@ -218,12 +212,7 @@ fn bloom_reader(
         .any(|predicate| matches!(predicate, Predicate::Equal("entity_value", _)))
         || !matches!(
             artifact.schema_version(),
-            "irmind-entities-v2"
-                | "irmind-entities-v3"
-                | "irmind-entities-v4"
-                | "irmind-coobservations-v1"
-                | "irmind-coobservations-v2"
-                | "irmind-coobservations-v3"
+            "irmind-entities-v4" | "irmind-coobservations-v3"
         )
     {
         return Ok(None);

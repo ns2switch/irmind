@@ -1,6 +1,6 @@
 //! Scoped identities are occurrences, never implicit directed attack edges.
 mod entity;
-mod legacy;
+mod entity_peers;
 mod node;
 mod path;
 mod peers;
@@ -32,7 +32,7 @@ fn spec<'a>(
         filter,
         cancel,
         deadline,
-        schema: "irmind-coobservations-v1",
+        schema: "irmind-coobservations-v3",
         columns: &[],
         predicates: &[],
     }

@@ -6,18 +6,10 @@ use arrow::{
 use std::{collections::BTreeMap, sync::Arc};
 
 pub(super) fn same_family(actual: &str, requested: &str) -> bool {
-    fn family(value: &str) -> Option<u8> {
-        match value {
-            "irmind-events-v2" | "irmind-events-v3" | "irmind-events-v4" => Some(0),
-            "irmind-entities-v1" | "irmind-entities-v2" | "irmind-entities-v3"
-            | "irmind-entities-v4" => Some(1),
-            "irmind-coobservations-v1"
-            | "irmind-coobservations-v2"
-            | "irmind-coobservations-v3" => Some(2),
-            _ => None,
-        }
-    }
-    family(actual).is_some() && family(actual) == family(requested)
+    matches!(
+        actual,
+        "irmind-events-v4" | "irmind-entities-v4" | "irmind-coobservations-v3"
+    ) && actual == requested
 }
 
 pub(super) fn expected_type(name: &str, precise: bool) -> DataType {

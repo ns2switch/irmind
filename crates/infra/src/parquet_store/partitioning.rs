@@ -18,8 +18,6 @@ use irmind_domain::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
-pub(super) const BUILDER: &str = "parquet-builder-v3";
-
 /// Constructed afresh for each locked batch. Nothing unsigned is persisted.
 #[derive(Clone)]
 pub(super) struct Allocator {
