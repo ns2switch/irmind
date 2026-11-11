@@ -19,8 +19,8 @@ fuzz_target!(|bytes: &[u8]| {
         assert_eq!(fields, restored);
     }
     if let Ok(text) = std::str::from_utf8(bytes) {
-        if let Ok(manifest) = irmind_mod_mapping_tables::TableMapping::review(text) {
-            let mapping = irmind_mod_mapping_tables::TableMapping::bundled(
+        if let Ok(manifest) = irmind_mapping_tables::TableMapping::review(text) {
+            let mapping = irmind_mapping_tables::TableMapping::bundled(
                 text,
                 manifest.identity().implementation(),
             )

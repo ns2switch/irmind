@@ -4,8 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Definition {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interpreter: Option<String>,
+    pub interpreter: String,
     pub id: String,
     pub version: String,
     pub target_schema: String,
@@ -32,24 +31,10 @@ impl Definition {
     pub(super) fn interpreter(
         &self,
     ) -> Result<&'static str, irmind_app::source_mapping::MappingError> {
-        match self.interpreter.as_deref() {
-            None | Some("irmind-mapping-tables-v1")
-                if self.when.is_empty()
-                    && self
-                        .fields
-                        .iter()
-                        .chain(self.rules.iter().flat_map(|r| &r.fields))
-                        .all(|field| {
-                            field.omit_text.is_empty()
-                                && !field.observation.as_ref().is_some_and(|o| {
-                                    matches!(o.scope, Scope::ProcessLifetime { .. })
-                                })
-                        }) =>
-            {
-                Ok("irmind-mapping-tables-v1")
-            }
-            Some("irmind-mapping-tables-v2") => Ok("irmind-mapping-tables-v2"),
-            _ => Err(irmind_app::source_mapping::MappingError::InvalidDefinition),
+        if self.interpreter == "irmind-mapping-tables-v2" {
+            Ok("irmind-mapping-tables-v2")
+        } else {
+            Err(irmind_app::source_mapping::MappingError::InvalidDefinition)
         }
     }
 }

@@ -1226,8 +1226,8 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "irmind-infra",
+ "irmind-mapping-tables",
  "irmind-mod-mapping-ecs",
- "irmind-mod-mapping-tables",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
@@ -1292,13 +1292,6 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
- "irmind-mapping-tables",
-]
-
-[[package]]
-name = "irmind-mod-mapping-tables"
-version = "0.1.0"
-dependencies = [
  "irmind-mapping-tables",
 ]
 

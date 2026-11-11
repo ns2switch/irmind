@@ -811,3 +811,11 @@ unchanged. Invalid metadata, source links, row counts and hashes still fail.
 **Decision.** File and object ingestion execute only `SourceDecoder` followed by the selected `SourceMapper`. The existing custody-side `StreamingEventParser` contract retains selection, provenance, scheduling and time-context metadata, without decoding callbacks. Native historical-version resolvers and their execution tests are retired under the pre-1.0 policy. Installed current declarative definitions still resolve their authenticated identities. The agreed small-buffer `EventParser` port remains separate.
 
 **Consequences.** Current decoder versions, mapping algorithms, artifact builder recipes and signed format golden bytes remain unchanged. Native mapping build identities continue to include the exact shared source tree and lockfile; their content hashes therefore track this build, as designed. Detector contracts, bounded malformed-record recovery, cancellation, exact time/offset tests and fuzz targets exercise the actual source-decoding route. Mapping tests and current pipeline golden fixtures cover extraction and interpretation in their owning modules. Canonical append and eviction remain sequential; bounded partition completion remains parallel.
+
+## Current table interpreter and shared implementation
+
+Context: all bundled table mappings name the current V2 interpreter. The V1 execution branch and a separate adapter crate that only re-exported the shared interpreter served retired paths.
+
+Decision: execute only explicitly declared `irmind-mapping-tables-v2` definitions. Remove the V1 display branch, its historical canonical fixture assertion and the redundant adapter facade. Keep the pure `irmind-mapping-tables` implementation, current V2 canonical behavior, finite predicates, operation budgets, `omit_text`, process-lifetime validation and installation-proof tests.
+
+Consequences: missing or retired interpreter declarations cannot activate a mapping. Existing bounded signed metadata can still be authenticated without executing a definition. This does not introduce a historical execution route or change current case, artifact, seal or export bytes. The remaining unused graph construction contracts are described separately in [the API-removal proposal](retired-graph-port-removal.md).

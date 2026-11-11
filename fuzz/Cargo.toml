@@ -12,7 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
-irmind-mod-mapping-tables = { path = "../crates/modules/mapping-tables", version = "0.1.0" }
+irmind-mapping-tables = { path = "../crates/mapping-tables", version = "0.1.0" }
 irmind-mod-parser-suricata = { path = "../crates/modules/parser-suricata", version = "0.1.0" }
 irmind-mod-parser-zeek = { path = "../crates/modules/parser-zeek", version = "0.1.0" }
 libfuzzer-sys = "0.4"
