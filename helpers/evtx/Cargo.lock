@@ -1404,6 +1404,7 @@ dependencies = [
  "irmind-infra",
  "irmind-mod-mapping-evtx",
  "irmind-mod-parser-evtx",
+ "irmind-mod-parser-json",
  "irmind-process-containment",
  "irmind-security",
  "irmind-testkit",
@@ -1483,6 +1484,16 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "irmind-process-containment",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-json"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
  "serde",
  "serde_json",
 ]

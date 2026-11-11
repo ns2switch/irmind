@@ -19,6 +19,7 @@ serde_json = "1"
 irmind-process-containment = { path = "../../crates/process-containment", version = "0.1.0", default-features = false }
 
 [dev-dependencies]
+irmind-mod-parser-json = { path = "../../crates/modules/parser-json", version = "0.1.0" }
 irmind-mod-mapping-evtx = { path = "../../crates/modules/mapping-evtx", version = "0.1.0" }
 irmind-domain = { path = "../../crates/domain", version = "0.1.0" }
 irmind-infra = { path = "../../crates/infra", version = "0.1.0" }

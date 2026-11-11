@@ -76,7 +76,10 @@ fn a_cancelled_launch_does_not_read_evidence_or_start_the_witness() {
 
 #[test]
 fn parser_reader_cleanup_retains_the_successful_session_witness() {
-    use irmind_app::{CancellationToken, StreamingEventParser};
+    use irmind_app::{
+        CancellationToken, SourceDecoder as _,
+        source_mapping::{SourceFileInput, SourceMetadata},
+    };
     let root = tempfile::tempdir().unwrap();
     let parser = irmind_mod_parser_evtx::EvtxParser::new(&support::helper_path(), root.path());
     assert!(
@@ -88,12 +91,19 @@ fn parser_reader_cleanup_retains_the_successful_session_witness() {
         .join("../../crates/testkit/fixtures/parser-evtx/source/Security.evtx");
     for _ in 0..2 {
         let mut file = File::open(&source).unwrap();
+        let reference = irmind_domain::SourceReferenceV1::file("Security.evtx").unwrap();
+        let cancel = CancellationToken::new();
         let report = parser
-            .parse_local_file_report(
-                "Security.evtx",
-                &mut file,
-                [1; 32],
-                &CancellationToken::new(),
+            .decode_local_file(
+                SourceFileInput {
+                    file: &mut file,
+                    metadata: SourceMetadata {
+                        source: &reference,
+                        evidence_hash: [1; 32],
+                        time_context: None,
+                        cancel: &cancel,
+                    },
+                },
                 &mut |_| Ok(()),
             )
             .unwrap();
