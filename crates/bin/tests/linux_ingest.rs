@@ -1,11 +1,13 @@
 #![forbid(unsafe_code)]
 #![cfg(feature = "parser-linux")]
 #![allow(clippy::unwrap_used)]
+#[path = "support/current_sources.rs"]
+mod current_sources;
+
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,
-    LargeCaseUseCases, ParserTimeBasis, ParserTimeContext, Signer,
-    modules::{ModuleConfig, ModuleRegistry, ParserSelectionRequest},
+    LargeCaseUseCases, ParserTimeBasis, ParserTimeContext, Signer, modules::ParserSelectionRequest,
 };
 use irmind_domain::{Actor, AuditEventKind, ExecutionMode, SourceManifestV2};
 use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
@@ -45,13 +47,7 @@ fn engine(store: &Arc<LocalStore>) -> Engine<'static> {
     .unwrap()
 }
 fn catalog() -> irmind_app::modules::ParserCatalog {
-    let mut registry = ModuleRegistry::new();
-    registry
-        .register(Box::new(LinuxParser::default()), &ModuleConfig::new())
-        .unwrap();
-    registry.parser_catalog().with_resolver(Arc::new(
-        irmind_mod_parser_linux::HistoricalResolver::new(None),
-    ))
+    current_sources::catalog()
 }
 fn sources() -> [(&'static str, &'static [u8]); 4] {
     [
@@ -79,7 +75,7 @@ fn synthetic_linux_episode_is_detected_signed_queryable_and_reproducible() {
     let root = tempfile::tempdir().unwrap();
     let originals = root.path().join("sources");
     fs::create_dir(&originals).unwrap();
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("case")));
     let engine = engine(&store);
     let case = engine
         .create_case("Synthetic Linux episode", "local")
@@ -139,16 +135,43 @@ fn synthetic_linux_episode_is_detected_signed_queryable_and_reproducible() {
     );
     let timeline = store.timeline(&case.id, 100).unwrap();
     assert_eq!(timeline.len(), 11);
-    for event in [
-        "ssh_login",
-        "sudo_command",
-        "cron_command",
-        "process_execute",
-        "journal_entry",
-        "http_access",
-    ] {
-        assert!(timeline.iter().any(|row| row.event == event));
+    for event in ["sshd", "sudo", "cron_command", "journal_entry", "GET"] {
+        assert!(
+            timeline
+                .iter()
+                .any(|row| row.event.split(" [").next() == Some(event)),
+            "missing {event}; timeline: {timeline:?}"
+        );
     }
+    assert!(
+        timeline
+            .iter()
+            .any(|row| row.event.contains("second precision; inferred"))
+    );
+    assert!(
+        timeline
+            .iter()
+            .any(|row| row.event.contains("microsecond precision"))
+    );
+    let audit_hash = manifests
+        .iter()
+        .find(|m| m.source.source == "audit.log")
+        .unwrap()
+        .source
+        .sha256
+        .as_str();
+    assert!(
+        store
+            .text_search(&case.id, "EXECVE", 20)
+            .unwrap()
+            .contains(audit_hash)
+    );
+    assert!(
+        store
+            .raw_record(&case.id, audit_hash, 0)
+            .unwrap()
+            .contains("EXECVE")
+    );
     for (kind, value) in [
         ("host", "synthetic-linux"),
         ("user", "synthetic-user"),
@@ -166,19 +189,23 @@ fn synthetic_linux_episode_is_detected_signed_queryable_and_reproducible() {
         store
             .text_search(&case.id, "203.0.113.77", 10)
             .unwrap()
-            .contains("ssh_login")
+            .contains("sshd")
     );
+    let neighbors = store
+        .neighbors(&case.id, "host", "synthetic-linux", 20)
+        .unwrap();
+    assert!(neighbors.contains("203.0.113.77"), "{neighbors}");
     assert!(
         store
-            .neighbors(&case.id, "host", "synthetic-linux", 20)
+            .neighbors(&case.id, "user", "root", 20)
             .unwrap()
-            .contains("root")
+            .contains("synthetic-linux")
     );
     assert!(
         store
             .entity_timeline(&case.id, "host", "synthetic-linux", 20)
             .unwrap()
-            .contains("sudo_command")
+            .contains("sudo")
     );
     let router = catalog.rebuild_router(&entries).unwrap();
     assert_eq!(
@@ -206,7 +233,7 @@ fn synthetic_linux_episode_is_detected_signed_queryable_and_reproducible() {
 #[test]
 fn missing_context_refuses_native_selection_and_has_an_audited_reason() {
     let root = tempfile::tempdir().unwrap();
-    let store = Arc::new(LocalStore::open(&root.path().join("case")).unwrap());
+    let store = Arc::new(current_sources::open(&root.path().join("case")));
     let engine = engine(&store);
     let case = engine
         .create_case("No implicit source year", "local")

@@ -14,9 +14,9 @@
 
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
-    AppError, AuditLog, CancellationToken, CaseExporter, CaseMutation, Clock, ConfigChange,
-    ConfigurationStore, CryptoPorts, Engine, EnginePorts, LargeCaseStore, PersistentConfig,
-    SignedEntry, Signer, StreamingEventParser, hex, sha256,
+    AppError, AuditLog, CancellationToken, CaseMutation, Clock, ConfigChange, ConfigurationStore,
+    CryptoPorts, Engine, EnginePorts, LargeCaseStore, PersistentConfig, SignedEntry, Signer,
+    StreamingEventParser, hex, sha256,
 };
 use irmind_domain::{Actor, AuditEventKind, Case, CaseId, ExecutionMode, Severity};
 use irmind_infra::{LocalStore, LocalVerifier, ParquetStore, TomlConfigurationStore};
@@ -338,12 +338,9 @@ fn export_goldens(
     let seal_path = root.join("seals").join(format!("{}.json", id.as_str()));
     record(out, "seal/file", &fs::read(seal_path).unwrap());
     let cancel = CancellationToken::new();
-    let v3 = root.join("export-v3.json");
-    store.export_case(&id, &v3, &cancel).unwrap();
-    record(out, "export/v3", &fs::read(v3).unwrap());
-    let v4 = root.join("export-v4.bin");
-    irmind_app::export_case_v6(engine, store, &id, &v4, None, false, &cancel).unwrap();
-    record(out, "export/v4", &fs::read(v4).unwrap());
+    let current = root.join("export-v6.bin");
+    irmind_app::export_case_v6(engine, store, &id, &current, None, false, &cancel).unwrap();
+    assert!(fs::read(current).unwrap().starts_with(b"IRMIND-EXPORT-V6"));
 }
 
 #[test]
@@ -462,7 +459,6 @@ fn historical_envelope_codecs_and_normalized_rows_remain_unchanged() {
             || key.starts_with("manifest/")
             || key.starts_with("entry/")
             || key.starts_with("seal/")
-            || key.starts_with("export/")
             || key.starts_with("configuration/")
             || key.starts_with("operation/")
         {

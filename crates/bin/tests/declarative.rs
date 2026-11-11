@@ -64,7 +64,13 @@ fn approved_definitions_are_pinned_signed_and_rebuild_after_replacement_or_remov
     let (active, statuses) = approved.load_active(&definitions, &DeclarativeCompiler);
     assert_eq!(active.len(), 1);
     assert!(statuses[0].available && statuses[0].active);
-    let parser = active[0].compiled().selector().clone();
+    let parser: Arc<dyn irmind_app::LogParser> = Arc::new(
+        irmind_app::source_mapping::SourceDecoderSelection::new(
+            active[0].compiled().decoder().clone(),
+        )
+        .with_selector(active[0].compiled().selector().clone())
+        .unwrap(),
+    );
     let version = parser.identity().version.to_owned();
     let mut registry = ModuleRegistry::new();
     registry
@@ -80,6 +86,11 @@ fn approved_definitions_are_pinned_signed_and_rebuild_after_replacement_or_remov
         registry.detect_parser("access.csv", SAMPLE),
         ParserChoice::NeedsAnalyst(_)
     ));
+    let registry =
+        registry.with_definition_history(approved.clone(), Arc::new(DeclarativeCompiler));
+    let mapped_store =
+        LocalStore::open_mapped(root.path(), Arc::new(registry.mapping_catalog().unwrap()))
+            .unwrap();
     let catalog = registry
         .parser_catalog()
         .with_resolver(approved.resolver(Arc::new(DeclarativeCompiler)));
@@ -102,7 +113,7 @@ fn approved_definitions_are_pinned_signed_and_rebuild_after_replacement_or_remov
     )]);
     LargeCaseUseCases {
         engine: &engine,
-        store: store.as_ref(),
+        store: &mapped_store,
         parser: parser.as_ref(),
     }
     .ingest_local_batch_selected(
@@ -144,7 +155,7 @@ fn approved_definitions_are_pinned_signed_and_rebuild_after_replacement_or_remov
     assert_eq!(
         LargeCaseUseCases {
             engine: &engine,
-            store: store.as_ref(),
+            store: &mapped_store,
             parser: &router
         }
         .verify_parquet_rebuild(&case.id, &source_root, &CancellationToken::new())
