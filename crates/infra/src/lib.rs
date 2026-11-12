@@ -9,11 +9,13 @@ mod graph_port;
 mod parquet_store;
 mod seal;
 mod signing;
+mod skill_package;
 mod sqlite;
 pub use clock::SystemClock;
 pub use config_toml::TomlConfigurationStore;
 use irmind_fs::{private_dir, private_file};
 pub use parquet_store::ParquetStore;
+pub use skill_package::{DecodedSkillPackage, decode_skill_package};
 
 use ed25519_dalek::{Signature, VerifyingKey};
 #[cfg(test)]
