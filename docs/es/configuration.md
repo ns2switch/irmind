@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit e30e450df0630b4c0b0cf200520f527ef371fd42; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit a0b2d321e9c11e1b73b57941b3c98d4ab8ec6e41; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -153,3 +153,7 @@ El contexto temporal de RFC 3164 pertenece a cada ingesta, no a config.toml. Con
 La CLI, la TUI y la demo usan el mismo decodificador, mapeo seleccionado y escritor directo V3. No hay una preferencia para elegir el escritor. La cadena firmada registra el decodificador, el perfil de mapeo y su recibo. JSON genérico y de nube, ECS, OCSF, EVTX, Linux, syslog, salidas DFIR, red y definiciones declarativas usan esta ruta.
 
 Un mapeo puede conservar campos y entidades consultables sin clasificar el evento. No se deducen categorías, resultados ni roles del texto. Los mapeos nuevos se aplican a ingestas nuevas. Los formatos anteriores a la 1.0 pueden cambiar sin migración: conserva la versión que creó el caso o reingiere los originales verificados en un caso nuevo. El formato no habilita ningún modelo ni conector.
+
+## Skills locales
+
+`/skills` gestiona las instalaciones y activaciones mediante operaciones globales firmadas, separadas de `config.toml`. La vista previa muestra el hash, las herramientas y los recursos antes de firmar. No hay descarga automática ni credenciales adicionales. Los tres métodos incluidos se pueden inspeccionar sin modelo. Consulta la [guía de skills](skills.md).

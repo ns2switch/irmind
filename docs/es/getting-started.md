@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit f201acd5d6f465541054580e514ed555a182fe91; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit a0b2d321e9c11e1b73b57941b3c98d4ab8ec6e41; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -106,3 +106,7 @@ Una consulta externa espera la aprobación firmada del analista. La tarjeta mues
 Consulta [configuración](configuration.md) para el alcance, la política, los backends y los nombres de credenciales. Consulta [módulos](modules.md) para los permisos y límites de los conectores y [plataformas](platforms.md) para el uso por SSH. La TUI es el flujo principal; los subcomandos sirven para automatizar tareas.
 
 Usa **Ctrl+O** o `/expand` para plegar o desplegar la tarjeta seleccionada mientras escribes. Si no hay una tarjeta plegable seleccionada, IRMind usa la última. Conserva tu borrador y funciona desde la caja de texto y el panel lateral. Consulta [las teclas del terminal](platforms.md#desplegar-tarjetas-y-mapas-de-teclas-del-terminal).
+
+## Métodos forenses
+
+Abre `/skills` para inspeccionar los métodos incluidos de Windows, Linux y AWS, instalar una carpeta local revisada o firmar un cambio de activación. En un caso, escribe `/windows-triage`, `/linux-triage` o `/aws-credential-compromise` y añade tu pregunta. El agente también puede elegir un método por su descripción. La carga es progresiva y siempre no confiable; la política y las aprobaciones no cambian. La [guía de skills](skills.md) explica los límites y los recibos firmados en la exportación V7.
