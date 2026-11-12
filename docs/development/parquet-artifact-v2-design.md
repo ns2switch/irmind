@@ -1,5 +1,7 @@
 # Proposal: precise event time in Parquet artifacts
 
+> Historical precision design for v0.2. Current V3 artifacts reuse checked time and partition metadata, but standalone earlier-format readers and precision migration routes are retired. See [current architecture](architecture.md) and [earlier-version cases](case-migration.md).
+
 This document is for maintainers reviewing [issue #143](https://github.com/ns2switch/irmind/issues/143). It proposes a new artifact envelope and timestamp schema. Existing source manifests, audit entries, seals, exports and Parquet files remain unchanged. Implementation is split into compatible stages.
 
 ## Problem and current behavior

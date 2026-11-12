@@ -38,8 +38,6 @@ pub enum AdapterPolicyError {
     CrowdStrikeResponseExceeds5MB,
     #[error("policy denied: CrowdStrike returned an alert outside the host or window")]
     CrowdStrikeReturnedAnAlertOutsideTheHostOrWindow,
-    #[error("policy denied: JSON input exceeds 50 MB")]
-    JSONInputExceeds50MB,
     #[error("policy denied: MISP URL must be an HTTPS base path")]
     MISPURLMustBeAnHTTPSBasePath,
     #[error("policy denied: MISP response exceeds 5 MB")]

@@ -10,6 +10,8 @@ CLI ingestion, the TUI and the demo use the common writer. Every compiled parser
 | Windows Event Log | Original EVTX through `evtx-source-v1` | Bundled, hash-pinned per-event/channel TOML modules | `mapping-evtx` | Experimental; synthetic contracts |
 | OCSF | Original JSON or Parquet through `ocsf-source-v1` | Native, typed OCSF 1.4 validation | `mapping-ocsf` | Experimental; synthetic contracts |
 | ECS | Original ECS NDJSON through `ecs-source-v1` | Native, typed ECS 9.5 validation | `mapping-ecs` | Experimental; synthetic contracts |
+| Elastic ECS | Original `elastic-source-v1` search hits | Native ECS validation with a connector-specific identity | `siem-elastic` | Experimental; synthetic contracts |
+| Google SecOps UDM | Original `chronicle-source-v1` UDM events | Native, bounded ProtoJSON noun projection | `siem-chronicle` | Experimental; synthetic contracts |
 | Generic JSON compatibility | Other JSON without `eventVersion` | Native, extraction-only | `mapping-json-compat` | Experimental; no inferred categories or roles |
 | Journald compatibility | Original journald JSON | Native, extraction-only | `mapping-journald-compat` | Experimental; no inferred categories or roles |
 | Linux authentication | auth.log and secure: sshd, sudo and su | Bundled, hash-pinned TOML | `mapping-linux` | Experimental; synthetic contracts |

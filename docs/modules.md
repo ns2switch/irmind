@@ -146,23 +146,23 @@ The module uses Splunk's [search export endpoint](https://help.splunk.com/en/spl
 
 **Configure:** Compiled by default with `parser-json`; a minimal build can omit it. Use the TUI's `/ingest` picker or the [CLI ingest command](development/cli.md).
 
-**Limits:** Deeply nested JSON and oversized individual records are rejected. Originals are hashed in place; copying one requires an explicit choice. Parquet searches use bounded substring matching and optional date, account or project, and region filters. Older derived indexes must be migrated from copied originals before graph queries are available. Other log formats need future parsers.
+**Limits:** Deeply nested JSON and oversized individual records are rejected. Originals are hashed in place; copying one requires an explicit choice. Parquet searches use bounded substring matching and optional date, account or project, and region filters. Open earlier-version cases with the executable that created them, or re-ingest verified originals into a new case. See the [parser catalog](parsers.md) for other supported formats.
 
 ## Elastic Common Schema parser
 
-**Does:** Detects ECS NDJSON from `@timestamp` and `ecs.version`, or characteristic ECS event fields. The original-field decoder preserves timestamps, source fields and provenance. With the experimental common writer, the separate `mapping-ecs` module validates explicit classifications and roles; the existing route remains during decoder rollout. See [ECS mapping coverage](mappings.md#elastic-common-schema).
+**Does:** Detects ECS NDJSON from `@timestamp` and `ecs.version`, or characteristic ECS event fields. The original-field decoder preserves timestamps, source fields and provenance. The separate `mapping-ecs` module validates explicit classifications and roles before the common writer stores the event. See [ECS mapping coverage](mappings.md#elastic-common-schema).
 
 **Permission:** Read access to the selected local file only.
 
 **Configure:** Compiled by default with `parser-ecs`. `/ingest` selects it automatically only with a unique high-confidence match; otherwise choose it explicitly after reviewing the candidates. The selection and parser version enter the signed source manifest.
 
-**Limits:** Experimental and tested with synthetic data only. Individual records are limited to 4 MiB, 1,024 fields, and 64 nesting levels; one source may contain at most ten million records and 50 GiB. Malformed lines are counted with bounded, escaped samples; they do not stop later lines. Timestamps are normalized to UTC seconds, while the original fractional value stays in the local record.
+**Limits:** Experimental and tested with synthetic data only. Individual records are limited to 4 MiB, 1,024 fields, and 64 nesting levels; one source may contain at most ten million records and 50 GiB. Malformed lines are counted with bounded, escaped samples; they do not stop later lines. Current artifacts preserve reported timestamp precision using UTC microseconds and a nanosecond remainder.
 
 The mapping follows the [official ECS field reference](https://www.elastic.co/docs/reference/ecs/ecs-reference).
 
 ## OCSF parser
 
-**Does:** Detects OCSF JSON (including pretty-printed records) or NDJSON from `class_uid`, `category_uid`, and `metadata.version`. The original-field decoder preserves OCSF fields and precise timestamps. With the experimental common writer, the separate `mapping-ocsf` module validates OCSF 1.4 classifications and roles for Authentication, API Activity, Network Activity, Process Activity, File Activity, and Detection Finding; other versions remain unclassified and searchable. See [mapping coverage](mappings.md#open-cybersecurity-schema-framework). It also reads OCSF Parquet exports, including Security Lake files, through the existing Parquet reader. Unknown fields remain local as attributes.
+**Does:** Detects OCSF JSON (including pretty-printed records) or NDJSON from `class_uid`, `category_uid`, and `metadata.version`. The original-field decoder preserves OCSF fields and precise timestamps. The separate `mapping-ocsf` module validates OCSF 1.4 classifications and roles for Authentication, API Activity, Network Activity, Process Activity, File Activity, and Detection Finding; other versions remain unclassified and searchable. See [mapping coverage](mappings.md#open-cybersecurity-schema-framework). It also reads OCSF Parquet exports, including Security Lake files, through the existing Parquet reader. Unknown fields remain local as attributes.
 
 **Permission:** Read access to the selected local file. Local OCSF Parquet is read directly with random access, without a parser-created copy. Cloud object streams use a private, automatically removed spool inside the case data directory before parsing.
 
@@ -174,7 +174,7 @@ The class mapping follows the [official OCSF schema](https://github.com/ocsf/ocs
 
 ## Velociraptor parser
 
-The five DFIR parsers below index times at UTC-second precision. Their local records retain the original timestamp, and the signed source manifest records the normalization context.
+The five DFIR parsers below preserve the reported timestamp precision in current artifacts. Their local records retain the original timestamp, and the signed source manifest records the normalization context.
 
 **Does:** Reads bounded JSONL artifact results with typed timestamp, artifact, host, user, process, command, and IP fields. Preserves unmapped fields as untrusted local record text.
 
@@ -260,11 +260,11 @@ Contributors adding a module should use [the architecture guide](development/arc
 
 ## Syslog parser
 
-For analysts importing line-oriented RFC 5424 or RFC 3164 logs, `parser-syslog` is an experimental local module compiled by default. It also supports bounded gzip streams. No credentials or network permissions are required. RFC 3164 requires an explicit year and UTC offset; both are signed as inferred context. See the [parser contract and configuration](development/syslog-parser.md) and [parser selection](parsers.md). Full source precision is retained while the current derived index remains second precision.
+For analysts importing line-oriented RFC 5424 or RFC 3164 logs, `parser-syslog` is an experimental local module compiled by default. It also supports bounded gzip streams. No credentials or network permissions are required. RFC 3164 requires an explicit year and UTC offset; both are signed as inferred context. See the [parser contract and configuration](development/syslog-parser.md) and [parser selection](parsers.md). The current derived index preserves the timestamp precision reported by the source.
 
 ## Linux logs
 
-For analysts importing auth.log/secure, auditd, journald JSON or nginx/Apache common and combined exports, `parser-linux` is an experimental local module compiled by default. It needs read access to those files and no credentials. Classic authentication time is confirmed per ingestion using the same form as syslog. Audit grouping is bounded and unfinished events are marked partial. Original fractional timestamps remain available while the current index uses seconds. Custom log formats use a signed declarative definition. See [parser selection](parsers.md) and the [Linux contract and limits](development/linux-parser.md).
+For analysts importing auth.log/secure, auditd, journald JSON or nginx/Apache common and combined exports, `parser-linux` is an experimental local module compiled by default. It needs read access to those files and no credentials. Classic authentication time is confirmed per ingestion using the same form as syslog. Audit grouping is bounded and unfinished events are marked partial. The current index preserves reported timestamp precision using UTC microseconds and a nanosecond remainder. Custom log formats use a signed declarative definition. See [parser selection](parsers.md) and the [Linux contract and limits](development/linux-parser.md).
 
 ## Windows EVTX
 
@@ -272,31 +272,31 @@ The experimental `parser-evtx` module is compiled by default but requires the ma
 
 ## Zeek parser
 
-**Does:** Reads Zeek's tab-separated logs with `#path`, `#fields` and `#types`, and Zeek JSON logs. It maps conn, dns, http, ssl, files, x509, notice and weird records. The `uid` entity connects records from different logs. Fractional epoch timestamps are indexed with microsecond precision and residual nanoseconds in artifact V2. The original source timestamp is retained.
+**Does:** Reads Zeek's tab-separated logs with `#path`, `#fields` and `#types`, and Zeek JSON logs. It maps conn, dns, http, ssl, files, x509, notice and weird records. The `uid` entity connects records from different logs. Fractional epoch timestamps are indexed with microsecond precision and residual nanoseconds in current mapped artifacts. The original source timestamp is retained.
 
 **Permission:** Read access to the selected export only. The parser does not run Zeek or open a network connection.
 
 **Configure:** Compiled by default with `parser-zeek`. A unique high-confidence content match selects it automatically; `/ingest` asks when detection is ambiguous. The parser and choice enter the signed source manifest.
 
-**Limits:** Experimental and validated only with synthetic data. A record is limited to 4 MiB, 1,024 fields and 64 JSON nesting levels; a source is limited to ten million records and 50 GiB. Malformed records are counted and sampled in bounded, escaped form. Only the default tab field separator is supported. V2 uses the endpoint-host partition profile. An explicit `sensor_host` identifies the sensor; an HTTP `host` is a domain, not the sensor hostname. Missing hosts remain unpartitioned by host. [Zeek log format](https://docs.zeek.org/en/current/tutorial/logs.html) and [log types](https://docs.zeek.org/en/current/reference/zeekscript/log-files.html).
+**Limits:** Experimental and validated only with synthetic data. A record is limited to 4 MiB, 1,024 fields and 64 JSON nesting levels; a source is limited to ten million records and 50 GiB. Malformed records are counted and sampled in bounded, escaped form. Only the default tab field separator is supported. Network sources use the endpoint-host partition profile. An explicit `sensor_host` identifies the sensor; an HTTP `host` is a domain, not the sensor hostname. Missing hosts remain unpartitioned by host. [Zeek log format](https://docs.zeek.org/en/current/tutorial/logs.html) and [log types](https://docs.zeek.org/en/current/reference/zeekscript/log-files.html).
 
 ## Suricata EVE parser
 
-**Does:** Reads EVE JSONL for alert, flow, dns, http, tls, fileinfo and anomaly events. It links records through `flow_id`. Alert signatures are unconfirmed source findings for analyst review, never confirmed case findings. The original timestamp and offset stay in the local record; artifact V2 preserves its indexed fractional precision.
+**Does:** Reads EVE JSONL for alert, flow, dns, http, tls, fileinfo and anomaly events. It links records through `flow_id`. Alert signatures are unconfirmed source findings for analyst review, never confirmed case findings. The original timestamp and offset stay in the local record; current mapped artifacts preserve its indexed fractional precision.
 
 **Permission:** Read access to the selected export only. The parser does not run Suricata or open a network connection.
 
 **Configure:** Compiled by default with `parser-suricata`. Detection requires a supported `event_type`, a timestamp and `flow_id` in the sample; ambiguous inputs require analyst selection. The choice is signed.
 
-**Limits:** Experimental and validated only with synthetic data. It applies the same record, JSON shape, source and rejection limits as the Zeek parser. Timestamps without an explicit offset are rejected. An explicitly supplied collector `host` uses the V2 endpoint-host partition profile; a missing host is not inferred from network addresses. [Suricata EVE format](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).
+**Limits:** Experimental and validated only with synthetic data. It applies the same record, JSON shape, source and rejection limits as the Zeek parser. Timestamps without an explicit offset are rejected. An explicitly supplied collector `host` uses the endpoint-host partition profile; a missing host is not inferred from network addresses. [Suricata EVE format](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).
 
 ## Common-event mappings
 
-Optional source mappings are separate from parsers and connectors. Bundled CloudTrail tables and Linux mappings classify supported operations. Native ECS mapping validates explicit sets, typed values and roles. Missing or unsupported results remain unknown. They require the experimental common writer; no remote module is enabled. See [mapping coverage and limitations](mappings.md).
+Optional source mappings are separate from parsers and connectors. Bundled CloudTrail tables and Linux mappings classify supported operations. Native ECS mapping validates explicit sets, typed values and roles. Missing or unsupported results remain unknown. All ingestion uses the common writer; mappings do not enable a remote module. See [mapping coverage and limitations](mappings.md).
 
 ### Windows common-event mapping
 
-The `mapping-evtx` feature compiles independent bundled TOML mappings for Security, System, PowerShell and Sysmon. They use original fields from the isolated EVTX decoder. The writer remains opt-in during decoder rollout. No additional credentials or permissions are required. See [Windows mapping coverage](mappings.md#windows-event-log).
+The `mapping-evtx` feature compiles independent bundled TOML mappings for Security, System, PowerShell and Sysmon. They use original fields from the isolated EVTX decoder. The common writer is used by CLI ingestion, the TUI and the demo. No additional credentials or permissions are required. See [Windows mapping coverage](mappings.md#windows-event-log).
 
 ## Elasticsearch and Elastic Security
 

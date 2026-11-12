@@ -11,7 +11,7 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 *The complete presentation runs the real product with synthetic evidence, ephemeral keys and an offline scripted model. Enter advances; Space pauses; Esc exits.*
 
 > [!WARNING]
-> IRMind 0.2.0 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
+> IRMind 0.3.0 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
 
 > [!WARNING]
 > Pre-1.0: each minor version may change case, export and definition formats without migration. Keep the IRMind version that created a case to open, verify or export it, or re-ingest the verified originals into a new case.
@@ -47,13 +47,13 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-The [v0.2.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.2.0) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
+The [v0.3.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.3.0) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
 
 Use the creating minor version for an existing case. The [version policy](docs/development/decisions.md#pre-10-format-policy) explains how to retain its executable or re-ingest verified originals.
 
 ```sh
 # After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:
-tag=v0.2.0; binary=irmind-linux-x86_64
+tag=v0.3.0; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -80,7 +80,9 @@ You can ingest, inspect, and verify local evidence without a model. On later sta
 
 ## Modules
 
-The normal build includes every current product module and both keystores. None is enabled until selected and configured. A smaller build uses `--no-default-features --features keystore-file` (at least one signer and secrets backend is required). All modules are experimental.
+Version 0.3 uses one source-decoder → identified mapping → V3 writer pipeline in the CLI, TUI and demo. It reads only current case formats and export V6; [earlier cases require their creating version or a new ingestion](docs/development/case-migration.md).
+
+The normal build includes every current product module and both keystores. No remote connector or LLM is enabled until selected and configured. A smaller build uses `--no-default-features --features keystore-file` (at least one signer and secrets backend is required). All modules are experimental.
 
 `/settings model` also has local LM Studio and vLLM presets and remote Mistral, Groq, Google Gemini, xAI, and Together presets. They reuse the OpenAI-compatible module; see [provider URLs and limits](docs/modules.md#openai-compatible).
 
@@ -90,10 +92,9 @@ The normal build includes every current product module and both keystores. None 
 | Anthropic | LLM | `llm-anthropic` | experimental | [LLM setup](docs/modules.md#anthropic) |
 | DeepSeek | LLM | `llm-deepseek` | experimental | [LLM setup](docs/modules.md#deepseek) |
 | OpenRouter | LLM | `llm-openrouter` | experimental | [LLM setup](docs/modules.md#openrouter) |
+| Elastic | SIEM | `siem-elastic` | experimental | [Elastic](docs/modules.md#elasticsearch-and-elastic-security) |
+| Google SecOps | SIEM | `siem-chronicle` | experimental | [Google SecOps](docs/modules.md#google-secops-chronicle) |
 | Splunk | SIEM | `siem-splunk` | experimental | [Splunk](docs/modules.md#splunk) |
-| Elasticsearch / Elastic Security | SIEM | `siem-elastic` | experimental | [Elastic](docs/modules.md#elasticsearch-and-elastic-security) |
-
-| Google SecOps (Chronicle) | SIEM | `siem-chronicle` | experimental | [Chronicle](docs/modules.md#google-secops-chronicle) |
 | AWS CloudTrail and IAM | cloud | `cloud-aws` | experimental | [AWS](docs/modules.md#aws-cloudtrail-and-iam) |
 | S3 object storage | cloud storage | `storage-s3` | experimental | [Object storage](docs/modules.md#cloud-object-storage-s3-gcs-azure-blob) |
 | GCS object storage | cloud storage | `storage-gcs` | experimental | [Object storage](docs/modules.md#cloud-object-storage-s3-gcs-azure-blob) |
@@ -106,11 +107,11 @@ The normal build includes every current product module and both keystores. None 
 | Windows EVTX | isolated local parser | `parser-evtx` (default) | experimental | [EVTX](docs/modules.md#windows-evtx) |
 | Syslog parser | local parser | `parser-syslog` (default) | experimental | [Syslog](docs/modules.md#syslog-parser) |
 | JSON and exported cloud log parser | local parser | `parser-json` (default) | experimental | [Local parser](docs/modules.md#streaming-json-and-exported-cloud-log-parser) |
-| CloudTrail common-event mapping | local mapping | `mapping-cloudtrail` | experimental, opt-in writer | [Mappings](docs/mappings.md) |
-| Windows common-event mapping | local mapping | `mapping-evtx` | experimental, opt-in writer | [Mappings](docs/mappings.md#windows-event-log) |
-| ECS common-event mapping | local mapping | `mapping-ecs` | experimental, opt-in writer | [Mappings](docs/mappings.md) |
+| CloudTrail common-event mapping | local mapping | `mapping-cloudtrail` | experimental | [Mappings](docs/mappings.md) |
+| Windows common-event mapping | local mapping | `mapping-evtx` | experimental | [Mappings](docs/mappings.md#windows-event-log) |
+| ECS common-event mapping | local mapping | `mapping-ecs` | experimental | [Mappings](docs/mappings.md) |
 | Elastic Common Schema parser | local parser | `parser-ecs` (default) | experimental | [ECS parser](docs/modules.md#elastic-common-schema-parser) |
-| OCSF common-event mapping | local mapping | `mapping-ocsf` | experimental, opt-in writer | [Mappings](docs/mappings.md) |
+| OCSF common-event mapping | local mapping | `mapping-ocsf` | experimental | [Mappings](docs/mappings.md) |
 | OCSF JSON and Parquet parser | local parser | `parser-ocsf` (default) | experimental | [OCSF parser](docs/modules.md#ocsf-parser) |
 | Velociraptor parser | local parser | `parser-velociraptor` (default) | experimental | [Velociraptor](docs/modules.md#velociraptor-parser) |
 | Hayabusa parser | local parser | `parser-hayabusa` (default) | experimental | [Hayabusa](docs/modules.md#hayabusa-parser) |
@@ -136,8 +137,8 @@ Read [security-model.md](docs/security-model.md) before connecting a provider.
 ## Roadmap
 
 - **v0.1.x:** Stabilize the pre-release, validate a model and connector, and add native platform signing.
-- **v0.2:** Add modular log parsers, precise V2 artifacts and optional precision migration.
-- **v0.3:** Add the typed common event schema and structured-query SIEM connectors.
+- **v0.2 (delivered):** Modular log parsers, precise artifacts and an isolated EVTX helper.
+- **v0.3:** Typed common events, separate decoders and mappings, sole V3 writing, multicore ingestion and experimental SIEM connectors.
 - **v0.4:** Add signed, progressively loaded forensic skills.
 - **v0.5:** Add bounded parallel subagents and streamed engine events.
 - **Public launch:** Publish the demo, benchmark, and initial community skills catalog.
