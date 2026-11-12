@@ -4,6 +4,46 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.4.0 — Signed forensic skills
+
+**Format impact: breaking.** Case methodology adds `SkillSnapshotV1` and
+Agent-signed `SkillLoadV1` records. Export V7 replaces V6 and includes the exact
+signed installation admissions referenced by a case. The export port is now
+`export_case`; versions belong to the file header. Parquet V3, existing audit
+entry encoding and seal inventory V2 are unchanged. Pre-1.0 minor versions may
+change formats without migration. Retain the creating executable or re-ingest
+verified originals into a new case.
+
+### Added
+
+- `/skills` previews local packages and signs installations, replacements,
+  activation changes and explicit restoration of approved files. There are no
+  executable skill plugins or automatic downloads.
+- Included Windows triage, Linux triage and AWS credential-compromise methods,
+  available as slash commands and through progressive agent selection.
+- Only active names and descriptions reach the model initially. Policy-checked
+  `skill_read` loads bounded, guarded resources after durable Agent-signed
+  receipts. Skill contents never enter system messages or become evidence.
+- Self-contained export V7 verifies skill packages, original/screened ranges,
+  admission proofs and signer identities without a keyring.
+
+### Changed
+
+- Release binaries strip debug symbols without changing executable code, data,
+  unwind information, security controls or signed data formats. A controlled
+  comparison reduces the Linux executable from 52.47 to 39.40 MiB.
+- Method-assisted calls must be declared by the active skill and still pass
+  policy, case scope, organization ceilings, taint checks, approvals and budgets.
+
+### Validation and limits
+
+The three included methods complete synthetic scripted investigations through
+real ingestion, evidence queries, analyst-confirmed findings and sealed,
+independently verified exports. This does not validate a real model's reasoning
+or a real connector deployment. No model or connector is enabled by default.
+This remains a pre-release for synthetic-data evaluation, not real incidents.
+
+
 ## 0.3.0 — Common events and one ingestion pipeline
 
 **Format impact: breaking.** This minor release reads and writes the current

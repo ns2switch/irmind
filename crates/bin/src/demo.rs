@@ -254,7 +254,7 @@ fn run_in_directory(
     let keystore = FileKeystore::ephemeral(root)?;
     let signer = keystore.create(Actor::Analyst)?;
     let agent_id = AgentId::parse("demo-agent").map_err(|_| anyhow!("invalid demo agent ID"))?;
-    let _agent = keystore.create(Actor::Agent(agent_id))?;
+    let agent = keystore.create(Actor::Agent(agent_id))?;
     let fingerprint = hex(&sha256(&signer.public_key()));
     let ports = EnginePorts::new(
         store.clone(),
@@ -263,12 +263,16 @@ fn run_in_directory(
         store.clone(),
         CryptoPorts::new(
             signer.clone(),
-            Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            Arc::new(
+                LocalVerifier::from_signer(signer.as_ref())
+                    .with_trusted_key(&agent.actor(), &agent.public_key())?,
+            ),
         ),
         Arc::new(MandatoryGuard::new()?),
     );
     let intel = SyntheticIntel;
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
+        .with_skills(super::skills::services(root, agent)?)?
         .with_threat_intel(&intel)
         .with_large_case_pipeline(store.clone(), irmind_mod_parser_json::source_log_parser())
         .with_parser_catalog(parser_catalog.clone());

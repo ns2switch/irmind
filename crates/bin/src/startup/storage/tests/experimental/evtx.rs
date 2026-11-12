@@ -176,7 +176,7 @@ fn authentication_failure_unifies_windows_linux_and_cloudtrail_with_roles_and_cu
         irmind_app::verify_export_details(&LocalExportVerifier, &path, Some(&key))
             .unwrap()
             .format_version,
-        6
+        7
     );
 }
 fn write_sources(root: &Path) {

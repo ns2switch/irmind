@@ -2,6 +2,8 @@
 
 mod metadata;
 mod package;
+mod provenance;
+pub use provenance::{SkillResourceProvenance, TaintedSkillResource};
 
 pub use metadata::{SkillMetadata, SkillMetadataInput, SkillName, SkillVersion};
 pub use package::{SkillDigest, SkillPackage, SkillResource, SkillResourcePath};

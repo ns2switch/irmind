@@ -211,7 +211,9 @@ impl PreparedStartup {
         let registry =
             super::parser_definitions::register(registry, &self.definitions, &self.home)?;
         let catalog = self.prepare_catalog(&registry)?;
-        let engine = self.compose_engine(&registry, catalog.clone())?;
+        let Some(engine) = self.compose_with_retry(&registry, &catalog)? else {
+            return Ok(false);
+        };
         let Self {
             cli,
             interactive,
@@ -276,11 +278,34 @@ impl PreparedStartup {
         )
     }
 
+    fn compose_with_retry<'a>(
+        &self,
+        registry: &'a ModuleRegistry,
+        catalog: &irmind_app::modules::ParserCatalog,
+    ) -> Result<Option<Engine<'a>>> {
+        retry_startup(
+            || self.compose_engine(registry, catalog.clone()),
+            &self.home,
+            self.guard.as_ref(),
+            self.interactive,
+            "skill-session",
+            "Check the selected signing backend and local skill storage",
+        )
+    }
+
     fn compose_engine<'a>(
         &self,
         registry: &'a ModuleRegistry,
         catalog: irmind_app::modules::ParserCatalog,
     ) -> Result<Engine<'a>> {
+        let agent = super::skills::agent(self.active.signer_backend.as_ref())?;
+        let verifier = Arc::new(
+            self.verifier
+                .as_ref()
+                .clone()
+                .with_trusted_key(&agent.actor(), &agent.public_key())?,
+        );
+        let services = super::skills::services(&self.home, agent)?;
         let engine = registry.bind(
             Engine::new(
                 EnginePorts::new(
@@ -288,12 +313,13 @@ impl PreparedStartup {
                     self.store.clone(),
                     self.store.clone(),
                     self.store.clone(),
-                    CryptoPorts::new(self.active.signer.clone(), self.verifier.clone()),
+                    CryptoPorts::new(self.active.signer.clone(), verifier),
                     self.guard.clone(),
                 ),
                 ExecutionMode::Attended,
                 Arc::new(SystemClock),
             )?
+            .with_skills(services)?
             .with_large_case_pipeline(self.store.clone(), Arc::new(JsonParser))
             .with_parser_catalog(catalog),
         )?;

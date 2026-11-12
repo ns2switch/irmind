@@ -48,6 +48,7 @@ impl<'a> Engine<'a> {
             policy_fingerprint: "builtin-v1".into(),
             module_fingerprint: "none".into(),
             source_scopes: crate::BTreeMap::new(),
+            skills: None,
             threat_intel: None,
             siems: Vec::new(),
             result_decoders: crate::BTreeMap::new(),

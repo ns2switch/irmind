@@ -199,7 +199,7 @@ impl CaseWorkflow<'_, '_> {
                 .io_ops
                 .large_case_exporter()
                 .ok_or(AppError::Policy("large-case export is unavailable".into()))?;
-            irmind_app::export_case_v6(
+            irmind_app::export_case_with_originals(
                 self.engine,
                 exporter,
                 id,

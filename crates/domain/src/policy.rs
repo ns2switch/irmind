@@ -116,6 +116,7 @@ pub enum Tool {
     ThreatIntelExternal,
     ObjectList,
     ObjectRead,
+    SkillRead,
 }
 
 mod scope;
@@ -150,6 +151,7 @@ impl Tool {
             "ti_lookup_external" => Ok(Self::ThreatIntelExternal),
             "object_list" => Ok(Self::ObjectList),
             "object_read" => Ok(Self::ObjectRead),
+            "skill_read" => Ok(Self::SkillRead),
             _ => Err(DomainError::UnknownTool),
         }
     }
@@ -177,6 +179,7 @@ impl Tool {
             Self::ThreatIntelExternal => "ti_lookup_external",
             Self::ObjectList => "object_list",
             Self::ObjectRead => "object_read",
+            Self::SkillRead => "skill_read",
         }
     }
 

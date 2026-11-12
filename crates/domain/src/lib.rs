@@ -40,3 +40,5 @@ pub use tainted::*;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;
+
+pub use skills::{SkillResourceProvenance, TaintedSkillResource};

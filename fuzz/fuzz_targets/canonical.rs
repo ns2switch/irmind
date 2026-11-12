@@ -69,6 +69,8 @@ fuzz_target!(|bytes: &[u8]| {
         check_mapping_codec!(irmind_domain::MappingProfileRecordV1);
         check_mapping_codec!(irmind_domain::MappingRunV1);
         check_mapping_codec!(irmind_domain::ParquetLayoutV1);
+        check_mapping_codec!(irmind_app::SkillSnapshotV1);
+        check_mapping_codec!(irmind_app::SkillLoadV1);
         if let Ok(irmind_domain::MappingProfileRecordV1::Snapshot(snapshot)) =
             irmind_domain::MappingProfileRecordV1::decode(text)
         {

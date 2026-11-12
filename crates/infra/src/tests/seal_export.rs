@@ -109,7 +109,7 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
         irmind_app::verify_export_details(&LocalExportVerifier, &path, None)
             .unwrap()
             .format_version,
-        6
+        7
     );
     let mut bundle = fs::read(&path).unwrap();
     let middle = bundle.len() / 2;

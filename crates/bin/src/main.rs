@@ -468,6 +468,7 @@ impl WorkspaceIo for RootWorkspaceIo {
     }
 }
 
+mod skills;
 mod startup;
 
 fn main() -> Result<()> {

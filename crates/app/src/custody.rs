@@ -40,7 +40,7 @@ pub fn export_case(
     exporter.export_case(id, path, cancel)
 }
 
-pub fn export_case_v6(
+pub fn export_case_with_originals(
     engine: &Engine<'_>,
     exporter: &dyn crate::LargeCaseExporter,
     id: &CaseId,
@@ -59,7 +59,7 @@ pub fn export_case_v6(
             crate::FixedAppError::PolicySealTheCaseBeforeExport,
         ));
     }
-    exporter.export_case_v6(id, path, source_root, include_originals, cancel)
+    exporter.export_case(id, path, source_root, include_originals, cancel)
 }
 
 pub struct SealPreview {

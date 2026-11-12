@@ -7,14 +7,11 @@ use irmind_app::CaseScope;
 
 mod export;
 mod parsers;
+mod skills;
 
 impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     pub(super) fn submit(&mut self, prompt: String) -> Result<bool> {
         if prompt.is_empty() {
-            return Ok(false);
-        }
-        if let Some(name) = prompt.strip_prefix("/help ") {
-            self.state.messages.push(command_registry::help_for(name));
             return Ok(false);
         }
         if prompt == "/demo exit" && self.io_ops.demo_mode() {
@@ -74,6 +71,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             self.state.messages.push(message.into());
             return Ok(false);
         }
+        if let Some(exit) = self.skill_command(&prompt) {
+            return Ok(exit);
+        }
         if self.parser_command(&prompt) {
             return Ok(self.parser_exit_requested());
         }
@@ -92,6 +92,13 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     }
 
     fn session_command(&mut self, prompt: &str) -> bool {
+        if let Some(name) = prompt.strip_prefix("/help ") {
+            self.state.messages.push(
+                command_registry::skill_help(name, &self.state.skill_commands)
+                    .unwrap_or_else(|| command_registry::help_for(name)),
+            );
+            return true;
+        }
         if prompt == "/expand" {
             self.state.conversation.toggle_selected();
             return true;
@@ -475,7 +482,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
 
     fn case_command(&mut self, prompt: &str) -> Result<bool> {
         match prompt {
-            "/help" => self.state.messages.push(command_registry::help()),
+            "/help" => self.state.messages.push(command_registry::help_with_skills(
+                &self.state.skill_commands,
+            )),
             "/scope" => {
                 self.state
                     .messages

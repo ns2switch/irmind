@@ -8,12 +8,12 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Write};
 
-pub(super) const MAGIC_V6: &[u8] = b"IRMIND-EXPORT-V6\0";
+pub(super) const MAGIC_V7: &[u8] = b"IRMIND-EXPORT-V7\0";
 pub(super) const MAX_FRAME_BYTES: u64 = 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct HeaderV6 {
+pub(super) struct HeaderV7 {
     pub version: u32,
     pub case_id: String,
     pub title: String,
@@ -28,14 +28,14 @@ struct ExportRequest<'a> {
     source_root: Option<&'a Path>,
     include_originals: bool,
     cancel: &'a CancellationToken,
-    header: HeaderV6,
+    header: HeaderV7,
     entry_count: u64,
     evidence: Vec<String>,
     source_count: u64,
 }
 
 impl LargeCaseExporter for LocalStore {
-    fn export_case_v6(
+    fn export_case(
         &self,
         id: &CaseId,
         path: &Path,
@@ -64,8 +64,8 @@ impl LocalStore {
             return Err(AppError::Sealed);
         }
         let seal = self.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
-        let header = HeaderV6 {
-            version: 6,
+        let header = HeaderV7 {
+            version: 7,
             case_id: id.as_str().into(),
             title: case.title,
             severity: case.severity.as_str().into(),
@@ -132,7 +132,7 @@ impl LocalStore {
         let mut out = options.open(path).map_err(storage)?;
         *created = true;
         private_file(path).map_err(storage)?;
-        out.write_all(MAGIC_V6).map_err(storage)?;
+        out.write_all(MAGIC_V7).map_err(storage)?;
         write_frame(&mut out, &serde_json::to_vec(&header).map_err(storage)?)?;
         out.write_all(&entry_count.to_be_bytes()).map_err(storage)?;
         let written = self.for_each_audit_entry(id, |entry| {
@@ -175,6 +175,7 @@ impl LocalStore {
         }
         {
             self.write_artifact_frames(id, &mut out, cancel)?;
+            super::skill_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
         }
         out.sync_all().map_err(storage)?;
         Ok(header.seal.analyst_key_fingerprint.clone())
@@ -258,7 +259,7 @@ pub(super) fn write_frame(out: &mut File, bytes: &[u8]) -> Result<(), AppError> 
     out.write_all(bytes).map_err(storage)
 }
 
-pub(super) fn v6_result(
+pub(super) fn v7_result(
     fingerprint: String,
     entries: usize,
     source_manifests: usize,
@@ -267,7 +268,7 @@ pub(super) fn v6_result(
     ExportVerification {
         analyst_key_fingerprint: fingerprint,
         entries,
-        format_version: 6,
+        format_version: 7,
         source_manifests,
         source_bytes_verified,
         source_bytes_unavailable: source_manifests.saturating_sub(source_bytes_verified),

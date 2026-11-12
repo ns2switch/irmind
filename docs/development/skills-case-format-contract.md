@@ -1,9 +1,6 @@
 # Skill use receipts and export V7
 
-This proposal is for reviewers implementing progressive skill loading. It fixes
-new encoding vectors before any skill text can enter an investigation. Local
-installation already has its separate [contract](skills-installation-contract.md).
-This document and its synthetic vectors do not implement or enable these formats.
+This contract is for implementers and reviewers of progressive skill loading. It fixes the current encoding vectors for case methodology and export V7. Local installation has its separate [contract](skills-installation-contract.md). The 0.4 implementation follows these encodings.
 
 ## Scope and unchanged boundaries
 

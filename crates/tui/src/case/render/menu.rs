@@ -26,12 +26,12 @@ pub(super) fn menu_text(state: &CaseState, modules: &[crate::ModuleStatus]) -> O
             .map(|value| (value, "argument".to_owned(), "Arguments"))
             .collect::<Vec<_>>()
     } else {
-        command_registry::matches(query)
+        command_registry::matches_with_skills(query, &state.skill_commands)
             .iter()
             .map(|command| {
                 (
                     format!("/{}{}", command.name, command.syntax()),
-                    command.description.to_owned(),
+                    command.description.clone(),
                     command.category(),
                 )
             })

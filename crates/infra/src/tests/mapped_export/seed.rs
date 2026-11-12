@@ -1,4 +1,4 @@
-//! Immutable current V6 wire goldens remain usable without a construction recipe.
+//! Immutable current V7 wire goldens remain usable without a construction recipe.
 use super::*;
 fn verify_golden(bytes: &[u8], digest: &str, entries: usize) {
     assert_eq!(hex(&sha256(bytes)), digest);
@@ -17,7 +17,7 @@ fn verify_golden(bytes: &[u8], digest: &str, entries: usize) {
             verified.entries,
             verified.source_manifests
         ),
-        (6, entries, 1)
+        (7, entries, 1)
     );
     assert!(
         LocalExportVerifier
@@ -31,18 +31,18 @@ fn verify_golden(bytes: &[u8], digest: &str, entries: usize) {
     assert!(verify_export(&package).is_err());
 }
 #[test]
-fn synthetic_v6_package_golden_authenticates_without_any_keystore() {
+fn synthetic_v7_package_golden_authenticates_without_any_keystore() {
     verify_golden(
-        include_bytes!("../../../../../fuzz/seeds/export/valid-v6-mapped.irmind"),
-        "f8dcfff30baece687942f1a38d1d30f21fd235b9718d83792361a7db79530d95",
+        include_bytes!("../../../../../fuzz/seeds/export/valid-v7-mapped.irmind"),
+        "1b01d95f59f055610c9fce87becdea460fa489f5f62e4c04445ad8facdb57efc",
         7,
     );
 }
 #[test]
-fn synthetic_installed_v6_golden_authenticates_portable_global_authorization() {
+fn synthetic_installed_v7_golden_authenticates_portable_global_authorization() {
     verify_golden(
-        include_bytes!("../../../../../fuzz/seeds/export/valid-v6-installed.irmind"),
-        "6991b04ecab077034cbf34980afb3e3fbe74157f18afa7854147f8a75847e40f",
+        include_bytes!("../../../../../fuzz/seeds/export/valid-v7-installed.irmind"),
+        "f4a92ac507e83897434a0a9ac365adf812e424afc2d95ebadeceee5cd62e41fa",
         8,
     );
 }

@@ -348,7 +348,7 @@ pub struct ExportVerification {
 }
 
 pub trait LargeCaseExporter: Send + Sync {
-    fn export_case_v6(
+    fn export_case(
         &self,
         _id: &CaseId,
         _path: &Path,
@@ -356,7 +356,7 @@ pub trait LargeCaseExporter: Send + Sync {
         _include_originals: bool,
         _cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        Err(AppError::Policy("export V6 is unavailable".into()))
+        Err(AppError::Policy("export is unavailable".into()))
     }
 }
 

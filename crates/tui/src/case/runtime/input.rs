@@ -191,7 +191,7 @@ impl CaseRuntime<'_, '_, '_> {
     ) -> Result<Option<bool>> {
         let selected = &options[self.state.menu_selected.min(options.len() - 1)];
         let exact = prefix.is_none()
-            && command_registry::matches(source)
+            && command_registry::matches_with_skills(source, &self.state.skill_commands)
                 .iter()
                 .any(|item| source == format!("/{}", item.name));
         let chosen = if exact {
@@ -257,9 +257,9 @@ impl CaseRuntime<'_, '_, '_> {
                 &ids,
             )
         } else {
-            command_registry::matches(source)
+            command_registry::matches_with_skills(source, &self.state.skill_commands)
                 .iter()
-                .map(|item| item.name.to_owned())
+                .map(|item| item.name.clone())
                 .collect()
         }
     }
@@ -467,9 +467,10 @@ impl CaseRuntime<'_, '_, '_> {
                     return Ok(None);
                 }
                 KeyCode::Enter => {
-                    self.state.input = command_registry::matches(&query)
-                        .first()
-                        .map_or_else(String::new, |command| format!("/{}", command.name));
+                    self.state.input =
+                        command_registry::matches_with_skills(&query, &self.state.skill_commands)
+                            .first()
+                            .map_or_else(String::new, |command| format!("/{}", command.name));
                     return Ok(Some(KeyCode::Enter));
                 }
                 _ => {

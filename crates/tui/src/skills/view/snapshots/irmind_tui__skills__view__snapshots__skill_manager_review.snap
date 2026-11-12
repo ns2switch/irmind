@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/skills/view/snapshots.rs
+expression: text
+---
+Forensic skills · methodology never grants permissions
+
+linux-triage · 0.1.0
+SHA-256: synthetic
+Tools: text_search
+
+Review synthetic authentication evidence.
+
+
+
+
+
+
+
+
+
+
+
+> 1. Cancel     2. Sign and apply
+
+
+Synthetic inline error · Esc returns without applying.
+
+↑/↓ choose · Tab actions · Enter confirm · PgUp/PgDn scroll · Esc back

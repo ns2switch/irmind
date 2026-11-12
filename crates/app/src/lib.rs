@@ -11,8 +11,8 @@ use irmind_domain::{
 };
 pub use irmind_domain::{
     AuditEventKind, Case, CaseId, CaseScope, GraphQueryFilter, IndexedInstant, IndexedTime,
-    ParserSelectionMode, ProposedCall, Provenance, Severity, SourceKind, SourceManifestV1,
-    SourceManifestV2, TimePrecision, Tool,
+    ParserSelectionMode, ProposedCall, Provenance, Severity, SkillName, SourceKind,
+    SourceManifestV1, SourceManifestV2, TimePrecision, Tool,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -88,7 +88,9 @@ pub use configuration::{
     ConfigChange, ConfigDifference, ConfigurationInspection, ConfigurationReview,
     ConfigurationStore, PersistentConfig, ProductSettings,
 };
-pub use custody::{SealPreview, export_case, export_case_v6, verify_export, verify_export_details};
+pub use custody::{
+    SealPreview, export_case, export_case_with_originals, verify_export, verify_export_details,
+};
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::{GraphRecord, GraphRelation, IndexedGraphRecord, TimelineEvent};
 mod indexed_parser;
@@ -112,3 +114,10 @@ pub use artifact_catalog::{
 
 mod source_scopes;
 pub use source_scopes::{SiemScopeMode, SiemSourceScope, recorded_instance_sources};
+
+pub use skills::{
+    SkillLoadResult, SkillLoadV1, SkillReadReceipt, SkillReceiptVerifier, SkillSnapshotId,
+    SkillSnapshotV1, skill_admission_references, verify_skill_admission,
+};
+
+pub use skills::SkillServices;

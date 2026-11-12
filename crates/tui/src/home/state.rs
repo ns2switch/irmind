@@ -8,6 +8,7 @@ pub(crate) enum HomeAction {
     Restart,
     Demo,
     Parsers(String),
+    Skills,
     OpenCase(CaseId),
     CreateCase,
     LoadKeystore,
@@ -236,6 +237,7 @@ fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
                     | "restart"
                     | "demo"
                     | "parsers"
+                    | "skills"
             )
         })
         .map(|command| format!("/{}", command.name))
@@ -267,6 +269,7 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
             state.mode = Mode::New;
         }
         "/demo" => return HomeAction::Demo,
+        "/skills" => return HomeAction::Skills,
         value if value == "/parsers" || value.starts_with("/parsers ") => {
             return HomeAction::Parsers(value.into());
         }

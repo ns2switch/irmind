@@ -31,7 +31,8 @@ impl irmind_app::Signer for FixtureSigner {
 fn synthetic_export_with_originals(path: &std::path::Path) -> String {
     use irmind_app::source_mapping::{MappingCatalog, SourceDecoderSelection};
     use irmind_app::{
-        CancellationToken, CryptoPorts, Engine, EnginePorts, LargeCaseUseCases, export_case_v6,
+        CancellationToken, CryptoPorts, Engine, EnginePorts, LargeCaseUseCases,
+        export_case_with_originals,
     };
     use irmind_domain::ExecutionMode;
     use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
@@ -93,7 +94,7 @@ fn synthetic_export_with_originals(path: &std::path::Path) -> String {
     )
     .unwrap();
     engine.seal(&case.id).unwrap();
-    export_case_v6(
+    export_case_with_originals(
         &engine,
         store.as_ref(),
         &case.id,
@@ -169,20 +170,20 @@ fn synthetic_export(path: &std::path::Path) -> String {
         analyst_key_fingerprint: fingerprint.clone(),
     };
     let header = json!({
-        "version": 6,
+        "version": 7,
         "case_id": case_id,
         "title": "Synthetic",
         "severity": "medium",
         "scope": scope,
         "seal": seal,
     });
-    let mut output = b"IRMIND-EXPORT-V6\0".to_vec();
+    let mut output = b"IRMIND-EXPORT-V7\0".to_vec();
     append_frame(&mut output, &header);
     output.extend_from_slice(&2u64.to_be_bytes());
     append_frame(&mut output, &created);
     append_frame(&mut output, &sealed);
-    // Zero copied evidence, originals, operations, mapping proofs and artifacts.
-    output.extend_from_slice(&[0; 5 * 8]);
+    // Zero copied evidence, originals, operations, mapping proofs, artifacts and skill admissions.
+    output.extend_from_slice(&[0; 6 * 8]);
     std::fs::write(path, output).unwrap();
     fingerprint
 }
