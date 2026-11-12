@@ -26,6 +26,13 @@ impl Signer for SyntheticSigner {
     }
 }
 
+struct SyntheticClock;
+impl irmind_app::Clock for SyntheticClock {
+    fn now(&self) -> Result<u64, irmind_app::AppError> {
+        Ok(1_793_491_200)
+    }
+}
+
 fn setup(root: &Path) -> (Engine<'_>, Arc<LocalStore>, Arc<EvtxParser>) {
     setup_with_clock(root, Arc::new(SystemClock))
 }
@@ -338,10 +345,7 @@ fn helper_workers_preserve_parquet_commitments_and_every_signed_entry() {
     }
     std::fs::write(inputs.join("collection.evtx"), bytes).unwrap();
     let seed = root.path().join("seed");
-    let (engine, store, parser) = setup_with_clock(
-        &seed,
-        Arc::new(irmind_testkit::FixedClock::new(1_793_491_200)),
-    );
+    let (engine, store, parser) = setup_with_clock(&seed, Arc::new(SyntheticClock));
     let case = engine
         .create_case("Synthetic worker equivalence", "local only")
         .unwrap();
@@ -351,10 +355,7 @@ fn helper_workers_preserve_parquet_commitments_and_every_signed_entry() {
         let run = root.path().join(format!("workers-{workers}"));
         std::fs::create_dir(&run).unwrap();
         std::fs::copy(seed.join("irmind.db"), run.join("irmind.db")).unwrap();
-        let (engine, store, parser) = setup_with_clock(
-            &run,
-            Arc::new(irmind_testkit::FixedClock::new(1_793_491_200)),
-        );
+        let (engine, store, parser) = setup_with_clock(&run, Arc::new(SyntheticClock));
         store.set_parallel_worker_limit(std::num::NonZeroU16::new(workers));
         let selected = SourceDecoderSelection::new(parser);
         let use_cases = LargeCaseUseCases {
