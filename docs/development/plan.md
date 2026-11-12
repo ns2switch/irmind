@@ -6,6 +6,8 @@ This internal plan records historical acceptance criteria and decisions behind t
 
 The approved [installation contract](skills-installation-contract.md) and [case/export contract](skills-case-format-contract.md) govern the implementation. Local compilation and storage are separate ports. The agent receives only active names and descriptions until a bounded, policy-checked load. Analyst-pinned snapshots and Agent-signed load receipts remain methodology, never evidence. Export V7 includes referenced installation admissions; the export port is named `export_case`, independently of the file version. Windows triage, Linux triage and AWS credential compromise must pass scripted synthetic ingestion → method load → investigation → confirmed finding → sealed/offline-verified export before the release. No provider is enabled by default.
 
+The three included methods pass the [scripted synthetic case test](../../crates/bin/tests/skills_runtime.rs), including confirmed findings and independent V7 verification. Broader multi-artifact Windows collection coverage and a separate community skills catalog remain follow-up work. Real-model forensic quality and real-connector deployment are not established by these tests.
+
 ## Current pre-1.0 delivery order
 
 The [pre-1.0 format decision](decisions.md#pre-10-format-policy) supersedes compatibility and V2-comparison requirements in the historical sections below. Minor versions may change formats without migrations until stabilization, expected around v0.6–v0.7. Preserve the creating executable for old cases, or re-ingest verified originals into a new case. Decide parser retention and stable compatibility before 1.0.
