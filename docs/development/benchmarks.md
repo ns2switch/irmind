@@ -1832,6 +1832,17 @@ admission and substantial producer work still limit scaling. No source, disk,
 record or memory limit was reduced to run this workload. See the
 [machine-readable samples](benchmark-data/mapped-buffered-4gib-profile.json).
 
+### Scaling limit
+
+Using `f = (4 / speedup - 1) / 3`, the measured one-to-four-worker
+speedups correspond to an Amdahl-equivalent serial fraction of about 81% for
+the 1 GiB Linux corpus and 69% for the 4 GiB Windows corpus. This is a scaling
+estimate that includes coordination, I/O and resource contention, not a measured
+exclusive CPU fraction. The overlapping phase counters above locate the producer
+wait and canonical work but cannot separate those effects into additive shares.
+The available standard Linux and Windows jobs expose four cores; no larger free
+runner was used for these measurements.
+
 ### Complete sole-V3 release matrix
 
 The [reference run](https://github.com/ns2switch/irmind/actions/runs/43131697106)
