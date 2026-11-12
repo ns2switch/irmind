@@ -21,10 +21,10 @@ opened. An incompatible creator/format produces the explicit version guidance.
 No V6 reader silently accepts the new records.
 
 The version-named `LargeCaseExporter::export_case_v6` becomes
-`export_case_v7`, with the same arguments and return type:
+`export_case`, with the same arguments and return type:
 
 ```rust
-fn export_case_v7(
+fn export_case(
     &self,
     id: &CaseId,
     path: &Path,
@@ -34,8 +34,9 @@ fn export_case_v7(
 ) -> Result<String, AppError>;
 ```
 
-This is an explicit proposed port change, not a V6 method returning V7 bytes.
-The unversioned `CaseExporter` and `ExportVerifier` signatures stay unchanged.
+The exporter port stays unversioned. Only the file magic and header identify
+the format, so future pre-1.0 format changes do not rename this method.
+`CaseExporter` and `ExportVerifier` signatures stay unchanged.
 
 ## Canonical encoding
 
