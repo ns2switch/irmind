@@ -304,3 +304,26 @@ extracción; un campo que no cabe en el contexto tipado escalar incluye un aviso
 de cobertura. La [referencia UDM](https://docs.cloud.google.com/chronicle/docs/reference/udm-field-list)
 documenta estos campos repetidos. El decodificador y el mapeo siguen disponibles
 para verificar sin conexión aunque se deshabilite el conector remoto.
+
+## Alcance explícito de instancia en Chronicle
+
+`IRMIND_CHRONICLE_SCOPE_MODE` usa `event-account` por defecto. El modo `instance`
+se configura desde `/settings connectors`, pide confirmación explícita y registra
+una operación firmada, incluso si el conector está desactivado. Permite lecturas
+entre las cuentas de eventos de un único proyecto, ubicación e instancia. Exige
+un techo explícito de política de la organización; la cuenta del caso identifica
+el proyecto que aloja la instancia. El agente no puede cambiar este modo.
+
+La cadena del caso registra el modo efectivo, el recurso exacto y el hash de la
+configuración pública antes de una lectura. La exportación conserva esos registros.
+La TUI mantiene `FULL INSTANCE SCOPE` visible aunque después se desactive la fuente
+o se vuelva al modo por cuenta. `/scope` muestra el recurso registrado.
+
+Las detecciones solo están disponibles en modo instancia. Configura un único
+`IRMIND_CHRONICLE_RULE_ID` y concede
+`chronicle.legacies.legacySearchDetections`. La consulta limita la ventana UTC en el
+servidor y comprueba el identificador exacto localmente. Cada lectura admite hasta
+cuatro páginas, 20 detecciones, 5 MB en total y 45 segundos. La paginación pendiente
+o el truncamiento del proveedor producen resultados parciales; nunca indican una
+ausencia definitiva. Las colecciones devueltas conservan sus campos e instante
+preciso como evidencia firmada sin clasificar.

@@ -294,6 +294,7 @@ impl StatusBuilder<'_> {
 
 fn default_value(module: &str, field: &str) -> Option<&'static str> {
     match (module, field) {
+        ("siem-chronicle", "IRMIND_CHRONICLE_SCOPE_MODE") => Some("event-account"),
         ("llm-openai-compatible", "IRMIND_LLM_BASE_URL") => Some("https://api.openai.com/v1/"),
         ("llm-anthropic", "IRMIND_ANTHROPIC_BASE_URL") => Some("https://api.anthropic.com/"),
         ("llm-deepseek", "IRMIND_DEEPSEEK_BASE_URL") => Some("https://api.deepseek.com/"),

@@ -75,6 +75,7 @@ impl ParserPrompt {
 
 pub(super) struct CaseState {
     pub case: Case,
+    pub instance_sources: Vec<irmind_app::SiemSourceScope>,
     pub input: String,
     pub confirm_exit: crate::ExitConfirmation,
     pub input_history: Vec<String>,
@@ -322,6 +323,7 @@ mod tests {
 
     fn synthetic_state() -> CaseState {
         CaseState {
+            instance_sources: Vec::new(),
             case: irmind_app::Case {
                 id: CaseId::parse("00000000-0000-0000-0000-000000000000").unwrap(),
                 title: "Synthetic".into(),

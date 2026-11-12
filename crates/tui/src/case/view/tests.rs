@@ -347,3 +347,41 @@ fn consecutive_model_rounds_have_separate_messages() {
     assert!(!shown.contains("enrichment.The"));
     insta::assert_snapshot!("two_model_rounds", shown);
 }
+
+#[test]
+fn full_instance_scope_stays_visible_with_long_model_and_overlay_at_eighty_columns() {
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let view = CaseFrame {
+        title: "Synthetic instance-scoped case with a long title",
+        guide: None,
+        guide_scroll: 0,
+        messages: "",
+        visible_lines: None,
+        input: "/scope",
+        input_focused: true,
+        panel: "",
+        overlay: Some("Synthetic scope details"),
+        menu: None,
+        tab: 0,
+        sidebar_visible: true,
+        sidebar_scroll: 100,
+        overlay_scroll: 0,
+        new_content: true,
+        model: "synthetic-model-with-a-very-long-display-name",
+        tokens: 12345,
+        cost: "n/a",
+        pending: 2,
+        detections: 3,
+        status: "FULL INSTANCE SCOPE · SCOPE LIMITED OVR idle",
+    };
+    draw_case(&mut terminal, &view).unwrap();
+    let shown = screen(&terminal);
+    assert!(shown.contains("Synthetic scope details"));
+    assert!(
+        shown
+            .lines()
+            .last()
+            .unwrap()
+            .starts_with("FULL INSTANCE SCOPE")
+    );
+}

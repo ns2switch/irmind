@@ -12,7 +12,7 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
     id: "siem-chronicle",
     version: "0.1.0",
     ports: &[ModulePort::Siem, ModulePort::SourceDecoder],
-    tools: &[Tool::SiemSearch],
+    tools: &[Tool::SiemSearch, Tool::SiemGetAlert],
     config: &[
         setting("IRMIND_CHRONICLE_URL", true),
         setting("IRMIND_CHRONICLE_SOURCE_ID", true),
@@ -20,6 +20,8 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
         setting("IRMIND_CHRONICLE_LOCATION", true),
         setting("IRMIND_CHRONICLE_INSTANCE", true),
         setting("IRMIND_CHRONICLE_ACCOUNT_FIELD", true),
+        setting("IRMIND_CHRONICLE_SCOPE_MODE", false),
+        setting("IRMIND_CHRONICLE_RULE_ID", false),
         setting("IRMIND_CHRONICLE_CA_PEM", false),
         setting("IRMIND_CHRONICLE_CA_SHA256", false),
         ConfigField {
@@ -62,6 +64,7 @@ impl Chronicle {
         {
             return Err(invalid_config());
         }
+        let (scope_mode, rule_id) = scope_settings(config)?;
         let ca = irmind_http::load_optional_ca(
             config.value("IRMIND_CHRONICLE_CA_PEM"),
             config.value("IRMIND_CHRONICLE_CA_SHA256"),
@@ -82,6 +85,9 @@ impl Chronicle {
             source_id: source_id.into(),
             resource: format!("projects/{project}/locations/{location}/instances/{instance}"),
             account_field: account_field.into(),
+            project: project.into(),
+            scope_mode,
+            rule_id,
         })
     }
 }
@@ -101,4 +107,26 @@ fn field_segment(value: &str) -> bool {
         && value
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+fn scope_settings(
+    config: &ModuleConfig,
+) -> Result<(irmind_app::SiemScopeMode, Option<String>), AppError> {
+    let scope_mode = match config
+        .value("IRMIND_CHRONICLE_SCOPE_MODE")
+        .unwrap_or("event-account")
+    {
+        "event-account" => irmind_app::SiemScopeMode::EventAccount,
+        "instance" => irmind_app::SiemScopeMode::Instance,
+        _ => return Err(invalid_config()),
+    };
+    let rule_id = config
+        .value("IRMIND_CHRONICLE_RULE_ID")
+        .filter(|value| !value.is_empty());
+    if rule_id
+        .is_some_and(|v| v.len() > 256 || v.split('@').count() > 2 || !v.split('@').all(identifier))
+    {
+        return Err(invalid_config());
+    }
+    Ok((scope_mode, rule_id.map(str::to_owned)))
 }

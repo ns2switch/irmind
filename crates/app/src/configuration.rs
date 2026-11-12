@@ -153,6 +153,16 @@ impl PersistentConfig {
             if module.ports.contains(&ModulePort::Llm) && settings.enabled {
                 return Err(invalid());
             }
+            if id == "siem-chronicle"
+                && settings
+                    .values
+                    .get("IRMIND_CHRONICLE_SCOPE_MODE")
+                    .is_some_and(|v| !matches!(v.as_str(), "event-account" | "instance"))
+            {
+                return Err(AppError::Policy(
+                    "Chronicle scope mode must be event-account or instance".into(),
+                ));
+            }
             if settings.values.len() > 32 {
                 return Err(invalid());
             }
@@ -253,6 +263,17 @@ impl PersistentConfig {
     }
 
     pub(super) fn active_egress_changed(&self, next: &Self) -> bool {
+        let mode = |config: &Self| {
+            config
+                .modules
+                .get("siem-chronicle")
+                .and_then(|m| m.values.get("IRMIND_CHRONICLE_SCOPE_MODE"))
+                .map_or("event-account", String::as_str)
+                .to_owned()
+        };
+        if mode(self) != mode(next) {
+            return true;
+        }
         if next.llm_module.is_some()
             && (self.llm_module != next.llm_module
                 || next

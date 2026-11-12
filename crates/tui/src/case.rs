@@ -134,8 +134,10 @@ fn initial_state(
             pending_approval: !approvals.is_empty(),
         },
     );
+    let instance_sources = irmind_app::recorded_instance_sources(&entries)?;
     Ok(CaseState {
         case,
+        instance_sources,
         input: String::new(),
         confirm_exit: crate::ExitConfirmation::Inactive,
         input_history: Vec::new(),

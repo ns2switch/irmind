@@ -322,7 +322,7 @@ Official references: [search API](https://www.elastic.co/docs/api/doc/elasticsea
 
 **Permissions:** Grant `chronicle.events.udmSearch` on the configured instance and authorize the `https://www.googleapis.com/auth/chronicle` OAuth scope. Use a dedicated read-only service account. Store its JSON key as `IRMIND_CHRONICLE_SERVICE_ACCOUNT_JSON` in `/settings keystore`. Ambient Google credentials are never discovered. Rotate and remove the key when it is no longer needed.
 
-**Configure:** In `/settings connectors`, set `IRMIND_CHRONICLE_URL` to the instance's regional HTTPS origin, such as `https://europe-west2-chronicle.googleapis.com/`. Set `IRMIND_CHRONICLE_PROJECT`, `IRMIND_CHRONICLE_LOCATION`, `IRMIND_CHRONICLE_INSTANCE`, and a unique `IRMIND_CHRONICLE_SOURCE_ID`. Set `IRMIND_CHRONICLE_ACCOUNT_FIELD` to the UDM field that actually identifies the account in your telemetry. The query always includes that account predicate and the case's UTC window. Include the source and account in the case and organization scopes before enabling the connector. Configuration changes use the existing signed confirmation flow.
+**Configure:** In `/settings connectors`, set `IRMIND_CHRONICLE_URL` to the instance's regional HTTPS origin, such as `https://europe-west2-chronicle.googleapis.com/`. Set `IRMIND_CHRONICLE_PROJECT`, `IRMIND_CHRONICLE_LOCATION`, `IRMIND_CHRONICLE_INSTANCE`, and a unique `IRMIND_CHRONICLE_SOURCE_ID`. Set `IRMIND_CHRONICLE_ACCOUNT_FIELD` to the UDM field that actually identifies the account in your telemetry. The default `event-account` mode always includes that account predicate and the case's UTC window. Include the source and account in the case and organization scopes before enabling the connector. Configuration changes use the existing signed confirmation flow.
 
 **Limits:** At most 20 events or aggregation buckets, a 24-hour window, a 45-second HTTP timeout and a 5 MB response. Redirects are disabled. Provider truncation markers remain in the signed response. Account-scoped mode does not read detections through an API that cannot enforce an account filter. Query support is limited to the same field comparisons and aggregations as the other SIEM connectors. This API is pre-GA and may change.
 
@@ -336,3 +336,28 @@ extraction projection; a field that cannot fit the scalar typed context carries
 a coverage diagnostic. The [UDM field reference](https://docs.cloud.google.com/chronicle/docs/reference/udm-field-list)
 describes these repeated fields. Stateless decoding and mapping remain available
 for offline case verification after disabling the remote connector.
+
+### Explicit Chronicle instance scope
+
+`IRMIND_CHRONICLE_SCOPE_MODE` defaults to `event-account`. Selecting `instance`
+in `/settings connectors` requires explicit confirmation and a signed configuration
+operation, even while the connector is disabled. This mode reads across event
+accounts in exactly the configured project, location and instance. An explicit
+organization policy ceiling is required. Include the hosting project as the case's
+account; the model cannot set or change this mode through a tool call.
+
+The case signs the effective mode, exact instance resource and public configuration
+hash before a remote read. The export includes those signed records. The TUI keeps
+`FULL INSTANCE SCOPE` visible, including after disabling the source or returning to
+account-scoped mode. `/scope` shows the recorded resource.
+
+Detection reads are available only in instance mode. Configure one fixed
+`IRMIND_CHRONICLE_RULE_ID` and grant
+`chronicle.legacies.legacySearchDetections`. The connector uses the documented
+[legacySearchDetections method](https://docs.cloud.google.com/chronicle/docs/reference/rest/v1alpha/projects.locations.instances.legacy/legacySearchDetections),
+with a server-enforced UTC window and exact local detection-ID comparison. A scan
+stops after four pages, 20 detections, 5 MB total or 45 seconds. A pagination token
+or provider truncation produces a partial-result marker; an incomplete scan never
+claims definitive absence. Returned collections preserve their fields and precise
+detection time as signed, unclassified evidence. UDM event mapping does not invent
+a category, outcome or confirmed finding for a detection collection.

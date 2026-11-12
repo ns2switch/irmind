@@ -109,6 +109,9 @@ impl CaseRuntime<'_, '_, '_> {
         if self.engine.case_scope_exceeds_policy(&self.state.case)? {
             status = format!("SCOPE LIMITED {status}");
         }
+        if !self.state.instance_sources.is_empty() {
+            status = format!("FULL INSTANCE SCOPE · {status}");
+        }
         Ok(self.engine.guard.screen(&status)?.text)
     }
 

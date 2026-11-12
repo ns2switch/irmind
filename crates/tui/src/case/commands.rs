@@ -480,6 +480,13 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 self.state
                     .messages
                     .push(format!("Scope: {}", self.state.case.scope));
+                for source in &self.state.instance_sources {
+                    self.state.messages.push(format!(
+                        "FULL INSTANCE SCOPE · {} · {}",
+                        source.source(),
+                        source.resource().unwrap_or("unavailable")
+                    ));
+                }
                 if let Some(guide) = self.state.demo_guide.as_mut() {
                     guide.record(DemoEvent::ScopeViewed);
                 }

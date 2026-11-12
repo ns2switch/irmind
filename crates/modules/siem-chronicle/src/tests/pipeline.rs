@@ -6,7 +6,7 @@ use irmind_app::{
 };
 use irmind_domain::{Actor, AuditEventKind, ExecutionMode, ProposedCall};
 use std::{collections::BTreeMap, sync::Arc};
-struct SyntheticSigner(SigningKey);
+pub(super) struct SyntheticSigner(pub(super) SigningKey);
 impl Signer for SyntheticSigner {
     fn actor(&self) -> Actor {
         Actor::Analyst
