@@ -248,6 +248,7 @@ fn assert_episode_queries(parquet: &LocalStore, case: &irmind_app::CaseId) {
 fn invalid_later_chunk_rolls_back_every_partial_row_and_manifest() {
     let root = tempfile::tempdir().unwrap();
     let (engine, store, parser) = setup(root.path());
+    store.set_parallel_worker_limit(std::num::NonZeroU16::new(3));
     let case = engine
         .create_case("Synthetic corrupt second chunk", "local evidence only")
         .unwrap();
@@ -286,7 +287,8 @@ fn invalid_later_chunk_rolls_back_every_partial_row_and_manifest() {
         )
         .unwrap_err();
     assert!(
-        matches!(error, irmind_app::AppError::Policy(ref message) if message.starts_with("EVTX helper exited unsuccessfully") && message.contains("entire file rejected; no partial ingestion"))
+        matches!(&error, irmind_app::AppError::Policy(message) if message.starts_with("EVTX helper exited unsuccessfully") && message.contains("entire file rejected; no partial ingestion")),
+        "unexpected corrupt-source rejection: {error:?}"
     );
     assert!(
         !store

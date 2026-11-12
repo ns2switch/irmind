@@ -90,7 +90,9 @@ pub(super) fn decode_source(
                 result
             },
         );
-        if !callback_failed {
+        // A failed decoder may stop its callbacks through cancellation. Do not
+        // replace its concrete failure by flushing cancelled pending work.
+        if !callback_failed && !input.cancel.is_cancelled() {
             let pending = emit(None);
             callback_failed |= pending.is_err();
             pending?;
@@ -122,7 +124,7 @@ pub(super) fn decode_source(
                 outcome
             },
         );
-        if !callback_failed {
+        if !callback_failed && !input.cancel.is_cancelled() {
             let pending = emit(None);
             callback_failed |= pending.is_err();
             pending?;
