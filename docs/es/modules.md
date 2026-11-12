@@ -1,4 +1,4 @@
-Traducción de docs/modules.md en el commit 2fae0b92ee0c0fbb950e7d8da18e5bd6edfd120e; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/modules.md en el commit a0b2d321e9c11e1b73b57941b3c98d4ab8ec6e41; si hay diferencias, prevalece la versión en inglés.
 
 # Módulos
 
@@ -327,3 +327,7 @@ cuatro páginas, 20 detecciones, 5 MB en total y 45 segundos. La paginación pen
 o el truncamiento del proveedor producen resultados parciales; nunca indican una
 ausencia definitiva. Las colecciones devueltas conservan sus campos e instante
 preciso como evidencia firmada sin clasificar.
+
+## Paquetes de metodología
+
+Las skills son paquetes de datos locales, no conectores ni módulos ejecutables. `/skills` gestiona los tres métodos incluidos y los paquetes aprobados por el analista. No cambian las herramientas compiladas ni activan proveedores. Consulta [skills forenses](skills.md).

@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 2fae0b92ee0c0fbb950e7d8da18e5bd6edfd120e; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit a0b2d321e9c11e1b73b57941b3c98d4ab8ec6e41; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -11,7 +11,7 @@ IRMind es un asistente agéntico de terminal para respuesta a incidentes y anál
 *La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
 
 > [!WARNING]
-> IRMind 0.3.0 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
+> IRMind 0.4.0 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
 
 > [!WARNING]
 > Antes de 1.0, cada versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración. Conserva la versión de IRMind que creó un caso para abrirlo, verificarlo o exportarlo, o reingiere los originales verificados en un caso nuevo.
@@ -47,13 +47,13 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-La [versión preliminar v0.3.0](https://github.com/ns2switch/irmind/releases/tag/v0.3.0) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.4.0](https://github.com/ns2switch/irmind/releases/tag/v0.4.0) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
 Usa la versión menor que creó el caso para volver a abrirlo. La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable o reingerir los originales verificados.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.3.0; binary=irmind-linux-x86_64
+tag=v0.4.0; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -79,9 +79,11 @@ Usa **Enter** para avanzar, **Retroceso** para revisar un paso, **Espacio** para
 Ningún LLM está habilitado por defecto. Puedes ingerir y verificar evidencia local sin uno.
 En los siguientes arranques, IRMind verifica y reabre el último caso abierto que usaste. Usa `/home` para volver a la lista o `/settings preferences` para desactivar esta opción. `/settings` también reúne conectores, credenciales, ratón y tema. `/help` enumera los comandos y las teclas reservadas: Enter, Esc, flechas, Tab/Shift+Tab, PgUp/PgDn, Ctrl+C, Ctrl+K y Ctrl+O. Ctrl+O o `/expand` despliega o pliega la tarjeta seleccionada o la última plegable sin salir del campo de entrada. Los caracteres imprimibles, incluido `/`, se escriben en el campo de formulario que tiene el foco; el pegado también funciona allí.
 
+Usa `/skills` para inspeccionar y gestionar los métodos incluidos de Windows, Linux y AWS. Invoca `/windows-triage`, `/linux-triage` o `/aws-credential-compromise` dentro de un caso. El modelo los carga cuando hacen falta; no amplían permisos. Consulta la [guía de skills](docs/es/skills.md).
+
 ## Módulos
 
-La versión 0.3 usa una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo lee los formatos actuales de caso y la exportación V6. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/development/case-migration.md).
+La versión 0.4 usa una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo lee los formatos actuales de caso y la exportación V7. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/development/case-migration.md).
 
 La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Los modelos remotos y conectores permanecen desactivados hasta seleccionarlos y configurarlos. Los parsers locales se eligen por detección del contenido. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre se necesita firma y un backend de secretos. Todos siguen siendo experimentales.
 

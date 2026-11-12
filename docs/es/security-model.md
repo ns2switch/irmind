@@ -1,4 +1,4 @@
-Traducción de docs/security-model.md en el commit 453a587d835344ba2dee39b185d38763f38fe038; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/security-model.md en el commit a0b2d321e9c11e1b73b57941b3c98d4ab8ec6e41; si hay diferencias, prevalece la versión en inglés.
 
 # Modelo de seguridad
 
@@ -48,3 +48,9 @@ Un paquete exportado contiene el log firmado, el sello y la clave pública. Los 
 Empieza por el [ejemplo sintético](getting-started.md). Limita el alcance remoto, usa credenciales de servicio dedicadas de solo lectura y aprueba solo llamadas cuyos argumentos entiendas. Si sospechas una vulnerabilidad, usa el proceso privado de [SECURITY.md](../../SECURITY.md) en lugar de abrir un issue público.
 
 El decodificador EVTX se ejecuta en un proceso aislado por el sistema operativo, con un descriptor de evidencia de solo lectura, salida acotada y confirmación de finalización. El parser solo está disponible tras verificar el aislamiento al arrancar. No existe ejecución sin aislamiento. La salida conserva su procedencia no confiable y pasa por los controles habituales antes de mostrarse, enviarse al modelo o influir en llamadas. Consulta el [diseño de aislamiento EVTX](../development/evtx-helper-design.md).
+
+## Metodología forense
+
+Las skills son paquetes locales de metodología, no evidencia ni plugins ejecutables. El modelo solo recibe al principio nombres y descripciones activos. Los recursos cargados pasan por ContentGuard, permanecen dentro del bloque UNTRUSTED del turno y nunca entran en mensajes de sistema. Sus herramientas declaradas restringen llamadas: no conceden permisos, aprueban acciones ni confirman hallazgos.
+
+Una instantánea firmada por Analyst y los recibos firmados por Agent conservan los recursos originales y los rangos filtrados. La exportación V7 incluye las pruebas de instalación referenciadas para autenticarlas sin llavero. Esto prueba qué se aprobó y cargó, no la veracidad del método ni la reproducción de una respuesta del modelo. Consulta [skills forenses](skills.md) para activación, restauración y límites.

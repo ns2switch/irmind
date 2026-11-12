@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 2fae0b92ee0c0fbb950e7d8da18e5bd6edfd120e; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit a0b2d321e9c11e1b73b57941b3c98d4ab8ec6e41; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -50,8 +50,8 @@ La versión 0.3 no lee casos de 0.2: conserva el ejecutable creador o
 
 ## v0.4: skills forenses
 
-- Aprobar `docs/development/skills-design.md` antes de implementar: formato, carga progresiva, instalación firmada, confianza y relación con la política.
-- Una skill es una carpeta con `SKILL.md` que describe una metodología, más plantillas de consulta, reglas Sigma o mapeos opcionales. Los métodos iniciales también cubren ransomware en Windows, persistencia en Linux y BEC en M365.
+- El [diseño aprobado](../development/skills-design.md), el [contrato de instalación](../development/skills-installation-contract.md) y el [contrato de recibos y exportación V7](../development/skills-case-format-contract.md) definen la implementación 0.4. Consulta la [guía de uso](skills.md).
+- Una skill es una carpeta con `SKILL.md` que describe una metodología, más plantillas de consulta, reglas Sigma o mapeos opcionales. Los tres métodos iniciales son Windows triage, Linux triage y AWS credential compromise. Ransomware de Windows y BEC de M365 quedan como posibles ampliaciones comunitarias.
 - Incluir [**Windows triage**](https://github.com/ns2switch/irmind/issues/157): guiar una colección sintética y acotada con KAPE o Velociraptor de logs de eventos, registro y sus logs de transacciones, `$MFT`, Prefetch, LNK, SRUM y Amcache. Ingerir primero timelines de Hayabusa derivados de EVTX o CSV de EvtxECmd (EVTX directo si el auxiliar aislado está disponible), y después las exportaciones de PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch y SrumECmd. Investigar en orden: inicio de sesión → ejecución → persistencia → movimiento lateral → exfiltración. Correlacionar fuentes independientes y confirmar hallazgos con evidencia. El analista ejecuta las herramientas externas; una skill no concede permisos de ejecución.
 - Incluir **Linux triage** para autenticación, ejecución y persistencia, y **AWS credential compromise** para CloudTrail, actividad de roles y sesiones, y cambios en IAM.
 - El modelo recibe primero nombre y descripción y carga el contenido completo solo cuando lo necesita. Las skills pueden venir incluidas, de una organización o instaladas por un analista.
