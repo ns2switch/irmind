@@ -25,3 +25,6 @@
 
 # Mapping wire fixtures also participate in native build identities.
 *.hex text eol=lf
+
+# Bundled skill package commitments cover the exact resource bytes.
+skills/** text eol=lf

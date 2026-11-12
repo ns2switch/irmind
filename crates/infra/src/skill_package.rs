@@ -6,6 +6,9 @@ use irmind_domain::{
 };
 use serde::Deserialize;
 
+mod bundled;
+pub use bundled::bundled_skill_candidates;
+
 pub struct TomlSkillCompiler;
 
 impl SkillCompiler for TomlSkillCompiler {

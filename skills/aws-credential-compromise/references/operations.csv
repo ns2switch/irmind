@@ -1,0 +1,8 @@
+operation,review_focus
+ConsoleLogin,Recorded sign-in result and identity context
+AssumeRole,Initiating principal and target role
+CreateAccessKey,Actor and target account identity
+AttachUserPolicy,Policy attachment and target user
+PutUserPolicy,Inline policy change and target user
+AddUserToGroup,Membership change and target identity
+UpdateAssumeRolePolicy,Trust relationship change

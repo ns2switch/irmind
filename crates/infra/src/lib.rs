@@ -16,7 +16,7 @@ pub use clock::SystemClock;
 pub use config_toml::TomlConfigurationStore;
 use irmind_fs::{private_dir, private_file};
 pub use parquet_store::ParquetStore;
-pub use skill_package::{TomlSkillCompiler, decode_skill_package};
+pub use skill_package::{TomlSkillCompiler, bundled_skill_candidates, decode_skill_package};
 pub use skill_store::FileSkillPackageStore;
 
 use ed25519_dalek::{Signature, VerifyingKey};
