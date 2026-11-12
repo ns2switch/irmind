@@ -28,3 +28,5 @@
 
 # Bundled skill package commitments cover the exact resource bytes.
 skills/** text eol=lf
+# Proposed skill wire vectors and their checksums use exact LF bytes.
+docs/development/skills-format-vectors/** text eol=lf
