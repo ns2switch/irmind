@@ -950,3 +950,21 @@ normal signed distribution workflow. Symbolized panic backtraces require an
 unstripped developer build; operational error messages and cause chains remain.
 The [controlled artifact measurements](release-binary-size.md) verify allocated
 code/data and unwind payloads, CLI behavior and native helper containment.
+
+## Start v0.4 with bounded data-only skill packages
+
+Context: forensic methods must be reusable without granting scripts, tools or
+model instructions privileged access to an investigation.
+
+Decision: implement the reviewed skill package format first as pure bounded data:
+strict TOML metadata, immutable resource inventory, a skill-specific digest and
+safe fixed errors. Package bytes remain untrusted. Reject invalid paths, platform
+aliases, unsupported files and executable code fences. Metadata declares needs;
+it does not authorize a tool or satisfy an evidence reference.
+
+Consequences: existing ports, audit kinds, case/seal/export encodings, current
+golden fixtures and default connector/model activation remain unchanged. Local
+compilation/storage ports and the signed installation family are specified in
+[the installation contract](skills-installation-contract.md) before their
+implementation. Case-use receipts and export integration require a separate
+concrete format review.
