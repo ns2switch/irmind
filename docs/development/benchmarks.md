@@ -1801,3 +1801,33 @@ buffering; oversized single results retain explicit commit acknowledgement.
 Current artifact and complete-chain determinism tests at different worker counts
 remain unchanged. See the [machine-readable samples](benchmark-data/mapped-buffered-batch-profile.json)
 and [bounded preparation design](bounded-parallel-mapping.md).
+
+### Single 4 GiB NDJSON source on Windows
+
+The [paired Windows release run](https://github.com/ns2switch/irmind/actions/runs/43131521252)
+uses the same reference and buffered candidate as the 1 GiB profile, with three
+alternating pairs per worker setting on one four-core runner. The original is
+4,294,967,296 bytes. Every run accepts 2,652,851 records, writes 194,200,266
+artifact bytes and passes full reconstruction.
+
+| Requested workers | Reference median | Buffered median | Improvement | Buffered MiB/s | Candidate maximum RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 94.722 s | 93.778 s | 1.0% | 43.68 | 65.68 MiB |
+| 4 | 79.880 s | 71.650 s | 10.3% | 57.17 | 74.55 MiB |
+| Automatic (3) | 82.378 s | 70.427 s | 14.5% | 58.16 | 76.45 MiB |
+
+The candidate's one-to-four-worker speedup is 1.31×. The OS process high-water
+counter is sampled every 20 ms, including generation and verification. Timings
+exclude those phases; measurements from different operating systems are not
+paired comparisons.
+
+With four workers, median cumulative mapping/preparation is 23.693 s, checked
+projection 13.493 s, canonical writing 10.486 s (including 9.896 s encoding/I/O),
+initial hashing 3.329 s and ordered source commitment 0.452 s. Writer waits fall
+from 71.853 s with one worker to 43.602 s with four; producer queue waits are
+zero at the displayed precision. Signing, signature checks and audit append
+remain below 0.004 s together. Overlapping wall counters do not establish an
+exclusive sequential CPU fraction. Pure mapping can overlap, but ordered
+admission and substantial producer work still limit scaling. No source, disk,
+record or memory limit was reduced to run this workload. See the
+[machine-readable samples](benchmark-data/mapped-buffered-4gib-profile.json).

@@ -16,11 +16,10 @@
       "requested_workers": "1",
       "repeat": 1,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 1.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 16.907018,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.668315,
@@ -42,7 +41,7 @@
         "append_seconds": 0.001076
       },
       "process": {
-        "peak_rss_kib": 86312.0,
+        "peak_rss_kib": 86312,
         "elapsed_seconds": 17.24
       }
     },
@@ -51,11 +50,10 @@
       "requested_workers": "1",
       "repeat": 2,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 1.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 16.670687,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.663763,
@@ -77,7 +75,7 @@
         "append_seconds": 0.000889
       },
       "process": {
-        "peak_rss_kib": 90140.0,
+        "peak_rss_kib": 90140,
         "elapsed_seconds": 17.0
       }
     },
@@ -86,11 +84,10 @@
       "requested_workers": "1",
       "repeat": 3,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 1.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 16.801689,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.653697,
@@ -112,7 +109,7 @@
         "append_seconds": 0.000913
       },
       "process": {
-        "peak_rss_kib": 88560.0,
+        "peak_rss_kib": 88560,
         "elapsed_seconds": 17.33
       }
     },
@@ -121,11 +118,10 @@
       "requested_workers": "4",
       "repeat": 1,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 4.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 14.192492,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.655504,
@@ -147,7 +143,7 @@
         "append_seconds": 0.000978
       },
       "process": {
-        "peak_rss_kib": 98876.0,
+        "peak_rss_kib": 98876,
         "elapsed_seconds": 14.53
       }
     },
@@ -156,11 +152,10 @@
       "requested_workers": "4",
       "repeat": 2,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 4.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 14.586067,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.654376,
@@ -182,7 +177,7 @@
         "append_seconds": 0.000956
       },
       "process": {
-        "peak_rss_kib": 98356.0,
+        "peak_rss_kib": 98356,
         "elapsed_seconds": 14.91
       }
     },
@@ -191,11 +186,10 @@
       "requested_workers": "4",
       "repeat": 3,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 4.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 14.437234,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.654172,
@@ -217,7 +211,7 @@
         "append_seconds": 0.000931
       },
       "process": {
-        "peak_rss_kib": 99240.0,
+        "peak_rss_kib": 99240,
         "elapsed_seconds": 14.78
       }
     },
@@ -226,10 +220,10 @@
       "requested_workers": "auto",
       "repeat": 1,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 14.027823,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.653549,
@@ -251,7 +245,7 @@
         "append_seconds": 0.163011
       },
       "process": {
-        "peak_rss_kib": 94020.0,
+        "peak_rss_kib": 94020,
         "elapsed_seconds": 14.38
       }
     },
@@ -260,10 +254,10 @@
       "requested_workers": "auto",
       "repeat": 2,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 14.033344,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.654803,
@@ -285,7 +279,7 @@
         "append_seconds": 0.001028
       },
       "process": {
-        "peak_rss_kib": 93188.0,
+        "peak_rss_kib": 93188,
         "elapsed_seconds": 14.4
       }
     },
@@ -294,10 +288,10 @@
       "requested_workers": "auto",
       "repeat": 3,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 14.01341,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.653856,
@@ -319,7 +313,7 @@
         "append_seconds": 0.000844
       },
       "process": {
-        "peak_rss_kib": 94204.0,
+        "peak_rss_kib": 94204,
         "elapsed_seconds": 14.7
       }
     },
@@ -328,11 +322,10 @@
       "requested_workers": "1",
       "repeat": 1,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 1.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 17.667489,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.653729,
@@ -354,7 +347,7 @@
         "append_seconds": 0.000968
       },
       "process": {
-        "peak_rss_kib": 88768.0,
+        "peak_rss_kib": 88768,
         "elapsed_seconds": 18.1
       }
     },
@@ -363,11 +356,10 @@
       "requested_workers": "1",
       "repeat": 2,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 1.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 17.777798,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.657202,
@@ -389,7 +381,7 @@
         "append_seconds": 0.000866
       },
       "process": {
-        "peak_rss_kib": 85732.0,
+        "peak_rss_kib": 85732,
         "elapsed_seconds": 18.1
       }
     },
@@ -398,11 +390,10 @@
       "requested_workers": "1",
       "repeat": 3,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 1.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 17.548009,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.653234,
@@ -424,7 +415,7 @@
         "append_seconds": 0.000884
       },
       "process": {
-        "peak_rss_kib": 84188.0,
+        "peak_rss_kib": 84188,
         "elapsed_seconds": 17.98
       }
     },
@@ -433,11 +424,10 @@
       "requested_workers": "4",
       "repeat": 1,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 4.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 15.309402,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.656908,
@@ -459,7 +449,7 @@
         "append_seconds": 0.004558
       },
       "process": {
-        "peak_rss_kib": 95420.0,
+        "peak_rss_kib": 95420,
         "elapsed_seconds": 15.64
       }
     },
@@ -468,11 +458,10 @@
       "requested_workers": "4",
       "repeat": 2,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 4.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 15.56846,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.653003,
@@ -494,7 +483,7 @@
         "append_seconds": 0.001032
       },
       "process": {
-        "peak_rss_kib": 92692.0,
+        "peak_rss_kib": 92692,
         "elapsed_seconds": 15.91
       }
     },
@@ -503,11 +492,10 @@
       "requested_workers": "4",
       "repeat": 3,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
-        "cap": 4.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 15.695891,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.653301,
@@ -529,7 +517,7 @@
         "append_seconds": 0.000854
       },
       "process": {
-        "peak_rss_kib": 91940.0,
+        "peak_rss_kib": 91940,
         "elapsed_seconds": 16.05
       }
     },
@@ -538,10 +526,10 @@
       "requested_workers": "auto",
       "repeat": 1,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 16.179328,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.65452,
@@ -563,7 +551,7 @@
         "append_seconds": 0.000904
       },
       "process": {
-        "peak_rss_kib": 92040.0,
+        "peak_rss_kib": 92040,
         "elapsed_seconds": 16.52
       }
     },
@@ -572,10 +560,10 @@
       "requested_workers": "auto",
       "repeat": 2,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 16.426001,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.654256,
@@ -597,7 +585,7 @@
         "append_seconds": 0.000964
       },
       "process": {
-        "peak_rss_kib": 90912.0,
+        "peak_rss_kib": 90912,
         "elapsed_seconds": 16.76
       }
     },
@@ -606,10 +594,10 @@
       "requested_workers": "auto",
       "repeat": 3,
       "ingest": {
-        "bytes": 1073741824.0,
-        "records": 663212.0,
+        "bytes": 1073741824,
+        "records": 663212,
         "wall_seconds": 16.148776,
-        "parquet_bytes": 48510482.0
+        "parquet_bytes": 48510482
       },
       "phases": {
         "hash_read_seconds": 0.654413,
@@ -631,7 +619,7 @@
         "append_seconds": 0.192115
       },
       "process": {
-        "peak_rss_kib": 90020.0,
+        "peak_rss_kib": 90020,
         "elapsed_seconds": 16.63
       }
     }
