@@ -1758,3 +1758,46 @@ later lane from preparing its complete bounded job. The next revision buffers
 ordinary frames and acknowledges oversized single outputs only, retaining the
 memory reservation and canonical commit order. See the
 [raw measurements](benchmark-data/mapped-acknowledged-batch-experiment.json).
+
+### Buffered, ordered mapping preparation
+
+The [selected paired release run](https://github.com/ns2switch/irmind/actions/runs/43129719416)
+compares the current serial mapping reference with bounded parallel preparation
+on the same four-core Linux runner. Each setting has three alternating pairs,
+one 1 GiB NDJSON source, 663,212 accepted records and full reconstruction.
+
+| Requested workers | Reference median | Buffered preparation median | Improvement | Candidate maximum RSS |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 17.667 s | 16.802 s | 4.9% | 88.03 MiB |
+| 4 | 15.568 s | 14.437 s | 7.3% | 96.91 MiB |
+| Automatic (3) | 16.179 s | 14.028 s | 13.3% | 92.00 MiB |
+
+All runs produce 48,510,482 artifact bytes. The candidate's one-to-four-worker
+speedup is 1.16×; this is a modest gain, not linear scaling. Maximum sampled RSS
+includes generation and verification. Ingestion timing excludes both.
+
+| Candidate phase, median cumulative wall time | One worker | Four workers |
+| --- | ---: | ---: |
+| Source read and hash | 0.664 s | 0.654 s |
+| Validation, mapping and canonical source preparation | 3.466 s | 4.867 s |
+| Checked projection | 1.910 s | 2.822 s |
+| Arrow row preparation | 0.574 s | 0.752 s |
+| Canonical writer | 2.669 s | 2.991 s |
+| Parquet encoding and I/O, within writer | 2.343 s | 2.675 s |
+| File writes, within encoding | 0.025 s | 0.029 s |
+| Fsync | 0.240 s | 0.201 s |
+| Artifact hash | 0.032 s | 0.032 s |
+| Writer waiting for producers | 9.942 s | 6.980 s |
+| Producers waiting for queues | 0.101 s | 0.111 s |
+| Ordered source commitment | 0.095 s | 0.095 s |
+
+Median signing, signature checks and audit append together remain below 0.002 s.
+Stage counters overlap across workers and include nested phases; they are not
+exclusive CPU percentages. The gain comes from overlapping checked preparation,
+while canonical admission and the writer remain ordered. Waiting for producers
+still dominates writer elapsed time. Source hashing and signed custody are not
+the principal bottleneck in this corpus. Ordinary result frames use bounded
+buffering; oversized single results retain explicit commit acknowledgement.
+Current artifact and complete-chain determinism tests at different worker counts
+remain unchanged. See the [machine-readable samples](benchmark-data/mapped-buffered-batch-profile.json)
+and [bounded preparation design](bounded-parallel-mapping.md).
