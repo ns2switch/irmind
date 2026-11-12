@@ -933,3 +933,20 @@ authentication outcome. Event-account mode cannot read detections through an API
 without an account filter. Both connectors remain experimental and have only
 synthetic contract validation. Insertion-ordered JSON CI also tests these source
 and mapping paths.
+
+## Explicit release symbol stripping
+
+Context: published Linux v0.3.0 retains static symbol metadata that is absent in
+the v0.2.0 asset, making download-size growth appear much larger than loaded-code
+and data growth. Neither workspace specified release stripping.
+
+Decision: set `CARGO_PROFILE_RELEASE_STRIP=symbols` in the release workflow for
+the main and isolated EVTX helper workspaces. Keep Cargo manifests unchanged:
+native mapping build identities hash their bytes. Preserve unwind behavior, optimization level, codegen
+units, module coverage, TLS providers and current format construction.
+
+Consequences: future release packages omit offline symbol metadata and keep the
+normal signed distribution workflow. Symbolized panic backtraces require an
+unstripped developer build; operational error messages and cause chains remain.
+The [controlled artifact measurements](release-binary-size.md) verify allocated
+code/data and unwind payloads, CLI behavior and native helper containment.
