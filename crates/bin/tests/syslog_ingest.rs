@@ -41,7 +41,6 @@ fn engine(store: &Arc<LocalStore>) -> Engine<'static> {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
-            current_sources::event_parser(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

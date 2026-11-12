@@ -9,7 +9,7 @@ fn scoped_edr_read_is_audited_indexed_and_redacted() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let calls = Arc::new(Mutex::new(0));
     let mut registry = ModuleRegistry::new();
     registry
@@ -33,7 +33,6 @@ fn scoped_edr_read_is_audited_indexed_and_redacted() {
                         Arc::new(LocalVerifier::from_signer(signer.as_ref())),
                     ),
                     guard.clone(),
-                    parser.clone(),
                 ),
                 ExecutionMode::Attended,
                 Arc::new(SystemClock),
@@ -118,7 +117,7 @@ fn cloud_identity_uses_scoped_read_port() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let cloud = FakeCloudAudit(Mutex::new(0));
     let engine = Engine::new(
         EnginePorts::new(
@@ -131,7 +130,6 @@ fn cloud_identity_uses_scoped_read_port() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -209,7 +207,7 @@ fn malicious_siem_record_cannot_dispatch_external_intel() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let siem = FakeSiem {
         calls: Mutex::new(0),
         source_id: "splunk-prod".into(),
@@ -228,7 +226,6 @@ fn malicious_siem_record_cannot_dispatch_external_intel() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

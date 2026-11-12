@@ -200,7 +200,6 @@ fn fixture_with_clock<'a>(
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         clock,

@@ -22,7 +22,6 @@ fn mapped_source_has_signed_lineage_public_v6_verification_and_reconstruction() 
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

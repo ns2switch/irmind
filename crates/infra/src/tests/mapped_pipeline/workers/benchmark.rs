@@ -126,7 +126,6 @@ fn profiled_fixture(root: &Path) -> ProfiledFixture {
             Arc::new(LocalVerifier::from_signer(signer.as_ref())),
         ),
         Arc::new(MandatoryGuard::new().unwrap()),
-        Arc::new(JsonParser),
     );
     let custody = crate::tests::benchmark_custody::attach(&mut ports);
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock)).unwrap();

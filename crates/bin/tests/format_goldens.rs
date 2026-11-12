@@ -15,12 +15,11 @@
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CaseMutation, Clock, ConfigChange, ConfigurationStore,
-    CryptoPorts, Engine, EnginePorts, EventParser, LargeCaseStore, PersistentConfig, SignedEntry,
-    Signer, SourceDecoder, hex, sha256,
+    CryptoPorts, Engine, EnginePorts, LargeCaseStore, PersistentConfig, SignedEntry, Signer,
+    SourceDecoder, hex, sha256,
 };
 use irmind_domain::{Actor, AuditEventKind, Case, CaseId, ExecutionMode, Severity};
 use irmind_infra::{LocalStore, LocalVerifier, ParquetStore, TomlConfigurationStore};
-use irmind_mod_parser_json::JsonParser;
 use std::{collections::BTreeMap, fs, sync::Arc};
 
 type Goldens = BTreeMap<String, String>;
@@ -125,37 +124,52 @@ type Row = (
 );
 
 fn normalized_rows(
-    parser: &dyn EventParser,
+    parser: &dyn SourceDecoder,
     source: &str,
     bytes: &[u8],
     cancel: &CancellationToken,
 ) -> Vec<Row> {
     let mut rows = Vec::new();
+    let mapping = irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new().unwrap();
+    let source_ref = irmind_domain::SourceReferenceV1::file(source).unwrap();
     parser
-        .parse_each(source, bytes, cancel, &mut |row| {
-            row.inspect(|row| {
-                rows.push((
-                    row.index,
-                    row.at.clone(),
-                    row.event.clone(),
-                    row.text.clone(),
-                    row.entities.clone(),
-                    row.relations
-                        .iter()
-                        .map(|r| {
-                            (
-                                r.from_kind.clone(),
-                                r.from_value.clone(),
-                                r.relation.clone(),
-                                r.to_kind.clone(),
-                                r.to_value.clone(),
-                            )
-                        })
-                        .collect::<Vec<_>>(),
-                ));
-            });
-            Ok(())
-        })
+        .decode_reader(
+            irmind_app::source_mapping::SourceInput {
+                metadata: irmind_app::source_mapping::SourceMetadata {
+                    source: &source_ref,
+                    evidence_hash: sha256(bytes),
+                    time_context: None,
+                    cancel,
+                },
+                reader: &mut std::io::Cursor::new(bytes),
+            },
+            &mut |row| {
+                row.inspect(|raw| {
+                    let mapped = irmind_app::SourceMapper::map(&mapping, raw).unwrap();
+                    let row = &mapped.record().indexed.record;
+                    rows.push((
+                        row.index,
+                        row.at.clone(),
+                        row.event.clone(),
+                        row.text.clone(),
+                        row.entities.clone(),
+                        row.relations
+                            .iter()
+                            .map(|r| {
+                                (
+                                    r.from_kind.clone(),
+                                    r.from_value.clone(),
+                                    r.relation.clone(),
+                                    r.to_kind.clone(),
+                                    r.to_value.clone(),
+                                )
+                            })
+                            .collect::<Vec<_>>(),
+                    ));
+                });
+                Ok(())
+            },
+        )
         .unwrap();
     rows
 }
@@ -164,12 +178,12 @@ fn parser_goldens(out: &mut Goldens) {
     one_parser_golden(
         out,
         "json",
-        &JsonParser,
+        &irmind_mod_parser_json::JsonSourceDecoder,
         include_bytes!("../../modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json"),
     );
 }
 
-fn one_parser_golden(out: &mut Goldens, name: &str, parser: &dyn EventParser, bytes: &[u8]) {
+fn one_parser_golden(out: &mut Goldens, name: &str, parser: &dyn SourceDecoder, bytes: &[u8]) {
     let cancel = CancellationToken::new();
     let source = format!("{name}.log");
     let rows = normalized_rows(parser, &source, bytes, &cancel);
@@ -194,7 +208,6 @@ fn engine(store: &Arc<LocalStore>) -> Engine<'static> {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(FixedClock),

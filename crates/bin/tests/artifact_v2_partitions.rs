@@ -11,7 +11,6 @@ use irmind_domain::{
     Actor, ExecutionMode, ParquetArtifact, ParserSelectionMode, ScopePartitionKey,
 };
 use irmind_infra::{LocalStore, LocalVerifier};
-use irmind_mod_parser_json::JsonParser;
 use irmind_mod_parser_json::JsonSourceDecoder;
 use irmind_mod_parser_linux::LinuxSourceDecoder;
 use std::{collections::BTreeMap, fs, sync::Arc};
@@ -46,7 +45,6 @@ fn engine(store: &Arc<LocalStore>) -> Engine<'static> {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(FixedClock),

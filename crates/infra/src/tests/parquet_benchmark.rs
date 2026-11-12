@@ -86,7 +86,7 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
         key: SigningKey::from_bytes(&[74u8; 32]),
         actor: Actor::Analyst,
     });
-    let parser = Arc::new(JsonParser);
+
     let mut ports = EnginePorts::new(
         store.clone(),
         store.clone(),
@@ -97,7 +97,6 @@ fn run_benchmark(files: usize, multiplier: usize, label: &str, scenario: &Scenar
             Arc::new(LocalVerifier::from_signer(signer.as_ref())),
         ),
         Arc::new(MandatoryGuard::new().unwrap()),
-        parser.clone(),
     );
     let custody = custody::attach(&mut ports);
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock)).unwrap();

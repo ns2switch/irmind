@@ -49,7 +49,6 @@ impl Harness {
                     Arc::new(LocalVerifier::from_signer(self.signer.as_ref())),
                 ),
                 Arc::new(MandatoryGuard::new().unwrap()),
-                Arc::new(JsonParser),
             ),
             ExecutionMode::Attended,
             Arc::new(SystemClock),

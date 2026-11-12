@@ -25,7 +25,6 @@ fn setup(root: &Path, _legacy: bool) -> (Arc<LocalStore>, Engine<'static>) {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

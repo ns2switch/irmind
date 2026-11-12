@@ -40,7 +40,7 @@ fn detected_injection_cannot_expand_next_read_scope() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let siem = FakeSiem {
         calls: Mutex::new(0),
         source_id: "splunk-prod".into(),
@@ -56,7 +56,6 @@ fn detected_injection_cannot_expand_next_read_scope() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -119,7 +118,7 @@ fn scoped_internal_intel_uses_its_own_read_port() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let intel = FakeInternalIntel {
         calls: Mutex::new(0),
         source_id: "misp-internal".into(),
@@ -135,7 +134,6 @@ fn scoped_internal_intel_uses_its_own_read_port() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -214,7 +212,7 @@ fn result_is_redacted_before_model_byte_limit() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let intel = BoundaryIntel;
     let engine = Engine::new(
         EnginePorts::new(
@@ -227,7 +225,6 @@ fn result_is_redacted_before_model_byte_limit() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -262,7 +259,7 @@ fn tainted_release_requires_analyst_signature_and_signed_audit() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -274,7 +271,6 @@ fn tainted_release_requires_analyst_signature_and_signed_audit() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

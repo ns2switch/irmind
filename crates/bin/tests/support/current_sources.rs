@@ -322,18 +322,3 @@ pub(super) fn parser(id: &str) -> Arc<dyn irmind_app::LogParser> {
         .1;
     catalog.get_version(id, &version).unwrap()
 }
-
-#[cfg(not(feature = "parser-json"))]
-#[path = "../../src/disabled_parser.rs"]
-mod disabled_buffer_parser;
-
-pub(super) fn event_parser() -> Arc<dyn irmind_app::EventParser> {
-    #[cfg(feature = "parser-json")]
-    {
-        Arc::new(irmind_mod_parser_json::JsonParser)
-    }
-    #[cfg(not(feature = "parser-json"))]
-    {
-        Arc::new(disabled_buffer_parser::JsonParser)
-    }
-}

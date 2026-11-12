@@ -76,7 +76,7 @@ fn cancelling_model_request_is_audited_without_a_result() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -88,7 +88,6 @@ fn cancelling_model_request_is_audited_without_a_result() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -215,7 +214,7 @@ fn cancelling_approved_external_call_is_audited_without_evidence() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let (started, received) = std::sync::mpsc::channel();
     let intel = WaitingIntel(started);
     let engine = Engine::new(
@@ -229,7 +228,6 @@ fn cancelling_approved_external_call_is_audited_without_evidence() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

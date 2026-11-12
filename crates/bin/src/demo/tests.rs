@@ -18,7 +18,6 @@ fn answer_check_is_local_and_does_not_call_the_model() {
             Arc::new(LocalVerifier::from_signer(signer.as_ref())),
         ),
         Arc::new(MandatoryGuard::new().unwrap()),
-        Arc::new(JsonParser),
     );
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock)).unwrap();
     let case = engine
@@ -54,7 +53,6 @@ fn scripted_investigation_proposes_a_signed_approval_and_checkable_finding() {
             Arc::new(LocalVerifier::from_signer(signer.as_ref())),
         ),
         Arc::new(MandatoryGuard::new().unwrap()),
-        Arc::new(JsonParser),
     );
     let intel = SyntheticIntel;
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))

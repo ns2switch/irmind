@@ -1,6 +1,6 @@
 use crate::{
-    Actor, AppError, CancellationToken, Case, CaseId, CaseSeal, GraphQueryFilter, GraphRecord,
-    SignedEntry, SignedOperation, Tainted, TimelineEvent,
+    Actor, AppError, CancellationToken, Case, CaseId, CaseSeal, GraphQueryFilter, SignedEntry,
+    SignedOperation, TimelineEvent,
 };
 use irmind_domain::{ParquetArtifact, SourceManifestV1};
 use std::path::Path;
@@ -27,22 +27,6 @@ pub trait EvidenceStore: Send + Sync {
 }
 
 pub trait EvidenceGraph: Send + Sync {
-    fn index_from_parser(
-        &self,
-        id: &CaseId,
-        hash: &str,
-        source: &str,
-        bytes: &[u8],
-        parser: &dyn EventParser,
-        cancel: &CancellationToken,
-    ) -> Result<usize, AppError>;
-    fn index_records(
-        &self,
-        id: &CaseId,
-        hash: &str,
-        records: &[Tainted<GraphRecord>],
-        cancel: &CancellationToken,
-    ) -> Result<(), AppError>;
     fn graph_version(&self) -> &'static str;
     fn graph_summary(&self, id: &CaseId) -> Result<String, AppError>;
     fn timeline(&self, id: &CaseId, limit: usize) -> Result<Vec<TimelineEvent>, AppError> {
@@ -124,20 +108,6 @@ pub trait EvidenceGraph: Send + Sync {
         limit: usize,
     ) -> Result<String, AppError>;
     fn raw_record(&self, id: &CaseId, hash: &str, index: usize) -> Result<String, AppError>;
-    fn rebuild_graph(
-        &self,
-        id: &CaseId,
-        sources: &[(String, usize)],
-        parser: &dyn EventParser,
-        cancel: &CancellationToken,
-    ) -> Result<usize, AppError>;
-    fn verify_graph(
-        &self,
-        id: &CaseId,
-        sources: &[(String, usize)],
-        parser: &dyn EventParser,
-        cancel: &CancellationToken,
-    ) -> Result<usize, AppError>;
 }
 
 pub enum CaseMutation {
@@ -163,26 +133,6 @@ pub trait AuditLog: Send + Sync {
     fn lock_global_operations(&self) -> Result<Box<dyn CaseLock>, AppError>;
     fn global_operations(&self) -> Result<Vec<SignedOperation>, AppError>;
     fn append_global_operation(&self, entry: &SignedOperation) -> Result<(), AppError>;
-}
-
-pub trait EventParser: Send + Sync {
-    fn version(&self) -> &'static str;
-    fn parse_each(
-        &self,
-        source: &str,
-        bytes: &[u8],
-        cancel: &CancellationToken,
-        emit: &mut dyn FnMut(Tainted<GraphRecord>) -> Result<(), AppError>,
-    ) -> Result<usize, AppError>;
-
-    fn parse(&self, source: &str, bytes: &[u8]) -> Result<Vec<Tainted<GraphRecord>>, AppError> {
-        let mut records = Vec::new();
-        self.parse_each(source, bytes, &CancellationToken::new(), &mut |record| {
-            records.push(record);
-            Ok(())
-        })?;
-        Ok(records)
-    }
 }
 
 /// Borrowed identity; catalogs own their keys while native parsers keep static names.

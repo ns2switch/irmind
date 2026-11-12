@@ -23,7 +23,6 @@ fn analyst_siem_alert_uses_policy_custody_and_redaction() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

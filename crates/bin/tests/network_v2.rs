@@ -47,7 +47,6 @@ fn detected_network_sources_write_precise_v3_and_reconstruct() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
-            Arc::new(irmind_mod_parser_json::JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

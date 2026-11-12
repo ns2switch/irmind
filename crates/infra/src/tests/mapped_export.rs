@@ -47,7 +47,6 @@ fn setup(root: &std::path::Path) -> (Arc<LocalStore>, Engine<'static>, Arc<Local
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

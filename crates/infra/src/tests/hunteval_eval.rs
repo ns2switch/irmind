@@ -298,7 +298,7 @@ fn private_answers_are_never_ingested_or_displayed() {
         key: SigningKey::from_bytes(&[76u8; 32]),
         actor: Actor::Analyst,
     });
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -310,7 +310,6 @@ fn private_answers_are_never_ingested_or_displayed() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

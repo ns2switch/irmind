@@ -18,7 +18,6 @@ fn organization_ceiling_rejects_case_creation_and_expansion_and_limits_old_cases
             Arc::new(LocalVerifier::from_signer(signer.as_ref())),
         ),
         Arc::new(MandatoryGuard::new().unwrap()),
-        Arc::new(JsonParser),
     );
     let broad = "v2;sources=cloud;accounts=account-a;projects=project-a,project-b;hosts=;from=2026-10-23T00:00:00Z;to=2026-10-23T23:59:59Z";
     let narrow = "v2;sources=cloud;accounts=account-a;projects=project-a;hosts=;from=2026-10-23T10:00:00Z;to=2026-10-23T20:00:00Z";
@@ -88,7 +87,7 @@ fn malicious_evidence_cannot_trigger_external_call() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -100,7 +99,6 @@ fn malicious_evidence_cannot_trigger_external_call() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -170,7 +168,7 @@ fn altered_case_scope_cannot_expand_signed_policy_scope() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -182,7 +180,6 @@ fn altered_case_scope_cannot_expand_signed_policy_scope() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -212,7 +209,7 @@ fn analyst_scope_change_is_atomic_signed_and_exportable() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -224,7 +221,6 @@ fn analyst_scope_change_is_atomic_signed_and_exportable() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -276,7 +272,7 @@ fn cloudtrail_assume_role_edge_is_verified_and_queryable() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -288,7 +284,6 @@ fn cloudtrail_assume_role_edge_is_verified_and_queryable() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -326,7 +321,7 @@ fn cloudtrail_session_and_access_key_edges_are_verified_and_queryable() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -338,7 +333,6 @@ fn cloudtrail_session_and_access_key_edges_are_verified_and_queryable() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

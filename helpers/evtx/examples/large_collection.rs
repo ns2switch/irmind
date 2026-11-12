@@ -54,7 +54,6 @@ fn setup(
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new()?),
-            Arc::new(irmind_mod_parser_json::JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

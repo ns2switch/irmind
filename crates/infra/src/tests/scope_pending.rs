@@ -33,7 +33,6 @@ fn narrowed_policy_keeps_old_pending_auditable_but_blocks_its_approval() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

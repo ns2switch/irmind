@@ -12,7 +12,6 @@ use irmind_app::{
 use irmind_domain::{Actor, AuthorizedCall, ExecutionMode, ProposedCall, Tool};
 use irmind_infra::{LocalExportVerifier, LocalStore, LocalVerifier, SystemClock};
 use irmind_mod_keystore_file::FileKeystore;
-use irmind_mod_parser_json::JsonParser;
 use irmind_security::MandatoryGuard;
 use irmind_tui::{
     KeystoreStatus, ModuleKind, ModuleParameter, ModuleSelectionSource, ModuleStatus, WorkspaceIo,
@@ -224,7 +223,6 @@ fn main() -> Result<()> {
             Arc::new(LocalVerifier::from_signer(signer.as_ref())),
         ),
         Arc::new(MandatoryGuard::new()?),
-        Arc::new(JsonParser),
     );
     let intel = DemoIntel;
     let model = DemoModel(AtomicUsize::new(0));

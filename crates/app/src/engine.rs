@@ -82,7 +82,6 @@ pub struct Engine<'a> {
     pub signer: Arc<dyn Signer>,
     pub verifier: Arc<dyn Verifier>,
     pub guard: Arc<dyn ContentGuard>,
-    pub parser: Arc<dyn EventParser>,
     pub clock: Arc<dyn Clock>,
     pub mode: ExecutionMode,
     pub policy: PolicyRules,
@@ -116,7 +115,6 @@ pub struct EnginePorts {
     pub signer: Arc<dyn Signer>,
     pub verifier: Arc<dyn Verifier>,
     pub guard: Arc<dyn ContentGuard>,
-    pub parser: Arc<dyn EventParser>,
 }
 
 pub struct CryptoPorts {
@@ -138,7 +136,6 @@ impl EnginePorts {
         audit_log: Arc<dyn AuditLog>,
         crypto: CryptoPorts,
         guard: Arc<dyn ContentGuard>,
-        parser: Arc<dyn EventParser>,
     ) -> Self {
         Self {
             repo,
@@ -148,7 +145,6 @@ impl EnginePorts {
             signer: crypto.signer,
             verifier: crypto.verifier,
             guard,
-            parser,
         }
     }
 }
@@ -163,7 +159,6 @@ impl<'a> Engine<'a> {
             signer: Arc::clone(&self.signer),
             verifier: Arc::clone(&self.verifier),
             guard: Arc::clone(&self.guard),
-            parser: Arc::clone(&self.parser),
             clock: Arc::clone(&self.clock),
             mode: self.mode,
             policy: self.policy.clone(),

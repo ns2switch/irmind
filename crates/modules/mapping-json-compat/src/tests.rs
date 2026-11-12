@@ -1,6 +1,6 @@
 use super::*;
 use irmind_app::{
-    CancellationToken, EventParser, SourceDecoder,
+    CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata},
 };
 use irmind_domain::Tainted;
@@ -13,21 +13,26 @@ fn compatibility_mapping_keeps_cloud_and_generic_lookup_identities_without_class
     ] {
         let cancel = CancellationToken::new();
         let hash = irmind_app::sha256(data);
-        let mut legacy = Vec::new();
-        irmind_mod_parser_json::JsonParser.parse_each("input.json", data, &cancel,
-            &mut |r| { r.inspect(|record| legacy.push(record.clone())); Ok(()) }).unwrap();
         let mapper = JsonCompatibilityMapping::new().unwrap();
         let mut outputs = Vec::new();
         irmind_mod_parser_json::JsonSourceDecoder.decode_reader(SourceInput {
             metadata: SourceMetadata { source: &irmind_domain::SourceReferenceV1::file("input.json").unwrap(), evidence_hash: hash, time_context: None, cancel: &cancel },
             reader: &mut std::io::Cursor::new(data),
         }, &mut |source: Tainted<SourceRecordV1>| { source.inspect(|r| outputs.push(mapper.map(r).unwrap())); Ok(()) }).unwrap();
-        assert_eq!(outputs.len(), legacy.len());
-        for (output, expected) in outputs.iter().zip(&legacy) {
+        assert_eq!(outputs.len(), 1);
+        for output in &outputs {
             let actual = &output.record().indexed.record;
-            assert_eq!((&actual.entities, &actual.relations), (&expected.entities, &expected.relations));
-            assert_eq!(actual.event, expected.event);
-            assert_eq!(actual.text, expected.text);
+            assert!(actual.entities.contains(&("ip".into(), "203.0.113.77".into())));
+            if actual.event == "AssumeRole" {
+                assert!(actual.entities.contains(&("role".into(), "arn:aws:iam::111122223333:role/admin".into())));
+                assert!(actual.relations.iter().any(|r| r.relation == "assumed_role"));
+            } else {
+                assert_eq!(actual.event, "original");
+                assert!(actual.entities.contains(&("host".into(), "synthetic".into())));
+                assert!(actual.entities.contains(&("user".into(), "alice".into())));
+                assert!(actual.relations.is_empty());
+            }
+            assert!(actual.text.contains("203.0.113.77"));
             assert_eq!(output.record().common.event(), &irmind_domain::EventHeaderV1::default());
             assert!(output.record().common.observations().values().is_empty());
         }
