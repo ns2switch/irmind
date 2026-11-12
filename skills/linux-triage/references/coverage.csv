@@ -1,0 +1,6 @@
+source,question,limit
+sshd,Which identity and source attempted authentication?,Missing records cannot establish absence
+sudo,Which actor requested which target identity?,A command string is not proof of completion
+su,Which identities participated in the transition?,Preserve recorded outcome or unknown
+auditd,Which grouped records describe execution?,Incomplete groups remain partial
+journald,What did the recorded fields report?,Unmapped sources do not gain inferred categories

@@ -1,0 +1,9 @@
+channel,event_id,observation
+Security,4624,Successful sign-in
+Security,4625,Failed sign-in
+Security,4688,Process creation
+System,7045,Service installation
+PowerShell,4104,Script block observation
+Sysmon,1,Process creation with ProcessGuid when present
+Sysmon,3,Network connection
+Sysmon,13,Registry value set
