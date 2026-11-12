@@ -5,7 +5,7 @@ fn document() -> String {
     "+++\nformat = \"irmind-skill-v1\"\nname = \"windows-triage\"\ndescription = \"Review synthetic evidence.\"\nversion = \"0.1.0\"\nauthor = \"PRIVATE_AUTHOR\"\nlicense = \"MIT OR Apache-2.0\"\ntarget_schema = \"irmind-common-event-v1\"\ntools = [\"text_search\"]\nsources = [\"parser-evtx\"]\ncategories = [\"authentication\"]\ninvocable = true\n+++\n# Method\nPRIVATE_METHOD\n".into()
 }
 
-fn decode(document: &str) -> Result<DecodedSkillPackage, SkillError> {
+fn decode(document: &str) -> Result<CompiledSkill, SkillError> {
     let package = SkillPackage::new([SkillResource::new("SKILL.md", document.as_bytes())?])?;
     decode_skill_package(package)
 }

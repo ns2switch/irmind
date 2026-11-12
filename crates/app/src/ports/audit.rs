@@ -1,6 +1,10 @@
 use crate::*;
 #[derive(Debug, Error)]
 pub enum AppError {
+    #[error("skill package: {0}")]
+    SkillPackage(#[from] irmind_domain::SkillError),
+    #[error("skills: {0}")]
+    SkillService(#[from] crate::SkillServiceError),
     #[error("source preparation rejected a file")]
     SourceFailure(crate::RejectedSource),
     #[error(transparent)]

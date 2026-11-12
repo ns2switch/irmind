@@ -106,7 +106,9 @@ commitment, recompiles the exact snapshot and checks built-in identities against
 the compiled inventory. Reused version labels cannot silently replace hashes.
 The encoded record must fit the existing 1 MiB ceiling; do not increase it.
 
-Bound history to 256 installed names, 4,096 versions and 32 active skills. Validate
+Bound history to 256 installed names, 4,096 versions, 16 MiB of encoded skill
+payloads and 32 active skills. Bound each encoded record to 768 KiB, within the
+unchanged 1 MiB envelope ceiling. Validate
 those limits before signing. Installation/update/activation/deactivation are
 attended analyst actions; there is no model tool for them and no key material in
 their arguments, snapshots or diagnostics. Apply ContentGuard before safe review

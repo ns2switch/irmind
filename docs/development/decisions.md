@@ -968,3 +968,24 @@ compilation/storage ports and the signed installation family are specified in
 [the installation contract](skills-installation-contract.md) before their
 implementation. Case-use receipts and export integration require a separate
 concrete format review.
+
+## Local skill admission uses signed snapshots
+
+Context: validated skill text still needs explicit analyst authorization and a
+recoverable local publication step.
+
+Decision: use `SkillCompiler` and `SkillPackageStore` with the existing global
+Analyst operation chain. The `skill-installation-v1` payload contains the complete
+canonical package, hash, origin and per-skill previous operation. Sign before
+atomic publication; a missing or altered generation requires explicit recovery.
+Limit the encoded skill history to 16 MiB, 4,096 versions, 256 names and 32 active
+skills. A record is at most 768 KiB within the unchanged 1 MiB envelope ceiling.
+Bundled origin requires the release inventory and cannot be claimed by a local
+import. No methodology reaches the model in this installation step.
+
+Consequences: no new dependency, credential or case/export format is needed.
+Candidate directories are read without writes, symlinks or hard-link aliases.
+The filesystem adapter reuses the existing Windows handle-information query to
+check link counts through an open file; the launcher's checks remain identical.
+Unix generations use private permissions and Windows uses the existing ACL
+boundary. Skill Debug output and errors omit package content.

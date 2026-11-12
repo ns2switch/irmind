@@ -19,11 +19,27 @@ use windows_sys::Win32::Security::{
     TOKEN_QUERY, TOKEN_USER, TokenUser,
 };
 use windows_sys::Win32::Storage::FileSystem::{
-    FILE_ALL_ACCESS, MOVEFILE_WRITE_THROUGH, MoveFileExW,
+    BY_HANDLE_FILE_INFORMATION, FILE_ALL_ACCESS, FILE_ATTRIBUTE_DIRECTORY,
+    FILE_ATTRIBUTE_REPARSE_POINT, GetFileInformationByHandle, MOVEFILE_WRITE_THROUGH, MoveFileExW,
 };
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
 static ACL_UPDATE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+pub(super) fn file_information(handle: HANDLE) -> Option<BY_HANDLE_FILE_INFORMATION> {
+    let mut info = BY_HANDLE_FILE_INFORMATION::default();
+    // SAFETY: the OS validates the borrowed disk handle; output is initialized,
+    // correctly aligned and lives throughout the synchronous query.
+    (unsafe { GetFileInformationByHandle(handle, &raw mut info) } != 0).then_some(info)
+}
+
+/// Read attributes through the already-open file, without following a new path.
+pub fn regular_file_has_single_link(file: &fs::File) -> io::Result<bool> {
+    use std::os::windows::io::AsRawHandle as _;
+    let info = file_information(file.as_raw_handle()).ok_or_else(io::Error::last_os_error)?;
+    Ok(info.nNumberOfLinks == 1
+        && info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT) == 0)
+}
 
 struct Token(HANDLE);
 impl Drop for Token {

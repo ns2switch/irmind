@@ -1,15 +1,16 @@
 #![cfg(windows)]
 //! Validate non-inheritable runtime handles and read-only aliases of the inherited evidence.
+use super::filesystem::file_information;
 use std::{fs::File, io, os::windows::fs::OpenOptionsExt as _};
 use windows_sys::{
     Wdk::Foundation::{NtQueryObject, ObjectBasicInformation},
     Win32::{
         Foundation::HANDLE,
         Storage::FileSystem::{
-            BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT,
-            FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_EXECUTE,
-            FILE_GENERIC_READ, FILE_NAME_OPENED, FILE_READ_ATTRIBUTES, GetFileInformationByHandle,
-            GetFinalPathNameByHandleW, SYNCHRONIZE, VOLUME_NAME_NT,
+            FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
+            FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_EXECUTE, FILE_GENERIC_READ,
+            FILE_NAME_OPENED, FILE_READ_ATTRIBUTES, GetFinalPathNameByHandleW, SYNCHRONIZE,
+            VOLUME_NAME_NT,
         },
         System::WindowsProgramming::PUBLIC_OBJECT_BASIC_INFORMATION,
     },
@@ -110,11 +111,8 @@ fn access_mask(handle: HANDLE) -> Option<u32> {
 }
 
 fn file_identity(handle: HANDLE, directory: bool) -> Option<(u32, u32, u32)> {
-    let mut info = BY_HANDLE_FILE_INFORMATION::default();
-    // SAFETY: the OS validates the borrowed disk handle; output is initialized,
-    // correctly aligned and lives throughout the synchronous query.
-    if unsafe { GetFileInformationByHandle(handle, &raw mut info) } == 0
-        || (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0) != directory
+    let info = file_information(handle)?;
+    if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0) != directory
         || info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
     {
         return None;

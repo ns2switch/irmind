@@ -11,6 +11,28 @@ use std::{
     path::{Component, Path},
 };
 
+/// Reject multiply-linked inputs without reopening a pathname.
+pub fn regular_file_has_single_link(file: &fs::File) -> io::Result<bool> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        let metadata = file.metadata()?;
+        Ok(metadata.is_file() && metadata.nlink() == 1)
+    }
+    #[cfg(windows)]
+    {
+        windows_security::regular_file_has_single_link(file)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = file;
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "cannot verify file link count",
+        ))
+    }
+}
+
 /// Opens a regular file below an analyst-selected root without following
 /// symlinks in the selected path. A second content hash detects concurrent
 /// replacement by another process with the same user privileges.

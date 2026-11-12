@@ -78,7 +78,7 @@ impl ParquetStore {
         let case_dir = self.case_dir(spec.id)?;
         let mut source_units = std::collections::BTreeMap::new();
         for group in selected.chunks(self.workers.count()) {
-            let status = std::thread::scope(|scope| {
+            let status = std::thread::scope(|scope| -> Result<ScanStatus, AppError> {
                 let receivers = group
                     .iter()
                     .map(|artifact| {
