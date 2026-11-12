@@ -387,7 +387,7 @@ impl Engine<'_> {
                 content,
             ));
         }
-        Ok(())
+        self.refresh_skill_tools(turn)
     }
 
     async fn finish_answer(&self, id: &CaseId, text: &str) -> Result<String, AppError> {

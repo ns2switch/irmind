@@ -5,7 +5,7 @@ use irmind_app::{CancellationToken, CompiledSkill, Engine, SkillOrigin};
 use ratatui::{Terminal, backend::Backend};
 use state::{Action, Screen, State};
 use std::fmt::Write as _;
-use std::{collections::BTreeSet, path::Path, time::Duration};
+use std::{path::Path, time::Duration};
 pub(crate) enum ManagerExit {
     Back,
     Palette,
@@ -162,10 +162,7 @@ fn apply(engine: &Engine<'_>, state: &State) -> anyhow::Result<()> {
         if existing {
             engine.update_skill(store, compiler, candidate)?;
         } else {
-            let reserved = super::case::command_registry::matches("/")
-                .iter()
-                .map(|s| s.name.to_owned())
-                .collect::<BTreeSet<_>>();
+            let reserved = super::case::command_registry::reserved_names();
             engine.install_skill(store, compiler, candidate, SkillOrigin::Analyst, &reserved)?;
         }
         return Ok(());

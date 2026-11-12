@@ -96,6 +96,48 @@ impl Episode {
             hash: hash.into(),
         }
     }
+    fn conclusion(&self) -> (&'static str, &'static str) {
+        match self.name.as_str() {
+            "windows-triage" => (
+                "Recorded PowerShell launch and scheduled task creation",
+                "T1053.005",
+            ),
+            "linux-triage" => (
+                "Failed SSH login followed by accepted public-key authentication",
+                "T1078",
+            ),
+            "aws-credential-compromise" => (
+                "Recorded IAM policy attachment and role assumption",
+                "T1098",
+            ),
+            _ => unreachable!("scripted synthetic episode"),
+        }
+    }
+    fn calls(&self, round: usize) -> Vec<ModelToolCall> {
+        let mut calls = self
+            .proposal(round)
+            .map(|p| ModelToolCall::from_proposal(&format!("episode_{round}"), p).unwrap())
+            .into_iter()
+            .collect::<Vec<_>>();
+        if round == 2 {
+            calls.push(
+                ModelToolCall::from_proposal(
+                    "episode_technique",
+                    ProposedCall {
+                        tool: Tool::CaseAddFinding,
+                        args: BTreeMap::from([
+                            ("kind".into(), "technique".into()),
+                            ("value".into(), self.conclusion().1.into()),
+                            ("technique_id".into(), self.conclusion().1.into()),
+                            ("evidence_hash".into(), self.hash.clone()),
+                        ]),
+                    },
+                )
+                .unwrap(),
+            );
+        }
+        calls
+    }
     fn proposal(&self, round: usize) -> Option<ProposedCall> {
         let (tool, args) = match round {
             0 => (Tool::SkillRead, vec![("name", self.name.clone())]),
@@ -107,7 +149,7 @@ impl Episode {
                 Tool::CaseAddFinding,
                 vec![
                     ("kind", "hypothesis".into()),
-                    ("value", "Synthetic suspicious activity".into()),
+                    ("value", self.conclusion().0.into()),
                     ("evidence_hash", self.hash.clone()),
                     ("supporting_evidence", self.hash.clone()),
                 ],
@@ -146,11 +188,7 @@ impl LlmPort for Episode {
             );
         }
         requests.push(request);
-        let calls = self
-            .proposal(round)
-            .map(|p| ModelToolCall::from_proposal(&format!("episode_{round}"), p).unwrap())
-            .into_iter()
-            .collect();
+        let calls = self.calls(round);
         Ok(Box::pin(futures_util::stream::iter([Ok(
             ModelEvent::Completed {
                 response: ModelResponse {

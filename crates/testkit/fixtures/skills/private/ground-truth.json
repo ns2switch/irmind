@@ -1,0 +1,15 @@
+{
+  "private_marker": "SKILLS_EVALUATOR_ONLY_DO_NOT_INGEST",
+  "windows-triage": {
+    "conclusion": "Recorded PowerShell launch and scheduled task creation",
+    "technique": "T1053.005"
+  },
+  "linux-triage": {
+    "conclusion": "Failed SSH login followed by accepted public-key authentication",
+    "technique": "T1078"
+  },
+  "aws-credential-compromise": {
+    "conclusion": "Recorded IAM policy attachment and role assumption",
+    "technique": "T1098"
+  }
+}
