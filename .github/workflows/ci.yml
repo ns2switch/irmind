@@ -26,6 +26,7 @@ env:
   CARGO_INCREMENTAL: 0
   CARGO_TARGET_DIR: ${{ github.workspace }}/target
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_RELEASE_STRIP: symbols
 jobs:
   dco:
     runs-on: ubuntu-latest
