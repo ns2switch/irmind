@@ -8,11 +8,14 @@ shows mapping and checked row preparation on the producer's critical path.
 
 Split the existing per-source worker allowance between format decoding and pure
 mapping preparation. Each mapping lane has at most one outstanding input batch and
-bounded channels. Reserve 128 MiB per lane from the existing queue allowance.
+bounded channels. Reserve 160 MiB per lane from the existing queue allowance.
 Input batches stop at 256 records or an 8 MiB conservative retained-size charge;
-a larger valid single record is processed alone. Output frames stop at a 4 MiB
-charge, or one valid larger output. The worker waits for an acknowledgement
-after each frame is committed, preventing accumulation of oversized results.
+a larger valid single record is processed alone. Output frames stop at an 8 MiB
+charge, or one valid larger output. Each lane has four buffered result slots. Ordinary frames need no round trip;
+an oversized single output waits for acknowledgement after ordered commit
+before that worker prepares another result. The lane reservation includes the
+bounded input, queued frames and transient large output; the coordinator keeps
+its existing separate reservation.
 The domain caches the source scheduling charge during its existing tree
 validation; this derived integer is absent from canonical encoding.
 Small budgets keep the sequential path. Writer completion remains parallel as

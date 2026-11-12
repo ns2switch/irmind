@@ -1740,3 +1740,21 @@ parallel preparation, especially with one mapping lane. Bounded input/output
 batches amortize coordination in the next candidate. The
 [raw measurements](benchmark-data/mapped-record-handoff-experiment.json) retain
 stage counters and RSS; they must not be presented as an ingestion speedup.
+
+### Acknowledged output batches
+
+The [next paired release run](https://github.com/ns2switch/irmind/actions/runs/43125249521)
+uses bounded input/output batches but acknowledges every output frame. Three
+pairs again preserve complete row counts, artifact size and reconstruction.
+
+| Requested workers | Reference median | Fully acknowledged batches | Candidate/reference |
+| --- | ---: | ---: | ---: |
+| 1 | 21.431 s | 21.333 s | 0.995× |
+| 4 | 19.767 s | 22.601 s | 1.143× |
+| Automatic (3) | 20.808 s | 20.874 s | 1.003× |
+
+This coordination scheme is also rejected. Waiting for each frame prevents a
+later lane from preparing its complete bounded job. The next revision buffers
+ordinary frames and acknowledges oversized single outputs only, retaining the
+memory reservation and canonical commit order. See the
+[raw measurements](benchmark-data/mapped-acknowledged-batch-experiment.json).

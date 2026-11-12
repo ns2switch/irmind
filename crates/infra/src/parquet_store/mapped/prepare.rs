@@ -8,7 +8,7 @@ use irmind_app::source_mapping::{
 use irmind_domain::MappingIdentityV1;
 use std::{collections::BTreeMap, io::Write, num::NonZeroUsize};
 type Routes = BTreeMap<Option<MappingIdentityV1>, String>;
-const LANE_BYTES: usize = 128 * 1024 * 1024;
+const LANE_BYTES: usize = 160 * 1024 * 1024;
 mod batches;
 
 pub(super) struct OrderedOutput<'a, 'catalog> {
@@ -64,7 +64,7 @@ pub(super) fn decode_projected(
         budget.queued_bytes() - lanes * LANE_BYTES,
     );
     let transform = acc.preparer();
-    let prepare = |sources, send: &mut dyn FnMut(Vec<_>) -> Result<(), AppError>| {
+    let prepare = |sources, send: &mut dyn FnMut(Vec<_>, bool) -> Result<(), AppError>| {
         batches::prepare(sources, send, |source| {
             let prepared = {
                 let _timer = store

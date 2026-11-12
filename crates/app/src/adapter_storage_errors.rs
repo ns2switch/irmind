@@ -2,6 +2,12 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum AdapterStorageError {
+    #[error("storage: cannot start a bounded mapping worker; reduce the worker limit and retry")]
+    CannotStartMappingWorker,
+    #[error(
+        "storage: a mapping worker stopped unexpectedly; the provisional group was not committed"
+    )]
+    MappingWorkerStoppedUnexpectedly,
     #[error("storage: AWS IAM GetRole failed")]
     AWSIAMGetRoleFailed,
     #[error("storage: AWS IAM GetUser failed")]
