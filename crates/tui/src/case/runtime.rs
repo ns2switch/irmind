@@ -330,6 +330,8 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             let _case_lock = self.engine.repo.lock_case(self.id)?;
             self.state.hashes = self.engine.evidence_store.evidence_hashes(self.id)?;
             self.state.entries = self.engine.audit_log.entries(self.id)?;
+            self.state.instance_sources =
+                irmind_app::recorded_instance_sources(&self.state.entries)?;
             self.state.operations = self.engine.audit_log.operations(self.id)?;
             self.state.timeline = self.engine.graph.timeline(self.id, 30)?;
             self.state.needs_refresh = false;

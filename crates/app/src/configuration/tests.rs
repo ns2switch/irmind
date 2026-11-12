@@ -343,3 +343,25 @@ fn worker_preference_is_optional_signed_and_bounded() {
         .unwrap();
     assert_eq!(auto.fingerprint().unwrap(), defaults.fingerprint().unwrap());
 }
+
+#[test]
+fn chronicle_scope_change_always_requires_egress_confirmation_even_when_disabled() {
+    let mut current = PersistentConfig::default();
+    current
+        .modules
+        .insert("siem-chronicle".into(), ProductSettings::default());
+    let mut next = current.clone();
+    next.modules
+        .get_mut("siem-chronicle")
+        .unwrap()
+        .values
+        .insert("IRMIND_CHRONICLE_SCOPE_MODE".into(), "instance".into());
+    assert!(current.active_egress_changed(&next));
+    assert!(next.active_egress_changed(&current));
+    next.modules
+        .get_mut("siem-chronicle")
+        .unwrap()
+        .values
+        .insert("IRMIND_CHRONICLE_SCOPE_MODE".into(), "event-account".into());
+    assert!(!current.active_egress_changed(&next));
+}

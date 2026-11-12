@@ -18,7 +18,9 @@ impl<'a> Engine<'a> {
             }
         }
         self.verify_unlocked_cancelable(id, cancel)?;
-        self.repo.get_case(id)
+        let case = self.repo.get_case(id)?;
+        self.record_source_scopes_unlocked(&case)?;
+        Ok(case)
     }
 
     pub fn new(
@@ -46,6 +48,7 @@ impl<'a> Engine<'a> {
             policy: PolicyRules::default(),
             policy_fingerprint: "builtin-v1".into(),
             module_fingerprint: "none".into(),
+            source_scopes: crate::BTreeMap::new(),
             threat_intel: None,
             siems: Vec::new(),
             result_decoders: crate::BTreeMap::new(),
@@ -187,7 +190,8 @@ impl<'a> Engine<'a> {
                 id: id.clone(),
                 new_scope: new_scope.to_owned(),
             },
-        )
+        )?;
+        self.record_source_scopes_unlocked(&self.repo.get_case(id)?)
     }
 
     pub fn case_scope_exceeds_policy(&self, case: &Case) -> Result<bool, AppError> {

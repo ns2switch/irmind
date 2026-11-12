@@ -104,3 +104,6 @@ pub use artifact_catalog::{
     ArtifactCatalog, ArtifactCatalogBuilder, SealInventoryBuilder, artifact_catalog,
     seal_inventory, verify_seal_inventory_snapshot,
 };
+
+mod source_scopes;
+pub use source_scopes::{SiemScopeMode, SiemSourceScope, recorded_instance_sources};

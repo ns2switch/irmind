@@ -27,6 +27,7 @@ impl Engine<'_> {
         approved: bool,
         cancel: &CancellationToken,
     ) -> Result<(String, String), AppError> {
+        self.prepare_siem_dispatch(id, call).await?;
         let payload = if call.tool() == &Tool::ObjectRead {
             match self.object_reservation_payload(id, call).await {
                 Ok(payload) => payload,
@@ -77,6 +78,33 @@ impl Engine<'_> {
             .checked_tool_result(id, call, local_tool, cancel)
             .await?;
         self.persist_tool_result(id, call, raw, cancel).await
+    }
+
+    async fn prepare_siem_dispatch(
+        &self,
+        id: &CaseId,
+        call: &AuthorizedCall,
+    ) -> Result<(), AppError> {
+        if !matches!(call.tool(), Tool::SiemSearch | Tool::SiemGetAlert) {
+            return Ok(());
+        }
+        if let Err(error) = self.validate_source_scope(call) {
+            self.audit_local(
+                id,
+                crate::AuditOrigin::Policy,
+                AuditEventKind::Denied,
+                "instance-scoped SIEM read requires its organization ceiling",
+                None,
+            )
+            .await?;
+            return Err(error);
+        }
+        let case_id = id.clone();
+        self.blocking_local(move |local| {
+            let case = local.repo.get_case(&case_id)?;
+            local.record_source_scopes_unlocked(&case)
+        })
+        .await
     }
 
     async fn checked_tool_result(

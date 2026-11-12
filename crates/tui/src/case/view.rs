@@ -102,7 +102,9 @@ where
         draw_prompt(frame, view, sections[1], theme);
         draw_footer(frame, view, sections[2], theme);
         draw_menu(frame, view, area, sections[1], theme);
-        let overlay_area = if view.guide.is_some() && presentation_compact(area) {
+        let overlay_area = if view.status.starts_with("FULL INSTANCE SCOPE") {
+            Rect::new(area.x, area.y, area.width, sections[2].y.saturating_sub(area.y))
+        } else if view.guide.is_some() && presentation_compact(area) {
             Rect::new(area.x, area.y, area.width, sections[3].y.saturating_sub(area.y))
         } else if view.guide.is_some() { sections[0] } else { area };
         draw_overlay(frame, view, overlay_area, theme);
@@ -265,6 +267,12 @@ fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
         label.push_str(view.cost);
     }
     let mut spans = vec![Span::styled(label, theme.muted())];
+    let status = if let Some(rest) = view.status.strip_prefix("FULL INSTANCE SCOPE · ") {
+        spans.insert(0, Span::styled("FULL INSTANCE SCOPE · ", theme.warning()));
+        rest
+    } else {
+        view.status
+    };
     if view.pending > 0 {
         spans.push(Span::styled(
             format!(
@@ -281,10 +289,10 @@ fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
             theme.warning(),
         ));
     }
-    if view.status != "idle" {
+    if status != "idle" {
         spans.push(Span::styled(
-            format!(" · {}", view.status),
-            if view.status.contains("OVR") || view.status.contains("SCOPE LIMITED") {
+            format!(" · {status}"),
+            if status.contains("OVR") || status.contains("SCOPE LIMITED") {
                 theme.warning()
             } else {
                 theme.muted()

@@ -22,6 +22,7 @@ pub struct ModuleRegistry {
     parser_variants: Vec<Arc<dyn LogParser>>,
     unavailable_parsers: BTreeMap<String, String>,
     siems: Vec<Box<dyn SiemPort>>,
+    source_scopes: BTreeMap<String, crate::SiemSourceScope>,
     result_decoders: BTreeMap<String, Arc<dyn crate::SourceDecoder>>,
     edrs: Vec<Box<dyn EdrPort>>,
     cloud_audits: Vec<Box<dyn CloudAuditPort>>,
@@ -56,12 +57,13 @@ impl ModuleRegistry {
         let mut staged = Self::new();
         module.register(&mut staged, config)?;
         self.validate_staged(manifest, &staged)?;
-        for definition in staged.definition_variants {
+        for definition in &staged.definition_variants {
             self.source_decoders
                 .push(Arc::clone(definition.compiled().decoder()));
             self.source_mappers
                 .push(Arc::clone(definition.compiled().extraction_mapper()));
         }
+        self.register_siem_scopes(&staged, manifest, config)?;
         for port in &staged.siems {
             if let Some(decoder) = staged
                 .source_decoders
@@ -93,6 +95,39 @@ impl ModuleRegistry {
             self.parsers.insert(port.identity().name.to_owned(), port);
         }
         self.manifests.insert(manifest.id, manifest);
+        Ok(())
+    }
+
+    fn register_siem_scopes(
+        &mut self,
+        staged: &Self,
+        manifest: &ModuleManifest,
+        config: &ModuleConfig,
+    ) -> Result<(), AppError> {
+        for port in &staged.siems {
+            let scope = staged
+                .source_scopes
+                .get(port.source_id())
+                .cloned()
+                .map_or_else(
+                    || crate::SiemSourceScope::event_account(port.source_id(), manifest.id),
+                    Ok,
+                )?;
+            if scope.module() != manifest.id {
+                return Err(mapping_error());
+            }
+            let public = manifest
+                .config
+                .iter()
+                .filter(|field| !field.secret)
+                .filter_map(|field| config.value(field.name).map(|value| (field.name, value)))
+                .collect::<BTreeMap<_, _>>();
+            let canonical = serde_json::to_vec(&public).map_err(|_| mapping_error())?;
+            self.source_scopes.insert(
+                port.source_id().into(),
+                scope.with_configuration_hash(sha256(&canonical)),
+            );
+        }
         Ok(())
     }
 
@@ -353,6 +388,21 @@ impl ModuleRegistry {
         ))
     }
 
+    /// Bind non-secret effective scope metadata to a registered SIEM source.
+    pub fn add_siem_scope(&mut self, scope: crate::SiemSourceScope) -> Result<(), AppError> {
+        scope.validate()?;
+        if !self
+            .siems
+            .iter()
+            .any(|port| port.source_id() == scope.source())
+            || self.source_scopes.contains_key(scope.source())
+        {
+            return Err(mapping_error());
+        }
+        self.source_scopes.insert(scope.source().into(), scope);
+        Ok(())
+    }
+
     pub fn bind<'a>(&'a self, mut engine: Engine<'a>) -> Result<Engine<'a>, AppError> {
         for port in &self.siems {
             engine = engine.with_siem(port.as_ref())?;
@@ -373,6 +423,7 @@ impl ModuleRegistry {
             engine = engine.with_object_source(port.as_ref())?;
         }
         engine.result_decoders.clone_from(&self.result_decoders);
+        engine.source_scopes.extend(self.source_scopes.clone());
         engine.with_module_fingerprint(self.fingerprint())
     }
 

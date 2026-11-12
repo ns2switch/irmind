@@ -41,9 +41,10 @@ impl SourceDecoder for ChronicleSourceDecoder {
         }
         let fields =
             decode_json_fields(&bytes, SourceJsonLimits::default()).map_err(|_| invalid())?;
-        let hits = match fields.field("events") {
-            Some(SourceValue::Array(events)) => events.as_slice(),
-            None => &[],
+        let (hits, detection) = match (fields.field("events"), fields.field("detections")) {
+            (Some(SourceValue::Array(events)), None) => (events.as_slice(), false),
+            (None, Some(SourceValue::Array(events))) => (events.as_slice(), true),
+            (None, None) => (&[][..], false),
             _ => return Err(invalid()),
         };
         if hits.len() > 20 {
@@ -63,6 +64,7 @@ impl SourceDecoder for ChronicleSourceDecoder {
                 report.accepted as u64,
                 ordinal as u64,
                 input.metadata,
+                detection,
             ) {
                 Ok(record) => {
                     emit(record)?;
@@ -81,13 +83,18 @@ fn record(
     index: u64,
     ordinal: u64,
     metadata: irmind_app::source_mapping::SourceMetadata<'_>,
+    detection: bool,
 ) -> Result<Tainted<SourceRecordV1>, AppError> {
-    let timestamp = fields
-        .field("udm")
-        .and_then(|v| v.field("metadata"))
-        .and_then(|v| v.field("eventTimestamp"))
-        .and_then(SourceValue::as_text)
-        .ok_or_else(invalid)?;
+    let timestamp = if detection {
+        fields.field("detectionTime")
+    } else {
+        fields
+            .field("udm")
+            .and_then(|v| v.field("metadata"))
+            .and_then(|v| v.field("eventTimestamp"))
+    }
+    .and_then(SourceValue::as_text)
+    .ok_or_else(invalid)?;
     let time = IndexedTime::from_rfc3339(timestamp, false).map_err(|_| invalid())?;
     let origin = EventOrigin::try_new(
         EvidenceHash::from_bytes(metadata.evidence_hash),
@@ -97,7 +104,12 @@ fn record(
         "chronicle-source-v1",
     )
     .map_err(|_| invalid())?;
-    let format = SourceFormatV1::try_new("chronicle-udm", "chronicle-source-v1", BTreeMap::new())
+    let dataset = if detection {
+        "chronicle-detection"
+    } else {
+        "chronicle-udm"
+    };
+    let format = SourceFormatV1::try_new(dataset, "chronicle-source-v1", BTreeMap::new())
         .map_err(|_| invalid())?;
     let annotations = DecodeAnnotationsV1::try_new(
         false,

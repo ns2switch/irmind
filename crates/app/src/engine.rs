@@ -46,11 +46,11 @@ pub fn verify_case_metadata(
     }
     let mut current = created.scope;
     CaseScope::parse(&current).map_err(|_| AppError::InvalidChain(first.seq))?;
-    for entry in entries
-        .iter()
-        .skip(1)
-        .filter(|entry| entry.kind == irmind_domain::AuditEventKind::CaseScopeChanged)
-    {
+    for entry in entries.iter().skip(1) {
+        if entry.kind != irmind_domain::AuditEventKind::CaseScopeChanged {
+            crate::source_scopes::verify_entry(entry, &current)?;
+            continue;
+        }
         let change: ScopeChangedEvent =
             serde_json::from_str(&entry.payload).map_err(|_| AppError::InvalidChain(entry.seq))?;
         if entry.actor != Actor::Analyst
@@ -88,6 +88,7 @@ pub struct Engine<'a> {
     pub policy: PolicyRules,
     pub(crate) policy_fingerprint: String,
     pub(crate) module_fingerprint: String,
+    pub(crate) source_scopes: BTreeMap<String, crate::SiemSourceScope>,
     pub(crate) threat_intel: Option<&'a dyn ThreatIntelPort>,
     pub(crate) siems: Vec<&'a dyn SiemPort>,
     pub(crate) result_decoders: BTreeMap<String, Arc<dyn crate::SourceDecoder>>,
@@ -168,6 +169,7 @@ impl<'a> Engine<'a> {
             policy: self.policy.clone(),
             policy_fingerprint: self.policy_fingerprint.clone(),
             module_fingerprint: self.module_fingerprint.clone(),
+            source_scopes: self.source_scopes.clone(),
             threat_intel: None,
             siems: Vec::new(),
             result_decoders: self.result_decoders.clone(),
@@ -245,6 +247,10 @@ impl<'a> Engine<'a> {
                 crate::FixedAppError::PolicyDuplicateSIEMSource,
             ));
         }
+        self.source_scopes.insert(
+            port.source_id().into(),
+            crate::SiemSourceScope::event_account(port.source_id(), "siem")?,
+        );
         self.siems.push(port);
         Ok(self)
     }

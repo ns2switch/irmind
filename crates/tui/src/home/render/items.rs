@@ -307,6 +307,12 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
             field,
             value,
         } => {
+            if module == "siem-chronicle" && field == "IRMIND_CHRONICLE_SCOPE_MODE" {
+                if value == "instance" {
+                    return "Chronicle FULL INSTANCE scope: includes every event account; the organization ceiling still applies".into();
+                }
+                return "Chronicle event-account scope: searches retain an account predicate; detection reads are disabled".into();
+            }
             format!("set {module}.{field}={value}")
         }
         irmind_app::ConfigChange::SetCertificateAuthority {

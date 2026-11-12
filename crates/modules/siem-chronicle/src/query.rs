@@ -37,11 +37,16 @@ impl Chronicle {
             ),
             SiemOperator::Prefix => format!("{} = {}", field(query.field()), prefix(query.value())),
         };
-        let mut text = format!(
-            "{} = {} AND ({predicate})",
-            self.account_field,
-            literal(account)?
-        );
+        let mut text = if self.scope_mode == irmind_app::SiemScopeMode::EventAccount {
+            format!(
+                "{} = {} AND ({predicate})",
+                self.account_field,
+                literal(account)?
+            )
+        } else {
+            self.check_scope(call)?;
+            format!("({predicate})")
+        };
         append_aggregation(&mut text, &query)?;
         let mut url = self
             .endpoint
