@@ -1,0 +1,695 @@
+{
+  "all_ingest_goals_met": true,
+  "criteria": "analyst-v3-absolute-v1",
+  "passed": true,
+  "run_url": "https://github.com/ns2switch/irmind/actions/runs/43131697106",
+  "scenarios": [
+    {
+      "deliberate_worst_path": {
+        "error": false,
+        "time_budget": true,
+        "truncated": true
+      },
+      "ingest_gate_required": true,
+      "ingest_goal_met": true,
+      "ingest_target_ns": 900000000000,
+      "ordinary_queries_successful": true,
+      "ordinary_query_p95_ns": [
+        {
+          "p95_ns": 5226366668,
+          "query": "entity",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 115646812,
+          "query": "neighbors",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 111105873,
+          "query": "path",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 3509371741,
+          "query": "term",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 493239110,
+          "query": "timeline",
+          "scope": "all"
+        }
+      ],
+      "passed": true,
+      "scenario": "cloud",
+      "wall_ns": 489607522456
+    },
+    {
+      "deliberate_worst_path": null,
+      "ingest_gate_required": true,
+      "ingest_goal_met": true,
+      "ingest_target_ns": 1350000000000,
+      "ordinary_queries_successful": true,
+      "ordinary_query_p95_ns": [
+        {
+          "p95_ns": 4990955291,
+          "query": "entity",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 100316350,
+          "query": "neighbors",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 100210543,
+          "query": "path",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 2703836729,
+          "query": "term",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 305176732,
+          "query": "timeline",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 5409991011,
+          "query": "entity",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 111863351,
+          "query": "neighbors",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 111885061,
+          "query": "path",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 2801059891,
+          "query": "term",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 306661711,
+          "query": "timeline",
+          "scope": "endpoint-0000"
+        }
+      ],
+      "passed": true,
+      "scenario": "endpoint-1",
+      "wall_ns": 994823539125
+    },
+    {
+      "deliberate_worst_path": null,
+      "ingest_gate_required": true,
+      "ingest_goal_met": true,
+      "ingest_target_ns": 900000000000,
+      "ordinary_queries_successful": true,
+      "ordinary_query_p95_ns": [
+        {
+          "p95_ns": 4561382608,
+          "query": "entity",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 88422009,
+          "query": "neighbors",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 86718757,
+          "query": "path",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 5082682224,
+          "query": "term",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 712157685,
+          "query": "timeline",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 4883841868,
+          "query": "entity",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 95832515,
+          "query": "neighbors",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 94801028,
+          "query": "path",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 4726785853,
+          "query": "term",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 720768892,
+          "query": "timeline",
+          "scope": "endpoint-0000"
+        }
+      ],
+      "passed": true,
+      "scenario": "endpoint-1-chronological",
+      "wall_ns": 379372994521
+    },
+    {
+      "deliberate_worst_path": null,
+      "ingest_gate_required": true,
+      "ingest_goal_met": true,
+      "ingest_target_ns": 1350000000000,
+      "ordinary_queries_successful": true,
+      "ordinary_query_p95_ns": [
+        {
+          "p95_ns": 196300498,
+          "query": "entity",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 40323491,
+          "query": "neighbors",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 39936703,
+          "query": "path",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 2401863064,
+          "query": "term",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 307740463,
+          "query": "timeline",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 170187108,
+          "query": "entity",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 35502429,
+          "query": "neighbors",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 36037854,
+          "query": "path",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 294952746,
+          "query": "term",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 843126083,
+          "query": "timeline",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 172116961,
+          "query": "entity",
+          "scope": "endpoint-1023"
+        },
+        {
+          "p95_ns": 36020391,
+          "query": "neighbors",
+          "scope": "endpoint-1023"
+        },
+        {
+          "p95_ns": 36655659,
+          "query": "path",
+          "scope": "endpoint-1023"
+        },
+        {
+          "p95_ns": 292640844,
+          "query": "term",
+          "scope": "endpoint-1023"
+        },
+        {
+          "p95_ns": 845074816,
+          "query": "timeline",
+          "scope": "endpoint-1023"
+        }
+      ],
+      "passed": true,
+      "scenario": "endpoint-1024",
+      "wall_ns": 970564192930
+    },
+    {
+      "deliberate_worst_path": null,
+      "ingest_gate_required": true,
+      "ingest_goal_met": true,
+      "ingest_target_ns": 900000000000,
+      "ordinary_queries_successful": true,
+      "ordinary_query_p95_ns": [
+        {
+          "p95_ns": 176994532,
+          "query": "entity",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 29453231,
+          "query": "neighbors",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 51769230,
+          "query": "path",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 3698557286,
+          "query": "term",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 689761134,
+          "query": "timeline",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 197935698,
+          "query": "entity",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 27389240,
+          "query": "neighbors",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 26970426,
+          "query": "path",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 622496478,
+          "query": "term",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 1792772906,
+          "query": "timeline",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 161569158,
+          "query": "entity",
+          "scope": "endpoint-1023"
+        },
+        {
+          "p95_ns": 27116997,
+          "query": "neighbors",
+          "scope": "endpoint-1023"
+        },
+        {
+          "p95_ns": 26185594,
+          "query": "path",
+          "scope": "endpoint-1023"
+        },
+        {
+          "p95_ns": 692088478,
+          "query": "term",
+          "scope": "endpoint-1023"
+        },
+        {
+          "p95_ns": 1791460538,
+          "query": "timeline",
+          "scope": "endpoint-1023"
+        }
+      ],
+      "passed": true,
+      "scenario": "endpoint-1024-chronological",
+      "wall_ns": 339330993040
+    },
+    {
+      "deliberate_worst_path": null,
+      "ingest_gate_required": false,
+      "ingest_goal_met": true,
+      "ingest_target_ns": 1350000000000,
+      "ordinary_queries_successful": true,
+      "ordinary_query_p95_ns": [
+        {
+          "p95_ns": 188266802,
+          "query": "entity",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 36681616,
+          "query": "neighbors",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 36179661,
+          "query": "path",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 2085532138,
+          "query": "term",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 283709663,
+          "query": "timeline",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 153584624,
+          "query": "entity",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 32059798,
+          "query": "neighbors",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 37576086,
+          "query": "path",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 271568221,
+          "query": "term",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 765176674,
+          "query": "timeline",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 161396678,
+          "query": "entity",
+          "scope": "endpoint-1024"
+        },
+        {
+          "p95_ns": 30008210,
+          "query": "neighbors",
+          "scope": "endpoint-1024"
+        },
+        {
+          "p95_ns": 34434162,
+          "query": "path",
+          "scope": "endpoint-1024"
+        },
+        {
+          "p95_ns": 274970847,
+          "query": "term",
+          "scope": "endpoint-1024"
+        },
+        {
+          "p95_ns": 794743219,
+          "query": "timeline",
+          "scope": "endpoint-1024"
+        }
+      ],
+      "passed": true,
+      "scenario": "endpoint-1025",
+      "wall_ns": 1072136509089
+    },
+    {
+      "deliberate_worst_path": null,
+      "ingest_gate_required": true,
+      "ingest_goal_met": true,
+      "ingest_target_ns": 900000000000,
+      "ordinary_queries_successful": true,
+      "ordinary_query_p95_ns": [
+        {
+          "p95_ns": 220974008,
+          "query": "entity",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 42804402,
+          "query": "neighbors",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 42343719,
+          "query": "path",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 5806411820,
+          "query": "term",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 794286599,
+          "query": "timeline",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 199071216,
+          "query": "entity",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 37994528,
+          "query": "neighbors",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 37849110,
+          "query": "path",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 770936956,
+          "query": "term",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 2219452613,
+          "query": "timeline",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 197343180,
+          "query": "entity",
+          "scope": "endpoint-1024"
+        },
+        {
+          "p95_ns": 37932631,
+          "query": "neighbors",
+          "scope": "endpoint-1024"
+        },
+        {
+          "p95_ns": 37798000,
+          "query": "path",
+          "scope": "endpoint-1024"
+        },
+        {
+          "p95_ns": 765932022,
+          "query": "term",
+          "scope": "endpoint-1024"
+        },
+        {
+          "p95_ns": 2220429745,
+          "query": "timeline",
+          "scope": "endpoint-1024"
+        }
+      ],
+      "passed": true,
+      "scenario": "endpoint-1025-chronological",
+      "wall_ns": 426365536288
+    },
+    {
+      "deliberate_worst_path": null,
+      "ingest_gate_required": true,
+      "ingest_goal_met": true,
+      "ingest_target_ns": 1350000000000,
+      "ordinary_queries_successful": true,
+      "ordinary_query_p95_ns": [
+        {
+          "p95_ns": 313420402,
+          "query": "entity",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 38260510,
+          "query": "neighbors",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 37873921,
+          "query": "path",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 2181756561,
+          "query": "term",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 258287591,
+          "query": "timeline",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 84705946,
+          "query": "entity",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 37661830,
+          "query": "neighbors",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 37183828,
+          "query": "path",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 46847337,
+          "query": "term",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 15027682,
+          "query": "timeline",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 76550974,
+          "query": "entity",
+          "scope": "endpoint-0063"
+        },
+        {
+          "p95_ns": 36534573,
+          "query": "neighbors",
+          "scope": "endpoint-0063"
+        },
+        {
+          "p95_ns": 42339789,
+          "query": "path",
+          "scope": "endpoint-0063"
+        },
+        {
+          "p95_ns": 41202112,
+          "query": "term",
+          "scope": "endpoint-0063"
+        },
+        {
+          "p95_ns": 18772504,
+          "query": "timeline",
+          "scope": "endpoint-0063"
+        }
+      ],
+      "passed": true,
+      "scenario": "endpoint-64",
+      "wall_ns": 1099335590229
+    },
+    {
+      "deliberate_worst_path": null,
+      "ingest_gate_required": true,
+      "ingest_goal_met": true,
+      "ingest_target_ns": 900000000000,
+      "ordinary_queries_successful": true,
+      "ordinary_query_p95_ns": [
+        {
+          "p95_ns": 406449216,
+          "query": "entity",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 48879229,
+          "query": "neighbors",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 50001911,
+          "query": "path",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 6139188800,
+          "query": "term",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 633544900,
+          "query": "timeline",
+          "scope": "all"
+        },
+        {
+          "p95_ns": 104436350,
+          "query": "entity",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 47514998,
+          "query": "neighbors",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 47742336,
+          "query": "path",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 111880556,
+          "query": "term",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 24040762,
+          "query": "timeline",
+          "scope": "endpoint-0000"
+        },
+        {
+          "p95_ns": 92516556,
+          "query": "entity",
+          "scope": "endpoint-0063"
+        },
+        {
+          "p95_ns": 48300242,
+          "query": "neighbors",
+          "scope": "endpoint-0063"
+        },
+        {
+          "p95_ns": 47893146,
+          "query": "path",
+          "scope": "endpoint-0063"
+        },
+        {
+          "p95_ns": 101967350,
+          "query": "term",
+          "scope": "endpoint-0063"
+        },
+        {
+          "p95_ns": 21827665,
+          "query": "timeline",
+          "scope": "endpoint-0063"
+        }
+      ],
+      "passed": true,
+      "scenario": "endpoint-64-chronological",
+      "wall_ns": 432425153369
+    }
+  ]
+}

@@ -1831,3 +1831,46 @@ exclusive sequential CPU fraction. Pure mapping can overlap, but ordered
 admission and substantial producer work still limit scaling. No source, disk,
 record or memory limit was reduced to run this workload. See the
 [machine-readable samples](benchmark-data/mapped-buffered-4gib-profile.json).
+
+### Complete sole-V3 release matrix
+
+The [reference run](https://github.com/ns2switch/irmind/actions/runs/43131697106)
+and [buffered candidate run](https://github.com/ns2switch/irmind/actions/runs/43137002958)
+each measure the complete nine-scenario matrix in release mode on standard
+four-core Ubuntu 24.04 runners. These are separate jobs, one full repetition per
+scenario; they are absolute-gate evidence, not paired speedup estimates. The
+paired 1 GiB and 4 GiB runs above isolate the mapping change.
+
+| Scenario | Reference ingestion s | Candidate ingestion s | Goal s | Candidate maximum ordinary p95 s | Result |
+| --- | ---: | ---: | ---: | ---: | --- |
+| cloud | 489.608 | 467.421 | 900 | 5.465 | Pass |
+| endpoint-1 | 994.824 | 999.885 | 1350 | 5.445 | Pass |
+| endpoint-1-chronological | 379.373 | 366.087 | 900 | 4.933 | Pass |
+| endpoint-1024 | 970.564 | 1030.540 | 1350 | 1.900 | Pass |
+| endpoint-1024-chronological | 339.331 | 440.642 | 900 | 6.256 | Pass |
+| endpoint-1025 | 1072.137 | 1043.052 | 1350 | 3.076 | Pass |
+| endpoint-1025-chronological | 426.366 | 367.911 | 900 | 4.215 | Pass |
+| endpoint-64 | 1099.336 | 1060.117 | 1350 | 2.554 | Pass |
+| endpoint-64-chronological | 432.425 | 366.855 | 900 | 4.126 | Pass |
+
+Every ingestion goal is met, including the 1,025-host stress scenario whose
+ingestion gate was separately waived. Every ordinary query succeeds below 10 s
+in unfiltered, first-host and last-host scopes, with unchanged result, sampling,
+hop and expansion limits. The deliberate worst-case cloud path remains a
+separate budget-truncated partial result without an error; it is not an ordinary
+query success. Both runs pass deterministic HuntEval evaluation.
+
+Initial ingestion retains zero inactive-parent bytes in all nine scenarios. No
+initial compaction is used. Candidate cloud active artifacts occupy 2,692,302,935
+bytes; the 64-host chronological and disordered cases occupy 2,851,654,003 and
+1,318,370,300 bytes. Sampled temporary disk peaks in those three scenarios are
+91,342,232, 96,952,748 and 442,326,375 bytes (100 ms interval, no scan errors).
+
+The numeric records retain ingestion, mapping, projection, sorting, writing,
+custody, active/retained disk, every scoped query p50/p95 and HuntEval recall.
+Cumulative stage wall timers overlap across sources and include nested work;
+they cannot be summed into an exclusive CPU percentage. Current format goldens
+and artifact/chain determinism tests remain pinned.
+
+- [Reference metrics](benchmark-data/sole-v3-baseline-15gb.json) and [evaluated gates](benchmark-data/sole-v3-baseline-15gb-gates.json).
+- [Candidate metrics](benchmark-data/buffered-v3-15gb.json) and [evaluated gates](benchmark-data/buffered-v3-15gb-gates.json).
