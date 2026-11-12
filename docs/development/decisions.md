@@ -860,3 +860,21 @@ produce identical protocol bytes, provenance and signed artifacts. Windows
 keeps serial source scheduling and its one verified network witness per session.
 A sink error disconnects all bounded producers before joining. Native probes
 also verify restrictions from a child thread before the parser is available.
+## Bounded pure mapping preparation
+
+Context: paired release profiles place checked source mapping and row projection
+on the producer path. Record-sized and fully acknowledged handoffs add more
+coordination cost than they save.
+
+Decision: reserve mapping lanes from the existing source CPU/memory allowance.
+Batch bounded inputs and ordinary outputs; acknowledge oversized single outputs
+before preparing another. An opaque preparation binds the source, provenance
+and exact frozen catalog. Canonical admission, commitment updates, partition
+allocation and append stay ordered; writer completion stays parallel.
+
+Consequences: no dependency, port signature, current format or physical golden
+changes. Cancellation closes both channel directions before joining workers.
+Stage timers are overlapping elapsed counters, not exclusive CPU fractions.
+The [release measurements](benchmarks.md#buffered-ordered-mapping-preparation)
+report the gain and remaining producer waits; the [design](bounded-parallel-mapping.md)
+fixes the queue and retained-memory budgets.
