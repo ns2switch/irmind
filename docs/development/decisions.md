@@ -878,3 +878,34 @@ Stage timers are overlapping elapsed counters, not exclusive CPU fractions.
 The [release measurements](benchmarks.md#buffered-ordered-mapping-preparation)
 report the gain and remaining producer waits; the [design](bounded-parallel-mapping.md)
 fixes the queue and retained-memory budgets.
+
+
+## Retired buffered graph contracts
+
+Context: the signed source-decoder/mapping pipeline is the only ingestion route;
+buffered parser and graph construction signatures only retained rejected calls.
+
+Decision: remove `EventParser`, its engine field/constructor argument and
+`EvidenceGraph::{index_from_parser,index_records,rebuild_graph,verify_graph}`.
+Keep detector metadata, current graph queries and signed Parquet verification.
+
+Consequences: old rejected implementations and unused fakes disappear. Current
+format bytes and goldens stay pinned; no permission, verification or limit is
+removed. Projection contracts run through the identified decoder and mapping.
+
+## Explicit full-instance Chronicle scope
+
+Context: detection listing supports an instance and time window, but cannot
+apply the UDM event-account predicate used by structured searches.
+
+Decision: keep `event-account` as the default and require explicit, analyst-only
+`instance` configuration for detections. The account argument then identifies
+the exact hosting project. Case and organization scope must authorize it and the
+source. Mode changes are signed and confirmed; bounded partial results stay
+explicit. Record effective source modes in signed case activation details and
+retain a permanent full-instance warning in the TUI and the exported chain.
+
+Consequences: ordinary event-account searches keep their mandatory account
+predicate and cannot fetch detections. Model tools cannot change configuration.
+Instance mode makes tenant-wide coverage explicit; it grants no write action or
+ability to exceed the organization ceiling.

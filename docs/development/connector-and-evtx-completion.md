@@ -121,6 +121,28 @@ UDM search records are decoded to `SourceRecordV1` with original field types and
 explicit provenance. A separate mapping owns the UDM-to-common-event mapping.
 No borrowed ECS compatibility projection invents UDM field meaning.
 
+### Case-local scope record and analyst-only configuration
+
+Scope mode is an analyst configuration field, not a tool argument. No model tool
+can select it or write connector settings. Installing or changing the mode uses
+the signed global configuration operation and explicit egress confirmation;
+instance mode explains that it includes every event account in that instance.
+
+The release registry carries the effective SIEM source descriptors into the
+engine without extending `SiemPort`. On opening an unsealed case and before a
+remote execution, record relevant source modes in versioned `ModulesActivated`
+details, sorted by source ID and bound to the configured instance/project and
+case scope. Existing fingerprint-only `ModulesActivated` payloads keep their
+bytes. The signed-entry envelope, seal and export encodings do not change.
+Package exports include the case chain and therefore these scope details.
+
+The case view permanently shows a full-instance warning when its signed source
+records include instance mode. The warning survives scrolling, inactive
+connectors and reopening; the scope detail lists the exact source and namespace.
+Sealed cases retain their recorded modes without appending new case entries.
+Tests cover an obedient fake model attempting a mode change, a persistent TUI
+warning, organization-ceiling denial and exported signed scope details.
+
 ## EVTX: bounded chunk decoding inside the existing helper
 
 The existing `SourceDecoder::decode_with_budget` contract already supplies the
