@@ -58,6 +58,13 @@ mod specs;
 pub(crate) use skills::{help_with_skills, matches_with_skills, skill_help};
 use specs::COMMANDS;
 
+pub(crate) fn reserved_names() -> std::collections::BTreeSet<String> {
+    COMMANDS
+        .iter()
+        .map(|command| command.name.to_owned())
+        .collect()
+}
+
 pub(crate) fn matches(query: &str) -> Vec<&'static Command> {
     let needle = query.trim_start_matches('/').to_ascii_lowercase();
     let mut found = COMMANDS
@@ -82,7 +89,10 @@ pub(crate) fn help() -> String {
     let mut output = String::from(
         "Enter confirm/send · Esc cancel/back · arrows select · Tab complete · PgUp/PgDn scroll · Ctrl+C confirm exit · Ctrl+K commands · Ctrl+O detail\nCommands:\n",
     );
-    for command in COMMANDS {
+    for command in COMMANDS
+        .iter()
+        .filter(|c| c.slash || !c.shortcut.is_empty())
+    {
         let suffix = if command.slash && !command.shortcut.is_empty() {
             format!(" ({})", command.shortcut)
         } else {

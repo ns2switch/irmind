@@ -48,6 +48,22 @@ impl Engine<'_> {
             call.id().into(),
             untrusted_user_message(&result, &turn.nonce).content,
         ));
+        self.refresh_skill_tools(turn)
+    }
+    pub(super) fn refresh_skill_tools(&self, turn: &mut TurnContext) -> Result<(), AppError> {
+        let active = turn
+            .skills
+            .lock()
+            .map_err(|_| crate::SkillServiceError::InvalidReceipt)?
+            .active
+            .clone();
+        if let Some(active) = active {
+            turn.catalog = self
+                .available_tools()
+                .into_iter()
+                .filter(|tool| tool.name == "skill_read" || active.tools.contains(tool.name))
+                .collect();
+        }
         Ok(())
     }
     pub(super) async fn read_turn_skill(

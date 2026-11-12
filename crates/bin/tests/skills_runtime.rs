@@ -9,9 +9,7 @@
 mod current_sources;
 #[path = "skills_runtime/mod.rs"]
 mod support;
-use irmind_app::{
-    AuditLog, CancellationToken, ExportVerifier, FindingKind, LargeCaseUseCases, MessageRole,
-};
+use irmind_app::{CancellationToken, ExportVerifier, FindingKind, LargeCaseUseCases, MessageRole};
 use irmind_domain::{Actor, AuditEventKind};
 use support::*;
 
@@ -40,7 +38,6 @@ fn three_bundled_methods_complete_scripted_synthetic_investigations_and_v7_expor
         episode(name, parser, fixture, term);
     }
 }
-#[allow(clippy::too_many_lines)]
 fn episode(name: &str, parser_id: &str, fixture: &str, term: &str) {
     let root = tempfile::tempdir().unwrap();
     let (store, engine) = setup(root.path());
@@ -74,8 +71,24 @@ fn episode(name: &str, parser_id: &str, fixture: &str, term: &str) {
         )
         .unwrap();
     assert!(answer.contains(&hash));
+    check_requests(name, &model);
+    confirm_expected(name, &engine, &case.id);
+    seal_export(name, &engine, store.as_ref(), &case, root.path());
+}
+
+fn check_requests(name: &str, model: &Episode) {
     let requests = model.requests.lock().unwrap();
     assert_eq!(requests.len(), 4);
+    let names = requests[1]
+        .tools
+        .iter()
+        .map(|tool| tool.name)
+        .collect::<Vec<_>>();
+    assert!(names.contains(&"skill_read"));
+    assert!(names.contains(&"text_search"));
+    assert!(!names.contains(&"evidence_search"));
+    assert!(!names.contains(&"ti_lookup_external"));
+
     assert!(
         requests[0]
             .messages
@@ -90,6 +103,12 @@ fn episode(name: &str, parser_id: &str, fixture: &str, term: &str) {
     );
     for request in requests.iter() {
         request.validate().unwrap();
+        assert!(
+            !request
+                .messages
+                .iter()
+                .any(|m| m.content.contains("SKILLS_EVALUATOR_ONLY_DO_NOT_INGEST"))
+        );
         for message in &request.messages {
             if message.role == MessageRole::System {
                 assert!(!message.content.contains("## Establish coverage"));
@@ -103,7 +122,10 @@ fn episode(name: &str, parser_id: &str, fixture: &str, term: &str) {
         }
     }
     drop(requests);
-    let entries = store.entries(&case.id).unwrap();
+}
+
+fn confirm_expected(name: &str, engine: &irmind_app::Engine<'_>, id: &irmind_app::CaseId) {
+    let entries = engine.audit_log.entries(id).unwrap();
     let snapshot = entries
         .iter()
         .find(|e| e.kind == AuditEventKind::SkillSnapshotV1)
@@ -119,23 +141,57 @@ fn episode(name: &str, parser_id: &str, fixture: &str, term: &str) {
     assert!(
         engine
             .add_finding(
-                &case.id,
+                id,
                 FindingKind::Hypothesis,
                 "Methodology is not evidence",
                 &irmind_app::hex(package.package().unwrap().hash().as_bytes())
             )
             .is_err()
     );
-    let findings = engine.findings(&case.id).unwrap();
-    assert_eq!(findings.len(), 1);
-    assert!(!findings[0].confirmed);
-    engine.confirm_finding(&case.id, &findings[0].id).unwrap();
+    let findings = engine.findings(id).unwrap();
+    // The evaluator reads answers only after the investigation; neither ingestion
+    // nor the scripted model receives the private fixture.
+    let expected: serde_json::Value = serde_json::from_str(include_str!(
+        "../../testkit/fixtures/skills/private/ground-truth.json"
+    ))
+    .unwrap();
+    assert_eq!(findings.len(), 2);
+    assert!(
+        findings
+            .iter()
+            .any(|f| f.kind == FindingKind::Hypothesis && f.value == expected[name]["conclusion"])
+    );
+    assert!(
+        findings
+            .iter()
+            .any(|f| f.kind == FindingKind::Technique && f.value == expected[name]["technique"])
+    );
+    assert!(!engine.audit_log.entries(id).unwrap().iter().any(|e| {
+        e.payload
+            .contains(expected["private_marker"].as_str().unwrap())
+    }));
+    for finding in &findings {
+        assert!(!finding.confirmed);
+        engine.confirm_finding(id, &finding.id).unwrap();
+    }
+    let report = engine.report(id).unwrap();
+    assert!(report.contains(expected[name]["conclusion"].as_str().unwrap()));
+    assert!(report.contains(expected[name]["technique"].as_str().unwrap()));
+}
+
+fn seal_export(
+    name: &str,
+    engine: &irmind_app::Engine<'_>,
+    store: &irmind_infra::LocalStore,
+    case: &irmind_app::Case,
+    root: &std::path::Path,
+) {
     engine.verify(&case.id).unwrap();
     engine.seal(&case.id).unwrap();
-    let export = root.path().join("episode.irmind");
+    let export = root.join("episode.irmind");
     let key = irmind_app::export_case_with_originals(
-        &engine,
-        store.as_ref(),
+        engine,
+        store,
         &case.id,
         &export,
         None,

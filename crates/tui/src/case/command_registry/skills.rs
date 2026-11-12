@@ -76,6 +76,7 @@ mod tests {
         let methods = vec![
             ("windows-triage".into(), "Review Windows logs".into()),
             ("verify".into(), "must not shadow".into()),
+            ("model".into(), "must not shadow a redirect".into()),
         ];
         let matches = matches_with_skills("/wint", &methods);
         assert!(matches.iter().any(|c| c.name == "windows-triage"));
@@ -87,5 +88,12 @@ mod tests {
             1
         );
         assert!(help_with_skills(&methods).contains("/windows-triage"));
+        assert!(super::super::reserved_names().contains("model"));
+        assert!(!help_with_skills(&methods).contains("Now in /settings"));
+        assert!(
+            !matches_with_skills("/", &methods)
+                .iter()
+                .any(|c| c.name == "model")
+        );
     }
 }
