@@ -11,7 +11,7 @@ IRMind es un asistente agéntico de terminal para respuesta a incidentes y anál
 *La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
 
 > [!WARNING]
-> IRMind 0.2.0 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
+> IRMind 0.3.0 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
 
 > [!WARNING]
 > Antes de 1.0, cada versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración. Conserva la versión de IRMind que creó un caso para abrirlo, verificarlo o exportarlo, o reingiere los originales verificados en un caso nuevo.
@@ -47,13 +47,13 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-La [versión preliminar v0.2.0](https://github.com/ns2switch/irmind/releases/tag/v0.2.0) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.3.0](https://github.com/ns2switch/irmind/releases/tag/v0.3.0) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
 Usa la versión menor que creó el caso para volver a abrirlo. La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable o reingerir los originales verificados.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.2.0; binary=irmind-linux-x86_64
+tag=v0.3.0; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -81,7 +81,9 @@ En los siguientes arranques, IRMind verifica y reabre el último caso abierto qu
 
 ## Módulos
 
-La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Ninguno se activa hasta seleccionarlo y configurarlo. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre se necesita firma y un backend de secretos. Todos siguen siendo experimentales.
+La versión 0.3 usa una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo lee los formatos actuales de caso y la exportación V6. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/development/case-migration.md).
+
+La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Los modelos remotos y conectores permanecen desactivados hasta seleccionarlos y configurarlos. Los parsers locales se eligen por detección del contenido. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre se necesita firma y un backend de secretos. Todos siguen siendo experimentales.
 
 `/settings model` también ofrece LM Studio y vLLM locales, y Mistral, Groq, Google Gemini, xAI y Together remotos. Usan el módulo compatible con OpenAI; consulta [URL y límites](docs/es/modules.md#compatible-con-openai).
 
@@ -91,10 +93,9 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Anthropic | LLM | `llm-anthropic` | experimental | [Módulos](docs/es/modules.md) |
 | DeepSeek | LLM | `llm-deepseek` | experimental | [Módulos](docs/es/modules.md) |
 | OpenRouter | LLM | `llm-openrouter` | experimental | [Módulos](docs/es/modules.md) |
+| Elastic | SIEM | `siem-elastic` | experimental | [Elastic](docs/es/modules.md#elasticsearch-y-elastic-security) |
+| Google SecOps | SIEM | `siem-chronicle` | experimental | [Google SecOps](docs/es/modules.md#google-secops-chronicle) |
 | Splunk | SIEM | `siem-splunk` | experimental | [Módulos](docs/es/modules.md) |
-| Elasticsearch / Elastic Security | SIEM | `siem-elastic` | experimental | [Elastic](docs/es/modules.md#elasticsearch-y-elastic-security) |
-
-| Google SecOps (Chronicle) | SIEM | `siem-chronicle` | experimental | [Chronicle](docs/es/modules.md#google-secops-chronicle) |
 | AWS CloudTrail e IAM | nube | `cloud-aws` | experimental | [Módulos](docs/es/modules.md) |
 | Almacenamiento S3 | almacenamiento en nube | `storage-s3` | experimental | [Objetos](docs/es/modules.md#almacenamiento-de-objetos-en-la-nube-s3-gcs-y-azure-blob) |
 | Almacenamiento GCS | almacenamiento en nube | `storage-gcs` | experimental | [Objetos](docs/es/modules.md#almacenamiento-de-objetos-en-la-nube-s3-gcs-y-azure-blob) |
@@ -104,10 +105,10 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | MISP | TI interna | `ti-misp` | experimental | [Módulos](docs/es/modules.md) |
 | VirusTotal | enriquecimiento externo | `ti-virustotal` | experimental | [Módulos](docs/es/modules.md) |
 | Parser JSON y logs de nube exportados | parser local | `parser-json` (por defecto) | experimental | [Módulos](docs/es/modules.md) |
-| Mapeo de eventos comunes de CloudTrail | mapeo local | `mapping-cloudtrail` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
-| Mapeo de eventos comunes Windows | mapeo local | `mapping-evtx` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md#registro-de-eventos-de-windows) |
-| Mapeo de eventos comunes ECS | mapeo local | `mapping-ecs` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
-| Mapeo OCSF de eventos comunes | mapeo local | `mapping-ocsf` | experimental, escritor opcional | [Mapeos](docs/es/mappings.md) |
+| Mapeo de eventos comunes de CloudTrail | mapeo local | `mapping-cloudtrail` | experimental | [Mapeos](docs/es/mappings.md) |
+| Mapeo de eventos comunes Windows | mapeo local | `mapping-evtx` | experimental | [Mapeos](docs/es/mappings.md#registro-de-eventos-de-windows) |
+| Mapeo de eventos comunes ECS | mapeo local | `mapping-ecs` | experimental | [Mapeos](docs/es/mappings.md) |
+| Mapeo OCSF de eventos comunes | mapeo local | `mapping-ocsf` | experimental | [Mapeos](docs/es/mappings.md) |
 | Parser de Elastic Common Schema | parser local | `parser-ecs` (por defecto) | experimental | [ECS](docs/es/modules.md#parser-de-elastic-common-schema) |
 | Parser de OCSF JSON y Parquet | parser local | `parser-ocsf` (por defecto) | experimental | [OCSF](docs/es/modules.md#parser-de-ocsf) |
 | Parser de Velociraptor | parser local | `parser-velociraptor` (por defecto) | experimental | [Velociraptor](docs/es/modules.md#parser-de-velociraptor) |
@@ -137,8 +138,8 @@ Lee [security-model.md](docs/es/security-model.md) antes de conectar un proveedo
 ## Hoja de ruta
 
 - **v0.1.x:** Estabilizar la versión preliminar, validar un modelo y un conector, y añadir firma nativa por plataforma.
-- **v0.2:** Añadir parsers modulares, artefactos V2 precisos y migración de precisión opcional.
-- **v0.3:** Añadir el esquema común tipado y conectores SIEM con consultas estructuradas.
+- **v0.2 (entregada):** Parsers modulares, artefactos precisos y auxiliar EVTX aislado.
+- **v0.3:** Eventos comunes tipados, decodificadores y mapeos separados, solo escritura V3, ingesta multinúcleo y conectores SIEM experimentales.
 - **v0.4:** Añadir skills forenses firmadas y de carga progresiva.
 - **v0.5:** Añadir subagentes paralelos acotados y eventos en streaming.
 - **Lanzamiento público:** Publicar la demo, el benchmark y el catálogo inicial de skills.

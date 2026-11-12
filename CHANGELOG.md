@@ -4,24 +4,47 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
-### Fixed
+## 0.3.0 — Common events and one ingestion pipeline
 
-- Count oversized whitespace-prefixed source records as rejected and preserve subsequent source ordinals and offsets. This corrects the development source-decoder pipeline; v0.2.0 is not affected by this regression.
-- Apply declarative JSON field budgets to array elements as well as object members. The affected source-decoder path is new for v0.3; v0.2.0 already applies the aggregate budget and is not affected.
-- Mark auditd terminator-only groups as partial. This corrects the development raw-source decoder; v0.2.0 already marks groups without substantive records partial and is not affected.
+**Format impact: breaking.** This minor release reads and writes the current
+mapped V3 case artifacts and export V6 only. It does not open, verify or export
+v0.2 cases or earlier exports. Keep the executable that created an earlier case,
+or verify its originals with that version and ingest them into a new case with
+0.3. No automatic migration runs when opening a case; previous approvals,
+findings and seals stay with the original case. See [earlier-version cases](docs/development/case-migration.md).
 
 ### Added and changed
 
-- Use the direct mapped V3 ingestion pipeline in CLI, TUI, demo and object storage; remove the obsolete common-writer preference.
+- Add validated common-event categories, types, outcomes and role-bearing entities, fixed code tables and bounded typed filters in the existing evidence tools. Source provenance and identity scopes distinguish PID reuse and actor/target observations.
+- Separate every format decoder from its identified source mapping. Signed source sets, mapping profiles and run receipts bind original fields, the selected interpretation and V3 artifacts. Full reconstruction reproduces the pinned pipeline; authentication-only verification remains explicitly distinct.
+- Include semantic mappings for Windows EVTX, Linux authentication/auditd/HTTP, CloudTrail, ECS and OCSF. Other DFIR, syslog, journald, network and declarative sources retain searchable extraction without inferred classifications. A cross-source test finds Windows 4625, Linux Failed password and CloudTrail ConsoleLogin failures with their documented roles.
+- Use one mapped writer in CLI, TUI, demo and object ingestion. Remove historical writers/readers, precision migrations, retired mapping interpreters, compatibility preferences and obsolete test/fuzz paths. Retain current golden bytes and inward dependency checks.
+- Scale ingestion and query workers with available CPUs, a global memory allowance and the analyst's configured cap. Decode independent records within NDJSON, CSV and text sources; preserve real offsets and source members. Prepare pure mapped records and finish independent partition writers in bounded parallel lanes, while canonical accounting and signed commits stay ordered. Ordered sources overlap decoding and writing; disorder keeps private case-local sorting.
+- Decode EVTX chunks concurrently inside the isolated helper without a new thread-pool dependency. Linux allows only the required same-process thread lifecycle; process creation, exec, network and unrelated file access remain blocked. Windows retains serial source starts and one verified network witness per session. Output order and signed bytes are checked across worker counts.
+- Add experimental Elastic Query DSL search and Elastic Security alert reads with a read-only API key, explicit indices and optional connector CA. Add experimental Google SecOps structured UDM search with an explicit service-account key and RS256 JWTs. Its default event-account scope stays account-filtered; explicit instance scope requires analyst confirmation, an organization ceiling, signed per-source case context and a persistent TUI warning. Detection reads use one configured rule and a bounded server-side UTC window, retaining partial-result markers. Credentials stay in the keystore, native roots and hostname checks stay enabled, and returned events enter the signed source/mapping pipeline. No remote model or connector is enabled by default.
+- Remove unused infrastructure keystore loading and dependency edges. The configured OS/file backends remain the only production signing/secret routes; missing backends fail closed.
 
-**Format impact — planned v0.3.0: breaking.** Mapped V3 artifacts and export V6 replace retired case/export layouts; retired parser and mapping interpreters are not retained. Before upgrading, keep the version that created an existing case or re-ingest verified originals into a new case. The source-decoder rollout and cleanup are in progress; this is not a release announcement.
+### Fixed
 
-- Add an experimental typed common-event core, frozen category/outcome/role codes and new physical schemas within artifact V2. SourceDecoder modules preserve original fields; independent source mappings classify supported records. Pre-1.0 minor releases do not promise cross-version readers or migrations.
-- Add bounded category, type, outcome and entity-role selectors to existing evidence tools, with explicit schema-coverage notices and identity scopes that distinguish PID reuse.
+- Update rusqlite from 0.32.1 to 0.41.1 and its SQLite binding from libsqlite3-sys 0.30.1 to 0.39.1, retaining parameterized queries and signed custody checks.
+- Count oversized whitespace-prefixed source records as rejected and preserve subsequent source ordinals and offsets. The affected development source-decoder path was not in v0.2.0.
+- Apply declarative JSON field budgets to array elements as well as object members. v0.2.0 already applies the aggregate budget and is not affected.
+- Mark auditd terminator-only groups as partial. v0.2.0 already marks groups without substantive records partial and is not affected.
+- Exercise empty-entity and three-artifact sources explicitly on every platform, including concurrent publication and artifact hash checks.
 
-- Add an independent experimental ECS source decoder and native ECS 9.5 mapping, with explicit categories, outcomes and occurrence roles, precise original timestamps and extraction-preserving search. PID observations retain source-record scope.
+### Known limits
 
-- Add independent, bundled declarative Windows mappings for Security, System, PowerShell and Sysmon, preserving source provenance and original 100 ns timestamps. Only reported Sysmon process GUIDs establish process lifetimes. Verify cross-source authentication failures through signed ingestion, typed queries, reconstruction and export V6.
+This is a pre-release for evaluation with synthetic data, not real incidents or
+sensitive evidence. H5 was accepted by analyst decision after a real DeepSeek
+greeting; investigation citations, follow-up, streaming and verification details
+remain unrecorded. No connector has been validated against a real test service.
+Some sources have extraction-only mappings; classification coverage is explicit.
+Windows 10/11 EVTX confirmation remains [community work](https://github.com/ns2switch/irmind/issues/189).
+Apple notarization and Windows Authenticode remain unavailable; releases carry
+Sigstore signatures, GitHub provenance, SBOMs and checksums. Co-observation size,
+dense-entity lookup and deliberately worst-case path work remain tracked in
+[issue #37](https://github.com/ns2switch/irmind/issues/37) and the
+[release benchmark record](docs/development/benchmarks.md).
 
 ## 0.2.0 — Modular parsers and precise evidence
 

@@ -10,13 +10,15 @@ La CLI, la TUI y la demo usan el escritor común. Cada parser compilado tiene un
 | --- | --- | --- | --- | --- |
 | CloudTrail | JSON de CloudTrail mediante `json-source-v1` | TOML incluido, con hash fijado | `mapping-cloudtrail` | Experimental; contratos sintéticos |
 | Registro de eventos de Windows | EVTX original mediante `evtx-source-v1` | Módulos TOML por evento o canal incluidos, con hash fijado | `mapping-evtx` | Experimental; contratos sintéticos |
+| OCSF | JSON o Parquet original mediante `ocsf-source-v1` | Validación nativa OCSF 1.4 | `mapping-ocsf` | Experimental; contratos sintéticos |
 | ECS | NDJSON original mediante `ecs-source-v1` | Validación nativa ECS 9.5 | `mapping-ecs` | Experimental; contratos sintéticos |
+| ECS de Elastic | Resultados originales mediante `elastic-source-v1` | Validación ECS nativa con identidad propia del conector | `siem-elastic` | Experimental; contratos sintéticos |
+| UDM de Google SecOps | Eventos UDM originales mediante `chronicle-source-v1` | Proyección nativa acotada de nombres ProtoJSON | `siem-chronicle` | Experimental; contratos sintéticos |
 | Compatibilidad JSON genérico | Otros JSON sin `eventVersion` | Nativo, solo extracción | `mapping-json-compat` | Experimental; sin categorías ni roles inferidos |
 | Compatibilidad journald | JSON original de journald | Nativo, solo extracción | `mapping-journald-compat` | Experimental; sin categorías ni roles inferidos |
 | Autenticación Linux | auth.log y secure: sshd, sudo y su | TOML incluido, con hash fijado | `mapping-linux` | Experimental; contratos sintéticos |
 | Linux auditd | Miembros originales agrupados SYSCALL y EXECVE | Nativo, proyección acotada entre miembros | `mapping-linux` | Experimental; contratos sintéticos |
 | Acceso HTTP | Common/combined de nginx y Apache | TOML incluido, con hash fijado | `mapping-linux` | Experimental; contratos sintéticos |
-
 | Salidas DFIR | Velociraptor, Hayabusa, Chainsaw, plaso y EZTools | Módulos nativos separados de extracción | `mapping-dfir` | Experimental; sin inferencias |
 | Syslog | RFC 5424 y RFC 3164 confirmado, texto o gzip | Extracción nativa | `mapping-syslog` | Experimental; sin inferencias |
 | Red | Zeek y Suricata EVE | Módulos nativos separados de extracción | `mapping-network` | Experimental; sin inferencias |

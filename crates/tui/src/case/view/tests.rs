@@ -377,6 +377,10 @@ fn full_instance_scope_stays_visible_with_long_model_and_overlay_at_eighty_colum
     draw_case(&mut terminal, &view).unwrap();
     let shown = screen(&terminal);
     assert!(shown.contains("Synthetic scope details"));
+    let footer = shown.lines().last().unwrap();
+    for marker in ["SCOPE LIMITED", "OVR", "2 approvals", "3 detections"] {
+        assert!(footer.contains(marker), "missing {marker}: {footer}");
+    }
     assert!(
         shown
             .lines()

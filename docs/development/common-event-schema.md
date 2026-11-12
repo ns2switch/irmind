@@ -4,7 +4,7 @@ This design is for parser, connector and evidence-store maintainers. It proposes
 
 ## Delivery sequence
 
-The typed core is delivered separately from parser mappings. The first mapping group covers EVTX, Linux authentication/auditd, CloudTrail, ECS, OCSF, Zeek and Suricata. Remaining mappings are community tasks. Semantic migration (`CommonEventMigrationV1`) is deferred: existing cases remain readable and re-ingestion into a new case is the current alternative. The migration section below records a future design, not an implemented transformation.
+The typed core is delivered separately from parser mappings. The first mapping group covers EVTX, Linux authentication/auditd, CloudTrail, ECS, OCSF, Zeek and Suricata. Remaining mappings are community tasks. Semantic migration (`CommonEventMigrationV1`) is deferred. Under the current pre-1.0 policy, cases from a previous minor version require their creating executable; re-ingestion of verified originals into a new case is the alternative. The migration section below records a future design, not an implemented transformation.
 
 ## Recommendation and scope
 

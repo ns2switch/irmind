@@ -6,7 +6,7 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 
 This page is for contributors and evaluators. It describes intentions, not release commitments. Read the [security model](../security-model.md) before connecting a service.
 
-Current pre-1.0 policy: minor versions may break formats without migration. V3 is the sole target layout for v0.3; compatibility statements in delivered-release sections describe those historical releases only.
+Current pre-1.0 policy: minor versions may break formats without migration. V3 is the sole artifact layout in v0.3; compatibility statements in delivered-release sections describe those historical releases only.
 
 ## Delivered in 0.1.0 and 0.1.1
 
@@ -27,7 +27,7 @@ Stabilize the pre-release with manual validation, verifiable installation, and s
 
 Syslog and Linux exports are available as experimental modules. Linux covers authentication, bounded auditd correlation, journald JSON and common/combined HTTP logs. [Parser coverage and selection](../parsers.md) describes current limits.
 
-Deliver detected log parsers, precise artifact V2, explicit precision migration and mixed-generation export V5.
+Version 0.2 delivered detected log parsers, precise artifact V2, explicit precision migration and mixed-generation export V5. Those historical readers and migration commands belong to that release, not the current executable.
 
 - Extend the detection registry delivered in v0.1.1. Each parser is a Cargo module activated only when its detector recognizes the log; ambiguous matches ask the analyst. A forced choice is audited.
 - Add experimental parsers for Windows EVTX; syslog; Linux authentication, auditd, journald, nginx, and Apache logs; ECS; OCSF; Velociraptor; Hayabusa; Chainsaw; plaso; EZTools; Zeek; Suricata EVE; and a user-defined declarative format.
@@ -37,15 +37,20 @@ Deliver detected log parsers, precise artifact V2, explicit precision migration 
 
 Windows binary artifacts (registry hives, `$MFT`, Prefetch, LNK, SRUM and Amcache) are covered through processed EZTools, Velociraptor and plaso exports. See [current Windows coverage](../parsers.md#windows-coverage) for the supported input shapes. Demand will guide [future native registry and `$MFT` parsers](https://github.com/ns2switch/irmind/issues/159); both require the same isolated-helper model approved for EVTX, rather than binary decoders inside the main process.
 
-## v0.3: Common event schema and SIEM connectors
+## v0.3: Common events, one pipeline and SIEM connectors
 
-Adopt the [typed common event schema](https://github.com/ns2switch/irmind/blob/6dfa5ef620f044892dbf1cfac9f27d5ffed22bbb/docs/development/common-event-schema.md) and map read-only SIEM results to it.
+The current source pipeline separates bounded format decoding from identified,
+validated mapping. CLI, TUI and demo use mapped V3 artifacts and export V6.
+Version 0.2 cases are not readable in 0.3: keep the creating executable or
+[re-ingest verified originals into a new case](case-migration.md).
 
-- Core: checked domain types, frozen codes, role-bearing entities, typed Parquet columns and extended V2 envelopes; existing graph tools, verification and export V5 support the new schemas. Unmapped parsers produce valid unclassified events, without guessing.
-- Initial mappings: EVTX, Linux authentication/auditd, CloudTrail, ECS, OCSF, Zeek and Suricata, with role, outcome and PID-reuse fixtures.
-- Community mapping work: DFIR exports, syslog, journald, nginx/Apache and declarative formats. Existing cases remain readable; semantic migration is deferred, and re-ingestion into a new case is the alternative.
-- Add experimental `siem-elastic` and `siem-chronicle` only after the core, using structured queries, reviewed credentials, minimum read permissions, synthetic contracts and signed evidence.
-- Benchmark representative 1 GiB sources three times and the full 15 GB matrix once, in release builds on the same runner class, retaining current gates.
+- Checked common-event types and fixed codes expose category, type, outcome and entity-role filters through the existing bounded evidence tools.
+- Semantic mappings cover EVTX, Linux authentication/auditd/HTTP, CloudTrail, ECS and OCSF. DFIR exports, syslog, journald, Zeek, Suricata and declarative formats retain original fields and searchable extraction without inventing classifications. Community semantic mappings remain welcome.
+- Every compiled parser has an original-field source decoder. Source sets, mapping profiles and run receipts bind its interpretation to signed artifacts; reconstruction uses those exact identities.
+- The isolated EVTX helper decodes independent chunks concurrently with identical output across worker counts. Native containment remains required; Windows uses one verified network witness per session.
+- Multicore ingestion follows available CPUs and a memory budget. Independent framing, pure record preparation and partition completion run in parallel; signed commits and record ordering remain deterministic. Ordered sources use bounded queues and disorder retains case-local sorting.
+- Experimental Elastic and Google SecOps connectors use structured queries, explicit keystore credentials, full TLS verification, synthetic contracts and signed source evidence. No connector or model is enabled by default; real-service validation remains pending. Chronicle defaults to event-account filtering; explicit instance scope requires analyst confirmation, an organization ceiling and signed case context, with a persistent TUI warning.
+- Keep release measurements for the nine 15 GB cloud/endpoint scenarios and all ordinary query deadlines. Track dense-entity, stress-sort and co-observation improvements separately from changes to security limits.
 
 ## v0.4: Forensic skills
 

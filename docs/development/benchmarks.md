@@ -1885,3 +1885,43 @@ and artifact/chain determinism tests remain pinned.
 
 - [Reference metrics](benchmark-data/sole-v3-baseline-15gb.json) and [evaluated gates](benchmark-data/sole-v3-baseline-15gb-gates.json).
 - [Candidate metrics](benchmark-data/buffered-v3-15gb.json) and [evaluated gates](benchmark-data/buffered-v3-15gb-gates.json).
+
+
+
+
+### Contained EVTX with bounded mapping preparation
+
+The [combined release sweep](https://github.com/ns2switch/irmind/actions/runs/43156027645)
+uses the contained chunk workers and buffered pure mapping together. Each run
+ingests one 1,073,745,920-byte synthetic source, accepts all 1,048,576 records,
+writes three artifacts and passes full reconstruction. No record, output or
+time limit is reached. Windows performs one network witness per session.
+
+| System | CPU cores | Requested global workers | Ingestion s | MiB/s | Main peak MiB | Helper peak MiB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Linux | 4 | 1 | 39.606 | 25.85 | 73.53 | 3.33 |
+| Linux | 4 | 4 | 33.969 | 30.15 | 80.28 | 5.41 |
+| Linux | 4 | Automatic | 32.075 | 31.93 | 76.48 | 3.29 |
+| Windows | 4 | 1 | 43.154 | 23.73 | 68.15 | 5.98 |
+| Windows | 4 | 4 | 35.681 | 28.70 | 72.69 | 7.02 |
+| Windows | 4 | Automatic | 39.250 | 26.09 | 72.29 | 6.01 |
+| macOS | 5 | 1 | 32.247 | 31.75 | 360.33 | 7.53 |
+| macOS | 5 | 4 | 29.409 | 34.82 | 356.64 | 9.84 |
+| macOS | 5 | 5 | 24.245 | 42.24 | 225.44 | 7.50 |
+| macOS | 5 | Automatic | 24.813 | 41.27 | 365.52 | 9.78 |
+
+The CPU allowance is shared between chunk decoding and pure mapping; the
+requested global worker count is not a separate allowance for each stage.
+The one-to-four-worker speedups in these samples are 1.17× on Linux, 1.21× on
+Windows and 1.10× on macOS. The five-core macOS run reaches 1.33× with all cores.
+These are one measurement per setting in one job per system, not medians or
+paired before/after comparisons. The two macOS settings requesting four workers
+(explicit and automatic) vary substantially; the samples do not establish linear
+scaling. Do not compare wall times with the earlier jobs as a speedup estimate.
+
+Linux and Windows sample process high-water counters every 20 ms. macOS samples
+resident bytes with `ps`, not an OS high-water counter. Memory includes generation
+and verification; ingestion timing excludes both. The larger free runner used
+here exposes five cores on macOS; Linux and Windows expose four. Numeric results
+retain full verification times, source/output limits and memory-method labels in
+[the release samples](benchmark-data/mapped-evtx-parallel-workers.json).

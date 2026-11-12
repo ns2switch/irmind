@@ -148,23 +148,23 @@ El módulo usa el [endpoint de exportación de búsquedas de Splunk](https://hel
 
 **Configuración:** Compilado por defecto con `parser-json`; una compilación mínima puede omitirlo. Usa el selector `/ingest` de la TUI o el [comando de ingesta de la CLI](../development/cli.md).
 
-**Límites:** Se rechazan el JSON muy anidado y los registros individuales demasiado grandes. Los originales se identifican por hash en su ubicación; copiarlos requiere una elección explícita. La búsqueda Parquet compara subcadenas con límites y acepta filtros de fecha, cuenta o proyecto y región. Los índices derivados anteriores requieren migrar los originales copiados antes de consultar el grafo. Otros formatos necesitarán parsers futuros.
+**Límites:** Se rechazan el JSON muy anidado y los registros individuales demasiado grandes. Los originales se identifican por hash en su ubicación; copiarlos requiere una elección explícita. La búsqueda Parquet compara subcadenas con límites y acepta filtros de fecha, cuenta o proyecto y región. Abre los casos de versiones anteriores con el ejecutable que los creó, o reingiere los originales verificados en un caso nuevo. Consulta el [catálogo de parsers](parsers.md) para otros formatos admitidos.
 
 ## Parser de Elastic Common Schema
 
-**Función:** Detecta ECS NDJSON mediante `@timestamp` y `ecs.version`, o mediante campos característicos de evento. El decodificador conserva los instantes, los campos originales y la procedencia. Con el escritor común experimental, el módulo independiente `mapping-ecs` valida clasificaciones y roles explícitos; la ruta actual se mantiene durante la incorporación de decodificadores. Consulta la [cobertura del mapeo ECS](mappings.md#elastic-common-schema).
+**Función:** Detecta ECS NDJSON mediante `@timestamp` y `ecs.version`, o mediante campos característicos de evento. El decodificador conserva los instantes, los campos originales y la procedencia. El módulo independiente `mapping-ecs` valida clasificaciones y roles explícitos antes de que el escritor común guarde el evento. Consulta la [cobertura del mapeo ECS](mappings.md#elastic-common-schema).
 
 **Permiso:** Solo lectura del archivo local elegido.
 
 **Configuración:** Compilado por defecto con `parser-ecs`. `/ingest` lo elige automáticamente solo si hay una coincidencia única de confianza alta. En los demás casos, el analista decide. La selección y versión quedan en el manifiesto firmado.
 
-**Límites:** Experimental y probado solo con datos sintéticos. Cada registro admite hasta 4 MiB, 1.024 campos y 64 niveles; una fuente admite hasta diez millones de registros y 50 GiB. Las líneas inválidas se cuentan con muestras acotadas y escapadas, sin detener las siguientes. La hora se normaliza a segundos UTC; la fracción original queda en el registro local.
+**Límites:** Experimental y probado solo con datos sintéticos. Cada registro admite hasta 4 MiB, 1.024 campos y 64 niveles; una fuente admite hasta diez millones de registros y 50 GiB. Las líneas inválidas se cuentan con muestras acotadas y escapadas, sin detener las siguientes. Los artefactos actuales conservan la precisión temporal indicada por la fuente mediante microsegundos UTC y un resto en nanosegundos.
 
 El mapeo sigue la [referencia oficial de ECS](https://www.elastic.co/docs/reference/ecs/ecs-reference).
 
 ## Parser de OCSF
 
-El decodificador conserva campos y precisión originales. Con el escritor común experimental, `mapping-ocsf` valida OCSF 1.4 y sus roles. Otras versiones quedan sin clasificar y siguen siendo consultables. Véase la [cobertura del mapeo](mappings.md#open-cybersecurity-schema-framework).
+El decodificador conserva campos y precisión originales. El módulo independiente `mapping-ocsf` valida OCSF 1.4 y sus roles. Otras versiones quedan sin clasificar y siguen siendo consultables. Véase la [cobertura del mapeo](mappings.md#open-cybersecurity-schema-framework).
 
 **Función:** Detecta OCSF JSON, incluidos registros con formato multilínea, o NDJSON mediante `class_uid`, `category_uid` y `metadata.version`. Mapea Authentication, API Activity, Network Activity, Process Activity, File Activity y Detection Finding. También lee exportaciones OCSF Parquet, incluidas las de Security Lake, con el lector Parquet existente. Los campos desconocidos se conservan localmente.
 
@@ -178,7 +178,7 @@ El mapeo sigue el [esquema oficial de OCSF](https://github.com/ocsf/ocsf-schema)
 
 ## Parser de velociraptor
 
-Los cinco parsers DFIR siguientes indexan tiempos con precisión de segundos UTC. El registro local conserva el instante original y el manifiesto firmado registra el contexto de normalización.
+Los cinco parsers DFIR siguientes conservan la precisión temporal indicada por la fuente en los artefactos actuales. El registro local conserva el instante original y el manifiesto firmado registra el contexto de normalización.
 
 Lee resultados JSONL de artefactos con campos tipados de tiempo, host, usuario, proceso e IP. Requiere acceso de lectura al archivo; no ejecuta el contenido. Compilado por defecto con `parser-velociraptor`. Experimental y validado solo con datos sintéticos. Los registros sin tiempo válido se rechazan de forma individual. [Referencia](https://docs.velociraptor.app/docs/).
 
@@ -234,11 +234,11 @@ Para añadir un módulo, consulta la [guía de arquitectura](../development/arch
 
 ## Parser Syslog
 
-Para ingerir logs RFC 5424 o RFC 3164, `parser-syslog` es un módulo local experimental compilado por defecto. También admite gzip con límites de entrada y salida. No necesita credenciales ni red. RFC 3164 exige año y desplazamiento UTC explícitos: ambos quedan firmados como contexto inferido. Consulta [el contrato y la configuración](../development/syslog-parser.md) y [la selección de parsers](parsers.md). Se conserva la precisión del original; el índice derivado actual aún usa segundos.
+Para ingerir logs RFC 5424 o RFC 3164, `parser-syslog` es un módulo local experimental compilado por defecto. También admite gzip con límites de entrada y salida. No necesita credenciales ni red. RFC 3164 exige año y desplazamiento UTC explícitos: ambos quedan firmados como contexto inferido. Consulta [el contrato y la configuración](../development/syslog-parser.md) y [la selección de parsers](parsers.md). El índice derivado actual conserva la precisión temporal indicada por la fuente.
 
 ## Logs de Linux
 
-Para ingerir auth.log/secure, auditd, journald JSON o exportaciones nginx/Apache common y combined, `parser-linux` es un módulo local experimental compilado por defecto. Necesita acceso de lectura a esos archivos y ninguna credencial. El tiempo de la autenticación clásica se confirma en cada ingesta con el mismo formulario de syslog. La agrupación de auditd está acotada y los eventos incompletos quedan marcados como parciales. Se conservan las fracciones del instante original; el índice actual usa segundos. Los formatos propios usan una definición declarativa firmada. Consulta [la selección de parsers](parsers.md) y [el contrato y los límites de Linux](../development/linux-parser.md).
+Para ingerir auth.log/secure, auditd, journald JSON o exportaciones nginx/Apache common y combined, `parser-linux` es un módulo local experimental compilado por defecto. Necesita acceso de lectura a esos archivos y ninguna credencial. El tiempo de la autenticación clásica se confirma en cada ingesta con el mismo formulario de syslog. La agrupación de auditd está acotada y los eventos incompletos quedan marcados como parciales. El índice actual conserva las fracciones indicadas por la fuente mediante microsegundos UTC y un resto en nanosegundos. Los formatos propios usan una definición declarativa firmada. Consulta [la selección de parsers](parsers.md) y [el contrato y los límites de Linux](../development/linux-parser.md).
 
 ## Windows EVTX
 
@@ -246,25 +246,25 @@ El módulo experimental `parser-evtx` se compila por defecto, pero requiere el a
 
 ## Parser de Zeek
 
-Lee logs TSV de Zeek con `#path`, `#fields` y `#types`, y logs JSON de Zeek. Mapea conn, dns, http, ssl, files, x509, notice y weird; la entidad `uid` enlaza registros de distintos logs. Solo requiere lectura del archivo local. Viene compilado por defecto con `parser-zeek` y es experimental, probado solo con datos sintéticos. Los artefactos V2 conservan microsegundos y el resto en nanosegundos. La marca temporal original se conserva en el registro.
+Lee logs TSV de Zeek con `#path`, `#fields` y `#types`, y logs JSON de Zeek. Mapea conn, dns, http, ssl, files, x509, notice y weird; la entidad `uid` enlaza registros de distintos logs. Solo requiere lectura del archivo local. Viene compilado por defecto con `parser-zeek` y es experimental, probado solo con datos sintéticos. Los artefactos mapeados actuales conservan microsegundos y el resto en nanosegundos. La marca temporal original se conserva en el registro.
 
-Limita cada registro a 4 MiB, 1.024 campos y 64 niveles JSON, y cada fuente a diez millones de registros y 50 GiB. Cuenta los registros malformados y guarda muestras acotadas y escapadas. Solo admite el separador de campos tabulado predeterminado. V2 usa el perfil de host: `sensor_host` identifica explícitamente el sensor; `host` de HTTP es un dominio. Si falta el sensor, no se inventa su nombre. [Formato de Zeek](https://docs.zeek.org/en/current/tutorial/logs.html).
+Limita cada registro a 4 MiB, 1.024 campos y 64 niveles JSON, y cada fuente a diez millones de registros y 50 GiB. Cuenta los registros malformados y guarda muestras acotadas y escapadas. Solo admite el separador de campos tabulado predeterminado. Las fuentes de red usan el perfil de host: `sensor_host` identifica explícitamente el sensor; `host` de HTTP es un dominio. Si falta el sensor, no se inventa su nombre. [Formato de Zeek](https://docs.zeek.org/en/current/tutorial/logs.html).
 
 ## Parser de Suricata EVE
 
-Lee EVE JSONL para alert, flow, dns, http, tls, fileinfo y anomaly. Relaciona registros mediante `flow_id`. Una firma de alerta se conserva como hallazgo de origen sin confirmar; nunca confirma automáticamente un hallazgo del caso. Solo requiere lectura del archivo local. Conserva el instante original y el offset; V2 mantiene su precisión fraccionaria en el índice. No ejecuta Suricata ni abre conexiones de red.
+Lee EVE JSONL para alert, flow, dns, http, tls, fileinfo y anomaly. Relaciona registros mediante `flow_id`. Una firma de alerta se conserva como hallazgo de origen sin confirmar; nunca confirma automáticamente un hallazgo del caso. Solo requiere lectura del archivo local. Conserva el instante original y el offset; los artefactos mapeados actuales mantienen su precisión fraccionaria en el índice. No ejecuta Suricata ni abre conexiones de red.
 
 Viene compilado por defecto con `parser-suricata` y es experimental, probado solo con datos sintéticos. La detección requiere un `event_type` admitido, un instante y `flow_id` en la muestra. Si hay ambigüedad, el analista elige; la elección queda firmada.
 
-Aplica los mismos límites de tamaño, estructura JSON y recuento que Zeek. Rechaza marcas temporales sin zona explícita. Conserva en el registro local la marca original y su zona; la timeline V2 conserva la precisión fraccionaria. Un `host` explícito usa el perfil de partición por host; no se deduce a partir de direcciones de red. [Formato EVE](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).
+Aplica los mismos límites de tamaño, estructura JSON y recuento que Zeek. Rechaza marcas temporales sin zona explícita. Conserva en el registro local la marca original y su zona; la timeline actual conserva la precisión fraccionaria. Un `host` explícito usa el perfil de partición por host; no se deduce a partir de direcciones de red. [Formato EVE](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html).
 
 ## Mapeos de eventos comunes
 
-Los mapeos opcionales son independientes de los parsers y conectores. Las tablas de CloudTrail y los mapeos de Linux clasifican las operaciones admitidas. El mapeo nativo ECS valida conjuntos explícitos, valores tipados y roles. Los resultados ausentes o no admitidos quedan como desconocidos. Requieren el escritor común experimental y no habilitan ningún módulo remoto. Véase la [cobertura y las limitaciones de los mapeos](mappings.md).
+Los mapeos opcionales son independientes de los parsers y conectores. Las tablas de CloudTrail y los mapeos de Linux clasifican las operaciones admitidas. El mapeo nativo ECS valida conjuntos explícitos, valores tipados y roles. Los resultados ausentes o no admitidos quedan como desconocidos. Toda ingesta usa el escritor común; los mapeos no habilitan ningún módulo remoto. Véase la [cobertura y las limitaciones de los mapeos](mappings.md).
 
 ### Mapeo de eventos comunes Windows
 
-La feature `mapping-evtx` compila mapeos TOML independientes para Security, System, PowerShell y Sysmon. Usan los campos originales del decodificador EVTX aislado. El escritor sigue siendo opcional durante la incorporación de decodificadores. No requieren credenciales ni permisos adicionales. Consulta la [cobertura de Windows](mappings.md#registro-de-eventos-de-windows).
+La feature `mapping-evtx` compila mapeos TOML independientes para Security, System, PowerShell y Sysmon. Usan los campos originales del decodificador EVTX aislado. La ingesta de la CLI, la TUI y la demo usan el escritor común. No requieren credenciales ni permisos adicionales. Consulta la [cobertura de Windows](mappings.md#registro-de-eventos-de-windows).
 
 ## Elasticsearch y Elastic Security
 
@@ -290,7 +290,7 @@ Referencias oficiales: [API de búsqueda](https://www.elastic.co/docs/api/doc/el
 
 **Permisos:** Concede `chronicle.events.udmSearch` sobre la instancia configurada y autoriza el ámbito OAuth `https://www.googleapis.com/auth/chronicle`. Usa una cuenta de servicio dedicada de solo lectura. Guarda su clave JSON como `IRMIND_CHRONICLE_SERVICE_ACCOUNT_JSON` en `/settings keystore`. Nunca se buscan credenciales ambientales de Google. Rota y elimina la clave cuando deje de ser necesaria.
 
-**Configuración:** En `/settings connectors`, indica el origen regional HTTPS en `IRMIND_CHRONICLE_URL`, por ejemplo `https://europe-west2-chronicle.googleapis.com/`. Configura `IRMIND_CHRONICLE_PROJECT`, `IRMIND_CHRONICLE_LOCATION`, `IRMIND_CHRONICLE_INSTANCE` e `IRMIND_CHRONICLE_SOURCE_ID`. `IRMIND_CHRONICLE_ACCOUNT_FIELD` debe identificar realmente la cuenta en tu telemetría UDM. Todas las consultas imponen esa cuenta y la ventana UTC del caso en el servidor. Incluye el origen y la cuenta en los alcances del caso y de la organización antes de habilitarlo. Se mantienen la confirmación y la operación firmada de configuración.
+**Configuración:** En `/settings connectors`, indica el origen regional HTTPS en `IRMIND_CHRONICLE_URL`, por ejemplo `https://europe-west2-chronicle.googleapis.com/`. Configura `IRMIND_CHRONICLE_PROJECT`, `IRMIND_CHRONICLE_LOCATION`, `IRMIND_CHRONICLE_INSTANCE` e `IRMIND_CHRONICLE_SOURCE_ID`. `IRMIND_CHRONICLE_ACCOUNT_FIELD` debe identificar realmente la cuenta en tu telemetría UDM. El modo predeterminado `event-account` impone esa cuenta y la ventana UTC del caso en el servidor. Incluye el origen y la cuenta en los alcances del caso y de la organización antes de habilitarlo. Se mantienen la confirmación y la operación firmada de configuración.
 
 **Límites:** Hasta 20 eventos o grupos, ventana de 24 horas, timeout HTTP de 45 segundos y respuesta de 5 MB. No sigue redirecciones. Conserva los indicadores de truncado del proveedor en la evidencia firmada. El modo limitado a una cuenta rechaza las lecturas de detecciones cuya API no impone ese filtro. La API es preliminar y puede cambiar.
 
@@ -305,7 +305,7 @@ de cobertura. La [referencia UDM](https://docs.cloud.google.com/chronicle/docs/r
 documenta estos campos repetidos. El decodificador y el mapeo siguen disponibles
 para verificar sin conexión aunque se deshabilite el conector remoto.
 
-## Alcance explícito de instancia en Chronicle
+### Alcance explícito de instancia en Chronicle
 
 `IRMIND_CHRONICLE_SCOPE_MODE` usa `event-account` por defecto. El modo `instance`
 se configura desde `/settings connectors`, pide confirmación explícita y registra

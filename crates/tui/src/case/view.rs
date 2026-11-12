@@ -266,14 +266,11 @@ fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
         label.push_str(" · ");
         label.push_str(view.cost);
     }
-    let mut spans = vec![Span::styled(label, theme.muted())];
-    let status = if let Some(rest) = view.status.strip_prefix("FULL INSTANCE SCOPE · ") {
-        spans.insert(0, Span::styled("FULL INSTANCE SCOPE · ", theme.warning()));
-        rest
-    } else {
-        view.status
-    };
-    if view.pending > 0 {
+    let instance = view.status.starts_with("FULL INSTANCE SCOPE · ");
+    let (status, mut spans) = instance_footer(view.status, view.pending, view.detections, theme)
+        .unwrap_or((view.status, Vec::new()));
+    spans.push(Span::styled(label, theme.muted()));
+    if !instance && view.pending > 0 {
         spans.push(Span::styled(
             format!(
                 " · {} approval{} pending",
@@ -283,7 +280,7 @@ fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
             theme.warning(),
         ));
     }
-    if view.detections > 0 {
+    if !instance && view.detections > 0 {
         spans.push(Span::styled(
             format!(" · {} detections", view.detections),
             theme.warning(),
@@ -309,6 +306,40 @@ fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
             ..section
         },
     );
+}
+
+fn instance_footer(
+    status: &str,
+    pending: usize,
+    detections: usize,
+    theme: Theme,
+) -> Option<(&str, Vec<Span<'static>>)> {
+    use std::fmt::Write as _;
+    let mut rest = status.strip_prefix("FULL INSTANCE SCOPE · ")?;
+    let mut warnings = String::from("FULL INSTANCE SCOPE");
+    for marker in ["SCOPE LIMITED", "OVR"] {
+        if let Some(tail) = rest.strip_prefix(marker).and_then(|v| v.strip_prefix(' ')) {
+            warnings.push_str(" · ");
+            warnings.push_str(marker);
+            rest = tail;
+        }
+    }
+    if pending > 0 {
+        let _ = write!(
+            warnings,
+            " · {pending} approval{}",
+            if pending == 1 { "" } else { "s" }
+        );
+    }
+    if detections > 0 {
+        let _ = write!(
+            warnings,
+            " · {detections} detection{}",
+            if detections == 1 { "" } else { "s" }
+        );
+    }
+    warnings.push_str(" · ");
+    Some((rest, vec![Span::styled(warnings, theme.warning())]))
 }
 
 fn draw_menu(
