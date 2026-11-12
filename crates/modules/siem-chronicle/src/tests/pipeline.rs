@@ -147,6 +147,6 @@ fn authorized_response_becomes_signed_mapped_evidence_and_queryable_roles() {
         )
         .unwrap()
         .format_version,
-        6
+        7
     );
 }

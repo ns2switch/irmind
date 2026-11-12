@@ -417,7 +417,7 @@ fn run_verify_export(path: &std::path::Path, expected_key: Option<&str>) -> Resu
         "verified {} audit entries; analyst key fingerprint {}",
         result.entries, result.analyst_key_fingerprint
     );
-    if result.format_version == 4 {
+    if result.source_manifests > 0 {
         println!(
             "signed source manifests: {}; original bytes verified: {}; originals unavailable in package: {}",
             result.source_manifests, result.source_bytes_verified, result.source_bytes_unavailable
