@@ -76,10 +76,16 @@ fn disordered_sources_keep_parallel_authenticated_fallback_parsing() {
 
 #[derive(Default)]
 struct ParallelFallback {
+    speculation: Rendezvous,
+    fallback: Rendezvous,
+}
+
+#[derive(Default)]
+struct Rendezvous {
     entered: std::sync::Mutex<usize>,
     ready: std::sync::Condvar,
 }
-impl ParallelFallback {
+impl Rendezvous {
     fn wait_for_both(&self) -> Result<(), AppError> {
         let mut entered = self.entered.lock().unwrap();
         *entered += 1;
@@ -119,10 +125,15 @@ impl SourceDecoder for CountSpeculation {
             *count += 1;
             *count
         };
-        if source_call == 2
-            && let Some(parallel) = &self.parallel
-        {
-            parallel.wait_for_both()?;
+        if let Some(parallel) = &self.parallel {
+            if source_call == 1 {
+                // Fix the intended interleaving: without this rendezvous the
+                // early disorder can stop the second speculative parser before
+                // its first call, so call counts cannot identify its fallback.
+                parallel.speculation.wait_for_both()?;
+            } else if source_call == 2 {
+                parallel.fallback.wait_for_both()?;
+            }
         }
         let mut count = 0;
         let result = JsonSourceDecoder.decode_reader(input, &mut |row| {
