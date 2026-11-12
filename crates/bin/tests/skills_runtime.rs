@@ -203,6 +203,22 @@ fn seal_export(
         .verify_export_details(&export, Some(&key))
         .unwrap();
     assert_eq!(details.format_version, 7);
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_irmind"))
+        .arg("--home")
+        .arg(root.join("independent-verifier"))
+        .arg("verify-export")
+        .arg(&export)
+        .arg("--expected-key")
+        .arg(&key)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(String::from_utf8(result.stdout).unwrap().contains("signed source manifests: 1; original bytes verified: 0; originals unavailable in package: 1"));
+
     assert!(
         std::fs::read(&export)
             .unwrap()
