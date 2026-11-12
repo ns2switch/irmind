@@ -120,15 +120,6 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
 }
 
 #[test]
-fn oversized_export_is_rejected_before_parsing() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join("oversized.json");
-    let file = fs::File::create(&path).unwrap();
-    file.set_len(2_000_000_000_001).unwrap();
-    assert!(verify_export(&path).is_err());
-}
-
-#[test]
 #[allow(clippy::panic)]
 fn approval_signature_cannot_be_reused_as_audit_signature() {
     let signer = LocalSigner {

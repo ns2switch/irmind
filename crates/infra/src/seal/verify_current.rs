@@ -18,9 +18,20 @@ pub(super) fn verify_export_v6(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
+    let input = File::open(path).map_err(storage)?;
+    let size = input.metadata().map_err(storage)?.len();
+    verify_open_export(input, size, expected_key)
+}
+
+// Production always obtains size from this same opened file. Keeping the
+// metadata gate here allows boundary tests without allocating huge fixtures.
+fn verify_open_export(
+    mut input: File,
+    size: u64,
+    expected_key: Option<&str>,
+) -> Result<ExportVerification, AppError> {
     let version = 6;
-    let mut input = File::open(path).map_err(storage)?;
-    if input.metadata().map_err(storage)?.len() > MAX_PACKAGE_FILE_BYTES {
+    if size > MAX_PACKAGE_FILE_BYTES {
         return Err(storage_reason("export package exceeds size limit"));
     }
     let mut magic = [0u8; MAGIC_V6.len()];
@@ -340,5 +351,41 @@ impl ChainState {
                 &header.seal.sig,
             )
             .map_err(|_| AppError::InvalidChain(last.seq))
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use std::io::Seek as _;
+
+    #[test]
+    fn oversized_export_is_rejected_before_parsing() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("synthetic-invalid-export");
+        std::fs::write(&path, b"not an export").unwrap();
+        let input = File::open(&path).unwrap();
+        let mut observer = input.try_clone().unwrap();
+        let error = verify_open_export(input, MAX_PACKAGE_FILE_BYTES + 1, None).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("export package exceeds size limit")
+        );
+        assert_eq!(observer.stream_position().unwrap(), 0);
+
+        // The exact limit remains inclusive: reaching the parser is observable
+        // through both its distinct error and the shared file cursor.
+        let input = File::open(&path).unwrap();
+        let mut observer = input.try_clone().unwrap();
+        assert!(matches!(
+            verify_open_export(input, MAX_PACKAGE_FILE_BYTES, None),
+            Err(AppError::Fixed(
+                irmind_app::FixedAppError::RetiredExportFormat
+            ))
+        ));
+        assert!(observer.stream_position().unwrap() > 0);
+        assert!(super::super::verify_export(&path).is_err());
     }
 }
