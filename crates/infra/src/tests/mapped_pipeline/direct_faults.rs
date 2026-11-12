@@ -234,19 +234,13 @@ fn fallback_rejects_a_disordered_source_changed_after_the_order_probe() {
     )
     .unwrap();
     let mutable = root.path().join("b.ndjson");
+    // Fill every bounded preparation window so the fake decoder observes the
+    // probe's callback error and actually replaces the source before retry.
+    let late = r#"{"eventTime":"2026-11-01T00:00:01Z","eventName":"SyntheticLate"}"#;
+    let early = r#"{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticEarly"}"#;
     fs::write(
         &mutable,
-        // More rows than the bounded preparation window ensure that the fake
-        // decoder observes the order-probe callback failure before it returns.
-        // It then replaces the opened source before the fallback hash check.
-        br#"{"eventTime":"2026-11-01T00:00:01Z","eventName":"SyntheticLate"}
-{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticEarly"}
-{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail1"}
-{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail2"}
-{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail3"}
-{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail4"}
-{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail5"}
-{"eventTime":"2026-11-01T00:00:00Z","eventName":"SyntheticTail6"}"#,
+        format!("{late}\n{}", format!("{early}\n").repeat(2048)),
     )
     .unwrap();
     let (store, engine, catalog) =

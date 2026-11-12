@@ -50,9 +50,12 @@ impl SourceValue {
     }
 
     pub fn validate(&self) -> Result<usize, SourceRecordError> {
+        self.measured_size().map(|(bytes, _)| bytes)
+    }
+    pub(super) fn measured_size(&self) -> Result<(usize, usize), SourceRecordError> {
         let mut budget = Budget { nodes: 0, bytes: 0 };
         walk(self, 0, &mut budget)?;
-        Ok(budget.bytes)
+        Ok((budget.bytes, budget.nodes))
     }
 }
 
