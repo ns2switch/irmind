@@ -11,7 +11,7 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 *The complete presentation runs the real product with synthetic evidence, ephemeral keys and an offline scripted model. Enter advances; Space pauses; Esc exits.*
 
 > [!WARNING]
-> IRMind 0.3.0 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
+> IRMind 0.4.0 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
 
 > [!WARNING]
 > Pre-1.0: each minor version may change case, export and definition formats without migration. Keep the IRMind version that created a case to open, verify or export it, or re-ingest the verified originals into a new case.
@@ -20,7 +20,7 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 
 - Open a case, set its scope, and investigate an alert from one terminal workspace.
 - Ingest local evidence and search a case timeline and entity graph.
-- Ask a selected AI model to suggest investigative queries.
+- Ask a selected AI model to suggest queries and load a signed forensic [skill](docs/skills.md) when needed.
 - Review and sign approvals before any external enrichment call.
 - Inspect indexed records and available originals while the model receives bounded, redacted data.
 - Verify, seal, export, and independently verify a case package.
@@ -47,13 +47,13 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-The [v0.3.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.3.0) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
+The [v0.4.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.4.0) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
 
 Use the creating minor version for an existing case. The [version policy](docs/development/decisions.md#pre-10-format-policy) explains how to retain its executable or re-ingest verified originals.
 
 ```sh
 # After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:
-tag=v0.3.0; binary=irmind-linux-x86_64
+tag=v0.4.0; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -72,7 +72,7 @@ Use **Enter** to advance, **Backspace** to revisit a step, **Space** to pause or
 1. Run `irmind`. The first-run guide sets up signing and secrets backends; enter and confirm a masked passphrase if you choose the file backend. Save the analyst key fingerprint outside this computer. Choose a model in the guide or type `/settings model` afterward. No model is selected by default.
 2. Type `/new`, enter a title, and choose a severity with the arrow keys. Enter creates a local case; the second form step adds optional remote scope.
 3. In the case, type `/ingest` and select the synthetic [CloudTrail example](examples/cloudtrail-alert.json). IRMind hashes the file in place; copying the original is an explicit option.
-4. Ask what the synthetic role assumption suggests, then press Enter. The response streams into the conversation. You can also chat without starting an investigation.
+4. Ask what the synthetic role assumption suggests, then press Enter. The response streams into the conversation. You can also chat without starting an investigation, or invoke `/aws-credential-compromise` for a forensic method. `/skills` lists and manages the included Windows, Linux and AWS methods.
 5. Review the proposed tool call. An external lookup waits for a signed approval; choose a numbered option with the arrows and Enter. Type `/` for commands, `Ctrl+K` for the palette, `/pause` to cancel active work, or `/continue` after a model limit.
 6. Use `/verify <source-root>` to check the original, then review `/report` before `/seal` and `/export`. The latter two show the case hash and signing-key fingerprint before confirmation.
 
@@ -80,7 +80,7 @@ You can ingest, inspect, and verify local evidence without a model. On later sta
 
 ## Modules
 
-Version 0.3 uses one source-decoder → identified mapping → V3 writer pipeline in the CLI, TUI and demo. It reads only current case formats and export V6; [earlier cases require their creating version or a new ingestion](docs/development/case-migration.md).
+Version 0.4 uses one source-decoder → identified mapping → V3 writer pipeline in the CLI, TUI and demo. It reads only current case formats and export V7; [earlier cases require their creating version or a new ingestion](docs/development/case-migration.md).
 
 The normal build includes every current product module and both keystores. No remote connector or LLM is enabled until selected and configured. A smaller build uses `--no-default-features --features keystore-file` (at least one signer and secrets backend is required). All modules are experimental.
 

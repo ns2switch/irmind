@@ -39,7 +39,12 @@ impl Engine<'_> {
         }
         let _lock = self.audit_log.lock_global_operations()?;
         let approved = self.approved_skills(compiler)?;
-        if approved.latest.contains_key(checked.metadata().name()) {
+        if approved.latest.contains_key(checked.metadata().name())
+            || self
+                .skills
+                .as_ref()
+                .is_some_and(|s| s.bundled.contains_key(checked.metadata().name()))
+        {
             return Err(SkillServiceError::NameConflict.into());
         }
         self.commit_skill_snapshot(store, compiler, &Snapshot::new(&checked, origin))
@@ -56,13 +61,22 @@ impl Engine<'_> {
         self.check_skill_content(&checked)?;
         let _lock = self.audit_log.lock_global_operations()?;
         let approved = self.approved_skills(compiler)?;
-        let old = approved
-            .latest
-            .get(checked.metadata().name())
-            .ok_or(SkillServiceError::NotInstalled)?;
-        let mut snapshot = Snapshot::new(&checked, old.snapshot.origin);
-        snapshot.active = old.snapshot.active;
-        snapshot.previous_operation = Some(old.operation_hash.clone());
+        let old = approved.latest.get(checked.metadata().name());
+        if old.is_none()
+            && !self
+                .skills
+                .as_ref()
+                .is_some_and(|s| s.bundled.contains_key(checked.metadata().name()))
+        {
+            return Err(SkillServiceError::NotInstalled.into());
+        }
+        let origin = old.map_or(SkillOrigin::Analyst, |s| match s.snapshot.origin {
+            SkillOrigin::Bundled => SkillOrigin::Analyst,
+            value => value,
+        });
+        let mut snapshot = Snapshot::new(&checked, origin);
+        snapshot.active = old.is_none_or(|s| s.snapshot.active);
+        snapshot.previous_operation = old.map(|s| s.operation_hash.clone());
         self.commit_skill_snapshot(store, compiler, &snapshot)
     }
 
@@ -118,7 +132,7 @@ impl Engine<'_> {
         }
     }
 
-    fn commit_skill_snapshot(
+    pub(in crate::skills) fn commit_skill_snapshot(
         &self,
         store: &dyn SkillPackageStore,
         compiler: &dyn SkillCompiler,
@@ -131,19 +145,19 @@ impl Engine<'_> {
         {
             return Err(SkillServiceError::HistoryLimit.into());
         }
-        let already_active = approved
+        let mut count = approved
             .latest
-            .get(&name)
-            .is_some_and(|old| old.snapshot.active);
-        if snapshot.active
-            && !already_active
-            && approved
-                .latest
-                .values()
-                .filter(|s| s.snapshot.active)
-                .count()
-                >= 32
-        {
+            .iter()
+            .filter(|(n, s)| **n != name && s.snapshot.active)
+            .count();
+        if let Some(services) = &self.skills {
+            count += services
+                .bundled
+                .keys()
+                .filter(|n| **n != name && !approved.latest.contains_key(*n))
+                .count();
+        }
+        if snapshot.active && count >= 32 {
             return Err(SkillServiceError::ActiveLimit.into());
         }
         let package = snapshot.package()?;

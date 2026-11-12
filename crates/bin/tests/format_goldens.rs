@@ -297,9 +297,10 @@ fn export_goldens(
     let seal_path = root.join("seals").join(format!("{}.json", id.as_str()));
     record(out, "seal/file", &fs::read(seal_path).unwrap());
     let cancel = CancellationToken::new();
-    let current = root.join("export-v6.bin");
-    irmind_app::export_case_v6(engine, store, &id, &current, None, false, &cancel).unwrap();
-    assert!(fs::read(current).unwrap().starts_with(b"IRMIND-EXPORT-V6"));
+    let current = root.join("export-v7.bin");
+    irmind_app::export_case_with_originals(engine, store, &id, &current, None, false, &cancel)
+        .unwrap();
+    assert!(fs::read(current).unwrap().starts_with(b"IRMIND-EXPORT-V7"));
 }
 
 #[test]

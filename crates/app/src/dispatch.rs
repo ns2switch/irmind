@@ -123,7 +123,7 @@ impl Engine<'_> {
         }
     }
 
-    async fn evaluate_proposal(
+    pub(crate) async fn evaluate_proposal(
         &self,
         case: &Case,
         proposal: ProposedCall,

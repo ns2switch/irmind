@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/skills/view/snapshots.rs
+expression: text
+---
+Forensic skills · methodology never grants permissions
+
+linux-triage · 0.1.0 · active · Bundled
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1. Inspect   2. Install/update   3. Enable/disable   4. Restore approved file
+Selected action: 3 · Input:
+
+Synthetic inline error · Esc returns without applying.
+
+↑/↓ choose · Tab actions · Enter confirm · PgUp/PgDn scroll · Esc back

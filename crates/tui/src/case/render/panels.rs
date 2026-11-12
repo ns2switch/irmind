@@ -179,7 +179,7 @@ pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Opt
         )));
     }
     if let Some(search) = &state.palette {
-        let listed = command_registry::matches(search)
+        let listed = command_registry::matches_with_skills(search, &state.skill_commands)
             .iter()
             .take(12)
             .map(|command| format!("/{} · {}", command.name, command.description))

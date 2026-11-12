@@ -13,5 +13,6 @@ mod local;
 mod mapping_proofs;
 mod parquet_frame;
 mod read;
+mod skill_proofs;
 mod verify_current;
 pub use export::{LocalExportVerifier, verify_export, verify_export_expected};

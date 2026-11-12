@@ -56,13 +56,13 @@ Version 0.2 cases are not readable in 0.3: keep the creating executable or
 
 Add signed, progressively loaded forensic skills that never extend policy permissions.
 
-- Approve `docs/development/skills-design.md` before implementation. It will define format, progressive loading, signed installation, trust, and policy interaction.
-- A skill is a folder with `SKILL.md` for methodology and instructions, plus optional query templates, Sigma rules, or mappings. Initial methods also cover Windows ransomware, Linux persistence, and M365 business email compromise.
+- The approved [skills design](skills-design.md), [installation contract](skills-installation-contract.md) and [case receipt contract](skills-case-format-contract.md) define the 0.4 implementation. See the [usage guide](../skills.md).
+- A skill is a folder with `SKILL.md` for methodology and instructions, plus optional query templates, Sigma rules, or mappings. The initial included set is Windows triage, Linux triage and AWS credential compromise. Windows ransomware and M365 business email compromise remain possible community extensions.
 - Bundle [**Windows triage**](https://github.com/ns2switch/irmind/issues/157): guide a scoped, synthetic KAPE or Velociraptor collection of event logs, registry hives and related transaction logs, `$MFT`, Prefetch, LNK, SRUM and Amcache. Ingest direct EVTX with its verified isolated helper, Hayabusa timelines or EvtxECmd CSV first, then EZTools exports from PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch and SrumECmd. Investigate logons → execution → persistence → lateral movement → exfiltration, correlate independent sources and confirm findings with evidence. Collection and external tools remain analyst-run; a skill grants no execution rights.
 - Bundle **Linux triage** for authentication, execution and persistence, and **AWS credential compromise** for CloudTrail, role/session activity and IAM changes.
 - The model initially sees only a skill's name and description; it loads full content when needed. Skills may be bundled, supplied by an organization, or installed by an analyst.
 - Installation is signed, and the case log records the hash of the version used. A skill can declare needed tools but cannot extend permissions: policy and the organization ceiling decide. Third-party content stays untrusted until the analyst signs it.
-- Add `/skills` to list, install, inspect, and disable skills. User-invocable skills appear as slash commands. Maintain a separate community skills repository.
+- Use `/skills` to list, install, inspect, update and disable skills. User-invocable skills appear as slash commands. Maintain a separate community skills repository.
 
 ## v0.5: Subagents and parallel work
 

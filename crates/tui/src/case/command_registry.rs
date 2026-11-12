@@ -10,6 +10,7 @@ pub(crate) struct Command {
 impl Command {
     pub(crate) fn category(&self) -> &'static str {
         match self.name {
+            "skills" => "Skills",
             "ingest" | "verify" | "seal" | "export" | "report" | "scope" | "home" | "rebuild" => {
                 "Case"
             }
@@ -47,12 +48,14 @@ pub(super) fn category_rank(category: &str) -> usize {
         "Evidence" => 1,
         "Approvals" => 2,
         "Findings" => 3,
-        "System" => 4,
+        "Skills" => 4,
         _ => 5,
     }
 }
 
+mod skills;
 mod specs;
+pub(crate) use skills::{help_with_skills, matches_with_skills, skill_help};
 use specs::COMMANDS;
 
 pub(crate) fn matches(query: &str) -> Vec<&'static Command> {

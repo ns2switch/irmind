@@ -163,7 +163,7 @@ impl ApprovedSkills {
         snapshot.compile(compiler)?;
         let name = SkillName::parse(&snapshot.name)?;
         let previous = self.latest.get(&name).map(|old| old.operation_hash.clone());
-        if snapshot.previous_operation != previous || snapshot.origin == SkillOrigin::Bundled {
+        if snapshot.previous_operation != previous {
             return Err(invalid());
         }
         self.latest.insert(
@@ -192,6 +192,20 @@ impl Engine<'_> {
         let mut approved = ApprovedSkills::default();
         for entry in &entries {
             approved.apply(entry, compiler)?;
+        }
+        for value in approved
+            .latest
+            .values()
+            .filter(|s| s.snapshot.origin == SkillOrigin::Bundled)
+        {
+            let skill = value.snapshot.compile(compiler)?;
+            if !self
+                .skills
+                .as_ref()
+                .is_some_and(|services| services.verifies_bundle(&skill))
+            {
+                return Err(SkillServiceError::InvalidOrigin.into());
+            }
         }
         Ok(approved)
     }

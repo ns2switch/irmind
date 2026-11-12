@@ -361,3 +361,7 @@ or provider truncation produces a partial-result marker; an incomplete scan neve
 claims definitive absence. Returned collections preserve their fields and precise
 detection time as signed, unclassified evidence. UDM event mapping does not invent
 a category, outcome or confirmed finding for a detection collection.
+
+## Methodology packages
+
+Skills are local data packages, not connectors or executable modules. `/skills` manages the three included methods and analyst-approved packages. They do not change compiled tools or enable providers. See [forensic skills](skills.md).

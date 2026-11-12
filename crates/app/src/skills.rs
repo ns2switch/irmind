@@ -3,6 +3,14 @@
 mod compiled;
 mod history;
 mod operations;
+mod receipts;
+pub(crate) mod runtime;
+pub use receipts::SkillReadReceipt;
+pub use receipts::{
+    SkillLoadResult, SkillLoadV1, SkillReceiptVerifier, SkillSnapshotId, SkillSnapshotV1,
+    skill_admission_references, verify_skill_admission,
+};
+pub use runtime::SkillServices;
 
 use crate::{AppError, CancellationToken, Engine};
 pub use compiled::CompiledSkill;
@@ -38,6 +46,8 @@ pub enum SkillOrigin {
 pub enum SkillServiceError {
     #[error("signed skill history is invalid")]
     InvalidHistory,
+    #[error("skill receipt or its authorization is invalid")]
+    InvalidReceipt,
     #[error("skill history or installation count exceeds its limit")]
     HistoryLimit,
     #[error("at most 32 skills can be active")]

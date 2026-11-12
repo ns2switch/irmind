@@ -1,5 +1,6 @@
 ---
 source: crates/tui/src/home/render/tests.rs
+assertion_line: 161
 expression: menu
 ---
 IRMind v0.1.0
@@ -13,6 +14,7 @@ Recent cases · all
 
 ╭ Commands ────────────────────────────────────────────────────────────────────╮
 │> /home — Return to case list                                                 │
+│  /skills — Inspect, install or manage signed forensic methods                │
 │  /cases — List cases; optional all|open|sealed|inconsistent                  │
 │  /demo — Play an offline synthetic presentation; Enter, Backspace, Space, Esc│
 │  /help — Show commands; /help <command> explains one command                 │
@@ -20,7 +22,6 @@ Recent cases · all
 │  /open — Open a case by title or ID                                          │
 │  /parsers — Manage or preview signed declarative parsers                     │
 │  /quit — Return to case list                                                 │
-│  /restart — Restart the session after a change                               │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │/                                                                             │

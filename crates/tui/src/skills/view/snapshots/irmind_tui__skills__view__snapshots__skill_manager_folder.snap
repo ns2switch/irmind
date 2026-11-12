@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/skills/view/snapshots.rs
+expression: text
+---
+Forensic skills · methodology never grants permissions
+
+Choose a local skill folder containing SKILL.md. Nothing is downloaded. The
+original folder remains unchanged.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+┌Skill folder──────────────────────────────────────────────────────────────────┐
+│examples/skills/linux-triage                                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+Synthetic inline error · Esc returns without applying.
+
+↑/↓ choose · Tab actions · Enter confirm · PgUp/PgDn scroll · Esc back

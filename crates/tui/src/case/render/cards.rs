@@ -34,6 +34,7 @@ pub(super) fn audit_card(
             Some(decision_card(entry, state, engine)?)
         }
         AuditEventKind::ToolResult => Some(result_card(entry, state, engine)?),
+        AuditEventKind::SkillLoadV1 => Some(skill_load_card(entry, engine)?),
         AuditEventKind::ToolError => rejected_source_card(entry, engine)?,
         AuditEventKind::EvidenceIngested => Some(Card::new(
             CardKind::Notice,
@@ -67,6 +68,27 @@ pub(super) fn audit_card(
     Ok(card)
 }
 
+fn skill_load_card(entry: &SignedEntry, engine: &Engine<'_>) -> Result<Card> {
+    let load = irmind_app::SkillLoadV1::decode(&entry.payload)?;
+    let detail = format!(
+        "Methodology, not evidence.\nResource: {}\nStatus: {:?}\n{}",
+        load.resource(),
+        load.result(),
+        load.text()
+    );
+    Ok(Card::new(
+        CardKind::ToolResult,
+        "Forensic method",
+        engine.guard.screen(&detail)?.text,
+        false,
+    )
+    .with_summary(format!(
+        "{:?} · {} bytes · Agent-signed receipt",
+        load.result(),
+        load.bytes()
+    )))
+}
+
 fn rejected_source_card(entry: &SignedEntry, engine: &Engine<'_>) -> Result<Option<Card>> {
     let Some(source) = irmind_app::RejectedSource::from_audit(entry)? else {
         return Ok(None);
@@ -94,6 +116,7 @@ fn is_hidden_custody_payload(kind: AuditEventKind) -> bool {
             | AuditEventKind::SourceManifestV2
             | AuditEventKind::ParquetArtifactV1
             | AuditEventKind::ParquetArtifactV2
+            | AuditEventKind::SkillSnapshotV1
     )
 }
 
@@ -304,6 +327,7 @@ fn friendly_tool(value: &str) -> String {
         "siem_get_alert" => "SIEM alert".into(),
         "cloud_audit_events" => "Cloud audit events".into(),
         "edr_process_tree" => "EDR process tree".into(),
+        "skill_read" => "Read forensic method".into(),
         other => other.replace('_', " "),
     }
 }
@@ -317,7 +341,7 @@ fn friendly_call(payload: &str) -> String {
     let Some(object) = value.as_object() else {
         return name;
     };
-    let primary = ["ioc", "host", "query", "id", "source"]
+    let primary = ["ioc", "host", "query", "id", "source", "name"]
         .iter()
         .find_map(|key| object.get(*key).and_then(serde_json::Value::as_str));
     primary.map_or(name.clone(), |value| {

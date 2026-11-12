@@ -166,6 +166,7 @@ fn initial_state(
         menu_selected: 0,
         menu_query: None,
         model_preview: String::new(),
+        skill_commands: engine.skill_command_metadata().unwrap_or_default(),
         model_round: None,
         approvals,
         approval_sources,

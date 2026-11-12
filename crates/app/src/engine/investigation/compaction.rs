@@ -4,7 +4,7 @@ use crate::{
     CompletionRequest, Engine, LlmPort, MessageRole, isolate_untrusted,
 };
 
-fn context_bytes(messages: &[CompletionMessage]) -> usize {
+pub(super) fn context_bytes(messages: &[CompletionMessage]) -> usize {
     messages
         .iter()
         .map(|message| {

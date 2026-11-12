@@ -91,19 +91,8 @@ pub(super) fn verify_artifact_frames(
     input: &mut File,
     expected: &BTreeMap<String, ArtifactFrame>,
 ) -> Result<(), AppError> {
-    // Empty pre-inventory V5 seeds have no derived files. Cases with signed
-    // artifacts require the complete section; EOF cannot downgrade coverage.
-    let mut first = [0u8; 1];
-    if input.read(&mut first).map_err(storage)? == 0 {
-        return if expected.is_empty() {
-            Ok(())
-        } else {
-            Err(storage_reason("missing derived files from V5 export"))
-        };
-    }
     let mut count = [0u8; 8];
-    count[0] = first[0];
-    input.read_exact(&mut count[1..]).map_err(storage)?;
+    input.read_exact(&mut count).map_err(storage)?;
     if u64::from_be_bytes(count) != expected.len() as u64 {
         return Err(storage_reason(
             "derived-file count differs from signed inventory",
@@ -127,10 +116,6 @@ pub(super) fn verify_artifact_frames(
         } else {
             verify_raw(input, frame.size, &frame.sha256)?;
         }
-    }
-    let mut extra = [0u8; 1];
-    if input.read(&mut extra).map_err(storage)? != 0 {
-        return Err(storage_reason("export has trailing bytes"));
     }
     Ok(())
 }

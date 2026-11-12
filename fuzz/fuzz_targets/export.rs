@@ -4,7 +4,7 @@ use libfuzzer_sys::fuzz_target;
 use std::io::Write as _;
 
 fuzz_target!(|bytes: &[u8]| {
-    if bytes.len() > 262_144 {
+    if bytes.len() > 2 * 1024 * 1024 {
         return;
     }
     if let Ok(mut file) = tempfile::NamedTempFile::new() {

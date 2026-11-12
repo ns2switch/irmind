@@ -23,6 +23,17 @@ pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
         | Tool::EdrDetections
         | Tool::ThreatIntelExternal => valid_edr_and_external_intel(proposal),
         Tool::ObjectList | Tool::ObjectRead => valid_object_request(proposal),
+        Tool::SkillRead => {
+            valid_args(&proposal.args, &["name", "resource"])
+                && proposal
+                    .args
+                    .get("name")
+                    .is_some_and(|n| crate::SkillName::parse(n).is_ok())
+                && proposal
+                    .args
+                    .get("resource")
+                    .is_none_or(|p| crate::SkillResourcePath::parse(p).is_ok())
+        }
     }
 }
 

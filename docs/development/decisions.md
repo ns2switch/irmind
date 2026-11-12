@@ -989,3 +989,11 @@ The filesystem adapter reuses the existing Windows handle-information query to
 check link counts through an open file; the launcher's checks remain identical.
 Unix generations use private permissions and Windows uses the existing ACL
 boundary. Skill Debug output and errors omit package content.
+
+## Signed forensic skills in 0.4
+
+Context: investigation methodology must be inspectable and reproducible as data without becoming a source of tool authority.
+
+Decision: compose local compiler/store ports, signed global installations, Analyst-signed case snapshots and Agent-signed progressive-load receipts. Advertise only active names/descriptions initially. Keep all full text untrusted and out of system messages and evidence. Recheck current activation and declarations before subsequent method-assisted calls. Include exact referenced installation admissions in export V7 and keep the exporter port named `export_case` independently of its wire version.
+
+Consequences: independent verifiers authenticate original packages and recorded screened loads without a keystore. They do not reproduce model reasoning or independently establish publisher trust from a bundled inventory label. The signed-entry envelope, Parquet V3 and seal inventory V2 are unchanged. The three included local methods do not enable a provider. Unsupported or locally changed packages are unavailable until explicit analyst action.

@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod parsers;
+mod skills;
 
 mod case;
 mod demo_choice;

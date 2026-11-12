@@ -2,6 +2,12 @@ use super::Command;
 
 pub(super) const COMMANDS: &[Command] = &[
     Command {
+        name: "skills",
+        description: "Inspect, install or manage signed forensic methods",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
         name: "parsers",
         description: "Manage or preview signed declarative parsers",
         shortcut: "",

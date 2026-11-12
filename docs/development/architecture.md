@@ -70,3 +70,11 @@ The audit log and case state share a SQLite transaction. Case sealing signs a pr
 For Chat Completions providers, reuse `irmind-llm-chat-completions`. Anthropic uses a separate native Messages adapter. New modules remain frozen until the current structural and documentation work is reviewed.
 
 The EVTX decoder lives in the separate Cargo workspace `helpers/evtx`, with an independent lockfile. The main parser module validates bounded NDJSON and retains source provenance. Its feature graph cannot enable decoder features in the main executable. See the [containment design](evtx-helper-design.md).
+
+## Methodology pipeline
+
+The composition root supplies the approved local `SkillCompiler` and `SkillPackageStore` ports and an Agent signer. Included packages are exact compiled bytes. `/skills` invokes application preview/installation/activation/restoration use cases; the shared command registry adds active invocable methods to case menus, help and the palette.
+
+The agent sees a guarded name/description catalog, then proposes the bounded local `skill_read` tool. The application applies policy and remaining budgets, pins `SkillSnapshotV1` with the Analyst key and appends `SkillLoadV1` with the Agent key before exposing a screened resource as an UNTRUSTED tool result. Method-assisted tools also require a current, active package and a matching declaration before normal authorization. Package identities never enter the evidence namespace.
+
+The V7 exporter appends only the installation admissions referenced by case snapshots. Offline verification uses the pinned package compiler, signed envelopes and admission proofs, without a keystore or downloading code. The `LargeCaseExporter::export_case` port is independent of the file version. [The format contract](skills-case-format-contract.md) fixes the exact encodings.

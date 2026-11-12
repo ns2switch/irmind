@@ -72,7 +72,7 @@ fn registry() -> ModuleRegistry {
 }
 
 #[test]
-fn default_source_ingestion_is_mapped_and_exports_v6() {
+fn default_source_ingestion_is_mapped_and_exports_v7() {
     let root = tempfile::tempdir().unwrap();
     let (_, engine) = setup(root.path(), false);
     let registry = registry();
@@ -133,7 +133,7 @@ fn default_source_ingestion_is_mapped_and_exports_v6() {
         irmind_app::verify_export_details(&LocalExportVerifier, &path, Some(&key))
             .unwrap()
             .format_version,
-        6
+        7
     );
 }
 

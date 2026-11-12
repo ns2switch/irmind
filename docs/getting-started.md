@@ -102,3 +102,7 @@ An external lookup waits for a signed approval. The card shows the exact argumen
 ## Next
 
 Use [configuration](configuration.md) for scopes, policy, backends, and credential names. Use [modules](modules.md) for connector permissions and limitations, and [platforms](platforms.md) for SSH notes. The TUI is the primary workflow; subcommands serve automation.
+
+## Forensic methods
+
+Open `/skills` to inspect the included Windows, Linux and AWS methods, install a reviewed local folder or sign an activation change. In a case, type `/windows-triage`, `/linux-triage` or `/aws-credential-compromise` and append your question. The agent can also choose a method from its description. Loading is progressive and always untrusted; policy and approvals stay the same. The [skills guide](skills.md) explains limits and signed receipts in export V7.

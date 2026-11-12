@@ -25,7 +25,7 @@ impl ExportVerifier for LocalExportVerifier {
         path: &Path,
         expected_key: Option<&str>,
     ) -> Result<irmind_app::ExportVerification, AppError> {
-        super::verify_current::verify_export_v6(path, expected_key)
+        super::verify_current::verify_export_v7(path, expected_key)
     }
 }
 
@@ -36,6 +36,6 @@ pub fn verify_export_expected(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<(String, usize), AppError> {
-    let verified = super::verify_current::verify_export_v6(path, expected_key)?;
+    let verified = super::verify_current::verify_export_v7(path, expected_key)?;
     Ok((verified.analyst_key_fingerprint, verified.entries))
 }

@@ -105,6 +105,7 @@ pub struct Engine<'a> {
         >,
     >,
     pub(crate) object_progress: ObjectProgressMap,
+    pub(crate) skills: Option<Arc<crate::SkillServices>>,
 }
 
 pub struct EnginePorts {
@@ -178,6 +179,7 @@ impl<'a> Engine<'a> {
             pricing: self.pricing,
             verified_cases: Arc::clone(&self.verified_cases),
             object_progress: Arc::clone(&self.object_progress),
+            skills: self.skills.clone(),
         }
     }
 
@@ -346,6 +348,7 @@ impl Engine<'_> {
                     .any(|port| port.supports(&Tool::EdrDetections)),
                 "ti_lookup_internal" => !self.internal_intel.is_empty(),
                 "ti_lookup_external" => self.threat_intel.is_some(),
+                "skill_read" => self.skills.is_some(),
                 "object_list" => !self.object_sources.is_empty(),
                 "object_read" => !self.object_sources.is_empty() && self.large_case_store.is_some(),
                 _ => true,

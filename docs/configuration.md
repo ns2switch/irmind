@@ -151,3 +151,7 @@ RFC 3164 time settings belong to an ingestion, not config.toml. Confirm the year
 CLI ingestion, the TUI and the demo use the same source decoder, selected mapping and direct V3 writer. There is no writer preference. Each source records its decoder, mapping profile and mapping receipt in the signed case chain. JSON/cloud JSON, ECS, OCSF, EVTX, Linux, syslog, DFIR tool output, network logs and declarative definitions use this pipeline.
 
 A mapping may preserve searchable fields and entities without classifying an event. Missing categories, outcomes and roles are not inferred from message text. New mappings apply to new ingestions. Pre-1.0 formats may change without migration; retain the creating version or re-ingest verified originals into a new case. No model or connector is enabled by the storage format.
+
+## Local skills
+
+`/skills` manages installations and activation through signed global operations, separate from `config.toml`. The preview shows package hashes, tools and resources before signing. No automatic download or additional credential is involved. You can inspect the three included methods without a model. See the [skills guide](skills.md).

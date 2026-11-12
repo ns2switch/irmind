@@ -1,4 +1,4 @@
-use super::export_current::{HeaderV6, MAGIC_V6, v6_result};
+use super::export_current::{HeaderV7, MAGIC_V7, v7_result};
 use super::frames::{read_frame, read_hash, read_u64, verify_raw};
 use super::{
     AppError, CaseId, LocalVerifier, Path, Severity, hex, seal_challenge, sha256, storage,
@@ -14,7 +14,7 @@ const MAX_AUDIT_ENTRIES: u64 = 5_000_000;
 const MAX_SOURCE_MANIFESTS: usize = 1_000_000;
 const MAX_PACKAGE_FILE_BYTES: u64 = 2_000_000_000_000;
 
-pub(super) fn verify_export_v6(
+pub(super) fn verify_export_v7(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
@@ -30,17 +30,17 @@ fn verify_open_export(
     size: u64,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
-    let version = 6;
+    let version = 7;
     if size > MAX_PACKAGE_FILE_BYTES {
         return Err(storage_reason("export package exceeds size limit"));
     }
-    let mut magic = [0u8; MAGIC_V6.len()];
-    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V6 {
+    let mut magic = [0u8; MAGIC_V7.len()];
+    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V7 {
         return Err(AppError::Fixed(
             irmind_app::FixedAppError::RetiredExportFormat,
         ));
     }
-    let header: HeaderV6 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
+    let header: HeaderV7 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
     if header.version != version {
         return Err(storage_reason("unsupported export version"));
     }
@@ -79,7 +79,17 @@ fn verify_open_export(
     {
         super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
     }
-    let mut result = v6_result(
+    super::skill_proofs::read(
+        &mut input,
+        &chain.skills,
+        &chain.verifier,
+        &header.seal.public_key,
+    )?;
+    let mut extra = [0u8; 1];
+    if input.read(&mut extra).map_err(storage)? != 0 {
+        return Err(storage_reason("export has trailing bytes"));
+    }
+    let mut result = v7_result(
         fingerprint,
         usize::try_from(count).map_err(storage)?,
         chain.source_count,
@@ -92,7 +102,7 @@ fn verify_open_export(
 fn verify_operation_frames(
     input: &mut File,
     chain: &mut ChainState,
-    header: &HeaderV6,
+    header: &HeaderV7,
 ) -> Result<(), AppError> {
     let count = read_u64(input)?;
     if count > MAX_AUDIT_ENTRIES {
@@ -192,6 +202,7 @@ fn verify_source_frames(input: &mut File, chain: &mut ChainState) -> Result<usiz
 }
 
 struct ChainState {
+    skills: irmind_app::SkillReceiptVerifier,
     mapping_installations:
         BTreeMap<irmind_domain::EvidenceHash, irmind_app::source_mapping::MappingManifest>,
     catalog: irmind_app::ArtifactCatalogBuilder,
@@ -212,6 +223,7 @@ struct ChainState {
 impl ChainState {
     fn new() -> Self {
         Self {
+            skills: irmind_app::SkillReceiptVerifier::default(),
             mapping_installations: BTreeMap::new(),
             catalog: irmind_app::ArtifactCatalogBuilder::default(),
             inventory: irmind_app::SealInventoryBuilder::default(),
@@ -258,6 +270,7 @@ impl ChainState {
             self.inventory.accept(&entry)?;
         }
         super::mapping_proofs::collect(&entry, &mut self.mapping_installations)?;
+        self.skills.accept(&entry, &crate::TomlSkillCompiler)?;
         self.accept_metadata(&entry)?;
         if let Some(hash) = &entry.evidence {
             self.referenced_evidence.insert(hash.clone());
@@ -323,7 +336,7 @@ impl ChainState {
         Ok(())
     }
 
-    fn verify_seal(&self, id: &CaseId, header: &HeaderV6) -> Result<(), AppError> {
+    fn verify_seal(&self, id: &CaseId, header: &HeaderV7) -> Result<(), AppError> {
         {
             self.catalog.validate()?;
         }

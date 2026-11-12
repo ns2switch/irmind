@@ -108,7 +108,7 @@ fn mapped_source_has_signed_lineage_public_v6_verification_and_reconstruction() 
         .unwrap();
     let verified =
         irmind_app::verify_export_details(&LocalExportVerifier, &path, Some(&key)).unwrap();
-    assert_eq!(verified.format_version, 6);
+    assert_eq!(verified.format_version, 7);
     assert!(
         irmind_app::verify_export_details(&LocalExportVerifier, &path, Some(&"00".repeat(32)))
             .is_err()
