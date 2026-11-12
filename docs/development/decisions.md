@@ -837,3 +837,7 @@ Consequences: backend selection stays explicit and unavailable backends fail
 closed. Current signatures, custody/export bytes, verification and native backend
 contract tests stay pinned. The file-only minimum build no longer acquires a
 system-keyring dependency through infrastructure.
+
+Retirement also removes fifteen fixed error variants whose only references were
+their declarations. They described removed writers, indexes and migrations.
+Current error messages and rejection paths are unchanged.
