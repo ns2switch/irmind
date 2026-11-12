@@ -1721,3 +1721,22 @@ Mapping/projection remain serial within a source and consume about 8.14 s at
 four workers. Their bounded parallel preparation is the next measured change;
 canonical source commitments, partition assignment and publication stay ordered.
 [Machine-readable samples](benchmark-data/mapped-worker-stage-profile.json).
+
+### Record-sized mapping handoff experiment
+
+The [paired release run](https://github.com/ns2switch/irmind/actions/runs/43121090174)
+compares the frozen current reference and a single-record channel implementation
+on one four-core runner, with three alternating pairs per setting. Both produce
+663,212 records and 48,510,482 artifact bytes and pass full reconstruction.
+
+| Requested workers | Reference median | Record handoff median | Candidate/reference |
+| --- | ---: | ---: | ---: |
+| 1 | 18.283 s | 18.592 s | 1.017× |
+| 4 | 15.635 s | 21.427 s | 1.370× |
+| Automatic (3) | 16.515 s | 32.181 s | 1.949× |
+
+This experiment is rejected: fine-grained wakeups and serial handoffs outweigh
+parallel preparation, especially with one mapping lane. Bounded input/output
+batches amortize coordination in the next candidate. The
+[raw measurements](benchmark-data/mapped-record-handoff-experiment.json) retain
+stage counters and RSS; they must not be presented as an ingestion speedup.

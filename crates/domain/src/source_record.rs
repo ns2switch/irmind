@@ -71,6 +71,8 @@ pub struct SourceRecordV1 {
     format: SourceFormatV1,
     fields: SourceValue,
     annotations: DecodeAnnotationsV1,
+    // Scheduling metadata only: deliberately absent from the canonical codec.
+    retained_bytes: usize,
 }
 impl std::fmt::Debug for SourceRecordV1 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -110,7 +112,8 @@ impl SourceRecordV1 {
         if !matches!(fields, SourceValue::Object(_)) {
             return Err(SourceRecordError::InvalidDescriptor);
         }
-        let estimated = fields.validate()?
+        let (field_bytes, nodes) = fields.measured_size()?;
+        let estimated = field_bytes
             + 512
             + source.reference().len()
             + origin.parser().len()
@@ -128,7 +131,12 @@ impl SourceRecordV1 {
             format,
             fields,
             annotations,
+            retained_bytes: estimated * 2 + nodes * 256 + 8192,
         })
+    }
+    /// Conservative bounded-queue charge, independent of signed encoding.
+    pub const fn retained_bytes(&self) -> usize {
+        self.retained_bytes
     }
     pub const fn origin(&self) -> &EventOrigin {
         &self.origin

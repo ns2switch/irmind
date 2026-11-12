@@ -90,9 +90,11 @@ pub(super) fn decode_source(
                 result
             },
         );
-        let pending = emit(None);
-        callback_failed |= pending.is_err();
-        pending?;
+        if !callback_failed {
+            let pending = emit(None);
+            callback_failed |= pending.is_err();
+            pending?;
+        }
         let report = source_result(
             input.relative_path,
             input.sample,
@@ -120,9 +122,11 @@ pub(super) fn decode_source(
                 outcome
             },
         );
-        let pending = emit(None);
-        callback_failed |= pending.is_err();
-        pending?;
+        if !callback_failed {
+            let pending = emit(None);
+            callback_failed |= pending.is_err();
+            pending?;
+        }
         if reader.io_failed {
             return Err(storage("source read failed"));
         }
@@ -147,6 +151,9 @@ fn source_result(
     result: Result<irmind_app::ParseReport, AppError>,
     callback_failed: bool,
 ) -> Result<irmind_app::ParseReport, AppError> {
+    if callback_failed && result.is_ok() {
+        return Err(invalid_source());
+    }
     let report = match result {
         Err(AppError::Fixed(irmind_app::FixedAppError::SourceFormat)) if !callback_failed => {
             return Err(rejected(
