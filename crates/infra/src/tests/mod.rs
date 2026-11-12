@@ -22,7 +22,7 @@ fn model_calls(proposals: Vec<ProposedCall>) -> Vec<ModelToolCall> {
 use irmind_domain::{
     Actor, Case, CaseId, Decision, ExecutionMode, PolicyRules, ProposedCall, Tool, evaluate,
 };
-use irmind_domain::{Provenance, SourceKind};
+use irmind_domain::{Provenance, SourceKind, Tainted};
 use irmind_mod_parser_json::JsonParser;
 use irmind_security::MandatoryGuard;
 use irmind_testkit::FakeEdr;

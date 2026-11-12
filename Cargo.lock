@@ -2885,6 +2885,7 @@ dependencies = [
  "irmind-domain",
  "irmind-mod-parser-json",
  "irmind-testkit",
+ "serde_json",
 ]
 
 [[package]]

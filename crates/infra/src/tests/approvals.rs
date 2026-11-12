@@ -90,7 +90,7 @@ fn analyst_resolves_persistent_agent_requests_without_external_execution() {
         key: agent_key,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let case_id = {
         let store = Arc::new(open_source_store(root.path()).unwrap());
         let attended = Engine::new(
@@ -108,7 +108,6 @@ fn analyst_resolves_persistent_agent_requests_without_external_execution() {
                     ),
                 ),
                 guard.clone(),
-                parser.clone(),
             ),
             ExecutionMode::Attended,
             Arc::new(SystemClock),
@@ -129,7 +128,6 @@ fn analyst_resolves_persistent_agent_requests_without_external_execution() {
                     ),
                 ),
                 guard.clone(),
-                parser.clone(),
             ),
             ExecutionMode::Unattended,
             Arc::new(SystemClock),
@@ -169,7 +167,6 @@ fn analyst_resolves_persistent_agent_requests_without_external_execution() {
                 ),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -190,7 +187,6 @@ fn analyst_resolves_persistent_agent_requests_without_external_execution() {
                 ),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Unattended,
         Arc::new(SystemClock),

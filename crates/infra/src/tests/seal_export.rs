@@ -10,7 +10,7 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -22,7 +22,6 @@ fn sealed_export_verifies_without_local_key_and_detects_tampering() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

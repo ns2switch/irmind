@@ -31,7 +31,6 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

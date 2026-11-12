@@ -32,7 +32,6 @@ use irmind_mod_parser_chainsaw::ChainsawParser;
 use irmind_mod_parser_ecs::EcsParser;
 use irmind_mod_parser_eztools::EztoolsParser;
 use irmind_mod_parser_hayabusa::HayabusaParser;
-use irmind_mod_parser_json::JsonParser;
 use irmind_mod_parser_ocsf::OcsfParser;
 use irmind_mod_parser_plaso::PlasoParser;
 use irmind_mod_parser_suricata::SuricataParser;
@@ -114,7 +113,6 @@ fn local_ocsf_parquet_is_signed_and_rebuilds_without_a_parser_spool()
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new()?),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -174,7 +172,6 @@ fn parser_modules_ingest_sign_and_rebuild_without_private_answers() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -528,7 +525,6 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() -> Result<(), Box<dyn std::er
                     Arc::new(LocalVerifier::from_signer(signer.as_ref())),
                 ),
                 Arc::new(MandatoryGuard::new().unwrap()),
-                Arc::new(JsonParser),
             ),
             ExecutionMode::Attended,
             Arc::new(SystemClock),

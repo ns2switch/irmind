@@ -22,7 +22,7 @@ fn reference_corpus() -> Result<(), String> {
             key: SigningKey::from_bytes(&[75u8; 32]),
             actor: Actor::Analyst,
         });
-        let parser = Arc::new(JsonParser);
+
         let engine = Engine::new(
             EnginePorts::new(
                 store.clone(),
@@ -34,7 +34,6 @@ fn reference_corpus() -> Result<(), String> {
                     Arc::new(LocalVerifier::from_signer(signer.as_ref())),
                 ),
                 Arc::new(MandatoryGuard::new().unwrap()),
-                parser.clone(),
             ),
             ExecutionMode::Attended,
             Arc::new(SystemClock),

@@ -21,11 +21,11 @@ use ed25519_dalek::{Signer as _, SigningKey};
 use fs4::fs_std::FileExt as _;
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CaseExporter, CaseLock, CaseMutation, CaseSeal,
-    EventParser, EvidenceGraph, EvidenceStore, ExportVerifier, GLOBAL_OPERATION_SCOPE, Repository,
-    SignedEntry, SignedOperation, Signer, TimelineEvent, Verifier, hex, seal_challenge, sha256,
+    EvidenceGraph, EvidenceStore, ExportVerifier, GLOBAL_OPERATION_SCOPE, Repository, SignedEntry,
+    SignedOperation, Signer, TimelineEvent, Verifier, hex, seal_challenge, sha256,
     verify_case_metadata,
 };
-use irmind_domain::{Actor, AnalystApprovalVerifier, Case, CaseId, Severity, Tainted};
+use irmind_domain::{Actor, AnalystApprovalVerifier, Case, CaseId, Severity};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde_json::json;
 use std::fs::{self, OpenOptions};

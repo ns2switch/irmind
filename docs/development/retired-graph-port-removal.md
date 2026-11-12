@@ -1,12 +1,12 @@
 # Retiring unused buffered graph construction contracts
 
-This proposal is for maintainers reviewing the final pre-1.0 source-pipeline cleanup. It removes interfaces whose implementations no longer construct or verify an index.
+This contract records the final pre-1.0 source-pipeline cleanup. It removes interfaces whose implementations no longer construct or verify an index.
 
-## Current state
+## Motivation
 
 Every ingestion path uses `SourceDecoder`, an identified `SourceMapper`, `LargeCaseStore::prepare_mapped_ingest` and the signed V3 commit path. `LocalStore` rejects the old `EvidenceGraph` construction methods. No production caller invokes them. The `EventParser` object still travels through `EnginePorts` and local engine handles solely to satisfy those unused signatures.
 
-## Proposed contract change
+## Removed contracts
 
 Remove the `EventParser` trait, `EnginePorts::parser`, `Engine::parser` and the final parser argument of `EnginePorts::new`. Remove only these four methods from `EvidenceGraph`:
 
@@ -24,3 +24,10 @@ Remove their rejected implementations, obsolete small-buffer parser implementati
 No case, source, artifact, mapping, seal or export encoding changes. Current format golden bytes remain pinned. Ingestion, reconstruction and exported-package verification still authenticate sources, mapping profiles, receipts and physical artifacts. Policy, taint, ContentGuard, approval and resource limits remain unchanged.
 
 Validation covers inward dependencies, native helper contracts, source/mapping contracts, signed worker determinism, all current format golden fixtures and the full release benchmark matrix. This is an API removal, not a new fallback or migration path.
+
+## Projection coverage
+
+The former buffered JSON implementation is removed. Its extraction assertions now
+exercise `JsonSourceDecoder` and `JsonCompatibilityMapping` directly. Existing
+current format golden fixtures remain unchanged. Decoder depth, framing, record
+size, cancellation and provenance tests cover the active streaming path.

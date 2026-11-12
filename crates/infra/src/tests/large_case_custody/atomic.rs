@@ -16,7 +16,7 @@ fn failed_artifact_insert_rolls_back_the_source_manifest() {
         key: SigningKey::from_bytes(&[79; 32]),
         actor: Actor::Analyst,
     });
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -28,7 +28,6 @@ fn failed_artifact_insert_rolls_back_the_source_manifest() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

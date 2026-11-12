@@ -53,7 +53,6 @@ impl Session {
                     Arc::new(irmind_infra::LocalVerifier::from_signer(signer.as_ref())),
                 ),
                 Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
-                Arc::new(irmind_mod_parser_json::JsonParser),
             ),
             ExecutionMode::Attended,
             Arc::new(irmind_testkit::FixedClock::new(1_793_491_200)),

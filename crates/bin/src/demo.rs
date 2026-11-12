@@ -266,7 +266,6 @@ fn run_in_directory(
             Arc::new(LocalVerifier::from_signer(signer.as_ref())),
         ),
         Arc::new(MandatoryGuard::new()?),
-        Arc::new(JsonParser),
     );
     let intel = SyntheticIntel;
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?

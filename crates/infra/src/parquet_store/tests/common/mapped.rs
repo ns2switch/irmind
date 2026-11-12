@@ -196,7 +196,6 @@ pub(super) fn assert_rebuild(root: &Path, paths: &[String], compact: bool) {
                 Arc::new(crate::LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
-            Arc::new(JsonParser),
         ),
         irmind_domain::ExecutionMode::Attended,
         Arc::new(crate::SystemClock),

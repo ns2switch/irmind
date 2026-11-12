@@ -1,8 +1,8 @@
 use crate::{
-    AppError, AuditLog, CaseId, EventParser, EvidenceGraph, LocalStore, Repository, Tainted,
-    TimelineEvent, storage, storage_reason,
+    AppError, AuditLog, CaseId, EvidenceGraph, LocalStore, Repository, TimelineEvent, storage,
+    storage_reason,
 };
-use irmind_app::{CancellationToken, GraphRecord};
+use irmind_app::CancellationToken;
 use irmind_domain::{CaseScope, GraphQueryFilter, ParquetArtifact};
 
 struct QueryCatalog {
@@ -19,28 +19,6 @@ mod catalog;
 pub(crate) use catalog::CachedCatalog;
 
 impl EvidenceGraph for LocalStore {
-    fn index_from_parser(
-        &self,
-        _id: &CaseId,
-        _hash: &str,
-        _source: &str,
-        _bytes: &[u8],
-        _parser: &dyn EventParser,
-        _cancel: &CancellationToken,
-    ) -> Result<usize, AppError> {
-        Err(retired_index())
-    }
-
-    fn index_records(
-        &self,
-        _id: &CaseId,
-        _hash: &str,
-        _records: &[Tainted<GraphRecord>],
-        _cancel: &CancellationToken,
-    ) -> Result<(), AppError> {
-        Err(retired_index())
-    }
-
     fn graph_version(&self) -> &'static str {
         "parquet-graph-v1"
     }
@@ -203,26 +181,6 @@ impl EvidenceGraph for LocalStore {
             irmind_app::AdapterPolicyError::RecordPointerIsNotIndexedInThisCase,
         )))
     }
-
-    fn rebuild_graph(
-        &self,
-        _id: &CaseId,
-        _sources: &[(String, usize)],
-        _parser: &dyn EventParser,
-        _cancel: &CancellationToken,
-    ) -> Result<usize, AppError> {
-        Err(retired_index())
-    }
-
-    fn verify_graph(
-        &self,
-        _id: &CaseId,
-        _sources: &[(String, usize)],
-        _parser: &dyn EventParser,
-        _cancel: &CancellationToken,
-    ) -> Result<usize, AppError> {
-        Err(retired_index())
-    }
 }
 
 fn format_raw(hash: &str, index: usize, raw: &str) -> String {
@@ -233,10 +191,6 @@ fn format_raw(hash: &str, index: usize, raw: &str) -> String {
         ""
     };
     format!("source={hash}#{index} {excerpt}{suffix}")
-}
-
-fn retired_index() -> AppError {
-    AppError::Policy("the old graph index is retired; ingest through the signed Parquet use case or run /migrate".into())
 }
 
 impl LocalStore {

@@ -20,7 +20,6 @@ use irmind_domain::{
 use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
 #[cfg(feature = "keystore-file")]
 use irmind_mod_keystore_file::FileKeystore;
-use irmind_mod_parser_json::JsonParser;
 use irmind_security::MandatoryGuard;
 use irmind_tui::{
     ModuleKind, ModuleParameter, ModuleSelectionSource, ModuleStatus, WorkspaceIo,

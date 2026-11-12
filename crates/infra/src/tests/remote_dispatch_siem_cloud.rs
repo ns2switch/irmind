@@ -66,7 +66,7 @@ fn every_port_family_dispatches_signed_approval_through_registry() {
             actor: Actor::Analyst,
         });
         let guard = Arc::new(MandatoryGuard::new().unwrap());
-        let parser = Arc::new(JsonParser);
+
         let mut registry = ModuleRegistry::new();
         match family {
             "siem" => registry
@@ -109,7 +109,6 @@ fn every_port_family_dispatches_signed_approval_through_registry() {
                             Arc::new(LocalVerifier::from_signer(signer.as_ref())),
                         ),
                         guard.clone(),
-                        parser.clone(),
                     ),
                     ExecutionMode::Attended,
                     Arc::new(SystemClock),
@@ -207,7 +206,7 @@ fn scoped_siem_read_uses_authorized_port_and_keeps_raw_evidence_local() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let siem = FakeSiem {
         calls: Mutex::new(0),
         source_id: "splunk-prod".into(),
@@ -223,7 +222,6 @@ fn scoped_siem_read_uses_authorized_port_and_keeps_raw_evidence_local() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -305,7 +303,7 @@ fn scoped_cloud_read_is_audited_and_redacted() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let cloud = FakeCloudAudit(Mutex::new(0));
     let engine = Engine::new(
         EnginePorts::new(
@@ -318,7 +316,6 @@ fn scoped_cloud_read_is_audited_and_redacted() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

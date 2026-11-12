@@ -9,7 +9,7 @@ fn forged_approval_without_challenge_signature_fails_verification() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -21,7 +21,6 @@ fn forged_approval_without_challenge_signature_fails_verification() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -70,7 +69,7 @@ fn concurrent_ingest_serializes_a_case() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -82,7 +81,6 @@ fn concurrent_ingest_serializes_a_case() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -140,7 +138,7 @@ fn analyst_and_agent_entries_use_distinct_keys_in_one_export() {
         key: agent_key,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let attended = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -156,7 +154,6 @@ fn analyst_and_agent_entries_use_distinct_keys_in_one_export() {
                 ),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -177,7 +174,6 @@ fn analyst_and_agent_entries_use_distinct_keys_in_one_export() {
                 ),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Unattended,
         Arc::new(SystemClock),
@@ -224,7 +220,6 @@ fn retired_graph_file_is_ignored_without_changing_the_signed_case() {
                     Arc::new(LocalVerifier::from_signer(signer.as_ref())),
                 ),
                 Arc::new(MandatoryGuard::new().unwrap()),
-                Arc::new(JsonParser),
             ),
             ExecutionMode::Attended,
             Arc::new(SystemClock),

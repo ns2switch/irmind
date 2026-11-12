@@ -35,7 +35,7 @@ fn synthetic_export_with_originals(path: &std::path::Path) -> String {
     };
     use irmind_domain::ExecutionMode;
     use irmind_infra::{LocalStore, LocalVerifier, SystemClock};
-    use irmind_mod_parser_json::{JsonParser, JsonSourceDecoder};
+    use irmind_mod_parser_json::JsonSourceDecoder;
     use irmind_security::MandatoryGuard;
 
     let scratch = tempfile::tempdir().unwrap();
@@ -59,7 +59,7 @@ fn synthetic_export_with_originals(path: &std::path::Path) -> String {
     let store = Arc::new(LocalStore::open_mapped(&scratch.path().join("case"), catalog).unwrap());
     let source_parser = SourceDecoderSelection::new(decoder);
     let signer = Arc::new(FixtureSigner(SigningKey::from_bytes(&[17; 32])));
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -71,7 +71,6 @@ fn synthetic_export_with_originals(path: &std::path::Path) -> String {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

@@ -16,7 +16,7 @@ fn agent_can_propose_but_only_analyst_can_confirm_evidence_finding() {
         key: agent_key,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let attended = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -32,7 +32,6 @@ fn agent_can_propose_but_only_analyst_can_confirm_evidence_finding() {
                 ),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -53,7 +52,6 @@ fn agent_can_propose_but_only_analyst_can_confirm_evidence_finding() {
                 ),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Unattended,
         Arc::new(SystemClock),
@@ -120,7 +118,7 @@ fn raw_record_pointer_selects_one_event_from_cloud_response() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -132,7 +130,6 @@ fn raw_record_pointer_selects_one_event_from_cloud_response() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -162,7 +159,7 @@ fn failed_local_tool_call_has_signed_error_event() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -174,7 +171,6 @@ fn failed_local_tool_call_has_signed_error_event() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -203,7 +199,7 @@ fn tool_call_quota_ends_with_a_no_tool_summary() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -215,7 +211,6 @@ fn tool_call_quota_ends_with_a_no_tool_summary() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -266,7 +261,7 @@ fn signed_model_usage_stops_case_before_followup_tool_dispatch() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let engine = Engine::new(
         EnginePorts::new(
             store.clone(),
@@ -278,7 +273,6 @@ fn signed_model_usage_stops_case_before_followup_tool_dispatch() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
@@ -351,7 +345,7 @@ fn signed_approval_executes_external_port_once_and_screens_next_context() {
         actor: Actor::Analyst,
     });
     let guard = Arc::new(MandatoryGuard::new().unwrap());
-    let parser = Arc::new(JsonParser);
+
     let port = FakeExternalIntel {
         calls: Mutex::new(0),
     };
@@ -366,7 +360,6 @@ fn signed_approval_executes_external_port_once_and_screens_next_context() {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             guard.clone(),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

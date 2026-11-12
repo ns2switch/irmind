@@ -64,7 +64,6 @@ fn setup_with_clock(
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            Arc::new(irmind_mod_parser_json::JsonParser),
         ),
         ExecutionMode::Attended,
         clock,

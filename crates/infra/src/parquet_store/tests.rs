@@ -1,7 +1,6 @@
 #![allow(clippy::unwrap_used)]
 
 use super::*;
-use irmind_mod_parser_json::JsonParser;
 use parquet::file::properties::ReaderProperties;
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use parquet::file::serialized_reader::ReadOptionsBuilder;

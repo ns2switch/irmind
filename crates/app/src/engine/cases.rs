@@ -42,7 +42,6 @@ impl<'a> Engine<'a> {
             signer: ports.signer,
             verifier: ports.verifier,
             guard: ports.guard,
-            parser: ports.parser,
             clock,
             mode,
             policy: PolicyRules::default(),

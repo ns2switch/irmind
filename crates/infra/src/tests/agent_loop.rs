@@ -63,7 +63,6 @@ fn engine_fixture() -> (tempfile::TempDir, Arc<LocalStore>, Engine<'static>, Cas
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().expect("guard")),
-            Arc::new(JsonParser),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

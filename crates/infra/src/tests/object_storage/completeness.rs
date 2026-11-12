@@ -52,7 +52,6 @@ fn assert_object(uri: &'static str, bytes: Vec<u8>, count: usize, rejected: u64)
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(MandatoryGuard::new().unwrap()),
-            parser.clone(),
         ),
         ExecutionMode::Attended,
         Arc::new(SystemClock),

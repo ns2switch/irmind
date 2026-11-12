@@ -351,7 +351,6 @@ mod matrix {
                     Arc::new(irmind_infra::LocalVerifier::from_signer(signer.as_ref())),
                 ),
                 Arc::new(irmind_security::MandatoryGuard::new()?),
-                Arc::new(JsonParser),
             ),
             irmind_domain::ExecutionMode::Attended,
             Arc::new(irmind_infra::SystemClock),
