@@ -25,27 +25,9 @@ pub enum FixedAppError {
     SourceLimit,
     #[error("policy denied: common event projection is invalid or inconsistent with its source")]
     PolicyInvalidCommonEvent,
-    #[error("policy denied: explicit artifact migration is unavailable")]
-    PolicyArtifactMigrationUnavailable,
-    #[error("policy denied: export V5 is unavailable")]
-    PolicyExportV5Unavailable,
-    #[error("policy denied: migration would change normalized record meaning")]
-    PolicyArtifactMigrationMeaning,
-    #[error("migration requires the exact signed parser identity and version")]
-    PolicyArtifactMigrationParser,
-    #[error("policy denied: no artifact generation needs migration")]
-    PolicyArtifactMigrationNotNeeded,
 
-    #[error("policy denied: source has no signed parser selection")]
-    PolicyMissingSignedParserSelection,
-    #[error("policy denied: partitioned preparation is unavailable")]
-    PolicyPartitionBatchUnavailable,
     #[error("policy denied: partition cap must be between 1 and 1024")]
     PolicyInvalidPartitionCap,
-    #[error("policy denied: partition preparation requires at most four sorted unique sources")]
-    PolicyInvalidPartitionBatch,
-    #[error("policy denied: source exceeds bounded Parquet artifact count")]
-    PolicyPartitionArtifactLimit,
     #[error(
         "storage: not enough space for bounded normalized staging in the case directory (including safety margin)"
     )]
@@ -87,8 +69,6 @@ pub enum FixedAppError {
     PolicyEditedRequestIdMismatch,
     #[error("policy denied: event parser is not registered")]
     PolicyEventParserIsNotRegistered,
-    #[error("policy denied: evidence exceeds 50 MB")]
-    PolicyEvidenceExceeds50MB,
     #[error("policy denied: external intel unavailable")]
     PolicyExternalIntelUnavailable,
     #[error("policy denied: global operational audit sequence exhausted")]
@@ -117,16 +97,6 @@ pub enum FixedAppError {
     PolicyConfigurationConfirmationRequired,
     #[error("policy denied: invalid indexed timestamp")]
     PolicyInvalidIndexedTimestamp,
-    #[error("policy denied: missing indexed record")]
-    PolicyMissingIndexedRecord,
-    #[error("policy denied: invalid indexed parser count")]
-    PolicyInvalidIndexedParserCount,
-    #[error("policy denied: precise artifacts require a signed parser selection")]
-    PolicyPreciseArtifactsRequireParserSelection,
-    #[error(
-        "policy denied: source already has another artifact version; explicit migration is required"
-    )]
-    PolicyArtifactVersionRequiresMigration,
     #[error(
         "source already has a mapped generation in this case; reuse its evidence or ingest into a new case"
     )]
@@ -237,8 +207,6 @@ pub enum FixedAppError {
     PolicyModuleSourceOrPortIsAlreadyRegistered,
     #[error("policy denied: resolve pending approvals before sealing")]
     PolicyResolvePendingApprovalsBeforeSealing,
-    #[error("policy denied: source must be a relative, slash-separated path")]
-    PolicySourceMustBeARelativeSlashSeparatedPath,
     #[error("signature: destination has a different signing key")]
     SignatureDestinationHasADifferentSigningKey,
     #[error("signature: migrated signing fingerprint differs")]
