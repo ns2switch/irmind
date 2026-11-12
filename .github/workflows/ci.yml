@@ -293,7 +293,7 @@ jobs:
       - name: Inspect helper DLL imports after native startup failure
         if: failure()
         run: python3 .github/scripts/inspect_evtx_windows.py target/x86_64-pc-windows-msvc/ci/irmind-evtx.exe
-      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
+      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked --no-fail-fast
       - name: Parse the PowerShell installer without running it
         run: |
           pwsh -NoProfile -Command '$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile("install.ps1",[ref]$tokens,[ref]$errors) | Out-Null; if ($errors.Count) { throw ($errors -join "`n") }'
