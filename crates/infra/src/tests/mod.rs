@@ -123,3 +123,5 @@ mod mapped_pipeline;
 mod mapping_installation;
 
 mod benchmark_custody;
+
+mod skill_installation;

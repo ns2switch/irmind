@@ -1,9 +1,18 @@
 //! Pure decoding of bounded package bytes. This module installs and executes nothing.
 
+use irmind_app::{AppError, CompiledSkill, SkillCompiler};
 use irmind_domain::{
     MAX_SKILL_HEADER_BYTES, SkillError, SkillMetadata, SkillMetadataInput, SkillPackage,
 };
 use serde::Deserialize;
+
+pub struct TomlSkillCompiler;
+
+impl SkillCompiler for TomlSkillCompiler {
+    fn compile(&self, package: SkillPackage) -> Result<CompiledSkill, AppError> {
+        decode_skill_package(package).map_err(Into::into)
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -23,38 +32,7 @@ struct Metadata {
     invocable: bool,
 }
 
-/// Parsed, still-untrusted bytes. It carries no installation or execution authority.
-pub struct DecodedSkillPackage {
-    metadata: SkillMetadata,
-    package: SkillPackage,
-    body_offset: usize,
-}
-
-impl DecodedSkillPackage {
-    pub const fn metadata(&self) -> &SkillMetadata {
-        &self.metadata
-    }
-
-    pub const fn package(&self) -> &SkillPackage {
-        &self.package
-    }
-
-    /// Byte offset of the original Markdown body, for later skill-resource provenance.
-    pub const fn body_offset(&self) -> usize {
-        self.body_offset
-    }
-}
-
-impl std::fmt::Debug for DecodedSkillPackage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DecodedSkillPackage")
-            .field("metadata", &self.metadata)
-            .field("package", &self.package)
-            .finish_non_exhaustive()
-    }
-}
-
-pub fn decode_skill_package(package: SkillPackage) -> Result<DecodedSkillPackage, SkillError> {
+pub fn decode_skill_package(package: SkillPackage) -> Result<CompiledSkill, SkillError> {
     let document = package
         .resources()
         .values()
@@ -76,11 +54,7 @@ pub fn decode_skill_package(package: SkillPackage) -> Result<DecodedSkillPackage
             validate_resource(resource.path().as_str(), resource.untrusted_text())?;
         }
     }
-    Ok(DecodedSkillPackage {
-        metadata,
-        package,
-        body_offset,
-    })
+    CompiledSkill::new(metadata, package, body_offset)
 }
 
 fn frontmatter(document: &str) -> Result<(&str, usize), SkillError> {
