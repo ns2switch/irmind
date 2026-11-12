@@ -1,0 +1,626 @@
+{
+  "workflow": "https://github.com/ns2switch/irmind/actions/runs/43125249521",
+  "reference": "75f81aa504689a32191a0b6b32f8e789cfdd9d1a",
+  "candidate": "5c9bdcd97af1390326e27a7791df0d1296053148",
+  "profile": "release",
+  "available_cores": 4,
+  "notes": [
+    "Acknowledging every output frame serializes most preparation; this candidate is not selected.",
+    "All samples retain 663212 records and 48510482 artifact bytes and pass full reconstruction.",
+    "Stage wall counters overlap and are not CPU fractions."
+  ],
+  "results": [
+    {
+      "variant": "candidate",
+      "requested_workers": "1",
+      "repeat": 1,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 21.437093,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.939295,
+        "row_preparation_seconds": 0.819633,
+        "canonical_write_seconds": 3.363594,
+        "parquet_encode_and_io_seconds": 3.232391,
+        "file_write_seconds": 0.024465,
+        "file_sync_seconds": 0.016472,
+        "artifact_hash_seconds": 0.044907,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 11.630672,
+        "validate_map_seconds": 4.514506,
+        "projection_seconds": 2.767286,
+        "input_commit_seconds": 0.125292
+      },
+      "custody": {
+        "sign_seconds": 0.000209,
+        "verify_signature_seconds": 5.7e-05,
+        "append_seconds": 0.001411
+      },
+      "process": {
+        "peak_rss_kib": 68908,
+        "elapsed_seconds": 21.86
+      }
+    },
+    {
+      "variant": "candidate",
+      "requested_workers": "1",
+      "repeat": 2,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 21.333327,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.933943,
+        "row_preparation_seconds": 0.78704,
+        "canonical_write_seconds": 3.324313,
+        "parquet_encode_and_io_seconds": 3.200748,
+        "file_write_seconds": 0.023995,
+        "file_sync_seconds": 0.014625,
+        "artifact_hash_seconds": 0.043471,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 11.818382,
+        "validate_map_seconds": 4.522777,
+        "projection_seconds": 2.714304,
+        "input_commit_seconds": 0.125239
+      },
+      "custody": {
+        "sign_seconds": 0.000222,
+        "verify_signature_seconds": 5.6e-05,
+        "append_seconds": 0.001225
+      },
+      "process": {
+        "peak_rss_kib": 69408,
+        "elapsed_seconds": 21.75
+      }
+    },
+    {
+      "variant": "candidate",
+      "requested_workers": "1",
+      "repeat": 3,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 21.217964,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.931983,
+        "row_preparation_seconds": 0.796716,
+        "canonical_write_seconds": 3.3018,
+        "parquet_encode_and_io_seconds": 3.173904,
+        "file_write_seconds": 0.023849,
+        "file_sync_seconds": 0.015929,
+        "artifact_hash_seconds": 0.044414,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 11.531201,
+        "validate_map_seconds": 4.465664,
+        "projection_seconds": 2.725762,
+        "input_commit_seconds": 0.125577
+      },
+      "custody": {
+        "sign_seconds": 0.000208,
+        "verify_signature_seconds": 5.5e-05,
+        "append_seconds": 0.001319
+      },
+      "process": {
+        "peak_rss_kib": 70860,
+        "elapsed_seconds": 21.63
+      }
+    },
+    {
+      "variant": "candidate",
+      "requested_workers": "4",
+      "repeat": 1,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 22.601207,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.943611,
+        "row_preparation_seconds": 0.838587,
+        "canonical_write_seconds": 3.503106,
+        "parquet_encode_and_io_seconds": 3.363475,
+        "file_write_seconds": 0.025556,
+        "file_sync_seconds": 0.015045,
+        "artifact_hash_seconds": 0.048345,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 14.92699,
+        "validate_map_seconds": 5.419851,
+        "projection_seconds": 2.693702,
+        "input_commit_seconds": 0.12595
+      },
+      "custody": {
+        "sign_seconds": 0.000208,
+        "verify_signature_seconds": 5.6e-05,
+        "append_seconds": 0.001073
+      },
+      "process": {
+        "peak_rss_kib": 71184,
+        "elapsed_seconds": 23.02
+      }
+    },
+    {
+      "variant": "candidate",
+      "requested_workers": "4",
+      "repeat": 2,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 22.772647,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.937634,
+        "row_preparation_seconds": 0.844107,
+        "canonical_write_seconds": 3.510843,
+        "parquet_encode_and_io_seconds": 3.375226,
+        "file_write_seconds": 0.025891,
+        "file_sync_seconds": 0.014503,
+        "artifact_hash_seconds": 0.046338,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 15.092633,
+        "validate_map_seconds": 5.385204,
+        "projection_seconds": 2.756003,
+        "input_commit_seconds": 0.126266
+      },
+      "custody": {
+        "sign_seconds": 0.000207,
+        "verify_signature_seconds": 5.7e-05,
+        "append_seconds": 0.001162
+      },
+      "process": {
+        "peak_rss_kib": 73500,
+        "elapsed_seconds": 23.19
+      }
+    },
+    {
+      "variant": "candidate",
+      "requested_workers": "4",
+      "repeat": 3,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 22.581137,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.941536,
+        "row_preparation_seconds": 0.834715,
+        "canonical_write_seconds": 3.513257,
+        "parquet_encode_and_io_seconds": 3.376556,
+        "file_write_seconds": 0.025124,
+        "file_sync_seconds": 0.013649,
+        "artifact_hash_seconds": 0.047937,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 14.934629,
+        "validate_map_seconds": 5.389172,
+        "projection_seconds": 2.691172,
+        "input_commit_seconds": 0.125154
+      },
+      "custody": {
+        "sign_seconds": 0.000208,
+        "verify_signature_seconds": 5.7e-05,
+        "append_seconds": 0.001088
+      },
+      "process": {
+        "peak_rss_kib": 73024,
+        "elapsed_seconds": 23.02
+      }
+    },
+    {
+      "variant": "candidate",
+      "requested_workers": "auto",
+      "repeat": 1,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 20.725077,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.943004,
+        "row_preparation_seconds": 0.854131,
+        "canonical_write_seconds": 3.551503,
+        "parquet_encode_and_io_seconds": 3.405001,
+        "file_write_seconds": 0.026044,
+        "file_sync_seconds": 0.014836,
+        "artifact_hash_seconds": 0.055092,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 12.58376,
+        "validate_map_seconds": 5.225811,
+        "projection_seconds": 2.672565,
+        "input_commit_seconds": 0.12597
+      },
+      "custody": {
+        "sign_seconds": 0.000231,
+        "verify_signature_seconds": 5.7e-05,
+        "append_seconds": 0.001204
+      },
+      "process": {
+        "peak_rss_kib": 71964,
+        "elapsed_seconds": 21.14
+      }
+    },
+    {
+      "variant": "candidate",
+      "requested_workers": "auto",
+      "repeat": 2,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 20.87424,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.933232,
+        "row_preparation_seconds": 0.88217,
+        "canonical_write_seconds": 3.628616,
+        "parquet_encode_and_io_seconds": 3.487784,
+        "file_write_seconds": 0.025397,
+        "file_sync_seconds": 0.01403,
+        "artifact_hash_seconds": 0.045693,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 12.553859,
+        "validate_map_seconds": 5.204583,
+        "projection_seconds": 2.655235,
+        "input_commit_seconds": 0.125647
+      },
+      "custody": {
+        "sign_seconds": 0.00021,
+        "verify_signature_seconds": 7.7e-05,
+        "append_seconds": 0.001326
+      },
+      "process": {
+        "peak_rss_kib": 73520,
+        "elapsed_seconds": 21.28
+      }
+    },
+    {
+      "variant": "candidate",
+      "requested_workers": "auto",
+      "repeat": 3,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 21.002303,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.939652,
+        "row_preparation_seconds": 0.907057,
+        "canonical_write_seconds": 3.746295,
+        "parquet_encode_and_io_seconds": 3.597276,
+        "file_write_seconds": 0.026486,
+        "file_sync_seconds": 0.014871,
+        "artifact_hash_seconds": 0.050123,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 12.575692,
+        "validate_map_seconds": 5.219431,
+        "projection_seconds": 2.665562,
+        "input_commit_seconds": 0.1257
+      },
+      "custody": {
+        "sign_seconds": 0.00021,
+        "verify_signature_seconds": 5.8e-05,
+        "append_seconds": 0.00127
+      },
+      "process": {
+        "peak_rss_kib": 71736,
+        "elapsed_seconds": 21.41
+      }
+    },
+    {
+      "variant": "reference",
+      "requested_workers": "1",
+      "repeat": 1,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 21.506505,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.931118,
+        "row_preparation_seconds": 0.794917,
+        "canonical_write_seconds": 3.340736,
+        "parquet_encode_and_io_seconds": 3.207505,
+        "file_write_seconds": 0.024015,
+        "file_sync_seconds": 0.016558,
+        "artifact_hash_seconds": 0.04838,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 12.016068,
+        "validate_map_seconds": 4.521573,
+        "projection_seconds": 2.775657,
+        "input_commit_seconds": 0.125807
+      },
+      "custody": {
+        "sign_seconds": 0.000207,
+        "verify_signature_seconds": 6.6e-05,
+        "append_seconds": 0.001139
+      },
+      "process": {
+        "peak_rss_kib": 69180,
+        "elapsed_seconds": 21.92
+      }
+    },
+    {
+      "variant": "reference",
+      "requested_workers": "1",
+      "repeat": 2,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 21.162023,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.926295,
+        "row_preparation_seconds": 0.773704,
+        "canonical_write_seconds": 3.257765,
+        "parquet_encode_and_io_seconds": 3.134463,
+        "file_write_seconds": 0.02374,
+        "file_sync_seconds": 0.013131,
+        "artifact_hash_seconds": 0.043477,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 11.889945,
+        "validate_map_seconds": 4.443902,
+        "projection_seconds": 2.681293,
+        "input_commit_seconds": 0.133701
+      },
+      "custody": {
+        "sign_seconds": 0.000206,
+        "verify_signature_seconds": 5.6e-05,
+        "append_seconds": 0.001218
+      },
+      "process": {
+        "peak_rss_kib": 71000,
+        "elapsed_seconds": 21.57
+      }
+    },
+    {
+      "variant": "reference",
+      "requested_workers": "1",
+      "repeat": 3,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 21.430664,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.929165,
+        "row_preparation_seconds": 0.794468,
+        "canonical_write_seconds": 3.321587,
+        "parquet_encode_and_io_seconds": 3.194329,
+        "file_write_seconds": 0.024222,
+        "file_sync_seconds": 0.01509,
+        "artifact_hash_seconds": 0.043694,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 11.844343,
+        "validate_map_seconds": 4.501807,
+        "projection_seconds": 2.754184,
+        "input_commit_seconds": 0.125649
+      },
+      "custody": {
+        "sign_seconds": 0.000221,
+        "verify_signature_seconds": 5.4e-05,
+        "append_seconds": 0.001159
+      },
+      "process": {
+        "peak_rss_kib": 67524,
+        "elapsed_seconds": 21.84
+      }
+    },
+    {
+      "variant": "reference",
+      "requested_workers": "4",
+      "repeat": 1,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 19.866963,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.927752,
+        "row_preparation_seconds": 0.874897,
+        "canonical_write_seconds": 3.661707,
+        "parquet_encode_and_io_seconds": 3.510302,
+        "file_write_seconds": 0.02645,
+        "file_sync_seconds": 0.017342,
+        "artifact_hash_seconds": 0.051842,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 9.684743,
+        "validate_map_seconds": 5.109185,
+        "projection_seconds": 2.813742,
+        "input_commit_seconds": 0.124937
+      },
+      "custody": {
+        "sign_seconds": 0.000207,
+        "verify_signature_seconds": 5.5e-05,
+        "append_seconds": 0.001146
+      },
+      "process": {
+        "peak_rss_kib": 74468,
+        "elapsed_seconds": 20.29
+      }
+    },
+    {
+      "variant": "reference",
+      "requested_workers": "4",
+      "repeat": 2,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 19.767062,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.929597,
+        "row_preparation_seconds": 0.841696,
+        "canonical_write_seconds": 3.68163,
+        "parquet_encode_and_io_seconds": 3.540662,
+        "file_write_seconds": 0.025871,
+        "file_sync_seconds": 0.016352,
+        "artifact_hash_seconds": 0.046007,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 9.686891,
+        "validate_map_seconds": 5.062754,
+        "projection_seconds": 2.767178,
+        "input_commit_seconds": 0.125364
+      },
+      "custody": {
+        "sign_seconds": 0.00022,
+        "verify_signature_seconds": 5.4e-05,
+        "append_seconds": 0.001198
+      },
+      "process": {
+        "peak_rss_kib": 77148,
+        "elapsed_seconds": 20.18
+      }
+    },
+    {
+      "variant": "reference",
+      "requested_workers": "4",
+      "repeat": 3,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 19.69701,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.930959,
+        "row_preparation_seconds": 0.836537,
+        "canonical_write_seconds": 3.602508,
+        "parquet_encode_and_io_seconds": 3.459495,
+        "file_write_seconds": 0.025654,
+        "file_sync_seconds": 0.017122,
+        "artifact_hash_seconds": 0.047562,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 9.707328,
+        "validate_map_seconds": 5.069075,
+        "projection_seconds": 2.754145,
+        "input_commit_seconds": 0.12528
+      },
+      "custody": {
+        "sign_seconds": 0.000207,
+        "verify_signature_seconds": 6.5e-05,
+        "append_seconds": 0.001119
+      },
+      "process": {
+        "peak_rss_kib": 77220,
+        "elapsed_seconds": 20.1
+      }
+    },
+    {
+      "variant": "reference",
+      "requested_workers": "auto",
+      "repeat": 1,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 20.72624,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.928213,
+        "row_preparation_seconds": 0.839014,
+        "canonical_write_seconds": 3.534571,
+        "parquet_encode_and_io_seconds": 3.393157,
+        "file_write_seconds": 0.025568,
+        "file_sync_seconds": 0.014396,
+        "artifact_hash_seconds": 0.049904,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 10.475817,
+        "validate_map_seconds": 5.01203,
+        "projection_seconds": 2.790394,
+        "input_commit_seconds": 0.125395
+      },
+      "custody": {
+        "sign_seconds": 0.000323,
+        "verify_signature_seconds": 5.5e-05,
+        "append_seconds": 0.002226
+      },
+      "process": {
+        "peak_rss_kib": 75280,
+        "elapsed_seconds": 21.15
+      }
+    },
+    {
+      "variant": "reference",
+      "requested_workers": "auto",
+      "repeat": 2,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 20.807647,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.941576,
+        "row_preparation_seconds": 0.849876,
+        "canonical_write_seconds": 3.547402,
+        "parquet_encode_and_io_seconds": 3.40668,
+        "file_write_seconds": 0.025608,
+        "file_sync_seconds": 0.013335,
+        "artifact_hash_seconds": 0.050291,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 10.450352,
+        "validate_map_seconds": 5.041871,
+        "projection_seconds": 2.782969,
+        "input_commit_seconds": 0.125536
+      },
+      "custody": {
+        "sign_seconds": 0.000208,
+        "verify_signature_seconds": 5.5e-05,
+        "append_seconds": 0.001134
+      },
+      "process": {
+        "peak_rss_kib": 75716,
+        "elapsed_seconds": 21.22
+      }
+    },
+    {
+      "variant": "reference",
+      "requested_workers": "auto",
+      "repeat": 3,
+      "ingest": {
+        "bytes": 1073741824,
+        "records": 663212,
+        "wall_seconds": 20.937009,
+        "parquet_bytes": 48510482
+      },
+      "phases": {
+        "hash_read_seconds": 0.933344,
+        "row_preparation_seconds": 0.847506,
+        "canonical_write_seconds": 3.564159,
+        "parquet_encode_and_io_seconds": 3.423313,
+        "file_write_seconds": 0.025623,
+        "file_sync_seconds": 0.014231,
+        "artifact_hash_seconds": 0.04719,
+        "producer_queue_wait_seconds": 0.0,
+        "consumer_queue_wait_seconds": 10.638229,
+        "validate_map_seconds": 5.03595,
+        "projection_seconds": 2.835348,
+        "input_commit_seconds": 0.125385
+      },
+      "custody": {
+        "sign_seconds": 0.000206,
+        "verify_signature_seconds": 5.5e-05,
+        "append_seconds": 0.001423
+      },
+      "process": {
+        "peak_rss_kib": 73120,
+        "elapsed_seconds": 21.35
+      }
+    }
+  ]
+}

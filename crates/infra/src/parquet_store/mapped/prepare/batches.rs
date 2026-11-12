@@ -2,7 +2,7 @@
 use super::{AppError, PreparedSourceRecord, RecordRow};
 use irmind_domain::{SourceRecordV1, Tainted};
 const INPUT_BYTES: usize = 8 * 1024 * 1024;
-const OUTPUT_BYTES: usize = 4 * 1024 * 1024;
+const OUTPUT_BYTES: usize = 8 * 1024 * 1024;
 const INPUT_RECORDS: usize = 256;
 type Input = Tainted<SourceRecordV1>;
 type Output<'a> = (PreparedSourceRecord<'a>, RecordRow);
@@ -41,7 +41,7 @@ impl Inputs {
 
 pub(super) fn prepare<'a>(
     sources: Vec<Input>,
-    send: &mut dyn FnMut(Vec<Output<'a>>) -> Result<(), AppError>,
+    send: &mut dyn FnMut(Vec<Output<'a>>, bool) -> Result<(), AppError>,
     mut prepare: impl FnMut(Input) -> Result<Output<'a>, AppError>,
 ) -> Result<(), AppError> {
     let mut outputs = Vec::new();
@@ -52,7 +52,7 @@ pub(super) fn prepare<'a>(
         let item = match prepare(source) {
             Ok(item) => item,
             Err(error) => {
-                flush(&mut outputs, send)?;
+                flush(&mut outputs, bytes, send)?;
                 return Err(error);
             }
         };
@@ -62,24 +62,25 @@ pub(super) fn prepare<'a>(
             .saturating_add(item.1.estimated_bytes().saturating_mul(4))
             .saturating_add(65_536);
         if bytes.saturating_add(weight) > OUTPUT_BYTES {
-            flush(&mut outputs, send)?;
+            flush(&mut outputs, bytes, send)?;
             bytes = 0;
         }
         outputs.push(item);
         bytes = bytes.saturating_add(weight);
         if bytes >= OUTPUT_BYTES {
-            flush(&mut outputs, send)?;
+            flush(&mut outputs, bytes, send)?;
             bytes = 0;
         }
     }
-    flush(&mut outputs, send)
+    flush(&mut outputs, bytes, send)
 }
 fn flush<'a>(
     outputs: &mut Vec<Output<'a>>,
-    send: &mut dyn FnMut(Vec<Output<'a>>) -> Result<(), AppError>,
+    bytes: usize,
+    send: &mut dyn FnMut(Vec<Output<'a>>, bool) -> Result<(), AppError>,
 ) -> Result<(), AppError> {
     if !outputs.is_empty() {
-        send(std::mem::take(outputs))?;
+        send(std::mem::take(outputs), bytes > OUTPUT_BYTES)?;
     }
     Ok(())
 }

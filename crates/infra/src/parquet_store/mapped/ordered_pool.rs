@@ -1,12 +1,12 @@
-//! One bounded job per lane; output frames are acknowledged after ordered commit.
-use super::super::{AppError, CancellationToken, invalid_source};
+//! One bounded job per lane; oversized results are acknowledged after ordered commit.
+use super::super::{AppError, CancellationToken};
 use std::{
     sync::mpsc::{self, Receiver, SyncSender},
     thread::{Scope, ScopedJoinHandle},
     time::Duration,
 };
 enum Frame<O> {
-    Item(O),
+    Item(O, bool),
     End,
     Error(AppError),
 }
@@ -23,7 +23,8 @@ impl<'scope, I: Send + 'scope, O: Send + 'scope> OrderedPool<'scope, I, O> {
         scope: &'scope Scope<'scope, 'env>,
         lanes: usize,
         prepare: &'scope (
-                    impl Fn(I, &mut dyn FnMut(O) -> Result<(), AppError>) -> Result<(), AppError> + Sync
+                    impl Fn(I, &mut dyn FnMut(O, bool) -> Result<(), AppError>) -> Result<(), AppError>
+                    + Sync
                 ),
     ) -> Result<Self, AppError> {
         let mut pool = Self {
@@ -43,11 +44,12 @@ impl<'scope, I: Send + 'scope, O: Send + 'scope> OrderedPool<'scope, I, O> {
         &mut self,
         scope: &'scope Scope<'scope, 'env>,
         prepare: &'scope (
-                    impl Fn(I, &mut dyn FnMut(O) -> Result<(), AppError>) -> Result<(), AppError> + Sync
+                    impl Fn(I, &mut dyn FnMut(O, bool) -> Result<(), AppError>) -> Result<(), AppError>
+                    + Sync
                 ),
     ) -> Result<(), AppError> {
         let (send, receive) = mpsc::sync_channel(1);
-        let (result_send, result_receive) = mpsc::sync_channel(1);
+        let (result_send, result_receive) = mpsc::sync_channel(4);
         let (ack_send, ack_receive) = mpsc::sync_channel(1);
         self.jobs.push(send);
         self.results.push(result_receive);
@@ -56,13 +58,17 @@ impl<'scope, I: Send + 'scope, O: Send + 'scope> OrderedPool<'scope, I, O> {
             std::thread::Builder::new()
                 .spawn_scoped(scope, move || {
                     while let Ok(input) = receive.recv() {
-                        let result = prepare(input, &mut |output| {
+                        let result = prepare(input, &mut |output, large| {
                             result_send
-                                .send(Frame::Item(output))
-                                .map_err(|_| invalid_source())?;
-                            // No next output can be prepared while this one is retained by
-                            // the coordinator. This also bounds oversized single records.
-                            ack_receive.recv().map_err(|_| invalid_source())
+                                .send(Frame::Item(output, large))
+                                .map_err(|_| worker_stopped())?;
+                            // Small frames fill a bounded queue without round trips.
+                            // A large single result must leave the coordinator before
+                            // the worker may prepare another oversized result.
+                            if large {
+                                ack_receive.recv().map_err(|_| worker_stopped())?;
+                            }
+                            Ok(())
                         });
                         let frame = result.map_or_else(Frame::Error, |()| Frame::End);
                         if result_send.send(frame).is_err() {
@@ -70,7 +76,11 @@ impl<'scope, I: Send + 'scope, O: Send + 'scope> OrderedPool<'scope, I, O> {
                         }
                     }
                 })
-                .map_err(|_| invalid_source())?,
+                .map_err(|_| {
+                    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                        irmind_app::AdapterStorageError::CannotStartMappingWorker,
+                    ))
+                })?,
         );
         Ok(())
     }
@@ -88,7 +98,7 @@ impl<'scope, I: Send + 'scope, O: Send + 'scope> OrderedPool<'scope, I, O> {
         }
         self.jobs[self.submitted % self.jobs.len()]
             .send(input)
-            .map_err(|_| invalid_source())?;
+            .map_err(|_| worker_stopped())?;
         self.submitted += 1;
         Ok(())
     }
@@ -103,11 +113,13 @@ impl<'scope, I: Send + 'scope, O: Send + 'scope> OrderedPool<'scope, I, O> {
                 return Err(AppError::Cancelled);
             }
             match self.results[lane].recv_timeout(Duration::from_millis(10)) {
-                Ok(Frame::Item(value)) => {
+                Ok(Frame::Item(value, large)) => {
                     emit(value)?;
-                    self.acknowledgements[lane]
-                        .send(())
-                        .map_err(|_| invalid_source())?;
+                    if large {
+                        self.acknowledgements[lane]
+                            .send(())
+                            .map_err(|_| worker_stopped())?;
+                    }
                 }
                 Ok(Frame::End) => {
                     self.consumed += 1;
@@ -115,7 +127,7 @@ impl<'scope, I: Send + 'scope, O: Send + 'scope> OrderedPool<'scope, I, O> {
                 }
                 Ok(Frame::Error(error)) => return Err(error),
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
-                Err(mpsc::RecvTimeoutError::Disconnected) => return Err(invalid_source()),
+                Err(mpsc::RecvTimeoutError::Disconnected) => return Err(worker_stopped()),
             }
         }
     }
@@ -142,6 +154,12 @@ impl<I, O> Drop for OrderedPool<'_, I, O> {
     }
 }
 
+fn worker_stopped() -> AppError {
+    AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+        irmind_app::AdapterStorageError::MappingWorkerStoppedUnexpectedly,
+    ))
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -151,12 +169,12 @@ mod tests {
         for lanes in [1, 2, 4, 7] {
             let cancel = CancellationToken::new();
             let mut actual = Vec::new();
-            let job = |n: usize, emit: &mut dyn FnMut(usize) -> Result<(), AppError>| {
+            let job = |n: usize, emit: &mut dyn FnMut(usize, bool) -> Result<(), AppError>| {
                 if n.is_multiple_of(3) {
                     std::thread::yield_now();
                 }
-                emit(n * n)?;
-                emit(n * n + 1)
+                emit(n * n, false)?;
+                emit(n * n + 1, false)
             };
             std::thread::scope(|scope| {
                 let mut pool = OrderedPool::new(scope, lanes, &job).unwrap();
@@ -181,7 +199,8 @@ mod tests {
     fn callback_error_and_cancellation_disconnect_pending_results() {
         for cancelled in [false, true] {
             let cancel = CancellationToken::new();
-            let job = |n: usize, emit: &mut dyn FnMut(usize) -> Result<(), AppError>| emit(n);
+            let job =
+                |n: usize, emit: &mut dyn FnMut(usize, bool) -> Result<(), AppError>| emit(n, true);
             std::thread::scope(|scope| {
                 let mut pool = OrderedPool::new(scope, 4, &job).unwrap();
                 for n in 0..4 {
@@ -200,7 +219,7 @@ mod tests {
     #[test]
     fn failed_worker_is_a_pipeline_error() {
         let cancel = CancellationToken::new();
-        let job = |_, _: &mut dyn FnMut(usize) -> Result<(), AppError>| Err(invalid_source());
+        let job = |_, _: &mut dyn FnMut(usize, bool) -> Result<(), AppError>| Err(worker_stopped());
         std::thread::scope(|scope| {
             let mut pool = OrderedPool::new(scope, 2, &job).unwrap();
             pool.submit(0, &cancel, &mut |_| Ok(())).unwrap();
