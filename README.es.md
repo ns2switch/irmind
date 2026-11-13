@@ -120,6 +120,8 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Zeek | Parser | `parser-zeek` | experimental | [Configuración](docs/es/modules.md#parser-de-zeek) |
 | Suricata EVE | Parser | `parser-suricata` | experimental | [Configuración](docs/es/modules.md#parser-de-suricata-eve) |
 | Parser declarativo | parser local | `parser-declarative` (por defecto) | experimental | [Formatos propios](docs/es/parsers.md) |
+| Auditoría Kubernetes | parser y mapeo locales | `parser-kubernetes` (por defecto) | experimental | [Contexto de clúster](docs/es/parsers.md#interpretación-de-kubernetes-y-falco) |
+| Falco | parser y mapeo locales | `parser-falco` (por defecto) | experimental | [Alertas de origen](docs/es/parsers.md#interpretación-de-kubernetes-y-falco) |
 | Logs de Linux | parser local | `parser-linux` (por defecto) | experimental | [Linux](docs/es/modules.md#logs-de-linux) |
 | Windows EVTX | parser local aislado | `parser-evtx` (por defecto) | experimental | [EVTX](docs/es/modules.md#windows-evtx) |
 | Parser Syslog | parser local | `parser-syslog` (por defecto) | experimental | [Syslog](docs/es/modules.md#parser-syslog) |

@@ -116,6 +116,15 @@ fn compatible(kind: &str, role: EntityRole, field: &str) -> bool {
         F::IrmindCollectorArtifact => ("artifact", None),
         F::IrmindKubernetesServiceAccount => ("k8s_service_account", None),
         F::OrchestratorNamespace => ("k8s_namespace", None),
+        F::OrchestratorResourceName => {
+            if !matches!(
+                kind,
+                "k8s_pod" | "k8s_node" | "k8s_namespace" | "k8s_service_account"
+            ) {
+                return false;
+            }
+            (kind, Some(EntityRole::Target))
+        }
         F::IrmindKubernetesPod => ("k8s_pod", None),
         F::IrmindKubernetesNode => ("k8s_node", None),
         F::ContainerId => ("container", None),
@@ -150,6 +159,19 @@ impl BoundedObservations {
         context: &super::EventContextV1,
     ) -> Result<(), EventSchemaError> {
         for observation in &self.0 {
+            if observation.field == CommonField::OrchestratorResourceName {
+                let resource = match observation.entity.kind() {
+                    super::ObservedEntityKind::KubernetesPod => "pods",
+                    super::ObservedEntityKind::KubernetesNode => "nodes",
+                    super::ObservedEntityKind::KubernetesNamespace => "namespaces",
+                    super::ObservedEntityKind::KubernetesServiceAccount => "serviceaccounts",
+                    _ => return Err(EventSchemaError::InvalidObservation),
+                };
+                if !matches!(context.get(CommonField::OrchestratorResourceType), Some(super::CommonValue::Text(value)) if value.as_str() == resource)
+                {
+                    return Err(EventSchemaError::InvalidObservation);
+                }
+            }
             if let EntityIdentityScope::Cluster { cluster, .. } = observation.entity.scope() {
                 let Some(super::CommonValue::Text(value)) =
                     context.get(CommonField::IrmindClusterIdentity)

@@ -236,7 +236,7 @@ fn selector(
         conditions,
     )
 }
-fn condition(c: &Condition) -> Result<SelectorCondition, MappingError> {
+pub(super) fn condition(c: &Condition) -> Result<SelectorCondition, MappingError> {
     let predicate = match &c.predicate {
         Predicate::Missing => SelectorPredicate::Missing,
         Predicate::Null => SelectorPredicate::Null,

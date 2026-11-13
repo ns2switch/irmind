@@ -109,6 +109,10 @@ fn add_graph_filters(spec: &mut ToolSpec) {
         ),
         ("region", "Optional region partition"),
         (
+            "cluster",
+            "Optional exact provider-qualified cluster identity from the case; narrows local records and never grants remote access",
+        ),
+        (
             "event_category",
             "Optional common-event category; only classified coverage is returned",
         ),
@@ -275,7 +279,7 @@ mod tests {
                 .into_iter()
                 .find(|spec| spec.name == tool)
                 .unwrap();
-            for field in ["from", "to", "account", "project", "region"] {
+            for &field in irmind_domain::GraphQueryFilter::ARGUMENTS {
                 assert_eq!(spec.parameters["properties"][field]["type"], "string");
                 assert!(
                     !spec.parameters["required"]

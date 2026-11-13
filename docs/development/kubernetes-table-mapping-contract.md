@@ -31,11 +31,21 @@ namespaces, roles and source fields as before. Process observations continue to
 use source-record scope unless an existing supported source explicitly supplies
 its documented lifetime identifier; Kubernetes PIDs do not create lifetimes.
 
+A field may also reuse up to eight of the existing finite `when` conditions.
+A validated field may have up to eight additional observations, each with
+those same finite conditions. This lets resource-name observations apply only
+to the explicit Kubernetes resource kind. It adds no predicate operator. Conditional fields remain within
+the same field/path/operation bounds. Typed target observations on
+`orchestrator.resource.name` additionally require the matching explicit
+`orchestrator.resource.type` (pods, nodes, namespaces or serviceaccounts). This
+keeps actor service accounts and target resources in distinct existing fields.
+
 ## Projection and partitions
 
 For a cluster source, the table mapper builds its searchable projection from the
-validated common event and observations. It never copies `requestObject`,
-`responseObject`, credentials or arbitrary original bodies into that projection.
+validated common event and observations. Bundled Kubernetes mappings select explicit metadata fields and do not select
+full request/response bodies or credential fields. Arbitrary original fields
+are never the default searchable projection.
 Original bytes and decoded-record commitments remain bound by custody. Existing
 non-cluster table definitions retain their current projection and canonical
 bytes.

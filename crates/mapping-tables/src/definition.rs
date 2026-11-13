@@ -60,13 +60,13 @@ fn unknown() -> String {
 fn event() -> String {
     "event".into()
 }
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Condition {
     pub path: Vec<String>,
     pub predicate: Predicate,
 }
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(
     tag = "op",
     content = "value",
@@ -86,10 +86,16 @@ pub(super) enum Predicate {
 #[serde(deny_unknown_fields)]
 pub(super) struct Field {
     pub source: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_index: Option<u16>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub when: Vec<Condition>,
     pub target: String,
     #[serde(default)]
     pub conversion: Conversion,
     pub observation: Option<Observation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub observations: Vec<Observation>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub omit_text: Vec<String>,
 }
@@ -105,10 +111,13 @@ pub(super) enum Conversion {
     Md5,
     Sha1,
     Sha256,
+    KubernetesServiceAccountName,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Observation {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub when: Vec<Condition>,
     pub kind: String,
     pub role: String,
     #[serde(default)]
@@ -131,6 +140,10 @@ pub(super) enum Scope {
         host: Vec<String>,
         lifetime: Vec<String>,
     },
+    Cluster {
+        namespace: Option<Vec<String>>,
+        service_account_principal: Option<Vec<String>>,
+    },
 }
 #[derive(Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -143,10 +156,21 @@ pub(super) struct Partition {
 impl Field {
     pub(super) fn operation_budget(&self) -> usize {
         33 + self.omit_text.len()
-            + usize::from(
-                self.observation
-                    .as_ref()
-                    .is_some_and(|o| matches!(o.scope, Scope::ProcessLifetime { .. })),
-            ) * 66
+            + usize::from(self.source_index.is_some())
+            + self.when.iter().map(|c| c.path.len() + 1).sum::<usize>()
+            + self.observation.as_ref().map_or(0, observation_budget)
+            + self
+                .observations
+                .iter()
+                .map(|o| 33 + observation_budget(o))
+                .sum::<usize>()
     }
+}
+fn observation_budget(o: &Observation) -> usize {
+    o.when.iter().map(|c| c.path.len() + 1).sum::<usize>()
+        + match o.scope {
+            Scope::ProcessLifetime { .. } => 66,
+            Scope::Cluster { .. } => 34,
+            _ => 0,
+        }
 }

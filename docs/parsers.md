@@ -104,3 +104,20 @@ For a source build, build the main executable normally, set `CARGO_TARGET_DIR` t
 ### Network exports
 
 Zeek and Suricata are experimental modules compiled by default. Current V3 ingestion preserves subsecond time and uses the endpoint-host partition profile. Zeek's explicit `sensor_host` supplies the collector host; its HTTP `host` remains a domain. A missing sensor host is never inferred from an IP or filename. Correlation IDs are source observations, not confirmed attack paths. See [Zeek](modules.md#zeek-parser) and [Suricata](modules.md#suricata-eve-parser) for supported records and limits. Both readers count oversized lines, retain bounded rejected samples and continue with subsequent well-framed records.
+
+### Kubernetes and Falco interpretation
+
+Bundled `mapping-kubernetes` tables classify audit API results from explicit HTTP
+status codes; an absent status stays unknown. Actor and impersonated user are
+distinct. Target pod, node, namespace and service-account observations require
+an explicit resource type; service accounts retain their own namespace even
+when accessing another namespace. The complete source IP array stays original;
+the first reported address is indexed as a source claim.
+
+`mapping-falco` has separate host and Kubernetes selectors. Falco rules are
+source alerts, not analyst-confirmed findings. Container OS users remain
+source-record-scoped users, rather than Kubernetes API principals. Process IDs
+never imply a process lifetime. Container IDs and image repositories are
+queryable within confirmed cluster scope; image tags and pod request bodies
+remain original evidence. No fields from full Kubernetes request/response
+bodies are automatically projected into search.

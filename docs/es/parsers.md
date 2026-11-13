@@ -106,3 +106,22 @@ Al compilar desde el código, compila el ejecutable principal y fija `CARGO_TARG
 ### Exportaciones de red
 
 Zeek y Suricata son módulos experimentales compilados por defecto. La ingesta V3 actual conserva la precisión temporal y usan el perfil de partición por host. En Zeek, `sensor_host` identifica explícitamente el sensor; `host` de HTTP es un dominio. No se deduce el host de la IP ni del nombre del fichero. Ambos lectores cuentan las líneas sobredimensionadas y continúan con los registros posteriores. Consulta los [módulos](modules.md) para sus límites.
+
+### Interpretación de Kubernetes y Falco
+
+Las tablas incluidas de `mapping-kubernetes` clasifican el resultado de la API
+mediante el código HTTP explícito; si falta, queda desconocido. Se distinguen el
+actor y el usuario suplantado. Las observaciones de pod, nodo, espacio de nombres
+y cuenta de servicio objetivo requieren el tipo de recurso explícito. Cada
+cuenta de servicio conserva su propio espacio de nombres aunque acceda a otro.
+La lista completa de IP de origen queda en el original; la primera dirección
+comunicada se indexa como una afirmación de la fuente.
+
+`mapping-falco` separa los selectores del host y de Kubernetes. Las reglas son
+alertas de origen, no hallazgos confirmados por el analista. Los usuarios del
+sistema del contenedor conservan ámbito de registro; no se convierten en
+principales de la API. Un PID nunca implica una vida de proceso. Los IDs de
+contenedor y los repositorios de imágenes son consultables con el ámbito de
+clúster confirmado. Las etiquetas de imagen y los cuerpos de solicitudes de
+pods quedan en el original. Los cuerpos completos de solicitudes y respuestas
+no se proyectan automáticamente en la búsqueda.

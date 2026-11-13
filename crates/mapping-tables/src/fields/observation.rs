@@ -15,6 +15,7 @@ pub(crate) struct CompiledObservation {
     kind: ObservedEntityKind,
     role: EntityRole,
     scope: CompiledScope,
+    conditions: Vec<irmind_app::source_mapping::SelectorCondition>,
 }
 enum CompiledScope {
     Global,
@@ -25,10 +26,22 @@ enum CompiledScope {
         host: SourcePath,
         lifetime: SourcePath,
     },
+    Cluster {
+        namespace: Option<SourcePath>,
+        principal: Option<SourcePath>,
+    },
 }
 impl CompiledObservation {
     pub(super) fn compile(value: Observation, target: CommonField) -> Result<Self, MappingError> {
+        if value.when.len() > 8 {
+            return Err(MappingError::InvalidDefinition);
+        }
         let result = Self {
+            conditions: value
+                .when
+                .iter()
+                .map(super::super::compile::condition)
+                .collect::<Result<_, _>>()?,
             kind: ObservedEntityKind::parse(&value.kind).map_err(invalid)?,
             role: EntityRole::parse(&value.role).map_err(invalid)?,
             scope: match value.scope {
@@ -36,6 +49,18 @@ impl CompiledObservation {
                 Scope::SourceRecord => CompiledScope::SourceRecord,
                 Scope::Host(keys) => CompiledScope::Host(path(&keys)?),
                 Scope::Account(keys) => CompiledScope::Account(path(&keys)?),
+                Scope::Cluster {
+                    namespace,
+                    service_account_principal,
+                } => {
+                    if namespace.is_some() && service_account_principal.is_some() {
+                        return Err(MappingError::InvalidDefinition);
+                    }
+                    CompiledScope::Cluster {
+                        namespace: namespace.as_deref().map(path).transpose()?,
+                        principal: service_account_principal.as_deref().map(path).transpose()?,
+                    }
+                }
                 Scope::ProcessLifetime { host, lifetime } => CompiledScope::ProcessLifetime {
                     host: path(&host)?,
                     lifetime: path(&lifetime)?,
@@ -49,6 +74,22 @@ impl CompiledObservation {
             _ => "synthetic",
         };
         let scope = match &result.scope {
+            CompiledScope::Cluster {
+                namespace,
+                principal,
+            } => EntityIdentityScope::cluster(
+                irmind_domain::ClusterIdentity::try_new(
+                    irmind_domain::ClusterProvider::Kubernetes,
+                    "urn:k8s:validation",
+                )
+                .map_err(invalid)?,
+                if namespace.is_some() || principal.is_some() {
+                    Some("synthetic")
+                } else {
+                    None
+                },
+            )
+            .map_err(invalid)?,
             CompiledScope::ProcessLifetime { .. } => EntityIdentityScope::ProcessLifetime {
                 host: EventText::identifier("host").map_err(invalid)?,
                 lifetime: EventText::identifier("lifetime").map_err(invalid)?,
@@ -73,6 +114,11 @@ impl CompiledObservation {
         .map_err(invalid)?;
         Ok(result)
     }
+    pub(crate) fn applies(&self, source: &SourceRecordV1) -> bool {
+        self.conditions
+            .iter()
+            .all(|c| c.predicate.matches(c.path.resolve(source.fields())))
+    }
     pub(crate) fn project(
         &self,
         source: &SourceRecordV1,
@@ -96,6 +142,20 @@ impl CompiledObservation {
             .map_err(|_| bad())
         };
         let scope = match &self.scope {
+            CompiledScope::Cluster {
+                namespace,
+                principal,
+            } => {
+                let cluster = source.cluster_identity().ok_or_else(bad)?.clone();
+                let explicit = namespace.as_ref().map(named).transpose()?;
+                let account = principal.as_ref().map(named).transpose()?;
+                let namespace = if let Some(account) = &account {
+                    Some(super::service_account_parts(account.as_str())?.0)
+                } else {
+                    explicit.as_ref().map(EventText::as_str)
+                };
+                EntityIdentityScope::cluster(cluster, namespace).map_err(|_| bad())?
+            }
             CompiledScope::Global => EntityIdentityScope::Global,
             CompiledScope::SourceRecord => EntityIdentityScope::SourceRecord {
                 source: source.origin().source().clone(),

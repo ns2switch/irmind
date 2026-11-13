@@ -230,6 +230,42 @@ fn registry() -> ModuleRegistry {
             .register(Box::new(SudoMapping::new().unwrap()), &ModuleConfig::new())
             .unwrap();
     }
+    #[cfg(feature = "parser-kubernetes")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_kubernetes::KubernetesParser::default()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_kubernetes::KubernetesMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
+    #[cfg(feature = "parser-falco")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_falco::FalcoParser::default()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_falco::KubernetesMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_falco::HostMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
     registry
 }
 pub(super) fn open(root: &Path) -> LocalStore {

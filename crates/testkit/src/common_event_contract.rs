@@ -13,6 +13,17 @@ pub fn run_source_mapping_contract(
     fixture: &[u8],
     expected: usize,
 ) -> Result<(), AppError> {
+    run_cluster_source_mapping_contract(decoder, mapper, source, fixture, expected, None)
+}
+/// Same deterministic, cancellation and commitment checks with explicit acquisition context.
+pub fn run_cluster_source_mapping_contract(
+    decoder: Arc<dyn SourceDecoder>,
+    mapper: Arc<dyn SourceMapper>,
+    source: &str,
+    fixture: &[u8],
+    expected: usize,
+    cluster_context: Option<&irmind_domain::SourceClusterContext>,
+) -> Result<(), AppError> {
     if fixture.len() > 64 * 1024 || expected == 0 || expected > 100 {
         return Err(invalid());
     }
@@ -20,13 +31,40 @@ pub fn run_source_mapping_contract(
     let key = (identity.name.to_owned(), identity.version.to_owned());
     let catalog = MappingCatalog::freeze(vec![decoder], vec![mapper]).map_err(|_| invalid())?;
     let decoder = catalog.decoder(&key.0, &key.1).map_err(|_| invalid())?;
-    let first = projection(&catalog, decoder, source, fixture, expected)?;
-    if first != projection(&catalog, decoder, source, fixture, expected)? {
+    let first = projection(
+        &catalog,
+        decoder,
+        source,
+        fixture,
+        expected,
+        cluster_context,
+    )?;
+    if first
+        != projection(
+            &catalog,
+            decoder,
+            source,
+            fixture,
+            expected,
+            cluster_context,
+        )?
+    {
         return Err(invalid());
     }
     std::thread::scope(|scope| {
         let workers = (0..4)
-            .map(|_| scope.spawn(|| projection(&catalog, decoder, source, fixture, expected)))
+            .map(|_| {
+                scope.spawn(|| {
+                    projection(
+                        &catalog,
+                        decoder,
+                        source,
+                        fixture,
+                        expected,
+                        cluster_context,
+                    )
+                })
+            })
             .collect::<Vec<_>>();
         for worker in workers {
             if worker.join().map_err(|_| invalid())?? != first {
@@ -45,7 +83,7 @@ pub fn run_source_mapping_contract(
                 source: &reference,
                 evidence_hash: irmind_app::sha256(fixture),
                 time_context: None,
-                cluster_context: None,
+                cluster_context,
                 cancel: &cancel,
             },
             reader: &mut Cursor::new(fixture),
@@ -66,6 +104,7 @@ fn projection(
     source: &str,
     fixture: &[u8],
     expected: usize,
+    cluster_context: Option<&irmind_domain::SourceClusterContext>,
 ) -> Result<Vec<MappingOutput>, AppError> {
     let cancel = CancellationToken::new();
     let reference = SourceReferenceV1::file(source).map_err(|_| invalid())?;
@@ -73,7 +112,7 @@ fn projection(
         source: &reference,
         evidence_hash: irmind_app::sha256(fixture),
         time_context: None,
-        cluster_context: None,
+        cluster_context,
         cancel: &cancel,
     };
     let mut accumulator =

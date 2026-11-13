@@ -100,10 +100,15 @@ fn prepare(fields: SourceValue) -> Result<DecodedSourceFrame, AppError> {
         .and_then(SourceValue::as_text)
         .ok_or_else(invalid)?;
     let timestamp = IndexedTime::from_rfc3339(time, false).map_err(|_| invalid())?;
+    let format = if is_kubernetes(&fields) {
+        "falco-kubernetes"
+    } else {
+        "falco"
+    };
     Ok(DecodedSourceFrame {
         fields,
         timestamp: Some(timestamp),
-        format: SourceFormatV1::try_new("falco", super::SOURCE_VERSION, BTreeMap::new())
+        format: SourceFormatV1::try_new(format, super::SOURCE_VERSION, BTreeMap::new())
             .map_err(|_| invalid())?,
     })
 }

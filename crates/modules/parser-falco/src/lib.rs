@@ -76,7 +76,14 @@ impl LogParser for FalcoParser {
 fn sample_fields(sample: &[u8]) -> Option<irmind_app::source_mapping::SourceValue> {
     let sample = &sample[..sample.len().min(65536)];
     let fields = irmind_app::source_mapping::json::decode_json_fields(
-        sample.split(|b| *b == b'\n').next()?,
+        {
+            let first = sample.split(|b| *b == b'\n').next()?;
+            if matches!(first.trim_ascii(), b"{" | b"[") {
+                sample
+            } else {
+                first
+            }
+        },
         irmind_app::source_mapping::json::SourceJsonLimits::default(),
     )
     .ok()?;

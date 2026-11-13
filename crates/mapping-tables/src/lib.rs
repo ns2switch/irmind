@@ -51,3 +51,7 @@ mod optional_field_tests;
 #[allow(clippy::unwrap_used)]
 mod lifetime_tests;
 pub use fields::copy_common_value;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod cluster_tests;

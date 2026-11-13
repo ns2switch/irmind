@@ -365,3 +365,15 @@ a category, outcome or confirmed finding for a detection collection.
 ## Methodology packages
 
 Skills are local data packages, not connectors or executable modules. `/skills` manages the three included methods and analyst-approved packages. They do not change compiled tools or enable providers. See [forensic skills](skills.md).
+
+## Kubernetes audit and Falco
+
+The experimental `parser-kubernetes` and `parser-falco` modules and their separate
+bundled table mappings are enabled in the default build. They require no
+credentials or network. Native Kubernetes audit Events require explicit cluster
+context per ingestion, using the form or `/ingest --cluster kubernetes:urn:k8s:example`.
+Falco requires that context when a record contains Kubernetes metadata; host-only
+alerts remain usable without inventing a cluster identity. Configure the
+collection identity, not an authority to contact a cluster. See the
+[parser coverage](parsers.md#kubernetes-and-falco-interpretation). Managed-provider
+export wrappers are not part of this native-format support.

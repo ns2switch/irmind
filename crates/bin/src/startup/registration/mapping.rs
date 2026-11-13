@@ -32,6 +32,8 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
         Box::new(irmind_mod_mapping_journald_compat::JournaldCompatibilityMapping::new()?),
         &ModuleConfig::new(),
     )?;
+    #[cfg(any(feature = "mapping-kubernetes", feature = "mapping-falco"))]
+    register_contextual(registry)?;
     #[cfg(feature = "mapping-cloudtrail")]
     registry.register(
         Box::new(irmind_mod_mapping_cloudtrail::CloudTrailMapping::new()?),
@@ -68,6 +70,26 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
         Box::new(irmind_mod_mapping_ocsf::OcsfMapping::new()?),
         &ModuleConfig::new(),
     )?;
+    Ok(())
+}
+#[cfg(any(feature = "mapping-kubernetes", feature = "mapping-falco"))]
+fn register_contextual(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "mapping-kubernetes")]
+    registry.register(
+        Box::new(irmind_mod_mapping_kubernetes::KubernetesMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "mapping-falco")]
+    {
+        registry.register(
+            Box::new(irmind_mod_mapping_falco::HostMapping::new()?),
+            &ModuleConfig::new(),
+        )?;
+        registry.register(
+            Box::new(irmind_mod_mapping_falco::KubernetesMapping::new()?),
+            &ModuleConfig::new(),
+        )?;
+    }
     Ok(())
 }
 #[cfg(feature = "mapping-evtx")]
@@ -180,13 +202,28 @@ mod tests {
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_ocsf::OcsfSourceDecoder))
             .unwrap();
+        #[cfg(feature = "mapping-kubernetes")]
+        registry
+            .add_source_decoder(Arc::new(
+                irmind_mod_parser_kubernetes::KubernetesSourceDecoder,
+            ))
+            .unwrap();
+        #[cfg(feature = "mapping-falco")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_falco::FalcoSourceDecoder))
+            .unwrap();
         register(&mut registry).unwrap();
+        check_catalog(&registry);
+    }
+    fn check_catalog(registry: &ModuleRegistry) {
         let catalog = registry.mapping_catalog().unwrap();
         assert!(catalog.supports_decoder("parser-json", "json-source-v1"));
         assert!(catalog.supports_decoder("parser-linux", "linux-source-v1"));
         assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + usize::from(cfg!(feature = "mapping-cloudtrail"))
+            2 + 2 * usize::from(cfg!(feature = "mapping-falco"))
+                + usize::from(cfg!(feature = "mapping-kubernetes"))
+                + usize::from(cfg!(feature = "mapping-cloudtrail"))
                 + usize::from(cfg!(feature = "mapping-syslog"))
                 + 6 * usize::from(cfg!(feature = "mapping-linux"))
                 + usize::from(cfg!(feature = "parser-zeek"))

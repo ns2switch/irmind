@@ -1,0 +1,19 @@
+[package]
+name = "irmind-mod-mapping-falco"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+irmind-mapping-tables = { path = "../../mapping-tables", version = "0.1.0" }
+
+[dev-dependencies]
+serde_json = "1"
+irmind-mod-parser-falco = { path = "../parser-falco", version = "0.1.0" }
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+
+[lints]
+workspace = true
