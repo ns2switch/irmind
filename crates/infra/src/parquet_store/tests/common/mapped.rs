@@ -217,6 +217,7 @@ pub(super) fn assert_rebuild(root: &Path, paths: &[String], compact: bool) {
                     confidence: 90,
                     mode: irmind_domain::ParserSelectionMode::Automatic,
                     timestamp_context: None,
+                    cluster_context: None,
                     format_sample_sha256: irmind_app::sha256(&raw[..raw.len().min(64 * 1024)]),
                 },
             )

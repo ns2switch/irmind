@@ -21,6 +21,7 @@ impl LargeCaseUseCases<'_, '_> {
                 confidence: 0,
                 mode: irmind_domain::ParserSelectionMode::Analyst,
                 timestamp_context: self.parser.timestamp_context().map(str::to_owned),
+                cluster_context: self.parser.cluster_context().cloned(),
                 format_sample_sha256: prepared.format_sample_sha256,
             };
             &configured
@@ -28,6 +29,7 @@ impl LargeCaseUseCases<'_, '_> {
         if selection.parser_version != identity.version
             || selection.parser_id != identity.name
             || selection.format_sample_sha256 != prepared.format_sample_sha256
+            || selection.cluster_context.as_ref() != self.parser.cluster_context()
         {
             return Err(invalid_manifest());
         }
@@ -43,6 +45,7 @@ impl LargeCaseUseCases<'_, '_> {
                     .clone()
                     .unwrap_or_else(|| "normalized-utc".into()),
             ),
+            cluster_context: selection.cluster_context.clone(),
             rejected_records: prepared.report.rejected,
             rejected_sample: prepared.report.samples.clone(),
         };

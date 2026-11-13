@@ -184,7 +184,7 @@ jobs:
           IRMIND_EXPECT_PRESERVE_ORDER: '1'
         run: |
           cargo nextest run -p irmind --test format_goldens --all-features --features serde_json/preserve_order --cargo-profile ci --locked
-          cargo nextest run -p irmind-domain -p irmind-app -p irmind-infra --lib --features serde_json/preserve_order --cargo-profile ci --locked -E 'test(skill) | test(case_budget)'
+          cargo nextest run -p irmind-domain -p irmind-app -p irmind-infra --lib --features serde_json/preserve_order --cargo-profile ci --locked -E 'test(skill) | test(case_budget) | test(cluster) | test(source_record)'
           cargo nextest run -p irmind-mapping-tables -p irmind-mod-mapping-cloudtrail -p irmind-mod-parser-evtx -p irmind-mod-mapping-evtx --lib --features serde_json/preserve_order --cargo-profile ci --locked
           cargo nextest run -p irmind-mod-siem-elastic -p irmind-mod-siem-chronicle -p irmind-mod-mapping-ecs -p irmind-mod-mapping-udm --lib --features serde_json/preserve_order --cargo-profile ci --locked
           cargo nextest run --lib --features serde_json/preserve_order --cargo-profile ci --locked \

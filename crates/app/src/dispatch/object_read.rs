@@ -340,6 +340,7 @@ fn select_object_parser(
         parser_override: None,
         forced: false,
         time_context: None,
+        cluster_context: None,
     })?;
     Ok((selected.parser, selected.selection))
 }

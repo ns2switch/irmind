@@ -21,6 +21,7 @@ fuzz_target!(|bytes: &[u8]| {
             let _ = irmind_mod_parser_syslog::SyslogSourceDecoder.decode_reader(
                 irmind_app::source_mapping::SourceInput {
                     metadata: irmind_app::source_mapping::SourceMetadata {
+                        cluster_context: None,
                         source: &source,
                         evidence_hash: sha256(bytes),
                         time_context,

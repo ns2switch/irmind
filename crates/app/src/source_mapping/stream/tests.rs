@@ -70,6 +70,7 @@ fn accumulator<'a>(
             source,
             evidence_hash: [7; 32],
             time_context: None,
+            cluster_context: None,
             cancel,
         },
         Decoder.identity(),
@@ -194,6 +195,7 @@ fn final_manifest_must_match_the_exact_source_size_and_rejection_report() {
         confidence: 90,
         selection: irmind_domain::ParserSelectionMode::Automatic,
         timestamp_context: Some("normalized-utc".into()),
+        cluster_context: None,
         rejected_records: 1,
         rejected_sample: report.samples.clone(),
     };
@@ -230,6 +232,7 @@ fn confirmed_time_inputs_survive_the_decoder_selection_and_input_commitment() {
         source: &source,
         evidence_hash: [7; 32],
         time_context: Some(&time),
+        cluster_context: None,
         cancel: &cancel,
     };
     let mut acc =
@@ -252,6 +255,7 @@ fn confirmed_time_inputs_survive_the_decoder_selection_and_input_commitment() {
         confidence: 90,
         selection: irmind_domain::ParserSelectionMode::Forced,
         timestamp_context: None,
+        cluster_context: None,
         rejected_records: 0,
         rejected_sample: vec![],
     };
@@ -295,6 +299,7 @@ fn prepared_outputs_bind_only_after_complete_source_manifest_and_row_accounting(
         confidence: 90,
         selection: irmind_domain::ParserSelectionMode::Automatic,
         timestamp_context: Some("normalized-utc".into()),
+        cluster_context: None,
         rejected_records: 0,
         rejected_sample: vec![],
     };
@@ -414,4 +419,70 @@ fn prepared_records_remain_bound_to_catalog_source_order_and_cancellation() {
         Err(AppError::Cancelled)
     ));
     assert_eq!(spool.get_ref().len(), 49);
+}
+
+#[test]
+fn acquisition_cluster_must_match_every_record_and_the_signed_manifest() {
+    use irmind_domain::{
+        ClusterContextBasis, ClusterIdentity, ClusterProvider, SourceClusterBinding,
+        SourceClusterContext,
+    };
+    let cluster = ClusterIdentity::try_new(ClusterProvider::Kubernetes, "urn:k8s:lab-a").unwrap();
+    let context = SourceClusterContext::try_new(vec![
+        SourceClusterBinding::try_new(cluster.clone(), ClusterContextBasis::Analyst, None).unwrap(),
+    ])
+    .unwrap();
+    let reference = SourceReferenceV1::file("logs/record.json").unwrap();
+    let cancel = CancellationToken::new();
+    let catalog = MappingCatalog::freeze(vec![Arc::new(Decoder)], vec![]).unwrap();
+    let metadata = SourceMetadata {
+        source: &reference,
+        evidence_hash: [7; 32],
+        time_context: None,
+        cluster_context: Some(&context),
+        cancel: &cancel,
+    };
+    let mut acc =
+        SourceRecordAccumulator::new(metadata, Decoder.identity(), 100, &catalog).unwrap();
+    let mut spool = Cursor::new(Vec::new());
+    assert!(acc.accept(&record(0, 0), &mut spool).is_err());
+    let wrong = ClusterIdentity::try_new(ClusterProvider::Kubernetes, "urn:k8s:lab-b").unwrap();
+    assert!(
+        acc.accept(
+            &record(0, 0).with_cluster_identity(wrong).unwrap(),
+            &mut spool
+        )
+        .is_err()
+    );
+    let tagged = record(0, 0).with_cluster_identity(cluster).unwrap();
+    assert!(
+        accumulator(&reference, &cancel, &catalog)
+            .accept(&tagged, &mut spool)
+            .is_err()
+    );
+    acc.accept(&tagged, &mut spool).unwrap();
+    let commitment = acc.finish(&mut spool, &report(1)).unwrap();
+    let mut manifest = irmind_domain::SourceManifestV2 {
+        source: irmind_domain::SourceManifestV1 {
+            source: reference.reference().into(),
+            size: 100,
+            modified_unix_seconds: None,
+            version: None,
+            provider_checksum: None,
+            sha256: EvidenceHash::from_bytes([7; 32]),
+            copied: false,
+        },
+        parser_id: "parser-json".into(),
+        parser_version: "json-source-v1".into(),
+        confidence: 90,
+        selection: irmind_domain::ParserSelectionMode::Analyst,
+        timestamp_context: None,
+        cluster_context: Some(context),
+        rejected_records: 0,
+        rejected_sample: vec![],
+    };
+    let set = commitment.bind_manifest(&manifest).unwrap();
+    assert_eq!(set.cluster_context(), manifest.cluster_context.as_ref());
+    manifest.cluster_context = None;
+    assert!(commitment.bind_manifest(&manifest).is_err());
 }

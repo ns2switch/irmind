@@ -93,12 +93,14 @@ impl DirectWriting {
             0 => irmind_app::PartitionProfile::Unpartitioned,
             1 => irmind_app::PartitionProfile::CloudAccountRegion,
             2 => irmind_app::PartitionProfile::EndpointHost,
+            3 => irmind_app::PartitionProfile::KubernetesCluster,
             _ => return Err(invalid_source()),
         };
-        let scope = allocator.assign(
+        let scope = allocator.assign_with_cluster(
             row.partition.utc_date(),
             profile,
             [&row.scope_account, &row.scope_region, &row.scope_host],
+            &row.scope_cluster,
         )?;
         row.partition = row.partition.with_scope(scope, 0);
         self.buffered = self.buffered.saturating_add(row.estimated_bytes());

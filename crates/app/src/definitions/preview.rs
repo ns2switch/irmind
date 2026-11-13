@@ -30,6 +30,7 @@ impl Engine<'_> {
                     source: &source,
                     evidence_hash: crate::sha256(sample),
                     time_context: None,
+                    cluster_context: None,
                     cancel: &cancel,
                 },
                 reader: &mut reader,

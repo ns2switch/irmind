@@ -56,6 +56,7 @@ pub(super) fn successive_sources(
             .clone();
         let identity = request.parser.identity_for_source(path)?;
         let manifest = SourceManifestV2 {
+            cluster_context: None,
             source: source.manifest.clone(),
             parser_id: identity.name.into(),
             parser_version: identity.version.into(),

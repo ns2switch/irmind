@@ -32,6 +32,7 @@ fn syslog_ingestion_signs_confirmed_calendar_and_rebuilds_gzip_without_fake_offs
         std::fs::write(root.path().join(path), &bytes).unwrap();
         let selected = catalog
             .select_source(ParserSelectionRequest {
+                cluster_context: None,
                 source: path,
                 sample: &bytes,
                 parser_override: Some("parser-syslog"),

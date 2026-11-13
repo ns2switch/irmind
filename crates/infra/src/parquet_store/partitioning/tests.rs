@@ -1,8 +1,13 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
 fn assign(a: &mut Allocator, host: &str) -> ArtifactPartitionV2 {
-    a.assign("2026-11-01", PartitionProfile::EndpointHost, ["", "", host])
-        .unwrap()
+    a.assign_with_cluster(
+        "2026-11-01",
+        PartitionProfile::EndpointHost,
+        ["", "", host],
+        "",
+    )
+    .unwrap()
 }
 #[test]
 fn cardinality_and_recovery_come_only_from_signed_assignments() {
@@ -145,4 +150,58 @@ fn the_hard_host_ceiling_keeps_the_1025th_value_in_typed_overflow() {
     .unwrap();
     restored.observe(&first).unwrap();
     assert_eq!(assign(&mut restored, "host-other").scopes[0].cap, 1024);
+}
+
+#[test]
+fn cluster_cardinality_is_signed_bounded_and_hashes_every_directory_component() {
+    for count in [1, 64, 1024, 1025] {
+        let limits = PartitionLimits {
+            cluster: 1024,
+            ..PartitionLimits::default()
+        };
+        let mut allocator = Allocator::from_signed(&[], limits).unwrap();
+        let mut last = None;
+        for i in 0..count {
+            let raw = format!("kubernetes:urn:k8s:cluster-{i:04}");
+            let partition = allocator
+                .assign_with_cluster(
+                    "2026-11-01",
+                    PartitionProfile::KubernetesCluster,
+                    ["", "", ""],
+                    &raw,
+                )
+                .unwrap();
+            assert!(!partition.path_prefix().unwrap().contains(&raw));
+            assert_eq!(partition.scopes[0].key, Key::Cluster);
+            last = Some(partition);
+        }
+        let last = last.unwrap();
+        assert_eq!(
+            matches!(last.scopes[0].value, Value::Overflow(Reason::Cardinality)),
+            count > 1024
+        );
+        let mut recovered = Allocator::from_signed(&[], limits).unwrap();
+        recovered.observe(&last).unwrap();
+        assert_eq!(recovered.cap(Key::Cluster), 1024);
+    }
+    assert_eq!(PartitionLimits::default().cluster, 64);
+    assert!(
+        PartitionLimits {
+            cluster: 1025,
+            ..PartitionLimits::default()
+        }
+        .validate()
+        .is_err()
+    );
+    assert!(
+        Allocator::from_signed(&[], PartitionLimits::default())
+            .unwrap()
+            .assign_with_cluster(
+                "2026-11-01",
+                PartitionProfile::KubernetesCluster,
+                ["", "", ""],
+                ""
+            )
+            .is_err()
+    );
 }

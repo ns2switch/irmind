@@ -18,6 +18,7 @@ fn ecs_detects_decodes_maps_filters_and_rebuilds_original_fields() {
             parser_override: None,
             forced: false,
             time_context: None,
+            cluster_context: None,
         })
         .unwrap();
     assert_eq!(selected.selection.parser_version, "ecs-source-v1");

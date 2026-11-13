@@ -187,6 +187,7 @@ impl<'a> SourceRecordAccumulator<'a> {
             samples: report.samples.clone(),
             reference: self.metadata.source.clone(),
             time_context: super::time::domain_time_context(self.metadata.time_context)?,
+            cluster_context: self.metadata.cluster_context.cloned(),
             decoder: self.identity,
             formats: self.formats.into_iter().collect(),
             records: self.records,
@@ -205,6 +206,7 @@ pub struct DecodedSourceCommitmentV1 {
     samples: Vec<String>,
     reference: super::SourceReferenceV1,
     time_context: Option<irmind_domain::SourceTimeContextV1>,
+    cluster_context: Option<crate::SourceClusterContext>,
     decoder: SourceDecoderIdentityV1,
     formats: Vec<SourceFormatIdentityV1>,
     records: u64,
@@ -216,7 +218,8 @@ impl DecodedSourceCommitmentV1 {
         &self,
         manifest: &irmind_domain::SourceManifestV2,
     ) -> Result<SourceRecordSetV1, AppError> {
-        if manifest.source.size != self.source_size
+        if manifest.cluster_context != self.cluster_context
+            || manifest.source.size != self.source_size
             || manifest.rejected_records != self.rejected
             || manifest.rejected_sample != self.samples
             || manifest.source.sha256 != self.source

@@ -191,6 +191,7 @@ fn installed_mapping_round_trips_v7_without_keyring_and_rebuilds_exact_version()
         confidence: 90,
         mode: ParserSelectionMode::Automatic,
         timestamp_context: None,
+        cluster_context: None,
         format_sample_sha256: sha256(raw),
     };
     let cancel = CancellationToken::new();

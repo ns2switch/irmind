@@ -48,6 +48,7 @@ pub struct ParserSelection {
     pub confidence: u8,
     pub mode: ParserSelectionMode,
     pub timestamp_context: Option<String>,
+    pub cluster_context: Option<crate::SourceClusterContext>,
     pub format_sample_sha256: [u8; 32],
 }
 

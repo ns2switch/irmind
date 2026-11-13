@@ -127,6 +127,7 @@ fn local_ocsf_parquet_is_signed_and_rebuilds_without_a_parser_spool()
             confidence: 55,
             mode: ParserSelectionMode::Analyst,
             timestamp_context: None,
+            cluster_context: None,
             format_sample_sha256: sha256(&sample[..sample_size]),
         },
     )]);
@@ -247,6 +248,7 @@ fn parser_modules_ingest_sign_and_rebuild_without_private_answers() {
                 confidence: 95,
                 mode: ParserSelectionMode::Automatic,
                 timestamp_context: None,
+                cluster_context: None,
                 format_sample_sha256: sha256(bytes),
             },
         )]);
@@ -544,6 +546,7 @@ fn benchmark_one_gib_synthetic_ingest_per_parser() -> Result<(), Box<dyn std::er
                 confidence: 95,
                 mode: ParserSelectionMode::Automatic,
                 timestamp_context: None,
+                cluster_context: None,
                 format_sample_sha256: sha256(&sample[..sample_size]),
             },
         )]);

@@ -23,6 +23,7 @@ fn oversized_whitespace_prefix_is_rejected_and_later_rows_keep_their_locations()
                         source: &source,
                         evidence_hash: [7; 32],
                         time_context: None,
+                        cluster_context: None,
                         cancel: &cancel,
                     },
                     reader: &mut reader,

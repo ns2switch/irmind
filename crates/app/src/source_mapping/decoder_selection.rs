@@ -11,6 +11,7 @@ type TimeDetector = fn(&str, &[u8]) -> Result<Option<crate::ParserTimeRequiremen
 pub struct SourceDecoderSelection {
     decoder: Arc<dyn SourceDecoder>,
     context: Option<String>,
+    cluster: Option<crate::SourceClusterContext>,
     detector: Option<Detector>,
     time_detector: Option<TimeDetector>,
     selector: Option<Arc<dyn LogParser>>,
@@ -20,6 +21,7 @@ impl SourceDecoderSelection {
         Self {
             decoder,
             context: None,
+            cluster: None,
             detector: None,
             time_detector: None,
             selector: None,
@@ -47,6 +49,9 @@ impl SourceDecoderSelection {
     }
 }
 impl StreamingEventParser for SourceDecoderSelection {
+    fn cluster_context(&self) -> Option<&crate::SourceClusterContext> {
+        self.cluster.as_ref()
+    }
     fn timestamp_context(&self) -> Option<&str> {
         self.context.as_deref()
     }
@@ -71,6 +76,28 @@ impl StreamingEventParser for SourceDecoderSelection {
 }
 
 impl LogParser for SourceDecoderSelection {
+    fn cluster_context_requirement(
+        &self,
+        source: &str,
+        sample: &[u8],
+    ) -> Result<Option<crate::ParserClusterRequirement>, AppError> {
+        self.selector.as_ref().map_or(Ok(None), |p| {
+            p.cluster_context_requirement(source, &sample[..sample.len().min(65536)])
+        })
+    }
+    fn with_cluster_context(
+        &self,
+        context: &crate::SourceClusterContext,
+    ) -> Result<Arc<dyn LogParser>, AppError> {
+        Ok(Arc::new(Self {
+            decoder: Arc::clone(&self.decoder),
+            context: self.context.clone(),
+            cluster: Some(context.clone()),
+            detector: self.detector,
+            time_detector: self.time_detector,
+            selector: self.selector.clone(),
+        }))
+    }
     fn description(&self) -> &str {
         self.selector
             .as_ref()
@@ -83,6 +110,7 @@ impl LogParser for SourceDecoderSelection {
         Ok(Arc::new(Self {
             decoder: Arc::clone(&self.decoder),
             context: Some(super::source_time_snapshot(context)?),
+            cluster: self.cluster.clone(),
             detector: self.detector,
             time_detector: self.time_detector,
             selector: self.selector.clone(),

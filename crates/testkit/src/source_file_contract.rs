@@ -40,6 +40,7 @@ pub fn run_source_file_mapping_contract(
                 source: &reference,
                 evidence_hash: hash,
                 time_context: None,
+                cluster_context: None,
                 cancel: &cancel,
             },
             file: &mut File::open(fixture).map_err(|_| invalid())?,
@@ -69,6 +70,7 @@ fn projection(
         source: &reference,
         evidence_hash: hash,
         time_context: None,
+        cluster_context: None,
         cancel: &cancel,
     };
     let mut accumulator = SourceRecordAccumulator::new(

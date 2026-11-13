@@ -50,6 +50,11 @@ pub(super) fn record(source: &SourceRecordV1, feed: &mut dyn FnMut(&[u8])) {
     if let Some(raw) = &source.annotations.raw {
         bytes(raw.as_bytes(), feed);
     }
+    if let Some(cluster) = &source.cluster {
+        feed(b"irmind-source-record-cluster-v1\0");
+        bytes(cluster.provider().as_str().as_bytes(), feed);
+        bytes(cluster.id().as_bytes(), feed);
+    }
 }
 
 fn value(input: &SourceValue, feed: &mut dyn FnMut(&[u8])) {

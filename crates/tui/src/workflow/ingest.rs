@@ -179,6 +179,7 @@ impl CaseWorkflow<'_, '_> {
                     resolved.selection.parser_id == *parser_id
                         && resolved.selection.parser_version == first.parser_version
                         && resolved.selection.timestamp_context == first.timestamp_context
+                        && resolved.selection.cluster_context == first.cluster_context
                 })
                 .count()
                 + cursor;
@@ -288,6 +289,7 @@ impl CaseWorkflow<'_, '_> {
                     .or_else(|| analyst_choices.get(&source).map(String::as_str)),
                 forced: forced_parser.is_some(),
                 time_context: context,
+                cluster_context: None,
             });
             let resolved = resolved.map_err(|error| {
                 self.engine

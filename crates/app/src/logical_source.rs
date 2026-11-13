@@ -21,6 +21,9 @@ impl StreamingEventParser for SourceParser<'_> {
     fn identity(&self) -> ParserIdentity<'_> {
         self.inner.identity()
     }
+    fn cluster_context(&self) -> Option<&crate::SourceClusterContext> {
+        self.inner.cluster_context()
+    }
     fn timestamp_context(&self) -> Option<&str> {
         self.inner.timestamp_context()
     }

@@ -63,6 +63,7 @@ fn unavailable_decoder_is_recognized_but_cannot_be_selected_or_rebuilt() {
         parser_override: None,
         forced: false,
         time_context: None,
+        cluster_context: None,
     });
     assert!(result.err().unwrap().to_string().contains("unavailable"));
     assert!(catalog.get_version("parser-evtx", VERSION).is_err());

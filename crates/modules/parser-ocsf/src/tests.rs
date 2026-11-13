@@ -326,6 +326,7 @@ fn decode_file(
                 source: &SourceReferenceV1::file(source).unwrap(),
                 evidence_hash: hash,
                 time_context: None,
+                cluster_context: None,
                 cancel,
             },
             file,

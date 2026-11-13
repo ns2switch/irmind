@@ -19,6 +19,7 @@ pub(super) fn digest(
                     source: &source,
                     evidence_hash: sha256(bytes),
                     time_context: None,
+                    cluster_context: None,
                     cancel: &cancel,
                 },
                 reader: &mut std::io::Cursor::new(bytes),

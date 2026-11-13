@@ -25,6 +25,7 @@ fn original_network_sources_keep_uid_flow_and_precise_time_through_signed_rebuil
                 parser_override: Some(parser),
                 forced: true,
                 time_context: None,
+                cluster_context: None,
             })
             .unwrap();
         assert!(selected.selection.parser_version.ends_with("-source-v1"));

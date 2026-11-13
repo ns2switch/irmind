@@ -16,6 +16,7 @@ fn records(
                 source: &reference,
                 evidence_hash: irmind_app::sha256(bytes),
                 time_context: context,
+                cluster_context: None,
                 cancel: &cancel,
             },
             reader: &mut std::io::Cursor::new(bytes),

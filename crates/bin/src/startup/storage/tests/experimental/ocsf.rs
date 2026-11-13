@@ -18,6 +18,7 @@ fn ocsf_detects_decodes_maps_filters_and_rebuilds_original_fields() {
             parser_override: None,
             forced: false,
             time_context: None,
+            cluster_context: None,
         })
         .unwrap();
     assert_eq!(selected.selection.parser_version, "ocsf-source-v1");
@@ -106,6 +107,7 @@ fn malformed_seekable_source_is_rejected_without_discarding_other_sources() {
                 parser_override: Some("parser-ocsf"),
                 forced: true,
                 time_context: None,
+                cluster_context: None,
             })
             .unwrap();
         selections.insert(path.into(), selected.selection);

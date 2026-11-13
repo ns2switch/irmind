@@ -107,6 +107,7 @@ fn approved_definitions_are_pinned_signed_and_rebuild_after_replacement_or_remov
             confidence: 65,
             mode: ParserSelectionMode::Forced,
             timestamp_context: parser.timestamp_context().map(str::to_owned),
+            cluster_context: None,
             format_sample_sha256: sha256(SAMPLE),
         },
     )]);
@@ -334,6 +335,7 @@ fn benchmark_declarative_one_gib() {
             confidence: 70,
             mode: ParserSelectionMode::Forced,
             timestamp_context: parser.timestamp_context().map(str::to_owned),
+            cluster_context: None,
             format_sample_sha256: sha256(&sample),
         },
     )]);

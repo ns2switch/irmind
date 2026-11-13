@@ -21,6 +21,7 @@ fn extracted_identity_and_projection_match_the_frozen_journald_baseline() {
                         source: &irmind_domain::SourceReferenceV1::file("journal.jsonl").unwrap(),
                         evidence_hash: hash,
                         time_context: None,
+                        cluster_context: None,
                         cancel: &cancel,
                     },
                     reader: &mut std::io::Cursor::new(bytes),

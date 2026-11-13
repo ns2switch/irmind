@@ -81,6 +81,7 @@ impl LargeCaseUseCases<'_, '_> {
                 .get(&source.manifest.source)
                 .is_some_and(|selection| {
                     selection.timestamp_context.as_deref() != self.parser.timestamp_context()
+                        || selection.cluster_context.as_ref() != self.parser.cluster_context()
                 })
             {
                 return Err(invalid_manifest());

@@ -187,6 +187,7 @@ mod tests {
                             source: &source,
                             evidence_hash: sha256(input.as_bytes()),
                             time_context: None,
+                            cluster_context: None,
                             cancel: &cancel,
                         },
                         reader: &mut Cursor::new(input.as_bytes()),

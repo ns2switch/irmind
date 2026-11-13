@@ -32,6 +32,7 @@ fn mapped_originals_reach_the_obedient_model_only_through_the_guard_and_policy()
         confidence: 90,
         mode: ParserSelectionMode::Automatic,
         timestamp_context: None,
+        cluster_context: None,
         format_sample_sha256: sha256(bytes),
     };
     LargeCaseUseCases {

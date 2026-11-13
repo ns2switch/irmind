@@ -28,6 +28,7 @@ fn account_management_cron_and_reused_pids_keep_legacy_search_identities_without
                     source: &reference,
                     evidence_hash: irmind_app::sha256(INPUT),
                     time_context: None,
+                    cluster_context: None,
                     cancel: &cancel,
                 },
                 reader: &mut std::io::Cursor::new(INPUT),

@@ -71,6 +71,8 @@ pub struct SourceRecordV1 {
     format: SourceFormatV1,
     fields: SourceValue,
     annotations: DecodeAnnotationsV1,
+    cluster: Option<crate::ClusterIdentity>,
+    encoded_bound: usize,
     // Scheduling metadata only: deliberately absent from the canonical codec.
     retained_bytes: usize,
 }
@@ -131,8 +133,39 @@ impl SourceRecordV1 {
             format,
             fields,
             annotations,
+            cluster: None,
+            encoded_bound: estimated,
             retained_bytes: estimated * 2 + nodes * 256 + 8192,
         })
+    }
+    pub fn with_cluster_identity(
+        mut self,
+        cluster: crate::ClusterIdentity,
+    ) -> Result<Self, SourceRecordError> {
+        if let Some(previous) = &self.cluster {
+            return if previous == &cluster {
+                Ok(self)
+            } else {
+                Err(SourceRecordError::InvalidDescriptor)
+            };
+        }
+        let extra = cluster.id().len() + cluster.provider().as_str().len() + 128;
+        self.encoded_bound = self
+            .encoded_bound
+            .checked_add(extra)
+            .ok_or(SourceRecordError::Limit)?;
+        if self.encoded_bound > SOURCE_MAX_BYTES {
+            return Err(SourceRecordError::Limit);
+        }
+        self.retained_bytes = self
+            .retained_bytes
+            .checked_add(extra * 2)
+            .ok_or(SourceRecordError::Limit)?;
+        self.cluster = Some(cluster);
+        Ok(self)
+    }
+    pub const fn cluster_identity(&self) -> Option<&crate::ClusterIdentity> {
+        self.cluster.as_ref()
     }
     /// Conservative bounded-queue charge, independent of signed encoding.
     pub const fn retained_bytes(&self) -> usize {
@@ -168,3 +201,14 @@ impl SourceRecordV1 {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;
+
+impl crate::Tainted<SourceRecordV1> {
+    /// Attach checked acquisition metadata without releasing or copying source content.
+    pub fn with_cluster_identity(
+        mut self,
+        cluster: crate::ClusterIdentity,
+    ) -> Result<Self, SourceRecordError> {
+        self.value = self.value.with_cluster_identity(cluster)?;
+        Ok(self)
+    }
+}

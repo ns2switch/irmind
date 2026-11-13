@@ -6,6 +6,11 @@ fuzz_target!(|bytes: &[u8]| {
     if bytes.len() > 65_536 {
         return;
     }
+    if let Ok(context) = irmind_domain::SourceClusterContext::decode(bytes) {
+        let encoded = context.encode();
+        assert_eq!(encoded, bytes);
+        assert_eq!(irmind_domain::SourceClusterContext::decode(&encoded).unwrap(), context);
+    }
     if let Ok(fields) = irmind_app::source_mapping::json::decode_json_fields(
         bytes,
         irmind_app::source_mapping::json::SourceJsonLimits::default(),

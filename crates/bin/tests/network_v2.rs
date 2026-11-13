@@ -78,6 +78,7 @@ fn detected_network_sources_write_precise_v3_and_reconstruct() {
                 parser_override: None,
                 forced: false,
                 time_context: None,
+                cluster_context: None,
             })
             .unwrap();
         let selections = BTreeMap::from([(name.into(), selected.selection)]);

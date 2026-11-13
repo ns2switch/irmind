@@ -4,6 +4,18 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+### Kubernetes ingestion foundation
+
+- Bind explicit, bounded cluster acquisition context to source manifests,
+  decoded-record commitments and reconstruction. Cluster claims cannot grant
+  permissions or silently replace analyst-confirmed identities.
+- Add deterministic cluster partitions with 64 ordinary values by default,
+  a maximum of 1,024 and signed overflow buckets. Raw cluster identifiers never
+  become directory names.
+- Format impact: current source manifests and record-set commitments gain an
+  optional cluster-context extension; records carrying cluster context include
+  it in their canonical hash. Sources without context retain their bytes.
+
 ### Case allocations
 
 - Add signed defaults for new cases in `/settings limits` and signed per-case

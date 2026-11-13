@@ -59,6 +59,7 @@ pub struct SourceRecordSetV1 {
     reference: SourceReferenceV1,
     decoder: SourceDecoderIdentityV1,
     time_context: Option<super::SourceTimeContextV1>,
+    cluster_context: Option<crate::SourceClusterContext>,
     formats: Vec<SourceFormatIdentityV1>,
     records: u64,
     commitment: EvidenceHash,
@@ -101,6 +102,7 @@ impl SourceRecordSetV1 {
             manifest: manifest_identity(manifest)?,
             rejected: manifest.rejected_records,
             time_context,
+            cluster_context: manifest.cluster_context.clone(),
             reference,
             decoder: SourceDecoderIdentityV1::try_new(
                 &manifest.parser_id,
@@ -130,6 +132,7 @@ impl SourceRecordSetV1 {
             || self.decoder.version() != manifest.parser_version
             || self.rejected != manifest.rejected_records
             || self.manifest != manifest_identity(manifest)?
+            || self.cluster_context != manifest.cluster_context
             || !context_matches(self.time_context, manifest.timestamp_context.as_deref())
         {
             return Err(invalid());
@@ -144,6 +147,9 @@ impl SourceRecordSetV1 {
     }
     pub const fn time_context(&self) -> Option<super::SourceTimeContextV1> {
         self.time_context
+    }
+    pub const fn cluster_context(&self) -> Option<&crate::SourceClusterContext> {
+        self.cluster_context.as_ref()
     }
     pub const fn source(&self) -> &EvidenceHash {
         &self.source
@@ -200,6 +206,7 @@ impl SourceRecordSetV1 {
         bytes.extend_from_slice(&self.records.to_be_bytes());
         bytes.extend_from_slice(&self.rejected.to_be_bytes());
         put(&mut bytes, self.commitment.as_str().as_bytes());
+        super::super::cluster_extension::write(&mut bytes, self.cluster_context.as_ref());
         wire::encode(&bytes, wire::MAX_SMALL)
     }
     pub fn decode(payload: &str) -> Result<Self, DomainError> {
@@ -247,6 +254,7 @@ impl SourceRecordSetV1 {
         let records = r.u64()?;
         let rejected = r.u64()?;
         let commitment = EvidenceHash::parse(&r.string_limit(64)?)?;
+        let cluster_context = super::super::cluster_extension::read(&mut r)?;
         r.end()?;
         Self::checked(Self {
             source,
@@ -255,6 +263,7 @@ impl SourceRecordSetV1 {
             reference,
             decoder,
             time_context,
+            cluster_context,
             formats,
             records,
             commitment,

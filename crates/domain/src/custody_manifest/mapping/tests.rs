@@ -32,6 +32,7 @@ fn source_manifest() -> crate::SourceManifestV2 {
         confidence: 90,
         selection: crate::ParserSelectionMode::Automatic,
         timestamp_context: Some("normalized-utc".into()),
+        cluster_context: None,
         rejected_records: 1,
         rejected_sample: vec![],
     }

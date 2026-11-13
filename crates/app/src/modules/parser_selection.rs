@@ -9,6 +9,7 @@ pub struct ParserSelectionRequest<'a> {
     pub parser_override: Option<&'a str>,
     pub forced: bool,
     pub time_context: Option<ParserTimeContext>,
+    pub cluster_context: Option<&'a crate::SourceClusterContext>,
 }
 
 #[derive(Clone)]
@@ -44,6 +45,26 @@ impl ParserCatalog {
         } else {
             original
         };
+        let requirement = parser.cluster_context_requirement(request.source, request.sample)?;
+        if request.cluster_context.is_none()
+            && parser.cluster_context().is_none()
+            && requirement
+                .as_ref()
+                .is_some_and(crate::ParserClusterRequirement::required)
+        {
+            return Err(AppError::ParserClusterContextRequired {
+                source_name: request.source.into(),
+                requirement: requirement.ok_or(AppError::ParserClusterUnsupported)?,
+            });
+        }
+        let parser = if let Some(context) = request.cluster_context {
+            if requirement.is_none() {
+                return Err(AppError::ParserClusterUnsupported);
+            }
+            parser.with_cluster_context(context)?
+        } else {
+            parser
+        };
         if parser.identity().name != id {
             return Err(AppError::Policy(
                 "configured parser changed its identity".into(),
@@ -56,6 +77,7 @@ impl ParserCatalog {
                 confidence,
                 mode,
                 timestamp_context: parser.timestamp_context().map(str::to_owned),
+                cluster_context: parser.cluster_context().cloned(),
                 format_sample_sha256: sha256(request.sample),
             },
             parser,

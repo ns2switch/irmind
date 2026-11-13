@@ -40,6 +40,7 @@ fuzz_target!(|bytes: &[u8]| {
                     source: &source,
                     evidence_hash: sha256(data),
                     time_context: None,
+                    cluster_context: None,
                     cancel: &cancel,
                 },
                 reader: &mut std::io::Cursor::new(data),

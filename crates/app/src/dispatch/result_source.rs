@@ -108,6 +108,7 @@ fn has_events(
                 source: &source,
                 evidence_hash: crate::sha256(raw),
                 time_context: None,
+                cluster_context: None,
                 cancel,
             },
         },
@@ -126,6 +127,7 @@ fn parser_selection(decoder: &dyn SourceDecoder, raw: &[u8]) -> ParserSelection 
         confidence: 100,
         mode: ParserSelectionMode::Automatic,
         timestamp_context: None,
+        cluster_context: None,
         format_sample_sha256: crate::sha256(&raw[..raw.len().min(65_536)]),
     }
 }

@@ -67,6 +67,7 @@ fn decode_digest(decoder: &dyn SourceDecoder, bytes: &[u8], workers: usize) -> D
                     source: &source,
                     evidence_hash: hash,
                     time_context: None,
+                    cluster_context: None,
                     cancel: &cancel,
                 },
                 reader: &mut std::io::Cursor::new(bytes),

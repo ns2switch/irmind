@@ -16,7 +16,8 @@ fn compatibility_mapping_keeps_cloud_and_generic_lookup_identities_without_class
         let mapper = JsonCompatibilityMapping::new().unwrap();
         let mut outputs = Vec::new();
         irmind_mod_parser_json::JsonSourceDecoder.decode_reader(SourceInput {
-            metadata: SourceMetadata { source: &irmind_domain::SourceReferenceV1::file("input.json").unwrap(), evidence_hash: hash, time_context: None, cancel: &cancel },
+            metadata: SourceMetadata {
+                cluster_context: None, source: &irmind_domain::SourceReferenceV1::file("input.json").unwrap(), evidence_hash: hash, time_context: None, cancel: &cancel },
             reader: &mut std::io::Cursor::new(data),
         }, &mut |source: Tainted<SourceRecordV1>| { source.inspect(|r| outputs.push(mapper.map(r).unwrap())); Ok(()) }).unwrap();
         assert_eq!(outputs.len(), 1);

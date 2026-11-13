@@ -166,3 +166,32 @@ fn record_bounds_apply_to_whole_tree_and_original_annotations() {
     assert!(!format!("{value:?}").contains("synthetic-sensitive-marker"));
     assert!(!format!("{:?}", value.fields()).contains("synthetic-sensitive-marker"));
 }
+
+#[test]
+fn cluster_metadata_changes_the_record_commitment_but_not_original_fields_or_taint() {
+    let original = record(
+        SourceValue::object(vec![(
+            "original".into(),
+            SourceValue::Text("unchanged".into()),
+        )])
+        .unwrap(),
+    )
+    .unwrap();
+    let identity =
+        crate::ClusterIdentity::try_new(crate::ClusterProvider::Kubernetes, "urn:k8s:lab-a")
+            .unwrap();
+    let tagged = original
+        .clone()
+        .with_cluster_identity(identity.clone())
+        .unwrap();
+    assert!(tagged.fields() == original.fields());
+    assert_eq!(tagged.origin(), original.origin());
+    assert_ne!(canonical(&tagged), canonical(&original));
+    assert!(tagged.retained_bytes() > original.retained_bytes());
+    let provenance = crate::Provenance::new([7; 32], Some(3), crate::SourceKind::File);
+    let tainted = crate::Tainted::from_external(original, provenance.clone())
+        .with_cluster_identity(identity)
+        .unwrap();
+    assert_eq!(tainted.provenance(), &provenance);
+    tainted.inspect(|source| assert!(source.fields() == tagged.fields()));
+}

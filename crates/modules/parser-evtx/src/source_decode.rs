@@ -205,6 +205,7 @@ pub(super) fn fuzz(bytes: &[u8]) {
         source: &source,
         evidence_hash: [0; 32],
         time_context: None,
+        cluster_context: None,
         cancel: &cancel,
     };
     let mut state = codec::State::new(69632);

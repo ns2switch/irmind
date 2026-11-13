@@ -29,6 +29,7 @@ impl MappedJson {
                         source: &source,
                         evidence_hash: irmind_app::sha256(bytes),
                         time_context: None,
+                        cluster_context: None,
                         cancel,
                     },
                     reader: &mut std::io::Cursor::new(bytes),

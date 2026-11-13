@@ -128,6 +128,7 @@ fn perform_ingest_plan(args: PlanExecution<'_>) -> Result<()> {
                 choice.selection.parser_id == *parser_id
                     && choice.selection.parser_version == first.parser_version
                     && choice.selection.timestamp_context == first.timestamp_context
+                    && choice.selection.cluster_context == first.cluster_context
             })
             .count()
             + cursor;
@@ -212,6 +213,7 @@ fn plan_ingest(input: IngestPlanInput<'_>) -> Result<Vec<(String, ResolvedParser
             parser_override: input.parser,
             forced: input.parser.is_some(),
             time_context: input.time_context,
+            cluster_context: None,
         });
         match selected {
             Ok(selection) => plan.push((source, selection)),
@@ -219,6 +221,12 @@ fn plan_ingest(input: IngestPlanInput<'_>) -> Result<Vec<(String, ResolvedParser
                 input
                     .engine
                     .record_parser_selection_required(input.id, "unsupported")?;
+                return Err(error.into());
+            }
+            Err(error @ irmind_app::AppError::ParserClusterContextRequired { .. }) => {
+                input
+                    .engine
+                    .record_parser_selection_required(input.id, "missing-cluster-context")?;
                 return Err(error.into());
             }
             Err(error @ irmind_app::AppError::ParserTimeContextRequired { .. }) => {

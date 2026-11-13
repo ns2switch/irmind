@@ -34,6 +34,7 @@ fn mapped_pipeline_binds_raw_inputs_and_maps_before_writing_and_exporting() {
             confidence: 90,
             mode: ParserSelectionMode::Automatic,
             timestamp_context: None,
+            cluster_context: None,
             format_sample_sha256: sha256(raw.as_bytes()),
         };
         large
@@ -221,3 +222,5 @@ mod cloudtrail;
 mod workers;
 
 mod partition_order;
+
+mod cluster;

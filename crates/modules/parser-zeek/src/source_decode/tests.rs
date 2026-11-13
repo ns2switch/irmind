@@ -16,6 +16,7 @@ fn oversized_whitespace_prefix_is_counted_in_tsv() {
                     source: &source,
                     evidence_hash: [1; 32],
                     time_context: None,
+                    cluster_context: None,
                     cancel: &cancel,
                 },
                 reader: &mut input.as_slice(),

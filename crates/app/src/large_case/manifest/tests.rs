@@ -45,6 +45,7 @@ fn mapped_entries() -> (Vec<SignedEntry>, ParquetArtifactV3) {
         confidence: 90,
         selection: ParserSelectionMode::Automatic,
         timestamp_context: None,
+        cluster_context: None,
         rejected_records: 0,
         rejected_sample: Vec::new(),
     };

@@ -52,6 +52,7 @@ fn decode(
                 source: &source,
                 evidence_hash: [0; 32],
                 time_context: None,
+                cluster_context: None,
                 cancel: &cancel,
             },
             reader,

@@ -63,6 +63,11 @@ pub(super) fn validate_binding(
     {
         return Err(invalid());
     }
+    match (binding.metadata.cluster_context, source.cluster_identity()) {
+        (None, None) => {}
+        (Some(context), Some(identity)) if context.contains(identity) => {}
+        _ => return Err(invalid()),
+    }
     match (origin.offset(), provenance.parser_location()) {
         (Some(offset), Some(location))
             if offset < binding.size
