@@ -155,3 +155,17 @@ fn oversized_first_lines_are_bounded_and_later_records_keep_real_offsets() {
         assert!(report.samples.iter().all(|sample| sample.len() <= 256));
     }
 }
+
+#[test]
+fn host_only_falco_passes_the_shared_decoder_contract_without_a_fake_cluster() {
+    let bytes = br#"{"time":"2026-11-01T00:00:00Z","rule":"Synthetic host shell","priority":"Warning","output_fields":{"proc.name":"sh"}}"#;
+    irmind_testkit::run_log_parser_contract(
+        &FalcoParser::default(),
+        &FalcoSourceDecoder,
+        "synthetic.ndjson",
+        bytes,
+        1,
+        None,
+    )
+    .unwrap();
+}

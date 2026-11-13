@@ -1,4 +1,4 @@
-Traducción de docs/parsers.md en el commit 2fae0b92ee0c0fbb950e7d8da18e5bd6edfd120e; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/parsers.md en el commit 9ecdc02dcd9b931aa1e36dc0b47411e4342420fe; si hay diferencias, prevalece la versión en inglés.
 
 # Parsers de logs
 
