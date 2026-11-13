@@ -55,6 +55,7 @@ fn signed_case_preserves_precise_time_and_rejects_decoder_substitution() {
             confidence: 90,
             mode: ParserSelectionMode::Automatic,
             timestamp_context: None,
+            cluster_context: None,
             format_sample_sha256: sha256(new),
         },
     )]);

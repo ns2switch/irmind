@@ -24,6 +24,7 @@ impl ParquetStore {
             source: &reference,
             evidence_hash: input.hash,
             time_context: time.as_ref(),
+            cluster_context: input.parser.cluster_context(),
             cancel: input.cancel,
         };
         let id = parser.identity_for_source(input.relative_path)?;

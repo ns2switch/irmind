@@ -23,6 +23,7 @@ fn decode(
                 source: &source,
                 evidence_hash: crate::sha256(bytes),
                 time_context: None,
+                cluster_context: None,
                 cancel: &cancel,
             },
             reader: &mut Cursor::new(bytes),
@@ -115,6 +116,7 @@ fn frame_reservation_includes_decoded_metadata_context() {
             source: &source,
             evidence_hash: [0; 32],
             time_context: None,
+            cluster_context: None,
             cancel: &cancel,
         },
         ParserIdentity {

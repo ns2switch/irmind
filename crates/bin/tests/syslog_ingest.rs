@@ -71,6 +71,7 @@ fn detected_syslog_is_signed_queryable_and_reproducible_without_expected_answers
                 .version
                 .into(),
             timestamp_context: parser.timestamp_context().map(str::to_owned),
+            cluster_context: None,
             format_sample_sha256: irmind_app::sha256(bytes),
         },
     )]);
@@ -203,6 +204,7 @@ fn selection(parser: &SyslogParser, sample: &[u8]) -> ParserSelection {
         confidence: parser.detect("synthetic.log", sample).unwrap().value(),
         mode: ParserSelectionMode::Automatic,
         timestamp_context: parser.timestamp_context().map(str::to_owned),
+        cluster_context: None,
         format_sample_sha256: irmind_app::sha256(sample),
     }
 }

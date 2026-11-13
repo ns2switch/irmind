@@ -17,6 +17,7 @@ fn records(bytes: &[u8]) -> Vec<SourceRecordV1> {
                     source: &source,
                     evidence_hash: irmind_app::sha256(bytes),
                     time_context: None,
+                    cluster_context: None,
                     cancel: &cancel,
                 },
                 reader: &mut std::io::Cursor::new(bytes),

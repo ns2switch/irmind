@@ -44,6 +44,7 @@ fn benchmark(format: &str) {
         .then(|| ParserTimeContext::new(2026, 0, true, ParserTimeBasis::Command).unwrap());
     let selected = catalog
         .select_source(ParserSelectionRequest {
+            cluster_context: None,
             source: "benchmark.log",
             sample: &sample,
             parser_override: None,

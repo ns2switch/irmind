@@ -87,6 +87,7 @@ fn default_source_ingestion_is_mapped_and_exports_v7() {
             parser_override: None,
             forced: false,
             time_context: None,
+            cluster_context: None,
         })
         .unwrap();
     assert_eq!(selected.selection.parser_version, "json-source-v1");
@@ -147,6 +148,7 @@ fn assert_journal_selection(catalog: &irmind_app::modules::ParserCatalog) {
             parser_override: None,
             forced: false,
             time_context: None,
+            cluster_context: None,
         })
         .unwrap();
     assert_eq!(journal_selected.selection.parser_version, "linux-source-v1");
@@ -174,6 +176,7 @@ fn linux_auth_context_is_confirmed_signed_and_reproducible_through_the_mapped_wr
         parser_override: None,
         forced: false,
         time_context: None,
+        cluster_context: None,
     };
     assert!(matches!(
         catalog.select_source(request),

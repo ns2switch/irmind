@@ -20,6 +20,7 @@ fn records(bytes: &[u8]) -> Vec<SourceRecordV1> {
                     source: &reference,
                     evidence_hash: irmind_app::sha256(bytes),
                     time_context: None,
+                    cluster_context: None,
                     cancel: &cancel,
                 },
             },

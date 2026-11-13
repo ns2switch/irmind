@@ -1,5 +1,6 @@
 use crate::{AuditEventKind, DomainError, EvidenceHash, canonical::put};
 
+mod cluster_extension;
 mod seal_inventory;
 pub use seal_inventory::*;
 mod commitment;
@@ -44,6 +45,7 @@ pub struct SourceManifestV2 {
     pub confidence: u8,
     pub selection: ParserSelectionMode,
     pub timestamp_context: Option<String>,
+    pub cluster_context: Option<crate::SourceClusterContext>,
     pub rejected_records: u64,
     pub rejected_sample: Vec<String>,
 }
@@ -83,6 +85,7 @@ impl SourceManifestV2 {
         for sample in &self.rejected_sample {
             put(&mut bytes, sample.as_bytes());
         }
+        cluster_extension::write(&mut bytes, self.cluster_context.as_ref());
         encode_payload(&bytes)
     }
 
@@ -109,6 +112,7 @@ impl SourceManifestV2 {
         for _ in 0..count {
             rejected_sample.push(reader.string()?);
         }
+        let cluster_context = cluster_extension::read(&mut reader)?;
         reader.end()?;
         let result = Self {
             source,
@@ -117,6 +121,7 @@ impl SourceManifestV2 {
             confidence,
             selection,
             timestamp_context,
+            cluster_context,
             rejected_records,
             rejected_sample,
         };
@@ -403,6 +408,7 @@ mod tests {
             confidence: 92,
             selection: ParserSelectionMode::Automatic,
             timestamp_context: Some("year=2026;offset=0".into()),
+            cluster_context: None,
             rejected_records: 1,
             rejected_sample: vec!["bad synthetic line".into()],
         };

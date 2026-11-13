@@ -37,6 +37,9 @@ impl ParquetStore {
             selection = selection
                 .with_time_context(&irmind_app::source_mapping::parser_time_context(context)?)?;
         }
+        if let Some(context) = first.0.cluster_context() {
+            selection = selection.with_cluster_context(context)?;
+        }
         let mut prepared = self.prepare_direct_history(
             location,
             &sources,
@@ -200,7 +203,9 @@ fn group_sources<'a>(
     sources.sort_by(|a, b| a.1.source.source.cmp(&b.1.source.source));
     let first = sources.first().ok_or_else(invalid_source)?;
     if sources.iter().any(|(set, _)| {
-        set.decoder() != first.0.decoder() || set.time_context() != first.0.time_context()
+        set.decoder() != first.0.decoder()
+            || set.time_context() != first.0.time_context()
+            || set.cluster_context() != first.0.cluster_context()
     }) {
         return Err(invalid_source());
     }

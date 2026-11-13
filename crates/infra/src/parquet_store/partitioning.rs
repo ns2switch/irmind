@@ -84,12 +84,25 @@ impl Allocator {
         Ok(())
     }
 
-    pub(in crate::parquet_store) fn assign(
+    pub(in crate::parquet_store) fn assign_with_cluster(
         &mut self,
         date: &str,
         profile: PartitionProfile,
         values: [&str; 3],
+        cluster: &str,
     ) -> Result<ArtifactPartitionV2, AppError> {
+        if profile == PartitionProfile::KubernetesCluster && cluster.is_empty() {
+            return Err(invalid_source());
+        }
+        let encoded_cluster = if profile == PartitionProfile::KubernetesCluster {
+            let checked = irmind_domain::ClusterIdentity::parse_qualified(cluster)
+                .map_err(|_| invalid_source())?;
+            let mut bytes = b"irmind-cluster-partition-value-v1\0".to_vec();
+            bytes.extend_from_slice(checked.qualified().as_bytes());
+            format!("cluster-{}", irmind_app::hex(&irmind_app::sha256(&bytes)))
+        } else {
+            String::new()
+        };
         let mut partition = ArtifactPartitionV2 {
             date: date.into(),
             key_set: ARTIFACT_V2_SCOPE_KEYS.into(),
@@ -104,6 +117,7 @@ impl Allocator {
                 &[(Key::Account, values[0]), (Key::Region, values[1])]
             }
             PartitionProfile::EndpointHost => &[(Key::Host, values[2])],
+            PartitionProfile::KubernetesCluster => &[(Key::Cluster, &encoded_cluster)],
         };
         // Do not consume values for an all-scope overflow tuple.
         let mut additions = Vec::new();
@@ -144,6 +158,7 @@ impl Allocator {
             || match key {
                 Key::Account => self.limits.account,
                 Key::Region => self.limits.region,
+                Key::Cluster => self.limits.cluster,
                 _ => self.limits.host,
             },
             |state| state.0,
@@ -175,6 +190,7 @@ pub(super) fn replay_limits(artifacts: &[ParquetArtifact]) -> Result<PartitionLi
         account: allocation.cap(Key::Account),
         region: allocation.cap(Key::Region),
         host: allocation.cap(Key::Host),
+        cluster: allocation.cap(Key::Cluster),
     })
 }
 

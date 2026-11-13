@@ -10,6 +10,7 @@ fn metadata<'a>(
         source,
         evidence_hash: [7; 32],
         time_context: None,
+        cluster_context: None,
         cancel,
     }
 }
@@ -120,7 +121,8 @@ fn event_ids_are_decoded_as_original_fields_without_interpretation() {
                 accepted_index: 0, record_id: 1, offset: 4608,
                 timestamp: "2026-11-01T00:00:00.0000007Z".into(),
                 event: json!({"Event":{"System":{"EventID":id,"Channel":channel,"Computer":"synthetic-endpoint"},"EventData":{"TargetUserName":"synthetic-user","IpAddress":"203.0.113.77"}}}),
-            }, SourceMetadata { source: &source, evidence_hash: [1;32], time_context: None, cancel: &cancel }).unwrap();
+            }, SourceMetadata {
+                cluster_context: None, source: &source, evidence_hash: [1;32], time_context: None, cancel: &cancel }).unwrap();
             assert_eq!(
                 row.provenance().parser_location().unwrap().byte_offset(),
                 4608

@@ -8,6 +8,7 @@ pub struct SourceMetadata<'a> {
     pub source: &'a SourceReferenceV1,
     pub evidence_hash: [u8; 32],
     pub time_context: Option<&'a ParserTimeContext>,
+    pub cluster_context: Option<&'a crate::SourceClusterContext>,
     pub cancel: &'a CancellationToken,
 }
 

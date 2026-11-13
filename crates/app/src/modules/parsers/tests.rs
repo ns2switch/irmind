@@ -136,6 +136,7 @@ mod parser_router_tests {
             confidence: 95,
             selection: ParserSelectionMode::Automatic,
             timestamp_context: None,
+            cluster_context: None,
             rejected_records: 0,
             rejected_sample: Vec::new(),
         };
@@ -178,9 +179,94 @@ mod parser_router_tests {
                 parser_override: Some("parser-json"),
                 forced: true,
                 time_context: Some(context),
+                cluster_context: None,
             })
             .unwrap();
         assert_eq!(selected.selection.parser_version, "json-source-v1");
         assert_eq!(selected.selection.timestamp_context, None);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod cluster_selection_tests {
+    use super::*;
+    use crate::{
+        ClusterContextBasis, ClusterIdentity, ClusterProvider, SourceClusterBinding,
+        SourceClusterContext,
+    };
+    struct ClusterParser(Option<SourceClusterContext>);
+    impl StreamingEventParser for ClusterParser {
+        fn parser_name(&self) -> &'static str {
+            "parser-cluster-test"
+        }
+        fn streaming_version(&self) -> &'static str {
+            "source-test-v1"
+        }
+        fn cluster_context(&self) -> Option<&SourceClusterContext> {
+            self.0.as_ref()
+        }
+    }
+    impl LogParser for ClusterParser {
+        fn detect(&self, _: &str, _: &[u8]) -> Option<ParserConfidence> {
+            ParserConfidence::new(95).ok()
+        }
+        fn cluster_context_requirement(
+            &self,
+            _: &str,
+            _: &[u8],
+        ) -> Result<Option<crate::ParserClusterRequirement>, AppError> {
+            Ok(Some(crate::ParserClusterRequirement::try_new(
+                true,
+                vec![],
+            )?))
+        }
+        fn with_cluster_context(
+            &self,
+            value: &SourceClusterContext,
+        ) -> Result<Arc<dyn LogParser>, AppError> {
+            Ok(Arc::new(Self(Some(value.clone()))))
+        }
+    }
+    #[test]
+    fn required_cluster_is_explicit_and_selection_does_not_change_the_catalog() {
+        let mut catalog = ParserCatalog::default();
+        catalog
+            .parsers
+            .insert("parser-cluster-test".into(), Arc::new(ClusterParser(None)));
+        let request = crate::modules::ParserSelectionRequest {
+            source: "audit.json",
+            sample: b"{}",
+            parser_override: None,
+            forced: false,
+            time_context: None,
+            cluster_context: None,
+        };
+        assert!(matches!(
+            catalog.select_source(request),
+            Err(AppError::ParserClusterContextRequired { .. })
+        ));
+        let identity =
+            ClusterIdentity::try_new(ClusterProvider::Kubernetes, "urn:k8s:synthetic").unwrap();
+        let context = SourceClusterContext::try_new(vec![
+            SourceClusterBinding::try_new(identity, ClusterContextBasis::Command, None).unwrap(),
+        ])
+        .unwrap();
+        let selected = catalog
+            .select_source(crate::modules::ParserSelectionRequest {
+                cluster_context: Some(&context),
+                ..request
+            })
+            .unwrap();
+        assert_eq!(selected.selection.cluster_context.as_ref(), Some(&context));
+        assert_eq!(selected.parser.cluster_context(), Some(&context));
+        assert!(
+            catalog
+                .get("parser-cluster-test")
+                .unwrap()
+                .cluster_context()
+                .is_none()
+        );
+        assert!(catalog.select_source(request).is_err());
     }
 }

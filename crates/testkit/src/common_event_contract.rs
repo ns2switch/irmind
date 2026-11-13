@@ -45,6 +45,7 @@ pub fn run_source_mapping_contract(
                 source: &reference,
                 evidence_hash: irmind_app::sha256(fixture),
                 time_context: None,
+                cluster_context: None,
                 cancel: &cancel,
             },
             reader: &mut Cursor::new(fixture),
@@ -72,6 +73,7 @@ fn projection(
         source: &reference,
         evidence_hash: irmind_app::sha256(fixture),
         time_context: None,
+        cluster_context: None,
         cancel: &cancel,
     };
     let mut accumulator =

@@ -59,3 +59,38 @@ fn time_detection_is_optional_bounded_and_survives_context_selection() {
             .required
     );
 }
+
+#[test]
+fn immutable_cluster_and_time_selection_survive_private_spool_provenance() {
+    use crate::{
+        ClusterContextBasis, ClusterIdentity, ClusterProvider, SourceClusterBinding,
+        SourceClusterContext,
+    };
+    let plain = SourceDecoderSelection::new(Arc::new(Decoder));
+    assert!(plain.cluster_context().is_none());
+    assert!(
+        plain
+            .cluster_context_requirement("source", &[])
+            .unwrap()
+            .is_none()
+    );
+    let identity =
+        ClusterIdentity::try_new(ClusterProvider::Kubernetes, "urn:k8s:synthetic").unwrap();
+    let context = SourceClusterContext::try_new(vec![
+        SourceClusterBinding::try_new(identity, ClusterContextBasis::Analyst, None).unwrap(),
+    ])
+    .unwrap();
+    let selected = plain.with_cluster_context(&context).unwrap();
+    let time =
+        crate::ParserTimeContext::new(2026, 0, true, crate::ParserTimeBasis::Analyst).unwrap();
+    let configured = selected.with_time_context(&time).unwrap();
+    let logical = crate::SourceParser::new(configured.as_ref(), "s3://synthetic/audit.json");
+    assert_eq!(logical.cluster_context(), Some(&context));
+    assert_eq!(logical.timestamp_context(), configured.timestamp_context());
+    assert_eq!(
+        logical.logical_source("private-spool"),
+        "s3://synthetic/audit.json"
+    );
+    assert_eq!(logical.identity(), plain.identity());
+    assert!(plain.cluster_context().is_none());
+}

@@ -173,6 +173,9 @@ pub trait StreamingEventParser: Send + Sync {
             version: self.version_for_source(source)?,
         })
     }
+    fn cluster_context(&self) -> Option<&crate::SourceClusterContext> {
+        None
+    }
     fn timestamp_context(&self) -> Option<&str> {
         None
     }
@@ -218,6 +221,19 @@ impl ParserConfidence {
 /// Format-specific, bounded evidence decoder. `detect` receives at most 64 KiB
 /// from the caller and must remain pure and cheap.
 pub trait LogParser: StreamingEventParser {
+    fn cluster_context_requirement(
+        &self,
+        _source_name: &str,
+        _sample: &[u8],
+    ) -> Result<Option<crate::ParserClusterRequirement>, AppError> {
+        Ok(None)
+    }
+    fn with_cluster_context(
+        &self,
+        _context: &crate::SourceClusterContext,
+    ) -> Result<std::sync::Arc<dyn LogParser>, AppError> {
+        Err(AppError::ParserClusterUnsupported)
+    }
     fn time_context_requirement(
         &self,
         _source_name: &str,

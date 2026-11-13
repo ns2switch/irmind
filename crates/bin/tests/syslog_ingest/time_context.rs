@@ -37,6 +37,7 @@ fn signed_per_file_contexts_rebuild_independently_and_old_manifests_keep_their_b
                 parser_override: None,
                 forced: false,
                 time_context: Some(context(year)),
+                cluster_context: None,
             })
             .unwrap();
         let selected = BTreeMap::from([(file.into(), resolved.selection.clone())]);
@@ -122,6 +123,7 @@ fn missing_context_is_audited_and_late_detection_rolls_back_the_source() {
             parser_override: None,
             forced: false,
             time_context: None,
+            cluster_context: None,
         })
         .err()
         .unwrap();
@@ -219,6 +221,7 @@ fn hints_come_only_from_verified_records_of_the_same_host_and_are_not_defaults()
     assert!(
         catalog
             .select_source(ParserSelectionRequest {
+                cluster_context: None,
                 source: "a.log",
                 sample: LEGACY,
                 parser_override: None,

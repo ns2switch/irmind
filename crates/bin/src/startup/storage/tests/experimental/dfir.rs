@@ -78,6 +78,7 @@ fn dfir_sources_are_selected_mapped_signed_and_reproducibly_rebuilt() {
                 parser_override: Some(parser),
                 forced: true,
                 time_context: None,
+                cluster_context: None,
             })
             .unwrap();
         assert!(selected.selection.parser_version.ends_with("-source-v1"));

@@ -70,6 +70,7 @@ fn ingest(
             confidence: 90,
             mode: ParserSelectionMode::Automatic,
             timestamp_context: None,
+            cluster_context: None,
             format_sample_sha256: sha256(bytes),
         },
     )]);

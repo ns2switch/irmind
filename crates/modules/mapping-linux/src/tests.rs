@@ -14,6 +14,7 @@ fn decode(raw: &str) -> Vec<SourceRecordV1> {
                     source: &SourceReferenceV1::file("synthetic.log").unwrap(),
                     evidence_hash: irmind_app::sha256(raw.as_bytes()),
                     time_context: None,
+                    cluster_context: None,
                     cancel: &cancel,
                 },
                 reader: &mut std::io::Cursor::new(raw.as_bytes()),

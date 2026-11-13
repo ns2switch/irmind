@@ -48,6 +48,13 @@ pub enum AppError {
         requirement: ParserTimeRequirement,
         suggestions: Vec<ParserTimeSuggestion>,
     },
+    #[error("this source needs an analyst-confirmed cluster identity")]
+    ParserClusterContextRequired {
+        source_name: String,
+        requirement: crate::ParserClusterRequirement,
+    },
+    #[error("this parser does not accept cluster context")]
+    ParserClusterUnsupported,
     #[error("this parser does not accept a temporal context")]
     ParserTimeUnsupported,
     #[error("invalid case id")]

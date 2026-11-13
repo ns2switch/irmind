@@ -26,6 +26,8 @@ pub(in crate::parquet_store) struct RecordRow {
     pub(in crate::parquet_store) scope_account: String,
     pub(in crate::parquet_store) scope_region: String,
     pub(in crate::parquet_store) scope_host: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub(in crate::parquet_store) scope_cluster: String,
 }
 
 impl RecordRow {
@@ -106,6 +108,7 @@ impl RecordRow {
             scope_account: account.into(),
             scope_region: region.into(),
             scope_host: String::new(),
+            scope_cluster: String::new(),
         })
     }
 
@@ -129,6 +132,7 @@ impl RecordRow {
             + self.event.len()
             + self.at.len()
             + self.hash.len()
+            + self.scope_cluster.len()
             + self.entities.len().saturating_mul(self.entity_pairs.len())
             + self
                 .entity_pairs

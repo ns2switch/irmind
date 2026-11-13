@@ -38,6 +38,7 @@ fn decoded(fixture: &Fixture, bytes: &[u8]) -> (irmind_app::ParseReport, Vec<Sou
                     source: &reference,
                     evidence_hash: irmind_app::sha256(bytes),
                     time_context: None,
+                    cluster_context: None,
                     cancel: &cancel,
                 },
                 reader: &mut std::io::Cursor::new(bytes),

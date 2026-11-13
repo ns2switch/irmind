@@ -28,6 +28,7 @@ pub(in crate::tests) fn ingest_selected(
                     confidence: 100,
                     mode: irmind_domain::ParserSelectionMode::Forced,
                     timestamp_context: None,
+                    cluster_context: None,
                     format_sample_sha256: irmind_app::sha256(&sample),
                 },
             )

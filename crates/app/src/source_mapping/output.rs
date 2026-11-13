@@ -18,6 +18,7 @@ pub struct MappingPartition {
     account: String,
     region: String,
     host: String,
+    cluster: String,
 }
 impl MappingPartition {
     pub fn try_new(
@@ -31,14 +32,31 @@ impl MappingPartition {
             account: account.into(),
             region: region.into(),
             host: host.into(),
+            cluster: String::new(),
         };
         if !value.valid() {
             return Err(MappingError::InvalidOutput);
         }
         Ok(value)
     }
+    pub fn with_cluster(
+        mut self,
+        identity: &irmind_domain::ClusterIdentity,
+    ) -> Result<Self, MappingError> {
+        if self.profile != crate::PartitionProfile::KubernetesCluster {
+            return Err(MappingError::InvalidOutput);
+        }
+        self.cluster = identity.qualified();
+        if !self.valid() {
+            return Err(MappingError::InvalidOutput);
+        }
+        Ok(self)
+    }
+    pub fn cluster(&self) -> &str {
+        &self.cluster
+    }
     fn valid(&self) -> bool {
-        [&self.account, &self.region, &self.host]
+        [&self.account, &self.region, &self.host, &self.cluster]
             .iter()
             .all(|value| value.len() <= 1024)
     }
@@ -112,6 +130,14 @@ impl MappingOutput {
             || !time::valid_display_time(&indexed.record.at, source.timestamp())
             || !valid_projection(&indexed.record)
             || !partition.valid()
+            || (partition.profile == crate::PartitionProfile::KubernetesCluster
+                && partition.cluster.is_empty())
+            || (partition.profile != crate::PartitionProfile::KubernetesCluster
+                && !partition.cluster.is_empty())
+            || (partition.profile == crate::PartitionProfile::KubernetesCluster
+                && source
+                    .cluster_identity()
+                    .is_none_or(|id| id.qualified() != partition.cluster))
             || diagnostics.len() > 8
         {
             return Err(MappingError::InvalidOutput);

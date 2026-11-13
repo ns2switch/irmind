@@ -139,6 +139,7 @@ fn normalized_rows(
                     source: &source_ref,
                     evidence_hash: sha256(bytes),
                     time_context: None,
+                    cluster_context: None,
                     cancel,
                 },
                 reader: &mut std::io::Cursor::new(bytes),

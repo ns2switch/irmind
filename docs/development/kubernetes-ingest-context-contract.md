@@ -124,3 +124,36 @@ separate design, not part of this contract.
 
 No additional production dependency, credential, execution privilege or live
 API access is proposed. The required port changes are the five rows above.
+
+## Canonical implementation details
+
+The acquisition context holds one explicit default or up to eight exact confirmed
+source claims per file. This bound is independent of the per-case partition cap.
+Bindings are sorted by provider code then the exact UTF-8 identifier. Provider
+codes are Kubernetes=0, EKS=1, GKE=2, AKS=3; basis codes are analyst=0, command=1,
+confirmed_source=2. A set of confirmed claims has no implicit default, even when
+it contains one entry. Control and format-control characters, wildcard syntax,
+relative path segments and query/fragment syntax are rejected. No case folding
+or Unicode equivalence changes identity.
+
+The context codec uses `irmind-source-cluster-context-v1` followed by NUL,
+a one-byte count, then provider and basis bytes and u64-big-endian-length-prefixed
+UTF-8 identifiers. A source manifest and record-set append the length-prefixed
+`irmind-acquisition-clusters-v1` tag, context bytes and SHA-256 of the normative
+record-extension descriptor. The descriptor is fixed in the domain codec and
+covered by independent golden vectors. Without context, no extension bytes are
+written: existing non-cluster canonical bytes are unchanged. This is one optional
+field in the current grammar, not an alternate historical parser.
+
+A resolved record appends `irmind-source-record-cluster-v1` plus NUL and the
+length-prefixed provider name and identifier to its canonical commitment. The
+source fields and provenance remain unchanged. The record's allocation charge
+includes the extra metadata; existing source-record and signed-frame limits do
+not increase.
+
+Physical cluster partition values are `cluster-` plus the SHA-256 of
+`irmind-cluster-partition-value-v1` plus NUL and the qualified identity. The
+ordinary partition normalization and hashed directory construction then apply.
+The actual identity remains available to mapping and queries; a physical bucket
+never substitutes for it. The default ordinary cluster cap is 64, with a fixed
+maximum of 1,024 and the existing signed overflow semantics.

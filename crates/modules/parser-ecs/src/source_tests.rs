@@ -17,6 +17,7 @@ fn decode(
                     source: &source,
                     evidence_hash: irmind_app::sha256(bytes),
                     time_context: None,
+                    cluster_context: None,
                     cancel,
                 },
                 reader: &mut Cursor::new(bytes),
@@ -66,6 +67,7 @@ fn oversized_first_line_is_rejected_whole_and_the_next_record_survives() {
                         source: &source,
                         evidence_hash: [8; 32],
                         time_context: None,
+                        cluster_context: None,
                         cancel: &cancel,
                     },
                     reader: &mut reader,
@@ -99,6 +101,7 @@ fn callback_errors_and_cancellation_propagate() {
         source: &source,
         evidence_hash: [8; 32],
         time_context: None,
+        cluster_context: None,
         cancel: &cancel,
     };
     assert!(matches!(

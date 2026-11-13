@@ -85,6 +85,7 @@ fn ingest_selected(
             .unwrap();
     let selected = catalog
         .select_source(ParserSelectionRequest {
+            cluster_context: None,
             source: name,
             sample: &sample,
             parser_override: None,
@@ -256,6 +257,7 @@ fn unavailable_evtx_does_not_block_other_experimental_decoders() {
             parser_override: None,
             forced: false,
             time_context: None,
+            cluster_context: None,
         })
         .unwrap();
     assert_eq!(selected.selection.parser_version, "json-source-v1");

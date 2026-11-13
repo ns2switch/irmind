@@ -29,6 +29,7 @@ impl ScopePartitionKey {
     pub fn parse(value: &str) -> Result<Self, DomainError> {
         match value {
             "account" => Ok(Self::Account),
+            "cluster" => Ok(Self::Cluster),
             "host" => Ok(Self::Host),
             "region" => Ok(Self::Region),
             _ => Err(DomainError::InvalidManifest),
@@ -103,10 +104,8 @@ impl ArtifactPartitionV2 {
             return Err(DomainError::InvalidManifest);
         }
         for scope in &self.scopes {
-            if matches!(
-                scope.key,
-                ScopePartitionKey::Cluster | ScopePartitionKey::Tenant
-            ) || !(1..=ARTIFACT_V2_MAX_KEY_VALUES).contains(&scope.cap)
+            if scope.key == ScopePartitionKey::Tenant
+                || !(1..=ARTIFACT_V2_MAX_KEY_VALUES).contains(&scope.cap)
                 || (self.all_scope_overflow
                     && scope.value
                         != ScopePartitionValue::Overflow(PartitionOverflowReason::TupleBudget))

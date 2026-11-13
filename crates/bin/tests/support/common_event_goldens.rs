@@ -193,6 +193,7 @@ fn direct_physical_fixture() -> BTreeMap<String, serde_json::Value> {
                 confidence: 90,
                 selection: irmind_domain::ParserSelectionMode::Automatic,
                 timestamp_context: None,
+                cluster_context: None,
                 rejected_records: source.report.rejected,
                 rejected_sample: source.report.samples.clone(),
             }

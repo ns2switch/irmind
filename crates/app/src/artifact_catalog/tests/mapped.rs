@@ -29,6 +29,7 @@ pub(super) fn mapped_history_for(
         confidence: 90,
         selection: ParserSelectionMode::Automatic,
         timestamp_context: None,
+        cluster_context: None,
         rejected_records: 0,
         rejected_sample: vec![],
     };

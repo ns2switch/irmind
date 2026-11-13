@@ -143,7 +143,8 @@ fn generic_keys_are_canonical_reserved_keys_are_rejected_and_values_never_become
     let mut value = original.clone();
     value.partition.scopes[1].key = ScopePartitionKey::Account;
     assert!(value.encode().is_err());
-    for key in [ScopePartitionKey::Cluster, ScopePartitionKey::Tenant] {
+    {
+        let key = ScopePartitionKey::Tenant;
         let mut value = original.clone();
         value.partition.scopes = vec![ScopePartitionV2 {
             key,

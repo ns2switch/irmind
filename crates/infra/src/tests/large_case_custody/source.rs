@@ -25,6 +25,7 @@ fn signed_v2_manifest_counts_malformed_jsonl_without_dropping_later_records() {
             confidence: 90,
             mode: irmind_domain::ParserSelectionMode::Automatic,
             timestamp_context: None,
+            cluster_context: None,
             format_sample_sha256: irmind_app::sha256(bytes),
         },
     )]);
@@ -106,6 +107,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
             confidence: 90,
             mode: irmind_domain::ParserSelectionMode::Automatic,
             timestamp_context: None,
+            cluster_context: None,
             format_sample_sha256: irmind_app::sha256(&fs::read(&path).unwrap()),
         },
     )]);

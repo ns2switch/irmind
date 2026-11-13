@@ -159,6 +159,7 @@ fn fields_arrays_and_source_objects_use_the_same_validated_ecs_mapping() {
         let cancel = CancellationToken::new();
         let report = irmind_app::SourceDecoder::decode_reader(&ElasticSourceDecoder, irmind_app::source_mapping::SourceInput {
             reader: &mut body.as_bytes(), metadata: irmind_app::source_mapping::SourceMetadata {
+                cluster_context: None,
                 source: &source, evidence_hash: irmind_app::sha256(body.as_bytes()), time_context: None, cancel: &cancel,
             },
         }, &mut |record| {

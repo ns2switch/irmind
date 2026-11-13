@@ -179,10 +179,12 @@ impl RecordRow {
                 irmind_app::PartitionProfile::Unpartitioned => 0,
                 irmind_app::PartitionProfile::CloudAccountRegion => 1,
                 irmind_app::PartitionProfile::EndpointHost => 2,
+                irmind_app::PartitionProfile::KubernetesCluster => 3,
             },
             scope_account: partition.account().into(),
             scope_region: partition.region().into(),
             scope_host: partition.host().into(),
+            scope_cluster: partition.cluster().into(),
         })
     }
 }

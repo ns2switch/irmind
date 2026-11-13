@@ -90,6 +90,7 @@ fn synthetic_linux_episode_is_detected_signed_queryable_and_reproducible() {
                 parser_override: None,
                 forced: false,
                 time_context: context,
+                cluster_context: None,
             })
             .unwrap();
         assert_eq!(resolved.selection.parser_id, "parser-linux");
@@ -244,6 +245,7 @@ fn missing_context_refuses_native_selection_and_has_an_audited_reason() {
             parser_override: None,
             forced: false,
             time_context: None,
+            cluster_context: None,
         })
         .err()
         .unwrap();
