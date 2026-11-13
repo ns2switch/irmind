@@ -223,6 +223,9 @@ fn target_field(
     observations: &mut Vec<EntityObservation>,
     diagnostics: &mut Vec<MappingDiagnostic>,
 ) -> Result<(), MappingError> {
+    if value.is_empty() {
+        return Ok(());
+    }
     if let Some(irmind_domain::CommonValue::Text(previous)) = context.get(field)
         && previous.as_str() != value
     {

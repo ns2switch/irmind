@@ -283,3 +283,46 @@ fn encoded_dynamic_values_are_single_bounded_json_values() {
     value["InitiatedBy"] = json!(" ".repeat(65537));
     assert!(mapper.map(&decode(&value)).is_err());
 }
+#[test]
+fn empty_optional_principal_target_and_ip_fields_do_not_reject_valid_audits() {
+    let mut audit: Value = serde_json::from_str(AUDIT).unwrap();
+    audit["properties"]["initiatedBy"]["user"]["id"] = json!("");
+    audit["properties"]["initiatedBy"]["user"]["ipAddress"] = json!("");
+    audit["properties"]["targetResources"][0]["id"] = json!("");
+    let mapped = map(&audit);
+    assert_eq!(
+        mapped.record().common.event().outcome(),
+        EventOutcome::Success
+    );
+    assert!(mapped.record().common.context().get(F::UserId).is_none());
+    assert!(mapped.record().common.context().get(F::SourceIp).is_none());
+    assert!(
+        mapped
+            .record()
+            .common
+            .context()
+            .get(F::IrmindResourceId)
+            .is_none()
+    );
+    assert!(
+        mapped
+            .record()
+            .common
+            .observations()
+            .values()
+            .iter()
+            .all(|o| !o.entity().value().is_empty())
+    );
+    audit["properties"]["initiatedBy"] = json!({"app":{"servicePrincipalId":"synthetic-principal", "displayName":"", "ipAddress":""}});
+    let mapped = map(&audit);
+    assert!(mapped.record().common.context().get(F::UserName).is_none());
+    assert!(
+        mapped
+            .record()
+            .common
+            .observations()
+            .values()
+            .iter()
+            .any(|o| o.entity().value() == "synthetic-principal" && o.role() == R::Actor)
+    );
+}
