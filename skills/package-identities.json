@@ -1,7 +1,7 @@
 {
   "aws-credential-compromise": "bef2b28e3722ee1c2eda76c835f4e83b99e6395ea00583ed85f90b78553a35ef",
   "aws-s3-data-exfiltration": "ec8c14a8ed5ecf5e2746821151395f7841ba530a0794d142d4a707e259b855a2",
-  "azure-entra-identity-compromise": "af5d8d30f890f28e83c887a3f7c498f228fbc31deea5d93e6e9c01bb587773bc",
+  "azure-entra-identity-compromise": "db1a409951af0423443a0ea3de25005924845f834a0c18dc0177e5942b224609",
   "gcp-service-account-abuse": "c74d04a881e956d8dd9c820c31d45f1867af4b4384288e45e7ff4f7185dfa4f4",
   "linux-persistence": "ccf593350d5a35921e96818aa876b9bfe78c73595bbf3146cd3f28736dfcf746",
   "linux-triage": "be4a83e88922a5b0fec026cd96d7b3d8eaf6e9f81487e5a60fca411d4d9f42e5",

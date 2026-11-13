@@ -68,7 +68,7 @@ pub(crate) fn layout(fields: &SourceValue) -> Option<(&'static str, &'static [&'
         _ => None,
     }
 }
-fn timestamp(fields: &SourceValue, keys: &[&str]) -> Result<IndexedTime, AppError> {
+pub(super) fn timestamp(fields: &SourceValue, keys: &[&str]) -> Result<IndexedTime, AppError> {
     for key in keys {
         let value = key
             .split('.')

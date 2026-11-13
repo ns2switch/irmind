@@ -10,6 +10,7 @@ CLI ingestion, the TUI and the demo use the common writer. Every compiled parser
 | Windows Event Log | Original EVTX through `evtx-source-v1` | Bundled, hash-pinned per-event/channel TOML modules | `mapping-evtx` | Experimental; synthetic contracts |
 | OCSF | Original JSON or Parquet through `ocsf-source-v1` | Native, typed OCSF 1.4 validation | `mapping-ocsf` | Experimental; synthetic contracts |
 | ECS | Original ECS NDJSON through `ecs-source-v1` | Native, typed ECS 9.5 validation | `mapping-ecs` | Experimental; synthetic contracts |
+| Microsoft Entra ID | Native SignInLogs and AuditLogs, four layouts | Included TOML tables and bounded native validation | `mapping-entra` | Experimental; synthetic contracts |
 | Elastic ECS | Original `elastic-source-v1` search hits | Native ECS validation with a connector-specific identity | `siem-elastic` | Experimental; synthetic contracts |
 | Google SecOps UDM | Original `chronicle-source-v1` UDM events | Native, bounded ProtoJSON noun projection | `siem-chronicle` | Experimental; synthetic contracts |
 | Generic JSON compatibility | Other JSON without `eventVersion` | Native, extraction-only | `mapping-json-compat` | Experimental; no inferred categories or roles |
@@ -257,3 +258,14 @@ tables and validates namespace/resource paths with a pure native wrapper bound
 to its build identity. Only the Kubernetes audit service can assign Kubernetes
 principal roles. Regional and zonal locations stay distinct. See the
 [contract and primary references](development/gcp-audit-mapping.md).
+
+## Microsoft Entra ID
+
+SignInLogs maps to authentication/start; AuditLogs to iam/info. Outcome uses
+explicit status/code fields: zero succeeds, a positive error code fails;
+missing, conflicting or unrecognized states stay unknown. MFA and Conditional
+Access do not replace the overall result. Identities use the directory tenant,
+not the workspace TenantId. Actor, target and source IP remain separate
+observations. Dynamic target arrays and encoded JSON are validated with strict
+bounds; the original is not rewritten. See the
+[decisions and primary references](development/entra-source-mapping.md).

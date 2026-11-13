@@ -355,3 +355,12 @@ o la falta de identidad siguen siendo carencias de cobertura. Las etiquetas de
 GKE necesitan confirmación explícita del clúster. Consulta los
 [formatos y ejemplos de exportación](parsers.md#cloud-audit-logs-de-gcp-y-gke)
 y el [contrato del mapeo](../development/gcp-audit-mapping.md).
+
+## Microsoft Entra ID
+
+El parser local experimental `parser-entra` y sus cuatro mapeos identificados
+se incluyen por defecto. No requieren credenciales ni conexión. Usan las
+exportaciones nativas documentadas de SignInLogs y AuditLogs; los campos de
+MFA, acceso condicional, cambios y aplicaciones se conservan como evidencia.
+Consulta [formatos y límites](parsers.md#microsoft-entra-id) y el
+[contrato del mapeo](../development/entra-source-mapping.md).

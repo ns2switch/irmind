@@ -12,6 +12,7 @@ La CLI, la TUI y la demo usan el escritor común. Cada parser compilado tiene un
 | Registro de eventos de Windows | EVTX original mediante `evtx-source-v1` | Módulos TOML por evento o canal incluidos, con hash fijado | `mapping-evtx` | Experimental; contratos sintéticos |
 | OCSF | JSON o Parquet original mediante `ocsf-source-v1` | Validación nativa OCSF 1.4 | `mapping-ocsf` | Experimental; contratos sintéticos |
 | ECS | NDJSON original mediante `ecs-source-v1` | Validación nativa ECS 9.5 | `mapping-ecs` | Experimental; contratos sintéticos |
+| Microsoft Entra ID | SignInLogs y AuditLogs nativos, cuatro layouts | Tablas TOML incluidas y validación nativa acotada | `mapping-entra` | Experimental; contratos sintéticos |
 | ECS de Elastic | Resultados originales mediante `elastic-source-v1` | Validación ECS nativa con identidad propia del conector | `siem-elastic` | Experimental; contratos sintéticos |
 | UDM de Google SecOps | Eventos UDM originales mediante `chronicle-source-v1` | Proyección nativa acotada de nombres ProtoJSON | `siem-chronicle` | Experimental; contratos sintéticos |
 | Compatibilidad JSON genérico | Otros JSON sin `eventVersion` | Nativo, solo extracción | `mapping-json-compat` | Experimental; sin categorías ni roles inferidos |
@@ -246,3 +247,14 @@ tablas de estado y valida rutas de recursos y espacios de nombres mediante una
 función nativa pura incluida en su identidad de compilación. Solo el servicio de
 auditoría Kubernetes puede asignar roles de principal Kubernetes. Una zona no se
 convierte en región. Consulta el [contrato y las fuentes oficiales](../development/gcp-audit-mapping.md).
+
+## Microsoft Entra ID
+
+SignInLogs se clasifica como authentication/start; AuditLogs como iam/info.
+El resultado depende de códigos y estados explícitos: cero es éxito, un código
+de error positivo es fallo; ausente, contradictorio o desconocido queda unknown.
+MFA y acceso condicional no sustituyen el resultado global. Las identidades
+están acotadas al tenant de directorio, no al TenantId del workspace. Actor,
+objetivo e IP de origen son observaciones distintas. Los arrays dinámicos de
+objetivos y JSON codificado se validan con límites; el original no se reescribe.
+Consulta las [decisiones y fuentes oficiales](../development/entra-source-mapping.md).

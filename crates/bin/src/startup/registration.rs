@@ -10,6 +10,7 @@
     feature = "mapping-network",
     feature = "mapping-kubernetes",
     feature = "mapping-gcp-audit",
+    feature = "mapping-entra",
     feature = "mapping-falco",
 ))]
 mod mapping;
@@ -44,6 +45,7 @@ use super::{
     feature = "parser-ocsf",
     feature = "parser-kubernetes",
     feature = "parser-gcp-audit",
+    feature = "parser-entra",
     feature = "parser-falco",
     feature = "parser-velociraptor",
     feature = "parser-hayabusa",
@@ -100,6 +102,7 @@ pub(super) fn configured_registry(
         feature = "parser-ocsf",
         feature = "parser-kubernetes",
         feature = "parser-gcp-audit",
+        feature = "parser-entra",
         feature = "parser-falco",
         feature = "parser-velociraptor",
         feature = "parser-hayabusa",
@@ -159,6 +162,7 @@ pub(super) fn configured_registry(
     feature = "parser-ocsf",
     feature = "parser-kubernetes",
     feature = "parser-gcp-audit",
+    feature = "parser-entra",
     feature = "parser-falco",
     feature = "parser-velociraptor",
     feature = "parser-hayabusa",
@@ -188,24 +192,17 @@ fn register_parsers(
         feature = "mapping-network",
         feature = "mapping-kubernetes",
         feature = "mapping-gcp-audit",
+        feature = "mapping-entra",
         feature = "mapping-falco",
     ))]
     mapping::register(registry)?;
-    #[cfg(feature = "parser-gcp-audit")]
-    registry.register(
-        Box::new(irmind_mod_parser_gcp_audit::GcpAuditParser::default()),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(feature = "parser-kubernetes")]
-    registry.register(
-        Box::new(irmind_mod_parser_kubernetes::KubernetesParser::default()),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(feature = "parser-falco")]
-    registry.register(
-        Box::new(irmind_mod_parser_falco::FalcoParser::default()),
-        &ModuleConfig::new(),
-    )?;
+    #[cfg(any(
+        feature = "parser-entra",
+        feature = "parser-gcp-audit",
+        feature = "parser-kubernetes",
+        feature = "parser-falco"
+    ))]
+    register_contextual_parsers(registry)?;
     #[cfg(feature = "parser-zeek")]
     registry.register(Box::new(ZeekParser), &ModuleConfig::new())?;
     #[cfg(feature = "parser-suricata")]
@@ -671,6 +668,36 @@ fn register_chronicle(
                 .map_err(irmind_app::source_mapping::MappingError::into_app)?,
         ),
         &irmind_app::modules::ModuleConfig::new(),
+    )?;
+    Ok(())
+}
+
+#[cfg(any(
+    feature = "parser-entra",
+    feature = "parser-gcp-audit",
+    feature = "parser-kubernetes",
+    feature = "parser-falco"
+))]
+fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-entra")]
+    registry.register(
+        Box::new(irmind_mod_parser_entra::EntraParser),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "parser-gcp-audit")]
+    registry.register(
+        Box::new(irmind_mod_parser_gcp_audit::GcpAuditParser::default()),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "parser-kubernetes")]
+    registry.register(
+        Box::new(irmind_mod_parser_kubernetes::KubernetesParser::default()),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "parser-falco")]
+    registry.register(
+        Box::new(irmind_mod_parser_falco::FalcoParser::default()),
+        &ModuleConfig::new(),
     )?;
     Ok(())
 }

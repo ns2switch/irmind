@@ -1,0 +1,33 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-entra-audit-table-status"
+version = "entra-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-entra"
+parser_versions = ["entra-source-v1"]
+format = "entra-audit-table"
+format_version = "entra-source-v1"
+
+[[rules]]
+categories = ["iam"]
+types = ["info"]
+outcome = "success"
+[[rules.when]]
+path = ["Result"]
+predicate = { op = "text", value = "success" }
+
+[[rules]]
+categories = ["iam"]
+types = ["info"]
+outcome = "failure"
+[[rules.when]]
+path = ["Result"]
+predicate = { op = "text", value = "failure" }
+
+[[rules]]
+categories = ["iam"]
+types = ["info"]
+outcome = "failure"
+[[rules.when]]
+path = ["Result"]
+predicate = { op = "text", value = "timeout" }

@@ -4,6 +4,17 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+### Microsoft Entra source coverage
+
+- Add experimental, default native SignInLogs and AuditLogs decoding and
+  identified mappings for Azure Monitor resource logs and Log Analytics object
+  rows, including non-interactive and service-principal sign-ins.
+- Preserve nanosecond time and original dynamic/MFA/Conditional Access fields;
+  map explicit outcome and tenant-scoped actor/target roles. Update the Azure
+  skill and its complete scripted episode to use native semantic queries.
+- Format impact: new parser/mapping identities, with no envelope, schema,
+  seal or export framing change.
+
 ### Network interpretation
 
 - Classify native Zeek and Suricata records with typed endpoint roles, protocol

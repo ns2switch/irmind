@@ -14,6 +14,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | Linux | auth.log/secure, auditd, journald JSON, HTTP common/combined | Authentication tags, audit headers, journal fields or HTTP header; 95 | UTC time, host, user, process, command, IP/port, action/result; bounded audit correlation | experimental |
 | Syslog | RFC 5424 / RFC 3164, plain or gzip | PRI and timestamp/header shape; 95 / 90 | UTC time, host, application, PID, facility, severity, message and raw data | experimental |
 | GCP Cloud Audit Logs | JSON/NDJSON LogEntry; GKE audit exports | Original protoPayload method/service and timestamp | UTC nanoseconds, explicit status, principal/resource/endpoint roles; confirmed GKE cluster | experimental |
+| Microsoft Entra ID | Azure Monitor JSON/NDJSON and Log Analytics object rows | Documented category or Type and original time | Sign-ins and audit, explicit outcome, tenant, actor, target and IP | experimental |
 | JSON and exported cloud logs | JSON/NDJSON; AWS, GCP, Azure and HuntEval | Recognized record fields | Time, identities, accounts, resources and IPs | experimental |
 | ECS | NDJSON | ECS version and timestamp/characteristic fields | Event, host, user, source, destination, process, file, URL | experimental |
 | OCSF | JSON/NDJSON or local Parquet | Class, category and schema metadata; Parquet needs confirmation | Authentication, API, network, process, file and findings | experimental |
@@ -149,3 +150,14 @@ Choose the project and UTC window permitted by the case and use the provider's
 export controls to bound the collection. Exporting does not grant IRMind any
 cloud credentials. See [Google's audit format](https://cloud.google.com/logging/docs/audit/understanding-audit-logs)
 and [GKE export filters](https://cloud.google.com/kubernetes-engine/docs/how-to/audit-logging).
+
+### Microsoft Entra ID
+
+The default experimental `parser-entra` recognizes Azure Monitor resource logs
+with `category` and `properties`, including a `records` envelope, and Log
+Analytics object rows with `Type`. It covers interactive, non-interactive,
+service-principal and managed-identity sign-ins, and AuditLogs. Nanosecond time,
+field names/types, offsets, MFA and Conditional Access details remain original.
+Graph `value` wrappers and positional `tables/columns/rows` query responses need
+an explicit conversion; they are not this source format.
+The [mapping](mappings.md#microsoft-entra-id) keeps actor and target separate.

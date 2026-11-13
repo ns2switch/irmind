@@ -17,7 +17,8 @@ pub(super) fn open(root: &Path) -> Arc<irmind_infra::LocalStore> {
 fn modules() -> Vec<Box<dyn Module>> {
     use irmind_mod_mapping_linux::{AuditMapping, HttpMapping};
     use irmind_mod_mapping_network::NetworkMapping;
-    vec![
+    let mut modules: Vec<Box<dyn Module>> = vec![
+        Box::new(irmind_mod_parser_entra::EntraParser),
         Box::new(irmind_mod_parser_gcp_audit::GcpAuditParser::default()),
         Box::new(irmind_mod_mapping_gcp_audit::CloudAuditMapping::new().unwrap()),
         Box::new(irmind_mod_mapping_gcp_audit::GkeMapping::new().unwrap()),
@@ -33,5 +34,9 @@ fn modules() -> Vec<Box<dyn Module>> {
         Box::new(NetworkMapping::new("parser-zeek").unwrap()),
         Box::new(irmind_mod_parser_suricata::SuricataParser),
         Box::new(NetworkMapping::new("parser-suricata").unwrap()),
-    ]
+    ];
+    for mapper in irmind_mod_mapping_entra::EntraMapping::all().unwrap() {
+        modules.push(Box::new(mapper));
+    }
+    modules
 }

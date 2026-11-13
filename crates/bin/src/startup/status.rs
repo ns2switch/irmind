@@ -52,6 +52,7 @@ pub(super) fn module_statuses(
 }
 
 const PARSER_STATUSES: &[(&str, bool)] = &[
+    ("parser-entra", cfg!(feature = "parser-entra")),
     ("parser-gcp-audit", cfg!(feature = "parser-gcp-audit")),
     ("parser-kubernetes", cfg!(feature = "parser-kubernetes")),
     ("parser-falco", cfg!(feature = "parser-falco")),

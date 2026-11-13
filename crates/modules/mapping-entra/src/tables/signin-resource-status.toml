@@ -1,0 +1,25 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-entra-signin-resource-status"
+version = "entra-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-entra"
+parser_versions = ["entra-source-v1"]
+format = "entra-signin-resource"
+format_version = "entra-source-v1"
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["properties", "status", "errorCode"]
+predicate = { op = "number", value = "0" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "failure"
+[[rules.when]]
+path = ["properties", "status", "errorCode"]
+predicate = { op = "integer_interval", value = { first = 1, last = 2147483647 } }

@@ -2493,6 +2493,7 @@ dependencies = [
  "irmind-mod-mapping-cloudtrail",
  "irmind-mod-mapping-dfir",
  "irmind-mod-mapping-ecs",
+ "irmind-mod-mapping-entra",
  "irmind-mod-mapping-evtx",
  "irmind-mod-mapping-falco",
  "irmind-mod-mapping-gcp-audit",
@@ -2507,6 +2508,7 @@ dependencies = [
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
+ "irmind-mod-parser-entra",
  "irmind-mod-parser-evtx",
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-falco",
@@ -2854,6 +2856,19 @@ dependencies = [
  "irmind-mapping-tables",
  "irmind-mod-parser-ecs",
  "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-mapping-entra"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-entra",
+ "irmind-testkit",
+ "serde_json",
 ]
 
 [[package]]

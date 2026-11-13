@@ -13,6 +13,8 @@ cargo-fuzz = true
 
 [dependencies]
 irmind-mod-mapping-network = { path = "../crates/modules/mapping-network", version = "0.1.0" }
+irmind-mod-parser-entra = { path = "../crates/modules/parser-entra", version = "0.1.0" }
+irmind-mod-mapping-entra = { path = "../crates/modules/mapping-entra", version = "0.1.0" }
 irmind-mod-parser-gcp-audit = { path = "../crates/modules/parser-gcp-audit", version = "0.1.0" }
 irmind-mod-parser-kubernetes = { path = "../crates/modules/parser-kubernetes", version = "0.1.0" }
 irmind-mod-parser-falco = { path = "../crates/modules/parser-falco", version = "0.1.0" }
@@ -186,6 +188,13 @@ bench = false
 [[bin]]
 name = "parser_gcp_audit"
 path = "fuzz_targets/parser_gcp_audit.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_entra"
+path = "fuzz_targets/parser_entra.rs"
 test = false
 doc = false
 bench = false
