@@ -1,0 +1,105 @@
+{
+  "private_marker": "EXPANDED_SKILLS_EVALUATOR_ONLY_7b249",
+  "episodes": {
+    "aws-s3-data-exfiltration": {
+      "conclusion": "Successful synthetic S3 read after a policy-change event; transfer volume unproven",
+      "technique": "T1530",
+      "records": 1,
+      "query": "GetObject",
+      "category": "api",
+      "type": "access",
+      "outcome": "success",
+      "role": "source"
+    },
+    "azure-entra-identity-compromise": {
+      "conclusion": "Synthetic application credential added; suspicious sign-in requires separate review",
+      "technique": "T1098.001",
+      "records": 2,
+      "query": "credential",
+      "category": "iam",
+      "type": "creation",
+      "outcome": "success",
+      "role": "actor"
+    },
+    "gcp-service-account-abuse": {
+      "conclusion": "Synthetic service-account key creation recorded; compromise remains a hypothesis",
+      "technique": "T1098.001",
+      "records": 2,
+      "query": "CreateServiceAccountKey",
+      "category": null,
+      "type": null,
+      "outcome": null,
+      "role": null
+    },
+    "windows-ransomware": {
+      "conclusion": "Recorded recovery-inhibition command; encryption is not established",
+      "technique": "T1490",
+      "records": 1,
+      "query": "vssadmin",
+      "category": "process",
+      "type": "start",
+      "outcome": "success",
+      "role": "actor"
+    },
+    "windows-lateral-movement": {
+      "conclusion": "Successful synthetic RDP logon; pass-the-hash is not established",
+      "technique": "T1021.001",
+      "records": 1,
+      "query": "4624",
+      "category": "authentication",
+      "type": "start",
+      "outcome": "success",
+      "role": "actor"
+    },
+    "windows-persistence": {
+      "conclusion": "Synthetic RunOnce value configured; execution remains unobserved",
+      "technique": "T1547.001",
+      "records": 1,
+      "query": "RunOnce",
+      "category": "registry",
+      "type": "change",
+      "outcome": "success",
+      "role": "actor"
+    },
+    "malware-execution-triage": {
+      "conclusion": "Synthetic sample.exe launched a command shell; maliciousness remains unproven",
+      "technique": "T1059.003",
+      "records": 1,
+      "query": "sample.exe",
+      "category": "process",
+      "type": "start",
+      "outcome": "success",
+      "role": "actor"
+    },
+    "linux-webshell": {
+      "conclusion": "Synthetic HTTP request near web-uid shell execution; causal webshell link is unproven",
+      "technique": "T1059.004",
+      "records": 2,
+      "query": "GET",
+      "category": "web",
+      "type": "access",
+      "outcome": "success",
+      "role": "source"
+    },
+    "linux-persistence": {
+      "conclusion": "Collected synthetic cron configuration and crontab execution",
+      "technique": "T1053.003",
+      "records": 2,
+      "query": "crontab",
+      "category": "process",
+      "type": "start",
+      "outcome": "success",
+      "role": null
+    },
+    "network-c2-beaconing": {
+      "conclusion": "Four synthetic connections at 60-second intervals; C2 remains unconfirmed",
+      "technique": "T1071.001",
+      "records": 2,
+      "query": "203.0.113.77",
+      "category": null,
+      "type": null,
+      "outcome": null,
+      "role": null
+    }
+  }
+}

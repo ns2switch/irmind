@@ -1,0 +1,26 @@
+{
+  "acceptable_conclusions": [
+    "The synthetic gcp identity escalated privileges and created persistence."
+  ],
+  "episode_id": "gcp-iam-001",
+  "expected_attack_path": [
+    "evt-0004",
+    "evt-0005",
+    "evt-0006"
+  ],
+  "expected_attack_techniques": [
+    "T1078",
+    "T1098"
+  ],
+  "malicious_entity_ids": [
+    "suspected-identity",
+    "gcp:resource:admin"
+  ],
+  "malicious_event_ids": [
+    "evt-0004",
+    "evt-0005",
+    "evt-0006"
+  ],
+  "minimum_evidence_items": 1,
+  "schema_version": "0.3"
+}

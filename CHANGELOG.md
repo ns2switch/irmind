@@ -4,6 +4,40 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.4.1 — Expanded forensic skill catalog
+
+**Format impact: none.** Case, export V7, skill package and definition formats
+are unchanged. The three skills shipped in 0.4.0 retain their exact package
+hashes. Adding candidates changes the bundled inventory commitment for new
+skill snapshots; recorded snapshots remain self-contained and verifiable.
+
+### Added
+
+- Ten data-only methods: S3 data exfiltration, Azure Entra identity compromise,
+  GCP service-account abuse, Windows ransomware, lateral movement and persistence,
+  Linux webshell and persistence, network C2 beaconing, and malware execution
+  triage. The binary now includes 13 methods.
+- Each new method includes a bounded investigation sequence, common-schema
+  query starting points, conditional ATT&CK proposals, collection requirements,
+  confirmation criteria and common false positives. They declare only local
+  evidence reads and finding-proposal tools.
+- Per-method scripted integration episodes cover real ingestion, progressive
+  loading, local queries, analyst confirmation, verification, sealing and
+  independent export verification. Hostile-evidence tests cover undeclared tools
+  and out-of-scope reads with an obedient fake model.
+- The Azure/GCP tests reuse pinned, attributed HuntEval episodes. Expected answers
+  remain evaluator-only, outside evidence, skills and model requests.
+
+### Coverage and limits
+
+All methods remain experimental and synthetic-tested. Native Entra has no
+specific semantic mapper; use original JSON fields or explicitly producer-normalized
+ECS/configured UDM. Native GCP and Zeek/Suricata retain extraction-only coverage.
+S3 policy/ACL changes, Windows task/WMI telemetry and several Linux configuration
+artifacts need original-field review or additional collection. A missing mapping
+is reported, never filled with an invented classification. This release adds no
+parser, mapper, credential, dependency or remote-provider default.
+
 ## 0.4.0 — Signed forensic skills
 
 **Format impact: breaking.** Case methodology adds `SkillSnapshotV1` and

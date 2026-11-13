@@ -2,29 +2,11 @@
 use super::{CompiledSkill, SkillError, SkillPackage, decode_skill_package};
 use irmind_domain::SkillResource;
 
+mod inventory;
+
 pub fn bundled_skill_candidates() -> Result<Vec<CompiledSkill>, SkillError> {
-    let methods = [
-        (
-            include_bytes!("../../../../skills/aws-credential-compromise/SKILL.md").as_slice(),
-            "references/operations.csv",
-            include_bytes!(
-                "../../../../skills/aws-credential-compromise/references/operations.csv"
-            )
-            .as_slice(),
-        ),
-        (
-            include_bytes!("../../../../skills/linux-triage/SKILL.md").as_slice(),
-            "references/coverage.csv",
-            include_bytes!("../../../../skills/linux-triage/references/coverage.csv").as_slice(),
-        ),
-        (
-            include_bytes!("../../../../skills/windows-triage/SKILL.md").as_slice(),
-            "references/event-ids.csv",
-            include_bytes!("../../../../skills/windows-triage/references/event-ids.csv").as_slice(),
-        ),
-    ];
-    methods
-        .into_iter()
+    inventory::METHODS
+        .iter()
         .map(|(method, reference, contents)| {
             let package = SkillPackage::new([
                 SkillResource::new("SKILL.md", method)?,
@@ -43,9 +25,34 @@ mod tests {
     use irmind_app::ContentGuard as _;
 
     #[test]
-    fn initial_methods_use_the_shared_compiler_guard_and_immutable_package_contract() {
+    fn published_initial_package_identities_remain_unchanged() {
+        let packages = bundled_skill_candidates().unwrap();
+        for (name, hash) in [
+            (
+                "aws-credential-compromise",
+                "bef2b28e3722ee1c2eda76c835f4e83b99e6395ea00583ed85f90b78553a35ef",
+            ),
+            (
+                "linux-triage",
+                "be4a83e88922a5b0fec026cd96d7b3d8eaf6e9f81487e5a60fca411d4d9f42e5",
+            ),
+            (
+                "windows-triage",
+                "50ca091e3379c589017459d1d210dec8d571b0c16f9e8e1e45312bc587bce57d",
+            ),
+        ] {
+            let package = packages
+                .iter()
+                .find(|s| s.metadata().name().as_str() == name)
+                .unwrap();
+            assert_eq!(irmind_app::hex(package.package().hash().as_bytes()), hash);
+        }
+    }
+
+    #[test]
+    fn bundled_methods_use_the_shared_compiler_guard_and_immutable_package_contract() {
         let methods = bundled_skill_candidates().unwrap();
-        assert_eq!(methods.len(), 3);
+        assert_eq!(methods.len(), 13);
         let names: Vec<_> = methods
             .iter()
             .map(|m| m.metadata().name().as_str())
@@ -54,8 +61,18 @@ mod tests {
             names,
             [
                 "aws-credential-compromise",
+                "aws-s3-data-exfiltration",
+                "azure-entra-identity-compromise",
+                "gcp-service-account-abuse",
+                "linux-persistence",
                 "linux-triage",
-                "windows-triage"
+                "linux-webshell",
+                "malware-execution-triage",
+                "network-c2-beaconing",
+                "windows-lateral-movement",
+                "windows-persistence",
+                "windows-ransomware",
+                "windows-triage",
             ]
         );
         let expected: std::collections::BTreeMap<String, String> =
@@ -81,12 +98,13 @@ mod tests {
                         || tool.starts_with("cloud_"))
             );
             for resource in method.package().resources().values() {
+                let screened = guard.screen(resource.untrusted_text()).unwrap();
                 assert!(
-                    guard
-                        .screen(resource.untrusted_text())
-                        .unwrap()
-                        .detections
-                        .is_empty()
+                    screened.detections.is_empty(),
+                    "{} {}: {:?}",
+                    method.metadata().name().as_str(),
+                    resource.path().as_str(),
+                    screened.detections
                 );
             }
         }

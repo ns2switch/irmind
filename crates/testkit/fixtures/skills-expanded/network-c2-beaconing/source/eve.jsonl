@@ -1,0 +1,1 @@
+{"alert": {"action": "allowed", "category": "Synthetic test", "severity": 2, "signature": "Synthetic suspicious connection; not proof of C2", "signature_id": 900001}, "dest_ip": "203.0.113.77", "dest_port": 443, "event_type": "alert", "flow_id": 9001001, "proto": "TCP", "src_ip": "192.0.2.14", "src_port": 55000, "timestamp": "2026-11-01T00:00:00.123456+0000"}

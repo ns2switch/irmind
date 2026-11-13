@@ -1,0 +1,5 @@
+source,required_fields,mapping,coverage_limit
+parser-linux,Original auth/audit/http fields; source host and timestamp provenance,Mapped sshd/sudo/su/auditd/HTTP core; extraction elsewhere,Incomplete groups and absent status stay unknown; HTTP may lack server host
+parser-ecs,@timestamp; ecs.version; event.*; host/user/source/destination,Validated ECS to common-event mapping,Producer must supply classification and preserve original identifiers
+parser-velociraptor,Artifact/_Source; original columns and collection provenance,DFIR extraction mapping,Artifact semantics depend on the collector and retained fields
+parser-plaso,parser; data_type; original timestamp and attributes,DFIR extraction mapping,Retain the source artifact meaning of each time

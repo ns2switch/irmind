@@ -1,0 +1,68 @@
+[
+  {
+    "account_id": "azure-tenant-001",
+    "event_id": "evt-0001",
+    "event_name": "Login",
+    "event_time": "2026-01-01T00:00:00Z",
+    "principal": "benign-operator",
+    "provider": "azure",
+    "resource": "azure:resource:admin",
+    "source_ip": "198.51.100.10",
+    "user_agent": "provider-cli/1.0"
+  },
+  {
+    "account_id": "azure-tenant-001",
+    "event_id": "evt-0002",
+    "event_name": "ReadPolicy",
+    "event_time": "2026-01-01T00:01:00Z",
+    "principal": "benign-operator",
+    "provider": "azure",
+    "resource": "azure:resource:admin",
+    "source_ip": "198.51.100.10",
+    "user_agent": "provider-cli/1.0"
+  },
+  {
+    "account_id": "azure-tenant-001",
+    "event_id": "evt-0003",
+    "event_name": "ListRoles",
+    "event_time": "2026-01-01T00:02:00Z",
+    "principal": "benign-operator",
+    "provider": "azure",
+    "resource": "azure:resource:admin",
+    "source_ip": "198.51.100.10",
+    "user_agent": "provider-cli/1.0"
+  },
+  {
+    "account_id": "azure-tenant-001",
+    "event_id": "evt-0004",
+    "event_name": "AssumeAdmin",
+    "event_time": "2026-01-01T00:03:00Z",
+    "principal": "suspected-identity",
+    "provider": "azure",
+    "resource": "azure:resource:admin",
+    "source_ip": "203.0.113.77",
+    "user_agent": "unknown-client/1.0"
+  },
+  {
+    "account_id": "azure-tenant-001",
+    "event_id": "evt-0005",
+    "event_name": "GrantPrivilege",
+    "event_time": "2026-01-01T00:04:00Z",
+    "principal": "suspected-identity",
+    "provider": "azure",
+    "resource": "azure:resource:admin",
+    "source_ip": "203.0.113.77",
+    "user_agent": "unknown-client/1.0"
+  },
+  {
+    "account_id": "azure-tenant-001",
+    "event_id": "evt-0006",
+    "event_name": "CreateCredential",
+    "event_time": "2026-01-01T00:05:00Z",
+    "principal": "suspected-identity",
+    "provider": "azure",
+    "resource": "azure:resource:admin",
+    "source_ip": "203.0.113.77",
+    "user_agent": "unknown-client/1.0"
+  }
+]

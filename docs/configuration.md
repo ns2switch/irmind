@@ -154,4 +154,4 @@ A mapping may preserve searchable fields and entities without classifying an eve
 
 ## Local skills
 
-`/skills` manages installations and activation through signed global operations, separate from `config.toml`. The preview shows package hashes, tools and resources before signing. No automatic download or additional credential is involved. You can inspect the three included methods without a model. See the [skills guide](skills.md).
+`/skills` manages installations and activation through signed global operations, separate from `config.toml`. The preview shows package hashes, tools and resources before signing. No automatic download or additional credential is involved. You can inspect the 13 included methods without a model. See the [skills guide](skills.md).

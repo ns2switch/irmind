@@ -1,0 +1,1 @@
+{"timestamp": "2026-11-01T00:00:02Z", "host": "synthetic-host", "action": "collected cron configuration", "message": "crontab synthetic-only: */5 * * * * /synthetic/task", "user": "www-data"}

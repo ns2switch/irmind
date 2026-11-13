@@ -1,4 +1,11 @@
 mod authorization;
+#[cfg(all(
+    feature = "mapping-cloudtrail",
+    feature = "parser-ecs",
+    feature = "parser-zeek",
+    feature = "parser-suricata"
+))]
+mod catalog;
 mod malicious;
 mod sequence;
 use ed25519_dalek::{Signer as _, SigningKey};
@@ -40,6 +47,13 @@ pub(super) fn setup_with_agent_failure(
     fail: bool,
 ) -> (Arc<LocalStore>, Engine<'static>) {
     let store = Arc::new(super::current_sources::open(&root.join("data")));
+    setup_with_store(root, store, fail)
+}
+pub(super) fn setup_with_store(
+    root: &Path,
+    store: Arc<LocalStore>,
+    fail: bool,
+) -> (Arc<LocalStore>, Engine<'static>) {
     let analyst = Arc::new(FixedSigner(
         Actor::Analyst,
         SigningKey::from_bytes(&[73; 32]),

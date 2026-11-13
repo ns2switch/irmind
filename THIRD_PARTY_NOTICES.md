@@ -21,6 +21,23 @@ episode's `private/ground-truth.json`. It is parsed only when `/demo check`
 runs. The full ground-truth file is not included; the external evaluator
 downloads and verifies it only when it runs.
 
+## HuntEval Azure and GCP skill fixtures
+
+The skill integration suite reuses two small synthetic source episodes and their
+separately stored evaluator answers from the same Apache-2.0 HuntEval commit above.
+Copyright 2026 Aníbal Cañada. The public episode fixtures are copied unchanged to
+`crates/testkit/fixtures/skills-expanded/azure-entra-identity-compromise/source/hunteval.json`
+and `crates/testkit/fixtures/skills-expanded/gcp-service-account-abuse/source/hunteval.json`.
+Evaluator answers live only under `crates/testkit/fixtures/skills-expanded/private/`.
+They are not packaged as skills, ingested as evidence or sent to the model.
+
+| Upstream path | SHA-256 |
+| --- | --- |
+| `datasets/azure/azure-iam-001/source/events.json` | `6eae0dadfb042e9beeed048d5ee8e84daa727d0e0d204ccf46def638c2dea6ad` |
+| `datasets/azure/azure-iam-001/private/ground-truth.json` | `316fa58dfbd4cc5555c8a9b9d03b5f260219e5efb67d8da38364aecb6cf335d3` |
+| `datasets/gcp/gcp-iam-001/source/events.json` | `9f5dc4a91c5b7347062107c2021224e1fd48bde5145304f4e0e9558269333452` |
+| `datasets/gcp/gcp-iam-001/private/ground-truth.json` | `9b7246483efb1734b54558b0aa8df4d52c58785c1167232c4937a6f1137ec81d` |
+
 ## `option-ext` 0.2.0
 
 `option-ext` is licensed under [MPL-2.0](https://www.mozilla.org/en-US/MPL/2.0/). It is included in a larger work without changing the license of IRMind's own code. The source for the used version is available on [crates.io](https://crates.io/crates/option-ext/0.2.0) and in its [repository](https://github.com/soc/option-ext). Its files retain MPL-2.0 and are not relicensed under IRMind's license.
