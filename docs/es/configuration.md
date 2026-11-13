@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 30e3be2b7c48d5ef816860a465b100bfe79e9da2; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit c6515b4d07c4f0ad28af13b5a193d90327132a76; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -14,10 +14,10 @@ Pasa `--policy policy.toml` o define `IRMIND_POLICY`. El archivo [policy.toml](.
 
 ```toml
 version = 1
-max_tool_calls_per_case = 100
+max_tool_calls_per_case = 1000
 max_model_rounds_per_turn = 25
 max_model_result_bytes = 10000
-max_model_tokens_per_case = 200000
+max_model_tokens_per_case = 2000000
 max_object_read_bytes = 1073741824
 max_object_bytes_per_case = 536870912000
 object_transfer_approval_bytes = 67108864
@@ -37,9 +37,70 @@ La tabla opcional `[scope]` fija un techo estricto para las lecturas remotas de 
 
 `max_model_rounds_per_turn` vale 25 por defecto si se omite y no puede superar 100. Al alcanzar el límite, IRMind pide un resumen final sin herramientas y ofrece `/continue`. Los límites de llamadas y tokens siguen aplicándose a todo el caso.
 
+## Asignaciones y consumo del caso
+
+Hay dos niveles. `policy.toml` fija el techo de la organización; el analista no
+puede superarlo desde la TUI, mediante una aprobación ni desde una skill.
+`/settings limits` elige valores por defecto firmados para los **casos futuros**.
+Dentro de un caso abierto, `/budget` muestra la asignación, el techo actual y el
+consumo, y permite editar los tokens, las llamadas y los bytes de nube reservados.
+Los campos están rellenados: Tab cambia de campo, Enter abre la revisión y las
+flechas o un número seguido de Enter confirman explícitamente la firma del
+analista. Esc cancela. Aumentar la asignación exige esa confirmación. El consumo
+nunca se reinicia. Un caso sellado no puede cambiar su asignación. Una política
+más restrictiva reduce de inmediato el techo efectivo de una asignación existente.
+
+Los valores por defecto son 2.000.000 de tokens y 1.000 llamadas, recortados al
+techo de la organización si es menor. Los máximos absolutos siguen siendo
+10.000.000 de tokens y 10.000 llamadas. Los límites de nube y las aprobaciones de
+transferencia conservan sus valores. Nunca se reescriben los archivos de política
+existentes. Las [mediciones](https://github.com/ns2switch/irmind/blob/a0dcfd1/docs/development/case-budget-measurements.md)
+locales con el modelo guionizado cubren las 13 skills incluidas y un caso de seis
+turnos; las estimaciones de planificación por bytes no son mediciones de
+facturación del proveedor.
+
+Al 80 %, la barra de estado avisa y señala `/budget`. Al agotarse el presupuesto,
+el turno conserva sus resultados y termina con un resumen y los límites
+consumidos y efectivos. Si quedan tokens, pide un resumen sin herramientas. Si
+no quedan, o la compactación del historial no cabe en su reserva, muestra un
+resumen local sin otra petición al modelo. Revisa `/budget` antes de `/continue`,
+o solicita al administrador que cambie el techo si este impide el aumento. El
+modelo no puede aplicar cambios de asignación.
+
+El uso del proveedor llega después de cada petición; el último recibo puede
+superar la asignación antes de detener las llamadas siguientes. Los topes de la
+cuenta del proveedor siguen siendo útiles para la facturación.
+
+Los tokens incluyen toda entrada y salida declarada por el proveedor: historial
+reenviado, resultados de herramientas, texto de skills, compactación y resúmenes
+finales. Si falta información de uso, se indica que no está disponible y cualquier
+subtotal informado se muestra como un mínimo, nunca como un cero medido. El coste
+solo aparece cuando hay información de uso y precios configurados. Las llamadas
+incluyen los despachos firmados y las lecturas acotadas de skills. Los bytes de
+nube son **reservas** de lecturas de objetos firmadas, incluidas las transferencias
+fallidas o canceladas, como en la aplicación del límite; no representan tráfico
+exacto de red.
+
+Los valores no secretos se guardan en `config.toml`, por ejemplo:
+
+```toml
+[case_budget_defaults]
+model_tokens = 2000000
+tool_calls = 1000
+cloud_bytes = 536870912000
+```
+
+La asignación inicial se firma atómicamente al crear el caso. Los cambios
+posteriores son registros del caso firmados por el analista; cambiar los valores
+por defecto no modifica casos existentes. Un caso sin asignación inicial pide
+confirmarla explícitamente con `/budget` antes de iniciar trabajo con el modelo o
+las herramientas. Se añade una asignación firmada y se conserva todo el consumo
+anterior, sin reescribir evidencia ni reiniciar el uso. Abrir un caso o cambiar
+los valores por defecto nunca inicializa su asignación en silencio.
+
 ## Ajustes no secretos
 
-La TUI guarda los ajustes no secretos en `config.toml` dentro del [directorio de datos estándar](platforms.md#datos-y-terminal). La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no activa ninguno. `/settings` reúne Modelo, Conectores, Llavero y Preferencias; `/settings model` abre directamente el modelo. En Conectores, las flechas eligen un módulo, Tab elige un parámetro y Enter lo edita en un campo visible. El primer carácter escrito o pegado sustituye el valor predeterminado; Enter lo acepta y Ctrl+U lo borra. La URL se recorta y las barras repetidas de la ruta se normalizan antes de validarla. Las credenciales se escriben en campos enmascarados de Llavero. La sesión se recarga tras un cambio. La salida de datos del equipo requiere confirmación explícita y firmada. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre debe existir un backend de firma y secretos.
+La TUI guarda los ajustes no secretos en `config.toml` dentro del [directorio de datos estándar](platforms.md#datos-y-terminal). La compilación normal incluye todos los módulos de producto actuales y ambos llaveros, pero no activa ninguno. `/settings` reúne Modelo, Conectores, Llavero, Preferencias y Límites; `/settings model` abre directamente el modelo. En Conectores, las flechas eligen un módulo, Tab elige un parámetro y Enter lo edita en un campo visible. El primer carácter escrito o pegado sustituye el valor predeterminado; Enter lo acepta y Ctrl+U lo borra. La URL se recorta y las barras repetidas de la ruta se normalizan antes de validarla. Las credenciales se escriben en campos enmascarados de Llavero. La sesión se recarga tras un cambio. La salida de datos del equipo requiere confirmación explícita y firmada. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre debe existir un backend de firma y secretos.
 
 Para Splunk, MISP, CrowdStrike, SentinelOne y un servicio S3 compatible, `/settings connectors` admite un archivo PEM de CA opcional. IRMind muestra y firma su huella SHA-256 junto con la ruta. El PEM se añade a las raíces del sistema; la comprobación del nombre del servidor sigue activa. Al iniciar el conector se vuelve a comprobar el hash, por lo que sustituir el archivo exige otra aprobación. Borra la ruta para retirar esa CA. No guardes una clave privada en el archivo.
 
