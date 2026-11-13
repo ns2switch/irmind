@@ -10,6 +10,7 @@ impl GraphQueryFilter {
         "project",
         "region",
         "host",
+        "cluster",
         "event_category",
         "event_type",
         "event_outcome",
@@ -25,6 +26,9 @@ impl GraphQueryFilter {
             args.get("region").map(String::as_str),
             args.get("host").map(String::as_str),
         )?;
+        if let Some(cluster) = args.get("cluster") {
+            filter = filter.with_cluster(cluster)?;
+        }
         filter.common = crate::CommonEventFilter {
             category: args
                 .get("event_category")

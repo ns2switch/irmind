@@ -31,6 +31,13 @@ pub(super) fn validate_schema(artifact: &ParquetArtifact, schema: &Schema) -> Re
         return Err(invalid_source());
     }
     super::common_format::validate_metadata(v.schema, schema, &v.builder_version)?;
+    validate_cluster_extension(
+        schema,
+        v.partition
+            .scopes
+            .iter()
+            .any(|s| s.key == irmind_domain::ScopePartitionKey::Cluster),
+    )?;
     validate_columns(v.schema, schema)
 }
 
@@ -45,11 +52,13 @@ pub(super) fn validate_row_count(artifact: &ParquetArtifact, rows: i64) -> Resul
 pub(crate) fn validate_common_export_schema(
     id: irmind_domain::ArtifactSchemaV2,
     schema: &Schema,
+    cluster: bool,
 ) -> Result<(), AppError> {
     if !id.is_common() {
         return Err(invalid_source());
     }
     super::common_format::validate_metadata(id, schema, super::common_format::BUILDER)?;
+    validate_cluster_extension(schema, cluster)?;
     validate_columns(id, schema)
 }
 
@@ -76,6 +85,9 @@ fn validate_columns(id: irmind_domain::ArtifactSchemaV2, schema: &Schema) -> Res
         irmind_domain::ArtifactSchemaV2::CommonCoobservations => {
             names.extend(["entity_kind", "entity_value", "co_entities"]);
         }
+    }
+    if schema.metadata().get("irmind.cluster.context").is_some() {
+        names.push("scope_cluster");
     }
     names.extend(super::common_format::extra_columns(id));
     if names.len() != schema.fields().len() {
@@ -196,3 +208,18 @@ fn source_name<'a>(
 
 #[cfg(test)]
 mod tests;
+
+fn validate_cluster_extension(schema: &Schema, expected: bool) -> Result<(), AppError> {
+    let marker = schema
+        .metadata()
+        .get("irmind.cluster.context")
+        .map(String::as_str);
+    let column = schema.field_with_name("scope_cluster").is_ok();
+    if (expected && marker == Some("source-cluster-v1") && column)
+        || (!expected && marker.is_none() && !column)
+    {
+        Ok(())
+    } else {
+        Err(invalid_source())
+    }
+}

@@ -8,6 +8,7 @@ use serde_json::{Value, json};
 
 pub(super) fn encode(value: &CommonValue) -> Value {
     match value {
+        CommonValue::Boolean(v) => json!(v),
         CommonValue::Text(v) => json!(v.as_str()),
         CommonValue::Unsigned(v) => json!(v),
         CommonValue::Ip(v) => json!(v.to_string()),
@@ -34,6 +35,7 @@ fn event_text(value: &Value) -> Result<EventText, AppError> {
 
 pub(super) fn decode(field: CommonField, value: &Value) -> Result<CommonValue, AppError> {
     let value = match field.value_type() {
+        CommonFieldType::Boolean => CommonValue::Boolean(value.as_bool().ok_or_else(invalid)?),
         CommonFieldType::Text | CommonFieldType::LongText => CommonValue::Text(event_text(value)?),
         CommonFieldType::Ip => CommonValue::Ip(text(value)?.parse().map_err(|_| invalid())?),
         CommonFieldType::Unsigned

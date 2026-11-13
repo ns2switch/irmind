@@ -37,6 +37,9 @@ pub(super) fn rules_for_artifact(
         rules.push(rule.clone());
     }
     if precise {
+        if let Some(cluster) = spec.filter.cluster() {
+            rules.push(Predicate::Equal("scope_cluster", cluster.qualified()));
+        }
         if let Some(host) = spec.filter.host() {
             rules.push(Predicate::Equal("scope_host", host.into()));
         }
@@ -56,7 +59,14 @@ fn scope_partition_matches(
     filter: &GraphQueryFilter,
 ) -> bool {
     use irmind_domain::{ScopePartitionKey as Key, ScopePartitionValue as Value};
+    if filter.cluster().is_some() && !partition.scopes.iter().any(|s| s.key == Key::Cluster) {
+        return false;
+    }
+    let cluster = filter
+        .cluster()
+        .map(super::super::partitioning::cluster_partition_value);
     [
+        (Key::Cluster, cluster.as_deref()),
         (Key::Account, filter.account_or_project()),
         (Key::Region, filter.region()),
         (Key::Host, filter.host()),

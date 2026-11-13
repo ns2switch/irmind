@@ -144,3 +144,24 @@ fn common_physical_schemas_require_the_mapped_envelope_and_receipts() {
     }
     assert!(artifact_catalog(&entries).is_ok());
 }
+
+#[test]
+fn unsupported_common_contract_explains_using_the_creating_version_or_reingesting() {
+    let (mut entries, _) = mapped_history();
+    let old = crate::hex(
+        irmind_domain::common_event_contract_digest()
+            .as_str()
+            .as_bytes(),
+    );
+    let profile = entries
+        .iter_mut()
+        .find(|entry| entry.kind == AuditEventKind::MappingProfileV1)
+        .unwrap();
+    let changed = profile.payload.replace(&old, &"30".repeat(64));
+    assert_ne!(changed, profile.payload);
+    profile.payload = changed;
+    assert!(matches!(
+        artifact_catalog(&entries),
+        Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat))
+    ));
+}

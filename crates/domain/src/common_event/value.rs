@@ -153,6 +153,7 @@ impl DnsAnswers {
 }
 #[derive(Clone, Eq, PartialEq)]
 pub enum CommonValue {
+    Boolean(bool),
     Text(EventText),
     Unsigned(u64),
     Ip(IpAddr),
@@ -165,6 +166,7 @@ pub enum CommonValue {
 impl CommonValue {
     pub(super) fn json_bytes(&self) -> usize {
         match self {
+            Self::Boolean(_) => 5,
             Self::Text(v) => v.json_bytes(),
             Self::Unsigned(_) => 20,
             Self::Ip(_) => 48,

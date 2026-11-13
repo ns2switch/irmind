@@ -120,7 +120,7 @@ pub(super) fn columns(
 }
 
 fn metadata_columns(selected: &[&RecordRow]) -> Vec<(String, ArrayRef)> {
-    vec![
+    let mut columns = vec![
         (
             "submicro_nanos".into(),
             Arc::new(UInt16Array::from(
@@ -181,7 +181,19 @@ fn metadata_columns(selected: &[&RecordRow]) -> Vec<(String, ArrayRef)> {
                     .collect::<Vec<_>>(),
             )) as ArrayRef,
         ),
-    ]
+    ];
+    if selected.iter().any(|r| !r.scope_cluster.is_empty()) {
+        columns.push((
+            "scope_cluster".into(),
+            Arc::new(StringArray::from(
+                selected
+                    .iter()
+                    .map(|r| r.scope_cluster.as_str())
+                    .collect::<Vec<_>>(),
+            )) as ArrayRef,
+        ));
+    }
+    columns
 }
 
 pub(super) fn manifest(

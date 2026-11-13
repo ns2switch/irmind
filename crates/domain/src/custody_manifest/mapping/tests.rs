@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 mod bounds;
 mod fixtures;
 mod layout;
@@ -110,4 +111,22 @@ fn profiles_reject_duplicate_sources_catalog_ids_and_noncanonical_payloads() {
             .is_err()
     );
     assert!(SourceDecoderIdentityV1::try_new("parser_bad", "1").is_err());
+}
+
+#[test]
+fn a_well_formed_unknown_contract_is_rejected_as_an_unsupported_format() {
+    let encoded = fixtures::profile().encode().unwrap();
+    let mut old = String::new();
+    for byte in super::contracts::common_event_contract_digest()
+        .as_str()
+        .as_bytes()
+    {
+        write!(&mut old, "{byte:02x}").unwrap();
+    }
+    let unsupported = encoded.replace(&old, &"30".repeat(64));
+    assert_ne!(unsupported, encoded);
+    assert_eq!(
+        MappingProfileV1::decode(&unsupported),
+        Err(DomainError::UnsupportedContract)
+    );
 }

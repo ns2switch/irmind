@@ -20,6 +20,8 @@ pub(super) struct ArtifactFrame {
     common_schema: Option<irmind_domain::ArtifactSchemaV2>,
     #[serde(skip)]
     common_rows: Option<u64>,
+    #[serde(skip)]
+    cluster: bool,
 }
 impl ArtifactFrame {
     pub(super) fn from_artifact(artifact: &ParquetArtifact) -> Self {
@@ -30,6 +32,12 @@ impl ArtifactFrame {
             size: artifact.size(),
             common_schema: Some(value.core().schema),
             common_rows: Some(value.pipeline().rows()),
+            cluster: value
+                .core()
+                .partition
+                .scopes
+                .iter()
+                .any(|s| s.key == irmind_domain::ScopePartitionKey::Cluster),
         }
     }
 }
@@ -112,6 +120,7 @@ pub(super) fn verify_artifact_frames(
                 &frame.sha256,
                 schema,
                 artifact.common_rows,
+                artifact.cluster,
             )?;
         } else {
             verify_raw(input, frame.size, &frame.sha256)?;

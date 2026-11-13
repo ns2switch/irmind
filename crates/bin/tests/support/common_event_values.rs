@@ -12,7 +12,14 @@ fn all_closed_field_types_round_trip_with_lexical_keys_in_both_map_modes() {
     let mut context = EventContextV1::default();
     for field in CommonField::all() {
         context
-            .try_insert(field, value_for(field.value_type()))
+            .try_insert(
+                field,
+                if field == CommonField::IrmindClusterIdentity {
+                    CommonValue::Text(EventText::new("kubernetes:urn:k8s:synthetic").unwrap())
+                } else {
+                    value_for(field.value_type())
+                },
+            )
             .unwrap();
     }
     let event = CommonEventV1::try_new(
@@ -43,6 +50,7 @@ fn all_closed_field_types_round_trip_with_lexical_keys_in_both_map_modes() {
 fn value_for(kind: CommonFieldType) -> CommonValue {
     use CommonFieldType as T;
     match kind {
+        T::Boolean => CommonValue::Boolean(true),
         T::Text | T::LongText => CommonValue::Text(EventText::new("synthetic").unwrap()),
         T::Ip => CommonValue::Ip("2001:db8::77".parse().unwrap()),
         T::Unsigned | T::Port | T::Pid => CommonValue::Unsigned(443),
@@ -101,6 +109,10 @@ fn every_identity_scope_keeps_its_canonical_bytes() {
     let hash = EvidenceHash::parse(&"ab".repeat(32)).unwrap();
     let text = |value| EventText::identifier(value).unwrap();
     let cases = [
+        (
+            EntityIdentityScope::cluster(irmind_domain::ClusterIdentity::try_new(irmind_domain::ClusterProvider::Kubernetes, "urn:k8s:lab").unwrap(), Some("production")).unwrap(),
+            r#"{"id":"urn:k8s:lab","kind":"cluster","namespace":"production","provider":"kubernetes"}"#.into(),
+        ),
         (
             EntityIdentityScope::Global,
             r#"{"kind":"global"}"#.to_owned(),

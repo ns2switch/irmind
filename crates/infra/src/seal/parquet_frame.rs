@@ -18,6 +18,7 @@ pub(super) fn verify_common(
     expected: &str,
     schema: ArtifactSchemaV2,
     rows: Option<u64>,
+    cluster: bool,
 ) -> Result<(), AppError> {
     let start = input.stream_position().map_err(storage)?;
     let end = start
@@ -32,7 +33,7 @@ pub(super) fn verify_common(
     let validated = ParquetRecordBatchReaderBuilder::try_new(source)
         .map_err(storage)
         .and_then(|reader| {
-            crate::parquet_store::validate_common_export_schema(schema, reader.schema())?;
+            crate::parquet_store::validate_common_export_schema(schema, reader.schema(), cluster)?;
             if rows.is_some_and(|expected| {
                 u64::try_from(reader.metadata().file_metadata().num_rows()).ok() != Some(expected)
             }) {

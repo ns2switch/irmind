@@ -157,3 +157,45 @@ ordinary partition normalization and hashed directory construction then apply.
 The actual identity remains available to mapping and queries; a physical bucket
 never substitutes for it. The default ordinary cluster cap is 64, with a fixed
 maximum of 1,024 and the existing signed overflow semantics.
+
+## Common projection and query extension
+
+The common vocabulary adds the ECS orchestrator/API/resource and container
+fields needed for Kubernetes and Falco, group-name lists and a Boolean privilege
+flag. Names follow the official [orchestrator](https://www.elastic.co/docs/reference/ecs/ecs-orchestrator)
+and [container](https://www.elastic.co/docs/reference/ecs/ecs-container) references.
+The raw `orchestrator.cluster.id` retains the producer's value. The distinct
+`irmind.cluster.identity` field holds the validated acquisition identity; a
+mapper cannot manufacture or replace it independently of SourceRecord context.
+
+Closed entity kinds cover Kubernetes users, service accounts, namespaces, pods,
+nodes, containers and image references. A cluster scope records provider, exact
+cluster ID and an optional namespace. Pods and service accounts require that
+namespace. Kubernetes-specific kinds cannot fall back to a global or host scope.
+Container IDs and exact image references may also use source/host scopes for
+non-Kubernetes telemetry. A display name alone is not a container identity.
+
+The existing query tools and CLI accept a `cluster` filter using the complete
+provider-qualified identity. Invalid values fail validation. Partition pruning
+uses the signed hash-derived cluster bucket; an exact `scope_cluster` predicate
+filters rows as well, including overflow buckets. Result counts, deadlines,
+neighbor samples, hop/expansion limits and file hash checks remain unchanged.
+
+Only cluster-partitioned files carry the non-null UTF-8 `scope_cluster` column
+and the Arrow metadata marker `irmind.cluster.context=source-cluster-v1`.
+Validation requires marker and column together, and requires their presence to
+match the signed partition's cluster key, including during export verification.
+Non-cluster Parquet bytes retain their physical layout. This is an optional
+extension of the current grammar, not a historical construction recipe.
+
+Adding closed common field codes changes the target-contract digest in mapped
+profiles and envelopes. Current wire, receipt and synthetic export vectors are
+refreshed for that contract. V7 framing, seal challenges and frame bounds do not
+change. A different well-formed contract is rejected with the creating-version /
+re-ingestion guidance rather than accepted or reported as a generic chain error.
+No migration or historical contract reader is added.
+
+An unmapped cluster record retains its full decoded-source commitment but does
+not copy arbitrary original bodies into its searchable/model-facing projection.
+It reports missing semantic coverage. In particular, Kubernetes request and
+response objects remain original evidence, not automatic full-text projections.

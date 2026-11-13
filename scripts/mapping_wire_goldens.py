@@ -86,8 +86,8 @@ def binding(letter, source, prof):
             + fields('parser-json', 'json-source-v1') + b'\1' + fields(*MAPPER))
 
 
-def artifact(path, file_hash, sources, bindings, rows, parents=None):
-    builder = LAYOUT if parents else BUILDER
+def artifact(path, file_hash, sources, bindings, rows, parents=None, builder=None):
+    builder = builder or (LAYOUT if parents else BUILDER)
     core = (b'irmind-parquet-artifact-v2\0' + field(path) + u64(150 if parents else 100)
             + fields(file_hash, 'parser-json', 'json-source-v1', 'irmind-events-v4')
             + partition() + u64(len(sources)) + fields(*sources)
@@ -128,7 +128,7 @@ def fixtures():
            + field('a' * 64) + b'\1' + fields(*MAPPER) + u64(2) + u64(0) * 3
            + commitment(b'irmind-mapping-outputs-v1\0', [first]))
     return {'source-set-v1': a, 'source-set-time-v1': source_set('a', 'logs/synthetic.json', (2026, -210, True, 'command')), 'snapshot-v1': snapshot(), 'profile-v1': pa,
-            'mapped-v3': first, 'layout-v3': child, 'layout-receipt-v1': layout, 'mapping-run-v1': run}
+            'mapped-v3': first, 'direct-v3': artifact(path_a, 'e' * 64, ['a' * 64], [ba], 2, builder='parquet-builder-common-event-direct-v1'), 'layout-v3': child, 'layout-receipt-v1': layout, 'mapping-run-v1': run}
 
 
 def main():
@@ -142,7 +142,7 @@ def main():
             path.write_text(text)
         elif path.read_text() != text:
             raise SystemExit('mapping fixture differs: ' + name)
-    print('Checked 8 independent mapping/layout wire fixtures')
+    print(f'Checked {len(fixtures())} independent mapping/layout wire fixtures')
 
 
 if __name__ == '__main__':

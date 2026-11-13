@@ -83,6 +83,12 @@ impl ClusterIdentity {
     pub fn id(&self) -> &str {
         &self.id
     }
+    pub fn matches_qualified(&self, value: &str) -> bool {
+        value
+            .strip_prefix(self.provider.as_str())
+            .and_then(|rest| rest.strip_prefix(':'))
+            == Some(self.id.as_str())
+    }
     /// A collision-free query identity, including the source provider.
     pub fn qualified(&self) -> String {
         format!("{}:{}", self.provider.as_str(), self.id)

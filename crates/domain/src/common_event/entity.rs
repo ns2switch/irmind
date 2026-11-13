@@ -21,6 +21,13 @@ pub enum ObservedEntityKind {
     Event,
     Rule,
     CollectorArtifact,
+    KubernetesUser,
+    KubernetesServiceAccount,
+    KubernetesNamespace,
+    KubernetesPod,
+    KubernetesNode,
+    Container,
+    ContainerImage,
 }
 impl ObservedEntityKind {
     pub const ALL: &'static [Self] = &[
@@ -42,6 +49,13 @@ impl ObservedEntityKind {
         Self::Event,
         Self::Rule,
         Self::CollectorArtifact,
+        Self::KubernetesUser,
+        Self::KubernetesServiceAccount,
+        Self::KubernetesNamespace,
+        Self::KubernetesPod,
+        Self::KubernetesNode,
+        Self::Container,
+        Self::ContainerImage,
     ];
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -63,6 +77,13 @@ impl ObservedEntityKind {
             Self::Event => "event",
             Self::Rule => "rule",
             Self::CollectorArtifact => "artifact",
+            Self::KubernetesUser => "k8s_user",
+            Self::KubernetesServiceAccount => "k8s_service_account",
+            Self::KubernetesNamespace => "k8s_namespace",
+            Self::KubernetesPod => "k8s_pod",
+            Self::KubernetesNode => "k8s_node",
+            Self::Container => "container",
+            Self::ContainerImage => "image",
         }
     }
     pub fn parse(value: &str) -> Result<Self, EventSchemaError> {
@@ -77,6 +98,10 @@ impl ObservedEntityKind {
 /// Identity scope prevents PID reuse and cross-account/user collisions.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EntityIdentityScope {
+    Cluster {
+        cluster: crate::ClusterIdentity,
+        namespace: Option<EventText>,
+    },
     Global,
     Account(EventText),
     Host(EventText),
@@ -90,20 +115,63 @@ pub enum EntityIdentityScope {
     },
 }
 impl EntityIdentityScope {
-    fn stable_key(&self) -> (&str, &str, &str, u64) {
+    pub fn cluster(
+        cluster: crate::ClusterIdentity,
+        namespace: Option<&str>,
+    ) -> Result<Self, EventSchemaError> {
+        if namespace.is_some_and(|value| !valid_kubernetes_label(value)) {
+            return Err(EventSchemaError::InvalidObservation);
+        }
+        Ok(Self::Cluster {
+            cluster,
+            namespace: namespace.map(EventText::identifier).transpose()?,
+        })
+    }
+    fn stable_key(&self) -> (&str, &str, &str, &str, u64) {
         match self {
-            Self::Global => ("global", "", "", 0),
-            Self::Account(value) => ("account", value.as_str(), "", 0),
-            Self::Host(value) => ("host", value.as_str(), "", 0),
+            Self::Cluster { cluster, namespace } => (
+                "cluster",
+                cluster.provider().as_str(),
+                cluster.id(),
+                namespace.as_ref().map_or("", EventText::as_str),
+                0,
+            ),
+            Self::Global => ("global", "", "", "", 0),
+            Self::Account(value) => ("account", value.as_str(), "", "", 0),
+            Self::Host(value) => ("host", value.as_str(), "", "", 0),
             Self::SourceRecord { source, record } => {
-                ("source_record", source.as_str(), "", *record)
+                ("source_record", source.as_str(), "", "", *record)
             }
             Self::ProcessLifetime { host, lifetime } => {
-                ("process_lifetime", host.as_str(), lifetime.as_str(), 0)
+                ("process_lifetime", host.as_str(), lifetime.as_str(), "", 0)
             }
         }
     }
     fn validate(&self, kind: ObservedEntityKind) -> Result<(), EventSchemaError> {
+        let clustered = matches!(self, Self::Cluster { .. });
+        if (clustered && !kind.is_cluster_entity())
+            || (!clustered
+                && kind.is_cluster_entity()
+                && !matches!(
+                    kind,
+                    ObservedEntityKind::Container | ObservedEntityKind::ContainerImage
+                ))
+        {
+            return Err(EventSchemaError::InvalidObservation);
+        }
+        if let Self::Cluster { namespace, .. } = self
+            && (namespace
+                .as_ref()
+                .is_some_and(|value| !valid_kubernetes_label(value.as_str()))
+                || (matches!(
+                    kind,
+                    ObservedEntityKind::KubernetesPod
+                        | ObservedEntityKind::KubernetesServiceAccount
+                ) && namespace.is_none()))
+        {
+            return Err(EventSchemaError::InvalidObservation);
+        }
+
         match self {
             Self::Global
                 if !matches!(
@@ -123,6 +191,7 @@ impl EntityIdentityScope {
         }
         let values = match self {
             Self::Global | Self::SourceRecord { .. } => [None, None],
+            Self::Cluster { namespace, .. } => [namespace.as_ref(), None],
             Self::Host(value) | Self::Account(value) => [Some(value), None],
             Self::ProcessLifetime { host, lifetime } => [Some(host), Some(lifetime)],
         };
@@ -176,6 +245,17 @@ impl ObservedEntity {
             {
                 return Err(EventSchemaError::InvalidValue);
             }
+            ObservedEntityKind::KubernetesNamespace if !valid_kubernetes_label(value.as_str()) => {
+                return Err(EventSchemaError::InvalidValue);
+            }
+            ObservedEntityKind::KubernetesPod
+            | ObservedEntityKind::KubernetesNode
+            | ObservedEntityKind::KubernetesServiceAccount
+                if value.as_str().len() > 253
+                    || !value.as_str().split('.').all(valid_kubernetes_label) =>
+            {
+                return Err(EventSchemaError::InvalidValue);
+            }
             ObservedEntityKind::Domain if !valid_domain(value.as_str()) => {
                 return Err(EventSchemaError::InvalidValue);
             }
@@ -192,6 +272,9 @@ impl ObservedEntity {
     }
     pub(super) fn json_bytes(&self) -> usize {
         let scope = match &self.scope {
+            EntityIdentityScope::Cluster { cluster, namespace } => {
+                128 + cluster.id().len() + namespace.as_ref().map_or(0, EventText::json_bytes)
+            }
             EntityIdentityScope::Global => 32,
             EntityIdentityScope::Account(value) | EntityIdentityScope::Host(value) => {
                 64 + value.json_bytes()
@@ -226,4 +309,34 @@ fn valid_domain(value: &str) -> bool {
                     .bytes()
                     .all(|b| b.is_ascii_alphanumeric() || b == b'-')
         })
+}
+
+impl ObservedEntityKind {
+    pub const fn is_cluster_entity(self) -> bool {
+        matches!(
+            self,
+            Self::KubernetesUser
+                | Self::KubernetesServiceAccount
+                | Self::KubernetesNamespace
+                | Self::KubernetesPod
+                | Self::KubernetesNode
+                | Self::Container
+                | Self::ContainerImage
+        )
+    }
+}
+pub(super) fn valid_kubernetes_label(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 63
+        && value
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+        && value
+            .as_bytes()
+            .last()
+            .is_some_and(u8::is_ascii_alphanumeric)
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }

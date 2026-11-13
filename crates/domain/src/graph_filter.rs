@@ -11,6 +11,7 @@ pub struct GraphQueryFilter {
     project: Option<String>,
     region: Option<String>,
     host: Option<String>,
+    cluster: Option<crate::ClusterIdentity>,
     common: crate::CommonEventFilter,
 }
 
@@ -59,6 +60,7 @@ impl GraphQueryFilter {
             project: project.map(str::to_owned),
             region: region.map(str::to_owned),
             host: host.map(str::to_owned),
+            cluster: None,
             common: crate::CommonEventFilter::default(),
         })
     }
@@ -69,7 +71,19 @@ impl GraphQueryFilter {
             && self.project.is_none()
             && self.region.is_none()
             && self.host.is_none()
+            && self.cluster.is_none()
             && self.common.is_empty()
+    }
+
+    pub const fn cluster(&self) -> Option<&crate::ClusterIdentity> {
+        self.cluster.as_ref()
+    }
+    pub fn with_cluster(mut self, value: &str) -> Result<Self, DomainError> {
+        self.cluster = Some(
+            crate::ClusterIdentity::parse_qualified(value)
+                .map_err(|_| DomainError::InvalidScope)?,
+        );
+        Ok(self)
     }
 
     pub fn time_range(&self) -> Option<(&str, &str)> {
@@ -363,5 +377,39 @@ mod tests {
             evaluate_with_rules(&case, proposal, 1, ExecutionMode::Attended, 0, &rules),
             Decision::Deny("outside organization policy scope")
         ));
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod cluster_tests {
+    use super::*;
+    #[test]
+    fn cluster_filter_is_exact_narrowing_and_never_drops_invalid_arguments() {
+        let args =
+            std::collections::BTreeMap::from([("cluster".into(), "kubernetes:urn:k8s:lab".into())]);
+        let filter = GraphQueryFilter::from_args(&args).unwrap();
+        assert!(!filter.is_empty());
+        assert_eq!(
+            filter.cluster().unwrap().qualified(),
+            "kubernetes:urn:k8s:lab"
+        );
+        for bad in [
+            "",
+            "overflow-cardinality",
+            "kubernetes:../lab",
+            "kubernetes:urn:k8s:*",
+            "kubernetes:urn:k8s:lab\n",
+        ] {
+            assert!(GraphQueryFilter::default().with_cluster(bad).is_err());
+            assert!(
+                GraphQueryFilter::from_args(&std::collections::BTreeMap::from([(
+                    "cluster".into(),
+                    bad.into()
+                )]))
+                .is_err()
+            );
+        }
+        assert!(GraphQueryFilter::default().cluster().is_none());
     }
 }

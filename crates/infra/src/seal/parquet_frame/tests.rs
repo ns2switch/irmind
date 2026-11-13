@@ -59,7 +59,8 @@ fn signed_hash_does_not_replace_validation_of_common_physical_columns() {
                 bytes.len() as u64,
                 &hash,
                 ArtifactSchemaV2::CommonEvents,
-                None
+                None,
+                false,
             )
             .is_err()
         );

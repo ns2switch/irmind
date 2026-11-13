@@ -79,4 +79,5 @@ pub enum DomainError {
     InvalidSeverity,
     UnknownAuditEvent,
     InvalidManifest,
+    UnsupportedContract,
 }
