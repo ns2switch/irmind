@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 30e3be2b7c48d5ef816860a465b100bfe79e9da2; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit e2891bdfb641a119cd5503f9168667c2cb6a00e8; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
