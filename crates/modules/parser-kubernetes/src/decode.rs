@@ -2,7 +2,7 @@ use irmind_app::{
     AppError, FixedAppError, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
         DecodeBudget, DecodeInput, SourceFormatV1, SourceInput, SourceRecordV1, SourceValue,
-        framed::{DecodedSourceFrame, decode_json_source},
+        framed::{DecodedSourceFrame, decode_json_envelope_source},
     },
 };
 use irmind_domain::{IndexedTime, Tainted};
@@ -33,35 +33,47 @@ impl SourceDecoder for KubernetesSourceDecoder {
         if input.metadata.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let cluster = input
-            .metadata
-            .cluster_context
-            .ok_or(AppError::ParserClusterContextRequired {
-                source_name: input.metadata.source.reference().into(),
-                requirement: irmind_app::ParserClusterRequirement::try_new(true, vec![])?,
-            })?
-            .resolve(None)
-            .map_err(|_| {
-                AppError::Policy(
-                    "Native audit events require an explicit analyst or command cluster binding"
-                        .into(),
+        let context = input.metadata.cluster_context;
+        let source_name = input.metadata.source.reference();
+        decode_json_envelope_source(
+            input,
+            self.identity(),
+            budget,
+            &super::managed::prepare,
+            &mut |record| {
+                let Some(context) = context else {
+                    return Err(AppError::ParserClusterContextRequired {
+                        source_name: source_name.into(),
+                        requirement: irmind_app::ParserClusterRequirement::try_new(true, vec![])?,
+                    });
+                };
+                let mut identity = None;
+                record.inspect(|source| {
+                    identity = Some(
+                        super::managed::resolve(
+                            context,
+                            source.fields(),
+                            source.format().id(),
+                            source_name,
+                        )
+                        .cloned(),
+                    );
+                });
+                let identity = identity.ok_or_else(invalid)??;
+                emit(
+                    record
+                        .with_cluster_identity(identity)
+                        .map_err(|_| invalid())?,
                 )
-            })?
-            .clone();
-        decode_json_source(input, self.identity(), budget, &prepare, &mut |record| {
-            emit(
-                record
-                    .with_cluster_identity(cluster.clone())
-                    .map_err(|_| invalid())?,
-            )
-        })
+            },
+        )
     }
 }
 pub(super) fn is_native(fields: &SourceValue) -> bool {
     fields.field("apiVersion").and_then(SourceValue::as_text) == Some("audit.k8s.io/v1")
         && fields.field("kind").and_then(SourceValue::as_text) == Some("Event")
 }
-fn prepare(fields: SourceValue) -> Result<DecodedSourceFrame, AppError> {
+pub(super) fn prepare_native(fields: SourceValue) -> Result<DecodedSourceFrame, AppError> {
     if !is_native(&fields)
         || fields
             .field("auditID")
@@ -91,6 +103,6 @@ fn prepare(fields: SourceValue) -> Result<DecodedSourceFrame, AppError> {
             .map_err(|_| invalid())?,
     })
 }
-fn invalid() -> AppError {
+pub(super) fn invalid() -> AppError {
     AppError::Fixed(FixedAppError::SourceFormat)
 }

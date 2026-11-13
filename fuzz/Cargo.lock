@@ -907,6 +907,7 @@ dependencies = [
  "irmind-mapping-tables",
  "irmind-mod-mapping-ecs",
  "irmind-mod-mapping-entra",
+ "irmind-mod-mapping-kubernetes",
  "irmind-mod-mapping-network",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
@@ -983,6 +984,15 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+]
+
+[[package]]
+name = "irmind-mod-mapping-kubernetes"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
  "irmind-domain",
  "irmind-mapping-tables",
 ]

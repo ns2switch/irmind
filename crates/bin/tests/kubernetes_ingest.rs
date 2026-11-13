@@ -8,6 +8,8 @@ mod current_sources;
 #[cfg(feature = "parser-entra")]
 #[path = "kubernetes_ingest/entra.rs"]
 mod entra;
+#[path = "kubernetes_ingest/managed.rs"]
+mod managed;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,

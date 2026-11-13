@@ -100,10 +100,9 @@ fn register_contextual(registry: &mut ModuleRegistry) -> Result<()> {
         )?;
     }
     #[cfg(feature = "mapping-kubernetes")]
-    registry.register(
-        Box::new(irmind_mod_mapping_kubernetes::KubernetesMapping::new()?),
-        &ModuleConfig::new(),
-    )?;
+    for mapper in irmind_mod_mapping_kubernetes::KubernetesMapping::all()? {
+        registry.register(Box::new(mapper), &ModuleConfig::new())?;
+    }
     #[cfg(feature = "mapping-falco")]
     {
         registry.register(
@@ -257,7 +256,7 @@ mod tests {
             2 + 4 * usize::from(cfg!(feature = "mapping-entra"))
                 + 2 * usize::from(cfg!(feature = "mapping-gcp-audit"))
                 + 2 * usize::from(cfg!(feature = "mapping-falco"))
-                + usize::from(cfg!(feature = "mapping-kubernetes"))
+                + 3 * usize::from(cfg!(feature = "mapping-kubernetes"))
                 + usize::from(cfg!(feature = "mapping-cloudtrail"))
                 + usize::from(cfg!(feature = "mapping-syslog"))
                 + 6 * usize::from(cfg!(feature = "mapping-linux"))
