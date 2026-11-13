@@ -18,9 +18,12 @@ struct PreparedInvestigation {
     findings: String,
     prior_summary: Option<String>,
     history: Vec<CompletionMessage>,
+    budget: crate::CaseBudgetLimits,
 }
 
 struct TurnContext {
+    cloud_limit_reached: bool,
+    budget: crate::CaseBudgetLimits,
     messages: Vec<CompletionMessage>,
     catalog: Vec<crate::tool_catalog::ToolSpec>,
     nonce: uuid::Uuid,
@@ -130,8 +133,12 @@ impl Engine<'_> {
             .await?;
         let (case, mut turn) = self.make_turn(prepared);
         self.initialize_turn_skills(&case, &mut turn, alert).await?;
-        self.compact_history_if_needed(&case.id, model, &mut turn, cancel)
-            .await?;
+        if let Some(answer) = self
+            .compact_or_finish_budget(&case.id, model, &mut turn, cancel)
+            .await?
+        {
+            return Ok(answer);
+        }
         let limit = self.policy.max_model_rounds_per_turn;
         for number in 1..=limit {
             if let Some(reply) = self
@@ -162,6 +169,7 @@ impl Engine<'_> {
             findings,
             prior_summary,
             history,
+            budget,
         } = prepared;
         let nonce = uuid::Uuid::new_v4();
         let case_context = format!(
@@ -194,6 +202,8 @@ impl Engine<'_> {
             self.available_tools()
         };
         let turn = TurnContext {
+            cloud_limit_reached: false,
+            budget,
             messages,
             catalog,
             nonce,
@@ -230,11 +240,11 @@ impl Engine<'_> {
             messages: turn.messages.clone(),
             tools: turn.catalog.clone(),
             max_output_tokens: 2048,
-            remaining_case_tokens: self
-                .policy
-                .max_model_tokens_per_case
+            remaining_case_tokens: turn
+                .budget
+                .model_tokens
                 .saturating_sub(used_tokens)
-                .saturating_sub(512.min(self.policy.max_model_tokens_per_case / 4)),
+                .saturating_sub(512.min(turn.budget.model_tokens / 4)),
         };
         if request.remaining_case_tokens == 0 {
             return self
@@ -251,6 +261,28 @@ impl Engine<'_> {
                 on_text(ModelProgress::TextDelta(text.to_owned()));
             })
             .await?;
+        let (answer, quota_exhausted) = self
+            .record_round_response(id, (answer, usage), used_tokens, turn.budget.model_tokens)
+            .await?;
+        self.handle_round_response(
+            case,
+            model,
+            turn,
+            (answer, quota_exhausted),
+            cancel,
+            on_text,
+        )
+        .await
+    }
+
+    async fn record_round_response(
+        &self,
+        id: &CaseId,
+        response: (ModelResponse, Option<crate::ModelUsage>),
+        used_tokens: u64,
+        token_limit: u64,
+    ) -> Result<(ModelResponse, bool), AppError> {
+        let (answer, usage) = response;
         self.audit_local(
             id,
             crate::AuditOrigin::Model,
@@ -263,18 +295,11 @@ impl Engine<'_> {
             used_tokens
                 .saturating_add(usage.input_tokens)
                 .saturating_add(usage.output_tokens)
-                >= self.policy.max_model_tokens_per_case
+                >= token_limit
         });
-        self.record_model_usage(id, usage, used_tokens).await?;
-        self.handle_round_response(
-            case,
-            model,
-            turn,
-            (answer, quota_exhausted),
-            cancel,
-            on_text,
-        )
-        .await
+        self.record_model_usage(id, usage, used_tokens, token_limit)
+            .await?;
+        Ok((answer, quota_exhausted))
     }
 
     async fn handle_round_response(
@@ -289,7 +314,10 @@ impl Engine<'_> {
         let id = &case.id;
         let (answer, quota_exhausted) = response;
         if quota_exhausted {
-            return self.finish_answer(id, &format!("{}\n\nModel token limit reached. Use /continue after increasing the case budget.", answer.text)).await.map(Some);
+            return self
+                .finish_token_exhaustion(id, &answer.text)
+                .await
+                .map(Some);
         }
         if answer.truncated {
             return self.finish_answer(id, &format!("{}\n\nResponse cut off by the provider's output limit. Use /continue to continue.", answer.text)).await.map(Some);
@@ -321,7 +349,20 @@ impl Engine<'_> {
         let completed = self
             .blocking_local(move |local| local.completed_calls_unlocked(&id_owned))
             .await?;
-        if completed >= self.policy.max_tool_calls_per_case {
+        if turn.cloud_limit_reached {
+            return self
+                .finish_limited_turn(
+                    id,
+                    model,
+                    turn,
+                    "case cloud transfer limit",
+                    cancel,
+                    on_text,
+                )
+                .await
+                .map(Some);
+        }
+        if completed as u64 >= turn.budget.tool_calls {
             return self
                 .finish_limited_turn(id, model, turn, "case tool call limit", cancel, on_text)
                 .await
@@ -360,7 +401,9 @@ impl Engine<'_> {
                     .next()
                     .map_or("", String::as_str)
             )));
-            let result = if call.proposal().tool == crate::Tool::SkillRead {
+            let result = if turn.cloud_limit_reached {
+                "denied: turn stopped at the case cloud transfer limit; review /budget".into()
+            } else if call.proposal().tool == crate::Tool::SkillRead {
                 self.read_turn_skill(case, turn, &call).await?
             } else if !self
                 .skill_call_declared(case, turn, call.proposal())
@@ -370,9 +413,17 @@ impl Engine<'_> {
             } else if let Some(previous) = turn.previous.get(&key) {
                 format!("Repeated call; cached result: {previous}")
             } else {
-                let result = self
+                let result = match self
                     .execute_proposal(case, call.proposal().clone(), cancel)
-                    .await?;
+                    .await
+                {
+                    Ok(result) => result,
+                    Err(error @ AppError::CloudTransferLimit { .. }) => {
+                        turn.cloud_limit_reached = true;
+                        error.to_string()
+                    }
+                    Err(error) => return Err(error),
+                };
                 turn.previous.insert(key, result.clone());
                 result
             };

@@ -53,9 +53,12 @@ impl Engine<'_> {
             .and_then(|value| value.parse::<u64>().ok())
             .ok_or(AppError::RemoteTool)?;
         let uri = object_uri(call)?;
-        let limit = self.policy.max_object_bytes_per_case;
         self.blocking_local(move |local| {
             local.verify_ingest_checkpoint(&id, &CancellationToken::new())?;
+            let limit = local
+                .case_budget_unlocked(&id)?
+                .require_effective()?
+                .cloud_bytes;
             let entries = local.audit_log.entries(&id)?;
             crate::large_case::read_manifest_index(&entries)?;
             let _ = require_signed_listing(&local, &id, &entries, &args, &uri, requested)?;
@@ -75,7 +78,11 @@ impl Engine<'_> {
                 .checked_add(requested)
                 .is_none_or(|total| total > limit)
             {
-                return Err(AppError::Policy("object transfer budget exceeded".into()));
+                return Err(AppError::CloudTransferLimit {
+                    used,
+                    requested,
+                    limit,
+                });
             }
             serde_json::to_string(&ObjectReservation {
                 version: 1,

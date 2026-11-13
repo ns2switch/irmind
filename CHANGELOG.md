@@ -4,6 +4,22 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+### Case allocations
+
+- Add signed defaults for new cases in `/settings limits` and signed per-case
+  token, tool-call and reserved cloud-byte allocations in `/budget`. Organization
+  ceilings remain mandatory; increases need explicit Analyst confirmation.
+- Use 2,000,000 tokens and 1,000 calls by default, retaining all fixed maxima and
+  existing cloud-transfer controls. Existing policy files are not rewritten.
+- Show consumption and 80% warnings, and retain completed work with a tool-free
+  or local summary when an allocation is exhausted. Missing provider usage is
+  labeled unavailable; costs are shown only when supported by usage/pricing.
+- Format impact: case creation records include the initial allocation and later
+  changes use `CaseBudgetChanged` receipts. Existing signed-entry and export V7
+  framing are unchanged. Cases without a recorded allocation require explicit signed confirmation in
+  `/budget` before new model/tool work; recorded consumption is retained.
+
+
 ## 0.4.1 — Expanded forensic skill catalog
 
 **Format impact: none.** Case, export V7, skill package and definition formats

@@ -153,6 +153,14 @@ fn fields(config: &PersistentConfig) -> BTreeMap<String, String> {
     if let Some(value) = config.max_parallel_workers {
         out.insert("max_parallel_workers".into(), value.to_string());
     }
+    let limits = config.case_budget_defaults.unwrap_or_default();
+    for (field, value) in [
+        ("model_tokens", limits.model_tokens),
+        ("tool_calls", limits.tool_calls),
+        ("cloud_bytes", limits.cloud_bytes),
+    ] {
+        out.insert(format!("case_budget_defaults.{field}"), value.to_string());
+    }
     for (id, settings) in &config.modules {
         out.insert(
             format!("modules.{id}.enabled"),
@@ -301,6 +309,13 @@ impl Engine<'_> {
         let _lock = self.audit_log.lock_global_operations()?;
         self.verify_configuration(store, manifests)?;
         let current = store.load()?;
+        if let ConfigChange::SetCaseBudgetDefaults(limits) = &change
+            && !limits.within(crate::CaseBudgetLimits::from_policy(&self.policy))
+        {
+            return Err(AppError::Policy(
+                "new-case defaults exceed the organization ceiling".into(),
+            ));
+        }
         let next = current.changed(change, manifests)?;
         if current == next {
             return Ok(false);

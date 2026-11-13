@@ -153,6 +153,8 @@ pub enum FixedAppError {
     PolicyMissingValue,
     #[error("policy denied: model cost overflow")]
     PolicyModelCostOverflow,
+    #[error("remaining model allocation cannot cover history compaction; review /budget")]
+    PolicyModelBudgetCannotCompact,
     #[error("policy denied: model proposed an unadvertised tool")]
     PolicyModelProposedUnadvertisedTool,
     #[error("policy denied: model token count overflow")]

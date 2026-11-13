@@ -77,7 +77,8 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if self.parser_command(&prompt) {
             return Ok(self.parser_exit_requested());
         }
-        if !(self.long_command(&prompt)?
+        if !(self.budget_command(&prompt)
+            || self.long_command(&prompt)?
             || self.case_command(&prompt)?
             || self.graph_command(&prompt)
             || self.objects_command(&prompt)
@@ -89,6 +90,40 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             self.investigate_prompt(prompt);
         }
         Ok(false)
+    }
+
+    fn budget_command(&mut self, prompt: &str) -> bool {
+        if prompt.starts_with("/budget ") {
+            self.state.messages.push(
+                "Use /budget and edit the visible fields; values are not command arguments.".into(),
+            );
+            return true;
+        }
+        if prompt == "/budget" {
+            match self.engine.case_budget(self.id) {
+                Ok(status) => {
+                    if self.state.case.sealed {
+                        let allocation = status.allocated.map_or_else(
+                            || "No signed allocation".to_owned(),
+                            |limits| {
+                                format!(
+                                    "{} tokens · {} calls · {} cloud bytes",
+                                    limits.model_tokens, limits.tool_calls, limits.cloud_bytes
+                                )
+                            },
+                        );
+                        self.state.messages.push(format!("Sealed case · limits are read-only.\n{allocation}\nRecorded token subtotal {} · calls {} · reserved cloud bytes {}", status.usage.model_tokens, status.usage.tool_calls, status.usage.cloud_bytes));
+                    } else {
+                        self.state.budget.editor =
+                            Some(crate::budgets::BudgetEditor::for_case(status));
+                    }
+                }
+                Err(error) => self.state.messages.push(error.to_string()),
+            }
+            self.state.overlay_scroll = 0;
+            return true;
+        }
+        false
     }
 
     fn session_command(&mut self, prompt: &str) -> bool {

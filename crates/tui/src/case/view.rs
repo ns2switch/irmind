@@ -30,7 +30,7 @@ pub(crate) struct CaseFrame<'a> {
     pub overlay_scroll: u16,
     pub new_content: bool,
     pub model: &'a str,
-    pub tokens: u64,
+    pub tokens: Option<u64>,
     pub cost: &'a str,
     pub pending: usize,
     pub detections: usize,
@@ -261,7 +261,10 @@ fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
     } else {
         view.title.to_owned()
     };
-    let mut label = format!("{title} · {} · {} tok", view.model, view.tokens);
+    let tokens = view
+        .tokens
+        .map_or_else(|| "tokens unavailable".to_owned(), |n| format!("{n} tok"));
+    let mut label = format!("{title} · {} · {tokens}", view.model);
     if !view.cost.is_empty() && !matches!(view.cost, "n/a" | "cost n/a") {
         label.push_str(" · ");
         label.push_str(view.cost);

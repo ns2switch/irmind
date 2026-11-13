@@ -26,6 +26,12 @@ pub(super) fn home_items(
         Mode::Model => model_items(state, &escaped)?,
         Mode::Modules => module_items(state, modules, &escaped)?,
         Mode::Config => preference_items(state, modules),
+        Mode::Limits => state
+            .budget_editor
+            .text()
+            .lines()
+            .map(|s| ListItem::new(s.to_owned()))
+            .collect(),
         Mode::Keystore => keystore_items(state),
         Mode::VerifyExport => ["Package path", "Expected analyst key fingerprint"]
             .iter()
@@ -124,7 +130,7 @@ fn section_status(
             ),
             state.keystore.is_none(),
         ),
-        SettingsSection::Preferences => (String::new(), false),
+        SettingsSection::Preferences | SettingsSection::Limits => (String::new(), false),
     }
 }
 
@@ -327,6 +333,10 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
         irmind_app::ConfigChange::SetShowHints(enabled) => format!("context hints={enabled}"),
         irmind_app::ConfigChange::SetMouseCapture(enabled) => format!("mouse capture={enabled}"),
         irmind_app::ConfigChange::SetTheme(theme) => format!("theme={theme}"),
+        irmind_app::ConfigChange::SetCaseBudgetDefaults(limits) => format!(
+            "new-case limits: {} tokens, {} calls, {} cloud bytes",
+            limits.model_tokens, limits.tool_calls, limits.cloud_bytes
+        ),
         irmind_app::ConfigChange::SetMaxParallelWorkers(limit) => {
             format!("maximum parallel workers={}", worker_limit_label(*limit))
         }

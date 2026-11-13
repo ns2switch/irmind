@@ -14,6 +14,10 @@ impl CaseRuntime<'_, '_, '_> {
         {
             return;
         }
+        if let Some(editor) = self.state.budget.editor.as_mut() {
+            editor.paste(value);
+            return;
+        }
         if let Some(prompt) = self.state.time_prompt.as_mut() {
             prompt.paste(value);
             return;
@@ -316,6 +320,12 @@ impl CaseRuntime<'_, '_, '_> {
             );
             return Ok(false);
         }
+        if shortcut == Some("palette") {
+            self.state.budget.editor = None;
+        }
+        if self.handle_budget_key(code, modifiers) {
+            return Ok(false);
+        }
         if self.state.time_prompt.is_some() {
             self.handle_time_prompt_key(code, modifiers)?;
             return Ok(false);
@@ -450,6 +460,53 @@ impl CaseRuntime<'_, '_, '_> {
                 self.submit(prompt)
             }
         }
+    }
+
+    fn handle_budget_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> bool {
+        if self.state.budget.editor.is_some() && matches!(code, KeyCode::PageUp | KeyCode::PageDown)
+        {
+            self.state.overlay_scroll = self
+                .state
+                .overlay_scroll
+                .saturating_add_signed(if code == KeyCode::PageUp { -5 } else { 5 });
+            return true;
+        }
+        if let Some(mut editor) = self.state.budget.editor.take() {
+            if modifiers.contains(KeyModifiers::CONTROL) && code == KeyCode::Char('u') {
+                editor.clear();
+                self.state.budget.editor = Some(editor);
+                return true;
+            }
+            if modifiers.contains(KeyModifiers::CONTROL) {
+                self.state.budget.editor = Some(editor);
+                return true;
+            }
+            match editor.update(code) {
+                crate::budgets::BudgetAction::Keep => self.state.budget.editor = Some(editor),
+                crate::budgets::BudgetAction::Cancel => {}
+                crate::budgets::BudgetAction::Save(limits) => {
+                    match self.engine.change_case_budget(self.id, limits, true) {
+                        Ok(changed) => {
+                            self.state.messages.push(
+                                if changed {
+                                    "Case allocation signed; existing consumption is unchanged."
+                                } else {
+                                    "Case allocation unchanged."
+                                }
+                                .into(),
+                            );
+                            self.state.needs_refresh = changed;
+                        }
+                        Err(error) => {
+                            editor.error = error.to_string();
+                            self.state.budget.editor = Some(editor);
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+        false
     }
 
     pub(super) fn handle_overlay_key(&mut self, code: KeyCode) -> Result<Option<KeyCode>> {

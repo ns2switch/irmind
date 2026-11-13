@@ -10,6 +10,7 @@ pub enum AuditEventKind {
     BudgetExceeded,
     Cancelled,
     CaseCreated,
+    CaseBudgetChanged,
     CaseScopeChanged,
     CaseSealed,
     Denied,
@@ -52,7 +53,7 @@ pub enum AuditEventKind {
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 46] = [
+    pub const ALL: [Self; 47] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -60,6 +61,7 @@ impl AuditEventKind {
         Self::BudgetExceeded,
         Self::Cancelled,
         Self::CaseCreated,
+        Self::CaseBudgetChanged,
         Self::CaseScopeChanged,
         Self::CaseSealed,
         Self::Denied,
@@ -110,6 +112,7 @@ impl AuditEventKind {
             Self::BudgetExceeded => "BudgetExceeded",
             Self::Cancelled => "Cancelled",
             Self::CaseCreated => "CaseCreated",
+            Self::CaseBudgetChanged => "CaseBudgetChanged",
             Self::CaseScopeChanged => "CaseScopeChanged",
             Self::CaseSealed => "CaseSealed",
             Self::Denied => "Denied",
@@ -196,7 +199,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 46] = [
+        const EXPECTED: [&str; 47] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -204,6 +207,7 @@ mod tests {
             "BudgetExceeded",
             "Cancelled",
             "CaseCreated",
+            "CaseBudgetChanged",
             "CaseScopeChanged",
             "CaseSealed",
             "Denied",

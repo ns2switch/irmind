@@ -3,6 +3,7 @@
 mod parsers;
 mod skills;
 
+mod budgets;
 mod case;
 mod demo_choice;
 mod home;

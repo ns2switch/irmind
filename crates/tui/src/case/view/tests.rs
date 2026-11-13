@@ -39,7 +39,7 @@ fn narrow_terminal_keeps_prompt_and_new_content_indicator() {
         overlay_scroll: 0,
         new_content: true,
         model: "fake",
-        tokens: 12,
+        tokens: Some(12),
         cost: "$0",
         pending: 1,
         detections: 1,
@@ -88,7 +88,7 @@ fn presentation_panel_is_large_below_the_thread_and_small_terminals_are_explicit
         overlay_scroll: 0,
         new_content: false,
         model: "scripted demo model",
-        tokens: 0,
+        tokens: Some(0),
         cost: "",
         pending: 0,
         detections: 0,
@@ -138,7 +138,7 @@ fn expanded_card_and_scrolled_sidebar_are_visible_in_test_backend() {
         overlay_scroll: 0,
         new_content: false,
         model: "fake",
-        tokens: 0,
+        tokens: Some(0),
         cost: "n/a",
         pending: 0,
         detections: 0,
@@ -189,7 +189,7 @@ fn cloud_listing_and_transfer_confirmation_fit_in_a_narrow_terminal() {
         overlay_scroll: 0,
         new_content: false,
         model: "no model",
-        tokens: 0,
+        tokens: Some(0),
         cost: "",
         pending: 0,
         detections: 0,
@@ -220,7 +220,7 @@ fn visual_frame<'a>(lines: &'a [Line<'static>]) -> CaseFrame<'a> {
         overlay_scroll: 0,
         new_content: false,
         model: "no model",
-        tokens: 0,
+        tokens: Some(0),
         cost: "$0",
         pending: 0,
         detections: 0,
@@ -251,7 +251,7 @@ fn visual_states_have_versioned_terminal_snapshots() {
     let lines1 = chat.visible_lines();
     view.visible_lines = Some(&lines1);
     view.model = "synthetic-model";
-    view.tokens = 18;
+    view.tokens = Some(18);
     draw_case(&mut terminal, &view).unwrap();
     insta::assert_snapshot!("streaming", screen(&terminal));
 
@@ -333,7 +333,7 @@ fn consecutive_model_rounds_have_separate_messages() {
             overlay_scroll: 0,
             new_content: false,
             model: "synthetic-model",
-            tokens: 42,
+            tokens: Some(42),
             cost: "",
             pending: 0,
             detections: 0,
@@ -368,7 +368,7 @@ fn full_instance_scope_stays_visible_with_long_model_and_overlay_at_eighty_colum
         overlay_scroll: 0,
         new_content: true,
         model: "synthetic-model-with-a-very-long-display-name",
-        tokens: 12345,
+        tokens: Some(12345),
         cost: "n/a",
         pending: 2,
         detections: 3,
@@ -388,4 +388,16 @@ fn full_instance_scope_stays_visible_with_long_model_and_overlay_at_eighty_colum
             .unwrap()
             .starts_with("FULL INSTANCE SCOPE")
     );
+}
+
+#[test]
+fn absent_provider_usage_is_not_rendered_as_measured_zero_tokens() {
+    let lines = [];
+    let mut view = visual_frame(&lines);
+    view.tokens = None;
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    draw_case(&mut terminal, &view).unwrap();
+    let shown = screen(&terminal);
+    assert!(shown.contains("tokens unavailable"));
+    assert!(!shown.contains("0 tok"));
 }

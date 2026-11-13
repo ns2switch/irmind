@@ -5,6 +5,13 @@ use crate::{
     sha256,
 };
 
+type SignedResolution = (
+    irmind_domain::AuditEventKind,
+    Vec<u8>,
+    Option<String>,
+    Option<AuthorizedCall>,
+);
+
 impl Engine<'_> {
     pub fn edit_approval(
         &self,
@@ -30,8 +37,8 @@ impl Engine<'_> {
             tool: request.tool.clone(),
             args: new_args,
         };
-        self.policy
-            .permits(&proposal.tool, 0)
+        self.policy_for_case_unlocked(id)?
+            .permits(&proposal.tool, self.completed_calls_unlocked(id)?)
             .map_err(|reason| AppError::Policy(reason.into()))?;
         let last = self
             .audit_log
@@ -131,7 +138,7 @@ impl Engine<'_> {
                 crate::FixedAppError::PolicyPendingApprovalNotFound,
             ))?;
         if denial.is_none() {
-            self.policy
+            self.policy_for_case_unlocked(id)?
                 .permits(&request.tool, self.completed_calls_unlocked(id)?)
                 .map_err(|reason| AppError::Policy(reason.into()))?;
             self.audit(
@@ -152,8 +159,32 @@ impl Engine<'_> {
         .map_err(|_| {
             AppError::Fixed(crate::FixedAppError::PolicyStoredApprovalChallengeIsInvalid)
         })?;
+        let (kind, signature, reason, authorized) =
+            self.sign_pending_resolution(pending, denial)?;
+        let event = ApprovalEvent {
+            version: 1,
+            id: request.id.clone(),
+            signature: hex(&signature),
+            reason,
+            executed: false,
+        };
+        self.audit(
+            id,
+            crate::AuditOrigin::Analyst,
+            kind,
+            &serde_json::to_string(&event).map_err(|e| AppError::Storage(e.to_string()))?,
+            None,
+        )?;
+        Ok(authorized)
+    }
+
+    fn sign_pending_resolution(
+        &self,
+        pending: PendingApproval,
+        denial: Option<&str>,
+    ) -> Result<SignedResolution, AppError> {
         let verifier = AnalystVerifierAdapter(self.verifier.as_ref());
-        let (kind, signature, reason, authorized) = if let Some(reason) = denial {
+        let result = if let Some(reason) = denial {
             let signature = self.signer.sign(&pending.rejection_challenge())?;
             pending.reject(&signature, &verifier).map_err(|_| {
                 AppError::Fixed(crate::FixedAppError::SignatureAnalystDenialSignatureIsInvalid)
@@ -180,21 +211,7 @@ impl Engine<'_> {
                 Some(authorized),
             )
         };
-        let event = ApprovalEvent {
-            version: 1,
-            id: request.id.clone(),
-            signature: hex(&signature),
-            reason,
-            executed: false,
-        };
-        self.audit(
-            id,
-            crate::AuditOrigin::Analyst,
-            kind,
-            &serde_json::to_string(&event).map_err(|e| AppError::Storage(e.to_string()))?,
-            None,
-        )?;
-        Ok(authorized)
+        Ok(result)
     }
 
     pub(crate) async fn resolve_approval(

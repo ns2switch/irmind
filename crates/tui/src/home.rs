@@ -46,6 +46,7 @@ pub(crate) enum Mode {
     Model,
     Modules,
     Config,
+    Limits,
     Keystore,
     Setup,
     Help,
@@ -58,14 +59,16 @@ pub(crate) enum SettingsSection {
     Connectors,
     Keystore,
     Preferences,
+    Limits,
 }
 
 impl SettingsSection {
-    const ALL: [Self; 4] = [
+    const ALL: [Self; 5] = [
         Self::Model,
         Self::Connectors,
         Self::Keystore,
         Self::Preferences,
+        Self::Limits,
     ];
 
     fn mode(self) -> Mode {
@@ -74,6 +77,7 @@ impl SettingsSection {
             Self::Connectors => Mode::Modules,
             Self::Keystore => Mode::Keystore,
             Self::Preferences => Mode::Config,
+            Self::Limits => Mode::Limits,
         }
     }
 
@@ -83,6 +87,7 @@ impl SettingsSection {
             Self::Connectors => "Connectors",
             Self::Keystore => "Keystore and credentials",
             Self::Preferences => "Preferences",
+            Self::Limits => "Limits",
         }
     }
 
@@ -92,6 +97,7 @@ impl SettingsSection {
             "connectors" | "modules" => Some(Self::Connectors),
             "keystore" | "credentials" => Some(Self::Keystore),
             "preferences" | "config" => Some(Self::Preferences),
+            "limits" => Some(Self::Limits),
             _ => None,
         }
     }
@@ -141,6 +147,7 @@ pub(crate) struct HomeState {
     preference_selected: usize,
     max_parallel_workers: Option<u16>,
     worker_limit_input: Option<String>,
+    budget_editor: crate::budgets::BudgetEditor,
     ui_selection: UiSelection,
     theme_choice: String,
     form: [String; 9],
@@ -202,6 +209,11 @@ impl HomeState {
             preference_selected: 0,
             max_parallel_workers: None,
             worker_limit_input: None,
+            budget_editor: crate::budgets::BudgetEditor::new(
+                irmind_app::CaseBudgetLimits::default(),
+                irmind_app::CaseBudgetLimits::default(),
+                None,
+            ),
             ui_selection: UiSelection {
                 mouse_capture: true,
                 keystore_action_focus: false,
@@ -453,6 +465,11 @@ fn prepare_home_state(
         launch.new_analyst_key || engine.repo.list_cases()?.is_empty(),
     );
     state.set_modules(modules);
+    state.budget_editor = crate::budgets::BudgetEditor::new(
+        engine.new_case_budget_limits(),
+        irmind_app::CaseBudgetLimits::from_policy(&engine.policy),
+        None,
+    );
     if let Some(catalog) = io_ops.parser_catalog() {
         state.parsers = catalog.available();
     }

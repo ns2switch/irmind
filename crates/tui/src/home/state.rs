@@ -85,6 +85,16 @@ pub(crate) fn update(state: &mut HomeState, key: KeyCode) -> HomeAction {
         Mode::VerifyExport => update_verify_export(state, key),
         Mode::Modules => modules::update_module_screen(state, key),
         Mode::Config => update_config(state, key),
+        Mode::Limits => match state.budget_editor.update(key) {
+            crate::budgets::BudgetAction::Keep => HomeAction::None,
+            crate::budgets::BudgetAction::Cancel => {
+                state.mode = Mode::Settings;
+                HomeAction::None
+            }
+            crate::budgets::BudgetAction::Save(limits) => {
+                HomeAction::ChangeModule(ConfigChange::SetCaseBudgetDefaults(limits), true)
+            }
+        },
         Mode::Setup => update_setup(state, key),
         Mode::Help => update_help(state, key),
         Mode::Keystore => update_keystore(state, key),
@@ -123,6 +133,7 @@ pub(crate) fn clear_active_field(state: &mut HomeState) {
                 input.clear();
             }
         }
+        Mode::Limits => state.budget_editor.clear(),
         Mode::List => state.input.clear(),
         _ => {}
     }
@@ -212,7 +223,7 @@ fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
             .collect();
     }
     if let Some(query) = source.strip_prefix("/settings ") {
-        return ["model", "connectors", "keystore", "preferences"]
+        return ["model", "connectors", "keystore", "preferences", "limits"]
             .into_iter()
             .filter(|value| value.starts_with(&query.to_ascii_lowercase()))
             .map(|value| format!("/settings {value}"))
@@ -304,7 +315,7 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
         }
         value if value.starts_with("/settings ") => {
             let Some(section) = SettingsSection::parse(value[10..].trim()) else {
-                state.notice = "Choose model, connectors, keystore, or preferences".into();
+                state.notice = "Choose model, connectors, keystore, preferences, or limits".into();
                 return HomeAction::None;
             };
             return open_settings_section(state, section);

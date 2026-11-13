@@ -20,6 +20,44 @@ pub(super) fn context_bytes(messages: &[CompletionMessage]) -> usize {
 }
 
 impl Engine<'_> {
+    pub(super) async fn compact_or_finish_budget(
+        &self,
+        id: &CaseId,
+        model: &dyn LlmPort,
+        turn: &mut TurnContext,
+        cancel: &CancellationToken,
+    ) -> Result<Option<String>, AppError> {
+        match self
+            .compact_history_if_needed(id, model, turn, cancel)
+            .await
+        {
+            Ok(()) => Ok(None),
+            Err(AppError::Fixed(crate::FixedAppError::PolicyModelBudgetCannotCompact)) => {
+                self.audit_local(
+                    id,
+                    AuditOrigin::Policy,
+                    AuditEventKind::BudgetExceeded,
+                    "remaining model budget cannot cover history compaction",
+                    None,
+                )
+                .await?;
+                let summary = self.completed_work_summary(id).await?;
+                let owned = id.clone();
+                let notice = self
+                    .blocking_local(move |local| {
+                        Ok(local
+                            .case_budget_unlocked(&owned)?
+                            .notice("remaining model budget cannot cover history compaction"))
+                    })
+                    .await?;
+                self.finish_answer(id, &format!("{summary}\n\n{notice}"))
+                    .await
+                    .map(Some)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     pub(super) async fn compact_history_if_needed(
         &self,
         id: &CaseId,
@@ -104,10 +142,19 @@ impl Engine<'_> {
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
         let used = self.used_model_tokens(id).await?;
-        let remaining = self.policy.max_model_tokens_per_case.saturating_sub(used);
+        let owned = id.clone();
+        let token_limit = self
+            .blocking_local(move |local| {
+                Ok(local
+                    .case_budget_unlocked(&owned)?
+                    .require_effective()?
+                    .model_tokens)
+            })
+            .await?;
+        let remaining = token_limit.saturating_sub(used);
         if remaining <= 512 {
-            return Err(AppError::Model(
-                "model budget is too small to compact history".into(),
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyModelBudgetCannotCompact,
             ));
         }
         let content = format!(
@@ -146,7 +193,8 @@ impl Engine<'_> {
             None,
         )
         .await?;
-        self.record_model_usage(id, usage, used).await?;
+        self.record_model_usage(id, usage, used, token_limit)
+            .await?;
         let screened = self
             .screen_and_audit_local(
                 id,

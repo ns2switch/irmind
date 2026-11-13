@@ -1,6 +1,8 @@
 use crate::*;
 
 mod audit;
+mod budgets;
+pub use budgets::budget_status;
 mod cases;
 mod investigation;
 mod model_request;
@@ -13,6 +15,8 @@ struct CaseCreatedEvent {
     #[serde(default)]
     severity: Option<String>,
     scope: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget: Option<crate::CaseBudgetLimits>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -44,6 +48,7 @@ pub fn verify_case_metadata(
     if created.title != title || created.severity.as_deref() != Some(severity.as_str()) {
         return Err(AppError::InvalidChain(first.seq));
     }
+    budgets::budget_status(entries, &PolicyRules::default())?;
     let mut current = created.scope;
     CaseScope::parse(&current).map_err(|_| AppError::InvalidChain(first.seq))?;
     for entry in entries.iter().skip(1) {
@@ -85,6 +90,7 @@ pub struct Engine<'a> {
     pub clock: Arc<dyn Clock>,
     pub mode: ExecutionMode,
     pub policy: PolicyRules,
+    pub(crate) case_budget_defaults: Option<crate::CaseBudgetLimits>,
     pub(crate) policy_fingerprint: String,
     pub(crate) module_fingerprint: String,
     pub(crate) source_scopes: BTreeMap<String, crate::SiemSourceScope>,
@@ -163,6 +169,7 @@ impl<'a> Engine<'a> {
             clock: Arc::clone(&self.clock),
             mode: self.mode,
             policy: self.policy.clone(),
+            case_budget_defaults: self.case_budget_defaults,
             policy_fingerprint: self.policy_fingerprint.clone(),
             module_fingerprint: self.module_fingerprint.clone(),
             source_scopes: self.source_scopes.clone(),

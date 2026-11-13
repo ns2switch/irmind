@@ -21,13 +21,34 @@ impl Engine<'_> {
         id: &CaseId,
         usage: Option<ModelUsage>,
         used_tokens: u64,
+        token_limit: u64,
     ) -> Result<(), AppError> {
         if let Some(usage) = usage {
+            usage
+                .input_tokens
+                .checked_add(usage.output_tokens)
+                .and_then(|n| n.checked_add(used_tokens))
+                .ok_or(AppError::Fixed(
+                    crate::FixedAppError::PolicyModelTokenCountOverflow,
+                ))?;
             let event = UsageEvent {
                 input_tokens: usage.input_tokens,
                 output_tokens: usage.output_tokens,
                 estimated_cost_microusd: self.usage_cost(usage)?,
             };
+            if let Some(cost) = event.estimated_cost_microusd {
+                let owned = id.clone();
+                let previous = self
+                    .blocking_local(move |local| {
+                        Ok(summarize_usage(&local.audit_log.entries(&owned)?)?
+                            .estimated_cost_microusd
+                            .unwrap_or(0))
+                    })
+                    .await?;
+                previous.checked_add(cost).ok_or(AppError::Fixed(
+                    crate::FixedAppError::PolicyModelCostOverflow,
+                ))?;
+            }
             self.audit_local(
                 id,
                 crate::AuditOrigin::System,
@@ -40,7 +61,7 @@ impl Engine<'_> {
             if used_tokens
                 .saturating_add(usage.input_tokens)
                 .saturating_add(usage.output_tokens)
-                > self.policy.max_model_tokens_per_case
+                > token_limit
             {
                 self.audit_local(
                     id,

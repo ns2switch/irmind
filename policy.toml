@@ -1,9 +1,9 @@
 # Versioned example. Pass with --policy policy.toml (or IRMIND_POLICY).
 version = 1
-max_tool_calls_per_case = 100
+max_tool_calls_per_case = 1000
 max_model_rounds_per_turn = 25
 max_model_result_bytes = 10000
-max_model_tokens_per_case = 200000
+max_model_tokens_per_case = 2000000
 max_object_read_bytes = 1073741824
 max_object_bytes_per_case = 536870912000
 object_transfer_approval_bytes = 67108864

@@ -373,7 +373,8 @@ impl WorkspaceIo for RootWorkspaceIo {
             | ConfigChange::SetShowHints(_)
             | ConfigChange::SetMouseCapture(_)
             | ConfigChange::SetTheme(_)
-            | ConfigChange::SetMaxParallelWorkers(_) => false,
+            | ConfigChange::SetMaxParallelWorkers(_)
+            | ConfigChange::SetCaseBudgetDefaults(_) => false,
             ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
             ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
             ConfigChange::SetValue { module, field, .. } => {

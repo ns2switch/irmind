@@ -35,10 +35,10 @@ impl Default for PolicyRules {
         Self {
             denied_tools: Vec::new(),
             scope: None,
-            max_tool_calls_per_case: 100,
+            max_tool_calls_per_case: 1_000,
             max_model_rounds_per_turn: 25,
             max_model_result_bytes: 10_000,
-            max_model_tokens_per_case: 200_000,
+            max_model_tokens_per_case: 2_000_000,
             max_object_read_bytes: 1_073_741_824,
             max_object_bytes_per_case: 536_870_912_000,
             object_transfer_approval_bytes: 67_108_864,

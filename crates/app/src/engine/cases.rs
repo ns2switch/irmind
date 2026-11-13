@@ -45,7 +45,8 @@ impl<'a> Engine<'a> {
             clock,
             mode,
             policy: PolicyRules::default(),
-            policy_fingerprint: "builtin-v1".into(),
+            case_budget_defaults: None,
+            policy_fingerprint: "builtin-v2".into(),
             module_fingerprint: "none".into(),
             source_scopes: crate::BTreeMap::new(),
             skills: None,
@@ -143,6 +144,7 @@ impl<'a> Engine<'a> {
                 title: title.to_owned(),
                 severity: Some(severity.as_str().to_owned()),
                 scope: scope.to_owned(),
+                budget: Some(self.new_case_budget_limits()),
             })
             .map_err(|error| AppError::Storage(error.to_string()))?,
             None,
