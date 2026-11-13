@@ -343,3 +343,15 @@ se pueden usar sin inventar una identidad de clúster. Se configura la identidad
 de la colección, no un permiso para contactar con el clúster. Consulta la
 [cobertura](parsers.md#interpretación-de-kubernetes-y-falco). Esta incorporación
 nativa no cubre aún las envolturas de exportación de los proveedores gestionados.
+
+## GCP Cloud Audit y GKE
+
+El módulo local experimental `parser-gcp-audit` se compila por defecto con
+`mapping-gcp-audit` y `mapping-gke-audit`. No requiere credenciales ni conexión
+remota. Conserva campos originales e instantes UTC con nanosegundos de Admin
+Activity, Data Access y la API de GKE. Las tablas de servicio y estado aportan
+categorías, resultados y roles para los casos cubiertos. Un servicio desconocido
+o la falta de identidad siguen siendo carencias de cobertura. Las etiquetas de
+GKE necesitan confirmación explícita del clúster. Consulta los
+[formatos y ejemplos de exportación](parsers.md#cloud-audit-logs-de-gcp-y-gke)
+y el [contrato del mapeo](../development/gcp-audit-mapping.md).

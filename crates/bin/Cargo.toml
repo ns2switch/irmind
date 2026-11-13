@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "parser-gcp-audit", "mapping-gcp-audit",
     "mapping-falco", "mapping-kubernetes", "mapping-json-compat", "mapping-journald-compat", "mapping-cloudtrail", "mapping-linux", "mapping-ecs", "mapping-evtx", "mapping-dfir", "mapping-syslog", "mapping-network", "mapping-ocsf",
     "keystore-os", "keystore-file",
     "parser-json", "parser-syslog", "parser-linux", "parser-evtx",
@@ -17,6 +18,8 @@ default = [
     "siem-splunk", "siem-elastic", "siem-chronicle", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
     "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
 ]
+mapping-gcp-audit = ["dep:irmind-mod-mapping-gcp-audit", "parser-gcp-audit"]
+parser-gcp-audit = ["dep:irmind-mod-parser-gcp-audit", "mapping-gcp-audit"]
 mapping-falco = ["dep:irmind-mod-mapping-falco", "parser-falco"]
 mapping-kubernetes = ["dep:irmind-mod-mapping-kubernetes", "parser-kubernetes"]
 mapping-cloudtrail = ["dep:irmind-mod-mapping-cloudtrail", "parser-json"]
@@ -63,6 +66,8 @@ storage-gcs = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/gcs"]
 storage-azure = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/azure"]
 
 [dependencies]
+irmind-mod-parser-gcp-audit = { path = "../modules/parser-gcp-audit", version = "0.1.0", optional = true }
+irmind-mod-mapping-gcp-audit = { path = "../modules/mapping-gcp-audit", version = "0.1.0", optional = true }
 irmind-mod-mapping-falco = { path = "../modules/mapping-falco", version = "0.1.0", optional = true }
 irmind-mod-mapping-kubernetes = { path = "../modules/mapping-kubernetes", version = "0.1.0", optional = true }
 irmind-mod-parser-kubernetes = { path = "../modules/parser-kubernetes", version = "0.1.0", optional = true }

@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "expected_events": [
+    "synthetic-admin-1",
+    "synthetic-admin-2"
+  ],
+  "expected_entities": [
+    "analyst@example.invalid",
+    "203.0.113.77",
+    "synthetic-project"
+  ],
+  "techniques": [
+    "T1098.001"
+  ]
+}

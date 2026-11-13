@@ -911,6 +911,7 @@ dependencies = [
  "irmind-mod-parser-ecs",
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-falco",
+ "irmind-mod-parser-gcp-audit",
  "irmind-mod-parser-hayabusa",
  "irmind-mod-parser-json",
  "irmind-mod-parser-kubernetes",
@@ -1018,6 +1019,14 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-parser-falco"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+]
+
+[[package]]
+name = "irmind-mod-parser-gcp-audit"
 version = "0.1.0"
 dependencies = [
  "irmind-app",

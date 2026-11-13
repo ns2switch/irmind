@@ -83,6 +83,8 @@ jobs:
         with: {tool: 'cargo-nextest,cargo-deny', fallback: none}
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_select_ci_scope.py
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_release_json_features.py
+      - name: Test documented command ownership
+        run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_docs.py
       - name: Test allocation profile attribution
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_profile_pipeline_allocations.py
       - name: Test current absolute benchmark criteria
@@ -185,7 +187,7 @@ jobs:
         run: |
           cargo nextest run -p irmind --test format_goldens --all-features --features serde_json/preserve_order --cargo-profile ci --locked
           cargo nextest run -p irmind-domain -p irmind-app -p irmind-infra --lib --features serde_json/preserve_order --cargo-profile ci --locked -E 'test(skill) | test(case_budget) | test(cluster) | test(source_record)'
-          cargo nextest run -p irmind-mapping-tables -p irmind-mod-mapping-kubernetes -p irmind-mod-mapping-falco -p irmind-mod-mapping-cloudtrail -p irmind-mod-parser-evtx -p irmind-mod-mapping-evtx --lib --features serde_json/preserve_order --cargo-profile ci --locked
+          cargo nextest run -p irmind-mapping-tables -p irmind-mod-mapping-kubernetes -p irmind-mod-mapping-falco -p irmind-mod-parser-gcp-audit -p irmind-mod-mapping-gcp-audit -p irmind-mod-mapping-cloudtrail -p irmind-mod-parser-evtx -p irmind-mod-mapping-evtx --lib --features serde_json/preserve_order --cargo-profile ci --locked
           cargo nextest run -p irmind-mod-siem-elastic -p irmind-mod-siem-chronicle -p irmind-mod-mapping-ecs -p irmind-mod-mapping-udm --lib --features serde_json/preserve_order --cargo-profile ci --locked
           cargo nextest run --lib --features serde_json/preserve_order --cargo-profile ci --locked \
             -p irmind-mod-parser-json -p irmind-mod-parser-ecs -p irmind-mod-parser-ocsf \

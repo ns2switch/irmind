@@ -56,6 +56,16 @@ fn ingest(
     root: &std::path::Path,
     file: &str,
 ) -> u64 {
+    ingest_with_context(engine, store, case, root, file, Some(&context()))
+}
+fn ingest_with_context(
+    engine: &Engine<'_>,
+    store: &LocalStore,
+    case: &irmind_domain::CaseId,
+    root: &std::path::Path,
+    file: &str,
+    cluster_context: Option<&irmind_domain::SourceClusterContext>,
+) -> u64 {
     use std::io::Read as _;
     let mut sample = Vec::new();
     std::io::Read::take(fs::File::open(root.join(file)).unwrap(), 65536)
@@ -69,7 +79,7 @@ fn ingest(
             parser_override: None,
             forced: false,
             time_context: None,
-            cluster_context: Some(&context()),
+            cluster_context,
         })
         .unwrap();
     LargeCaseUseCases {
@@ -176,6 +186,107 @@ fn native_and_falco_records_keep_cluster_roles_through_rebuild_seal_and_export()
     assert_eq!(
         irmind_infra::LocalExportVerifier
             .verify_export_details(&target, Some(&key))
+            .unwrap()
+            .format_version,
+        7
+    );
+}
+
+#[cfg(feature = "parser-gcp-audit")]
+#[test]
+fn cloud_and_gke_sources_keep_separate_context_and_reconstruct_the_same_signed_graph() {
+    use irmind_domain::{CommonEventFilter, EventCategory, EventOutcome, GraphQueryFilter};
+    let root = tempfile::tempdir().unwrap();
+    let originals = root.path().join("sources");
+    fs::create_dir(&originals).unwrap();
+    let store = Arc::new(current_sources::open(&root.path().join("data")));
+    let engine = engine(&store);
+    let case = engine
+        .create_case("Synthetic GCP audit", "local only")
+        .unwrap();
+    let context = irmind_app::command_cluster_context(Some(
+        "gke:projects/synthetic-project/locations/us-central1/clusters/synthetic-cluster",
+    ))
+    .unwrap()
+    .unwrap();
+    for (name, bytes, context, count) in [
+        (
+            "cloud.ndjson",
+            include_bytes!("../../testkit/fixtures/parser-gcp-audit/source/events.ndjson")
+                .as_slice(),
+            None,
+            2,
+        ),
+        (
+            "gke.ndjson",
+            include_bytes!("../../testkit/fixtures/parser-gcp-audit/source/gke.ndjson").as_slice(),
+            Some(&context),
+            1,
+        ),
+    ] {
+        fs::write(originals.join(name), bytes).unwrap();
+        assert_eq!(
+            ingest_with_context(&engine, store.as_ref(), &case.id, &originals, name, context),
+            count
+        );
+    }
+    assert_eq!(store.timeline(&case.id, 10).unwrap().len(), 3);
+    let filter = GraphQueryFilter::default().with_common(CommonEventFilter {
+        category: Some(EventCategory::Iam),
+        outcome: Some(EventOutcome::Failure),
+        ..Default::default()
+    });
+    assert_eq!(
+        store
+            .timeline_filtered(&case.id, &filter, 10)
+            .unwrap()
+            .len(),
+        1
+    );
+    let filter = GraphQueryFilter::default()
+        .with_cluster(
+            "gke:projects/synthetic-project/locations/us-central1/clusters/synthetic-cluster",
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .timeline_filtered(&case.id, &filter, 10)
+            .unwrap()
+            .len(),
+        1
+    );
+    verify_gcp_custody(
+        &engine,
+        store.as_ref(),
+        &case.id,
+        &originals,
+        &root.path().join("synthetic.irmind"),
+    );
+}
+
+#[cfg(feature = "parser-gcp-audit")]
+fn verify_gcp_custody(
+    engine: &Engine<'_>,
+    store: &LocalStore,
+    id: &irmind_domain::CaseId,
+    originals: &std::path::Path,
+    path: &std::path::Path,
+) {
+    use irmind_app::ExportVerifier;
+    let parser = current_sources::parser("parser-gcp-audit");
+    LargeCaseUseCases {
+        engine,
+        store,
+        parser: parser.as_ref(),
+    }
+    .verify_parquet_rebuild(id, originals, &CancellationToken::new())
+    .unwrap();
+    engine.verify(id).unwrap();
+    engine.seal(id).unwrap();
+    let key = irmind_app::export_case(engine, store, id, path, &CancellationToken::new()).unwrap();
+    assert_eq!(
+        irmind_infra::LocalExportVerifier
+            .verify_export_details(path, Some(&key))
             .unwrap()
             .format_version,
         7

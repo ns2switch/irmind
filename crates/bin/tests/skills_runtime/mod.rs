@@ -1,6 +1,7 @@
 mod authorization;
 #[cfg(all(
     feature = "mapping-cloudtrail",
+    feature = "parser-gcp-audit",
     feature = "parser-ecs",
     feature = "parser-zeek",
     feature = "parser-suricata"

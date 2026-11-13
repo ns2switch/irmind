@@ -62,7 +62,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
             ),
             (
                 "cloud-audit.json",
-                "parser-json",
+                "parser-gcp-audit",
                 include_str!(
                     "../../../../testkit/fixtures/skills-expanded/gcp-service-account-abuse/source/cloud-audit.json"
                 ),
@@ -72,7 +72,12 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         conclusion: "Synthetic service-account key creation recorded; compromise remains a hypothesis",
         technique: "T1098.001",
         selected_source: 1,
-        filters: &[],
+        filters: &[
+            ("event_category", "iam"),
+            ("event_type", "access"),
+            ("event_outcome", "success"),
+            ("entity_role", "actor"),
+        ],
     },
     Scenario {
         name: "windows-ransomware",

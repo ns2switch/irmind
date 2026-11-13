@@ -231,3 +231,15 @@ desconocido, no un ataque exitoso ni un hallazgo confirmado. Los usuarios del
 contenedor no se convierten en principales de la API. Los PID conservan ámbito
 de registro. No se inventan metadatos ausentes. Consulta las
 [ampliaciones del intérprete finito](../development/kubernetes-table-mapping-contract.md).
+
+## GCP Cloud Audit y GKE (experimentales)
+
+Las tablas de Cloud Audit usan servicios exactos y estado RPC explícito. IAM,
+IAM Credentials y métodos documentados de política de proyecto tienen cobertura
+IAM; si falta el estado, queda desconocido. Principal, recurso y extremos de red
+conservan sus roles e identidades acotadas al proyecto cuando se comunica.
+Las direcciones ocultadas no se convierten en entidades IP. GKE reutiliza las
+tablas de estado y valida rutas de recursos y espacios de nombres mediante una
+función nativa pura incluida en su identidad de compilación. Solo el servicio de
+auditoría Kubernetes puede asignar roles de principal Kubernetes. Una zona no se
+convierte en región. Consulta el [contrato y las fuentes oficiales](../development/gcp-audit-mapping.md).

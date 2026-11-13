@@ -4,6 +4,19 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+### GCP Cloud Audit and GKE interpretation
+
+- Add a default, experimental Cloud Audit JSON/NDJSON source decoder and bundled
+  service/status mappings, sharing explicit cluster confirmation with GKE.
+  Preserve nanosecond time and original fields; distinguish reported caller,
+  target resource and source/destination endpoints. Redacted IPs remain unknown.
+- Keep missing RPC status unknown and classify project-policy operations only
+  from documented exact method names. Validate GKE namespace/resource paths and
+  keep zonal locations distinct from regions. Unknown services retain coverage gaps.
+- Update the GCP service-account skill and its scripted episode to use native
+  IAM/outcome/role filters, with independent evaluator-only HuntEval answers.
+- Format impact: no additional envelope, export framing or seal change.
+
 ### Kubernetes and Falco source modules
 
 - Add separate experimental native Kubernetes audit and Falco JSON decoders, selected by the bounded detection registry. Original fields, nanosecond timestamps and actual offsets are retained; mappings remain independent.

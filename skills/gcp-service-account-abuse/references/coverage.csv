@@ -1,3 +1,3 @@
 source,required_fields,mapping,coverage_limit
-parser-json,"original event identifiers, timestamps and provider request/response fields",Extraction only unless an explicit provider mapping matches,Never apply category/outcome/role filters to unclassified records
+parser-gcp-audit,"timestamp; protoPayload serviceName/methodName/authenticationInfo/status/requestMetadata/resourceName; resource.labels.project_id",Pinned Cloud Audit service/status and occurrence-role tables,Missing status stays unknown; redacted identity and unsupported services remain coverage gaps
 parser-ecs,@timestamp; ecs.version; event.*; host/user/source/destination,Validated ECS to common-event mapping,Producer must supply classification and preserve original identifiers

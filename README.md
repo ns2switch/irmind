@@ -103,6 +103,7 @@ The normal build includes every current product module and both keystores. No re
 | SentinelOne | EDR | `edr-sentinelone` | experimental | [SentinelOne](docs/modules.md#sentinelone) |
 | MISP | internal threat intel | `ti-misp` | experimental | [MISP](docs/modules.md#misp) |
 | VirusTotal | external enrichment | `ti-virustotal` | experimental | [VirusTotal](docs/modules.md#virustotal) |
+| GCP Cloud Audit / GKE | local parser + mapping | `parser-gcp-audit` (default) | experimental | [GCP and GKE](docs/parsers.md#gcp-cloud-audit-logs-and-gke) |
 | Kubernetes audit | local parser + mapping | `parser-kubernetes` (default) | experimental | [Cluster context](docs/parsers.md#kubernetes-and-falco-interpretation) |
 | Falco | local parser + mapping | `parser-falco` (default) | experimental | [Source alerts](docs/parsers.md#kubernetes-and-falco-interpretation) |
 | Linux logs | local parser | `parser-linux` (default) | experimental | [Linux](docs/modules.md#linux-logs) |

@@ -2,12 +2,12 @@
 format = "irmind-skill-v1"
 name = "gcp-service-account-abuse"
 description = "Review service-account keys, impersonation, IAM changes and unfamiliar use in Cloud Audit Logs."
-version = "0.1.0"
+version = "0.1.1"
 author = "IRMind contributors"
 license = "MIT OR Apache-2.0"
 target_schema = "irmind-common-event-v1"
 tools = ["graph_summary", "text_search", "entity_timeline", "raw_records", "case_add_finding"]
-sources = ["parser-json", "parser-ecs"]
+sources = ["parser-gcp-audit", "parser-ecs"]
 categories = ["iam", "authentication", "api"]
 invocable = true
 +++
@@ -15,7 +15,7 @@ invocable = true
 
 ## Establish coverage
 
-Experimental; validated with synthetic episodes only. Partial. Native Cloud Audit Logs JSON is ingestible and its original protoPayload fields are searchable, but the current generic mapping does not classify GCP outcomes or assign roles to principalEmail and callerIp. Already normalized ECS can provide typed filters. HuntEval normalized episodes exercise extraction, not a native GCP semantic mapping.
+Experimental; validated with synthetic episodes only. Native Cloud Audit LogEntry JSON/NDJSON uses parser-gcp-audit and bundled service/status tables. IAM and IAM Credentials operations have api/iam categories; documented project SetIamPolicy/GetIamPolicy operations have the same typed coverage. Explicit RPC code 0 means success, 1–16 means failure, and missing status stays unknown. Reported callers, resources and endpoints retain distinct roles. Other services or missing/redacted identity fields can leave coverage incomplete; inspect graph_summary before a negative conclusion. HuntEval normalized data still tests extraction separately.
 
 Ask the analyst for Cloud Logging JSON exports covering Admin Activity and any relevant Data Access logs for the authorized projects and UTC window. Retain protoPayload.serviceName, methodName, authenticationInfo, serviceAccountDelegationInfo, authorizationInfo, requestMetadata, status and resourceName. Data Access and credential/token-use visibility depend on enabled audit coverage; do not assume all calls were logged.
 
@@ -36,10 +36,10 @@ Ask the analyst for Cloud Logging JSON exports covering Admin Activity and any r
 Example tool arguments, not a script to execute automatically:
 
 ```text
-text_search({"query":"CreateServiceAccountKey","limit":20})
+text_search({"query":"CreateServiceAccountKey","event_category":"iam","event_outcome":"success","entity_role":"actor","limit":20})
 ```
 
-For native GCP use raw_records for authenticationInfo.principalEmail, delegation and requestMetadata.callerIp; these fields do not currently guarantee entity_lookup or role coverage. Only already mapped ECS supports event_category="iam", event_type="creation", event_outcome="success" and actor/target role filters. Do not use those filters to hide unclassified native records.
+For supported native GCP use event_category="iam", event_type="access", event_outcome and entity_role filters. An API access type does not establish that a proposed policy change took effect. Read original authenticationInfo, serviceAccountDelegationInfo, authorizationInfo and resourceName with raw_records; a reported caller is not necessarily the human initiator behind delegation. Private/redacted caller IP labels are not IP entities. Do not use typed filters to hide unclassified services or claim collection completeness.
 
 Start with graph_summary. Results can be sampled, partial or truncated; inspect
 those markers and narrow the UTC window rather than silently extrapolating.

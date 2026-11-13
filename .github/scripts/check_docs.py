@@ -169,6 +169,19 @@ def source_tui_flags() -> set[str]:
     return set(re.findall(r'strip_prefix\("(?:/[a-z-]+ )?(--[a-z0-9-]+) ?"\)', source))
 
 
+def irmind_flag_citations(text: str) -> set[str]:
+    """Keep IRMind flags strict while recognizing complete external export commands."""
+    lines = []
+    for line in text.splitlines():
+        # This is one gcloud invocation, not an IRMind command. Mixed shell
+        # commands and any IRMind mention keep the ordinary strict validation.
+        external = re.match(r"^\s*(?:\$ )?gcloud\s", line)
+        mixed = re.search(r"\birmind(?:\.exe)?\b|&&|\|\||;|\$\(|`", line)
+        if not (external and not mixed):
+            lines.append(line)
+    return set(FLAG.findall("\n".join(lines))) - NON_IRMIND_FLAGS
+
+
 def check_cli(paths: list[Path], binary: Path | None) -> tuple[int, list[str]]:
     if binary is None:
         root_commands, case_commands, available_flags = source_cli()
@@ -176,7 +189,7 @@ def check_cli(paths: list[Path], binary: Path | None) -> tuple[int, list[str]]:
         root_commands, case_commands, available_flags = binary_cli(binary)
     available_flags |= source_tui_flags()
     text = "\n".join(path.read_text(encoding="utf-8") for path in paths)
-    cited_flags = set(FLAG.findall(text)) - NON_IRMIND_FLAGS
+    cited_flags = irmind_flag_citations(text)
     errors = [f"unknown IRMind flag {flag}" for flag in sorted(cited_flags - available_flags)]
     cited_commands = COMMAND.findall(text)
     for command, nested in cited_commands:

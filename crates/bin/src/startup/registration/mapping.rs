@@ -32,7 +32,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
         Box::new(irmind_mod_mapping_journald_compat::JournaldCompatibilityMapping::new()?),
         &ModuleConfig::new(),
     )?;
-    #[cfg(any(feature = "mapping-kubernetes", feature = "mapping-falco"))]
+    #[cfg(any(
+        feature = "mapping-kubernetes",
+        feature = "mapping-falco",
+        feature = "mapping-gcp-audit"
+    ))]
     register_contextual(registry)?;
     #[cfg(feature = "mapping-cloudtrail")]
     registry.register(
@@ -72,8 +76,23 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     )?;
     Ok(())
 }
-#[cfg(any(feature = "mapping-kubernetes", feature = "mapping-falco"))]
+#[cfg(any(
+    feature = "mapping-kubernetes",
+    feature = "mapping-falco",
+    feature = "mapping-gcp-audit"
+))]
 fn register_contextual(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "mapping-gcp-audit")]
+    {
+        registry.register(
+            Box::new(irmind_mod_mapping_gcp_audit::CloudAuditMapping::new()?),
+            &ModuleConfig::new(),
+        )?;
+        registry.register(
+            Box::new(irmind_mod_mapping_gcp_audit::GkeMapping::new()?),
+            &ModuleConfig::new(),
+        )?;
+    }
     #[cfg(feature = "mapping-kubernetes")]
     registry.register(
         Box::new(irmind_mod_mapping_kubernetes::KubernetesMapping::new()?),
@@ -212,6 +231,10 @@ mod tests {
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_falco::FalcoSourceDecoder))
             .unwrap();
+        #[cfg(feature = "mapping-gcp-audit")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_gcp_audit::GcpAuditSourceDecoder))
+            .unwrap();
         register(&mut registry).unwrap();
         check_catalog(&registry);
     }
@@ -221,7 +244,8 @@ mod tests {
         assert!(catalog.supports_decoder("parser-linux", "linux-source-v1"));
         assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + 2 * usize::from(cfg!(feature = "mapping-falco"))
+            2 + 2 * usize::from(cfg!(feature = "mapping-gcp-audit"))
+                + 2 * usize::from(cfg!(feature = "mapping-falco"))
                 + usize::from(cfg!(feature = "mapping-kubernetes"))
                 + usize::from(cfg!(feature = "mapping-cloudtrail"))
                 + usize::from(cfg!(feature = "mapping-syslog"))

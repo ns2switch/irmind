@@ -266,6 +266,27 @@ fn registry() -> ModuleRegistry {
             )
             .unwrap();
     }
+    #[cfg(feature = "parser-gcp-audit")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_gcp_audit::GcpAuditParser::default()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_gcp_audit::CloudAuditMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_gcp_audit::GkeMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
     registry
 }
 pub(super) fn open(root: &Path) -> LocalStore {
