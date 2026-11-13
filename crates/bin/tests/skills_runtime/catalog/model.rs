@@ -13,6 +13,13 @@ pub(super) struct Episode {
     hashes: Vec<String>,
 }
 impl Episode {
+    pub(super) fn final_text(&self) -> String {
+        format!(
+            "{} Evidence: {}",
+            self.scenario.conclusion,
+            self.hashes.join(", ")
+        )
+    }
     pub(super) fn new(scenario: &'static Scenario, hashes: Vec<String>) -> Self {
         Self {
             requests: Mutex::default(),
@@ -110,11 +117,7 @@ impl LlmPort for Episode {
                 response: ModelResponse {
                     truncated: false,
                     text: if round >= 6 {
-                        format!(
-                            "{} Evidence: {}",
-                            self.scenario.conclusion,
-                            self.hashes.join(", ")
-                        )
+                        self.final_text()
                     } else {
                         String::new()
                     },

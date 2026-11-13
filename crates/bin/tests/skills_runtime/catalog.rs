@@ -1,6 +1,7 @@
 //! Each public episode runs through the release decoder/mapping, guard and custody paths.
 mod checks;
 mod hostile;
+mod measurement;
 mod model;
 mod scenarios;
 mod sources;
@@ -50,6 +51,13 @@ fn episode(index: usize) {
     let answer = engine.investigate(&case.id, "Use the named local method to review this synthetic episode; distinguish observation from inference.", &model).unwrap();
     assert!(answer.contains(scenario.conclusion));
     checks::requests(scenario, &model);
+    measurement::record(
+        scenario,
+        std::slice::from_ref(&model),
+        store.as_ref(),
+        &case.id,
+        "single",
+    );
     checks::evaluate(scenario, &engine, store.as_ref(), &case.id);
     checks::export(
         &engine,
@@ -94,3 +102,40 @@ skill_tests!(
     8
 );
 skill_tests!(network_episode, network_rejects_hostile_evidence, 9);
+
+#[test]
+fn six_turn_scripted_investigation_records_budget_inputs_without_a_provider() {
+    let scenario = &SCENARIOS[0];
+    let root = tempfile::tempdir().unwrap();
+    let store = sources::open(&root.path().join("data"));
+    let (_, engine) = super::setup_with_store(root.path(), store.clone(), false);
+    let case = engine
+        .create_case("Synthetic multi-turn budget profile", "local")
+        .unwrap();
+    let (name, parser_id, content) = scenario.files[0];
+    std::fs::write(root.path().join(name), content).unwrap();
+    let parser = crate::current_sources::parser(parser_id);
+    let large = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: parser.as_ref(),
+    };
+    let ingested = large
+        .ingest_local_batch(
+            &case.id,
+            root.path(),
+            &[name.into()],
+            false,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    let mut models = vec![];
+    for turn in 0..6 {
+        let model = model::Episode::new(scenario, vec![ingested[0].1.as_str().into()]);
+        engine.investigate(&case.id, &format!("Review the synthetic evidence again for follow-up {turn}; preserve uncertainty."), &model).unwrap();
+        assert_eq!(model.requests.lock().unwrap().len(), 7);
+        models.push(model);
+    }
+    measurement::record(scenario, &models, store.as_ref(), &case.id, "six-turns");
+    engine.verify(&case.id).unwrap();
+}
