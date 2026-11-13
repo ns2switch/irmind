@@ -160,3 +160,38 @@ fn oversized_first_lines_are_bounded_and_later_records_keep_real_offsets() {
         assert!(report.samples.iter().all(|sample| sample.len() <= 256));
     }
 }
+
+struct ConfirmedDecoder(SourceClusterContext);
+impl SourceDecoder for ConfirmedDecoder {
+    fn identity(&self) -> irmind_app::ParserIdentity<'_> {
+        KubernetesSourceDecoder.identity()
+    }
+    fn decode_reader(
+        &self,
+        input: SourceInput<'_>,
+        emit: &mut dyn FnMut(irmind_domain::Tainted<SourceRecordV1>) -> Result<(), AppError>,
+    ) -> Result<ParseReport, AppError> {
+        KubernetesSourceDecoder.decode_reader(
+            SourceInput {
+                metadata: SourceMetadata {
+                    cluster_context: Some(&self.0),
+                    ..input.metadata
+                },
+                reader: input.reader,
+            },
+            emit,
+        )
+    }
+}
+#[test]
+fn shared_decoder_contract_uses_only_the_explicitly_confirmed_context() {
+    irmind_testkit::run_log_parser_contract(
+        &KubernetesParser::default(),
+        &ConfirmedDecoder(context()),
+        "synthetic.ndjson",
+        EVENT,
+        1,
+        None,
+    )
+    .unwrap();
+}
