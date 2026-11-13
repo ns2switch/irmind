@@ -36,6 +36,27 @@ the generic JSON detector returns 45%, and there is no other high-confidence
 candidate. Their selected identity and confidence enter the source manifest.
 Managed-provider wrappers require separate coverage.
 
+## Cloud Audit and GKE smoke (release)
+
+The [measurement](benchmarks/gcp-audit-native.json) repeats original-field
+synthetic source fixtures through detection, decoding, selected mapping,
+Parquet writing and signed custody. Ordinary Cloud Audit uses bundled status
+and service tables. GKE additionally validates resource paths against confirmed
+cluster context. Generation and later complete verification are outside the
+timer. These are local optimized Linux smokes with a fixed source timestamp,
+not replacements for standard 15 GB gates or query-latency measurements.
+
+| Source | Input bytes | Accepted records | Rejected | Ingestion (s) | MiB/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Cloud Audit | 1,073,742,145 | 596,855 | 0 | 20.491 | 49.974 |
+| GKE Cloud Audit | 1,073,742,181 | 600,863 | 0 | 25.553 | 40.074 |
+
+The [complete detection matrix](benchmarks/gcp-audit-detection.json) has a
+unique 98% native match for each new fixture and a 45% generic JSON fallback.
+AddressSanitizer fuzzing completed 2,437,042 executions in 601 seconds without
+failures. Contracts also cover rejected oversized first lines, later valid
+records, worker-count determinism, redacted addresses and cluster disagreement.
+
 ## Method
 
 The representative CloudTrail-shaped corpus has about 1,000 files of approximately 1 MB, each with 1–2 KB records. The 15 GB variant repeats synthetic records within those files and deletes each temporary source batch after conversion. A separate extreme corpus has 25 files with one large record per file; its historical result is kept only as a stress reference. Every case uses the signed source manifest and signed Parquet artifact path. Each query verifies the selected Parquet files by SHA-256 before reading. The benchmark runs in the release profile, takes five warm samples per query after a cold summary, and reports p50/p95. Times are wall-clock unless marked as CPU sums. Files are removed after each run.

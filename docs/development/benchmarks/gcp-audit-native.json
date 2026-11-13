@@ -1,0 +1,37 @@
+{
+  "source_commit": "47276f54ac795bfa97cf0986999ecbc166d81404",
+  "profile": "release (optimized; debug assertions disabled)",
+  "platform": "Linux x86_64",
+  "runner": "local; not a standard GitHub performance-gate run",
+  "command": "cargo test -p irmind --all-features --test kubernetes_ingest --release gcp_audit_one_gib_release_throughput -- --ignored --nocapture",
+  "method": "Repeat each committed original-field source fixture with 1024 bytes of synthetic padding to at least 1 GiB. Time production detection, hash, decoder, selected mapper, Parquet creation and signed custody. Generation and subsequent complete case verification are outside the ingestion timer. One fixed-timestamp smoke per source; no provider or network. Not a query-latency or 15 GB benchmark.",
+  "results": [
+    {
+      "source": "gcp",
+      "bytes": 1073742145,
+      "records": 596855,
+      "rejected": 0,
+      "ingestion_seconds": 20.491,
+      "mib_per_second": 49.974,
+      "fixture": "crates/testkit/fixtures/parser-gcp-audit/source/event.ndjson",
+      "fixture_sha256": "5231ca557d8ba2da0f035adc5f28180ea85744eb25ff527ebbcf0ad3c7e5fea2"
+    },
+    {
+      "source": "gke",
+      "bytes": 1073742181,
+      "records": 600863,
+      "rejected": 0,
+      "ingestion_seconds": 25.553,
+      "mib_per_second": 40.074,
+      "fixture": "crates/testkit/fixtures/parser-gcp-audit/source/gke.ndjson",
+      "fixture_sha256": "b8cd15acce34eb55fe10f173a56abe047ce315c8ccf66d257e775013c6e0ab4b"
+    }
+  ],
+  "fuzz": {
+    "target": "parser_gcp_audit",
+    "sanitizer": "AddressSanitizer",
+    "seconds": 601,
+    "executions": 2437042,
+    "failures": 0
+  }
+}
