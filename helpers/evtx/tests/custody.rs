@@ -129,6 +129,7 @@ fn detected_evtx_signs_mapped_sources_and_rebuilds_without_ingesting_private_ans
                     confidence: 95,
                     mode: irmind_app::ParserSelectionMode::Automatic,
                     timestamp_context: None,
+                    cluster_context: None,
                     format_sample_sha256: sha256(sample),
                 },
             )
@@ -267,6 +268,7 @@ fn invalid_later_chunk_rolls_back_every_partial_row_and_manifest() {
         confidence: 95,
         mode: irmind_app::ParserSelectionMode::Automatic,
         timestamp_context: None,
+        cluster_context: None,
         format_sample_sha256: sha256(&bytes[..65536]),
     };
     let selected = SourceDecoderSelection::new(parser.clone());

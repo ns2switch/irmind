@@ -25,6 +25,7 @@ fn selection(path: &Path, parser: &EvtxParser) -> Result<ParserSelection, large_
         confidence: confidence.value(),
         mode: ParserSelectionMode::Automatic,
         timestamp_context: None,
+        cluster_context: None,
         format_sample_sha256: sha256(&sample),
     })
 }
