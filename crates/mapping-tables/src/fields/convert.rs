@@ -50,6 +50,10 @@ pub fn copy_common_value(
     let bad = || MappingError::UnsupportedSourceValue;
     let text = || value.as_text().ok_or_else(bad);
     match target.value_type() {
+        CommonFieldType::Boolean => match value {
+            SourceValue::Boolean(value) => Ok(CommonValue::Boolean(*value)),
+            _ => Err(bad()),
+        },
         CommonFieldType::Text | CommonFieldType::LongText => Ok(CommonValue::Text(
             EventText::new(text()?).map_err(|_| bad())?,
         )),

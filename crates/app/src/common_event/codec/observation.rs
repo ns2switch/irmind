@@ -8,15 +8,35 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum WireScope {
+    Cluster {
+        provider: String,
+        id: String,
+        namespace: Option<String>,
+    },
     Global,
-    Account { value: String },
-    Host { value: String },
-    SourceRecord { source: String, record: u64 },
-    ProcessLifetime { host: String, lifetime: String },
+    Account {
+        value: String,
+    },
+    Host {
+        value: String,
+    },
+    SourceRecord {
+        source: String,
+        record: u64,
+    },
+    ProcessLifetime {
+        host: String,
+        lifetime: String,
+    },
 }
 impl From<&EntityIdentityScope> for WireScope {
     fn from(scope: &EntityIdentityScope) -> Self {
         match scope {
+            EntityIdentityScope::Cluster { cluster, namespace } => Self::Cluster {
+                provider: cluster.provider().as_str().into(),
+                id: cluster.id().into(),
+                namespace: namespace.as_ref().map(|v| v.as_str().to_owned()),
+            },
             EntityIdentityScope::Global => Self::Global,
             EntityIdentityScope::Account(v) => Self::Account {
                 value: v.as_str().into(),
@@ -38,6 +58,19 @@ impl From<&EntityIdentityScope> for WireScope {
 impl WireScope {
     fn checked(self) -> Result<EntityIdentityScope, AppError> {
         Ok(match self {
+            Self::Cluster {
+                provider,
+                id,
+                namespace,
+            } => EntityIdentityScope::cluster(
+                irmind_domain::ClusterIdentity::try_new(
+                    irmind_domain::ClusterProvider::parse(&provider).map_err(|_| invalid())?,
+                    &id,
+                )
+                .map_err(|_| invalid())?,
+                namespace.as_deref(),
+            )
+            .map_err(|_| invalid())?,
             Self::Global => EntityIdentityScope::Global,
             Self::Account { value } => EntityIdentityScope::Account(identifier(&value)?),
             Self::Host { value } => EntityIdentityScope::Host(identifier(&value)?),

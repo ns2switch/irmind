@@ -97,9 +97,7 @@ impl Allocator {
         let encoded_cluster = if profile == PartitionProfile::KubernetesCluster {
             let checked = irmind_domain::ClusterIdentity::parse_qualified(cluster)
                 .map_err(|_| invalid_source())?;
-            let mut bytes = b"irmind-cluster-partition-value-v1\0".to_vec();
-            bytes.extend_from_slice(checked.qualified().as_bytes());
-            format!("cluster-{}", irmind_app::hex(&irmind_app::sha256(&bytes)))
+            cluster_partition_value(&checked)
         } else {
             String::new()
         };
@@ -199,4 +197,16 @@ pub(super) fn supported_builder(version: &str) -> bool {
         version,
         irmind_domain::COMMON_EVENT_DIRECT_BUILDER | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
     )
+}
+
+pub(in crate::parquet_store) fn cluster_partition_value(
+    identity: &irmind_domain::ClusterIdentity,
+) -> String {
+    use sha2::{Digest as _, Sha256};
+    let mut digest = Sha256::new();
+    digest.update(b"irmind-cluster-partition-value-v1\0");
+    digest.update(identity.provider().as_str().as_bytes());
+    digest.update(b":");
+    digest.update(identity.id().as_bytes());
+    format!("cluster-{}", irmind_app::hex(&digest.finalize()))
 }

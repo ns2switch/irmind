@@ -104,3 +104,30 @@ fn current_physical_families_do_not_alias_retired_schemas() {
         }
     }
 }
+
+#[test]
+fn cluster_column_and_marker_must_match_the_signed_partition() {
+    use std::collections::HashMap;
+    let plain = Schema::new(Vec::<Field>::new());
+    let column = Field::new("scope_cluster", DataType::Utf8, false);
+    let clustered = Schema::new_with_metadata(
+        vec![column.clone()],
+        HashMap::from([("irmind.cluster.context".into(), "source-cluster-v1".into())]),
+    );
+    assert!(validate_cluster_extension(&plain, false).is_ok());
+    assert!(validate_cluster_extension(&clustered, true).is_ok());
+    assert!(validate_cluster_extension(&plain, true).is_err());
+    assert!(validate_cluster_extension(&clustered, false).is_err());
+    let without_marker = Schema::new(vec![column.clone()]);
+    let without_column =
+        Schema::new_with_metadata(Vec::<Field>::new(), clustered.metadata().clone());
+    let unknown_marker = Schema::new_with_metadata(
+        vec![column],
+        HashMap::from([("irmind.cluster.context".into(), "unknown-v2".into())]),
+    );
+    for malformed in [without_marker, without_column, unknown_marker] {
+        for expected in [false, true] {
+            assert!(validate_cluster_extension(&malformed, expected).is_err());
+        }
+    }
+}

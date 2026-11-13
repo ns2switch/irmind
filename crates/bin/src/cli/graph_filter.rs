@@ -16,6 +16,8 @@ pub(crate) struct GraphFilterArgs {
     #[arg(long)]
     host: Option<String>,
     #[arg(long)]
+    cluster: Option<String>,
+    #[arg(long)]
     event_category: Option<String>,
     #[arg(long)]
     event_type: Option<String>,
@@ -35,6 +37,7 @@ impl GraphFilterArgs {
             ("project", &self.project),
             ("region", &self.region),
             ("host", &self.host),
+            ("cluster", &self.cluster),
             ("event_category", &self.event_category),
             ("event_type", &self.event_type),
             ("event_outcome", &self.event_outcome),

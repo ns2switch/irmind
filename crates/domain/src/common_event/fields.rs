@@ -155,4 +155,78 @@ fields!(
         98,
         Text
     ),
+    (OrchestratorApiVersion, "orchestrator.api_version", 99, Text),
+    (OrchestratorClusterId, "orchestrator.cluster.id", 100, Text),
+    (
+        OrchestratorClusterName,
+        "orchestrator.cluster.name",
+        101,
+        Text
+    ),
+    (OrchestratorNamespace, "orchestrator.namespace", 102, Text),
+    (
+        OrchestratorResourceId,
+        "orchestrator.resource.id",
+        103,
+        Text
+    ),
+    (
+        OrchestratorResourceName,
+        "orchestrator.resource.name",
+        104,
+        Text
+    ),
+    (
+        OrchestratorResourceType,
+        "orchestrator.resource.type",
+        105,
+        Text
+    ),
+    (OrchestratorType, "orchestrator.type", 106, Text),
+    (ContainerId, "container.id", 107, Text),
+    (ContainerName, "container.name", 108, Text),
+    (ContainerImageName, "container.image.name", 109, Text),
+    (ContainerImageTag, "container.image.tag", 110, TextList),
+    (
+        ContainerImageHashAll,
+        "container.image.hash.all",
+        111,
+        TextList
+    ),
+    (ContainerRuntime, "container.runtime", 112, Text),
+    (
+        ContainerSecurityContextPrivileged,
+        "container.security_context.privileged",
+        113,
+        Boolean
+    ),
+    (UserGroups, "user.group.name", 114, TextList),
+    (UserTargetGroups, "user.target.group.name", 115, TextList),
+    (
+        IrmindKubernetesServiceAccount,
+        "irmind.kubernetes.service_account",
+        116,
+        Text
+    ),
+    (IrmindKubernetesPod, "irmind.kubernetes.pod", 117, Text),
+    (IrmindKubernetesNode, "irmind.kubernetes.node", 118, Text),
+    (IrmindKubernetesStage, "irmind.kubernetes.stage", 119, Text),
+    (
+        IrmindKubernetesAuthorizationDecision,
+        "irmind.kubernetes.authorization_decision",
+        120,
+        Text
+    ),
+    (
+        IrmindKubernetesSubresource,
+        "irmind.kubernetes.subresource",
+        121,
+        Text
+    ),
+    (
+        IrmindClusterIdentity,
+        "irmind.cluster.identity",
+        122,
+        LongText
+    ),
 );

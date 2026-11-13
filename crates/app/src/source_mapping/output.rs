@@ -83,8 +83,12 @@ pub(super) fn unmapped(source: &SourceRecordV1) -> Result<MappingOutput, Mapping
                 .timestamp()
                 .map_or_else(String::new, irmind_domain::IndexedTime::to_rfc3339),
             event: String::new(),
-            text: super::json::render_source_fields(source.fields())
-                .map_err(|_| MappingError::InvalidOutput)?,
+            text: if source.cluster_identity().is_some() {
+                "Cluster source has no selected semantic mapping; original fields are retained in the signed source.".into()
+            } else {
+                super::json::render_source_fields(source.fields())
+                    .map_err(|_| MappingError::InvalidOutput)?
+            },
             entities: Vec::new(),
             relations: Vec::new(),
         },
@@ -95,7 +99,12 @@ pub(super) fn unmapped(source: &SourceRecordV1) -> Result<MappingOutput, Mapping
         source,
         indexed,
         MappingOutput::unclassified_common(source)?,
-        MappingPartition::default(),
+        if let Some(cluster) = source.cluster_identity() {
+            MappingPartition::try_new(crate::PartitionProfile::KubernetesCluster, "", "", "")?
+                .with_cluster(cluster)?
+        } else {
+            MappingPartition::default()
+        },
         vec![MappingDiagnostic::Unclassified],
     )
 }
@@ -137,7 +146,8 @@ impl MappingOutput {
             || (partition.profile == crate::PartitionProfile::KubernetesCluster
                 && source
                     .cluster_identity()
-                    .is_none_or(|id| id.qualified() != partition.cluster))
+                    .is_none_or(|id| !id.matches_qualified(&partition.cluster)))
+            || !valid_acquisition(source, common.context(), &partition)
             || diagnostics.len() > 8
         {
             return Err(MappingError::InvalidOutput);
@@ -150,11 +160,23 @@ impl MappingOutput {
     }
 
     pub fn unclassified_common(source: &SourceRecordV1) -> Result<CommonEventV1, MappingError> {
+        let mut context = EventContextV1::default();
+        if let Some(cluster) = source.cluster_identity() {
+            context
+                .try_insert(
+                    irmind_domain::CommonField::IrmindClusterIdentity,
+                    irmind_domain::CommonValue::Text(
+                        irmind_domain::EventText::new(&cluster.qualified())
+                            .map_err(|_| MappingError::InvalidOutput)?,
+                    ),
+                )
+                .map_err(|_| MappingError::InvalidOutput)?;
+        }
         CommonEventV1::try_new(
             source.origin().clone(),
             source.timestamp(),
             EventHeaderV1::default(),
-            EventContextV1::default(),
+            context,
             BoundedObservations::default(),
         )
         .map_err(|_| MappingError::InvalidOutput)
@@ -202,4 +224,21 @@ fn valid_projection(record: &crate::GraphRecord) -> bool {
                     .bytes()
                     .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"_-".contains(&b))
         })
+}
+
+fn valid_acquisition(
+    source: &SourceRecordV1,
+    context: &EventContextV1,
+    partition: &MappingPartition,
+) -> bool {
+    let projected = context.get(irmind_domain::CommonField::IrmindClusterIdentity);
+    match (source.cluster_identity(), projected) {
+        (None, None) => partition.cluster().is_empty(),
+        (Some(cluster), Some(irmind_domain::CommonValue::Text(value))) => {
+            cluster.matches_qualified(value.as_str())
+                && partition.profile == crate::PartitionProfile::KubernetesCluster
+                && partition.cluster == value.as_str()
+        }
+        _ => false,
+    }
 }

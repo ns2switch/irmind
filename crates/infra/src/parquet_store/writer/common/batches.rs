@@ -129,10 +129,13 @@ fn extend(batch: &RecordBatch, extra: Vec<(&str, ArrayRef)>) -> Result<RecordBat
         fields.push(Arc::new(Field::new(name, array.data_type().clone(), false)));
         columns.push(array);
     }
-    let metadata = std::collections::HashMap::from([(
+    let mut metadata = std::collections::HashMap::from([(
         "irmind.common.schema".into(),
         irmind_domain::COMMON_EVENT_V1.into(),
     )]);
+    if batch.column_by_name("scope_cluster").is_some() {
+        metadata.insert("irmind.cluster.context".into(), "source-cluster-v1".into());
+    }
     RecordBatch::try_new(
         Arc::new(Schema::new(fields).with_metadata(metadata)),
         columns,

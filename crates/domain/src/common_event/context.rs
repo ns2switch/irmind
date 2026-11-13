@@ -16,6 +16,13 @@ impl EventContextV1 {
         if self.fields.contains_key(&field) {
             return Err(EventSchemaError::DuplicateField);
         }
+        if field == CommonField::IrmindClusterIdentity {
+            let CommonValue::Text(text) = &value else {
+                return Err(EventSchemaError::InvalidFieldType);
+            };
+            crate::ClusterIdentity::parse_qualified(text.as_str())
+                .map_err(|_| EventSchemaError::InvalidValue)?;
+        }
         if !field.validates(&value) {
             return Err(EventSchemaError::InvalidFieldType);
         }

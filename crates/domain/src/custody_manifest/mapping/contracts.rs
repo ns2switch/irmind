@@ -42,8 +42,10 @@ pub(super) fn read(reader: &mut Reader<'_>) -> Result<(), DomainError> {
         source_record_contract_digest(),
         common_event_contract_digest(),
     ] {
-        if reader.string_limit(64)? != expected.as_str() {
-            return Err(invalid());
+        let actual = reader.string_limit(64)?;
+        EvidenceHash::parse(&actual).map_err(|_| invalid())?;
+        if actual != expected.as_str() {
+            return Err(DomainError::UnsupportedContract);
         }
     }
     Ok(())

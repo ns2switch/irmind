@@ -34,7 +34,7 @@ fn verify_golden(bytes: &[u8], digest: &str, entries: usize) {
 fn synthetic_v7_package_golden_authenticates_without_any_keystore() {
     verify_golden(
         include_bytes!("../../../../../fuzz/seeds/export/valid-v7-mapped.irmind"),
-        "1b01d95f59f055610c9fce87becdea460fa489f5f62e4c04445ad8facdb57efc",
+        "c99318407384f2af4d3d93299370f16ec15987cb6ffb81dbd7a9594f628fc0a7",
         7,
     );
 }
@@ -42,7 +42,7 @@ fn synthetic_v7_package_golden_authenticates_without_any_keystore() {
 fn synthetic_installed_v7_golden_authenticates_portable_global_authorization() {
     verify_golden(
         include_bytes!("../../../../../fuzz/seeds/export/valid-v7-installed.irmind"),
-        "f4a92ac507e83897434a0a9ac365adf812e424afc2d95ebadeceee5cd62e41fa",
+        "1bf5773166da748c8e2da3237fa738d3bb51e6152cb58768460dc7a639b7cd22",
         8,
     );
 }

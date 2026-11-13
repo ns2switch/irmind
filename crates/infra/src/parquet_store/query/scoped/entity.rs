@@ -128,7 +128,10 @@ impl<'a> View<'a> {
         batch: &RecordBatch,
         (scope, role, field): (&str, u8, u16),
     ) -> Result<(), AppError> {
-        if role > 8 || (role == 0) != (field == 0) || field > 98 {
+        if role > 8
+            || (role == 0) != (field == 0)
+            || (field != 0 && irmind_domain::CommonField::from_code(field).is_err())
+        {
             return Err(invalid_source());
         }
         self.roles[usize::from(role)] += u64::try_from(batch.num_rows()).map_err(storage)?;

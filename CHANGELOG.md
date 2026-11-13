@@ -4,6 +4,21 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+### Cluster-qualified common events
+
+- Extend the current common event vocabulary with bounded orchestrator,
+  container, group and privilege fields and cluster/namespace-qualified entities.
+  Raw producer cluster IDs remain separate from acquisition identity.
+- Add an exact `cluster` query filter, signed partition pruning and row filtering
+  inside overflow buckets. Hash verification and all query limits remain intact.
+- Cluster artifacts carry an explicit optional column/metadata extension;
+  non-cluster Parquet files retain their physical bytes. Unmapped cluster sources
+  retain originals and commitments without projecting arbitrary request bodies.
+- Format impact: the expanded common vocabulary changes the mapped target-contract
+  digest and current profile/envelope/export vectors. V7 framing and seal
+  challenges are unchanged. Use the creating version for another contract, or
+  re-ingest verified originals into a new case; no migration is introduced.
+
 ### Kubernetes ingestion foundation
 
 - Bind explicit, bounded cluster acquisition context to source manifests,

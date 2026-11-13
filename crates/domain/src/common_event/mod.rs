@@ -89,3 +89,7 @@ mod tests;
 /// Deterministic construction of the first typed physical schemas.
 pub const COMMON_EVENT_DIRECT_BUILDER: &str = "parquet-builder-common-event-direct-v1";
 pub const COMMON_EVENT_BUILDER: &str = "parquet-builder-common-event-v1";
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod kubernetes_tests;

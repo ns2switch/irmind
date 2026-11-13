@@ -40,7 +40,7 @@ fn kind_role(kind: super::ObservedEntityKind, role: EntityRole) -> bool {
     use super::ObservedEntityKind as K;
     use EntityRole as R;
     match kind {
-        K::User => matches!(
+        K::User | K::KubernetesUser | K::KubernetesServiceAccount => matches!(
             role,
             R::Actor | R::Target | R::Source | R::Destination | R::Observer | R::Related
         ),
@@ -52,7 +52,14 @@ fn kind_role(kind: super::ObservedEntityKind, role: EntityRole) -> bool {
             role,
             R::Subject | R::Parent | R::Actor | R::Target | R::Observer | R::Related
         ),
-        K::File | K::Registry | K::Resource => {
+        K::File
+        | K::Registry
+        | K::Resource
+        | K::KubernetesNamespace
+        | K::KubernetesPod
+        | K::KubernetesNode
+        | K::Container
+        | K::ContainerImage => {
             matches!(role, R::Subject | R::Target | R::Related | R::Observer)
         }
         K::Hash => matches!(role, R::Subject | R::Target | R::Related),
@@ -107,9 +114,16 @@ fn compatible(kind: &str, role: EntityRole, field: &str) -> bool {
         F::IrmindFlowRef => ("flow", None),
         F::IrmindSourceEventId => ("event", None),
         F::IrmindCollectorArtifact => ("artifact", None),
+        F::IrmindKubernetesServiceAccount => ("k8s_service_account", None),
+        F::OrchestratorNamespace => ("k8s_namespace", None),
+        F::IrmindKubernetesPod => ("k8s_pod", None),
+        F::IrmindKubernetesNode => ("k8s_node", None),
+        F::ContainerId => ("container", None),
+        F::ContainerImageName => ("image", None),
         _ => return false,
     };
-    kind == expected.0 && expected.1.is_none_or(|expected| role == expected)
+    let compatible_kind = kind == expected.0 || (kind == "k8s_user" && expected.0 == "user");
+    compatible_kind && expected.1.is_none_or(|expected| role == expected)
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -136,6 +150,16 @@ impl BoundedObservations {
         context: &super::EventContextV1,
     ) -> Result<(), EventSchemaError> {
         for observation in &self.0 {
+            if let EntityIdentityScope::Cluster { cluster, .. } = observation.entity.scope() {
+                let Some(super::CommonValue::Text(value)) =
+                    context.get(CommonField::IrmindClusterIdentity)
+                else {
+                    return Err(EventSchemaError::InvalidObservation);
+                };
+                if !cluster.matches_qualified(value.as_str()) {
+                    return Err(EventSchemaError::InvalidObservation);
+                }
+            }
             let field = context
                 .get(observation.field)
                 .ok_or(EventSchemaError::InvalidObservation)?;

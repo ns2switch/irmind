@@ -1,6 +1,7 @@
 use super::CommonValue;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CommonFieldType {
+    Boolean,
     Text,
     LongText,
     Ip,
@@ -23,7 +24,8 @@ impl CommonFieldType {
             (Self::Text, CommonValue::Text(v)) => {
                 v.as_str().len() <= 512 && !v.as_str().chars().any(char::is_control)
             }
-            (Self::LongText, CommonValue::Text(_))
+            (Self::Boolean, CommonValue::Boolean(_))
+            | (Self::LongText, CommonValue::Text(_))
             | (Self::Ip, CommonValue::Ip(_))
             | (Self::Unsigned, CommonValue::Unsigned(_))
             | (Self::Time, CommonValue::Time(_))

@@ -45,7 +45,8 @@ fn context() -> SourceClusterContext {
 #[test]
 fn signed_cluster_context_survives_reconstruction_sealing_and_public_export_verification() {
     let root = tempfile::tempdir().unwrap();
-    let (store, engine, catalog) = fixture_decoder(root.path(), Arc::new(ContextDecoder));
+    let catalog = Arc::new(MappingCatalog::freeze(vec![Arc::new(ContextDecoder)], vec![]).unwrap());
+    let (store, engine, catalog) = fixture_catalog(root.path(), catalog);
     let case = engine
         .create_case("Synthetic acquisition context", "local only")
         .unwrap();
@@ -121,3 +122,5 @@ fn signed_cluster_context_survives_reconstruction_sealing_and_public_export_veri
         7
     );
 }
+
+mod queries;
