@@ -166,6 +166,16 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
     fn finish_task_error(&mut self, label: &str, error: &irmind_app::AppError) -> bool {
         if label == "Ingest" {
             let message = match error {
+                irmind_app::AppError::ParserClusterContextRequired {
+                    source_name,
+                    requirement,
+                } => {
+                    self.state.cluster_prompt = Some(super::cluster_prompt::ClusterPrompt::new(
+                        source_name.clone(),
+                        requirement,
+                    ));
+                    Some("Confirm the source cluster identity before ingestion.")
+                }
                 irmind_app::AppError::ParserTimeContextRequired {
                     source_name,
                     requirement,

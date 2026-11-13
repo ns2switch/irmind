@@ -51,72 +51,46 @@ pub(super) fn module_statuses(
     builder.out
 }
 
+const PARSER_STATUSES: &[(&str, bool)] = &[
+    ("parser-kubernetes", cfg!(feature = "parser-kubernetes")),
+    ("parser-falco", cfg!(feature = "parser-falco")),
+    ("parser-evtx", cfg!(feature = "parser-evtx")),
+    ("parser-json", cfg!(feature = "parser-json")),
+    ("parser-syslog", cfg!(feature = "parser-syslog")),
+    ("parser-linux", cfg!(feature = "parser-linux")),
+    ("parser-ecs", cfg!(feature = "parser-ecs")),
+    ("parser-ocsf", cfg!(feature = "parser-ocsf")),
+    ("parser-velociraptor", cfg!(feature = "parser-velociraptor")),
+    ("parser-hayabusa", cfg!(feature = "parser-hayabusa")),
+    ("parser-chainsaw", cfg!(feature = "parser-chainsaw")),
+    ("parser-plaso", cfg!(feature = "parser-plaso")),
+    ("parser-eztools", cfg!(feature = "parser-eztools")),
+    ("parser-zeek", cfg!(feature = "parser-zeek")),
+    ("parser-suricata", cfg!(feature = "parser-suricata")),
+];
+
 fn append_parser_statuses(builder: &mut StatusBuilder<'_>) {
-    for (id, compiled, version) in [
-        (
-            "parser-evtx",
-            cfg!(feature = "parser-evtx"),
-            "evtx-0.15.1-ndjson-v1",
-        ),
-        (
-            "parser-json",
-            cfg!(feature = "parser-json"),
-            "json-stream-v3",
-        ),
-        (
-            "parser-syslog",
-            cfg!(feature = "parser-syslog"),
-            "syslog-v2",
-        ),
-        ("parser-linux", cfg!(feature = "parser-linux"), "linux-v1"),
-        ("parser-ecs", cfg!(feature = "parser-ecs"), "ecs-ndjson-v2"),
-        (
-            "parser-ocsf",
-            cfg!(feature = "parser-ocsf"),
-            "ocsf-stream-v2",
-        ),
-        (
-            "parser-velociraptor",
-            cfg!(feature = "parser-velociraptor"),
-            "velociraptor-json-v2",
-        ),
-        (
-            "parser-hayabusa",
-            cfg!(feature = "parser-hayabusa"),
-            "hayabusa-json-csv-v2",
-        ),
-        (
-            "parser-chainsaw",
-            cfg!(feature = "parser-chainsaw"),
-            "chainsaw-json-v2",
-        ),
-        (
-            "parser-plaso",
-            cfg!(feature = "parser-plaso"),
-            "plaso-json-v2",
-        ),
-        (
-            "parser-eztools",
-            cfg!(feature = "parser-eztools"),
-            "eztools-csv-v1",
-        ),
-        ("parser-zeek", cfg!(feature = "parser-zeek"), "zeek-log-v1"),
-        (
-            "parser-suricata",
-            cfg!(feature = "parser-suricata"),
-            "suricata-eve-v1",
-        ),
-    ] {
+    let versions = builder
+        .registry
+        .parser_catalog()
+        .available()
+        .into_iter()
+        .collect::<BTreeMap<_, _>>();
+    for &(id, compiled) in PARSER_STATUSES {
         builder.out.push(ModuleStatus {
             id: id.into(),
             compiled,
             enabled: compiled
                 && builder.registry.manifest(id).is_some()
-                && !builder.issues.contains_key(id),
+                && !builder.issues.contains_key(id)
+                && versions.contains_key(id),
             configuration: if let Some(issue) = builder.issues.get(id) {
                 issue.clone()
             } else if compiled {
-                format!("experimental; {version}")
+                versions.get(id).map_or_else(
+                    || "experimental; source decoder unavailable".into(),
+                    |version| format!("experimental; {version}"),
+                )
             } else {
                 format!("not compiled; enable --features {id}")
             },

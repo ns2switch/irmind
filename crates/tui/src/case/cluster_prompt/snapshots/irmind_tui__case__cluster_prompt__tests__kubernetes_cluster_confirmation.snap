@@ -1,0 +1,14 @@
+---
+source: crates/tui/src/case/cluster_prompt/tests.rs
+expression: screen
+---
+Confirm cluster identity · synthetic\u{1b}[31m-audit.ndjson
+Names alone are not unique. This choice is signed; it never grants permissions.
+> Explicit identity
+┌────────────────────────────────────────┐
+│ kubernetes:urn:k8s:team-a
+└────────────────────────────────────────┘
+  Apply to this file only
+  Confirm 0 original source claim(s)
+  Confirm explicit identity and ingest
+Tab fields/options · ↑/↓ choose · Enter confirm · Esc cancel

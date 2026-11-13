@@ -22,6 +22,8 @@ pub(super) struct PendingIngest {
     pub analyst_choices: BTreeMap<String, String>,
     pub time_contexts: BTreeMap<String, irmind_app::ParserTimeContext>,
     pub default_time_context: Option<irmind_app::ParserTimeContext>,
+    pub cluster_contexts: BTreeMap<String, irmind_app::SourceClusterContext>,
+    pub default_cluster_context: Option<irmind_app::SourceClusterContext>,
 }
 
 pub(super) struct ParserPrompt {
@@ -119,6 +121,7 @@ pub(super) struct CaseState {
     pub pending_ingest: Option<PendingIngest>,
     pub parser_prompt: Option<ParserPrompt>,
     pub time_prompt: Option<super::time_prompt::TimePrompt>,
+    pub cluster_prompt: Option<super::cluster_prompt::ClusterPrompt>,
     pub confirmation: Option<Confirmation>,
     pub confirmed_action: Option<Confirmation>,
     pub hashes: Vec<String>,
@@ -375,6 +378,7 @@ mod tests {
             pending_ingest: None,
             parser_prompt: None,
             time_prompt: None,
+            cluster_prompt: None,
             confirmation: None,
             confirmed_action: None,
             hashes: Vec::new(),

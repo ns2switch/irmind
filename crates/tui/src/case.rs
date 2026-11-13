@@ -25,6 +25,7 @@ mod operation;
 mod picker;
 mod render;
 pub(crate) use render::{approval_panel, entity_panel};
+mod cluster_prompt;
 mod runtime;
 mod state;
 mod time_prompt;
@@ -104,6 +105,25 @@ fn load_case_evidence(
     })
 }
 
+fn initial_context_hints(
+    conversation: &mut Conversation,
+    io_ops: &dyn WorkspaceIo,
+    no_hashes: bool,
+    entries: &[irmind_app::SignedEntry],
+    no_model: bool,
+    pending_approval: bool,
+) {
+    add_context_hints(
+        conversation,
+        io_ops.show_hints() && !io_ops.demo_mode(),
+        HintContext {
+            no_evidence: no_case_evidence(no_hashes, entries.iter().map(|entry| entry.kind)),
+            no_model,
+            pending_approval,
+        },
+    );
+}
+
 fn initial_state(
     engine: &Engine<'_>,
     id: &CaseId,
@@ -122,17 +142,13 @@ fn initial_state(
         operations,
         timeline,
     } = load_case_evidence(engine, id, &mut conversation)?;
-    add_context_hints(
+    initial_context_hints(
         &mut conversation,
-        io_ops.show_hints() && !io_ops.demo_mode(),
-        HintContext {
-            no_evidence: no_case_evidence(
-                hashes.is_empty(),
-                entries.iter().map(|entry| entry.kind),
-            ),
-            no_model: model.is_none(),
-            pending_approval: !approvals.is_empty(),
-        },
+        io_ops,
+        hashes.is_empty(),
+        &entries,
+        model.is_none(),
+        !approvals.is_empty(),
     );
     let instance_sources = irmind_app::recorded_instance_sources(&entries)?;
     Ok(CaseState {
@@ -181,6 +197,7 @@ fn initial_state(
         pending_ingest: None,
         parser_prompt: None,
         time_prompt: None,
+        cluster_prompt: None,
         confirmation: None,
         confirmed_action: None,
         hashes,

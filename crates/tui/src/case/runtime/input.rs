@@ -18,6 +18,10 @@ impl CaseRuntime<'_, '_, '_> {
             editor.paste(value);
             return;
         }
+        if let Some(prompt) = self.state.cluster_prompt.as_mut() {
+            prompt.paste(value);
+            return;
+        }
         if let Some(prompt) = self.state.time_prompt.as_mut() {
             prompt.paste(value);
             return;
@@ -278,6 +282,7 @@ impl CaseRuntime<'_, '_, '_> {
             || self.state.confirmation.is_some()
             || self.state.palette.is_some()
             || self.state.time_prompt.is_some()
+            || self.state.cluster_prompt.is_some()
         {
             self.state.overlay_scroll = self.state.overlay_scroll.saturating_add_signed(delta);
         } else if self.state.sidebar_visible && self.state.focus == Focus::Sidebar {
@@ -324,6 +329,10 @@ impl CaseRuntime<'_, '_, '_> {
             self.state.budget.editor = None;
         }
         if self.handle_budget_key(code, modifiers) {
+            return Ok(false);
+        }
+        if self.state.cluster_prompt.is_some() {
+            self.handle_cluster_prompt_key(code, modifiers)?;
             return Ok(false);
         }
         if self.state.time_prompt.is_some() {
@@ -383,6 +392,43 @@ impl CaseRuntime<'_, '_, '_> {
             }
             _ => false,
         }
+    }
+
+    fn handle_cluster_prompt_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<()> {
+        if matches!(code, KeyCode::PageUp | KeyCode::PageDown) {
+            self.state.overlay_scroll = self
+                .state
+                .overlay_scroll
+                .saturating_add_signed(if code == KeyCode::PageUp { -10 } else { 10 });
+            return Ok(());
+        }
+        let Some(mut prompt) = self.state.cluster_prompt.take() else {
+            return Ok(());
+        };
+        match prompt.update(code, modifiers) {
+            crate::case::cluster_prompt::ClusterPromptAction::Cancel => {
+                self.state.pending_ingest = None;
+                self.engine
+                    .record_cancellation(self.id, irmind_app::CancelledOperation::Ingest)?;
+                self.state.messages.push(
+                    "Cluster confirmation cancelled; unfinished sources were not ingested.".into(),
+                );
+            }
+            crate::case::cluster_prompt::ClusterPromptAction::Confirm { context, all_files } => {
+                if let Some(pending) = self.state.pending_ingest.as_mut() {
+                    if all_files {
+                        pending.default_cluster_context = Some(context);
+                    } else {
+                        pending.cluster_contexts.insert(prompt.source, context);
+                    }
+                    self.start_pending_ingest();
+                }
+            }
+            crate::case::cluster_prompt::ClusterPromptAction::Keep => {
+                self.state.cluster_prompt = Some(prompt);
+            }
+        }
+        Ok(())
     }
 
     fn handle_time_prompt_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<()> {

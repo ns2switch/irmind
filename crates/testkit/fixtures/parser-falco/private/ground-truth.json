@@ -1,0 +1,8 @@
+{
+  "malicious_event_indexes": [
+    0,
+    1
+  ],
+  "private_marker": "falco-private-ground-truth-synthetic",
+  "conclusion": "Synthetic audit and workload activity; source alerts require analyst confirmation."
+}

@@ -192,7 +192,8 @@ jobs:
             -p irmind-mod-parser-velociraptor -p irmind-mod-parser-hayabusa \
             -p irmind-mod-parser-chainsaw -p irmind-mod-parser-plaso -p irmind-mod-parser-eztools \
             -p irmind-mod-parser-zeek -p irmind-mod-parser-suricata -p irmind-mod-parser-linux \
-            -p irmind-mod-parser-syslog -p irmind-mod-parser-declarative
+            -p irmind-mod-parser-syslog -p irmind-mod-parser-declarative \
+            -p irmind-mod-parser-kubernetes -p irmind-mod-parser-falco
   evtx_linux_compatibility:
     needs: [dco, linux]
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true }}

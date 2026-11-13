@@ -57,7 +57,7 @@ mod ingest;
 mod logical_source;
 pub use logical_source::SourceParser;
 mod ingest_options;
-pub use ingest_options::{IngestOptions, command_time_context};
+pub use ingest_options::{IngestOptions, command_cluster_context, command_time_context};
 mod keystore;
 mod large_case;
 pub mod mapped_ingest;

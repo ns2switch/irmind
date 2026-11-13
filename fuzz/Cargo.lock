@@ -910,8 +910,10 @@ dependencies = [
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
  "irmind-mod-parser-eztools",
+ "irmind-mod-parser-falco",
  "irmind-mod-parser-hayabusa",
  "irmind-mod-parser-json",
+ "irmind-mod-parser-kubernetes",
  "irmind-mod-parser-linux",
  "irmind-mod-parser-ocsf",
  "irmind-mod-parser-plaso",
@@ -1015,6 +1017,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-parser-falco"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+]
+
+[[package]]
 name = "irmind-mod-parser-hayabusa"
 version = "0.1.0"
 dependencies = [
@@ -1033,6 +1043,14 @@ dependencies = [
  "irmind-domain",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-kubernetes"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
 ]
 
 [[package]]

@@ -4,6 +4,13 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+### Kubernetes and Falco source modules
+
+- Add separate experimental native Kubernetes audit and Falco JSON decoders, selected by the bounded detection registry. Original fields, nanosecond timestamps and actual offsets are retained; mappings remain independent.
+- Ask for required cluster acquisition context in the TUI, with explicit per-file or batch confirmation. CLI and `/ingest --cluster` use the same typed, signed context. No identity is inferred from the machine or path, and no live API access is added.
+- Include synthetic fixtures, detection-matrix coverage, malformed/oversized-record regressions and cluster-confirmation keyboard tests.
+- Format impact: no additional format change beyond the cluster/common vocabulary extensions described below.
+
 ### Cluster-qualified common events
 
 - Extend the current common event vocabulary with bounded orchestrator,

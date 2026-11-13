@@ -65,6 +65,9 @@ pub(super) enum Command {
         copy_original: bool,
         #[arg(long)]
         parser: Option<String>,
+        /// Explicit provider-qualified acquisition identity; never inferred from a file path.
+        #[arg(long)]
+        cluster: Option<String>,
         #[arg(long)]
         year: Option<String>,
         #[arg(long, allow_hyphen_values = true)]

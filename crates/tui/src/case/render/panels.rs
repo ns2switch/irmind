@@ -130,6 +130,12 @@ pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Opt
     if let Some(editor) = &state.budget.editor {
         return Ok(Some(engine.guard.screen(&editor.text())?.text));
     }
+    if let Some(prompt) = &state.cluster_prompt {
+        return prompt
+            .screened_text(engine.guard.as_ref())
+            .map(Some)
+            .map_err(Into::into);
+    }
     if let Some(prompt) = &state.time_prompt {
         return prompt
             .screened_text(engine.guard.as_ref())

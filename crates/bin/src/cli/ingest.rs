@@ -40,6 +40,7 @@ impl AutomationContext<'_, '_> {
                 path,
                 copy_original,
                 parser,
+                cluster,
                 year,
                 utc_offset,
                 no_year_rollover,
@@ -50,6 +51,7 @@ impl AutomationContext<'_, '_> {
                     utc_offset.as_deref(),
                     !no_year_rollover,
                 )?;
+                let cluster_context = irmind_app::command_cluster_context(cluster.as_deref())?;
                 engine.verify_cancelable(&id, cancel)?;
                 if store.get_case(&id)?.sealed {
                     return Err(anyhow!("case is sealed"));
@@ -85,6 +87,7 @@ impl AutomationContext<'_, '_> {
                     id: &id,
                     parser: parser.as_deref(),
                     time_context,
+                    cluster_context: cluster_context.as_ref(),
                 })?;
                 perform_ingest_plan(PlanExecution {
                     id: &id,
@@ -197,6 +200,7 @@ struct IngestPlanInput<'a> {
     id: &'a CaseId,
     parser: Option<&'a str>,
     time_context: Option<ParserTimeContext>,
+    cluster_context: Option<&'a irmind_app::SourceClusterContext>,
 }
 
 fn plan_ingest(input: IngestPlanInput<'_>) -> Result<Vec<(String, ResolvedParserSelection)>> {
@@ -213,7 +217,7 @@ fn plan_ingest(input: IngestPlanInput<'_>) -> Result<Vec<(String, ResolvedParser
             parser_override: input.parser,
             forced: input.parser.is_some(),
             time_context: input.time_context,
-            cluster_context: None,
+            cluster_context: input.cluster_context,
         });
         match selected {
             Ok(selection) => plan.push((source, selection)),

@@ -1,0 +1,1 @@
+{"time":"2026-11-01T00:00:00.123456789Z","rule":"Synthetic shell in container","priority":"Warning","output":"Synthetic container execution","output_fields":{"container.id":"synthetic-container","proc.name":"sh","proc.pid":42,"k8s.ns.name":"production","k8s.pod.name":"frontend"},"source":"syscall"}

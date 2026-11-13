@@ -19,11 +19,21 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | DFIR tools | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Format markers or exact CSV headers | Time, host, user, process, action and available entities | experimental |
 | Zeek | TSV headers or JSON for conn, dns, http, ssl, files, x509, notice and weird | Bounded header/field match; 95 for conn/DNS fixtures | Precise time, source/destination endpoints, UID correlation, explicit sensor host | experimental |
 | Suricata EVE | alert, flow, dns, http, tls, fileinfo and anomaly JSONL | Supported event type, timestamp and flow ID; 95 | Precise time, flow correlation, endpoints, unconfirmed detections and explicit host | experimental |
+| Kubernetes audit | Native `audit.k8s.io/v1` Event JSON/NDJSON | Explicit API version and kind; 98 | Original fields and nanosecond timestamps; signed cluster context. Semantic classification is provided separately by mapping modules. | experimental |
+| Falco | JSON/NDJSON detections | Rule, priority, timestamp and output-fields object; 98 | Original rule/output fields and precise time; Kubernetes records require confirmed cluster context. Source detections are not analyst confirmations. | experimental |
 | Declarative | CSV, JSON, NDJSON or bounded regex | Exact header, required JSON pointers or sample regex; at most 70% | Explicit mapping described below | experimental |
+
+## Cluster acquisition context
+
+Native Kubernetes audit events do not contain a globally unique cluster identity. Before ingestion, the TUI asks for an explicit provider-qualified identity, such as `kubernetes:urn:k8s:team-a`. Confirm it for one file or explicitly select the batch option. There is no default from the machine, file name or directory. Falco requires the same confirmation when Kubernetes metadata is present; host-only detections do not invent a cluster.
+
+The automation equivalent is `irmind ingest <case-id> <path> --cluster kubernetes:urn:k8s:team-a`; the conversational input accepts `/ingest --cluster kubernetes:urn:k8s:team-a <path>`. Both use the same bounded typed context in the signed source manifest and reconstruction. A source without required context fails closed; confirming an identity never grants a remote permission. Equal names in different clusters or namespaces remain distinct. Native decoders retain request/response bodies as original source fields, rather than automatically placing them in the searchable projection.
+
+These two modules currently cover native audit Events and Falco JSON. Managed EKS/GKE/AKS wrappers and semantic mappings are separate work; no live Kubernetes API connector is enabled.
 
 ## Current readers and existing cases
 
-New ingestion uses the current parser version recorded in its signed source manifest. JSON uses `json-stream-v3`. Historical parsing engines are not retained. Existing signed bytes can still be authenticated and exported; to regenerate records from an older reader, create a new case and ingest the verified originals. Reinstall declarative definitions after a reader-version update. See the [changelog](../CHANGELOG.md#known-issue-fixed).
+New ingestion uses the current parser version recorded in its signed source manifest. JSON uses `json-source-v1`. Historical parsing engines are not retained. Existing signed bytes can still be authenticated and exported; to regenerate records from an older reader, create a new case and ingest the verified originals. Reinstall declarative definitions after a reader-version update. See the [changelog](../CHANGELOG.md#known-issue-fixed).
 
 ## Windows coverage
 
