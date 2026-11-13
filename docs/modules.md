@@ -388,3 +388,12 @@ supported categories, outcomes and occurrence roles; unknown services and missin
 identity remain visible coverage gaps. GKE source labels require explicit cluster
 confirmation. See [formats and export examples](parsers.md#gcp-cloud-audit-logs-and-gke)
 and the [mapping contract](development/gcp-audit-mapping.md).
+
+## Microsoft Entra ID
+
+The experimental local `parser-entra` and its four identified mapping modules
+are included by default. They require no credentials or connection. They use
+the documented native SignInLogs and AuditLogs export layouts; MFA, Conditional
+Access, changed properties and application details remain evidence.
+See [formats and bounds](parsers.md#microsoft-entra-id) and the
+[mapping contract](development/entra-source-mapping.md).

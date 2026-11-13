@@ -50,7 +50,8 @@ impl LogParser for EntraParser {
             irmind_app::source_mapping::json::SourceJsonLimits::default(),
         )
         .ok()?;
-        decode::layout(&fields)?;
+        let (_, keys) = decode::layout(&fields)?;
+        decode::timestamp(&fields, keys).ok()?;
         ParserConfidence::new(98).ok()
     }
 }

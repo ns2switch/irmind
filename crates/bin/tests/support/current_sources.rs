@@ -262,6 +262,20 @@ fn registry() -> ModuleRegistry {
             )
             .unwrap();
     }
+    #[cfg(feature = "parser-entra")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_entra::EntraParser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        for mapper in irmind_mod_mapping_entra::EntraMapping::all().unwrap() {
+            registry
+                .register(Box::new(mapper), &ModuleConfig::new())
+                .unwrap();
+        }
+    }
     #[cfg(feature = "parser-gcp-audit")]
     {
         registry

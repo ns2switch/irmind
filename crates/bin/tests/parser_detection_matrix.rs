@@ -88,6 +88,11 @@ mod matrix {
             Box::new(irmind_mod_parser_falco::FalcoParser::default()),
             &ModuleConfig::new(),
         )?;
+        #[cfg(feature = "parser-entra")]
+        registry.register(
+            Box::new(irmind_mod_parser_entra::EntraParser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-gcp-audit")]
         registry.register(
             Box::new(irmind_mod_parser_gcp_audit::GcpAuditParser::default()),
@@ -184,6 +189,34 @@ mod matrix {
                 include_bytes!("../../testkit/fixtures/parser-gcp-audit/source/gke.ndjson")
                     .as_slice(),
                 "parser-gcp-audit",
+            ),
+            #[cfg(feature = "parser-entra")]
+            (
+                "signin-resource.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-entra/source/signin-resource.ndjson")
+                    .as_slice(),
+                "parser-entra",
+            ),
+            #[cfg(feature = "parser-entra")]
+            (
+                "signin-table.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-entra/source/signin-table.ndjson")
+                    .as_slice(),
+                "parser-entra",
+            ),
+            #[cfg(feature = "parser-entra")]
+            (
+                "audit-resource.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-entra/source/audit-resource.ndjson")
+                    .as_slice(),
+                "parser-entra",
+            ),
+            #[cfg(feature = "parser-entra")]
+            (
+                "audit-table.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-entra/source/audit-table.ndjson")
+                    .as_slice(),
+                "parser-entra",
             ),
             ("cloud.json", JSON, "parser-json"),
             #[cfg(feature = "parser-kubernetes")]
@@ -289,7 +322,7 @@ mod matrix {
         let expected_scores: [Option<u8>; 8] = match expected {
             "parser-syslog" => [None; 8],
             "parser-linux" | "parser-zeek" | "parser-suricata" | "parser-kubernetes"
-            | "parser-falco" | "parser-gcp-audit" => [
+            | "parser-falco" | "parser-gcp-audit" | "parser-entra" => [
                 if sample.first() == Some(&b'{') {
                     Some(45)
                 } else {
@@ -326,6 +359,13 @@ mod matrix {
         Ok(())
     }
     fn assert_additional_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-entra")]
+        assert_eq!(
+            irmind_mod_parser_entra::EntraParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-entra").then_some(98)
+        );
         #[cfg(feature = "parser-gcp-audit")]
         assert_eq!(
             irmind_mod_parser_gcp_audit::GcpAuditParser::default()

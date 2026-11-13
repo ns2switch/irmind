@@ -14,6 +14,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | --- | --- | --- | --- | --- |
 | JSON y logs de nube exportados | JSON/NDJSON; AWS, GCP, Azure y HuntEval | Campos reconocidos del registro | Instante, identidades, cuentas, recursos e IP | experimental |
 | GCP Cloud Audit Logs | LogEntry JSON/NDJSON; exportaciones de GKE | Servicio/método protoPayload e instante originales | Nanosegundos UTC, estado explícito, roles de principal, recurso y extremos; clúster GKE confirmado | experimental |
+| Microsoft Entra ID | JSON/NDJSON de Azure Monitor y filas-objeto de Log Analytics | Categoría o Type documentado e instante original | Accesos y auditoría, resultado explícito, tenant, actor, objetivo e IP | experimental |
 | ECS | NDJSON | Versión de ECS e instante/campos característicos | Evento, host, usuario, origen, destino, proceso, archivo, URL | experimental |
 | OCSF | JSON/NDJSON o Parquet local | Clase, categoría y metadatos; Parquet requiere confirmación | Autenticación, API, red, procesos, archivos y hallazgos | experimental |
 | Herramientas DFIR | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Marcadores o cabecera CSV exacta | Instante, host, usuario, proceso, acción y entidades disponibles | experimental |
@@ -154,3 +155,14 @@ Elige el proyecto y la ventana UTC autorizados para el caso y limita la
 colección con los controles de exportación del proveedor. Exportar no concede
 credenciales a IRMind. Consulta el [formato de auditoría](https://cloud.google.com/logging/docs/audit/understanding-audit-logs)
 y los [filtros de GKE](https://cloud.google.com/kubernetes-engine/docs/how-to/audit-logging).
+
+### Microsoft Entra ID
+
+El módulo experimental `parser-entra`, incluido por defecto, reconoce logs de
+Azure Monitor con `category` y `properties`, también bajo `records`, y filas
+objeto de Log Analytics con `Type`. Cubre accesos interactivos, no interactivos,
+de service principals e identidades administradas, y AuditLogs. Conserva
+nanosegundos, nombres, tipos, offsets y detalles originales de MFA y acceso
+condicional. Los envoltorios `value` de Graph y las respuestas posicionales
+`tables/columns/rows` necesitan una conversión explícita; no son este formato.
+El [mapeo](mappings.md#microsoft-entra-id) mantiene actor y objetivo separados.

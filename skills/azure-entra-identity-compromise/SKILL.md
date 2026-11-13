@@ -2,12 +2,12 @@
 format = "irmind-skill-v1"
 name = "azure-entra-identity-compromise"
 description = "Review Entra sign-ins, MFA and OAuth changes, role grants and application credentials with explicit coverage gaps."
-version = "0.1.0"
+version = "0.1.1"
 author = "IRMind contributors"
 license = "MIT OR Apache-2.0"
 target_schema = "irmind-common-event-v1"
 tools = ["graph_summary", "text_search", "entity_timeline", "raw_records", "case_add_finding"]
-sources = ["parser-ecs", "parser-json"]
+sources = ["parser-entra", "parser-ecs", "parser-json"]
 categories = ["authentication", "iam", "configuration"]
 invocable = true
 +++
@@ -15,7 +15,9 @@ invocable = true
 
 ## Establish coverage
 
-Experimental; validated with synthetic episodes only. Partial. Producer-normalized ECS can supply typed identity events through parser-ecs/mapping-ecs. Configured Chronicle UDM can supply mapped authentication and administration events. Native Entra and Azure Activity JSON can be ingested by parser-json, but has no Entra-specific semantic mapping: use original fields without category/outcome/role filters. IRMind does not convert a portal export to ECS automatically.
+Experimental; validated with synthetic episodes only. Native Microsoft Entra sign-in and directory audit exports are decoded by parser-entra and mapped by mapping-entra. Azure Monitor resource-log JSON (including a records envelope) and Log Analytics object rows cover interactive, non-interactive, service-principal and managed-identity sign-ins, plus AuditLogs. Producer-normalized ECS and configured Chronicle UDM remain alternatives. Azure Activity and arbitrary portal/Graph response wrappers need a supported conversion; do not assume they share the Entra layout.
+
+Explicit sign-in status codes and directory audit result values supply outcome. Conditional Access and MFA details remain original evidence; their presence is not proof that MFA succeeded. Dynamic TargetResources and InitiatedBy JSON strings are decoded with strict bounds for mapping and retained unchanged in the original record. Distinguish the directory AADTenantId from a Log Analytics workspace TenantId.
 
 Ask the analyst to download sign-in and audit logs as JSON from Entra Monitoring & health and export Azure Activity for the authorized tenant, subscriptions and UTC window. Reports Reader is the documented least role for the portal log download; access, licensing and retention vary. Collect applied authentication details, Conditional Access results, initiatedBy, targetResources, modifiedProperties, app/service-principal IDs and correlation IDs. If using ECS or UDM, retain the native identifiers and original results alongside the producer mapping.
 
@@ -39,7 +41,7 @@ Example tool arguments, not a script to execute automatically:
 text_search({"query":"login","event_category":"authentication","event_outcome":"failure","limit":20})
 ```
 
-This query applies only to explicitly mapped ECS/UDM records with matching original action text. Use entity_role="actor" or "target" only when that observation exists. For native JSON use text_search on original activity names and raw_records, without semantic filters.
+This query applies to native Entra and explicitly mapped ECS/UDM records with matching original action text. Use entity_role="actor" or "target" only when that observation exists. Authentication and directory IAM events with an absent or contradictory status have outcome unknown. For unmapped generic JSON use original activity names and raw_records without semantic filters.
 
 Start with graph_summary. Results can be sampled, partial or truncated; inspect
 those markers and narrow the UTC window rather than silently extrapolating.

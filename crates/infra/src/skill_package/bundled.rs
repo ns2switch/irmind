@@ -82,7 +82,9 @@ mod tests {
         for method in methods {
             assert_eq!(method.package().resources().len(), 2);
             let version = match method.metadata().name().as_str() {
-                "gcp-service-account-abuse" | "network-c2-beaconing" => "0.1.1",
+                "gcp-service-account-abuse"
+                | "network-c2-beaconing"
+                | "azure-entra-identity-compromise" => "0.1.1",
                 _ => "0.1.0",
             };
             assert_eq!(method.metadata().version().as_str(), version);

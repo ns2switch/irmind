@@ -35,7 +35,8 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     #[cfg(any(
         feature = "mapping-kubernetes",
         feature = "mapping-falco",
-        feature = "mapping-gcp-audit"
+        feature = "mapping-gcp-audit",
+        feature = "mapping-entra"
     ))]
     register_contextual(registry)?;
     #[cfg(feature = "mapping-cloudtrail")]
@@ -79,9 +80,14 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
 #[cfg(any(
     feature = "mapping-kubernetes",
     feature = "mapping-falco",
-    feature = "mapping-gcp-audit"
+    feature = "mapping-gcp-audit",
+    feature = "mapping-entra"
 ))]
 fn register_contextual(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "mapping-entra")]
+    for mapper in irmind_mod_mapping_entra::EntraMapping::all()? {
+        registry.register(Box::new(mapper), &ModuleConfig::new())?;
+    }
     #[cfg(feature = "mapping-gcp-audit")]
     {
         registry.register(
@@ -235,6 +241,10 @@ mod tests {
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_gcp_audit::GcpAuditSourceDecoder))
             .unwrap();
+        #[cfg(feature = "mapping-entra")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_entra::EntraSourceDecoder))
+            .unwrap();
         register(&mut registry).unwrap();
         check_catalog(&registry);
     }
@@ -244,7 +254,8 @@ mod tests {
         assert!(catalog.supports_decoder("parser-linux", "linux-source-v1"));
         assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + 2 * usize::from(cfg!(feature = "mapping-gcp-audit"))
+            2 + 4 * usize::from(cfg!(feature = "mapping-entra"))
+                + 2 * usize::from(cfg!(feature = "mapping-gcp-audit"))
                 + 2 * usize::from(cfg!(feature = "mapping-falco"))
                 + usize::from(cfg!(feature = "mapping-kubernetes"))
                 + usize::from(cfg!(feature = "mapping-cloudtrail"))

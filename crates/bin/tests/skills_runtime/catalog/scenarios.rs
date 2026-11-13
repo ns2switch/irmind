@@ -32,10 +32,17 @@ pub(super) const SCENARIOS: &[Scenario] = &[
                 ),
             ),
             (
-                "entra-ecs.jsonl",
-                "parser-ecs",
+                "entra-native.ndjson",
+                "parser-entra",
                 include_str!(
-                    "../../../../testkit/fixtures/skills-expanded/azure-entra-identity-compromise/source/entra-ecs.jsonl"
+                    "../../../../testkit/fixtures/parser-entra/source/audit-resource.ndjson"
+                ),
+            ),
+            (
+                "entra-signin.ndjson",
+                "parser-entra",
+                include_str!(
+                    "../../../../testkit/fixtures/parser-entra/source/signin-resource.ndjson"
                 ),
             ),
         ],
@@ -45,7 +52,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         selected_source: 1,
         filters: &[
             ("event_category", "iam"),
-            ("event_type", "creation"),
+            ("event_type", "info"),
             ("event_outcome", "success"),
             ("entity_role", "actor"),
         ],

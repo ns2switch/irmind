@@ -5,6 +5,9 @@
 mod benchmark;
 #[path = "support/current_sources.rs"]
 mod current_sources;
+#[cfg(feature = "parser-entra")]
+#[path = "kubernetes_ingest/entra.rs"]
+mod entra;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,

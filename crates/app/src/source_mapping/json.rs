@@ -47,12 +47,21 @@ pub fn decode_json_fields(
     read::decode(input, limits.validate()?)
 }
 
+/// Decode a bounded JSON value without changing its original member types.
+/// Secondary dynamic fields may be arrays; source records still require objects.
+pub fn decode_json_value(
+    input: &[u8],
+    limits: SourceJsonLimits,
+) -> Result<SourceValue, SourceRecordError> {
+    read::parse(input, limits.validate()?)
+}
+
 /// Validate discarded container metadata with the same bounded JSON grammar.
 pub fn validate_json_value(
     input: &[u8],
     limits: SourceJsonLimits,
 ) -> Result<(), SourceRecordError> {
-    read::parse(input, limits.validate()?).map(|_| ())
+    decode_json_value(input, limits).map(|_| ())
 }
 
 /// Display/search projection only. Source hashes use the typed canonical codec.

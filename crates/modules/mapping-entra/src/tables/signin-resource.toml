@@ -1,0 +1,72 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-entra-signin-resource-base"
+version = "entra-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-entra"
+parser_versions = ["entra-source-v1"]
+format = "entra-signin-resource"
+format_version = "entra-source-v1"
+action = ["operationName"]
+
+[partition]
+account = ["tenantId"]
+
+[[fields]]
+source = ["tenantId"]
+target = "cloud.account.id"
+omit_text = [""]
+observation = { kind = "account", role = "subject", scope = { kind = "account", path = ["tenantId"] } }
+[[fields.when]]
+path = ["tenantId"]
+predicate = { op = "present" }
+
+[[fields]]
+source = ["properties", "userPrincipalName"]
+target = "user.name"
+omit_text = [""]
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["tenantId"] } }
+[[fields.when]]
+path = ["tenantId"]
+predicate = { op = "present" }
+
+[[fields]]
+source = ["properties", "userId"]
+target = "user.id"
+omit_text = [""]
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["tenantId"] } }
+[[fields.when]]
+path = ["tenantId"]
+predicate = { op = "present" }
+
+[[fields]]
+source = ["properties", "appId"]
+target = "irmind.resource.id"
+omit_text = [""]
+observation = { kind = "resource", role = "subject", scope = { kind = "account", path = ["tenantId"] } }
+[[fields.when]]
+path = ["tenantId"]
+predicate = { op = "present" }
+
+[[fields]]
+source = ["properties", "ipAddress"]
+target = "source.ip"
+omit_text = [""]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["properties", "userAgent"]
+target = "user_agent.original"
+omit_text = [""]
+
+[[fields]]
+source = ["properties", "id"]
+target = "irmind.source_event.id"
+omit_text = [""]
+observation = { kind = "event", role = "subject", scope = { kind = "source_record" } }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "unknown"

@@ -37,7 +37,7 @@ fn benchmark(format: &str) {
         .unwrap();
     let started = std::time::Instant::now();
     let context = match format {
-        "gcp" | "zeek" | "suricata" => None,
+        "gcp" | "zeek" | "suricata" | "entra-signin" | "entra-audit" => None,
         "gke" => irmind_app::command_cluster_context(Some(
             "gke:projects/synthetic-project/locations/us-central1/clusters/synthetic-cluster",
         ))
@@ -94,8 +94,31 @@ fn network_one_gib_release_throughput() -> Result<(), &'static str> {
     Ok(())
 }
 
+#[cfg(feature = "parser-entra")]
+#[test]
+#[ignore = "manual optimized 1 GiB Entra native mapping smoke"]
+fn entra_one_gib_release_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Run benchmarks in the release profile");
+    }
+    for format in ["entra-signin", "entra-audit"] {
+        benchmark(format);
+    }
+    Ok(())
+}
+
 fn fixture(format: &str) -> &'static [u8] {
     [
+        (
+            "entra-signin",
+            include_bytes!("../../../testkit/fixtures/parser-entra/source/signin-resource.ndjson")
+                .as_slice(),
+        ),
+        (
+            "entra-audit",
+            include_bytes!("../../../testkit/fixtures/parser-entra/source/audit-resource.ndjson")
+                .as_slice(),
+        ),
         (
             "kubernetes",
             include_bytes!("../../../testkit/fixtures/parser-kubernetes/source/event.ndjson")
@@ -142,6 +165,8 @@ fn verify_selection(store: &LocalStore, id: &irmind_domain::CaseId, format: &str
         .map(|e| SourceManifestV2::decode(&e.payload).unwrap())
         .unwrap();
     let expected = [
+        ("entra-signin", "parser-entra"),
+        ("entra-audit", "parser-entra"),
         ("gcp", "parser-gcp-audit"),
         ("gke", "parser-gcp-audit"),
         ("kubernetes", "parser-kubernetes"),
