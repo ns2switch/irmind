@@ -65,7 +65,7 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
 
     #[cfg(feature = "mapping-network")]
     for &parser in NETWORK_PARSERS {
-        let mapper = irmind_mod_mapping_network::NetworkExtractionMapping::new(parser)?;
+        let mapper = irmind_mod_mapping_network::NetworkMapping::new(parser)?;
         registry.register(Box::new(mapper), &ModuleConfig::new())?;
     }
 

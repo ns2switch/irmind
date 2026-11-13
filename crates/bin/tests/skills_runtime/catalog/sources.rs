@@ -16,7 +16,7 @@ pub(super) fn open(root: &Path) -> Arc<irmind_infra::LocalStore> {
 // extraction-only compatibility fixture used by unrelated integration tests.
 fn modules() -> Vec<Box<dyn Module>> {
     use irmind_mod_mapping_linux::{AuditMapping, HttpMapping};
-    use irmind_mod_mapping_network::NetworkExtractionMapping;
+    use irmind_mod_mapping_network::NetworkMapping;
     vec![
         Box::new(irmind_mod_parser_gcp_audit::GcpAuditParser::default()),
         Box::new(irmind_mod_mapping_gcp_audit::CloudAuditMapping::new().unwrap()),
@@ -30,8 +30,8 @@ fn modules() -> Vec<Box<dyn Module>> {
         Box::new(AuditMapping::new().unwrap()),
         Box::new(HttpMapping::new().unwrap()),
         Box::new(irmind_mod_parser_zeek::ZeekParser),
-        Box::new(NetworkExtractionMapping::new("parser-zeek").unwrap()),
+        Box::new(NetworkMapping::new("parser-zeek").unwrap()),
         Box::new(irmind_mod_parser_suricata::SuricataParser),
-        Box::new(NetworkExtractionMapping::new("parser-suricata").unwrap()),
+        Box::new(NetworkMapping::new("parser-suricata").unwrap()),
     ]
 }

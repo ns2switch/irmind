@@ -12,6 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-mapping-network = { path = "../crates/modules/mapping-network" }
 irmind-mod-parser-gcp-audit = { path = "../crates/modules/parser-gcp-audit", version = "0.1.0" }
 irmind-mod-parser-kubernetes = { path = "../crates/modules/parser-kubernetes", version = "0.1.0" }
 irmind-mod-parser-falco = { path = "../crates/modules/parser-falco", version = "0.1.0" }

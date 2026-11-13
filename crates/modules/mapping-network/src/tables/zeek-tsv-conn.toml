@@ -1,0 +1,13 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "network-header-zeek-tsv-conn"
+version = "network-headers-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-zeek"
+parser_versions = ["zeek-source-v1"]
+
+[[rules]]
+categories = ["network"]
+types = ["connection"]
+kind = "event"
+outcome = "unknown"

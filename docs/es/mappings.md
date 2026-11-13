@@ -21,7 +21,7 @@ La CLI, la TUI y la demo usan el escritor común. Cada parser compilado tiene un
 | Acceso HTTP | Common/combined de nginx y Apache | TOML incluido, con hash fijado | `mapping-linux` | Experimental; contratos sintéticos |
 | Salidas DFIR | Velociraptor, Hayabusa, Chainsaw, plaso y EZTools | Módulos nativos separados de extracción | `mapping-dfir` | Experimental; sin inferencias |
 | Syslog | RFC 5424 y RFC 3164 confirmado, texto o gzip | Extracción nativa | `mapping-syslog` | Experimental; sin inferencias |
-| Red | Zeek y Suricata EVE | Módulos nativos separados de extracción | `mapping-network` | Experimental; sin inferencias |
+| Red | Zeek y Suricata EVE | Clasificación TOML vinculada a la release y validación nativa acotada | `mapping-network` | Experimental; roles explícitos de extremos y solo estados admitidos |
 | Linux de cuentas y cron | useradd, usermod y cron/crond | Extracción nativa | `mapping-linux` | Experimental; sin inferencias |
 | Declarativo | Definiciones locales aprobadas | Extracción fijada por la definición | `parser-declarative` | Experimental; sin inferencias |
 
@@ -195,25 +195,28 @@ selectores separados de sshd, sudo y su. La extracción nativa acotada lee el
 mensaje original sin asignar categoría, resultado ni vida de proceso. Una
 petición registrada por cron no demuestra que el comando terminara bien.
 
-## Extracción de Zeek y Suricata
+## Zeek y Suricata
 
-Los decodificadores conservan los campos originales JSON y TSV de Zeek y el JSON
-EVE de Suricata. El TSV mantiene las cadenas de las columnas y sus tipos
-declarados en dos objetos separados; el discriminador de formato registra el
-dataset de la cabecera. Los instantes decimales de Zeek conservan microsegundos
-o nanosegundos sin redondeo de coma flotante. Los offsets UTC de EVE se
-interpretan explícitamente.
+Los decodificadores conservan JSON/TSV original e instantes precisos.
+`mapping-network` registra `mapping-zeek` y `mapping-suricata`. Las tablas TOML
+incluidas clasifican conexiones/flujos, DNS, HTTP, TLS, archivos, certificados
+y detecciones. HTTP añade la categoría web; notice/weird/alert/anomaly son
+alertas de detección de intrusiones sin confirmar. La capa nativa conserva
+claves con puntos, representaciones escalares TSV y relaciones UID/flow,
+validando campos tipados y ocurrencias de origen y destino. No reconstruye los
+campos originales a partir del texto de presentación.
 
-`mapping-network` proporciona módulos independientes para Zeek y Suricata.
-Mantienen la correlación por UID o flujo, extremos de red, dominios,
-certificados, archivos y alias de detección sin inferir categorías, resultados
-ni roles. Una alerta de la fuente no confirma un hallazgo del caso. La extracción
-nativa conserva los nombres de campo con puntos de Zeek, los marcadores nulos de
-TSV y las relaciones propias de cada fuente.
+Solo un estado explícito admitido determina el resultado: conexión Zeek normal
+o rechazada, código DNS, HTTP 200–399/400–599 o TLS establecido explícitamente.
+Sin estado, el resultado es desconocido. Un TLS no establecido no demuestra un
+fallo; una alerta permitida tampoco demuestra un ataque exitoso. Los hallazgos
+siguen exigiendo confirmación del analista.
 
-La ingesta y la reconstrucción mantienen los límites de registro y fuente, los
-offsets medidos, la cancelación y las muestras no confiables de rechazo. Los
-campos originales no se reconstruyen a partir del texto de presentación.
+El esquema común tiene un único campo de pregunta DNS. Suricata DNS v3 proyecta
+la primera; las demás se conservan en el original con un diagnóstico explícito
+de cobertura. Un dataset desconocido queda sin clasificar. Se mantienen límites,
+taint, cancelación y custodia. Consulta las
+[notas de implementación](../development/network-semantic-mapping.md).
 
 ## Kubernetes y Falco (experimentales)
 

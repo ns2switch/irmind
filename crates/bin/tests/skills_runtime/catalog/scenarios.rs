@@ -238,6 +238,11 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         conclusion: "Four synthetic connections at 60-second intervals; C2 remains unconfirmed",
         technique: "T1071.001",
         selected_source: 0,
-        filters: &[],
+        filters: &[
+            ("event_category", "network"),
+            ("event_type", "connection"),
+            ("event_outcome", "unknown"),
+            ("entity_role", "destination"),
+        ],
     },
 ];

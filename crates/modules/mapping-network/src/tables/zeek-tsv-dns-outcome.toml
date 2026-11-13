@@ -1,0 +1,79 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "network-outcome-zeek-tsv-dns"
+version = "network-headers-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-zeek"
+parser_versions = ["zeek-source-v1"]
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "success"
+[[rules.when]]
+path = ["columns", "rcode_name"]
+predicate = { op = "text", value = "NOERROR" }
+[[rules.when]]
+path = ["columns", "rcode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["columns", "rcode_name"]
+predicate = { op = "text", value = "FORMERR" }
+[[rules.when]]
+path = ["columns", "rcode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["columns", "rcode_name"]
+predicate = { op = "text", value = "SERVFAIL" }
+[[rules.when]]
+path = ["columns", "rcode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["columns", "rcode_name"]
+predicate = { op = "text", value = "NXDOMAIN" }
+[[rules.when]]
+path = ["columns", "rcode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["columns", "rcode_name"]
+predicate = { op = "text", value = "NOTIMP" }
+[[rules.when]]
+path = ["columns", "rcode"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["columns", "rcode_name"]
+predicate = { op = "text", value = "REFUSED" }
+[[rules.when]]
+path = ["columns", "rcode"]
+predicate = { op = "missing" }

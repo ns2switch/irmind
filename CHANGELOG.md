@@ -4,6 +4,15 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+### Network interpretation
+
+- Classify native Zeek and Suricata records with typed endpoint roles, protocol
+  fields, explicit status outcomes and unconfirmed source alerts. Update the
+  network skill's synthetic episode to query category, outcome and role.
+- Network mapping identities and their current logical golden projections change;
+  source decoders, signed envelopes, physical schemas and export format do not.
+
+
 ### GCP Cloud Audit and GKE interpretation
 
 - Add a default, experimental Cloud Audit JSON/NDJSON source decoder and bundled

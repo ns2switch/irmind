@@ -3,31 +3,8 @@ use irmind_app::source_mapping::{MappingDiagnostic, MappingError, MappingOutput,
 use irmind_domain::{BoundedObservations, CommonEventV1, EventContextV1};
 impl TableMapping {
     pub(super) fn project(&self, source: &SourceRecordV1) -> Result<MappingOutput, MappingError> {
-        if !self
-            .manifest
-            .selectors()
-            .iter()
-            .any(|selector| selector.matches(source))
-        {
-            return Err(MappingError::UnsupportedSourceValue);
-        }
-        let mut selected = self.rules.iter().filter(|r| r.selector.matches(source));
-        let rule = selected.next();
-        let mut header = rule.map(|rule| rule.header.clone()).unwrap_or_default();
-        if selected.next().is_some() {
-            return Err(MappingError::InvalidDefinition);
-        }
-        if let Some(path) = &self.action
-            && let Some(value) = path.resolve(source.fields())
-        {
-            header = header
-                .with_action(
-                    value
-                        .as_text()
-                        .ok_or(MappingError::UnsupportedSourceValue)?,
-                )
-                .map_err(|_| MappingError::UnsupportedSourceValue)?;
-        }
+        let rule = self.selected_rule(source)?;
+        let header = self.header(source, rule)?;
         let (context, observations) = self.project_fields(source, rule)?;
         let common = CommonEventV1::try_new(
             source.origin().clone(),
@@ -51,6 +28,52 @@ impl TableMapping {
             self.partition.project(source)?,
             vec![],
         )
+    }
+    /// Evaluate only finite classification/action rules, without serializing a projection.
+    /// Native source validators use this with their own validated field representation.
+    pub fn event_header(
+        &self,
+        source: &SourceRecordV1,
+    ) -> Result<irmind_domain::EventHeaderV1, MappingError> {
+        self.header(source, self.selected_rule(source)?)
+    }
+    fn selected_rule(
+        &self,
+        source: &SourceRecordV1,
+    ) -> Result<Option<&super::CompiledRule>, MappingError> {
+        if !self
+            .manifest
+            .selectors()
+            .iter()
+            .any(|selector| selector.matches(source))
+        {
+            return Err(MappingError::UnsupportedSourceValue);
+        }
+        let mut selected = self.rules.iter().filter(|r| r.selector.matches(source));
+        let rule = selected.next();
+        if selected.next().is_some() {
+            return Err(MappingError::InvalidDefinition);
+        }
+        Ok(rule)
+    }
+    fn header(
+        &self,
+        source: &SourceRecordV1,
+        rule: Option<&super::CompiledRule>,
+    ) -> Result<irmind_domain::EventHeaderV1, MappingError> {
+        let mut header = rule.map(|rule| rule.header.clone()).unwrap_or_default();
+        if let Some(path) = &self.action
+            && let Some(value) = path.resolve(source.fields())
+        {
+            header = header
+                .with_action(
+                    value
+                        .as_text()
+                        .ok_or(MappingError::UnsupportedSourceValue)?,
+                )
+                .map_err(|_| MappingError::UnsupportedSourceValue)?;
+        }
+        Ok(header)
     }
     fn project_fields(
         &self,

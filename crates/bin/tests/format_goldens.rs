@@ -425,9 +425,8 @@ fn syslog_source_and_projection_bytes_are_independent_of_json_map_features() {
 #[cfg(feature = "mapping-network")]
 #[test]
 fn network_source_and_projection_bytes_are_independent_of_json_map_features() {
-    let zeek = irmind_mod_mapping_network::NetworkExtractionMapping::new("parser-zeek").unwrap();
-    let suricata =
-        irmind_mod_mapping_network::NetworkExtractionMapping::new("parser-suricata").unwrap();
+    let zeek = irmind_mod_mapping_network::NetworkMapping::new("parser-zeek").unwrap();
+    let suricata = irmind_mod_mapping_network::NetworkMapping::new("parser-suricata").unwrap();
     let actual = [
         source_pipeline_goldens::digest(
             &irmind_mod_parser_zeek::ZeekSourceDecoder,
@@ -445,8 +444,8 @@ fn network_source_and_projection_bytes_are_independent_of_json_map_features() {
     assert_eq!(
         actual,
         [
-            "997c13d7a5840fec396e743a057a2cb7e7a5a0e408fd7748a28b556220d19694",
-            "16d352ec9785d3431326eddb39bdda28a25e86ded552cb310de6a734f125745a"
+            "087857b4994ba66baf819cc1037bbb8b378ebc4cd76309808184e14a10566fca",
+            "398a1dfdd9f63619eb4a845a8b86a94ea59061d75bde6e1e60a6eeefa8792adf"
         ]
     );
 }

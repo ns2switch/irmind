@@ -2,7 +2,7 @@
 format = "irmind-skill-v1"
 name = "network-c2-beaconing"
 description = "Review periodic connections, DNS and network alerts without treating regular traffic as proof of C2."
-version = "0.1.0"
+version = "0.1.1"
 author = "IRMind contributors"
 license = "MIT OR Apache-2.0"
 target_schema = "irmind-common-event-v1"
@@ -15,7 +15,7 @@ invocable = true
 
 ## Establish coverage
 
-Experimental; validated with synthetic episodes only. Partial. Zeek conn/dns/http/ssl and Suricata EVE records are ingestible with queryable endpoint entities, uid/flow_id and original fields, but current network mappings are extraction-only: no typed categories, outcomes or roles. Already normalized ECS can provide those filters. Interval statistics must be based on the actual bounded records, not invented whole-case aggregates.
+Experimental; validated with synthetic episodes only. Native Zeek and Suricata mappings provide network/protocol categories, explicit source/destination roles and outcomes only when the source reports a supported status. Missing status stays unknown; an observed flow or an allowed alert is not proof of success or compromise. UID/flow_id correlations and original fields remain available. The common schema has one DNS-question slot: additional questions remain original evidence with an explicit coverage diagnostic. Interval statistics must be based on the actual bounded records, not invented whole-case aggregates.
 
 Ask the analyst for Zeek logs with headers or JSON, relevant Suricata EVE JSON, sensor timezone/configuration and the authorized time window. Collect conn, dns and available http/ssl/tls plus alert records; retain uid/flow_id. No packet capture or live network probing is performed by this skill.
 
@@ -36,10 +36,10 @@ Ask the analyst for Zeek logs with headers or JSON, relevant Suricata EVE JSON, 
 Example tool arguments, not a script to execute automatically:
 
 ```text
-text_search({"query":"203.0.113.77","limit":20})
+text_search({"query":"203.0.113.77","limit":20,"event_category":"network","event_type":"connection","event_outcome":"unknown","entity_role":"destination"})
 ```
 
-Use entity_timeline with kind="ip" on native Zeek/Suricata without semantic/role filters. For producer-mapped ECS, event_category="network", event_type="connection" and entity_role="destination" are available only when supplied; outcome="success" must not be assumed for an observed flow.
+Use entity_timeline with kind="ip", event_category="network", event_type="connection" and entity_role="destination" for bounded flow review. Select the actual outcome (including unknown); success must not be assumed for an observed flow. DNS, HTTP and TLS use protocol events, with HTTP also categorized as web. Source alerts are unconfirmed intrusion_detection events and need separate queries. Inspect coverage diagnostics and originals before excluding records with typed filters.
 
 Start with graph_summary. Results can be sampled, partial or truncated; inspect
 those markers and narrow the UTC window rather than silently extrapolating.

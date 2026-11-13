@@ -104,7 +104,7 @@ fn network_registry() -> ModuleRegistry {
             &ModuleConfig::new(),
         )
         .unwrap();
-    for mapper in irmind_mod_mapping_network::NetworkExtractionMapping::all().unwrap() {
+    for mapper in irmind_mod_mapping_network::NetworkMapping::all().unwrap() {
         registry
             .register(Box::new(mapper), &ModuleConfig::new())
             .unwrap();
