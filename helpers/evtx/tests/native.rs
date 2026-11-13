@@ -239,6 +239,7 @@ fn decode_file(
                 source: &source,
                 evidence_hash: [1; 32],
                 time_context: None,
+                cluster_context: None,
                 cancel,
             },
         },

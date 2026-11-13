@@ -101,6 +101,7 @@ fn parser_reader_cleanup_retains_the_successful_session_witness() {
                         source: &reference,
                         evidence_hash: [1; 32],
                         time_context: None,
+                        cluster_context: None,
                         cancel: &cancel,
                     },
                 },
