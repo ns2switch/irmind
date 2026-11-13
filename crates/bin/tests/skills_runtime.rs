@@ -72,6 +72,14 @@ fn episode(name: &str, parser_id: &str, fixture: &str, term: &str) {
         .unwrap();
     assert!(answer.contains(&hash));
     check_requests(name, &model);
+    support::measurement::record(
+        name,
+        &[model.requests.lock().unwrap().as_slice()],
+        format!("Synthetic finding supported by {hash}").len(),
+        store.as_ref(),
+        &case.id,
+        "single",
+    );
     confirm_expected(name, &engine, &case.id);
     seal_export(name, &engine, store.as_ref(), &case, root.path());
 }

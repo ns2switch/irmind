@@ -7,6 +7,7 @@ mod authorization;
 ))]
 mod catalog;
 mod malicious;
+pub(super) mod measurement;
 mod sequence;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
