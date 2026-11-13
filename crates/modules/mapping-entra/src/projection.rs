@@ -78,7 +78,7 @@ fn insert(
     context: &mut EventContextV1,
     observations: &mut Vec<EntityObservation>,
 ) -> Result<(), MappingError> {
-    if context.get(field).is_some() {
+    if value.is_empty() || context.get(field).is_some() {
         return Ok(());
     }
     let common = if field == F::SourceIp {
