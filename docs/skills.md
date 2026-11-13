@@ -19,7 +19,7 @@ Open a case, configure a model in `/settings model`, and type `/` to see the act
 | `/windows-persistence` | Services, tasks, Run keys and WMI subscriptions. | EVTX and collected configuration/DFIR exports. | Partial: task 4698 and WMI subscriptions lack current semantic table rules. |
 | `/linux-webshell` | Web requests correlated with web-user execution. | nginx/Apache common/combined and auditd; collected web-root evidence. | Mapped HTTP/execve core; host, request ID or causal linkage may be missing. |
 | `/linux-persistence` | Cron, systemd, SSH keys, accounts and sudoers. | Linux logs plus collected configuration or DFIR exports. | Partial: sparse logs do not reconstruct complete configuration state. |
-| `/network-c2-beaconing` | Periodic flows, suspicious DNS and alerts. | Zeek and Suricata EVE; optional producer-normalized ECS. | Partial: native network mappings extract entities and fields without categories or roles. |
+| `/network-c2-beaconing` | Periodic flows, suspicious DNS and alerts. | Zeek and Suricata EVE; optional producer-normalized ECS. | Mapped protocol categories and source/destination roles; missing status stays unknown. Source alerts remain unconfirmed. |
 | `/malware-execution-triage` | Binary origin, execution and observed follow-on activity. | Sysmon 1/3/11 and PECmd/AmcacheParser or other DFIR exports. | Partial: Amcache presence is not proof of execution; raw binary artifacts need an export. |
 
 See the [parser guide](parsers.md) and [module configuration](modules.md) before collecting data. Skills declare only the local tools needed by their methodology. None runs a collector, accesses a provider, installs a mapper or expands case scope.

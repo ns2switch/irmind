@@ -1,12 +1,14 @@
 #![forbid(unsafe_code)]
-//! Extraction modules retain network search aliases without assigning classifications or roles.
+//! Bounded network interpretation, separated from source format decoding.
+mod headers;
 mod projection;
+mod semantic;
 use irmind_app::{
     IndexedGraphRecord, PartitionProfile, SourceMapper,
     modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
     source_mapping::{
-        MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
-        MappingPartition, MappingProvenance, SourceRecordV1, SourceSelector,
+        MappingError, MappingIdentityV1, MappingManifest, MappingOutput, MappingPartition,
+        MappingProvenance, SourceRecordV1, SourceSelector,
     },
 };
 use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
@@ -15,13 +17,14 @@ use std::{
     sync::Arc,
 };
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
-pub struct NetworkExtractionMapping {
+pub struct NetworkMapping {
     manifest: MappingManifest,
     parser: &'static str,
     module: &'static ModuleManifest,
+    headers: headers::Headers,
 }
 const PARSERS: &[&str] = &["parser-zeek", "parser-suricata"];
-impl NetworkExtractionMapping {
+impl NetworkMapping {
     pub fn new(parser: &'static str) -> Result<Self, MappingError> {
         let index = PARSERS
             .iter()
@@ -33,8 +36,8 @@ impl NetworkExtractionMapping {
             .ok_or(MappingError::InvalidManifest)?;
         let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
-            &format!("mapping-{short}-extraction"),
-            &format!("extraction-v1-{}", digest.as_str()),
+            &format!("mapping-{short}"),
+            &format!("network-semantic-v1-{}", digest.as_str()),
             COMMON_EVENT_V1,
             digest,
         )
@@ -57,13 +60,14 @@ impl NetworkExtractionMapping {
             )?,
             parser,
             module,
+            headers: headers::Headers::new(parser)?,
         })
     }
     pub fn all() -> Result<Vec<Self>, MappingError> {
         PARSERS.iter().map(|&p| Self::new(p)).collect()
     }
 }
-impl SourceMapper for NetworkExtractionMapping {
+impl SourceMapper for NetworkMapping {
     fn manifest(&self) -> &MappingManifest {
         &self.manifest
     }
@@ -72,6 +76,7 @@ impl SourceMapper for NetworkExtractionMapping {
             return Err(MappingError::UnsupportedSourceValue);
         }
         let (record, host) = projection::project(self.parser, source)?;
+        let (common, diagnostics) = semantic::project(self.parser, source, &self.headers)?;
         MappingOutput::try_new(
             source,
             IndexedGraphRecord {
@@ -79,9 +84,9 @@ impl SourceMapper for NetworkExtractionMapping {
                 time: source.timestamp(),
                 source_offset: source.origin().offset(),
             },
-            MappingOutput::unclassified_common(source)?,
+            common,
             MappingPartition::try_new(PartitionProfile::EndpointHost, "", "", host)?,
-            vec![MappingDiagnostic::Unclassified],
+            diagnostics,
         )
     }
 }
@@ -94,11 +99,8 @@ const fn module(id: &'static str) -> ModuleManifest {
         config: &[],
     }
 }
-static MODULES: [ModuleManifest; 2] = [
-    module("mapping-zeek-extraction"),
-    module("mapping-suricata-extraction"),
-];
-impl Module for NetworkExtractionMapping {
+static MODULES: [ModuleManifest; 2] = [module("mapping-zeek"), module("mapping-suricata")];
+impl Module for NetworkMapping {
     fn manifest(&self) -> &'static ModuleManifest {
         self.module
     }

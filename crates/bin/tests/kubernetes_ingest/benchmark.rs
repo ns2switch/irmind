@@ -37,7 +37,7 @@ fn benchmark(format: &str) {
         .unwrap();
     let started = std::time::Instant::now();
     let context = match format {
-        "gcp" => None,
+        "gcp" | "zeek" | "suricata" => None,
         "gke" => irmind_app::command_cluster_context(Some(
             "gke:projects/synthetic-project/locations/us-central1/clusters/synthetic-cluster",
         ))
@@ -77,6 +77,23 @@ fn gcp_audit_one_gib_release_throughput() -> Result<(), &'static str> {
     Ok(())
 }
 
+#[cfg(all(
+    feature = "parser-zeek",
+    feature = "parser-suricata",
+    feature = "mapping-network"
+))]
+#[test]
+#[ignore = "manual optimized 1 GiB network semantic mapping smoke"]
+fn network_one_gib_release_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Run benchmarks in the release profile");
+    }
+    for format in ["zeek", "suricata"] {
+        benchmark(format);
+    }
+    Ok(())
+}
+
 fn fixture(format: &str) -> &'static [u8] {
     [
         (
@@ -87,6 +104,17 @@ fn fixture(format: &str) -> &'static [u8] {
         (
             "falco",
             include_bytes!("../../../testkit/fixtures/parser-falco/source/event.ndjson").as_slice(),
+        ),
+        (
+            "zeek",
+            include_bytes!("../../../testkit/fixtures/parser-zeek/source/dns.jsonl").as_slice(),
+        ),
+        (
+            "suricata",
+            include_bytes!("../../../testkit/fixtures/parser-suricata/source/eve.jsonl")
+                .split(|b| *b == b'\n')
+                .next()
+                .unwrap(),
         ),
         (
             "gcp",
@@ -113,11 +141,18 @@ fn verify_selection(store: &LocalStore, id: &irmind_domain::CaseId, format: &str
         .find(|e| e.kind == AuditEventKind::SourceManifestV2)
         .map(|e| SourceManifestV2::decode(&e.payload).unwrap())
         .unwrap();
-    let expected = match format {
-        "gcp" | "gke" => "parser-gcp-audit",
-        "kubernetes" => "parser-kubernetes",
-        _ => "parser-falco",
-    };
+    let expected = [
+        ("gcp", "parser-gcp-audit"),
+        ("gke", "parser-gcp-audit"),
+        ("kubernetes", "parser-kubernetes"),
+        ("falco", "parser-falco"),
+        ("zeek", "parser-zeek"),
+        ("suricata", "parser-suricata"),
+    ]
+    .into_iter()
+    .find(|(name, _)| *name == format)
+    .unwrap()
+    .1;
     assert_eq!(manifest.parser_id, expected);
     assert!(
         entries

@@ -42,13 +42,13 @@ const SURICATA: &[Alias] = &[
     ("file", "fileinfo.filename"),
     ("finding", "anomaly.event"),
 ];
-struct View<'a> {
+pub(super) struct View<'a> {
     fields: &'a SourceValue,
     zeek: bool,
     tsv: bool,
 }
 impl<'a> View<'a> {
-    fn new(source: &'a SourceRecordV1, zeek: bool) -> Result<Self, MappingError> {
+    pub(super) fn new(source: &'a SourceRecordV1, zeek: bool) -> Result<Self, MappingError> {
         let tsv = zeek && source.format().id() == "zeek-tsv";
         let fields = if tsv {
             source.fields().field("columns").ok_or_else(invalid)?
@@ -57,12 +57,18 @@ impl<'a> View<'a> {
         };
         Ok(Self { fields, zeek, tsv })
     }
-    fn get(&self, path: &str) -> Option<&'a str> {
-        let value = if self.zeek {
+    pub(super) fn is_tsv(&self) -> bool {
+        self.tsv
+    }
+    pub(super) fn raw(&self, path: &str) -> Option<&'a SourceValue> {
+        if self.zeek {
             self.fields.field(path)
         } else {
             path.split('.').try_fold(self.fields, |v, key| v.field(key))
-        }?;
+        }
+    }
+    pub(super) fn get(&self, path: &str) -> Option<&'a str> {
+        let value = self.raw(path)?;
         let text = match value {
             SourceValue::Text(t) => t.as_str(),
             SourceValue::Number(n) => n.as_str(),
@@ -113,30 +119,57 @@ pub(super) fn project<'a>(
     };
     Ok((record, host))
 }
-fn zeek_kind<'a>(source: &'a SourceRecordV1, view: &View<'_>) -> &'a str {
-    if let Some(kind) = source
+pub(super) fn zeek_kind<'a>(source: &'a SourceRecordV1, view: &View<'a>) -> &'a str {
+    let declared = source
         .format()
         .discriminators()
         .get(&SourceDiscriminator::Dataset)
-    {
-        return kind;
+        .map(String::as_str)
+        .or_else(|| view.get("_path"));
+    if let Some(kind) = declared {
+        return if matches!(
+            kind,
+            "conn" | "dns" | "http" | "ssl" | "files" | "x509" | "notice" | "weird"
+        ) {
+            kind
+        } else {
+            "unknown"
+        };
     }
-    for (field, kind) in [
-        ("query", "dns"),
-        ("method", "http"),
-        ("uri", "http"),
-        ("server_name", "ssl"),
-        ("fuid", "files"),
-        ("fingerprint", "x509"),
-        ("note", "notice"),
-        ("name", "weird"),
-    ] {
-        if view.get(field).is_some() {
-            return kind;
+    let candidates = [
+        (
+            "dns",
+            ["query", "qtype_name", "rcode", "rcode_name"]
+                .iter()
+                .any(|f| view.get(f).is_some()),
+        ),
+        (
+            "http",
+            ["method", "uri", "status_code"]
+                .iter()
+                .any(|f| view.get(f).is_some()),
+        ),
+        (
+            "ssl",
+            view.get("server_name").is_some()
+                || view.get("cipher").is_some()
+                || view.raw("established").is_some(),
+        ),
+        ("files", view.get("fuid").is_some()),
+        ("x509", view.get("fingerprint").is_some()),
+        ("notice", view.get("note").is_some()),
+        ("weird", view.get("name").is_some()),
+    ];
+    let mut selected = candidates.into_iter().filter(|(_, present)| *present);
+    match (selected.next(), selected.next()) {
+        (Some((kind, _)), None) => kind,
+        (None, None) if view.get("id.orig_h").is_some() || view.get("id.resp_h").is_some() => {
+            "conn"
         }
+        _ => "unknown",
     }
-    "conn"
 }
+
 fn relations(view: &View<'_>) -> Vec<GraphRelation> {
     let (kind, key, aliases) = if view.zeek {
         (

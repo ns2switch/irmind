@@ -1,4 +1,4 @@
 source,required_fields,mapping,coverage_limit
-parser-zeek,ts; uid; id.orig_h; id.resp_h; DNS/HTTP/TLS fields when collected,Extraction-only network mapping,No native typed category/outcome/roles; bounded timelines are samples
-parser-suricata,timestamp; flow_id; src_ip; dest_ip; event_type; alert/DNS/TLS,Extraction-only network mapping,Alert signature alone does not confirm compromise
+parser-zeek,ts; uid; id.orig_h; id.resp_h; DNS/HTTP/TLS fields when collected,Finite classification tables and native scalar validation,Explicit status only; bounded timelines are samples
+parser-suricata,timestamp; flow_id; src_ip; dest_ip; event_type; alert/DNS/TLS,Finite classification tables and native scalar validation,Source alerts remain unconfirmed; additional DNS questions stay original
 parser-ecs,@timestamp; ecs.version; event.*; host/user/source/destination,Validated ECS to common-event mapping,Producer must supply classification and preserve original identifiers

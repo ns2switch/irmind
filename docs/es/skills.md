@@ -21,7 +21,7 @@ Abre un caso, configura un modelo en `/settings model` y escribe `/` para ver lo
 | `/windows-persistence` | Servicios, tareas, claves Run y suscripciones WMI. | EVTX y exportaciones de configuración/DFIR. | Parcial: 4698 y las suscripciones WMI no tienen reglas semánticas actuales. |
 | `/linux-webshell` | Peticiones web correlacionadas con ejecución del usuario web. | nginx/Apache common/combined, auditd y evidencia del directorio web. | Núcleo HTTP/execve mapeado; pueden faltar host, ID de petición o causalidad. |
 | `/linux-persistence` | Cron, systemd, claves SSH, cuentas y sudoers. | Registros Linux y configuración recogida o exportaciones DFIR. | Parcial: pocos registros no reconstruyen todo el estado de configuración. |
-| `/network-c2-beaconing` | Flujos periódicos, DNS y alertas. | Zeek y Suricata EVE; ECS ya normalizado, opcional. | Parcial: los mapeos nativos extraen entidades y campos sin categorías ni roles. |
+| `/network-c2-beaconing` | Flujos periódicos, DNS y alertas. | Zeek y Suricata EVE; ECS ya normalizado, opcional. | Categorías de protocolo y roles de origen/destino mapeados; sin estado, el resultado es desconocido. Alertas sin confirmar. |
 | `/malware-execution-triage` | Origen, ejecución y actividad observada de un binario. | Sysmon 1/3/11 y PECmd/AmcacheParser u otras exportaciones DFIR. | Parcial: presencia en Amcache no prueba ejecución; los artefactos binarios necesitan exportación. |
 
 Consulta la [guía de parsers](parsers.md) y la [configuración de módulos](modules.md) antes de recoger datos. Las skills solo declaran las herramientas locales que necesitan. Ninguna ejecuta recolectores, accede a proveedores, instala mapeos ni amplía el alcance.

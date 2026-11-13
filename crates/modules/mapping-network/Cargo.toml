@@ -9,6 +9,8 @@ license.workspace = true
 irmind-app = { path = "../../app", version = "0.1.0" }
 irmind-domain = { path = "../../domain", version = "0.1.0" }
 
+irmind-mapping-tables = { path = "../../mapping-tables", version = "0.1.0" }
+
 [build-dependencies]
 irmind-build-manifest = { path = "../../build-manifest", version = "0.1.0" }
 

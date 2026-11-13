@@ -161,10 +161,7 @@ fn registry() -> ModuleRegistry {
             .unwrap();
         registry
             .register(
-                Box::new(
-                    irmind_mod_mapping_network::NetworkExtractionMapping::new("parser-zeek")
-                        .unwrap(),
-                ),
+                Box::new(irmind_mod_mapping_network::NetworkMapping::new("parser-zeek").unwrap()),
                 &ModuleConfig::new(),
             )
             .unwrap();
@@ -180,8 +177,7 @@ fn registry() -> ModuleRegistry {
         registry
             .register(
                 Box::new(
-                    irmind_mod_mapping_network::NetworkExtractionMapping::new("parser-suricata")
-                        .unwrap(),
+                    irmind_mod_mapping_network::NetworkMapping::new("parser-suricata").unwrap(),
                 ),
                 &ModuleConfig::new(),
             )

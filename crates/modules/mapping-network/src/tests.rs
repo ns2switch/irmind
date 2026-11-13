@@ -3,7 +3,7 @@ use irmind_app::{
     CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
-use irmind_domain::EventOutcome;
+use irmind_domain::{CommonField, EntityRole, EventCategory, EventKind, EventOutcome};
 struct Fixture {
     parser: &'static str,
     name: &'static str,
@@ -56,7 +56,7 @@ fn every_decoder_and_extraction_module_passes_the_shared_contract() {
     for f in fixtures() {
         irmind_testkit::run_source_mapping_contract(
             f.decoder.clone(),
-            Arc::new(NetworkExtractionMapping::new(f.parser).unwrap()),
+            Arc::new(NetworkMapping::new(f.parser).unwrap()),
             f.name,
             f.bytes,
             2,
@@ -65,11 +65,11 @@ fn every_decoder_and_extraction_module_passes_the_shared_contract() {
     }
 }
 #[test]
-fn original_aliases_events_time_and_relations_survive_without_classifying() {
+fn original_aliases_events_time_and_relations_survive_with_typed_network_roles() {
     for f in fixtures() {
         let (report, sources) = decoded(&f, f.bytes);
         assert_eq!((report.accepted, report.rejected), (2, 0));
-        let mapper = NetworkExtractionMapping::new(f.parser).unwrap();
+        let mapper = NetworkMapping::new(f.parser).unwrap();
         for source in &sources {
             let out = mapper.map(source).unwrap();
             let graph = &out.record().indexed;
@@ -77,9 +77,30 @@ fn original_aliases_events_time_and_relations_survive_without_classifying() {
             assert!(!graph.record.event.is_empty(), "{}", f.parser);
             assert_eq!(graph.time, source.timestamp(), "{}", f.parser);
             assert_eq!(graph.source_offset, source.origin().offset());
-            assert_eq!(out.record().common.event().categories().bits(), 0);
+            assert!(
+                out.record()
+                    .common
+                    .event()
+                    .categories()
+                    .contains(EventCategory::Network)
+            );
             assert_eq!(out.record().common.event().outcome(), EventOutcome::Unknown);
-            assert!(out.record().common.observations().values().is_empty());
+            assert!(
+                out.record()
+                    .common
+                    .observations()
+                    .values()
+                    .iter()
+                    .any(|o| o.role() == EntityRole::Source)
+            );
+            assert!(
+                out.record()
+                    .common
+                    .observations()
+                    .values()
+                    .iter()
+                    .any(|o| o.role() == EntityRole::Destination)
+            );
             assert_eq!(
                 source.origin().source(),
                 &EvidenceHash::from_bytes(irmind_app::sha256(f.bytes))
@@ -99,7 +120,7 @@ fn bad_ndjson_rows_are_counted_without_losing_original_offsets() {
     }
 }
 #[test]
-fn zeek_json_preserves_decimal_microseconds_custom_fields_and_roles_are_not_inferred() {
+fn zeek_json_preserves_decimal_microseconds_and_explicit_endpoint_roles() {
     let bytes = include_bytes!("../../../testkit/fixtures/parser-zeek/source/dns.jsonl");
     let f = Fixture {
         parser: "parser-zeek",
@@ -116,7 +137,7 @@ fn zeek_json_preserves_decimal_microseconds_custom_fields_and_roles_are_not_infe
     assert!(
         matches!(rows[0].fields().field("ts"),Some(irmind_domain::SourceValue::Number(n)) if n.as_str()=="1790000000.123458")
     );
-    let mapper = NetworkExtractionMapping::new("parser-zeek").unwrap();
+    let mapper = NetworkMapping::new("parser-zeek").unwrap();
     let out = mapper.map(&rows[0]).unwrap();
     assert_eq!(out.record().indexed.record.event, "zeek_dns");
     assert!(
@@ -126,7 +147,14 @@ fn zeek_json_preserves_decimal_microseconds_custom_fields_and_roles_are_not_infe
             .entities
             .contains(&("domain".into(), "synthetic.example.test".into()))
     );
-    assert!(out.record().common.observations().values().is_empty());
+    assert!(
+        out.record()
+            .common
+            .observations()
+            .values()
+            .iter()
+            .any(|o| o.field() == CommonField::DnsQuestionName)
+    );
 }
 #[test]
 fn tsv_columns_and_declared_types_are_original_not_reconstructed_from_normalized_text() {
@@ -158,3 +186,5 @@ fn tsv_columns_and_declared_types_are_original_not_reconstructed_from_normalized
     );
     assert!(rows[1].origin().offset().unwrap() > rows[0].origin().offset().unwrap());
 }
+
+mod protocols;

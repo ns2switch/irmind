@@ -906,6 +906,7 @@ dependencies = [
  "irmind-infra",
  "irmind-mapping-tables",
  "irmind-mod-mapping-ecs",
+ "irmind-mod-mapping-network",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
@@ -966,6 +967,16 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-mapping-ecs"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+]
+
+[[package]]
+name = "irmind-mod-mapping-network"
 version = "0.1.0"
 dependencies = [
  "irmind-app",

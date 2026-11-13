@@ -1,0 +1,25 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "network-outcome-suricata-json-http"
+version = "network-headers-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-suricata"
+parser_versions = ["suricata-source-v1"]
+
+[[rules]]
+categories = ["network", "web"]
+types = ["protocol"]
+kind = "event"
+outcome = "success"
+[[rules.when]]
+path = ["http", "status"]
+predicate = { op = "integer_interval", value = { first = 200, last = 399 } }
+
+[[rules]]
+categories = ["network", "web"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["http", "status"]
+predicate = { op = "integer_interval", value = { first = 400, last = 599 } }

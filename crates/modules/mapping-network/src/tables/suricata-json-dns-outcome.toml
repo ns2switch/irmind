@@ -1,0 +1,196 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "network-outcome-suricata-json-dns"
+version = "network-headers-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-suricata"
+parser_versions = ["suricata-source-v1"]
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "success"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "number", value = "0" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "integer_interval", value = { first = 1, last = 65535 } }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "success"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "NOERROR" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "FORMERR" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "SERVFAIL" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "NXDOMAIN" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "NOTIMP" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "REFUSED" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "YXDOMAIN" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "YXRRSET" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "NXRRSET" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "NOTAUTH" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "NOTZONE" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "BADVERS" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "BADKEY" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "BADTIME" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "BADMODE" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "BADNAME" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "BADALG" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "BADTRUNC" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+kind = "event"
+outcome = "failure"
+[[rules.when]]
+path = ["dns", "rcode"]
+predicate = { op = "text", value = "BADCOOKIE" }

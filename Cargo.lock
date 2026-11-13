@@ -2950,6 +2950,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-tables",
  "irmind-mod-parser-suricata",
  "irmind-mod-parser-zeek",
  "irmind-testkit",

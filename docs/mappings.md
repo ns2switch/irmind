@@ -20,7 +20,7 @@ CLI ingestion, the TUI and the demo use the common writer. Every compiled parser
 | Linux account and cron logs | useradd, usermod and cron/crond | Native, extraction-only | `mapping-linux` | Experimental; no inferred categories or roles |
 | DFIR tool output | Velociraptor, Hayabusa, Chainsaw, plaso and EZTools | Separate native extraction modules | `mapping-dfir` | Experimental; no inferred categories or roles |
 | Syslog | RFC 5424 and confirmed RFC 3164, plain or gzip | Native, extraction-only | `mapping-syslog` | Experimental; no inferred categories or roles |
-| Network | Zeek and Suricata EVE | Separate native extraction modules | `mapping-network` | Experimental; no inferred categories or roles |
+| Network | Zeek and Suricata EVE | Release-bound TOML classification and bounded native scalar validation | `mapping-network` | Experimental; explicit endpoint roles and supported status only |
 | Declarative formats | Approved local parser definitions | Definition-pinned extraction module | `parser-declarative` | Experimental; no inferred categories or roles |
 
 ## CloudTrail
@@ -207,25 +207,28 @@ Its bounded native extraction reads the original message layout; it assigns no
 category, outcome or process lifetime. A request in a cron log does not prove
 that a command succeeded.
 
-## Zeek and Suricata extraction
+## Zeek and Suricata
 
-The source decoders preserve original Zeek JSON and TSV fields and Suricata EVE
-JSON. Zeek TSV retains its original column strings and declared types as two
-separate objects; the format discriminator records the header's dataset. Decimal
-Zeek timestamps retain microseconds or nanoseconds without floating-point
-rounding. EVE numeric UTC offsets are parsed explicitly.
+The decoders retain original JSON/TSV fields and precise source timestamps.
+`mapping-network` registers independent `mapping-zeek` and `mapping-suricata`
+modules. Finite bundled TOML tables classify conn/flow, DNS, HTTP, TLS,
+files, certificates and source detections. HTTP also has the web category;
+notice/weird/alert/anomaly are unconfirmed intrusion-detection alerts. Native
+glue preserves dotted Zeek keys, TSV scalar representations and UID/flow
+relations. It validates typed fields and source/destination occurrences; it
+never reconstructs original fields from normalized display text.
 
-The `mapping-network` feature provides separately identified Zeek and Suricata
-extraction modules. They retain UID/flow correlation, endpoints, domains,
-certificates, files and source detection aliases. These modules do not infer
-common-event categories, outcomes or roles. A source alert remains telemetry;
-it does not confirm a case finding. Native extraction preserves literal dotted
-Zeek field names, TSV nil markers and source-specific correlation relations that
-are not classification-table operations.
+Only explicit supported status determines outcome: normal/rejected Zeek
+connection states, DNS response codes, HTTP 200–399/400–599 and an explicitly
+established Zeek TLS session. Missing status stays unknown. A false TLS
+established flag alone does not establish failure, and an allowed alert does
+not mean a successful attack. Source alerts require analyst confirmation.
 
-The existing bounded record framing, source-size limits, measured offsets,
-cancellation and untrusted rejection samples apply to both ingestion and
-reconstruction. No original fields are recovered from normalized display text.
+The common schema has one DNS-question slot. Suricata DNS v3 projects the first
+question; additional questions remain in original evidence with an explicit
+coverage diagnostic. Unknown datasets stay unclassified. All source, record,
+query, taint, cancellation and custody limits remain in force. See the
+[implementation notes](development/network-semantic-mapping.md).
 
 ## Kubernetes and Falco (experimental)
 

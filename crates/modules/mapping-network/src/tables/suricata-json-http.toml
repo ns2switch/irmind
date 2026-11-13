@@ -1,0 +1,13 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "network-header-suricata-json-http"
+version = "network-headers-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-suricata"
+parser_versions = ["suricata-source-v1"]
+
+[[rules]]
+categories = ["network", "web"]
+types = ["protocol"]
+kind = "event"
+outcome = "unknown"
