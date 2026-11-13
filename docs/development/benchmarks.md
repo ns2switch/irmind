@@ -14,6 +14,28 @@ The [absolute evaluation](benchmarks/v3-absolute-targets.json) reports `passed: 
 
 Earlier paired sections below are historical measurements and decisions, not current activation requirements.
 
+## Native Kubernetes and Falco smoke (release)
+
+The [measurement](benchmarks/kubernetes-falco-native.json) uses the real identified
+decoder → bundled table mapping → mapped Parquet → signed custody path. The
+committed integration harness repeats synthetic source fixtures with 1,024 bytes
+of padding to at least 1 GiB. Corpus generation and subsequent chain verification
+are outside the ingestion timer. Both sources have the same fixed timestamp;
+this is a framing/mapping smoke, not a disorder or query-latency benchmark.
+These are local optimized Linux measurements, not replacements for the standard
+15 GB performance gates.
+
+| Source | Input bytes | Accepted records | Rejected | Ingestion (s) | MiB/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Native Kubernetes audit | 1,073,743,096 | 746,692 | 0 | 13.983 | 73.229 |
+| Falco Kubernetes metadata | 1,073,742,192 | 797,136 | 0 | 24.472 | 41.844 |
+
+The [detection matrix](benchmarks/kubernetes-falco-detection.json) includes the
+current native fixtures. Both new detectors return 98% on their own fixture;
+the generic JSON detector returns 45%, and there is no other high-confidence
+candidate. Their selected identity and confidence enter the source manifest.
+Managed-provider wrappers require separate coverage.
+
 ## Method
 
 The representative CloudTrail-shaped corpus has about 1,000 files of approximately 1 MB, each with 1–2 KB records. The 15 GB variant repeats synthetic records within those files and deletes each temporary source batch after conversion. A separate extreme corpus has 25 files with one large record per file; its historical result is kept only as a stress reference. Every case uses the signed source manifest and signed Parquet artifact path. Each query verifies the selected Parquet files by SHA-256 before reading. The benchmark runs in the release profile, takes five warm samples per query after a cold summary, and reports p50/p95. Times are wall-clock unless marked as CPU sums. Files are removed after each run.

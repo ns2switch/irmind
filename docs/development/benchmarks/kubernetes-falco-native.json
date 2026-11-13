@@ -1,0 +1,28 @@
+{
+  "source_commit": "e2891bdfb641a119cd5503f9168667c2cb6a00e8",
+  "profile": "release (optimized; debug assertions disabled)",
+  "platform": "Linux x86_64",
+  "runner": "local; not a standard GitHub performance-gate run",
+  "command": "cargo test -p irmind --all-features --test kubernetes_ingest --release -- --ignored --nocapture",
+  "method": "Repeat the committed source fixture with 1024 bytes of synthetic padding to at least 1 GiB. Time production selection, hash, decode, selected mapping, Parquet creation and signed custody. Corpus generation and subsequent engine verification are outside the ingestion timer. No provider, credential or network is used.",
+  "results": [
+    {
+      "source": "kubernetes",
+      "bytes": 1073743096,
+      "records": 746692,
+      "ingestion_seconds": 13.983,
+      "mib_per_second": 73.229,
+      "fixture": "crates/testkit/fixtures/parser-kubernetes/source/event.ndjson",
+      "fixture_sha256": "1b9ae434d1157b3f278d20bbfdf3f240f0c453fadb5df3255532843fd8edbe0c"
+    },
+    {
+      "source": "falco",
+      "bytes": 1073742192,
+      "records": 797136,
+      "ingestion_seconds": 24.472,
+      "mib_per_second": 41.844,
+      "fixture": "crates/testkit/fixtures/parser-falco/source/event.ndjson",
+      "fixture_sha256": "d55ca33e4a793d24578e0d54c4e5baf4afe8ffc735c11c3b126e8d9ba54bcd25"
+    }
+  ]
+}
