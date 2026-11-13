@@ -16,6 +16,7 @@ impl Engine<'_> {
             return Err(AppError::Sealed);
         }
         self.verify_unlocked(id_owned)?;
+        let budget = self.case_budget_unlocked(id_owned)?.require_effective()?;
         let entries = self.audit_log.entries(id_owned)?;
         let (prior_summary, history) = self.conversation_history(&entries)?;
         let findings = self
@@ -60,6 +61,7 @@ impl Engine<'_> {
             findings,
             prior_summary,
             history,
+            budget,
         })
     }
 

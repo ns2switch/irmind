@@ -104,9 +104,9 @@ impl Engine<'_> {
         let nonce = turn.nonce;
         let call_id = call.id().to_owned();
         let budget = turn.skills.clone();
-        let remaining = self
-            .policy
-            .max_model_tokens_per_case
+        let remaining = turn
+            .budget
+            .model_tokens
             .saturating_sub(self.used_model_tokens(&case.id).await?)
             .saturating_sub(512);
         let available = 48_000usize

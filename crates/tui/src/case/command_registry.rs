@@ -11,9 +11,8 @@ impl Command {
     pub(crate) fn category(&self) -> &'static str {
         match self.name {
             "skills" => "Skills",
-            "ingest" | "verify" | "seal" | "export" | "report" | "scope" | "home" | "rebuild" => {
-                "Case"
-            }
+            "budget" | "ingest" | "verify" | "seal" | "export" | "report" | "scope" | "home"
+            | "rebuild" => "Case",
             "evidence" | "evidence-save" | "raw" | "graph" | "timeline" | "entity"
             | "neighbors" | "path" | "search" | "entity-timeline" | "siem-alert"
             | "verify-graph" | "objects" | "object-read" => "Evidence",
@@ -29,7 +28,7 @@ impl Command {
         match self.name {
             "approve" | "deny" | "edit" => " <id>",
             "parsers" => " [test <definition> <file>]",
-            "settings" => " [model|connectors|keystore|preferences]",
+            "settings" => " [model|connectors|keystore|preferences|limits]",
             "open" => " <case title or ID>",
             "demo" => " [check|exit]",
             "evidence" | "raw" => " <hash>",

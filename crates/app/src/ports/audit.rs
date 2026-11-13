@@ -25,6 +25,14 @@ pub enum AppError {
     Model(String),
     #[error("policy denied: {0}")]
     Policy(String),
+    #[error(
+        "Cloud transfer limit reached: {used} reserved bytes, {requested} requested, limit {limit}. Use /budget; the organization ceiling still applies."
+    )]
+    CloudTransferLimit {
+        used: u64,
+        requested: u64,
+        limit: u64,
+    },
     #[error("analyst approval required: {0}")]
     PendingApproval(String),
     #[error("parser {parser_id} is unavailable: {reason}")]

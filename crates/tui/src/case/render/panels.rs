@@ -127,6 +127,9 @@ fn audit_panel(state: &CaseState) -> String {
 }
 
 pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Option<String>> {
+    if let Some(editor) = &state.budget.editor {
+        return Ok(Some(engine.guard.screen(&editor.text())?.text));
+    }
     if let Some(prompt) = &state.time_prompt {
         return prompt
             .screened_text(engine.guard.as_ref())

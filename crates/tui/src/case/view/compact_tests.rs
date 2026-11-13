@@ -19,7 +19,7 @@ fn frame(guide: &str) -> CaseFrame<'_> {
         overlay_scroll: 0,
         new_content: false,
         model: "scripted",
-        tokens: 0,
+        tokens: Some(0),
         cost: "",
         pending: 1,
         detections: 0,

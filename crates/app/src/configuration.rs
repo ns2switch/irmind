@@ -34,6 +34,8 @@ pub struct PersistentConfig {
     /// Local execution preference. Absence preserves existing signed snapshots.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_parallel_workers: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_budget_defaults: Option<crate::CaseBudgetLimits>,
     #[serde(default)]
     pub modules: BTreeMap<String, ProductSettings>,
 }
@@ -70,6 +72,7 @@ pub enum ConfigChange {
     SetMouseCapture(bool),
     SetTheme(String),
     SetMaxParallelWorkers(Option<u16>),
+    SetCaseBudgetDefaults(crate::CaseBudgetLimits),
 }
 
 pub trait ConfigurationStore: Send + Sync {
@@ -94,6 +97,7 @@ impl Default for PersistentConfig {
             resume_last_case: None,
             show_hints: None,
             max_parallel_workers: None,
+            case_budget_defaults: None,
             modules: BTreeMap::new(),
         }
     }
@@ -120,14 +124,8 @@ fn manifest<'a>(
 
 impl PersistentConfig {
     pub fn validate(&self, manifests: &[&ModuleManifest]) -> Result<(), AppError> {
+        self.validate_local_preferences()?;
         if self.version != 1
-            || self
-                .theme
-                .as_deref()
-                .is_some_and(|theme| !matches!(theme, "auto" | "light" | "dark"))
-            || self
-                .max_parallel_workers
-                .is_some_and(|n| !(1..=256).contains(&n))
             || self.modules.len() > 256
             || self.policy_path.as_ref().is_some_and(|path| {
                 path.is_empty() || path.len() > 4096 || path.chars().any(disallowed_char)
@@ -199,6 +197,23 @@ impl PersistentConfig {
         Ok(())
     }
 
+    fn validate_local_preferences(&self) -> Result<(), AppError> {
+        if self
+            .case_budget_defaults
+            .is_some_and(|limits| limits.validate().is_err())
+            || self
+                .theme
+                .as_deref()
+                .is_some_and(|theme| !matches!(theme, "auto" | "light" | "dark"))
+            || self
+                .max_parallel_workers
+                .is_some_and(|n| !(1..=256).contains(&n))
+        {
+            return Err(invalid());
+        }
+        Ok(())
+    }
+
     pub fn changed(
         &self,
         change: ConfigChange,
@@ -257,6 +272,7 @@ impl PersistentConfig {
             ConfigChange::SetMouseCapture(enabled) => next.mouse_capture = Some(enabled),
             ConfigChange::SetTheme(theme) => next.theme = Some(theme),
             ConfigChange::SetMaxParallelWorkers(limit) => next.max_parallel_workers = limit,
+            ConfigChange::SetCaseBudgetDefaults(limits) => next.case_budget_defaults = Some(limits),
         }
         next.validate(manifests)?;
         Ok(next)

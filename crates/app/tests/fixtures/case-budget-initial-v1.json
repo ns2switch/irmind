@@ -1,0 +1,1 @@
+{"version":1,"previous":null,"limits":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"organization":{"model_tokens":10000000,"tool_calls":10000,"cloud_bytes":10995116277760},"increase_confirmed":true}

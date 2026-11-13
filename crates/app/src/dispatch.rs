@@ -82,6 +82,19 @@ impl Engine<'_> {
                     None,
                 )
                 .await?;
+                if reason == "case tool call quota reached" {
+                    let owned = id.clone();
+                    return self
+                        .blocking_local(move |local| {
+                            Ok(format!(
+                                "denied: {reason}. {}",
+                                local
+                                    .case_budget_unlocked(&owned)?
+                                    .notice("case tool call limit")
+                            ))
+                        })
+                        .await;
+                }
                 Ok(format!("denied: {reason}"))
             }
             Decision::NeedsApproval(pending) => {
@@ -133,6 +146,7 @@ impl Engine<'_> {
         let case_owned = case.clone();
         self.blocking_local(move |local| {
             let id = &case_owned.id;
+            let policy = local.policy_for_case_unlocked(id)?;
             local.audit(
                 id,
                 origin,
@@ -141,7 +155,7 @@ impl Engine<'_> {
                 None,
             )?;
             let completed_calls = local.completed_calls_unlocked(id)?;
-            if let Err(reason) = local.policy.permits(&proposal.tool, completed_calls) {
+            if let Err(reason) = policy.permits(&proposal.tool, completed_calls) {
                 return Ok(Decision::Deny(reason));
             }
             let next_seq = local
@@ -165,7 +179,7 @@ impl Engine<'_> {
                     local.mode,
                     local.turn_has_detections(id)?,
                     now,
-                    &local.policy,
+                    &policy,
                 ))
             } else {
                 Ok(irmind_domain::evaluate_with_rules(
@@ -174,7 +188,7 @@ impl Engine<'_> {
                     next_seq,
                     local.mode,
                     now,
-                    &local.policy,
+                    &policy,
                 ))
             }
         })

@@ -8,11 +8,45 @@ fn continuation_hint(reason: &str) -> &'static str {
     if reason == "model round limit" {
         "Use /continue to resume."
     } else {
-        "Increase the case policy limit before using /continue."
+        "Use /budget to review or increase the signed case allocation before /continue; the organization ceiling still applies."
     }
 }
 
 impl Engine<'_> {
+    pub(super) async fn finish_token_exhaustion(
+        &self,
+        id: &CaseId,
+        answer: &str,
+    ) -> Result<String, AppError> {
+        let summary = self.completed_work_summary(id).await?;
+        let owned = id.clone();
+        let notice = self
+            .blocking_local(move |local| {
+                Ok(local
+                    .case_budget_unlocked(&owned)?
+                    .notice("model token limit"))
+            })
+            .await?;
+        self.finish_answer(
+            id,
+            &format!(
+                "{answer}\n{summary}\n\n{notice} Use /continue after reviewing the allocation."
+            ),
+        )
+        .await
+    }
+
+    pub(super) async fn completed_work_summary(&self, id: &CaseId) -> Result<String, AppError> {
+        let id = id.clone();
+        self.blocking_local(move |local| {
+            let entries = local.audit_log.entries(&id)?;
+            let recent = entries.iter().rev().take_while(|e| e.kind != AuditEventKind::Prompt);
+            let completed = recent.filter(|e| e.kind == AuditEventKind::ToolResult).count();
+            let findings = local.findings_unlocked(&id, &entries)?.len();
+            Ok(format!("Recorded work: {completed} completed tool results in this turn; {findings} case findings remain available. Review pending approvals and findings before continuing."))
+        }).await
+    }
+
     pub(super) async fn finish_limited_turn(
         &self,
         id: &CaseId,
@@ -31,12 +65,20 @@ impl Engine<'_> {
         )
         .await?;
         let used = self.used_model_tokens(id).await?;
-        let remaining = self.policy.max_model_tokens_per_case.saturating_sub(used);
+        let remaining = turn.budget.model_tokens.saturating_sub(used);
         let hint = continuation_hint(reason);
+        let owned = id.clone();
+        let reason_owned = reason.to_owned();
+        let notice = self
+            .blocking_local(move |local| {
+                Ok(local.case_budget_unlocked(&owned)?.notice(&reason_owned))
+            })
+            .await?;
         if remaining == 0 {
-            return self.finish_answer(id, &format!(
-                "Limit reached ({reason}). The completed tool results remain in this case. {hint}"
-            )).await;
+            let summary = self.completed_work_summary(id).await?;
+            return self
+                .finish_answer(id, &format!("{summary}\n\n{notice} {hint}"))
+                .await;
         }
         let mut messages = turn.messages.clone();
         messages.push(CompletionMessage::text(MessageRole::System,
@@ -69,19 +111,20 @@ impl Engine<'_> {
             None,
         )
         .await?;
-        self.record_model_usage(id, usage, used).await?;
+        self.record_model_usage(id, usage, used, turn.budget.model_tokens)
+            .await?;
         let mut summary = if answer.text.trim().is_empty() {
-            "No model summary was returned; review the signed tool results.".to_owned()
+            format!(
+                "No model summary text was returned. {}",
+                self.completed_work_summary(id).await?
+            )
         } else {
             answer.text
         };
         if answer.truncated {
             summary.push_str("\n[Model summary cut off by output limit]");
         }
-        self.finish_answer(
-            id,
-            &format!("{summary}\n\nLimit reached ({reason}). {hint}"),
-        )
-        .await
+        self.finish_answer(id, &format!("{summary}\n\n{notice} {hint}"))
+            .await
     }
 }

@@ -12,10 +12,10 @@ Pass `--policy policy.toml` or set `IRMIND_POLICY`. The repository's [policy.tom
 
 ```toml
 version = 1
-max_tool_calls_per_case = 100
+max_tool_calls_per_case = 1000
 max_model_rounds_per_turn = 25
 max_model_result_bytes = 10000
-max_model_tokens_per_case = 200000
+max_model_tokens_per_case = 2000000
 max_object_read_bytes = 1073741824
 max_object_bytes_per_case = 536870912000
 object_transfer_approval_bytes = 67108864
@@ -35,9 +35,67 @@ The optional `[scope]` table is a hard ceiling for remote reads across cases. It
 
 `max_model_rounds_per_turn` defaults to 25 if omitted and cannot exceed 100. At the limit, IRMind requests a final summary without tools and offers `/continue`. Tool-call and token limits still apply across the case.
 
+## Case allocations and consumption
+
+There are two levels. `policy.toml` is the organization ceiling; an analyst
+cannot exceed it from the TUI, through an approval, or through a skill.
+`/settings limits` chooses signed defaults for **future cases**. `/budget` in
+an open case shows its allocation, current organization ceiling and consumption,
+and edits its token, tool-call and reserved cloud-byte allocations. Fields are
+prefilled; Tab changes fields, Enter reviews, then arrows or a number followed
+by Enter explicitly confirm the Analyst signature. Escape cancels. Increasing a
+case allocation requires this confirmation. The consumed amounts never reset.
+A sealed case cannot change its allocation. A stricter policy immediately
+reduces the effective ceiling of an existing allocation.
+
+The defaults are 2,000,000 model tokens and 1,000 tool calls, clipped to any
+smaller organization ceiling. Fixed supported maxima stay 10,000,000 tokens and
+10,000 calls. Cloud limits and transfer approvals retain their previous values.
+Existing policy files are never rewritten. Local scripted
+[measurements](https://github.com/ns2switch/irmind/blob/a0dcfd1/docs/development/case-budget-measurements.md)
+cover all 13 bundled skills and a six-turn case; their byte-based planning
+estimates are not provider billing measurements.
+
+At 80% the status line warns and points to `/budget`. At exhaustion the turn
+preserves its results and finishes with a summary and the consumed/effective
+limits. The normal limit path uses a tool-free summary when tokens remain. If no
+tokens remain, or history compaction cannot fit its reserved allowance, IRMind
+shows a local summary without another model request. Review `/budget` before
+`/continue`, or ask the organization administrator if its ceiling prevents an
+increase. The model cannot apply allocation changes.
+
+Provider usage arrives after each request; a final receipt can cross an
+allocation before further calls stop. Provider-side account caps remain useful
+for billing.
+
+Tokens include every provider-reported input and output: repeated conversation
+history, tool results, loaded skill text, compaction and final summaries. Missing
+provider usage is explicitly unavailable, with any reported subtotal shown as
+a lower bound. It is never presented as a measured zero. Cost appears only
+when usage and configured pricing support the estimate. Tool calls include
+signed dispatches and bounded skill reads. Cloud bytes are **reservations** from
+signed object-read dispatches, including failed/canceled transfers, as in budget
+enforcement; they are not a claim of exact network traffic.
+
+Non-secret defaults are stored in `config.toml`, for example:
+
+```toml
+[case_budget_defaults]
+model_tokens = 2000000
+tool_calls = 1000
+cloud_bytes = 536870912000
+```
+
+The initial allocation is signed atomically with case creation. Later changes
+are Analyst-signed case records; changing defaults does not alter existing cases.
+A case without an initial allocation asks for explicit confirmation through
+`/budget` before new model/tool work. This appends a signed allocation and keeps
+all previously recorded consumption; it does not rewrite evidence or reset usage.
+Opening a case or changing defaults never initializes its allocation silently.
+
 ## Non-secret settings
 
-The TUI stores non-secret settings in `config.toml` in the [standard data directory](platforms.md#data-and-terminal-behavior). The normal build compiles all current product modules and both keystores but enables none. `/settings` opens four sections: model, connectors, keystore, and preferences. `/settings model` opens one directly. In connectors, arrows select a module, Tab selects a parameter, and Enter edits it in a visible field. The first typed or pasted character replaces the displayed default; Enter accepts it and Ctrl+U clears it. A URL is trimmed and repeated path slashes are collapsed before validation. Credentials use masked fields in the keystore section. The session reloads inside the TUI after a change. Activation or endpoint changes that may send data off this computer require explicit signed confirmation. A minimal build uses `--no-default-features --features keystore-file` because a signer and secrets backend must remain available.
+The TUI stores non-secret settings in `config.toml` in the [standard data directory](platforms.md#data-and-terminal-behavior). The normal build compiles all current product modules and both keystores but enables none. `/settings` opens five sections: model, connectors, keystore, preferences, and limits. `/settings model` opens one directly. In connectors, arrows select a module, Tab selects a parameter, and Enter edits it in a visible field. The first typed or pasted character replaces the displayed default; Enter accepts it and Ctrl+U clears it. A URL is trimmed and repeated path slashes are collapsed before validation. Credentials use masked fields in the keystore section. The session reloads inside the TUI after a change. Activation or endpoint changes that may send data off this computer require explicit signed confirmation. A minimal build uses `--no-default-features --features keystore-file` because a signer and secrets backend must remain available.
 
 For Splunk, MISP, CrowdStrike, SentinelOne, and an S3-compatible storage endpoint, `/settings connectors` also accepts an optional CA PEM file. IRMind shows and signs its SHA-256 fingerprint alongside the path. The PEM augments the operating system trust roots; TLS hostname checks remain enabled. The file is read again and its hash checked when the connector starts, so replacing it requires another approval. Clear the path to remove the connector-specific CA. Do not put a private key in this file.
 

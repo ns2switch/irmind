@@ -459,6 +459,7 @@ fn home_header(mode: Mode) -> &'static str {
         Mode::Model => " Model setup ",
         Mode::Modules => " Connectors ",
         Mode::Config => " Preferences ",
+        Mode::Limits => " Limits ",
         Mode::Keystore => " Keystore ",
         Mode::Setup => " First-run guide ",
         Mode::Help => " Commands and keys ",

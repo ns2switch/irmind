@@ -3,7 +3,7 @@ mod menu;
 mod panels;
 use super::conversation::{Card, CardKind};
 use super::runtime::CaseRuntime;
-use super::{CaseFrame, Result, draw_case, escape_display, summarize_usage};
+use super::{CaseFrame, Result, case_budget_usage, draw_case, escape_display};
 use cards::audit_card;
 use irmind_app::AuditEventKind;
 use menu::menu_text;
@@ -37,18 +37,17 @@ impl CaseRuntime<'_, '_, '_> {
         if last_seq == self.state.usage_cache_seq {
             return Ok(());
         }
-        let usage = summarize_usage(&self.state.entries)?;
-        self.state.usage_cache_tokens = usage.input_tokens.saturating_add(usage.output_tokens);
-        self.state.usage_cache_cost =
-            usage
-                .estimated_cost_microusd
-                .map_or_else(String::new, |micro| {
-                    format!(
-                        "cost ${}.{:04}",
-                        micro / 1_000_000,
-                        (micro % 1_000_000) / 100
-                    )
-                });
+        let usage = case_budget_usage(&self.state.entries)?;
+        self.state.budget.usage_known = usage.provider_usage_available;
+        self.state.usage_cache_tokens = usage.model_tokens;
+        self.state.budget.cost = usage.cost_microusd.map_or_else(String::new, |micro| {
+            format!(
+                "cost ${}.{:04}",
+                micro / 1_000_000,
+                (micro % 1_000_000) / 100
+            )
+        });
+        self.refresh_budget_warning();
         self.state.usage_cache_seq = last_seq;
         self.state.turn_detection_count = self
             .state
@@ -59,6 +58,28 @@ impl CaseRuntime<'_, '_, '_> {
             .filter(|entry| entry.kind == AuditEventKind::InjectionDetected)
             .count();
         Ok(())
+    }
+
+    fn refresh_budget_warning(&mut self) {
+        let status = irmind_app::budget_status(&self.state.entries, &self.engine.policy);
+        if let Ok(budget) = status {
+            let warned = budget.warning() || budget.allocated.is_none();
+            if budget.allocated.is_none() && !self.state.budget.warning_issued {
+                self.state.messages.push("Approve this case's allocation with /budget before model/tool work. Existing consumption is retained.".into());
+            } else if warned && !self.state.budget.warning_issued {
+                self.state.messages.push(format!("Budget warning: at least 80% of a case allocation is used. Recorded tokens {}/{}, calls {}/{}, reserved cloud bytes {}/{}. Use /budget to review; the organization ceiling applies.", budget.usage.model_tokens, budget.effective.map_or(0, |limits| limits.model_tokens), budget.usage.tool_calls, budget.effective.map_or(0, |limits| limits.tool_calls), budget.usage.cloud_bytes, budget.effective.map_or(0, |limits| limits.cloud_bytes)));
+            }
+            self.state.budget.warning_issued = warned;
+            self.state.budget.warning = if budget.allocated.is_none() {
+                "BUDGET SETUP · /budget".into()
+            } else if warned {
+                "BUDGET ≥80% · /budget".into()
+            } else {
+                String::new()
+            };
+        } else {
+            self.state.budget.warning = "budget unavailable · /budget".into();
+        }
     }
 
     fn status_text(&self) -> Result<String> {
@@ -99,6 +120,10 @@ impl CaseRuntime<'_, '_, '_> {
                 format!("{spinner} {verb}… {elapsed}s{round}{transferred} · esc to interrupt")
             },
         );
+        if !self.state.budget.warning.is_empty() {
+            status.push_str(" · ");
+            status.push_str(&self.state.budget.warning);
+        }
         if self.overrides_active {
             status = format!("OVR {status}");
         }
@@ -245,8 +270,12 @@ impl CaseRuntime<'_, '_, '_> {
                 overlay_scroll: u16::try_from(self.state.overlay_scroll).unwrap_or(u16::MAX),
                 new_content: self.state.conversation.has_new_content(),
                 model: &model_name,
-                tokens: self.state.usage_cache_tokens,
-                cost: &self.state.usage_cache_cost,
+                tokens: self
+                    .state
+                    .budget
+                    .usage_known
+                    .then_some(self.state.usage_cache_tokens),
+                cost: &self.state.budget.cost,
                 pending: self.state.approvals.len(),
                 detections: self.state.turn_detection_count,
                 status: &status,

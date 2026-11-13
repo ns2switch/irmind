@@ -404,6 +404,9 @@ fn apply_session_policy<'a>(
         let (policy, fingerprint) = load_policy(path)?;
         engine = engine.with_policy(policy, fingerprint)?;
     }
+    if let Some(limits) = saved.case_budget_defaults {
+        engine = engine.with_case_budget_defaults(limits)?;
+    }
     if let Some(pricing) = load_pricing(saved)? {
         engine = engine.with_pricing(pricing);
     }
