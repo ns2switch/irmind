@@ -57,6 +57,28 @@ AddressSanitizer fuzzing completed 2,437,042 executions in 601 seconds without
 failures. Contracts also cover rejected oversized first lines, later valid
 records, worker-count determinism, redacted addresses and cluster disagreement.
 
+## Native network semantic smoke (release)
+
+The [measurement](benchmarks/network-semantic.json) uses the production source
+registry, typed network mapper, Parquet writer and signed custody path. The
+shared committed integration harness repeats one source record with 1,024 bytes
+of synthetic padding to at least 1 GiB. Generation and later complete case
+verification are outside the timer. Both source timestamps are fixed. These are
+local optimized Linux smokes, not the standard 15 GB or query-latency gates.
+
+| Source | Input bytes | Accepted records | Rejected | Ingestion (s) | MiB/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Zeek DNS JSON | 1,073,742,160 | 867,320 | 0 | 41.152 | 24.883 |
+| Suricata source alert | 1,073,742,522 | 783,182 | 0 | 36.209 | 28.281 |
+
+Zeek is slightly below the earlier indicative 25 MiB/s parser target; this
+single smoke is not reported as meeting it. The source decoders and detection
+scores are unchanged; the [complete detection matrix](benchmarks/gcp-audit-detection.json)
+still applies. The new typed projections add protocol/outcome and endpoint-role
+work to the previous extraction path. No threshold, result limit or validation
+was relaxed. Separate 601-second AddressSanitizer campaigns exercised decoding
+and mapping: Zeek 2,083,120 executions, Suricata 6,530,647, with no failures.
+
 ## Method
 
 The representative CloudTrail-shaped corpus has about 1,000 files of approximately 1 MB, each with 1–2 KB records. The 15 GB variant repeats synthetic records within those files and deletes each temporary source batch after conversion. A separate extreme corpus has 25 files with one large record per file; its historical result is kept only as a stress reference. Every case uses the signed source manifest and signed Parquet artifact path. Each query verifies the selected Parquet files by SHA-256 before reading. The benchmark runs in the release profile, takes five warm samples per query after a cold summary, and reports p50/p95. Times are wall-clock unless marked as CPU sums. Files are removed after each run.
