@@ -9,7 +9,7 @@ use crate::{AppError, FixedAppError, ParseReport, ParserIdentity};
 use irmind_domain::{
     EventOrigin, EvidenceHash, IndexedTime, ParserLocation, Provenance, SourceMemberV1, Tainted,
 };
-pub use json::decode_json_source;
+pub use json::{decode_json_envelope_source, decode_json_source};
 pub use time::source_datetime;
 
 pub struct DecodedSourceFrame {

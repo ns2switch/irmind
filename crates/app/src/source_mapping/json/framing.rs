@@ -51,6 +51,7 @@ pub struct JsonFrames<'a> {
     mode: Mode,
     wrapper_keys: BTreeSet<String>,
     record_wrappers: bool,
+    wrapper_seen: bool,
 }
 impl<'a> JsonFrames<'a> {
     pub fn new(reader: &'a mut dyn Read, cancel: &'a CancellationToken) -> Self {
@@ -61,6 +62,7 @@ impl<'a> JsonFrames<'a> {
             mode: Mode::Roots,
             wrapper_keys: BTreeSet::new(),
             record_wrappers: true,
+            wrapper_seen: false,
         }
     }
     /// Formats with flat event objects must retain fields named `events` as data.
@@ -68,6 +70,11 @@ impl<'a> JsonFrames<'a> {
     pub fn without_record_wrappers(mut self) -> Self {
         self.record_wrappers = false;
         self
+    }
+    /// Content-only probe: a root record-array wrapper was structurally recognized.
+    /// Inspecting a separate bounded sample never consumes the real input reader.
+    pub const fn record_wrapper_seen(&self) -> bool {
+        self.wrapper_seen
     }
     pub fn next_frame(&mut self) -> Result<Option<JsonFrame>, AppError> {
         loop {
@@ -155,6 +162,7 @@ impl<'a> JsonFrames<'a> {
                 }
                 self.byte()?;
                 self.wrapper_keys = keys;
+                self.wrapper_seen = true;
                 self.mode = Mode::Array {
                     wrapped: true,
                     comma: false,
