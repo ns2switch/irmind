@@ -18,6 +18,9 @@ fn modules() -> Vec<Box<dyn Module>> {
     use irmind_mod_mapping_linux::{AuditMapping, HttpMapping};
     use irmind_mod_mapping_network::NetworkExtractionMapping;
     vec![
+        Box::new(irmind_mod_parser_gcp_audit::GcpAuditParser::default()),
+        Box::new(irmind_mod_mapping_gcp_audit::CloudAuditMapping::new().unwrap()),
+        Box::new(irmind_mod_mapping_gcp_audit::GkeMapping::new().unwrap()),
         Box::new(irmind_mod_parser_json::JsonParser),
         Box::new(irmind_mod_mapping_json_compat::JsonCompatibilityMapping::generic_only().unwrap()),
         Box::new(irmind_mod_mapping_cloudtrail::CloudTrailMapping::new().unwrap()),

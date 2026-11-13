@@ -13,6 +13,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | Parser | Entrada | Detección | Campos mapeados | Estado |
 | --- | --- | --- | --- | --- |
 | JSON y logs de nube exportados | JSON/NDJSON; AWS, GCP, Azure y HuntEval | Campos reconocidos del registro | Instante, identidades, cuentas, recursos e IP | experimental |
+| GCP Cloud Audit Logs | LogEntry JSON/NDJSON; exportaciones de GKE | Servicio/método protoPayload e instante originales | Nanosegundos UTC, estado explícito, roles de principal, recurso y extremos; clúster GKE confirmado | experimental |
 | ECS | NDJSON | Versión de ECS e instante/campos característicos | Evento, host, usuario, origen, destino, proceso, archivo, URL | experimental |
 | OCSF | JSON/NDJSON o Parquet local | Clase, categoría y metadatos; Parquet requiere confirmación | Autenticación, API, red, procesos, archivos y hallazgos | experimental |
 | Herramientas DFIR | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Marcadores o cabecera CSV exacta | Instante, host, usuario, proceso, acción y entidades disponibles | experimental |
@@ -31,7 +32,7 @@ Los eventos nativos de auditoría Kubernetes no contienen una identidad global d
 
 En automatización: `irmind ingest <case-id> <path> --cluster kubernetes:urn:k8s:team-a`. En el campo de conversación: `/ingest --cluster kubernetes:urn:k8s:team-a <path>`. Ambos usan el mismo contexto tipado y acotado en el manifiesto firmado y la reconstrucción. Sin el contexto obligatorio, no se ingiere. Confirmar una identidad no concede permisos remotos. Los nombres iguales en distintos clústeres o namespaces mantienen identidades distintas. Los decodificadores conservan request/response como campos originales, sin copiarlos automáticamente a la proyección de búsqueda.
 
-Estos módulos cubren por ahora Events nativos y JSON de Falco. Las envolturas EKS/GKE/AKS y los mapeos semánticos son trabajo separado; no se activa ningún conector a la API de Kubernetes.
+Estos módulos cubren por ahora Events nativos y JSON de Falco. Las exportaciones Cloud Audit de GKE usan el módulo GCP descrito abajo. Las envolturas EKS y AKS son trabajo separado; no se activa ningún conector a la API de Kubernetes.
 
 ## Lectores actuales y casos existentes
 
@@ -125,3 +126,31 @@ contenedor y los repositorios de imágenes son consultables con el ámbito de
 clúster confirmado. Las etiquetas de imagen y los cuerpos de solicitudes de
 pods quedan en el original. Los cuerpos completos de solicitudes y respuestas
 no se proyectan automáticamente en la búsqueda.
+
+### Cloud Audit Logs de GCP y GKE
+
+El módulo experimental `parser-gcp-audit`, incluido por defecto, reconoce
+LogEntry de Cloud Audit en JSON o NDJSON. `mapping-gcp-audit` interpreta valores
+documentados de servicio y estado; `mapping-gke-audit` valida además las rutas
+de recursos de GKE. Si falta el estado, queda desconocido. Las direcciones
+ocultadas por el proveedor no son entidades IP. JSON genérico queda como opción
+de baja confianza para estas exportaciones.
+
+En GKE se confirma la identidad completa
+`gke:projects/PROJECT_ID/locations/LOCATION/clusters/CLUSTER`. El formulario
+muestra sugerencias de las etiquetas originales, sin aceptarlas en silencio.
+Un clúster nuevo encontrado después requiere otra confirmación. Un contexto
+manual contradictorio se rechaza. Divide las exportaciones de más de ocho
+clústeres o que mezclen recursos de GKE y otros recursos de nube.
+
+Ejemplos con acceso de lectura a logs configurado fuera de IRMind:
+
+```sh
+gcloud logging read 'logName:"cloudaudit.googleapis.com" AND NOT resource.type="k8s_cluster"' --project=PROJECT_ID --format=json > cloud-audit.json
+gcloud logging read 'resource.type="k8s_cluster" AND protoPayload.serviceName="k8s.io"' --project=PROJECT_ID --format=json > gke-audit.json
+```
+
+Elige el proyecto y la ventana UTC autorizados para el caso y limita la
+colección con los controles de exportación del proveedor. Exportar no concede
+credenciales a IRMind. Consulta el [formato de auditoría](https://cloud.google.com/logging/docs/audit/understanding-audit-logs)
+y los [filtros de GKE](https://cloud.google.com/kubernetes-engine/docs/how-to/audit-logging).

@@ -13,6 +13,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | Windows EVTX | Binary EVTX: Security, System, PowerShell, Sysmon | Valid EVTX header and checksum; 95 | UTC time at 100 ns precision, host, user, process, IP/port and real record offsets | available; experimental |
 | Linux | auth.log/secure, auditd, journald JSON, HTTP common/combined | Authentication tags, audit headers, journal fields or HTTP header; 95 | UTC time, host, user, process, command, IP/port, action/result; bounded audit correlation | experimental |
 | Syslog | RFC 5424 / RFC 3164, plain or gzip | PRI and timestamp/header shape; 95 / 90 | UTC time, host, application, PID, facility, severity, message and raw data | experimental |
+| GCP Cloud Audit Logs | JSON/NDJSON LogEntry; GKE audit exports | Original protoPayload method/service and timestamp | UTC nanoseconds, explicit status, principal/resource/endpoint roles; confirmed GKE cluster | experimental |
 | JSON and exported cloud logs | JSON/NDJSON; AWS, GCP, Azure and HuntEval | Recognized record fields | Time, identities, accounts, resources and IPs | experimental |
 | ECS | NDJSON | ECS version and timestamp/characteristic fields | Event, host, user, source, destination, process, file, URL | experimental |
 | OCSF | JSON/NDJSON or local Parquet | Class, category and schema metadata; Parquet needs confirmation | Authentication, API, network, process, file and findings | experimental |
@@ -29,7 +30,7 @@ Native Kubernetes audit events do not contain a globally unique cluster identity
 
 The automation equivalent is `irmind ingest <case-id> <path> --cluster kubernetes:urn:k8s:team-a`; the conversational input accepts `/ingest --cluster kubernetes:urn:k8s:team-a <path>`. Both use the same bounded typed context in the signed source manifest and reconstruction. A source without required context fails closed; confirming an identity never grants a remote permission. Equal names in different clusters or namespaces remain distinct. Native decoders retain request/response bodies as original source fields, rather than automatically placing them in the searchable projection.
 
-These two modules currently cover native audit Events and Falco JSON. Managed EKS/GKE/AKS wrappers and semantic mappings are separate work; no live Kubernetes API connector is enabled.
+These two modules currently cover native audit Events and Falco JSON. GKE Cloud Audit exports use the dedicated GCP module below. EKS and AKS wrappers are separate work; no live Kubernetes API connector is enabled.
 
 ## Current readers and existing cases
 
@@ -121,3 +122,30 @@ never imply a process lifetime. Container IDs and image repositories are
 queryable within confirmed cluster scope; image tags and pod request bodies
 remain original evidence. No fields from full Kubernetes request/response
 bodies are automatically projected into search.
+
+### GCP Cloud Audit Logs and GKE
+
+The default experimental `parser-gcp-audit` module recognizes original Cloud
+Audit LogEntry JSON or NDJSON. `mapping-gcp-audit` interprets exact documented
+service/status values; `mapping-gke-audit` additionally validates GKE resource
+paths. Missing status stays unknown. Provider-redacted addresses are not IP
+entities. Generic JSON remains a low-confidence fallback for these exports.
+
+For GKE, confirm the complete source identity
+`gke:projects/PROJECT_ID/locations/LOCATION/clusters/CLUSTER`. The form shows
+source-label suggestions; neither the first suggestion nor a batch default is
+accepted silently. Unseen later clusters require additional confirmation;
+contradictory manual context is rejected. Split exports with more than eight
+clusters, or containing both GKE cluster and non-cluster resource types.
+
+Export examples, with read-only logging access configured outside IRMind:
+
+```sh
+gcloud logging read 'logName:"cloudaudit.googleapis.com" AND NOT resource.type="k8s_cluster"' --project=PROJECT_ID --format=json > cloud-audit.json
+gcloud logging read 'resource.type="k8s_cluster" AND protoPayload.serviceName="k8s.io"' --project=PROJECT_ID --format=json > gke-audit.json
+```
+
+Choose the project and UTC window permitted by the case and use the provider's
+export controls to bound the collection. Exporting does not grant IRMind any
+cloud credentials. See [Google's audit format](https://cloud.google.com/logging/docs/audit/understanding-audit-logs)
+and [GKE export filters](https://cloud.google.com/kubernetes-engine/docs/how-to/audit-logging).

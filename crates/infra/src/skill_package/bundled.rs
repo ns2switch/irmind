@@ -81,7 +81,11 @@ mod tests {
         let guard = irmind_security::MandatoryGuard::new().unwrap();
         for method in methods {
             assert_eq!(method.package().resources().len(), 2);
-            assert_eq!(method.metadata().version().as_str(), "0.1.0");
+            let version = match method.metadata().name().as_str() {
+                "gcp-service-account-abuse" => "0.1.1",
+                _ => "0.1.0",
+            };
+            assert_eq!(method.metadata().version().as_str(), version);
             assert_eq!(
                 expected.get(method.metadata().name().as_str()),
                 Some(&irmind_app::hex(method.package().hash().as_bytes()))

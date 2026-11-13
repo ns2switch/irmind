@@ -88,6 +88,11 @@ mod matrix {
             Box::new(irmind_mod_parser_falco::FalcoParser::default()),
             &ModuleConfig::new(),
         )?;
+        #[cfg(feature = "parser-gcp-audit")]
+        registry.register(
+            Box::new(irmind_mod_parser_gcp_audit::GcpAuditParser::default()),
+            &ModuleConfig::new(),
+        )?;
         registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
         registry.register(Box::new(EcsParser), &ModuleConfig::new())?;
         registry.register(Box::new(OcsfParser), &ModuleConfig::new())?;
@@ -165,6 +170,20 @@ mod matrix {
                 include_bytes!("../../testkit/fixtures/parser-suricata/source/eve.jsonl")
                     .as_slice(),
                 "parser-suricata",
+            ),
+            #[cfg(feature = "parser-gcp-audit")]
+            (
+                "gcp.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-gcp-audit/source/event.ndjson")
+                    .as_slice(),
+                "parser-gcp-audit",
+            ),
+            #[cfg(feature = "parser-gcp-audit")]
+            (
+                "gke.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-gcp-audit/source/gke.ndjson")
+                    .as_slice(),
+                "parser-gcp-audit",
             ),
             ("cloud.json", JSON, "parser-json"),
             #[cfg(feature = "parser-kubernetes")]
@@ -270,7 +289,7 @@ mod matrix {
         let expected_scores: [Option<u8>; 8] = match expected {
             "parser-syslog" => [None; 8],
             "parser-linux" | "parser-zeek" | "parser-suricata" | "parser-kubernetes"
-            | "parser-falco" => [
+            | "parser-falco" | "parser-gcp-audit" => [
                 if sample.first() == Some(&b'{') {
                     Some(45)
                 } else {
@@ -307,6 +326,13 @@ mod matrix {
         Ok(())
     }
     fn assert_additional_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-gcp-audit")]
+        assert_eq!(
+            irmind_mod_parser_gcp_audit::GcpAuditParser::default()
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-gcp-audit").then_some(98)
+        );
         #[cfg(feature = "parser-kubernetes")]
         assert_eq!(
             irmind_mod_parser_kubernetes::KubernetesParser::default()

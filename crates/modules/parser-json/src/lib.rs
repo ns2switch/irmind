@@ -55,9 +55,7 @@ impl LogParser for JsonParser {
         let known = (contains(b"eventVersion") && contains(b"eventTime"))
             || (contains(b"\"Records\"") && contains(b"eventTime") && contains(b"eventName"))
             || (contains(b"event_id")
-                && (contains(b"provider") || (contains(b"account_id") && contains(b"principal"))))
-            || contains(b"protoPayload")
-            || contains(b"createdDateTime");
+                && (contains(b"provider") || (contains(b"account_id") && contains(b"principal"))));
         ParserConfidence::new(if known { 90 } else { 45 }).ok()
     }
 }

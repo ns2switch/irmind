@@ -377,3 +377,14 @@ alerts remain usable without inventing a cluster identity. Configure the
 collection identity, not an authority to contact a cluster. See the
 [parser coverage](parsers.md#kubernetes-and-falco-interpretation). Managed-provider
 export wrappers are not part of this native-format support.
+
+## GCP Cloud Audit and GKE
+
+The experimental `parser-gcp-audit` local source module is compiled by default
+with `mapping-gcp-audit` and `mapping-gke-audit`. It requires no credentials or
+remote connection. Exported Admin Activity/Data Access and GKE API records retain
+original fields and nanosecond UTC time. Exact service/status tables provide
+supported categories, outcomes and occurrence roles; unknown services and missing
+identity remain visible coverage gaps. GKE source labels require explicit cluster
+confirmation. See [formats and export examples](parsers.md#gcp-cloud-audit-logs-and-gke)
+and the [mapping contract](development/gcp-audit-mapping.md).

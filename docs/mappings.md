@@ -242,3 +242,15 @@ formats. A Falco rule is an unconfirmed source alert with unknown outcome, not a
 successful attack or confirmed finding. Container OS users do not become API
 principals, and PIDs keep source-record scope. Absent container/image/Kubernetes
 metadata is not fabricated. See the [finite interpreter additions](development/kubernetes-table-mapping-contract.md).
+
+## GCP Cloud Audit and GKE (experimental)
+
+Bundled Cloud Audit tables use exact service names and explicit RPC status.
+IAM/IAM Credentials and documented project-policy methods have IAM coverage;
+absent status remains unknown. Principal, resource and both network endpoints
+retain occurrence roles, with project-qualified identities where reported.
+Redacted caller addresses do not become IP entities. GKE reuses those status
+tables and validates namespace/resource paths with a pure native wrapper bound
+to its build identity. Only the Kubernetes audit service can assign Kubernetes
+principal roles. Regional and zonal locations stay distinct. See the
+[contract and primary references](development/gcp-audit-mapping.md).

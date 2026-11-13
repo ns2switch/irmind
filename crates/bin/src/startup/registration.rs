@@ -9,6 +9,7 @@
     feature = "mapping-syslog",
     feature = "mapping-network",
     feature = "mapping-kubernetes",
+    feature = "mapping-gcp-audit",
     feature = "mapping-falco",
 ))]
 mod mapping;
@@ -42,6 +43,7 @@ use super::{
     feature = "parser-ecs",
     feature = "parser-ocsf",
     feature = "parser-kubernetes",
+    feature = "parser-gcp-audit",
     feature = "parser-falco",
     feature = "parser-velociraptor",
     feature = "parser-hayabusa",
@@ -97,6 +99,7 @@ pub(super) fn configured_registry(
         feature = "parser-ecs",
         feature = "parser-ocsf",
         feature = "parser-kubernetes",
+        feature = "parser-gcp-audit",
         feature = "parser-falco",
         feature = "parser-velociraptor",
         feature = "parser-hayabusa",
@@ -155,6 +158,7 @@ pub(super) fn configured_registry(
     feature = "parser-ecs",
     feature = "parser-ocsf",
     feature = "parser-kubernetes",
+    feature = "parser-gcp-audit",
     feature = "parser-falco",
     feature = "parser-velociraptor",
     feature = "parser-hayabusa",
@@ -183,9 +187,15 @@ fn register_parsers(
         feature = "mapping-syslog",
         feature = "mapping-network",
         feature = "mapping-kubernetes",
+        feature = "mapping-gcp-audit",
         feature = "mapping-falco",
     ))]
     mapping::register(registry)?;
+    #[cfg(feature = "parser-gcp-audit")]
+    registry.register(
+        Box::new(irmind_mod_parser_gcp_audit::GcpAuditParser::default()),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-kubernetes")]
     registry.register(
         Box::new(irmind_mod_parser_kubernetes::KubernetesParser::default()),

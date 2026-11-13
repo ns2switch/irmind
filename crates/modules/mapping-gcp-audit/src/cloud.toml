@@ -1,0 +1,419 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-gcp-audit"
+version = "gcp-audit-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-gcp-audit"
+parser_versions = ["gcp-audit-source-v1"]
+format = "gcp-audit"
+format_version = "gcp-audit-source-v1"
+action = ["protoPayload", "methodName"]
+
+[partition]
+account = ["resource", "labels", "project_id"]
+region = ["resource", "labels", "location"]
+
+[[fields]]
+source = ["protoPayload", "authenticationInfo", "principalEmail"]
+target = "user.name"
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["resource", "labels", "project_id"] } }
+[[fields.when]]
+path = ["resource", "labels", "project_id"]
+predicate = { op = "present" }
+
+[[fields]]
+source = ["protoPayload", "authenticationInfo", "principalSubject"]
+target = "user.id"
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["resource", "labels", "project_id"] } }
+[[fields.when]]
+path = ["resource", "labels", "project_id"]
+predicate = { op = "present" }
+
+[[fields]]
+source = ["resource", "labels", "project_id"]
+target = "cloud.project.id"
+observation = { kind = "project", role = "subject", scope = { kind = "account", path = ["resource", "labels", "project_id"] } }
+
+[[fields]]
+source = ["resource", "labels", "location"]
+target = "cloud.region"
+
+[[fields]]
+source = ["protoPayload", "serviceName"]
+target = "cloud.service.name"
+
+[[fields]]
+source = ["protoPayload", "requestMetadata", "callerIp"]
+target = "source.ip"
+conversion = "ip"
+omit_text = ["private", "gce-internal-ip"]
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["protoPayload", "requestMetadata", "callerSuppliedUserAgent"]
+target = "user_agent.original"
+
+[[fields]]
+source = ["protoPayload", "resourceName"]
+target = "irmind.resource.id"
+observation = { kind = "resource", role = "target", scope = { kind = "account", path = ["resource", "labels", "project_id"] } }
+[[fields.when]]
+path = ["resource", "labels", "project_id"]
+predicate = { op = "present" }
+
+[[fields]]
+source = ["protoPayload", "authenticationInfo", "serviceAccountKeyName"]
+target = "irmind.key.id"
+observation = { kind = "key", role = "subject", scope = { kind = "account", path = ["resource", "labels", "project_id"] } }
+[[fields.when]]
+path = ["resource", "labels", "project_id"]
+predicate = { op = "present" }
+
+[[fields]]
+source = ["protoPayload", "requestMetadata", "destinationAttributes", "ip"]
+target = "destination.ip"
+conversion = "ip"
+observation = { kind = "ip", role = "destination", scope = { kind = "global" } }
+
+[[fields]]
+source = ["protoPayload", "requestMetadata", "destinationAttributes", "port"]
+target = "destination.port"
+conversion = "decimal"
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "iam.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "number", value = "0" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "iam.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "integer_interval", value = { first = 1, last = 16 } }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "iam.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "iam.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "null" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "iamcredentials.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "number", value = "0" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "iamcredentials.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "integer_interval", value = { first = 1, last = 16 } }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "iamcredentials.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "iamcredentials.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "null" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "storage.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "number", value = "0" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "storage.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "integer_interval", value = { first = 1, last = 16 } }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "storage.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "storage.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "null" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "compute.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "number", value = "0" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "compute.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "integer_interval", value = { first = 1, last = 16 } }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "compute.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "compute.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "null" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "container.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "number", value = "0" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "container.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "integer_interval", value = { first = 1, last = 16 } }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "container.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "container.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "null" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "cloudresourcemanager.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "number", value = "0" }
+
+[[rules.when]]
+path = ["protoPayload", "methodName"]
+predicate = { op = "text", value = "SetIamPolicy" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "cloudresourcemanager.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "integer_interval", value = { first = 1, last = 16 } }
+
+[[rules.when]]
+path = ["protoPayload", "methodName"]
+predicate = { op = "text", value = "SetIamPolicy" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "cloudresourcemanager.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "missing" }
+
+[[rules.when]]
+path = ["protoPayload", "methodName"]
+predicate = { op = "text", value = "SetIamPolicy" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "cloudresourcemanager.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "null" }
+[[rules.when]]
+path = ["protoPayload", "methodName"]
+predicate = { op = "text", value = "SetIamPolicy" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "cloudresourcemanager.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "number", value = "0" }
+
+[[rules.when]]
+path = ["protoPayload", "methodName"]
+predicate = { op = "text", value = "GetIamPolicy" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "cloudresourcemanager.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "integer_interval", value = { first = 1, last = 16 } }
+
+[[rules.when]]
+path = ["protoPayload", "methodName"]
+predicate = { op = "text", value = "GetIamPolicy" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "cloudresourcemanager.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "missing" }
+
+[[rules.when]]
+path = ["protoPayload", "methodName"]
+predicate = { op = "text", value = "GetIamPolicy" }
+
+[[rules]]
+categories = ["api", "iam"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["protoPayload", "serviceName"]
+predicate = { op = "text", value = "cloudresourcemanager.googleapis.com" }
+[[rules.when]]
+path = ["protoPayload", "status", "code"]
+predicate = { op = "null" }
+[[rules.when]]
+path = ["protoPayload", "methodName"]
+predicate = { op = "text", value = "GetIamPolicy" }

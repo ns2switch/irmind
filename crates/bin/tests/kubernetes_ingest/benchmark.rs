@@ -15,15 +15,7 @@ fn benchmark(format: &str) {
     let root = tempfile::tempdir().unwrap();
     let originals = root.path().join("sources");
     fs::create_dir(&originals).unwrap();
-    let fixture = match format {
-        "kubernetes" => {
-            include_bytes!("../../../testkit/fixtures/parser-kubernetes/source/event.ndjson")
-                .as_slice()
-        }
-        _ => {
-            include_bytes!("../../../testkit/fixtures/parser-falco/source/event.ndjson").as_slice()
-        }
-    };
+    let fixture = fixture(format);
     let mut value: serde_json::Value = serde_json::from_slice(fixture).unwrap();
     value["synthetic_padding"] = serde_json::json!("x".repeat(1024));
     let mut line = serde_json::to_vec(&value).unwrap();
@@ -44,13 +36,22 @@ fn benchmark(format: &str) {
         .create_case("Synthetic cluster benchmark", "local only")
         .unwrap();
     let started = std::time::Instant::now();
+    let context = match format {
+        "gcp" => None,
+        "gke" => irmind_app::command_cluster_context(Some(
+            "gke:projects/synthetic-project/locations/us-central1/clusters/synthetic-cluster",
+        ))
+        .unwrap(),
+        _ => Some(context()),
+    };
     assert_eq!(
-        ingest(
+        ingest_with_context(
             &engine,
             store.as_ref(),
             &case.id,
             &originals,
-            "benchmark.ndjson"
+            "benchmark.ndjson",
+            context.as_ref()
         ),
         count
     );
@@ -59,5 +60,68 @@ fn benchmark(format: &str) {
         "KUBERNETES_BENCH format={format} bytes={bytes} records={count} seconds={seconds:.3} MiB_per_second={:.3}",
         f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / seconds
     );
+    verify_selection(store.as_ref(), &case.id, format);
     engine.verify(&case.id).unwrap();
+}
+
+#[cfg(feature = "parser-gcp-audit")]
+#[test]
+#[ignore = "manual optimized 1 GiB Cloud Audit and GKE smoke"]
+fn gcp_audit_one_gib_release_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Run benchmarks in the release profile");
+    }
+    for format in ["gcp", "gke"] {
+        benchmark(format);
+    }
+    Ok(())
+}
+
+fn fixture(format: &str) -> &'static [u8] {
+    [
+        (
+            "kubernetes",
+            include_bytes!("../../../testkit/fixtures/parser-kubernetes/source/event.ndjson")
+                .as_slice(),
+        ),
+        (
+            "falco",
+            include_bytes!("../../../testkit/fixtures/parser-falco/source/event.ndjson").as_slice(),
+        ),
+        (
+            "gcp",
+            include_bytes!("../../../testkit/fixtures/parser-gcp-audit/source/event.ndjson")
+                .as_slice(),
+        ),
+        (
+            "gke",
+            include_bytes!("../../../testkit/fixtures/parser-gcp-audit/source/gke.ndjson")
+                .as_slice(),
+        ),
+    ]
+    .into_iter()
+    .find(|(name, _)| *name == format)
+    .unwrap()
+    .1
+}
+
+fn verify_selection(store: &LocalStore, id: &irmind_domain::CaseId, format: &str) {
+    let entries = store.entries(id).unwrap();
+    let manifest = entries
+        .iter()
+        .rev()
+        .find(|e| e.kind == AuditEventKind::SourceManifestV2)
+        .map(|e| SourceManifestV2::decode(&e.payload).unwrap())
+        .unwrap();
+    let expected = match format {
+        "gcp" | "gke" => "parser-gcp-audit",
+        "kubernetes" => "parser-kubernetes",
+        _ => "parser-falco",
+    };
+    assert_eq!(manifest.parser_id, expected);
+    assert!(
+        entries
+            .iter()
+            .any(|e| e.kind == AuditEventKind::MappingRunV1)
+    );
 }
