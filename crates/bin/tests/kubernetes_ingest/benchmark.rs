@@ -38,6 +38,8 @@ fn benchmark(format: &str) {
     let started = std::time::Instant::now();
     let context = match format {
         "gcp" | "zeek" | "suricata" | "entra-signin" | "entra-audit" => None,
+        "eks" => irmind_app::command_cluster_context(Some("eks:arn:aws:eks:us-east-1:111122223333:cluster/synthetic-cluster")).unwrap(),
+        "aks" => irmind_app::command_cluster_context(Some("aks:/subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/synthetic/providers/Microsoft.ContainerService/managedClusters/synthetic-cluster")).unwrap(),
         "gke" => irmind_app::command_cluster_context(Some(
             "gke:projects/synthetic-project/locations/us-central1/clusters/synthetic-cluster",
         ))
@@ -107,8 +109,30 @@ fn entra_one_gib_release_throughput() -> Result<(), &'static str> {
     Ok(())
 }
 
+#[test]
+#[ignore = "manual optimized 1 GiB managed Kubernetes smoke"]
+fn managed_one_gib_release_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Run benchmarks in the release profile");
+    }
+    for format in ["eks", "aks"] {
+        benchmark(format);
+    }
+    Ok(())
+}
+
 fn fixture(format: &str) -> &'static [u8] {
     [
+        (
+            "eks",
+            include_bytes!("../../../testkit/fixtures/parser-kubernetes/source/eks-row.ndjson")
+                .as_slice(),
+        ),
+        (
+            "aks",
+            include_bytes!("../../../testkit/fixtures/parser-kubernetes/source/aks-row.ndjson")
+                .as_slice(),
+        ),
         (
             "entra-signin",
             include_bytes!("../../../testkit/fixtures/parser-entra/source/signin-resource.ndjson")
@@ -167,6 +191,8 @@ fn verify_selection(store: &LocalStore, id: &irmind_domain::CaseId, format: &str
     let expected = [
         ("entra-signin", "parser-entra"),
         ("entra-audit", "parser-entra"),
+        ("eks", "parser-kubernetes"),
+        ("aks", "parser-kubernetes"),
         ("gcp", "parser-gcp-audit"),
         ("gke", "parser-gcp-audit"),
         ("kubernetes", "parser-kubernetes"),

@@ -3121,6 +3121,7 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "irmind-testkit",
+ "serde_json",
 ]
 
 [[package]]

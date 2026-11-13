@@ -226,6 +226,34 @@ mod matrix {
                     .as_slice(),
                 "parser-kubernetes",
             ),
+            #[cfg(feature = "parser-kubernetes")]
+            (
+                "eks.json",
+                include_bytes!("../../testkit/fixtures/parser-kubernetes/source/eks.json")
+                    .as_slice(),
+                "parser-kubernetes",
+            ),
+            #[cfg(feature = "parser-kubernetes")]
+            (
+                "aks.json",
+                include_bytes!("../../testkit/fixtures/parser-kubernetes/source/aks.json")
+                    .as_slice(),
+                "parser-kubernetes",
+            ),
+            #[cfg(feature = "parser-kubernetes")]
+            (
+                "eks-row.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-kubernetes/source/eks-row.ndjson")
+                    .as_slice(),
+                "parser-kubernetes",
+            ),
+            #[cfg(feature = "parser-kubernetes")]
+            (
+                "aks-row.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-kubernetes/source/aks-row.ndjson")
+                    .as_slice(),
+                "parser-kubernetes",
+            ),
             #[cfg(feature = "parser-falco")]
             (
                 "falco.ndjson",

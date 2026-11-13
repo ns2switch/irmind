@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 //! Original Kubernetes audit fields. Semantic classification belongs to mappings.
 mod decode;
+mod managed;
 pub use decode::KubernetesSourceDecoder;
 use irmind_app::{
     AppError, LogParser, ParserClusterRequirement, ParserConfidence, SourceClusterContext,
@@ -50,31 +51,15 @@ impl LogParser for KubernetesParser {
         "Kubernetes audit events (experimental; explicit cluster identity required)"
     }
     fn detect(&self, _: &str, sample: &[u8]) -> Option<ParserConfidence> {
-        let sample = &sample[..sample.len().min(65536)];
-        let first = sample.split(|b| *b == b'\n').next()?;
-        let fields = irmind_app::source_mapping::json::decode_json_fields(
-            if first.trim_ascii() == b"{" || first.trim_ascii() == b"[" {
-                sample
-            } else {
-                first
-            },
-            irmind_app::source_mapping::json::SourceJsonLimits::default(),
-        )
-        .ok()?;
-        let fields = match &fields {
-            irmind_app::source_mapping::SourceValue::Array(rows) => rows.first()?,
-            fields => fields,
-        };
-        decode::is_native(fields)
-            .then(|| ParserConfidence::new(98).ok())
-            .flatten()
+        managed::detect(sample).and_then(|()| ParserConfidence::new(98).ok())
     }
+
     fn cluster_context_requirement(
         &self,
         _: &str,
-        _: &[u8],
+        sample: &[u8],
     ) -> Result<Option<ParserClusterRequirement>, AppError> {
-        Ok(Some(ParserClusterRequirement::try_new(true, vec![])?))
+        managed::requirement(sample).map(Some)
     }
     fn with_cluster_context(
         &self,
@@ -86,6 +71,9 @@ impl LogParser for KubernetesParser {
     }
 }
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod managed_tests;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;

@@ -234,12 +234,11 @@ fn registry() -> ModuleRegistry {
                 &ModuleConfig::new(),
             )
             .unwrap();
-        registry
-            .register(
-                Box::new(irmind_mod_mapping_kubernetes::KubernetesMapping::new().unwrap()),
-                &ModuleConfig::new(),
-            )
-            .unwrap();
+        for mapper in irmind_mod_mapping_kubernetes::KubernetesMapping::all().unwrap() {
+            registry
+                .register(Box::new(mapper), &ModuleConfig::new())
+                .unwrap();
+        }
     }
     #[cfg(feature = "parser-falco")]
     {
