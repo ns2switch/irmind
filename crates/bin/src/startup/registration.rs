@@ -8,6 +8,8 @@
     feature = "mapping-dfir",
     feature = "mapping-syslog",
     feature = "mapping-network",
+    feature = "mapping-kubernetes",
+    feature = "mapping-falco",
 ))]
 mod mapping;
 #[cfg(feature = "llm-anthropic")]
@@ -180,6 +182,8 @@ fn register_parsers(
         feature = "mapping-dfir",
         feature = "mapping-syslog",
         feature = "mapping-network",
+        feature = "mapping-kubernetes",
+        feature = "mapping-falco",
     ))]
     mapping::register(registry)?;
     #[cfg(feature = "parser-kubernetes")]

@@ -31,7 +31,7 @@ mod source_file_contract;
 pub use skill_contract::{run_skill_compiler_contract, run_skill_store_contract};
 pub use source_file_contract::run_source_file_mapping_contract;
 mod contract_support;
-pub use common_event_contract::run_source_mapping_contract;
+pub use common_event_contract::{run_cluster_source_mapping_contract, run_source_mapping_contract};
 mod edr_contract;
 mod fakes;
 mod keystore_contract;

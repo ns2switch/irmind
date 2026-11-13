@@ -214,3 +214,20 @@ TSV y las relaciones propias de cada fuente.
 La ingesta y la reconstrucción mantienen los límites de registro y fuente, los
 offsets medidos, la cancelación y las muestras no confiables de rechazo. Los
 campos originales no se reconstruyen a partir del texto de presentación.
+
+## Kubernetes y Falco (experimentales)
+
+`mapping-kubernetes` cubre eventos nativos `audit.k8s.io/v1` de
+`parser-kubernetes`. Sus tablas finitas usan códigos HTTP explícitos
+(200–399: éxito; 400–599: fallo; ausente o nulo: desconocido), verbos originales,
+actor, suplantación, primera IP de origen y campos del recurso. Las observaciones
+de pod, nodo, espacio de nombres y cuenta de servicio objetivo exigen el tipo de
+recurso correspondiente. La identidad queda acotada al clúster confirmado; cada
+cuenta de servicio conserva además su propio espacio de nombres.
+
+`mapping-falco-host` y `mapping-falco-kubernetes` cubren formatos de origen
+separados. Una regla Falco es una alerta de origen sin confirmar y con resultado
+desconocido, no un ataque exitoso ni un hallazgo confirmado. Los usuarios del
+contenedor no se convierten en principales de la API. Los PID conservan ámbito
+de registro. No se inventan metadatos ausentes. Consulta las
+[ampliaciones del intérprete finito](../development/kubernetes-table-mapping-contract.md).

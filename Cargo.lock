@@ -2494,8 +2494,10 @@ dependencies = [
  "irmind-mod-mapping-dfir",
  "irmind-mod-mapping-ecs",
  "irmind-mod-mapping-evtx",
+ "irmind-mod-mapping-falco",
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
+ "irmind-mod-mapping-kubernetes",
  "irmind-mod-mapping-linux",
  "irmind-mod-mapping-network",
  "irmind-mod-mapping-ocsf",
@@ -2866,6 +2868,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-falco"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-falco",
+ "irmind-testkit",
+ "serde_json",
+]
+
+[[package]]
 name = "irmind-mod-mapping-journald-compat"
 version = "0.1.0"
 dependencies = [
@@ -2886,6 +2900,18 @@ dependencies = [
  "irmind-build-manifest",
  "irmind-domain",
  "irmind-mod-parser-json",
+ "irmind-testkit",
+ "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-mapping-kubernetes"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-kubernetes",
  "irmind-testkit",
  "serde_json",
 ]

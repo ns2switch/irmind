@@ -1,0 +1,147 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-kubernetes"
+version = "kubernetes-audit-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-kubernetes"
+parser_versions = ["kubernetes-source-v1"]
+format = "kubernetes-audit"
+format_version = "kubernetes-source-v1"
+action = ["verb"]
+
+
+[[fields]]
+source = ["user", "username"]
+target = "user.name"
+observation = { kind = "k8s_user", role = "actor", scope = { kind = "cluster", path = {  } } }
+
+[[fields]]
+source = ["impersonatedUser", "username"]
+target = "user.target.name"
+observation = { kind = "k8s_user", role = "target", scope = { kind = "cluster", path = {  } } }
+
+[[fields]]
+source = ["user", "groups"]
+target = "user.group.name"
+
+[[fields]]
+source = ["impersonatedUser", "groups"]
+target = "user.target.group.name"
+
+[[fields]]
+source = ["user", "username"]
+target = "irmind.kubernetes.service_account"
+conversion = "kubernetes_service_account_name"
+observation = { kind = "k8s_service_account", role = "actor", scope = { kind = "cluster", path = { service_account_principal = ["user", "username"] } } }
+
+[[fields]]
+source = ["objectRef", "namespace"]
+target = "orchestrator.namespace"
+observation = { kind = "k8s_namespace", role = "subject", scope = { kind = "cluster", path = {  } } }
+
+[[fields]]
+source = ["objectRef", "resource"]
+target = "orchestrator.resource.type"
+
+[[fields]]
+source = ["objectRef", "name"]
+target = "orchestrator.resource.name"
+[[fields.observations]]
+kind = "k8s_pod"
+role = "target"
+scope = { kind = "cluster", path = { namespace = ["objectRef", "namespace"] } }
+[[fields.observations.when]]
+path = ["objectRef", "resource"]
+predicate = { op = "text", value = "pods" }
+[[fields.observations]]
+kind = "k8s_node"
+role = "target"
+scope = { kind = "cluster", path = {  } }
+[[fields.observations.when]]
+path = ["objectRef", "resource"]
+predicate = { op = "text", value = "nodes" }
+[[fields.observations]]
+kind = "k8s_namespace"
+role = "target"
+scope = { kind = "cluster", path = {  } }
+[[fields.observations.when]]
+path = ["objectRef", "resource"]
+predicate = { op = "text", value = "namespaces" }
+[[fields.observations]]
+kind = "k8s_service_account"
+role = "target"
+scope = { kind = "cluster", path = { namespace = ["objectRef", "namespace"] } }
+[[fields.observations.when]]
+path = ["objectRef", "resource"]
+predicate = { op = "text", value = "serviceaccounts" }
+
+[[fields]]
+source = ["objectRef", "uid"]
+target = "orchestrator.resource.id"
+
+[[fields]]
+source = ["objectRef", "apiVersion"]
+target = "orchestrator.api_version"
+
+[[fields]]
+source = ["objectRef", "subresource"]
+target = "irmind.kubernetes.subresource"
+
+[[fields]]
+source = ["stage"]
+target = "irmind.kubernetes.stage"
+
+[[fields]]
+source = ["annotations", "authorization.k8s.io/decision"]
+target = "irmind.kubernetes.authorization_decision"
+
+[[fields]]
+source = ["sourceIPs"]
+source_index = 0
+target = "source.ip"
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["userAgent"]
+target = "user_agent.original"
+
+[[fields]]
+source = ["requestURI"]
+target = "url.original"
+
+[[fields]]
+source = ["responseStatus", "code"]
+target = "http.response.status_code"
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["responseStatus", "code"]
+predicate = { op = "integer_interval", value = { first = 200, last = 399 } }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["responseStatus", "code"]
+predicate = { op = "integer_interval", value = { first = 400, last = 599 } }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["responseStatus", "code"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["responseStatus", "code"]
+predicate = { op = "null" }

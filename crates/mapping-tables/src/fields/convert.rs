@@ -27,6 +27,12 @@ impl CompiledField {
                 .map_err(|_| bad())?,
             )),
             Conversion::Copy => copy_common_value(self.target, value),
+            Conversion::KubernetesServiceAccountName => {
+                let (_, name) = super::service_account_parts(text()?)?;
+                Ok(CommonValue::Text(
+                    EventText::identifier(name).map_err(|_| bad())?,
+                ))
+            }
             Conversion::Ip => Ok(CommonValue::Ip(text()?.parse().map_err(|_| bad())?)),
             Conversion::Md5 | Conversion::Sha1 | Conversion::Sha256 => {
                 let algorithm = match self.conversion {

@@ -8,7 +8,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 - Add separate experimental native Kubernetes audit and Falco JSON decoders, selected by the bounded detection registry. Original fields, nanosecond timestamps and actual offsets are retained; mappings remain independent.
 - Ask for required cluster acquisition context in the TUI, with explicit per-file or batch confirmation. CLI and `/ingest --cluster` use the same typed, signed context. No identity is inferred from the machine or path, and no live API access is added.
-- Include synthetic fixtures, detection-matrix coverage, malformed/oversized-record regressions and cluster-confirmation keyboard tests.
+- Include hash-pinned Kubernetes and Falco table mappings: explicit API outcomes, actor/impersonation roles, namespaced target resources, and unconfirmed source alerts. Cluster search projects validated fields instead of whole request/response bodies.
+- Include synthetic fixtures, detection-matrix coverage, malformed/oversized-record regressions, cluster-confirmation keyboard tests and signed ingest/rebuild/seal/export coverage.
 - Format impact: no additional format change beyond the cluster/common vocabulary extensions described below.
 
 ### Cluster-qualified common events

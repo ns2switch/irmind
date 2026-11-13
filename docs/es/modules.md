@@ -331,3 +331,15 @@ preciso como evidencia firmada sin clasificar.
 ## Paquetes de metodología
 
 Las skills son paquetes de datos locales, no conectores ni módulos ejecutables. `/skills` gestiona los tres métodos incluidos y los paquetes aprobados por el analista. No cambian las herramientas compiladas ni activan proveedores. Consulta [skills forenses](skills.md).
+
+## Auditoría Kubernetes y Falco
+
+Los módulos experimentales `parser-kubernetes` y `parser-falco`, con sus mapeos de
+tablas independientes, se incluyen por defecto. No necesitan credenciales ni red.
+Los eventos nativos de auditoría requieren contexto de clúster explícito por
+ingesta, mediante el formulario o `/ingest --cluster kubernetes:urn:k8s:example`.
+Falco lo exige si un registro contiene metadatos Kubernetes; las alertas del host
+se pueden usar sin inventar una identidad de clúster. Se configura la identidad
+de la colección, no un permiso para contactar con el clúster. Consulta la
+[cobertura](parsers.md#interpretación-de-kubernetes-y-falco). Esta incorporación
+nativa no cubre aún las envolturas de exportación de los proveedores gestionados.

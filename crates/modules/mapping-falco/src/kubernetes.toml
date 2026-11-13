@@ -1,0 +1,92 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-falco-kubernetes"
+version = "falco-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-falco"
+parser_versions = ["falco-source-v1"]
+format = "falco-kubernetes"
+format_version = "falco-source-v1"
+action = ["rule"]
+
+[[fields]]
+source = ["rule"]
+target = "rule.name"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "rule", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["output_fields", "proc.name"]
+target = "process.name"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "process", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["output_fields", "proc.pid"]
+target = "process.pid"
+omit_text = ["<NA>", "<NONE>"]
+
+[[fields]]
+source = ["output_fields", "proc.cmdline"]
+target = "process.command_line"
+omit_text = ["<NA>", "<NONE>"]
+
+[[fields]]
+source = ["output_fields", "proc.pname"]
+target = "process.parent.name"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "process", role = "parent", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["output_fields", "user.name"]
+target = "user.name"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["output_fields", "container.id"]
+target = "container.id"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "container", role = "subject", scope = { kind = "cluster", path = {} } }
+
+[[fields]]
+source = ["output_fields", "container.image.repository"]
+target = "container.image.name"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "image", role = "subject", scope = { kind = "cluster", path = {} } }
+
+[[fields]]
+source = ["hostname"]
+target = "host.name"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "host", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["output_fields", "k8s.ns.name"]
+target = "orchestrator.namespace"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "k8s_namespace", role = "subject", scope = { kind = "cluster", path = {} } }
+
+[[fields]]
+source = ["output_fields", "k8s.pod.name"]
+target = "irmind.kubernetes.pod"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "k8s_pod", role = "subject", scope = { kind = "cluster", path = { namespace = ["output_fields", "k8s.ns.name"] } } }
+
+[[fields]]
+source = ["output_fields", "k8s.node.name"]
+target = "irmind.kubernetes.node"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "k8s_node", role = "subject", scope = { kind = "cluster", path = {} } }
+
+[[fields]]
+source = ["output_fields", "k8s.sa.name"]
+target = "irmind.kubernetes.service_account"
+omit_text = ["<NA>", "<NONE>"]
+observation = { kind = "k8s_service_account", role = "actor", scope = { kind = "cluster", path = { namespace = ["output_fields", "k8s.ns.name"] } } }
+
+[[rules]]
+kind = "alert"
+categories = ["intrusion_detection"]
+types = ["info"]
+outcome = "unknown"

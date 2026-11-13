@@ -226,3 +226,19 @@ are not classification-table operations.
 The existing bounded record framing, source-size limits, measured offsets,
 cancellation and untrusted rejection samples apply to both ingestion and
 reconstruction. No original fields are recovered from normalized display text.
+
+## Kubernetes and Falco (experimental)
+
+`mapping-kubernetes` covers native `audit.k8s.io/v1` Events decoded by
+`parser-kubernetes`. It uses finite response-status tables (200–399 success,
+400–599 failure, absent/null unknown), original verbs, and explicit actor,
+impersonation, primary source IP and resource fields. Typed target pod, node,
+namespace and service-account observations require the corresponding resource
+kind. Names are scoped to confirmed acquisition identity; service accounts also
+retain their own namespace.
+
+`mapping-falco-host` and `mapping-falco-kubernetes` cover disjoint Falco source
+formats. A Falco rule is an unconfirmed source alert with unknown outcome, not a
+successful attack or confirmed finding. Container OS users do not become API
+principals, and PIDs keep source-record scope. Absent container/image/Kubernetes
+metadata is not fabricated. See the [finite interpreter additions](development/kubernetes-table-mapping-contract.md).
