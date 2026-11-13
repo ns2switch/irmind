@@ -21,11 +21,21 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | Syslog | RFC 5424/RFC 3164, texto o gzip acotado | PRI y forma de cabecera/instante, no extensión | Host, aplicación, PID, facility, severity, mensaje y tiempo completo | experimental |
 | Zeek | TSV o JSON de red | Cabecera o campos reconocidos; 95 en los fixtures conn/DNS | Tiempo preciso, extremos, correlación UID y host explícito del sensor | experimental |
 | Suricata EVE | JSONL de alertas, flujo y protocolos | Tipo compatible, instante y flow ID; 95 | Tiempo preciso, extremos, correlación y detecciones sin confirmar | experimental |
+| Auditoría Kubernetes | Event nativo `audit.k8s.io/v1`, JSON/NDJSON | Versión de API y tipo explícitos; 98 | Campos originales, nanosegundos y contexto firmado de clúster. La clasificación semántica corresponde a módulos de mapeo separados. | experimental |
+| Falco | Detecciones JSON/NDJSON | Regla, prioridad, instante y objeto output-fields; 98 | Regla y campos originales, tiempo preciso; los registros Kubernetes requieren contexto de clúster confirmado. Una detección de origen no es una confirmación del analista. | experimental |
 | Declarativo | CSV, JSON, NDJSON o regex acotada | Cabecera exacta, campos JSON o regex; máximo 70 % | Mapeo explícito descrito abajo | experimental |
+
+## Contexto de clúster por ingesta
+
+Los eventos nativos de auditoría Kubernetes no contienen una identidad global del clúster. La TUI pide una identidad explícita con proveedor, por ejemplo `kubernetes:urn:k8s:team-a`, antes de ingerir. Confírmala para un archivo o selecciona expresamente la opción del lote. No se toma un valor por defecto del equipo, nombre de archivo o directorio. Falco requiere la misma confirmación si hay metadatos Kubernetes; las detecciones solo de host no inventan un clúster.
+
+En automatización: `irmind ingest <case-id> <path> --cluster kubernetes:urn:k8s:team-a`. En el campo de conversación: `/ingest --cluster kubernetes:urn:k8s:team-a <path>`. Ambos usan el mismo contexto tipado y acotado en el manifiesto firmado y la reconstrucción. Sin el contexto obligatorio, no se ingiere. Confirmar una identidad no concede permisos remotos. Los nombres iguales en distintos clústeres o namespaces mantienen identidades distintas. Los decodificadores conservan request/response como campos originales, sin copiarlos automáticamente a la proyección de búsqueda.
+
+Estos módulos cubren por ahora Events nativos y JSON de Falco. Las envolturas EKS/GKE/AKS y los mapeos semánticos son trabajo separado; no se activa ningún conector a la API de Kubernetes.
 
 ## Lectores actuales y casos existentes
 
-Las ingestas nuevas usan la versión del parser registrada en su manifiesto firmado. JSON usa `json-stream-v3`. No se conservan lectores históricos. Los bytes firmados existentes se pueden autenticar y exportar; para regenerar registros de un lector anterior, crea un caso nuevo e ingiere los originales verificados. Reinstala las definiciones declarativas después de actualizar su lector. Consulta el [registro de cambios](../../CHANGELOG.md#known-issue-fixed).
+Las ingestas nuevas usan la versión del parser registrada en su manifiesto firmado. JSON usa `json-source-v1`. No se conservan lectores históricos. Los bytes firmados existentes se pueden autenticar y exportar; para regenerar registros de un lector anterior, crea un caso nuevo e ingiere los originales verificados. Reinstala las definiciones declarativas después de actualizar su lector. Consulta el [registro de cambios](../../CHANGELOG.md#known-issue-fixed).
 
 ## Cobertura de Windows
 

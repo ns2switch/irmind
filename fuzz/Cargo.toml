@@ -12,6 +12,8 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-kubernetes = { path = "../crates/modules/parser-kubernetes", version = "0.1.0" }
+irmind-mod-parser-falco = { path = "../crates/modules/parser-falco", version = "0.1.0" }
 irmind-mapping-tables = { path = "../crates/mapping-tables", version = "0.1.0" }
 irmind-mod-parser-suricata = { path = "../crates/modules/parser-suricata", version = "0.1.0" }
 irmind-mod-parser-zeek = { path = "../crates/modules/parser-zeek", version = "0.1.0" }
@@ -161,6 +163,20 @@ bench = false
 [[bin]]
 name = "source_mapping"
 path = "fuzz_targets/source_mapping.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_kubernetes"
+path = "fuzz_targets/parser_kubernetes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_falco"
+path = "fuzz_targets/parser_falco.rs"
 test = false
 doc = false
 bench = false

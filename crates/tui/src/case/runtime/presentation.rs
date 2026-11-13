@@ -19,7 +19,8 @@ impl CaseRuntime<'_, '_, '_> {
         let busy = self.active.is_some()
             || self.state.confirmation.is_some()
             || self.state.parser_prompt.is_some()
-            || self.state.time_prompt.is_some();
+            || self.state.time_prompt.is_some()
+            || self.state.cluster_prompt.is_some();
         let Some(guide) = self.state.demo_guide.as_mut() else {
             return Ok(());
         };
@@ -73,12 +74,15 @@ impl CaseRuntime<'_, '_, '_> {
             .demo_guide
             .as_ref()
             .is_some_and(super::super::demo_guide::DemoGuide::active)
-            || (self.state.parser_prompt.is_none() && self.state.time_prompt.is_none())
+            || (self.state.parser_prompt.is_none()
+                && self.state.time_prompt.is_none()
+                && self.state.cluster_prompt.is_none())
         {
             return false;
         }
         self.state.parser_prompt = None;
         self.state.time_prompt = None;
+        self.state.cluster_prompt = None;
         self.presentation_failed("The bundled source unexpectedly needs a parser or time choice");
         true
     }

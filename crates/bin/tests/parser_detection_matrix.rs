@@ -78,6 +78,16 @@ mod matrix {
         registry.register(Box::new(ZeekParser), &ModuleConfig::new())?;
         #[cfg(feature = "parser-suricata")]
         registry.register(Box::new(SuricataParser), &ModuleConfig::new())?;
+        #[cfg(feature = "parser-kubernetes")]
+        registry.register(
+            Box::new(irmind_mod_parser_kubernetes::KubernetesParser::default()),
+            &ModuleConfig::new(),
+        )?;
+        #[cfg(feature = "parser-falco")]
+        registry.register(
+            Box::new(irmind_mod_parser_falco::FalcoParser::default()),
+            &ModuleConfig::new(),
+        )?;
         registry.register(Box::new(JsonParser), &ModuleConfig::new())?;
         registry.register(Box::new(EcsParser), &ModuleConfig::new())?;
         registry.register(Box::new(OcsfParser), &ModuleConfig::new())?;
@@ -157,6 +167,20 @@ mod matrix {
                 "parser-suricata",
             ),
             ("cloud.json", JSON, "parser-json"),
+            #[cfg(feature = "parser-kubernetes")]
+            (
+                "kubernetes.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-kubernetes/source/events.ndjson")
+                    .as_slice(),
+                "parser-kubernetes",
+            ),
+            #[cfg(feature = "parser-falco")]
+            (
+                "falco.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-falco/source/events.ndjson")
+                    .as_slice(),
+                "parser-falco",
+            ),
             ("ecs.ndjson", ECS, "parser-ecs"),
             ("ocsf.ndjson", OCSF, "parser-ocsf"),
             ("velociraptor.jsonl", VELOCIRAPTOR, "parser-velociraptor"),
@@ -245,7 +269,8 @@ mod matrix {
         assert_additional_scores(name, sample, expected);
         let expected_scores: [Option<u8>; 8] = match expected {
             "parser-syslog" => [None; 8],
-            "parser-linux" | "parser-zeek" | "parser-suricata" => [
+            "parser-linux" | "parser-zeek" | "parser-suricata" | "parser-kubernetes"
+            | "parser-falco" => [
                 if sample.first() == Some(&b'{') {
                     Some(45)
                 } else {
@@ -282,6 +307,20 @@ mod matrix {
         Ok(())
     }
     fn assert_additional_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-kubernetes")]
+        assert_eq!(
+            irmind_mod_parser_kubernetes::KubernetesParser::default()
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-kubernetes").then_some(98)
+        );
+        #[cfg(feature = "parser-falco")]
+        assert_eq!(
+            irmind_mod_parser_falco::FalcoParser::default()
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-falco").then_some(98)
+        );
         #[cfg(feature = "parser-syslog")]
         assert_eq!(
             irmind_mod_parser_syslog::SyslogParser

@@ -403,6 +403,8 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 analyst_choices: std::collections::BTreeMap::new(),
                 time_contexts: std::collections::BTreeMap::new(),
                 default_time_context: options.time_context,
+                cluster_contexts: std::collections::BTreeMap::new(),
+                default_cluster_context: options.cluster_context,
             });
             self.start_pending_ingest();
             return Ok(true);
@@ -436,6 +438,8 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                         analyst_choices: &pending.analyst_choices,
                         time_contexts: &pending.time_contexts,
                         default_time_context: pending.default_time_context,
+                        cluster_contexts: &pending.cluster_contexts,
+                        default_cluster_context: pending.default_cluster_context.as_ref(),
                         cancel: &cancel,
                     },
                     |done, count, source| {

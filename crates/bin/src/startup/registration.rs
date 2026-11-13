@@ -39,6 +39,8 @@ use super::{
     feature = "parser-json",
     feature = "parser-ecs",
     feature = "parser-ocsf",
+    feature = "parser-kubernetes",
+    feature = "parser-falco",
     feature = "parser-velociraptor",
     feature = "parser-hayabusa",
     feature = "parser-chainsaw",
@@ -92,6 +94,8 @@ pub(super) fn configured_registry(
         feature = "parser-json",
         feature = "parser-ecs",
         feature = "parser-ocsf",
+        feature = "parser-kubernetes",
+        feature = "parser-falco",
         feature = "parser-velociraptor",
         feature = "parser-hayabusa",
         feature = "parser-chainsaw",
@@ -148,6 +152,8 @@ pub(super) fn configured_registry(
     feature = "parser-json",
     feature = "parser-ecs",
     feature = "parser-ocsf",
+    feature = "parser-kubernetes",
+    feature = "parser-falco",
     feature = "parser-velociraptor",
     feature = "parser-hayabusa",
     feature = "parser-chainsaw",
@@ -176,6 +182,16 @@ fn register_parsers(
         feature = "mapping-network",
     ))]
     mapping::register(registry)?;
+    #[cfg(feature = "parser-kubernetes")]
+    registry.register(
+        Box::new(irmind_mod_parser_kubernetes::KubernetesParser::default()),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "parser-falco")]
+    registry.register(
+        Box::new(irmind_mod_parser_falco::FalcoParser::default()),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-zeek")]
     registry.register(Box::new(ZeekParser), &ModuleConfig::new())?;
     #[cfg(feature = "parser-suricata")]

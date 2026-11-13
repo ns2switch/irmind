@@ -1,0 +1,16 @@
+[package]
+name = "irmind-mod-parser-kubernetes"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+
+[dev-dependencies]
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+
+[lints]
+workspace = true

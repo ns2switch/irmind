@@ -17,6 +17,8 @@ pub(crate) struct IngestRequest<'a> {
     pub cancel: &'a CancellationToken,
     pub time_contexts: &'a BTreeMap<String, ParserTimeContext>,
     pub default_time_context: Option<ParserTimeContext>,
+    pub cluster_contexts: &'a BTreeMap<String, irmind_app::SourceClusterContext>,
+    pub default_cluster_context: Option<&'a irmind_app::SourceClusterContext>,
 }
 
 impl CaseWorkflow<'_, '_> {
@@ -59,6 +61,8 @@ impl CaseWorkflow<'_, '_> {
                 analyst_choices: &BTreeMap::new(),
                 time_contexts: &BTreeMap::new(),
                 default_time_context: None,
+                cluster_contexts: &BTreeMap::new(),
+                default_cluster_context: None,
                 cancel,
             },
             &mut progress,
@@ -83,6 +87,8 @@ impl CaseWorkflow<'_, '_> {
         if forced_parser.is_some()
             || request.default_time_context.is_some()
             || !request.time_contexts.is_empty()
+            || request.default_cluster_context.is_some()
+            || !request.cluster_contexts.is_empty()
         {
             return Err(AppError::Policy("parser override is unavailable".into()));
         }
@@ -289,7 +295,10 @@ impl CaseWorkflow<'_, '_> {
                     .or_else(|| analyst_choices.get(&source).map(String::as_str)),
                 forced: forced_parser.is_some(),
                 time_context: context,
-                cluster_context: None,
+                cluster_context: request
+                    .cluster_contexts
+                    .get(&source)
+                    .or(request.default_cluster_context),
             });
             let resolved = resolved.map_err(|error| {
                 self.engine
