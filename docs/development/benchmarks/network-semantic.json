@@ -1,0 +1,50 @@
+{
+  "source_commit": "0e1133ac919185dbd082c2d0da33867fde51f9a4",
+  "profile": "release (optimized; debug assertions disabled)",
+  "platform": "Linux x86_64",
+  "runner": "local; not a standard GitHub performance-gate run",
+  "command": "cargo test -p irmind --all-features --test kubernetes_ingest --release network_one_gib_release_throughput -- --ignored --nocapture",
+  "method": "Repeat each selected committed source record with 1024 synthetic padding bytes to at least 1 GiB. Time production detection, hash, decoder, mapper, Parquet and signed custody. Generation and subsequent complete case verification are outside the timer. One fixed-timestamp smoke per source, after compilation and fuzzing finished. No provider or network. Not a query-latency or 15 GB benchmark.",
+  "results": [
+    {
+      "source": "zeek",
+      "bytes": 1073742160,
+      "records": 867320,
+      "rejected": 0,
+      "ingestion_seconds": 41.152,
+      "mib_per_second": 24.883,
+      "fixture": "crates/testkit/fixtures/parser-zeek/source/dns.jsonl",
+      "fixture_sha256": "7af777847227c74d8540f39c168bd00f244a1673c6b6b2d55496dea323944c5f",
+      "fixture_selection": "entire single-record fixture",
+      "selected_record_sha256": "7af777847227c74d8540f39c168bd00f244a1673c6b6b2d55496dea323944c5f"
+    },
+    {
+      "source": "suricata",
+      "bytes": 1073742522,
+      "records": 783182,
+      "rejected": 0,
+      "ingestion_seconds": 36.209,
+      "mib_per_second": 28.281,
+      "fixture": "crates/testkit/fixtures/parser-suricata/source/eve.jsonl",
+      "fixture_sha256": "f0be19c00f4c4892d085a5efdc0681569157b72e035cfb70a15505d4dd8da333",
+      "fixture_selection": "first line",
+      "selected_record_sha256": "7d286ac90d24d39bda2e44e7e6fec220007f4a2a550207a586ed135ef9bedcbc"
+    }
+  ],
+  "fuzz": [
+    {
+      "target": "parser_zeek",
+      "sanitizer": "AddressSanitizer",
+      "seconds": 601,
+      "executions": 2083120,
+      "failures": 0
+    },
+    {
+      "target": "parser_suricata",
+      "sanitizer": "AddressSanitizer",
+      "seconds": 601,
+      "executions": 6530647,
+      "failures": 0
+    }
+  ]
+}
