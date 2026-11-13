@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit d99da3a179ee34783395f39696642ed26f8bb934; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 30e3be2b7c48d5ef816860a465b100bfe79e9da2; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -156,4 +156,4 @@ Un mapeo puede conservar campos y entidades consultables sin clasificar el event
 
 ## Skills locales
 
-`/skills` gestiona las instalaciones y activaciones mediante operaciones globales firmadas, separadas de `config.toml`. La vista previa muestra el hash, las herramientas y los recursos antes de firmar. No hay descarga automática ni credenciales adicionales. Los tres métodos incluidos se pueden inspeccionar sin modelo. Consulta la [guía de skills](skills.md).
+`/skills` gestiona las instalaciones y activaciones mediante operaciones globales firmadas, separadas de `config.toml`. La vista previa muestra el hash, las herramientas y los recursos antes de firmar. No hay descarga automática ni credenciales adicionales. Los 13 métodos incluidos se pueden inspeccionar sin modelo. Consulta la [guía de skills](skills.md).

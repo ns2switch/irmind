@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit d99da3a179ee34783395f39696642ed26f8bb934; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 30e3be2b7c48d5ef816860a465b100bfe79e9da2; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -109,4 +109,4 @@ Usa **Ctrl+O** o `/expand` para plegar o desplegar la tarjeta seleccionada mient
 
 ## Métodos forenses
 
-Abre `/skills` para inspeccionar los métodos incluidos de Windows, Linux y AWS, instalar una carpeta local revisada o firmar un cambio de activación. En un caso, escribe `/windows-triage`, `/linux-triage` o `/aws-credential-compromise` y añade tu pregunta. El agente también puede elegir un método por su descripción. La carga es progresiva y siempre no confiable; la política y las aprobaciones no cambian. La [guía de skills](skills.md) explica los límites y los recibos firmados en la exportación V7.
+Abre `/skills` para inspeccionar los 13 métodos incluidos de nube, Windows, Linux y red, instalar una carpeta local revisada o firmar un cambio de activación. En un caso, escribe `/windows-triage`, `/linux-triage` o `/aws-credential-compromise` y añade tu pregunta. El agente también puede elegir un método por su descripción. La carga es progresiva y siempre no confiable; la política y las aprobaciones no cambian. La [guía de skills](skills.md) explica los límites y los recibos firmados en la exportación V7.

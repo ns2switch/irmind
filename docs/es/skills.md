@@ -1,4 +1,4 @@
-Traducción de docs/skills.md en el commit d99da3a179ee34783395f39696642ed26f8bb934; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/skills.md en el commit 30e3be2b7c48d5ef816860a465b100bfe79e9da2; si hay diferencias, prevalece la versión en inglés.
 
 # Skills forenses
 
@@ -6,13 +6,33 @@ Esta página ayuda a los analistas a aplicar un método de investigación repeti
 
 ## Usar un método incluido
 
-Abre un caso, configura un modelo en `/settings model` y escribe `/` para ver los métodos activos. La versión 0.4 incluye:
+Abre un caso, configura un modelo en `/settings model` y escribe `/` para ver los métodos activos. El binario incluye 13 métodos. Todos son experimentales y se prueban con episodios sintéticos; no validan por sí solos una conclusión forense.
 
-| Comando | Método |
-| --- | --- |
-| `/windows-triage` | Revisar inicios de sesión, ejecución, persistencia, movimiento lateral y posible exfiltración en datos de Windows recogidos por el analista. |
-| `/linux-triage` | Revisar autenticación, cambios de privilegios, ejecución y persistencia en Linux. |
-| `/aws-credential-compromise` | Revisar en CloudTrail el uso de credenciales, los cambios de privilegios y los recursos afectados. |
+| Comando | Para qué sirve | Fuentes necesarias | Cobertura |
+| --- | --- | --- | --- |
+| `/windows-triage` | Accesos, ejecución y actividad posterior de Windows. | EVTX o exportaciones de Hayabusa, EZTools, Velociraptor/plaso. | Parcial: depende de los canales y artefactos recogidos. |
+| `/linux-triage` | Autenticación, privilegios y ejecución. | auth.log/secure, auditd y journald. | Núcleo de autenticación/ejecución mapeado; otra actividad puede tener solo extracción. |
+| `/aws-credential-compromise` | Credenciales y cambios de privilegios. | Eventos de administración de CloudTrail. | Solo operaciones mapeadas; la falta de eventos de datos limita el seguimiento. |
+| `/aws-s3-data-exfiltration` | Exposición, permisos y lecturas inusuales de S3. | CloudTrail de administración **y eventos de datos de S3**. | Parcial: GetObject se clasifica como `api/access`; políticas y ACL requieren campos originales. |
+| `/azure-entra-identity-compromise` | Accesos, MFA, roles, OAuth y credenciales de aplicaciones. | Entra/Azure normalizado a ECS o UDM de Chronicle configurado; JSON nativo para revisión original. | Parcial: no hay mapeo semántico nativo de Entra. IRMind no convierte automáticamente una descarga del portal en ECS. |
+| `/gcp-service-account-abuse` | Claves, suplantación y cambios IAM. | Cloud Audit Logs JSON; ECS normalizado por el productor, opcional. | Parcial: GCP nativo no tiene categorías, resultados ni roles tipados. |
+| `/windows-ransomware` | Inhibición de recuperación, propagación e impacto posible. | EVTX/Sysmon y observaciones de ficheros, recuperación y defensas. | Parcial: un comando no demuestra cifrado ni un cambio efectivo de defensas. |
+| `/windows-lateral-movement` | RDP, SMB/PsExec, WMI, WinRM y uso de credenciales. | Security, System, Sysmon y registros operativos de origen/destino. | Núcleo de accesos/servicios mapeado; un acceso tipo 3 nunca prueba por sí solo pass-the-hash. |
+| `/windows-persistence` | Servicios, tareas, claves Run y suscripciones WMI. | EVTX y exportaciones de configuración/DFIR. | Parcial: 4698 y las suscripciones WMI no tienen reglas semánticas actuales. |
+| `/linux-webshell` | Peticiones web correlacionadas con ejecución del usuario web. | nginx/Apache common/combined, auditd y evidencia del directorio web. | Núcleo HTTP/execve mapeado; pueden faltar host, ID de petición o causalidad. |
+| `/linux-persistence` | Cron, systemd, claves SSH, cuentas y sudoers. | Registros Linux y configuración recogida o exportaciones DFIR. | Parcial: pocos registros no reconstruyen todo el estado de configuración. |
+| `/network-c2-beaconing` | Flujos periódicos, DNS y alertas. | Zeek y Suricata EVE; ECS ya normalizado, opcional. | Parcial: los mapeos nativos extraen entidades y campos sin categorías ni roles. |
+| `/malware-execution-triage` | Origen, ejecución y actividad observada de un binario. | Sysmon 1/3/11 y PECmd/AmcacheParser u otras exportaciones DFIR. | Parcial: presencia en Amcache no prueba ejecución; los artefactos binarios necesitan exportación. |
+
+Consulta la [guía de parsers](parsers.md) y la [configuración de módulos](modules.md) antes de recoger datos. Las skills solo declaran las herramientas locales que necesitan. Ninguna ejecuta recolectores, accede a proveedores, instala mapeos ni amplía el alcance.
+
+### Recoger evidencia suficiente
+
+Cada método incluye una sección de cobertura y una tabla de referencia. Explica qué fuentes y mapeos necesita, cómo puede obtenerlos el analista y qué queda sin observar. La recogida de Windows usa procedimientos aprobados de KAPE o Velociraptor y exportaciones de herramientas como EZTools; IRMind no analiza directamente todos los artefactos binarios. En nube hacen falta los tipos de auditoría y la retención pertinentes, no solo configurar un conector.
+
+Empieza con `graph_summary` y los registros originales antes de filtrar por el esquema común. Los filtros `event_category`, `event_type`, `event_outcome` y `entity_role` solo devuelven cobertura mapeada coincidente y pueden excluir registros sin clasificar. Para fuentes con solo extracción, usa búsqueda acotada, timelines de entidades cuando existan y registros originales. Ninguna skill inventa un rol ni un resultado ausente. Pide al analista lo que falta y registra la limitación.
+
+Los métodos incluyen falsos positivos y condiciones para proponer técnicas ATT&CK. La proximidad temporal, una arista, una alerta o una línea de comandos no confirman por sí solas un ataque. Solo el analista confirma hallazgos.
 
 Puedes añadir una pregunta: `/linux-triage Revisa los accesos fallidos de este caso.` El agente también puede elegir un método por su descripción. Una skill no activa modelos ni conectores remotos. Puedes inspeccionarlas sin configurar un modelo.
 
@@ -40,3 +60,17 @@ La metodología siempre es contenido no confiable. Nunca entra en mensajes de si
 El caso conserva el paquete original y los rangos filtrados realmente cargados. La exportación V7 incluye las pruebas de instalación referenciadas para verificarla sin llavero. Autentica el uso de la metodología registrado; no reproduce una respuesta del modelo ni garantiza una conclusión forense.
 
 Antes de la 1.0, las versiones menores pueden cambiar los formatos sin migración. Conserva la versión que creó cada caso. Consulta el [modelo de seguridad](security-model.md), la [configuración](configuration.md) y el [diseño de desarrollo en inglés](../development/skills-design.md).
+
+## Referencias metodológicas
+
+Los métodos usan texto propio bajo la licencia del proyecto. Sus fuentes públicas incluyen
+[la auditoría de S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/cloudtrail-logging-s3-info.html),
+[los eventos de datos de S3](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-s3-data-events-governance.html),
+[la exportación de Entra](https://learn.microsoft.com/en-us/entra/identity/monitoring-health/howto-download-logs),
+[las actividades auditadas de Entra](https://learn.microsoft.com/en-us/entra/identity/monitoring-health/reference-audit-activities),
+[la auditoría IAM de GCP](https://docs.cloud.google.com/iam/docs/audit-logging),
+[Sysmon](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon),
+[las conexiones de Zeek](https://docs.zeek.org/en/current/logs/conn.html),
+[Suricata EVE](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html)
+y [MITRE ATT&CK](https://attack.mitre.org/). Los enlaces viven aquí porque
+el texto cargado de las skills pasa por el mismo guard que otro contenido no confiable.
