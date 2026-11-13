@@ -87,7 +87,11 @@ impl Engine<'_> {
         policy.max_model_tokens_per_case = limits.model_tokens;
         policy.max_tool_calls_per_case = usize::try_from(limits.tool_calls)
             .map_err(|_| AppError::Policy("invalid case call limit".into()))?;
-        policy.max_object_bytes_per_case = limits.cloud_bytes;
+        // Cloud reservations enforce the case allocation separately. Keep the
+        // organization's per-read/total relationship valid in this policy view.
+        policy
+            .validate()
+            .map_err(|_| AppError::Policy("invalid effective case policy".into()))?;
         Ok(policy)
     }
 }
