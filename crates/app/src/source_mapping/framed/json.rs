@@ -17,15 +17,45 @@ pub fn decode_json_source(
     decode: &(impl Fn(SourceValue) -> Result<DecodedSourceFrame, AppError> + Sync),
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
+    decode_json_inner(input, identity, budget, false, decode, emit)
+}
+
+/// Original object rows or a root records array, with streaming bounded framing.
+/// Used by exported resource logs; flat source formats keep the existing helper.
+pub fn decode_json_envelope_source(
+    input: SourceInput<'_>,
+    identity: ParserIdentity<'_>,
+    budget: DecodeBudget,
+    decode: &(impl Fn(SourceValue) -> Result<DecodedSourceFrame, AppError> + Sync),
+    emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
+    decode_json_inner(input, identity, budget, true, decode, emit)
+}
+fn decode_json_inner(
+    input: SourceInput<'_>,
+    identity: ParserIdentity<'_>,
+    budget: DecodeBudget,
+    record_wrappers: bool,
+    decode: &(impl Fn(SourceValue) -> Result<DecodedSourceFrame, AppError> + Sync),
+    emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
     let metadata = input.metadata;
     if metadata.cancel.is_cancelled() {
         return Err(AppError::Cancelled);
     }
     let mut reader = BufReader::new(input.reader);
     let mut state = SourceFrameEmitter::new(metadata, identity);
-    if is_document(&mut reader, metadata.source.reference())? {
+    if is_document(
+        &mut reader,
+        metadata.source.reference(),
+        record_wrappers,
+        metadata.cancel,
+    )? {
         let mut limited = reader.take(MAX_SOURCE + 1);
-        let mut frames = JsonFrames::new(&mut limited, metadata.cancel).without_record_wrappers();
+        let mut frames = JsonFrames::new(&mut limited, metadata.cancel);
+        if !record_wrappers {
+            frames = frames.without_record_wrappers();
+        }
         state.decode_frames(
             budget,
             || {
@@ -68,8 +98,21 @@ pub fn decode_json_source(
     Ok(state.finish())
 }
 
-fn is_document(reader: &mut impl BufRead, source: &str) -> Result<bool, AppError> {
+fn is_document(
+    reader: &mut impl BufRead,
+    source: &str,
+    record_wrappers: bool,
+    cancel: &crate::CancellationToken,
+) -> Result<bool, AppError> {
     let prefix = reader.fill_buf().map_err(|_| invalid())?.trim_ascii_start();
+    if record_wrappers {
+        let mut probe = std::io::Cursor::new(prefix);
+        let mut frames = JsonFrames::new(&mut probe, cancel);
+        let _ = frames.next_frame();
+        if frames.record_wrapper_seen() {
+            return Ok(true);
+        }
+    }
     let line = prefix
         .split(|b| *b == b'\n')
         .next()

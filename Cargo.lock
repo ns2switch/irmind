@@ -3028,6 +3028,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-parser-entra"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-parser-evtx"
 version = "0.1.0"
 dependencies = [
