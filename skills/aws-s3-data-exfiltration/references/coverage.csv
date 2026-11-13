@@ -1,0 +1,2 @@
+source,required_fields,mapping,coverage_limit
+parser-json,eventTime; eventSource; eventName; eventType; userIdentity; resources; requestParameters; errorCode,CloudTrail GetObject api/access; policy and ACL originals retained,S3 read data events must actually be collected; request counts are not transferred bytes

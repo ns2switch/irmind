@@ -1,6 +1,6 @@
 [package]
 name = "irmind"
-version = "0.4.0"
+version = "0.4.1"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -72,7 +72,7 @@ irmind-mod-mapping-journald-compat = { path = "../modules/mapping-journald-compa
 irmind-mod-parser-evtx = { path = "../modules/parser-evtx", version = "0.1.0", optional = true }
 irmind-app = { path = "../app", version = "0.1.0" }
 irmind-http = { path = "../http", version = "0.1.0" }
-irmind-tui = { path = "../tui", version = "0.4.0" }
+irmind-tui = { path = "../tui", version = "0.4.1" }
 irmind-domain = { path = "../domain", version = "0.1.0" }
 irmind-security = { path = "../security", version = "0.1.0" }
 irmind-infra = { path = "../infra", version = "0.1.0" }

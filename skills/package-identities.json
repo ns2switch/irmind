@@ -1,5 +1,15 @@
 {
   "aws-credential-compromise": "bef2b28e3722ee1c2eda76c835f4e83b99e6395ea00583ed85f90b78553a35ef",
+  "aws-s3-data-exfiltration": "ec8c14a8ed5ecf5e2746821151395f7841ba530a0794d142d4a707e259b855a2",
+  "azure-entra-identity-compromise": "af5d8d30f890f28e83c887a3f7c498f228fbc31deea5d93e6e9c01bb587773bc",
+  "gcp-service-account-abuse": "78ce00fa67f6a5f8297453d46f19a00109cd152432e4cd9ab871c1e9b8a6c785",
+  "linux-persistence": "ccf593350d5a35921e96818aa876b9bfe78c73595bbf3146cd3f28736dfcf746",
   "linux-triage": "be4a83e88922a5b0fec026cd96d7b3d8eaf6e9f81487e5a60fca411d4d9f42e5",
+  "linux-webshell": "0579f0f44188fc36cae19e145b61a8a1cf7993683ef5f82861233c8dba1ae8bb",
+  "malware-execution-triage": "0d4be3f7aa12fc0c9d49686b1e568fc40c8064c41c9000ae392fe93a8c7f787d",
+  "network-c2-beaconing": "935f16f760e736456b66ee7bba07b55ff6883c2a1da20b7e117fa89e6eee87b2",
+  "windows-lateral-movement": "db5444367669a43bf281ab5d1793ab61b84324984fa9b450177023db0cc40919",
+  "windows-persistence": "bf42605151b9123b6702c7441664dc822875ec2bb180f5d9681c6d6369ecf7b0",
+  "windows-ransomware": "97fac9ded016ccaf74c4ec28c8d9e3399d944999ce275c29c9a18ff30c26a79b",
   "windows-triage": "50ca091e3379c589017459d1d210dec8d571b0c16f9e8e1e45312bc587bce57d"
 }

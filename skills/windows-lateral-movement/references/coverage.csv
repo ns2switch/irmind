@@ -1,0 +1,5 @@
+source,required_fields,mapping,coverage_limit
+parser-evtx,Provider; Channel; EventID; original EventData; ProcessGuid when supplied,Bundled finite Security/System/PowerShell/Sysmon tables,No process lifetime from PID; absent event IDs remain unclassified
+parser-ecs,@timestamp; ecs.version; event.*; host/user/source/destination,Validated ECS to common-event mapping,Producer must supply classification and preserve original identifiers
+parser-hayabusa,Timestamp; EventID; Channel; Computer; Details,DFIR extraction mapping,Detection title is a lead; original evidence still required
+parser-velociraptor,Artifact/_Source; original columns and collection provenance,DFIR extraction mapping,Artifact semantics depend on the collector and retained fields

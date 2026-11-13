@@ -4,7 +4,7 @@ assertion_line: 104
 expression: shown
 ---
 ┌ Live investigation ──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│IRMind v0.4.0                                                                                                         │
+│IRMind v0.4.1                                                                                                         │
 │Evidence ready: 1 synthetic file · parser-json · 90% confidence                                                       │
 │                                                                                                                      │
 │                                                                                                                      │
