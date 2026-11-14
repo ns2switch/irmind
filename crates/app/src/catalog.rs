@@ -1,4 +1,9 @@
 //! Explicit catalog downloads and signed methodology provenance. Never evidence.
+mod acquisition;
+pub use acquisition::{
+    AnalystCatalogRequest, CatalogInstallPreview, PortFuture, SkillCatalogSource,
+};
+pub(crate) use acquisition::{check_release_history, older_or_unknown};
 mod digest;
 mod frames;
 mod limits;
@@ -52,6 +57,7 @@ pub const MAX_CATALOG_INDEX_BYTES: usize = 1024 * 1024;
 pub struct CatalogIndexBytes {
     index: Vec<u8>,
     signature: [u8; 64],
+    resolved_tag: Option<String>,
 }
 impl CatalogIndexBytes {
     pub fn new(index: Vec<u8>, signature: &[u8]) -> Result<Self, CatalogError> {
@@ -60,10 +66,18 @@ impl CatalogIndexBytes {
         }
         Ok(Self {
             index,
+            resolved_tag: None,
             signature: signature
                 .try_into()
                 .map_err(|_| CatalogError::InvalidData)?,
         })
+    }
+    /// Untrusted release metadata, frozen before any package fetch. Not signed
+    /// proof bytes; the authenticated index must match this exact tag.
+    pub fn with_resolved_tag(mut self, tag: &str) -> Result<Self, CatalogError> {
+        version::release_tag(tag)?;
+        self.resolved_tag = Some(tag.into());
+        Ok(self)
     }
     pub fn index(&self) -> &[u8] {
         &self.index

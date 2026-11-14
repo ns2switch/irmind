@@ -128,6 +128,12 @@ Capacidades verificadas tienen constructores privados, sin deserializador del
 modelo. El request solo nace de la instalación del analista. Offline invoca el
 mismo verificador y nunca el puerto de red. No hay compilador alternativo.
 
+Si se elige la última release, los metadatos no confiables del transporte incluyen
+la etiqueta resuelta junto a `CatalogIndexBytes`. Se congela antes de descargar el
+paquete y el índice verificado debe indicar exactamente esa etiqueta. Esos
+metadatos no forman parte del preimage firmado, de la identidad ni del fichero de
+prueba. La revisión sin conexión siempre aporta una etiqueta congelada explícita.
+
 Por operación: 4 MiB descargados incluyendo metadatos, cuerpos índice/paquete,
 firma64, hasta tres redirecciones/petición y 30 segundos/petición. HTTPS y saltos
 validados bajo assets del repo GitHub fijo, sin reenviar credenciales. Sin hosts
