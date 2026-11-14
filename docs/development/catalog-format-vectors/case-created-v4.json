@@ -1,0 +1,1 @@
+{"version":4,"title":"Contract synthetic case","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000}}
