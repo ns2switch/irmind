@@ -38,6 +38,7 @@ impl TaskDispatchAttribution {
 
 pub(super) struct Accounted {
     pub seq: u64,
+    pub actor: crate::Actor,
     pub amount: SubagentResources,
     pub attribution: Option<TaskDispatchAttribution>,
 }
@@ -46,7 +47,9 @@ impl SubagentJournal {
         &mut self,
         entry: &SignedEntry,
     ) -> Result<(), SubagentRecordError> {
-        if entry.actor != self.agent {
+        if entry.actor != self.agent
+            && !(entry.actor == crate::Actor::Analyst && entry.kind == AuditEventKind::ModelUsage)
+        {
             return Ok(());
         }
         let (amount, attribution) = match entry.kind {
@@ -85,6 +88,7 @@ impl SubagentJournal {
             SubagentDigest::from_bytes(entry.hash),
             Accounted {
                 seq: entry.seq,
+                actor: entry.actor.clone(),
                 amount,
                 attribution,
             },
@@ -122,7 +126,14 @@ impl SubagentJournal {
         if expected != value.amount
             || self.accounted.contains(&(hash, value.purpose))
             || accounted.seq <= request.1
-            || accounted.seq >= *checkpoint_seq
+            || (value.task_id.is_some() && accounted.seq >= *checkpoint_seq)
+            || (value.task_id.is_none() && accounted.seq > self.seq)
+            || accounted.actor
+                != if value.task_id.is_none() {
+                    crate::Actor::Analyst
+                } else {
+                    self.agent.clone()
+                }
         {
             return Err(SubagentRecordError);
         }

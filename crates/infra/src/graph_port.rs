@@ -6,8 +6,8 @@ use irmind_app::CancellationToken;
 use irmind_domain::{CaseScope, GraphQueryFilter, ParquetArtifact};
 
 pub(crate) struct QueryCatalog {
-    artifacts: Vec<ParquetArtifact>,
-    source_names: std::collections::BTreeMap<String, String>,
+    pub(crate) artifacts: Vec<ParquetArtifact>,
+    pub(crate) source_names: std::collections::BTreeMap<String, String>,
 }
 impl std::ops::Deref for QueryCatalog {
     type Target = [ParquetArtifact];

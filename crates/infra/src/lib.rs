@@ -14,6 +14,7 @@ mod signing;
 mod skill_package;
 mod skill_store;
 mod sqlite;
+mod task_queries;
 pub use clock::SystemClock;
 pub use config_toml::TomlConfigurationStore;
 use irmind_fs::{private_dir, private_file};

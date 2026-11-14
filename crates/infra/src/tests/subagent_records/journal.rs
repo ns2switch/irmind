@@ -445,6 +445,162 @@ fn accounting_has_one_authoritative_charge_and_unknown_usage_stays_reserved() {
     );
 }
 
+fn completed_child_with_coordination() -> (
+    History,
+    SubagentPlanV1,
+    SubagentReservationV1,
+    irmind_app::subagents::SubagentCheckpointV1,
+    irmind_app::subagents::BranchTerminal,
+) {
+    use irmind_app::subagents::SubagentResultV1;
+    let mut history = History::new();
+    let mut plan = history.plan(100_000);
+    plan.coordination = SubagentResources {
+        tokens: 100,
+        rounds: 1,
+        ..SubagentResources::default()
+    };
+    plan.reservation = plan.reservation.checked_add(plan.coordination).unwrap();
+    plan.validate().unwrap();
+    let plan_hash = history.record(&plan, false);
+    let hold = transition(&plan, ReservationAction::HoldPreview, None, plan_hash);
+    history.record(&hold, false);
+    let start = transition(
+        &plan,
+        ReservationAction::StartPlan,
+        Some(hold.operation_id),
+        plan_hash,
+    );
+    history.record(&start, false);
+    let (reserve, request, first) = model_request_prefix(&mut history, &plan, plan_hash, &start);
+    let (last, terminal, accounting, _) =
+        model_terminal_prefix(&mut history, &plan, &reserve, &request, &first);
+    let settled = SubagentReservationV1::prepare(
+        &plan,
+        Some(plan.tasks[0].task_id),
+        1,
+        ReservationAction::SettleRequest,
+        ReservationPurpose::Model,
+        ReservationTransition {
+            amount: terminal.usage,
+            parent_operation: Some(reserve.operation_id),
+            cause_sha256: last.identity().unwrap(),
+            accounting_audit_sha256: Some(accounting),
+        },
+    )
+    .unwrap();
+    history.record(&settled, false);
+    history.record(
+        &SubagentResultV1::from_terminal(&last, &terminal).unwrap(),
+        false,
+    );
+    (history, plan, start, last, terminal)
+}
+
+#[test]
+fn coordination_summary_uses_its_own_slice_without_double_charging_parent_rounds() {
+    let (mut history, plan, start, last, terminal) = completed_child_with_coordination();
+    let summary = SubagentReservationV1::prepare(
+        &plan,
+        None,
+        1,
+        ReservationAction::ReserveRequest,
+        ReservationPurpose::Model,
+        ReservationTransition {
+            amount: plan.coordination,
+            parent_operation: Some(start.operation_id),
+            cause_sha256: last.identity().unwrap(),
+            accounting_audit_sha256: None,
+        },
+    )
+    .unwrap();
+    history.record(&summary, false);
+    history.append(
+        AuditEventKind::ModelRequest,
+        "summary without tools".into(),
+        true,
+    );
+    let usage = SubagentResources {
+        tokens: 15,
+        rounds: 1,
+        ..SubagentResources::default()
+    };
+    let before_usage = history.entries.len();
+    let settle_summary = |history: &mut History, analyst: bool| {
+        let accounting = history.append(
+            AuditEventKind::ModelUsage,
+            "{\"input_tokens\":10,\"output_tokens\":5,\"estimated_cost_microusd\":null}".into(),
+            analyst,
+        );
+        let settlement = SubagentReservationV1::prepare(
+            &plan,
+            None,
+            1,
+            ReservationAction::SettleRequest,
+            ReservationPurpose::Model,
+            ReservationTransition {
+                amount: usage,
+                parent_operation: Some(summary.operation_id),
+                cause_sha256: last.identity().unwrap(),
+                accounting_audit_sha256: Some(accounting),
+            },
+        )
+        .unwrap();
+        history.record(&settlement, false);
+    };
+    settle_summary(&mut history, false);
+    assert!(history.replay().is_err()); // Child usage cannot pay for a parent summary.
+    history.entries.truncate(before_usage);
+    settle_summary(&mut history, true);
+    let spent = terminal.usage.checked_add(usage).unwrap();
+    assert_eq!(
+        history.replay().unwrap(),
+        plan.reservation.checked_sub(spent).unwrap()
+    );
+    let mut release = transition(
+        &plan,
+        ReservationAction::ReleasePlan,
+        Some(start.operation_id),
+        last.identity().unwrap(),
+    );
+    release.amount = plan.reservation.checked_sub(spent).unwrap();
+    history.record(&release, false);
+    assert_eq!(history.replay().unwrap(), SubagentResources::default());
+    check_next_coordination_turn(&mut history, &plan, spent);
+}
+
+fn check_next_coordination_turn(
+    history: &mut History,
+    plan: &SubagentPlanV1,
+    spent: SubagentResources,
+) {
+    let mut task = plan.tasks[0].clone();
+    task.nonce = "00000000-0000-0000-0000-000000000003".into();
+    let mut context = SubagentPlanContext {
+        parent_checkpoint_sha256: SubagentDigest::from_bytes(history.entries.last().unwrap().hash),
+        budget_checkpoint_sha256: SubagentDigest::from_bytes(history.entries[0].hash),
+        policy: plan.policy.clone(),
+        case_limits: plan.case_limits,
+        usage: spent,
+        prior_reserved: SubagentResources::default(),
+    };
+    context.usage.rounds = 2; // One parent request and one child request, counted once.
+    let next = SubagentPlanV1::prepare(
+        &history.case,
+        &plan.turn_id,
+        2,
+        context,
+        vec![task],
+        SubagentResources::default(),
+        plan.deadline_at,
+    )
+    .unwrap();
+    let next_hash = history.record(&next, false);
+    let hold = transition(&next, ReservationAction::HoldPreview, None, next_hash);
+    history.record(&hold, false);
+    assert_eq!(history.replay().unwrap(), next.reservation);
+}
+
 #[test]
 fn child_dispatch_attribution_matches_the_approved_canonical_vector() {
     let bytes = include_bytes!(

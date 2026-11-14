@@ -20,6 +20,31 @@ pub(crate) struct CachedCatalog {
 }
 
 impl LocalStore {
+    pub(crate) fn query_catalog_at(
+        &self,
+        id: &CaseId,
+        seq: u64,
+        hash: &[u8; 32],
+    ) -> Result<super::QueryCatalog, AppError> {
+        self.get_case(id)?;
+        let mut entries = self.entries(id)?;
+        let count = usize::try_from(seq).map_err(|_| AppError::InvalidChain(seq))?;
+        if count == 0 || entries.len() < count {
+            return Err(AppError::InvalidChain(seq));
+        }
+        entries.truncate(count);
+        let last = entries.last().ok_or(AppError::InvalidChain(seq))?;
+        if last.seq != seq || &last.hash != hash {
+            return Err(AppError::InvalidChain(seq));
+        }
+        self.verify_installed_mapping_metadata(&entries)?;
+        let contents = collect_signed_artifacts(&entries, Vec::new(), id, last)?;
+        Ok(super::QueryCatalog {
+            artifacts: contents.artifacts.unwrap_or_default(),
+            source_names: contents.source_names,
+        })
+    }
+
     pub(crate) fn query_catalog(&self, id: &CaseId) -> Result<super::QueryCatalog, AppError> {
         self.signed_parquet_artifacts(id)?;
         let cache = self.graph_catalog.lock().map_err(storage)?;

@@ -90,6 +90,52 @@ fn signed_snapshot_restores_after_crash_before_file_write() {
 }
 
 #[test]
+fn subagent_preference_uses_signed_history_and_never_a_loose_config_flag() {
+    let (_root, audit, engine, file) = setup();
+    assert!(!engine.confirm_all_subagent_plans().unwrap());
+    let loose = PersistentConfig {
+        confirm_all_subagent_plans: Some(true),
+        ..PersistentConfig::default()
+    };
+    file.save(&loose).unwrap();
+    assert!(!engine.confirm_all_subagent_plans().unwrap());
+    file.save(&PersistentConfig::default()).unwrap();
+    engine
+        .apply_configuration_change(
+            &file,
+            &[],
+            ConfigChange::SetConfirmAllSubagentPlans(true),
+            true,
+        )
+        .unwrap();
+    assert!(engine.confirm_all_subagent_plans().unwrap());
+    let operations = audit.global_operations().unwrap();
+    assert_eq!(operations.len(), 1);
+    assert_eq!(operations[0].actor, Actor::Analyst);
+    file.save(&PersistentConfig::default()).unwrap();
+    assert!(engine.confirm_all_subagent_plans().unwrap());
+    engine
+        .restore_approved_configuration(&file, &[], true)
+        .unwrap();
+    engine
+        .apply_configuration_change(
+            &file,
+            &[],
+            ConfigChange::SetConfirmAllSubagentPlans(false),
+            true,
+        )
+        .unwrap();
+    assert!(!engine.confirm_all_subagent_plans().unwrap());
+    let operations = audit.global_operations().unwrap();
+    assert_eq!(operations.len(), 3); // Enable, explicit restoration, disable.
+    assert!(
+        operations[1]
+            .operation
+            .starts_with("configuration-restored:")
+    );
+}
+
+#[test]
 fn manual_configuration_edit_requires_review_then_can_be_signed() {
     let (_root, audit, engine, file) = setup();
     let manifests = [&irmind_mod_llm_openai_compatible::MANIFEST];

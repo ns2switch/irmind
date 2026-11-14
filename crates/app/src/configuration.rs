@@ -36,6 +36,8 @@ pub struct PersistentConfig {
     pub max_parallel_workers: Option<u16>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub case_budget_defaults: Option<crate::CaseBudgetLimits>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confirm_all_subagent_plans: Option<bool>,
     #[serde(default)]
     pub modules: BTreeMap<String, ProductSettings>,
 }
@@ -73,6 +75,7 @@ pub enum ConfigChange {
     SetTheme(String),
     SetMaxParallelWorkers(Option<u16>),
     SetCaseBudgetDefaults(crate::CaseBudgetLimits),
+    SetConfirmAllSubagentPlans(bool),
 }
 
 pub trait ConfigurationStore: Send + Sync {
@@ -98,6 +101,7 @@ impl Default for PersistentConfig {
             show_hints: None,
             max_parallel_workers: None,
             case_budget_defaults: None,
+            confirm_all_subagent_plans: None,
             modules: BTreeMap::new(),
         }
     }
@@ -273,6 +277,9 @@ impl PersistentConfig {
             ConfigChange::SetTheme(theme) => next.theme = Some(theme),
             ConfigChange::SetMaxParallelWorkers(limit) => next.max_parallel_workers = limit,
             ConfigChange::SetCaseBudgetDefaults(limits) => next.case_budget_defaults = Some(limits),
+            ConfigChange::SetConfirmAllSubagentPlans(enabled) => {
+                next.confirm_all_subagent_plans = Some(enabled);
+            }
         }
         next.validate(manifests)?;
         Ok(next)

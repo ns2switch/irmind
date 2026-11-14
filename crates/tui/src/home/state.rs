@@ -425,7 +425,7 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
             HomeAction::None
         }
         KeyCode::Down => {
-            state.preference_selected = (state.preference_selected + 1).min(4);
+            state.preference_selected = (state.preference_selected + 1).min(5);
             HomeAction::None
         }
         KeyCode::Enter => {
@@ -445,6 +445,9 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
                     state.worker_limit_input = Some(String::new());
                     return HomeAction::None;
                 }
+                5 => ConfigChange::SetConfirmAllSubagentPlans(
+                    !state.confirm_all_subagent_plans.all(),
+                ),
                 _ => return HomeAction::None,
             };
             HomeAction::ChangeModule(change, true)

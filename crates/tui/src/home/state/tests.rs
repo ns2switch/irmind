@@ -195,6 +195,18 @@ fn preference_can_disable_context_hints() {
 }
 
 #[test]
+fn subagent_plan_confirmation_is_an_explicit_signed_preference_action() {
+    let mut state = HomeState::new(Vec::new(), false);
+    assert!(!state.confirm_all_subagent_plans.all());
+    state.mode = Mode::Config;
+    state.preference_selected = 5;
+    assert!(matches!(
+        update(&mut state, KeyCode::Enter),
+        HomeAction::ChangeModule(ConfigChange::SetConfirmAllSubagentPlans(true), true)
+    ));
+}
+
+#[test]
 fn printable_keys_only_edit_the_home_command_field() {
     let mut state = HomeState::new(Vec::new(), false);
     assert!(matches!(

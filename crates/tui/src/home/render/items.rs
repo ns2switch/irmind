@@ -331,6 +331,9 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
             format!("resume recent case={enabled}")
         }
         irmind_app::ConfigChange::SetShowHints(enabled) => format!("context hints={enabled}"),
+        irmind_app::ConfigChange::SetConfirmAllSubagentPlans(enabled) => {
+            format!("confirm all subagent plans={enabled}")
+        }
         irmind_app::ConfigChange::SetMouseCapture(enabled) => format!("mouse capture={enabled}"),
         irmind_app::ConfigChange::SetTheme(theme) => format!("theme={theme}"),
         irmind_app::ConfigChange::SetCaseBudgetDefaults(limits) => format!(
@@ -636,6 +639,14 @@ pub(super) fn preference_items(
     items.push(ListItem::new(format!(
         "Maximum parallel workers: {}",
         worker_limit_label(state.max_parallel_workers)
+    )));
+    items.push(ListItem::new(format!(
+        "Confirm all subagent plans: {}",
+        if state.confirm_all_subagent_plans.all() {
+            "on"
+        } else {
+            "off"
+        }
     )));
     if let Some(input) = &state.worker_limit_input {
         items.push(ListItem::new(format!(

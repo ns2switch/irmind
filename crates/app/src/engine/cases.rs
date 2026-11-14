@@ -40,6 +40,7 @@ impl<'a> Engine<'a> {
             evidence_store: ports.evidence_store,
             graph: ports.graph,
             source_evidence_reader: ports.source_evidence_reader,
+            subagents: ports.subagents,
             audit_log: ports.audit_log,
             signer: ports.signer,
             verifier: ports.verifier,
