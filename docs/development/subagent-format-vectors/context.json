@@ -1,0 +1,1 @@
+{"complete_case":false,"base_seq":100,"base_checkpoint":"f927c7897b781506245750303973853369d679871cf60591cb9343ab2c5346f4","source_set_sha256":"c2fe6a787eeaaaf6e311170810e1266b55d03c03e34aafb847cbed5f803f60f0","type_snapshot_sha256":"34a4e7ab46587abd9c9e652db9771e4a69b0b0916cf12056e74c0682d16d9f06","budget":{"tokens":1000000,"calls":100,"rounds":25,"cloud_bytes":536870912000}}
