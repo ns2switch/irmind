@@ -2,7 +2,7 @@ Traducción de docs/development/subagents-design.md en el commit 332d88742dcf4ed
 
 # Subagentes acotados y eventos del motor
 
-Propuesta para v0.5 basada en los presupuestos de caso, el esquema común y los
+Arquitectura aprobada para v0.5 basada en los presupuestos de caso, el esquema común y los
 recibos de skills de v0.4.2. Define contratos y formatos propuestos; no implementa
 delegación ni aprueba puertos, dependencias o credenciales.
 [English](../development/subagents-design.md) · [Roadmap](roadmap.md) ·
@@ -67,23 +67,11 @@ la skill cargada. Declarar una herramienta no la autoriza. Una intersección vac
 no activa un catálogo más amplio. Los identificadores y filtros salen del
 [registro común actual](../../crates/app/src/tool_catalog.rs).
 
-Los tipos comunitarios son paquetes TOML de datos: nombre, versión, autor/licencia,
-versión del intérprete, metodología, herramientas y skills permitidas, categorías
-del esquema común y presupuestos sugeridos. Se rechazan campos desconocidos,
-expresiones, scripts, ejecutables, imports, duplicados y nombres que colisionen
-con tipos incluidos o comandos. Se reutilizan los límites de ficheros, rutas y
-texto del compilador de skills; se exponen como máximo 64 descriptores activos.
-Sus metadatos visibles para el modelo comparten 16 KiB con las descripciones de
-skills y respetan el techo de contexto. Activar más de lo que cabe falla con un
-aviso, sin truncar una declaración silenciosamente.
-
-Los tipos incluidos fijan el hash del inventario de la release. Los tipos de la
-organización o del analista se instalan, actualizan o desactivan mediante una
-operación global firmada explícita, con compromiso canónico y versiones admitidas
-inmutables. La manipulación o un intérprete no soportado desactivan el tipo con un
-aviso; no impiden arrancar. El modelo no instala ni descarga tipos. El caso guarda
-la instantánea exacta y su prueba de admisión, independientemente de cambios
-posteriores del catálogo. Su contrato canónico requiere otra revisión.
+En v0.5 solo están los seis tipos incluidos de la tabla. Sus declaraciones
+fijas vinculan el hash del inventario de la release; el caso congela la
+instantánea exacta antes de usarlas. No hay compilador, almacén, instalación
+ni sección de admisiones para tipos comunitarios en v0.5. Nombres y descripciones
+comparten 16 KiB con metadatos de skills y respetan el techo de contexto.
 
 El texto de tipos y skills pasa por ContentGuard y permanece como datos UNTRUSTED
 en mensajes user/tool con el nonce del hijo, incluso si está firmado. Solo las
@@ -146,6 +134,30 @@ de un hermano más amplio a una tarea más estrecha. Se registra la reutilizaci�
 se conservan procedencia y contabilidad y se envuelve el cuerpo saneado con el
 nonce del receptor, sin ejecutar otra consulta remota equivalente.
 
+## Plan visible y confirmación firmada por umbral
+
+Antes de arrancar hijos, la TUI muestra el plan completo: objetivos, tipos,
+fuentes y tokens/llamadas/rondas/bytes reservados, junto al presupuesto restante.
+El analista puede inspeccionarlo, iniciarlo o cancelarlo. No hay temporizador
+ni forma de que el modelo omita esa vista. Iniciar un plan pequeño desde la TUI
+no convierte los eventos del motor en autoridad de aprobación.
+
+Bajo la transacción del caso se calcula lo restante: intersección entre asignación
+y techo organizativo vigente, menos consumo y reservas pendientes. Se prueba
+el total del plan, incluida coordinación/resumen, no cada hijo:
+`4 * plan_tokens > remaining_tokens || 4 * plan_calls > remaining_calls`.
+Aritmética ancha comprobada. Exactamente 25% no exige firma por esta regla;
+superar cualquiera de los dos recursos sí. Se rechaza exceder la asignación.
+
+Por encima del umbral se exige `SubagentPlanApprovalV1` firmado por Analyst en la
+cadena principal antes de reservar ejecución o llamar a proveedores/herramientas.
+Vincula compromiso del plan, checkpoint de presupuesto, cantidades restantes y
+propuestas. Se recalcula bajo el mismo bloqueo al admitirlo: si cambia plan o
+presupuesto hay nueva vista y decisión. Cancelar libera solo la retención de
+previsualización y no inicia hijos. Ni el modelo, ni un hijo, ni un evento
+restaurado, ni una aprobación de herramienta, ni un booleano del llamante pueden
+crear el consentimiento. Dividir el plan en hijos no elude la prueba.
+
 ## Presupuestos compartidos y planificación
 
 El presupuesto actual cuenta tokens, llamadas y bytes de nube reservados; el coste
@@ -175,11 +187,10 @@ retenidos o nube. Las lecturas pueden solaparse dentro de ese presupuesto.
 Hallazgos, publicación de evidencia y firmas usan turnos canónicos breves, sin
 mantener el bloqueo del caso durante peticiones de modelo o red.
 
-Un tope monetario requiere instantánea tipada de precios y reserva conservadora,
-además de tokens. Si faltan precios adecuados, se rechaza la ejecución solicitada
-con ese tope; coste desconocido no es cero. La facturación puede diferir de la
-estimación. El tipo de presupuesto actual no impone dinero: el formato de reservas
-y el techo monetario propuestos necesitan revisión antes de implementarse.
+En v0.5 solo se imponen tokens, llamadas, rondas y bytes de nube. El coste es
+una estimación cuando existen precios y uso adecuados, o "no disponible".
+No hay reservas ni ajustes de límite monetario ni techo organizativo en dinero
+en esta versión. Un coste desconocido nunca se muestra como cero.
 
 Al 80% se muestra consumo principal y del hijo. Agotar límites o cancelar conserva
 el trabajo y un estado parcial. El resumen final sin herramientas solo se pide si
@@ -200,8 +211,9 @@ Cada rama tiene secuencia, hash anterior y firma Agent. Se proponen estos regist
 
 | Registro | Contenido y firmante |
 | --- | --- |
-| `SubagentTypeSnapshotV1` | Agent, principal antes del plan; paquete/tipo exacto, inventario de release o admisión global Analyst, intérprete y herramientas/skills. |
+| `SubagentTypeSnapshotV1` | Agent, principal antes del plan; uno de los seis tipos incluidos, inventario de release, intérprete y herramientas/skills; sin admisión comunitaria. |
 | `SubagentPlanV1` | Agent, cadena principal; checkpoint padre, turno, tareas ordenadas, restricciones y reservas. |
+| `SubagentPlanApprovalV1` | Analyst, principal; plan y checkpoint de presupuesto exactos, cantidades restantes/reservadas y consentimiento explícito antes de ejecutar. |
 | `SubagentReservationV1` | Agent, principal; operación/tarea única, reserva o liquidación acotada de recursos, estado y causa autenticada anterior. Reservar antes de ejecutar; liquidar contra un prefijo ya comprometido. |
 | `SubagentBranchEntryV1` | Agent, rama; caso/turno/tarea, secuencia local, hash anterior, tipo, contenido acotado e instante registrado. |
 | `SubagentCheckpointV1` | Agent, principal; tramo contiguo, checkpoint previo, contador, compromiso ordenado, nuevas admisiones de evidencia y estado terminal o no. |
@@ -245,6 +257,7 @@ bytes con 1, 2, 4 y N trabajadores y distinto orden de finalización.
 ### Codificación y almacenamiento
 
 Dominios separados: `irmind-subagent-type-v1`, `irmind-subagent-plan-v1`,
+`irmind-subagent-plan-approval-v1`,
 `irmind-subagent-reservation-v1`, `irmind-subagent-branch-entry-v1`,
 `irmind-subagent-checkpoint-v1` y
 `irmind-subagent-result-v1`. El compromiso SHA-256 incluye dominio, NUL y JSON
@@ -278,14 +291,13 @@ V2. El hash principal compromete planes/checkpoints/resultados; la validación
 tipada nueva comprueba todas las ramas. El verificador V7 actual no lo implementa.
 
 Tras las secciones actuales de V7 y las pruebas de skills se añaden secciones
-acotadas con contador para admisiones de tipos y chunks de rama. Pruebas ordenadas
-por hash de operación; chunks por tarea y secuencia. Se incluye exactamente lo
+acotadas con contador para chunks de rama, ordenados por tarea y secuencia. Se incluye exactamente lo
 referenciado, sin duplicados, omisiones, extras ni bytes finales. Se exportan
 prefijos fallidos/cancelados, no solo resúmenes exitosos. No se incluye configuración
 global ajena ni secretos. Contadores u64 comprobados y cotas del caso.
 
 Antes de sellar/exportar se recalculan firmas, secuencias, hashes, compromisos,
-restricciones, admisiones, referencias de skills, vínculos de aprobación, citas y
+restricciones, inventario de tipos, consentimiento del plan, referencias de skills, vínculos de aprobación, citas y
 contabilidad. Una rama comprometida ausente o alterada invalida la verificación;
 no es un aviso de modelo no disponible. Fuentes y Parquet se comprueban como ahora.
 La verificación offline no ejecuta modelos ni código descargado ni usa red.
@@ -330,13 +342,46 @@ de red o instalación de catálogo. Los cambios futuros de admisión se concilia
 en el contrato concreto de recibos/export, sin asumir compatibilidad con los
 bytes actuales de skills.
 
+## Aplazado para después de v0.5
+
+Se conserva este diseño para revisión futura; no forma parte de puertos,
+registros, ajustes ni secciones de exportación de v0.5.
+
+### Tipos comunitarios
+
+Los tipos comunitarios son paquetes TOML de datos: nombre, versión, autor/licencia,
+versión del intérprete, metodología, herramientas y skills permitidas, categorías
+del esquema común y presupuestos sugeridos. Se rechazan campos desconocidos,
+expresiones, scripts, ejecutables, imports, duplicados y nombres que colisionen
+con tipos incluidos o comandos. Se reutilizan los límites de ficheros, rutas y
+texto del compilador de skills; se exponen como máximo 64 descriptores activos.
+Sus metadatos visibles para el modelo comparten 16 KiB con las descripciones de
+skills y respetan el techo de contexto. Activar más de lo que cabe falla con un
+aviso, sin truncar una declaración silenciosamente.
+
+Los tipos incluidos fijan el hash del inventario de la release. Los tipos de la
+organización o del analista se instalan, actualizan o desactivan mediante una
+operación global firmada explícita, con compromiso canónico y versiones admitidas
+inmutables. La manipulación o un intérprete no soportado desactivan el tipo con un
+aviso; no impiden arrancar. El modelo no instala ni descarga tipos. El caso guarda
+la instantánea exacta y su prueba de admisión, independientemente de cambios
+posteriores del catálogo. Su contrato canónico requiere otra revisión.
+
+### Límites monetarios
+
+Un tope monetario requiere instantánea tipada de precios y reserva conservadora,
+además de tokens. Si faltan precios adecuados, se rechaza la ejecución solicitada
+con ese tope; coste desconocido no es cero. La facturación puede diferir de la
+estimación. El tipo de presupuesto actual no impone dinero: el formato de reservas
+y el techo monetario propuestos necesitan revisión antes de implementarse.
+
 ## Contratos propuestos que requieren revisión
 
 | Capacidad propuesta | Límite del contrato |
 | --- | --- |
-| `SubagentTypeCompiler` / `SubagentTypeStore` | Compilador único acotado, paquetes inmutables y operaciones Analyst `subagent-type-installation-v1`, sin ejecutar código. |
+| Inventario de tipos incluidos | Seis declaraciones fijadas por la release e instantáneas de caso; compilador, almacén e instalación comunitarios aplazados. |
 | `SubagentBranchStore` | Preparación y lectura privada acotada, publicación de checkpoints y recuperación; sin acceso a claves. |
-| Mediador de reservas | Reservas atómicas caso/turno/tarea y recibos, incluida la extensión propuesta de precios/coste; ningún hijo controla su propio techo. |
+| Mediador de reservas | Reservas atómicas caso/turno/tarea y recibos, solo tokens, llamadas, rondas y bytes en v0.5; ningún hijo controla su propio techo. |
 | Consultas restringidas confiables | Contratos aditivos para limitar fuentes antes de muestreo/límites, sin confiar en listas elegidas por el modelo. |
 | `EngineEventSubscription` | Eventos tipados acotados, cursores e intenciones explícitas de cancelación; los datos no conceden aprobación. |
 
@@ -347,19 +392,21 @@ y bytes V8 antes de implementar.
 
 ## Pruebas y secuencia
 
-1. Revisar este diseño y después contratos/golden de compilación y almacenamiento
-   de tipos, ramas, reservas, consultas restringidas y suscripciones. Reutilizar
+1. Revisar este diseño y después contratos/golden de instantáneas incluidas, consentimiento del plan,
+   ramas, reservas, consultas restringidas y suscripciones. Reutilizar
    modelos, guard, firmante y cola actuales. Sin dependencias nuevas previstas;
    cualquier dependencia o credencial se revisará antes de incorporarse.
 2. Implementar primero un hijo y verificación de ramas/checkpoints/export. Tests
    de bytes, caso/tarea/clave erróneos, entradas duplicadas/ausentes/reordenadas,
-   admisiones falsas, dependencias circulares, consumo y frontera de 1 MiB;
+   inventarios falsos, consentimiento ausente/falsificado, dependencias circulares, consumo y frontera de 1 MiB;
    fuzzing de canónicos y export actuales.
 3. Modelo falso obediente: recursión, herramientas no declaradas, salida del
    alcance, identidades entre clústeres, modo instancia, aprobaciones y hallazgos
-   falsificados, ampliación de presupuesto y tipos/skills maliciosos. Todo debe
+   falsificados, ampliación de presupuesto, consentimiento de plan falso y skills maliciosas. Todo debe
    quedar denegado y fuera de system.
-4. Carreras en reservas por caso/turno/hijo, agotamiento, precio desconocido, uso
+4. Umbral exacto de 25% y una unidad más en tokens/llamadas, cambios tras la
+   vista, cancelación e intentos de omitir consentimiento. Carreras en reservas
+   por caso/turno/hijo, agotamiento, coste no disponible, uso
    incierto, duplicados y varias aprobaciones pendientes. Un cargo por operación
    y ningún exceso por arranques concurrentes.
 5. Episodio sintético Windows/AWS/Kubernetes con tres tareas paralelas, skills

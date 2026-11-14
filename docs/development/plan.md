@@ -14,9 +14,12 @@ Entra/GCP/network semantics complete the 0.4.2 A/B scope. The Kubernetes live AP
 connector and [catalog installation](https://github.com/ns2switch/irmind/pull/271) remain design-only. Publication of the
 separate community catalog is deferred; it is not a prerequisite for 0.4.2.
 
-The [subagent design](subagents-design.md) proposes bounded parallel tasks,
+The approved [subagent architecture](subagents-design.md) specifies bounded parallel tasks,
 shared reservations, signed event branches and an engine event stream; it is
-design-only. The separate [Windows collection evaluation](https://github.com/ns2switch/irmind/pull/284)
+design-only: concrete ports/formats and golden vectors precede implementation.
+Version 0.5 includes six bundled types, resource limits and signed confirmation
+above 25% of remaining tokens/calls; community types and monetary caps are deferred.
+The separate [Windows collection evaluation](https://github.com/ns2switch/irmind/pull/284)
 correlates nine synthetic Hayabusa/EZTools exports and ten observations through
 confirmed findings, reconstruction, sealing and independently verified export.
 It neither launches a collector nor validates a real collection or model.

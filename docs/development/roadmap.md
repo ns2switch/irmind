@@ -76,7 +76,7 @@ correlates nine synthetic exports; real collection/model validation remains open
 Run bounded parallel subagents with Agent-key signatures and deterministic case records.
 
 - Review the proposed [subagent design](subagents-design.md) before implementation: types, shared limits, Agent-key signing, approval routing, event branches, deterministic merging and engine events. Concrete ports and export V8 bytes need their own reviewed contract.
-- The main agent delegates bounded tasks to parallel subagents with separate contexts. Built-in types cover triage, cloud, endpoint, network, Kubernetes, and threat intelligence; community-defined types come from a file.
+- The main agent delegates bounded tasks to parallel subagents with separate contexts. Version 0.5 includes only triage, cloud, endpoint, network, Kubernetes, and threat intelligence; community-defined types and monetary caps follow later. Plans are visible before work; reserving more than 25% of remaining case tokens or calls requires signed analyst confirmation.
 - Subagents inherit case scope and never extend it. They cannot approve calls; requests enter the analyst queue. They sign with the Agent key, and their output returns to the main agent as untrusted data.
 - Enforce concurrency, round, and token limits per subagent and a total budget per turn. Show each subagent in the TUI and allow cancellation.
 - Give each subagent an event branch and merge branches deterministically into the signed case chain so reports remain reproducible. Make the TUI a client of the engine's streamed events as preparation for the engine API.
