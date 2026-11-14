@@ -1,4 +1,4 @@
-Traducción de docs/development/subagents-design.md en el commit a19361c1b29d874f5c32215ae9106097f07b10cd; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/subagents-design.md en el commit 419f88fe8ff3e3184c56b614a0fd46b60690f715; si hay diferencias, prevalece la versión en inglés.
 
 # Subagentes acotados y eventos del motor
 
