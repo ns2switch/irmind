@@ -103,6 +103,7 @@ jobs:
           install -m 0755 .tools/cargo-fuzz "$HOME/.cargo/bin/cargo-fuzz"
       - name: Fuzz isolated-workspace decoder and parent protocol with AddressSanitizer
         run: |
+          cargo metadata --locked --manifest-path helpers/evtx/fuzz/Cargo.toml --format-version 1 > /dev/null
           mkdir -p helpers/evtx/fuzz/corpus/evtx_decode helpers/evtx/fuzz/corpus/evtx_protocol
           cp helpers/evtx/fuzz/seeds/security.evtx helpers/evtx/fuzz/corpus/evtx_decode/
           cp helpers/evtx/fuzz/seeds/protocol/* helpers/evtx/fuzz/corpus/evtx_protocol/

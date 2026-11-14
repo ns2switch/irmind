@@ -19,6 +19,7 @@ Use `git commit -s` for a new commit. To fix your last local commit, use `git co
 - Keep the change within the current [architecture](docs/development/architecture.md) and document any new public behavior.
 - Add meaningful tests for policy, custody, parsing, or connector changes. Use synthetic fixtures.
 - Run `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo nextest run --workspace --all-features --locked`, and `cargo deny check`.
+- Run `python3 -B .github/scripts/check_locked_workspaces.py` to resolve all four locked graphs, including the isolated EVTX fuzz workspace, and check the shipping package versions.
 - Describe security implications, tests run, and known limits in the pull request template.
 
 English documentation is authoritative. Update a Spanish translation when its user-facing source changes, and put the English source commit hash in its first line.

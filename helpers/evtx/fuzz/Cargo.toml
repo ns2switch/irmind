@@ -15,7 +15,7 @@ resolver = "3"
 [dependencies]
 libfuzzer-sys = "0.4"
 irmind-mod-parser-evtx = { path = "../../../crates/modules/parser-evtx", version = "0.1.0", features = ["fuzzing"] }
-irmind-evtx = { path = "..", version = "0.3.0" }
+irmind-evtx = { path = "..", version = "0.4.2" }
 evtx = { version = "=0.15.1", default-features = false }
 
 [[bin]]

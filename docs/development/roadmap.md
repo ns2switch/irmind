@@ -54,12 +54,18 @@ Version 0.2 cases are not readable in 0.3: keep the creating executable or
 
 ## v0.4: Forensic skills
 
-The 0.4 pre-release includes signed, progressively loaded forensic skills that never extend policy permissions. The three initial methods pass scripted synthetic cases with confirmed findings and independently verified exports; broader collection coverage and the separate community catalog remain follow-up work.
+The 0.4.2 pre-release includes 15 signed, progressively loaded forensic skills,
+signed case budgets, native Kubernetes audit/Falco ingestion and semantic Entra,
+GCP and network coverage. Each skill passes a scripted synthetic case with
+confirmed findings and an independently verified export. Real-connector
+validation, broader Windows collections and publication of the separate
+community catalog remain follow-up work.
 
 - The approved [skills design](skills-design.md), [installation contract](skills-installation-contract.md) and [case receipt contract](skills-case-format-contract.md) define the 0.4 implementation. See the [usage guide](../skills.md).
-- A skill is a folder with `SKILL.md` for methodology and instructions, plus optional query templates, Sigma rules, or mappings. The initial included set is Windows triage, Linux triage and AWS credential compromise. Windows ransomware and M365 business email compromise remain possible community extensions.
+- A skill is a folder with `SKILL.md` for methodology and instructions, plus optional query templates, Sigma rules, or mappings. The core catalog covers AWS, Azure, GCP, Windows, Linux, network and Kubernetes. Windows triage, Linux triage and AWS credential compromise remain the initial methods; Windows ransomware and nine other methods arrived in 0.4.1, and two Kubernetes methods in 0.4.2. M365 business email compromise remains a possible community extension.
 - Bundle [**Windows triage**](https://github.com/ns2switch/irmind/issues/157): guide a scoped, synthetic KAPE or Velociraptor collection of event logs, registry hives and related transaction logs, `$MFT`, Prefetch, LNK, SRUM and Amcache. Ingest direct EVTX with its verified isolated helper, Hayabusa timelines or EvtxECmd CSV first, then EZTools exports from PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch and SrumECmd. Investigate logons → execution → persistence → lateral movement → exfiltration, correlate independent sources and confirm findings with evidence. Collection and external tools remain analyst-run; a skill grants no execution rights.
 - Bundle **Linux triage** for authentication, execution and persistence, and **AWS credential compromise** for CloudTrail, role/session activity and IAM changes.
+- `/budget` shows signed case consumption and allocations; `/settings limits` sets defaults for new cases below the organization ceiling. Kubernetes cluster identity is confirmed explicitly, and the source-reader contract permits verified original facts without projecting entire request bodies.
 - The model initially sees only a skill's name and description; it loads full content when needed. Skills may be bundled, supplied by an organization, or installed by an analyst.
 - Installation is signed, and the case log records the hash of the version used. A skill can declare needed tools but cannot extend permissions: policy and the organization ceiling decide. Signing admits exact package bytes; skill content stays untrusted even after admission and never enters system messages.
 - Use `/skills` to list, install, inspect, update and disable skills. User-invocable skills appear as slash commands. Maintain a separate community skills repository.
@@ -69,7 +75,7 @@ The 0.4 pre-release includes signed, progressively loaded forensic skills that n
 Run bounded parallel subagents with Agent-key signatures and deterministic case records.
 
 - Approve `docs/development/subagents-design.md` before implementation. It will define types, limits, Agent-key signing, approval routing, event branches, and deterministic merging.
-- The main agent delegates bounded tasks to parallel subagents with separate contexts. Built-in types cover triage, cloud, endpoint, network, and threat intelligence; community-defined types come from a file.
+- The main agent delegates bounded tasks to parallel subagents with separate contexts. Built-in types cover triage, cloud, endpoint, network, Kubernetes, and threat intelligence; community-defined types come from a file.
 - Subagents inherit case scope and never extend it. They cannot approve calls; requests enter the analyst queue. They sign with the Agent key, and their output returns to the main agent as untrusted data.
 - Enforce concurrency, round, and token limits per subagent and a total budget per turn. Show each subagent in the TUI and allow cancellation.
 - Give each subagent an event branch and merge branches deterministically into the signed case chain so reports remain reproducible. Make the TUI a client of the engine's streamed events as preparation for the engine API.
