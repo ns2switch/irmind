@@ -31,6 +31,31 @@ pub struct SubagentResultV1 {
     pub usage: SubagentResources,
     pub pending_approvals: Vec<SubagentDigest>,
 }
+impl SubagentResultV1 {
+    pub fn from_terminal(
+        checkpoint: &SubagentCheckpointV1,
+        terminal: &super::BranchTerminal,
+    ) -> Result<Self, SubagentRecordError> {
+        if !checkpoint.terminal {
+            return Err(SubagentRecordError);
+        }
+        let value = Self {
+            format_version: 1,
+            case_id: checkpoint.case_id.clone(),
+            task_id: checkpoint.task_id,
+            checkpoint_sha256: checkpoint.identity()?,
+            status: terminal.status,
+            guarded_summary: terminal.guarded_summary.clone(),
+            summary_sha256: terminal.summary_sha256,
+            sources: terminal.sources.clone(),
+            coverage: terminal.coverage.clone(),
+            usage: terminal.usage,
+            pending_approvals: terminal.pending_approvals.clone(),
+        };
+        value.validate()?;
+        Ok(value)
+    }
+}
 impl SubagentRecord for SubagentResultV1 {
     const KIND: AuditEventKind = AuditEventKind::SubagentResultV1;
     const DOMAIN: &'static [u8] = b"irmind-subagent-result-v1\0";

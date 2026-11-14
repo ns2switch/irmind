@@ -17,6 +17,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::time::UNIX_EPOCH;
 
+mod branches;
 mod common_format;
 mod compact;
 mod format;

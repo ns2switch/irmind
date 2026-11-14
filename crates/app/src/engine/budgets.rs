@@ -101,48 +101,69 @@ pub fn budget_status(
     entries: &[SignedEntry],
     organization: &PolicyRules,
 ) -> Result<CaseBudgetStatus, AppError> {
-    let first = entries.first().ok_or(AppError::InvalidChain(0))?;
-    let created = super::current_case_creation(first)?;
-    if first.kind != AuditEventKind::CaseCreated
-        || first.actor != Actor::Analyst
-        || created.version != 4
-    {
-        return Err(AppError::InvalidChain(first.seq));
-    }
-    let mut allocated = Some(created.budget);
-    if let Some(limits) = allocated {
-        limits.validate()?;
-    }
-    let mut ledger = crate::case_budget::UsageAccumulator::default();
+    let mut replay = BudgetReplay::default();
     for entry in entries {
+        replay.accept(entry)?;
+    }
+    replay.status(organization)
+}
+
+/// Streaming replay of authenticated allocation and usage records.
+#[derive(Default)]
+pub(crate) struct BudgetReplay {
+    allocated: Option<CaseBudgetLimits>,
+    ledger: crate::case_budget::UsageAccumulator,
+    checkpoint: [u8; 32],
+}
+impl BudgetReplay {
+    pub(crate) fn accept(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
+        if self.allocated.is_none() {
+            let created = super::current_case_creation(entry)?;
+            if entry.kind != AuditEventKind::CaseCreated || entry.actor != Actor::Analyst {
+                return Err(AppError::InvalidChain(entry.seq));
+            }
+            created.budget.validate()?;
+            self.allocated = Some(created.budget);
+            self.checkpoint = entry.hash;
+            return Ok(());
+        }
         if entry.kind != AuditEventKind::CaseBudgetChanged {
-            ledger.push(entry)?;
-            continue;
+            return self.ledger.push(entry);
         }
         let change: BudgetChange =
             serde_json::from_str(&entry.payload).map_err(|_| AppError::InvalidChain(entry.seq))?;
         if entry.actor != Actor::Analyst
             || change.version != 1
             || serde_json::to_string(&change).ok().as_deref() != Some(entry.payload.as_str())
-            || change.previous != allocated
+            || change.previous != self.allocated
             || change.limits.validate().is_err()
             || change.organization.validate().is_err()
             || !change.limits.within(change.organization)
-            || !ledger.finish().fits(change.limits)
-            || (allocated.is_none_or(|old| change.limits.increases(old))
+            || !self.ledger.finish().fits(change.limits)
+            || (self
+                .allocated
+                .is_none_or(|old| change.limits.increases(old))
                 && !change.increase_confirmed)
         {
             return Err(AppError::InvalidChain(entry.seq));
         }
-        allocated = Some(change.limits);
+        self.allocated = Some(change.limits);
+        self.checkpoint = entry.hash;
+        Ok(())
     }
-    let ceiling = CaseBudgetLimits::from_policy(organization);
-    Ok(CaseBudgetStatus {
-        allocated,
-        organization: ceiling,
-        effective: allocated.map(|limits| limits.intersection(ceiling)),
-        usage: ledger.finish(),
-    })
+    pub(crate) fn status(&self, organization: &PolicyRules) -> Result<CaseBudgetStatus, AppError> {
+        let allocated = self.allocated.ok_or(AppError::InvalidChain(0))?;
+        let ceiling = CaseBudgetLimits::from_policy(organization);
+        Ok(CaseBudgetStatus {
+            allocated: Some(allocated),
+            organization: ceiling,
+            effective: Some(allocated.intersection(ceiling)),
+            usage: self.ledger.finish(),
+        })
+    }
+    pub(crate) const fn checkpoint(&self) -> [u8; 32] {
+        self.checkpoint
+    }
 }
 
 #[cfg(test)]

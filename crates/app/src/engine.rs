@@ -2,6 +2,7 @@ use crate::*;
 
 mod audit;
 mod budgets;
+pub(crate) use budgets::BudgetReplay;
 pub use budgets::budget_status;
 mod cases;
 mod investigation;
