@@ -1,4 +1,4 @@
-Traducción de CONTRIBUTING.md en el commit d85c1aa07cfffbfbdf30ac9f1e88b71e5e807efb; si hay diferencias, prevalece la versión en inglés.
+Traducción de CONTRIBUTING.md en el commit fd58c3a30349977056f5e39ba18a3b9f8715d5cf; si hay diferencias, prevalece la versión en inglés.
 
 # Contribuir a IRMind
 
