@@ -1,0 +1,51 @@
+{
+  "source_commit": "f5edf23fd31c8c200c1e4a4aa0ef4319145ab18e",
+  "profile": "release (optimized; debug assertions disabled)",
+  "platform": "Linux x86_64",
+  "runner": "local; not a standard GitHub performance-gate run",
+  "command": "cargo test -p irmind --test kubernetes_ingest --release managed_one_gib_release_throughput -- --ignored --nocapture",
+  "method": "Repeat the committed transport row with 1024 synthetic padding bytes to at least 1 GiB. Time production detection, source hash, bounded transport/event decoding, selected mapping, Parquet and signed custody. Generation and subsequent complete verification are outside the timer. Frozen optimized test binary; no other compilation, tests or fuzzing during timing. One fixed-timestamp smoke per source, no provider or network. Padding and full request bodies remain original data, not automatic search projections. Not a query-latency or 15 GB benchmark.",
+  "results": [
+    {
+      "format": "eks",
+      "bytes": 1073741994,
+      "records": 685659,
+      "seconds": 13.255,
+      "mib_per_second": 77.257,
+      "rejected": 0,
+      "fixture": "crates/testkit/fixtures/parser-kubernetes/source/eks-row.ndjson",
+      "fixture_sha256": "2eb5a1ff56331554368b5202115b7bcd336d81ffcb9ed6fd20d4fe94fdf592bd"
+    },
+    {
+      "format": "aks",
+      "bytes": 1073743352,
+      "records": 617804,
+      "seconds": 13.176,
+      "mib_per_second": 77.718,
+      "rejected": 0,
+      "fixture": "crates/testkit/fixtures/parser-kubernetes/source/aks-row.ndjson",
+      "fixture_sha256": "c3322d98b30ef86ca7cd1cc80be0f9040fdc9c9c5cc1926f4a25ff6cc6cfc825"
+    }
+  ],
+  "fuzz": [
+    {
+      "target": "parser_kubernetes",
+      "sanitizer": "AddressSanitizer",
+      "budget_seconds": 600,
+      "executions": 612025,
+      "peak_rss_mib": 445,
+      "exit_code": 0,
+      "failures": 0
+    },
+    {
+      "target": "parser_gcp_audit",
+      "sanitizer": "AddressSanitizer",
+      "budget_seconds": 600,
+      "executions": 3109464,
+      "peak_rss_mib": 450,
+      "exit_code": 0,
+      "failures": 0
+    }
+  ],
+  "detection_matrix": "managed-kubernetes-detection.json"
+}

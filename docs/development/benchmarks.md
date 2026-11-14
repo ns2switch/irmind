@@ -1,6 +1,24 @@
 # Evidence scan benchmarks
 
 
+## Managed Kubernetes transports: optimized 1 GiB smoke
+
+Production detection, hash, source decoding, mapping, Parquet and signed custody,
+from [source f5edf23](https://github.com/ns2switch/irmind/commit/f5edf23fd31c8c200c1e4a4aa0ef4319145ab18e).
+Each synthetic source repeats the committed transport row with 1,024 padding
+bytes. Padding and complete request bodies remain original data without an
+automatic search projection. Generation and complete verification are outside
+the timer. Compilation, other tests and fuzzing finished first. These local
+fixed-record smokes are not standard-runner gates or varied 15 GB measurements.
+
+| Transport | Bytes | Records | Rejected | Ingestion (s) | MiB/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| eks | 1,073,741,994 | 685,659 | 0 | 13.255 | 77.257 |
+| aks | 1,073,743,352 | 617,804 | 0 | 13.176 | 77.718 |
+
+[Raw results, fixture hashes and method](benchmarks/managed-kubernetes.json). The Kubernetes decoder/mapping ASAN campaign completed its 600-second budget with 612,025 inputs and no failures. A separate GCP/GKE source campaign completed the same budget with 3,109,464 inputs and no failures. The [33-fixture detection matrix](benchmarks/managed-kubernetes-detection.json) has one unique high-confidence detector per fixture.
+
+
 ## Native Entra exports: optimized 1 GiB smoke
 
 Production decoder, mapping, Parquet and signed-custody ingestion from
