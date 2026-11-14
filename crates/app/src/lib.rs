@@ -26,6 +26,7 @@ mod adapter_storage_errors;
 mod approvals;
 mod audit_origin;
 mod case_budget;
+pub mod catalog;
 mod configuration;
 pub use case_budget::{CaseBudgetLimits, CaseBudgetStatus, CaseBudgetUsage, case_budget_usage};
 pub use engine::budget_status;
