@@ -1,4 +1,4 @@
-Traducción de docs/skills.md en el commit 9c9119c70f3dcad41cb30ffad70d563041761944; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/skills.md en el commit e1d14506c6b9fa8e2551731c11ae004bdfd2c59a; si hay diferencias, prevalece la versión en inglés.
 
 # Skills forenses
 

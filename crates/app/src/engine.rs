@@ -408,6 +408,17 @@ impl Engine<'_> {
 mod format_tests {
     use super::*;
     #[test]
+    fn case_created_v4_matches_the_approved_contract_bytes() {
+        let bytes = include_bytes!(
+            "../../../docs/development/subagent-format-vectors/case-created-v4.json"
+        );
+        let created: CaseCreatedEvent = serde_json::from_slice(bytes).unwrap();
+        assert_eq!(created.version, 4);
+        created.budget.validate().unwrap();
+        assert_eq!(serde_json::to_vec(&created).unwrap(), bytes);
+    }
+
+    #[test]
     fn metadata_gate_rejects_retired_case_creation_payloads_without_interpreting_them() {
         let mut first = SignedEntry {
             seq: 1,

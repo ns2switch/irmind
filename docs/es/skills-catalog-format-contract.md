@@ -1,4 +1,4 @@
-Traducción de docs/development/skills-catalog-format-contract.md en el commit 348d8d615728ddd44859d8461c0c32c27af60376; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/skills-catalog-format-contract.md en el commit 62587a090941cf0919207e7dafae763bcfb22037; si hay diferencias, prevalece la versión en inglés.
 
 # Contrato del índice firmado, admisión y caso/export del catálogo
 

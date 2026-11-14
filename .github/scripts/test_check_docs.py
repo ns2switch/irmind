@@ -18,5 +18,13 @@ class CommandOwnership(unittest.TestCase):
         text = 'gcloud logging read query --format=json\nirmind --made-up-flag'
         self.assertIn('--made-up-flag', check_docs.irmind_flag_citations(text))
 
+    def test_catalog_environment_secret_example_uses_github_flags(self):
+        line = 'gh secret set CATALOG_ED25519_SEED_HEX --repo ns2switch/irmind-skills --env release < catalog-seed.hex'
+        self.assertEqual(check_docs.irmind_flag_citations(line), set())
+        for suffix in [' && irmind --repo=unexpected', '; target/ci/irmind --env=unexpected']:
+            self.assertTrue(check_docs.irmind_flag_citations(line + suffix))
+        self.assertIn('--repo', check_docs.irmind_flag_citations('irmind --repo=unexpected'))
+        self.assertIn('--env', check_docs.irmind_flag_citations('irmind --env=unexpected'))
+
 if __name__ == '__main__':
     unittest.main()

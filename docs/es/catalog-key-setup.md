@@ -1,3 +1,5 @@
+Traducción de docs/development/catalog-key-setup.md en el commit a19361c1b29d874f5c32215ae9106097f07b10cd; si hay diferencias, prevalece la versión en inglés.
+
 # Configurar la clave de firma del catálogo
 
 Procedimiento del mantenedor para el [contrato firmado](https://github.com/ns2switch/irmind/pull/287).
