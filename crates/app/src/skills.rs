@@ -1,5 +1,6 @@
 //! Analyst-authorized skill installation. Package text remains untrusted data.
 
+mod catalog_installation;
 mod compiled;
 mod history;
 mod operations;

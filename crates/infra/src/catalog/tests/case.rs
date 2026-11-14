@@ -15,50 +15,32 @@ struct Fixture {
     case: Case,
     index: VerifiedCatalogIndex,
 }
+mod installation;
+mod recovery;
 fn fixture() -> Fixture {
     fixture_with_snapshot(true)
 }
 fn fixture_with_snapshot(pin: bool) -> Fixture {
+    fixture_mode(pin, true)
+}
+fn fixture_mode(pin: bool, admit: bool) -> Fixture {
+    fixture_keys(pin, admit, keys())
+}
+fn fixture_keys(pin: bool, admit: bool, release_keys: &'static [[u8; 32]]) -> Fixture {
     let root = tempfile::tempdir().unwrap();
     let mut store = LocalStore::open(root.path()).unwrap();
-    store.catalog_verifier = Ed25519CatalogIndexVerifier::from_release_keys(keys()).unwrap();
+    store.catalog_verifier = Ed25519CatalogIndexVerifier::from_release_keys(release_keys).unwrap();
     let store = Arc::new(store);
     let analyst = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[42; 32]),
         actor: Actor::Analyst,
     });
-    let agent = Arc::new(LocalSigner {
-        key: SigningKey::from_bytes(&[44; 32]),
-        actor: Actor::Agent(AgentId::parse("skills-agent").unwrap()),
-    });
-    let verifier = Arc::new(
-        LocalVerifier::from_signer(analyst.as_ref())
-            .with_trusted_key(&agent.actor(), &agent.public_key())
-            .unwrap(),
-    );
-    let services = SkillServices::new(
-        Arc::new(crate::FileSkillPackageStore::new(root.path())),
-        Arc::new(TomlSkillCompiler),
-        agent,
-        Vec::new(),
-    )
-    .unwrap()
-    .with_catalog(store.catalog_services());
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(analyst.clone(), verifier),
-            Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
-        ),
+    let engine = new_engine(
+        root.path(),
+        store.clone(),
+        analyst.clone(),
         ExecutionMode::Attended,
-        Arc::new(crate::SystemClock),
-    )
-    .unwrap()
-    .with_skills(services)
-    .unwrap();
+    );
     let case = engine
         .create_case("Synthetic catalog custody", "local")
         .unwrap();
@@ -70,8 +52,10 @@ fn fixture_with_snapshot(pin: bool) -> Fixture {
     admission.public_key = analyst.public_key();
     admission.hash = irmind_app::sha256(&admission.canonical());
     admission.sig = analyst.sign(&admission.hash).unwrap();
-    store.append_global_operation(&admission).unwrap();
-    publish_package(root.path(), &index);
+    if admit {
+        store.append_global_operation(&admission).unwrap();
+        publish_package(root.path(), &index);
+    }
     if pin {
         append_snapshot(&store, &case, &index, analyst.as_ref(), &admission);
     }
@@ -82,6 +66,45 @@ fn fixture_with_snapshot(pin: bool) -> Fixture {
         case,
         index,
     }
+}
+fn new_engine(
+    root: &std::path::Path,
+    store: Arc<LocalStore>,
+    analyst: Arc<dyn Signer>,
+    mode: ExecutionMode,
+) -> Engine<'static> {
+    let agent = Arc::new(LocalSigner {
+        key: SigningKey::from_bytes(&[44; 32]),
+        actor: Actor::Agent(AgentId::parse("skills-agent").unwrap()),
+    });
+    let verifier = Arc::new(
+        LocalVerifier::from_signer(analyst.as_ref())
+            .with_trusted_key(&agent.actor(), &agent.public_key())
+            .unwrap(),
+    );
+    let services = SkillServices::new(
+        Arc::new(crate::FileSkillPackageStore::new(root)),
+        Arc::new(TomlSkillCompiler),
+        agent,
+        Vec::new(),
+    )
+    .unwrap()
+    .with_catalog(store.catalog_services());
+    Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store,
+            CryptoPorts::new(analyst, verifier),
+            Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
+        ),
+        mode,
+        Arc::new(crate::SystemClock),
+    )
+    .unwrap()
+    .with_skills(services)
+    .unwrap()
 }
 fn append_snapshot(
     store: &LocalStore,

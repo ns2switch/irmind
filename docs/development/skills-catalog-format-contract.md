@@ -173,6 +173,12 @@ pub trait CatalogProofStore: Send + Sync {
 Request/release/asset verified capabilities have private constructors and no
 model deserializer. A request is minted only by the explicit analyst installation
 flow; offline input calls the same verifier directly and invokes no source port.
+For a latest-release selection, untrusted transport metadata carries the resolved
+tag alongside `CatalogIndexBytes`. It is frozen before package retrieval and the
+verified index must name that exact tag. Transport metadata does not enter the
+signature preimage, proof identity or stored proof; offline review always provides
+an explicit frozen tag.
+
 The verifier is pure (no network, I/O, clock, secrets or admission); its infra
 implementation reuses current Ed25519 code. Store reads are untrusted bytes until
 reverified against current compiled keys. No second package compiler is introduced.

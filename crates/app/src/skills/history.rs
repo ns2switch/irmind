@@ -110,6 +110,7 @@ pub(super) struct ApprovedSnapshot {
 pub struct ApprovedSkills {
     pub(super) latest: BTreeMap<SkillName, ApprovedSnapshot>,
     pub(super) retired: BTreeSet<SkillName>,
+    pub(crate) catalog_history: Vec<crate::catalog::CatalogReceipt>,
     pub(super) versions: usize,
     pub(super) encoded_bytes: usize,
 }
@@ -211,6 +212,9 @@ impl ApprovedSkills {
         let previous = self.latest.get(&name).map(|old| old.operation_hash.clone());
         if snapshot.previous_operation != previous {
             return Err(invalid());
+        }
+        if let Some(receipt) = &snapshot.catalog {
+            self.catalog_history.push(receipt.clone());
         }
         self.retired.remove(&name);
         self.latest.insert(
