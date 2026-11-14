@@ -4,7 +4,7 @@ use super::{
 };
 use irmind_app::{
     AuditLog, CancellationToken, ExportVerifier, SkillCompiler, SkillLoadResult, SkillLoadV1,
-    SkillOrigin, SkillSnapshotV1,
+    SkillOrigin, SkillSnapshotV2,
 };
 use irmind_domain::{AuditEventKind, SkillName, SkillPackage, SkillResource, Tool};
 use irmind_infra::TomlSkillCompiler;
@@ -40,7 +40,7 @@ fn repeated_method_reads_are_bounded_and_the_limit_is_a_signed_result() {
     assert_eq!(
         entries
             .iter()
-            .filter(|e| e.kind == AuditEventKind::SkillSnapshotV1)
+            .filter(|e| e.kind == AuditEventKind::SkillSnapshotV2)
             .count(),
         1
     );
@@ -134,10 +134,10 @@ fn installed_method_export_requires_its_exact_signed_admission_and_no_other_oper
         .investigate(&case.id, "/community-triage Review this case.", &model)
         .unwrap();
     let entries = store.entries(&case.id).unwrap();
-    let snapshot = SkillSnapshotV1::decode(
+    let snapshot = SkillSnapshotV2::decode(
         &entries
             .iter()
-            .find(|e| e.kind == AuditEventKind::SkillSnapshotV1)
+            .find(|e| e.kind == AuditEventKind::SkillSnapshotV2)
             .unwrap()
             .payload,
     )

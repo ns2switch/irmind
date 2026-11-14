@@ -1,9 +1,10 @@
 //! Local, explicitly composed capabilities for progressive methodology loading.
 mod catalog;
 mod loading;
+mod proof;
 use crate::{
     AppError, CompiledSkill, Engine, Signer, SkillCompiler, SkillPackageStore, SkillSnapshotId,
-    SkillSnapshotV1, sha256,
+    SkillSnapshotV2, sha256,
 };
 use irmind_domain::{Actor, SkillName, SkillPackage};
 use std::{
@@ -17,6 +18,7 @@ pub struct SkillServices {
     pub(crate) agent: Arc<dyn Signer>,
     pub(crate) bundled: BTreeMap<SkillName, SkillPackage>,
     inventory: [u8; 32],
+    pub(crate) catalog: Option<crate::catalog::CatalogServices>,
 }
 impl SkillServices {
     pub fn new(
@@ -54,7 +56,13 @@ impl SkillServices {
             agent,
             bundled,
             inventory: sha256(&bytes),
+            catalog: None,
         })
+    }
+    #[must_use]
+    pub fn with_catalog(mut self, catalog: crate::catalog::CatalogServices) -> Self {
+        self.catalog = Some(catalog);
+        self
     }
     pub fn package_store(&self) -> &dyn SkillPackageStore {
         self.store.as_ref()
@@ -79,7 +87,8 @@ pub(crate) struct ActiveSkill {
 }
 pub(crate) struct ResolvedSkill {
     pub(crate) skill: CompiledSkill,
-    snapshot: SkillSnapshotV1,
+    snapshot: SkillSnapshotV2,
+    catalog: Option<crate::catalog::VerifiedCatalogIndex>,
 }
 impl Engine<'_> {
     pub fn with_skills(mut self, services: SkillServices) -> Result<Self, AppError> {
@@ -96,11 +105,18 @@ impl Engine<'_> {
     pub(crate) fn verify_skill_receipts(
         &self,
         entries: &[crate::SignedEntry],
+        cancel: &crate::CancellationToken,
     ) -> Result<(), AppError> {
+        if entries
+            .iter()
+            .any(|entry| entry.kind == crate::AuditEventKind::RetiredSkillSnapshot)
+        {
+            return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
+        }
         if !entries.iter().any(|e| {
             matches!(
                 e.kind,
-                crate::AuditEventKind::SkillSnapshotV1 | crate::AuditEventKind::SkillLoadV1
+                crate::AuditEventKind::SkillSnapshotV2 | crate::AuditEventKind::SkillLoadV1
             )
         }) {
             return Ok(());
@@ -113,6 +129,10 @@ impl Engine<'_> {
         for entry in entries {
             checked.accept(entry, services.compiler.as_ref())?;
         }
+        checked.verify_bundled(
+            &services.bundled.values().cloned().collect::<Vec<_>>(),
+            services.compiler.as_ref(),
+        )?;
         let refs = checked.admissions();
         let mut proofs: Vec<_> = self
             .audit_log
@@ -121,10 +141,33 @@ impl Engine<'_> {
             .filter(|p| refs.contains(&crate::hex(&p.hash)))
             .collect();
         proofs.sort_by_key(|p| p.hash);
-        checked.verify_admissions(
+        let analyst = self.verifier.trusted_public_key(&Actor::Analyst)?;
+        let requirements =
+            checked.catalog_requirements(&proofs, self.verifier.as_ref(), &analyst)?;
+        let mut indices = Vec::with_capacity(requirements.len());
+        for requirement in requirements {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let catalog = services
+                .catalog
+                .as_ref()
+                .ok_or(crate::catalog::CatalogError::Unavailable)?;
+            let case = crate::CaseId::parse(
+                &entries
+                    .first()
+                    .ok_or_else(super::receipts::invalid)?
+                    .case_id,
+            )
+            .map_err(|_| super::receipts::invalid())?;
+            indices.push(catalog.read_case(&case, &requirement, cancel)?);
+        }
+        checked.verify_catalog_admissions(
             &proofs,
+            &indices,
             self.verifier.as_ref(),
-            &self.verifier.trusted_public_key(&Actor::Analyst)?,
+            &analyst,
+            services.compiler.as_ref(),
         )
     }
 }

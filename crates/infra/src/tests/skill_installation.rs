@@ -103,7 +103,7 @@ fn install_update_and_activation_replay_exact_approved_snapshots_and_links() {
         let bytes = hex::decode(
             operation
                 .operation
-                .strip_prefix("skill-installation-v1:")
+                .strip_prefix("skill-installation-v2:")
                 .unwrap(),
         )
         .unwrap();

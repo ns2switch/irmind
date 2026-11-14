@@ -173,7 +173,7 @@ fn identifiers(values: &[String]) -> Result<(), CatalogError> {
     }
     Ok(())
 }
-fn asset_name(value: &str) -> bool {
+pub(super) fn asset_name(value: &str) -> bool {
     if value.is_empty()
         || value.len() > 128
         || value.starts_with('.')

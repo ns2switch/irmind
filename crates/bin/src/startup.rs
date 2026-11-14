@@ -305,7 +305,8 @@ impl PreparedStartup {
                 .clone()
                 .with_trusted_key(&agent.actor(), &agent.public_key())?,
         );
-        let services = super::skills::services(&self.home, agent)?;
+        let services =
+            super::skills::services(&self.home, agent)?.with_catalog(self.store.catalog_services());
         let engine = registry.bind(
             Engine::new(
                 EnginePorts::new(

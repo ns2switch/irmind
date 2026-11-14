@@ -26,9 +26,19 @@ pub(super) fn verify_export_v8(
 // Production always obtains size from this same opened file. Keeping the
 // metadata gate here allows boundary tests without allocating huge fixtures.
 fn verify_open_export(
+    input: File,
+    size: u64,
+    expected_key: Option<&str>,
+) -> Result<ExportVerification, AppError> {
+    let catalog = crate::Ed25519CatalogIndexVerifier::production()?;
+    verify_open_export_with_catalog(input, size, expected_key, &catalog)
+}
+
+fn verify_open_export_with_catalog(
     mut input: File,
     size: u64,
     expected_key: Option<&str>,
+    catalog: &dyn irmind_app::catalog::CatalogIndexVerifier,
 ) -> Result<ExportVerification, AppError> {
     let version = 8;
     if size > MAX_PACKAGE_FILE_BYTES {
@@ -81,13 +91,21 @@ fn verify_open_export(
     {
         super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
     }
-    super::skill_proofs::read(
+    let proofs = super::skill_proofs::read(
         &mut input,
         &chain.skills,
         &chain.verifier,
         &header.seal.public_key,
     )?;
-    verify_empty_extensions(&mut input)?;
+    super::catalog_proofs::read(
+        &mut input,
+        &mut chain.skills,
+        &proofs,
+        &chain.verifier,
+        &header.seal.public_key,
+        catalog,
+    )?;
+    verify_empty_branches(&mut input)?;
     let mut extra = [0u8; 1];
     if input.read(&mut extra).map_err(storage)? != 0 {
         return Err(storage_reason("export has trailing bytes"));
@@ -102,16 +120,24 @@ fn verify_open_export(
     Ok(result)
 }
 
-fn verify_empty_extensions(input: &mut File) -> Result<(), AppError> {
-    for reason in [
-        "export contains catalog proofs not supported by this build",
-        "export contains subagent branch chunks not supported by this build",
-    ] {
-        if read_u64(input)? != 0 {
-            return Err(storage_reason(reason));
-        }
+fn verify_empty_branches(input: &mut File) -> Result<(), AppError> {
+    if read_u64(input)? != 0 {
+        return Err(storage_reason(
+            "export contains subagent branch chunks not supported by this build",
+        ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn verify_export_with_catalog(
+    path: &Path,
+    expected_key: Option<&str>,
+    catalog: &dyn irmind_app::catalog::CatalogIndexVerifier,
+) -> Result<ExportVerification, AppError> {
+    let input = File::open(path).map_err(storage)?;
+    let size = input.metadata().map_err(storage)?.len();
+    verify_open_export_with_catalog(input, size, expected_key, catalog)
 }
 
 fn verify_operation_frames(

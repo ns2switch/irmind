@@ -13,8 +13,51 @@ pub use store::FileCatalogProofStore;
 // fixture key, environment fallback or downloaded trust root is accepted here.
 const RELEASE_CATALOG_KEYS: &[[u8; 32]] = &[];
 
+#[derive(Clone)]
 pub struct Ed25519CatalogIndexVerifier {
     keys: &'static [[u8; 32]],
+}
+
+impl crate::LocalStore {
+    pub fn catalog_services(self: &std::sync::Arc<Self>) -> irmind_app::catalog::CatalogServices {
+        irmind_app::catalog::CatalogServices::new(
+            std::sync::Arc::new(self.catalog_verifier.clone()),
+            self.clone(),
+        )
+    }
+}
+
+impl irmind_app::catalog::CatalogProofStore for crate::LocalStore {
+    fn publish(
+        &self,
+        proof: &VerifiedCatalogIndex,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<irmind_app::catalog::CatalogProofId, AppError> {
+        self.catalog_proofs.publish(proof, cancel)
+    }
+    fn read(
+        &self,
+        id: &irmind_app::catalog::CatalogProofId,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<CatalogIndexBytes, AppError> {
+        self.catalog_proofs.read(id, cancel)
+    }
+    fn publish_for_case(
+        &self,
+        case: &irmind_domain::CaseId,
+        proof: &VerifiedCatalogIndex,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<irmind_app::catalog::CatalogProofId, AppError> {
+        self.catalog_proofs.publish_for_case(case, proof, cancel)
+    }
+    fn read_for_case(
+        &self,
+        case: &irmind_domain::CaseId,
+        id: &irmind_app::catalog::CatalogProofId,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<CatalogIndexBytes, AppError> {
+        self.catalog_proofs.read_for_case(case, id, cancel)
+    }
 }
 impl Ed25519CatalogIndexVerifier {
     pub fn production() -> Result<Self, CatalogError> {

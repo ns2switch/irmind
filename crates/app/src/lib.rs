@@ -123,7 +123,7 @@ pub use source_scopes::{SiemScopeMode, SiemSourceScope, recorded_instance_source
 
 pub use skills::{
     SkillLoadResult, SkillLoadV1, SkillReadReceipt, SkillReceiptVerifier, SkillSnapshotId,
-    SkillSnapshotV1, skill_admission_references, verify_skill_admission,
+    SkillSnapshotV2, skill_admission_references, verify_skill_admission,
 };
 
 pub use skills::SkillServices;

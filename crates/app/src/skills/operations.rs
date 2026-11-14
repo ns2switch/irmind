@@ -28,7 +28,7 @@ impl Engine<'_> {
         reserved: &BTreeSet<String>,
     ) -> Result<SkillName, AppError> {
         self.require_attended_analyst("install skill")?;
-        if origin == SkillOrigin::Bundled {
+        if matches!(origin, SkillOrigin::Bundled | SkillOrigin::Catalog) {
             return Err(SkillServiceError::InvalidOrigin.into());
         }
         // Recompile the exact preview bytes; callers cannot substitute metadata.
@@ -70,6 +70,9 @@ impl Engine<'_> {
         {
             return Err(SkillServiceError::NotInstalled.into());
         }
+        if old.is_some_and(|s| s.snapshot.origin == SkillOrigin::Catalog) {
+            return Err(AppError::Policy("Catalog skills require a verified catalog update; local files cannot retain catalog provenance.".into()));
+        }
         let origin = old.map_or(SkillOrigin::Analyst, |s| match s.snapshot.origin {
             SkillOrigin::Bundled => SkillOrigin::Analyst,
             value => value,
@@ -101,7 +104,9 @@ impl Engine<'_> {
             } else if store.read_active(name)?.is_some() {
                 return Err(SkillServiceError::StorageMismatch.into());
             }
-            self.check_skill_content(&snapshot.compile(compiler)?)?;
+            let skill = snapshot.compile(compiler)?;
+            self.check_installed_catalog(&snapshot, &skill, &CancellationToken::new())?;
+            self.check_skill_content(&skill)?;
         }
         snapshot.active = active;
         snapshot.previous_operation = Some(old.operation_hash.clone());
@@ -124,6 +129,7 @@ impl Engine<'_> {
             .get(name)
             .ok_or(SkillServiceError::NotInstalled)?;
         let skill = old.snapshot.compile(compiler)?;
+        self.check_installed_catalog(&old.snapshot, &skill, &CancellationToken::new())?;
         self.check_skill_content(&skill)?;
         if old.snapshot.active {
             store.publish(name, skill.package())
@@ -196,6 +202,9 @@ impl Engine<'_> {
                     }
                     old.snapshot.compile(compiler)?
                 };
+                if old.snapshot.active {
+                    self.check_installed_catalog(&old.snapshot, &skill, &CancellationToken::new())?;
+                }
                 self.check_skill_content(&skill)?;
                 Ok(skill)
             })();
@@ -219,8 +228,16 @@ impl Engine<'_> {
                 }),
             });
         }
+        for name in &approved.retired {
+            statuses.push(SkillStatus {
+                name: name.clone(), version: String::new(), sha256: String::new(),
+                origin: SkillOrigin::Analyst, active: false, available: false,
+                description: String::new(),
+                warning: Some("Skill interpreter was retired; review and reinstall this skill with the current version.".into()),
+            });
+        }
         for name in store.names()? {
-            if !approved.latest.contains_key(&name) {
+            if !approved.latest.contains_key(&name) && !approved.retired.contains(&name) {
                 statuses.push(SkillStatus {
                     name,
                     version: String::new(),

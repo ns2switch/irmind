@@ -6,6 +6,7 @@ use crate::{
 };
 
 mod artifact_frames;
+mod catalog_proofs;
 mod export;
 mod export_current;
 mod frames;
@@ -16,3 +17,5 @@ mod read;
 mod skill_proofs;
 mod verify_current;
 pub use export::{LocalExportVerifier, verify_export, verify_export_expected};
+#[cfg(test)]
+pub(crate) use verify_current::verify_export_with_catalog;

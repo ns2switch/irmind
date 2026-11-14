@@ -168,3 +168,23 @@ fn catalog_case_store_default_is_unavailable_without_global_fallback() {
     assert!(result.err().unwrap().to_string().contains("unavailable"));
     assert_eq!(store.0.load(Ordering::SeqCst), 0);
 }
+
+#[test]
+fn catalog_receipt_matches_the_approved_bytes_and_domain_commitment() {
+    let bytes =
+        include_bytes!("../../../../docs/development/catalog-format-vectors/catalog-receipt.json");
+    let receipt = CatalogReceipt::decode(bytes).unwrap();
+    assert_eq!(receipt.canonical().unwrap(), bytes);
+    assert_eq!(
+        crate::hex(receipt.identity().unwrap().as_bytes()),
+        "aa1a0b0f1a3611e173831a082b6e78ea97c35ec1530a8b72a222f5c6754adad7"
+    );
+    assert!(receipt.offline());
+    assert!(!receipt.downgrade_confirmed());
+    assert!(CatalogReceipt::decode(&[bytes.as_slice(), b"\n"].concat()).is_err());
+    assert!(CatalogReceipt::decode(&[b"{\"offline\":true,", &bytes[1..]].concat()).is_err());
+    let changed = std::str::from_utf8(bytes)
+        .unwrap()
+        .replace("compiled-ed25519-v1", "manual-external-check");
+    assert!(CatalogReceipt::decode(changed.as_bytes()).is_err());
+}

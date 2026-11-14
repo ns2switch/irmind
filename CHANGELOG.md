@@ -9,6 +9,11 @@ allocation. Export V8 replaces V7 and always includes catalog-proof and subagent
 branch counts, including zero counts. Older cases/exports require their creating
 IRMind version or re-ingestion of verified originals; there is no automatic migration.
 
+- Use SkillInstallationV2 and SkillSnapshotV2 for current methodology admissions.
+  Catalog provenance requires a signed index from a compiled publisher key and
+  an independent, immutable proof in every referencing case. Export V8 carries
+  exactly the proofs needed for offline verification. No production catalog key
+  is configured yet, so catalog publication and downloading remain unavailable.
 - Establish the shared case/export foundation for catalog admissions and
   subagent branches, retaining current seal bytes and frame limits.
 

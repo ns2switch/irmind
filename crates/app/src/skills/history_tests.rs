@@ -33,9 +33,9 @@ fn snapshot() -> Snapshot {
 fn installation_json_has_fixed_field_order_explicit_null_and_exact_package_commitment() {
     let bytes = serde_json::to_vec(&snapshot()).unwrap();
     let expected = concat!(
-        "{\"format_version\":1,\"name\":\"triage\",\"skill_version\":\"1\",",
+        "{\"format_version\":2,\"name\":\"triage\",\"skill_version\":\"1\",",
         "\"package_sha256\":\"f2c2ab563442f71e9f522e8311931f3a18def62561a01c987b23448929cf4a03\",\"origin\":\"analyst\",\"active\":true,",
-        "\"previous_operation\":null,\"files\":[{\"path\":\"SKILL.md\",\"contents\":\"# Method\\nSynthetic review.\\n\"}]}"
+        "\"previous_operation\":null,\"catalog\":null,\"files\":[{\"path\":\"SKILL.md\",\"contents\":\"# Method\\nSynthetic review.\\n\"}]}"
     );
     assert_eq!(bytes, expected.as_bytes());
 }
@@ -99,4 +99,21 @@ fn replay_rejects_noncanonical_bytes_unknown_fields_and_uppercase_hex() {
             .apply(&changed, &Compiler)
             .is_err()
     );
+}
+
+#[test]
+fn retired_installation_is_identity_only_disabled_until_current_readmission() {
+    let mut history = ApprovedSkills::default();
+    let mut old = operation(&snapshot());
+    old.operation = format!(
+        "skill-installation-v1:{}",
+        hex(br#"{"name":"triage","unsupported_interpreter":"old","files":[]}"#)
+    );
+    history.apply(&old, &Compiler).unwrap();
+    let name = SkillName::parse("triage").unwrap();
+    assert!(history.retired.contains(&name));
+    assert!(history.latest.is_empty());
+    history.apply(&operation(&snapshot()), &Compiler).unwrap();
+    assert!(!history.retired.contains(&name));
+    assert!(history.latest.contains_key(&name));
 }

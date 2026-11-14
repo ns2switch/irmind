@@ -6,6 +6,14 @@ fuzz_target!(|bytes: &[u8]| {
     if bytes.len() > 65_536 {
         return;
     }
+    if let Ok(receipt) = irmind_app::catalog::CatalogReceipt::decode(bytes) {
+        assert_eq!(receipt.canonical().unwrap(), bytes);
+        assert_eq!(irmind_app::catalog::CatalogReceipt::decode(bytes).unwrap(), receipt);
+        receipt.identity().unwrap();
+    }
+    if let Ok(index) = irmind_app::catalog::CatalogIndex::decode_untrusted(bytes) {
+        assert_eq!(serde_json::to_vec(&index).unwrap(), bytes);
+    }
     if let Ok(context) = irmind_domain::SourceClusterContext::decode(bytes) {
         let encoded = context.encode();
         assert_eq!(encoded, bytes);
@@ -77,7 +85,7 @@ fuzz_target!(|bytes: &[u8]| {
         check_mapping_codec!(irmind_domain::MappingProfileRecordV1);
         check_mapping_codec!(irmind_domain::MappingRunV1);
         check_mapping_codec!(irmind_domain::ParquetLayoutV1);
-        check_mapping_codec!(irmind_app::SkillSnapshotV1);
+        check_mapping_codec!(irmind_app::SkillSnapshotV2);
         check_mapping_codec!(irmind_app::SkillLoadV1);
         if let Ok(irmind_domain::MappingProfileRecordV1::Snapshot(snapshot)) =
             irmind_domain::MappingProfileRecordV1::decode(text)

@@ -1,4 +1,5 @@
 //! Current-version skill methodology receipts; these are not evidence identities.
+mod inventory;
 mod load;
 mod snapshot;
 mod verification;
@@ -6,7 +7,7 @@ use super::SkillServiceError;
 use crate::{AppError, AuditEventKind, hex};
 pub use load::{SkillLoadResult, SkillLoadV1, SkillReadReceipt};
 use serde::{Serialize, de::DeserializeOwned};
-pub use snapshot::{SkillSnapshotId, SkillSnapshotV1};
+pub use snapshot::{SkillSnapshotId, SkillSnapshotV2};
 pub use verification::{SkillReceiptVerifier, skill_admission_references, verify_skill_admission};
 const MAX_PAYLOAD: usize = 768 * 1024;
 pub(super) fn invalid() -> AppError {

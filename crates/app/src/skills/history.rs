@@ -2,9 +2,9 @@ use super::{CompiledSkill, SkillCompiler, SkillOrigin, SkillPackageStore, SkillS
 use crate::{AppError, Engine, SignedOperation, hex};
 use irmind_domain::{SkillName, SkillPackage, SkillResource};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-pub(super) const PREFIX: &str = "skill-installation-v1:";
+pub(super) const PREFIX: &str = "skill-installation-v2:";
 pub(super) const MAX_OPERATION_BYTES: usize = 768 * 1024;
 pub(super) const MAX_HISTORY_BYTES: usize = 16 * 1024 * 1024;
 
@@ -30,19 +30,21 @@ pub(super) struct Snapshot {
     pub(super) origin: SkillOrigin,
     pub(super) active: bool,
     pub(super) previous_operation: Option<String>,
+    pub(super) catalog: Option<crate::catalog::CatalogReceipt>,
     files: Vec<WireFile>,
 }
 
 impl Snapshot {
     pub(super) fn new(skill: &CompiledSkill, origin: SkillOrigin) -> Self {
         Self {
-            format_version: 1,
+            format_version: 2,
             name: skill.metadata().name().as_str().into(),
             skill_version: skill.metadata().version().as_str().into(),
             package_sha256: hex(skill.package().hash().as_bytes()),
             origin,
             active: true,
             previous_operation: None,
+            catalog: None,
             files: skill
                 .package()
                 .resources()
@@ -56,7 +58,16 @@ impl Snapshot {
     }
 
     pub(super) fn package(&self) -> Result<SkillPackage, AppError> {
-        if self.format_version != 1
+        if (self.origin == SkillOrigin::Catalog) != self.catalog.is_some() {
+            return Err(invalid());
+        }
+        if let Some(receipt) = &self.catalog {
+            receipt.validate()?;
+        }
+        if let Some(previous) = &self.previous_operation {
+            super::receipts::hash(previous)?;
+        }
+        if self.format_version != 2
             || self.files.len() > 17
             || self
                 .files
@@ -98,6 +109,7 @@ pub(super) struct ApprovedSnapshot {
 #[derive(Default)]
 pub struct ApprovedSkills {
     pub(super) latest: BTreeMap<SkillName, ApprovedSnapshot>,
+    pub(super) retired: BTreeSet<SkillName>,
     pub(super) versions: usize,
     pub(super) encoded_bytes: usize,
 }
@@ -133,11 +145,45 @@ impl ApprovedSkills {
         Ok(skill)
     }
 
+    // Read only a bounded identity for a disabled-interpreter warning. No old
+    // package, activation, authorization or methodology is interpreted.
+    fn retire_header(&mut self, payload: &str) -> Result<(), AppError> {
+        #[derive(Deserialize)]
+        struct Header {
+            name: String,
+        }
+        self.encoded_bytes = self
+            .encoded_bytes
+            .checked_add(payload.len())
+            .ok_or_else(invalid)?;
+        self.versions = self.versions.checked_add(1).ok_or_else(invalid)?;
+        if payload.len() > MAX_OPERATION_BYTES
+            || self.encoded_bytes > MAX_HISTORY_BYTES
+            || self.versions > 4096
+        {
+            return Err(SkillServiceError::HistoryLimit.into());
+        }
+        let raw = hex::decode(payload).map_err(|_| invalid())?;
+        crate::catalog::bounded_metadata(&raw)?;
+        let header: Header = serde_json::from_slice(&raw).map_err(|_| invalid())?;
+        let name = SkillName::parse(&header.name)?;
+        if !self.latest.contains_key(&name) {
+            self.retired.insert(name);
+        }
+        if self.retired.len() > 256 {
+            return Err(SkillServiceError::HistoryLimit.into());
+        }
+        Ok(())
+    }
+
     fn apply(
         &mut self,
         operation: &SignedOperation,
         compiler: &dyn SkillCompiler,
     ) -> Result<(), AppError> {
+        if let Some(payload) = operation.operation.strip_prefix("skill-installation-v1:") {
+            return self.retire_header(payload);
+        }
         let Some(payload) = operation.operation.strip_prefix(PREFIX) else {
             return Ok(());
         };
@@ -166,6 +212,7 @@ impl ApprovedSkills {
         if snapshot.previous_operation != previous {
             return Err(invalid());
         }
+        self.retired.remove(&name);
         self.latest.insert(
             name,
             ApprovedSnapshot {

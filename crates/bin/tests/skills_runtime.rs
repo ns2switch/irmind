@@ -136,7 +136,7 @@ fn confirm_expected(name: &str, engine: &irmind_app::Engine<'_>, id: &irmind_app
     let entries = engine.audit_log.entries(id).unwrap();
     let snapshot = entries
         .iter()
-        .find(|e| e.kind == AuditEventKind::SkillSnapshotV1)
+        .find(|e| e.kind == AuditEventKind::SkillSnapshotV2)
         .unwrap();
     let load = entries
         .iter()
@@ -145,7 +145,7 @@ fn confirm_expected(name: &str, engine: &irmind_app::Engine<'_>, id: &irmind_app
     assert_eq!(snapshot.actor, Actor::Analyst);
     assert!(matches!(load.actor, Actor::Agent(_)));
     assert!(load.evidence.is_none());
-    let package = irmind_app::SkillSnapshotV1::decode(&snapshot.payload).unwrap();
+    let package = irmind_app::SkillSnapshotV2::decode(&snapshot.payload).unwrap();
     assert!(
         engine
             .add_finding(

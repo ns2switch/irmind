@@ -48,7 +48,7 @@ fn synthetic_installed_v8_golden_authenticates_portable_global_authorization() {
 }
 
 #[test]
-fn v8_requires_both_extension_counts_and_rejects_unsupported_nonempty_sections() {
+fn v8_requires_both_extension_counts_and_rejects_unreferenced_or_unsupported_sections() {
     let valid = include_bytes!("../../../../../fuzz/seeds/export/valid-v8-mapped.irmind");
     assert_eq!(&valid[valid.len() - 16..], &[0; 16]);
     let root = tempfile::tempdir().unwrap();
@@ -66,7 +66,12 @@ fn v8_requires_both_extension_counts_and_rejects_unsupported_nonempty_sections()
         changed[start..start + 8].copy_from_slice(&count.to_be_bytes());
         fs::write(&path, changed).unwrap();
         let error = verify_export(&path).unwrap_err();
-        assert!(error.to_string().contains("not supported by this build"));
+        if offset == 8 {
+            assert!(error.to_string().contains("not supported by this build"));
+        } else {
+            // Catalog proofs are supported, but no snapshot references one here.
+            assert!(matches!(error, AppError::InvalidChain(0)));
+        }
     }
     let mut changed = valid.to_vec();
     changed.push(0);

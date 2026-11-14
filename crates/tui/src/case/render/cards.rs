@@ -116,7 +116,7 @@ fn is_hidden_custody_payload(kind: AuditEventKind) -> bool {
             | AuditEventKind::SourceManifestV2
             | AuditEventKind::ParquetArtifactV1
             | AuditEventKind::ParquetArtifactV2
-            | AuditEventKind::SkillSnapshotV1
+            | AuditEventKind::SkillSnapshotV2
     )
 }
 

@@ -48,12 +48,14 @@ pub enum AuditEventKind {
     MappingRunV1,
     ParquetArtifactV3,
     ParquetLayoutV1,
-    SkillSnapshotV1,
+    SkillSnapshotV2,
     SkillLoadV1,
+    /// Recognized only to reject a retired case without interpreting its body.
+    RetiredSkillSnapshot,
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 47] = [
+    pub const ALL: [Self; 48] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -99,8 +101,9 @@ impl AuditEventKind {
         Self::MappingRunV1,
         Self::ParquetArtifactV3,
         Self::ParquetLayoutV1,
-        Self::SkillSnapshotV1,
+        Self::SkillSnapshotV2,
         Self::SkillLoadV1,
+        Self::RetiredSkillSnapshot,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -150,7 +153,8 @@ impl AuditEventKind {
             Self::MappingRunV1 => "MappingRunV1",
             Self::ParquetArtifactV3 => "ParquetArtifactV3",
             Self::ParquetLayoutV1 => "ParquetLayoutV1",
-            Self::SkillSnapshotV1 => "skill-snapshot-v1",
+            Self::SkillSnapshotV2 => "skill-snapshot-v2",
+            Self::RetiredSkillSnapshot => "skill-snapshot-v1",
             Self::SkillLoadV1 => "skill-load-v1",
         }
     }
@@ -199,7 +203,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 47] = [
+        const EXPECTED: [&str; 48] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -245,8 +249,9 @@ mod tests {
             "MappingRunV1",
             "ParquetArtifactV3",
             "ParquetLayoutV1",
-            "skill-snapshot-v1",
+            "skill-snapshot-v2",
             "skill-load-v1",
+            "skill-snapshot-v1",
         ];
         for (kind, expected) in AuditEventKind::ALL.into_iter().zip(EXPECTED) {
             assert_eq!(kind.as_str(), expected);

@@ -11,10 +11,11 @@ impl Engine<'_> {
         name: &SkillName,
         resource: &str,
         turn: &mut SkillTurn,
-        nonce: uuid::Uuid,
-        call: &str,
+        invocation: (uuid::Uuid, &str),
+        cancel: &crate::CancellationToken,
     ) -> Result<String, AppError> {
-        let resolved = self.resolve_skill(name)?;
+        let (nonce, call) = invocation;
+        let resolved = self.resolve_skill_cancelable(name, cancel)?;
         SkillResourcePath::parse(resource)?;
         let package = resolved.skill.package();
         let original = package
@@ -28,7 +29,7 @@ impl Engine<'_> {
         } else {
             0..original.len()
         };
-        let snapshot = self.pin_skill_snapshot(id, &resolved)?;
+        let snapshot = self.pin_skill_snapshot(id, &resolved, cancel)?;
         let mut result = SkillLoadResult::Loaded;
         let mut text = String::new();
         let mut detections = 0;
@@ -138,6 +139,7 @@ impl Engine<'_> {
         &self,
         id: &CaseId,
         resolved: &ResolvedSkill,
+        cancel: &crate::CancellationToken,
     ) -> Result<crate::SkillSnapshotId, AppError> {
         if self.signer.actor() != Actor::Analyst {
             return Err(super::super::receipts::invalid());
@@ -152,6 +154,7 @@ impl Engine<'_> {
         for entry in &entries {
             state.accept(entry, services.compiler.as_ref())?;
         }
+        self.pin_catalog_proof(id, resolved, &state, cancel)?;
         if state
             .snapshots()
             .any(|s| s.identity().ok() == Some(identity))
@@ -161,7 +164,7 @@ impl Engine<'_> {
         let entry = self.signed_entry(
             id,
             AuditOrigin::Analyst,
-            AuditEventKind::SkillSnapshotV1,
+            AuditEventKind::SkillSnapshotV2,
             &resolved.snapshot.encode()?,
             None,
         )?;
