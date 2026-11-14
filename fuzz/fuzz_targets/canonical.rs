@@ -8,7 +8,10 @@ fuzz_target!(|bytes: &[u8]| {
     }
     if let Ok(receipt) = irmind_app::catalog::CatalogReceipt::decode(bytes) {
         assert_eq!(receipt.canonical().unwrap(), bytes);
-        assert_eq!(irmind_app::catalog::CatalogReceipt::decode(bytes).unwrap(), receipt);
+        assert_eq!(
+            irmind_app::catalog::CatalogReceipt::decode(bytes).unwrap(),
+            receipt
+        );
         receipt.identity().unwrap();
     }
     if let Ok(index) = irmind_app::catalog::CatalogIndex::decode_untrusted(bytes) {
