@@ -1,5 +1,22 @@
 # Evidence scan benchmarks
 
+
+## Native Entra exports: optimized 1 GiB smoke
+
+Production decoder, mapping, Parquet and signed-custody ingestion from
+[source 7ce4c12](https://github.com/ns2switch/irmind/commit/7ce4c126fd99278f8ad805534299d4cefc84e8c5).
+Synthetic local Linux smoke; source generation and complete verification are
+outside the timer. Compilation, other tests and fuzzing finished before timing.
+Each input repeats the committed record with 1,024 bytes of synthetic padding.
+This is not a standard-runner performance gate or a varied 15 GB corpus.
+
+| Native source | Bytes | Records | Rejected | Ingestion (s) | MiB/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| entra-signin | 1,073,742,432 | 653,128 | 0 | 18.381 | 55.710 |
+| entra-audit | 1,073,743,200 | 627,920 | 0 | 18.018 | 56.832 |
+
+[Raw results, fixture hashes and method](benchmarks/entra-native.json). The final decoder/mapping ASAN campaign completed its 600-second budget with 3,605,515 inputs and no failures.
+
 Current measured targets are 900 seconds for 15 GB cloud/chronological ingestion and 1,350 seconds for disordered stress. The approved 1,025-host stress ingestion miss is nonblocking; ordinary query limits remain required. See the [current policy](#current-policy-sole-mapped-v3-writer). Earlier comparisons retain their historical acceptance criteria and workflow outcomes.
 
 This page is for maintainers comparing signed Parquet ingestion and bounded evidence queries. The [manual and weekly workflow](../../.github/workflows/graph-benchmark.yml) generates synthetic 1 GB and 15 GB corpora on a standard Linux runner. It uploads the raw output. No corpus or original evidence is kept as an artifact.

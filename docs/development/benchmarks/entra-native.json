@@ -1,0 +1,39 @@
+{
+  "source_commit": "7ce4c126fd99278f8ad805534299d4cefc84e8c5",
+  "profile": "release (optimized; debug assertions disabled)",
+  "platform": "Linux x86_64",
+  "runner": "local; not a standard GitHub performance-gate run",
+  "command": "cargo test -p irmind --test kubernetes_ingest --release entra_one_gib_release_throughput -- --ignored --nocapture",
+  "method": "Repeat the committed resource-log record with 1024 synthetic padding bytes to at least 1 GiB. Time production detection, hash, decoder, mapper, Parquet and signed custody. Generation and subsequent complete verification are outside the timer. Execute a frozen optimized test binary after compilation, other tests and fuzzing finish. One fixed-timestamp smoke per source; no network or provider. Not a query-latency or 15 GB benchmark.",
+  "results": [
+    {
+      "format": "entra-signin",
+      "bytes": 1073742432,
+      "records": 653128,
+      "seconds": 18.381,
+      "mib_per_second": 55.71,
+      "rejected": 0,
+      "fixture": "crates/testkit/fixtures/parser-entra/source/signin-resource.ndjson",
+      "fixture_sha256": "c9c49905591de0b44c2c961796fa7db2d850689adc9b570a57133279d3b97d65"
+    },
+    {
+      "format": "entra-audit",
+      "bytes": 1073743200,
+      "records": 627920,
+      "seconds": 18.018,
+      "mib_per_second": 56.832,
+      "rejected": 0,
+      "fixture": "crates/testkit/fixtures/parser-entra/source/audit-resource.ndjson",
+      "fixture_sha256": "203bb56e69680d28581abe49f1c6a468d04f9f299518d201ac2f2a753e1f91ee"
+    }
+  ],
+  "fuzz": {
+    "target": "parser_entra",
+    "sanitizer": "AddressSanitizer",
+    "budget_seconds": 600,
+    "executions": 3605515,
+    "peak_rss_mib": 479,
+    "exit_code": 0,
+    "failures": 0
+  }
+}
