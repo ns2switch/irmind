@@ -1,6 +1,6 @@
 # Bounded subagents and engine events
 
-Design proposal for v0.5, based on the v0.4.2 case budgets, common-event pipeline
+Approved architecture for v0.5, based on the v0.4.2 case budgets, common-event pipeline
 and signed skill receipts. This document proposes contracts and formats; it does
 not implement delegation or approve a new port, dependency or credential.
 [Español](../es/subagents-design.md) · [Roadmap](roadmap.md) ·
@@ -66,24 +66,12 @@ tools. A declaration never authorizes a call. Types do not add a fallback to a
 wider tool set when an intersection is empty. Native tool names and typed filters
 come from the existing [catalog](../../crates/app/src/tool_catalog.rs).
 
-Community types are data-only TOML packages: name, version, author/license,
-interpreter version, methodology text, allowed tool IDs, allowed skill IDs,
-relevant common-event categories and proposed budget defaults. Reject unknown
-fields, arbitrary expressions, scripts, executable files, imports, duplicate
-identities and names colliding with bundled types or commands. Reuse the current
-skill package's path/file/text limits rather than inventing a second unbounded
-loader; at most 64 active type descriptors are exposed. Their model-visible
-metadata shares a 16 KiB catalog byte cap with skill descriptions and still
-fits the existing context ceiling; excess activation fails visibly, not by
-silently truncating a declaration.
-
-Bundled types bind a release inventory hash. Organization/analyst types use an
-explicit global signed installation/update/disable operation with the exact
-canonical package hash and immutable admitted versions. Tampering or an
-unsupported interpreter disables that type with an actionable warning; it does
-not prevent startup. Installation is never a model tool or an automatic download.
-The case records the exact snapshot and admission proof used, independently of
-later live catalog changes. This needs its own reviewed canonical contract.
+Version 0.5 has only the six bundled types above. Their fixed declarations bind
+an immutable release inventory hash; the case freezes the exact bundled type
+snapshot before use. No community type compiler, package store, installation
+operation or type-admission export section is implemented in v0.5. Names and
+descriptions share a 16 KiB model-visible catalog cap with skill metadata and
+remain within the existing context ceiling.
 
 Type text and skills, including signed content, pass through ContentGuard and
 remain UNTRUSTED user/tool messages with the child's nonce. Only fixed trusted
@@ -147,6 +135,31 @@ result in a narrower task. Record the reuse, retain provenance and normal
 accounting rules, and wrap the guarded body with the receiving child's nonce;
 no second remote execution is needed for an equivalent authorized call.
 
+## Visible plan and signed threshold confirmation
+
+Before any child starts, the TUI presents the entire frozen plan: objectives,
+types, source subsets and reserved tokens/calls/rounds/cloud bytes, alongside
+remaining case allowances. The analyst can inspect it, start it or cancel it;
+there is no timer or model-controlled bypass of this preview. A visible Start
+intent for a small plan is not an approval capability carried by an engine event.
+
+Compute remaining tokens/calls under the case transaction as the effective case
+allocation intersected with the current organization ceiling, minus recorded
+consumption and all outstanding reservations. Apply the test to the aggregate
+plan, including its coordination/summary allowance, not to each child:
+`4 * plan_tokens > remaining_tokens || 4 * plan_calls > remaining_calls`.
+Use checked wide-integer arithmetic. Exactly 25% does not trigger the signature
+rule; exceeding either resource does. Reject an over-allocation before preview.
+
+For a plan above that threshold, require an explicit Analyst-signed
+`SubagentPlanApprovalV1` in the main chain before any execution reservation or
+provider/tool dispatch. It binds the plan commitment, budget checkpoint,
+remaining values and proposed amounts. Recalculate under the same lock immediately
+before admission; changed plan/budget inputs require a fresh displayed decision.
+Cancellation releases only a preview hold and starts no child. A model tool,
+subagent, restored event, generic tool approval or caller-supplied boolean cannot
+create this consent. Splitting one proposal into children does not evade the test.
+
 ## Shared budgets and scheduling
 
 The current [case budget](../../crates/app/src/case_budget.rs) accounts for tokens,
@@ -179,12 +192,10 @@ limit. Read-only queries may run concurrently within those shared budgets.
 Findings, evidence publication and signed append use short canonical commit slots,
 not a case lock held across model/network requests.
 
-A requested cost cap requires a typed pricing snapshot and conservative monetary
-reservation in addition to tokens. Without suitable pricing, reject the requested
-cost-capped run with a clear explanation; do not treat unknown cost as zero.
-Provider usage/billing can differ, so display estimates and unknown usage honestly.
-The present budget type does not enforce money: the cost reservation format and
-organization ceiling are proposed additions requiring review before implementation.
+Version 0.5 enforces tokens, calls, rounds and cloud bytes only. Cost is an
+estimate when provider usage and configured prices support it, otherwise
+"unavailable". There is no monetary reservation, cost-cap setting or monetary
+organization ceiling in this release; unknown cost is never displayed as zero.
 
 At 80% show parent and child consumption. On exhaustion or cancellation, retain
 completed work and a partial status. Use a final no-tool summary only if its
@@ -207,8 +218,9 @@ records and references are:
 
 | Record | Signer and contents |
 | --- | --- |
-| `SubagentTypeSnapshotV1` | Agent, main chain before the plan; exact type/package, bundled inventory or global Analyst admission proof, interpreter and tool/skill declarations. |
+| `SubagentTypeSnapshotV1` | Agent, main chain before the plan; exact one of six bundled declarations, release inventory, interpreter and tool/skill restrictions; no community admission. |
 | `SubagentPlanV1` | Agent, main chain; parent checkpoint, turn ID, ordered task descriptors, source restrictions, policy/budget snapshot and reservations. |
+| `SubagentPlanApprovalV1` | Analyst, main chain; exact plan and budget checkpoint, remaining/reserved amounts and explicit threshold consent before dispatch. |
 | `SubagentReservationV1` | Agent, main chain; unique operation/task, bounded resource reservation or settlement, state and prior authenticated cause. Reserve before dispatch; settle against an already committed branch prefix. |
 | `SubagentBranchEntryV1` | Agent, child branch; case/turn/task, local sequence, previous hash, typed kind, bounded payload and recorded timestamp. |
 | `SubagentCheckpointV1` | Agent, main chain; task, contiguous sequence range, previous checkpoint, count, ordered entry commitment, task-local evidence admissions and terminal/nonterminal status. |
@@ -255,6 +267,7 @@ and a fixed clock to compare bytes for 1, 2, 4 and N execution workers.
 
 Propose closed versioned event labels and domain-separated SHA-256 commitments
 (`irmind-subagent-type-v1`, `irmind-subagent-plan-v1`,
+`irmind-subagent-plan-approval-v1`,
 `irmind-subagent-reservation-v1`, `irmind-subagent-branch-entry-v1`,
 `irmind-subagent-checkpoint-v1`,
 `irmind-subagent-result-v1`). A commitment hashes its domain plus NUL and exact
@@ -290,16 +303,15 @@ V2 bytes unchanged: the main audit hash commits plans/checkpoints/results, while
 new typed case validation verifies every referenced branch. This is a proposal,
 not a claim that the V7 verifier already supports branches.
 
-Retain current V7 sections and append bounded, counted sections for type admission
-proofs and branch chunks after the skill-admission section, before end-of-file.
-Sort proofs by operation hash and chunks by task identity then chunk sequence;
+Retain current V7 sections and append bounded, counted sections for branch chunks after the skill-admission section, before end-of-file.
+Sort chunks by task identity then chunk sequence;
 include exactly the referenced material, with no duplicate, missing, unrelated or
 trailing frames. Commit full branch prefixes, including failed/cancelled tasks,
 not only successful summaries. No unrelated global configuration or secret is
 exported. Counts use checked u64 values and the case caps above.
 
 Before sealing/exporting, recompute branch signatures, sequence/hash chains,
-checkpoint commitments, plan restrictions, admission/skill references, proposal
+checkpoint commitments, plan restrictions, bundled-type/skill references, required plan consent, proposal
 approval links, evidence citations and accounting consistency. A missing or
 altered committed branch is a verification failure, not an unavailable-model
 warning. Verify source/Parquet commitments as today. Offline verification executes
@@ -348,13 +360,48 @@ network or installation capability to a model. Future catalog admission changes
 must be reconciled in the concrete receipt/export contract rather than assumed
 compatible with today's skill bytes.
 
+## Deferred after v0.5
+
+The following design is retained for later review, not part of the v0.5 ports,
+records, configuration or export sections.
+
+### Community types
+
+Community types are data-only TOML packages: name, version, author/license,
+interpreter version, methodology text, allowed tool IDs, allowed skill IDs,
+relevant common-event categories and proposed budget defaults. Reject unknown
+fields, arbitrary expressions, scripts, executable files, imports, duplicate
+identities and names colliding with bundled types or commands. Reuse the current
+skill package's path/file/text limits rather than inventing a second unbounded
+loader; at most 64 active type descriptors are exposed. Their model-visible
+metadata shares a 16 KiB catalog byte cap with skill descriptions and still
+fits the existing context ceiling; excess activation fails visibly, not by
+silently truncating a declaration.
+
+Bundled types bind a release inventory hash. Organization/analyst types use an
+explicit global signed installation/update/disable operation with the exact
+canonical package hash and immutable admitted versions. Tampering or an
+unsupported interpreter disables that type with an actionable warning; it does
+not prevent startup. Installation is never a model tool or an automatic download.
+The case records the exact snapshot and admission proof used, independently of
+later live catalog changes. This needs its own reviewed canonical contract.
+
+### Monetary limits
+
+A requested cost cap requires a typed pricing snapshot and conservative monetary
+reservation in addition to tokens. Without suitable pricing, reject the requested
+cost-capped run with a clear explanation; do not treat unknown cost as zero.
+Provider usage/billing can differ, so display estimates and unknown usage honestly.
+The present budget type does not enforce money: the cost reservation format and
+organization ceiling are proposed additions requiring review before implementation.
+
 ## Proposed contract review
 
 | Proposed capability | Boundary requiring review before implementation |
 | --- | --- |
-| `SubagentTypeCompiler` / `SubagentTypeStore` | One bounded compiler, immutable packages and Analyst-signed `subagent-type-installation-v1` operations; no executable loader. |
+| Bundled type inventory | Six release-fixed declarations and bounded case snapshots; community compiler/store/installation are deferred. |
 | `SubagentBranchStore` | Private bounded staging/readback, checkpoint publication and crash recovery; no signing key access. |
-| Shared reservation broker | Atomic case/turn/task reservations and accounting receipts, including the proposed pricing/cost extension; no independent child budget authority. |
+| Shared reservation broker | Atomic case/turn/task reservations and accounting receipts, tokens, calls, rounds and cloud bytes only in v0.5; no independent child budget authority. |
 | Trusted source-restricted queries | Additive graph/query contracts that enforce the broker's source subset before limits, without trusting a model-supplied allowlist. |
 | `EngineEventSubscription` | Bounded typed presentation events, cursors and explicit cancellation intents; no approval capability in event data. |
 
@@ -366,19 +413,21 @@ approval references and the V8 encoding before implementation.
 ## Required tests and implementation sequence
 
 1. Approve this design, then the concrete port/format/golden contract. Proposed
-   contracts cover type compilation/storage, branch storage, shared reservations,
+   contracts cover bundled snapshots, signed plan confirmation, branch storage, shared reservations,
    trusted source-restricted queries and engine event subscriptions. No new
    production dependency is planned; review any dependency or credential before
    incorporation. Reuse existing model, guard, signer and approval services.
 2. Implement one-child execution and branch/checkpoint/export verification before
    parallel scheduling. Add flipped bytes, wrong case/task/Agent key, duplicate or
-   reordered/missing entries, forged admission, circular approval links, altered
+   reordered/missing entries, wrong bundled inventory, missing/forged threshold consent, circular approval links, altered
    budget counts and 1 MiB boundary tests. Fuzz current canonical/export frames.
 3. With the obedient malicious fake model, try child recursion, undeclared tools,
    scope escape, cross-cluster identities, Chronicle instance-mode changes,
-   approval/confirmation forgery, budget raises and malicious signed type/skill
+   approval/confirmation forgery, budget raises, model-forged plan consent and malicious skill
    instructions. They remain denied; all external content stays out of system.
-4. Race reservations at case/turn/child limits, exhausted budgets, unknown pricing,
+4. Test exactly 25% and one unit above for tokens and calls, changed budgets after
+   preview, cancellation and model attempts to skip consent. Race reservations at
+   case/turn/child limits, exhausted budgets, unavailable cost estimates,
    failed/cancelled usage, duplicate receipts and multiple waiting approvals.
    Prove one accounting charge per request and no overspend by concurrent starts.
 5. Build a synthetic Windows/AWS/Kubernetes episode. Delegate three independent

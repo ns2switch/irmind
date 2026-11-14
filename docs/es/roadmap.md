@@ -71,7 +71,7 @@ reales.
 ## v0.5: subagentes y trabajo paralelo
 
 - Revisar el [diseño de subagentes](subagents-design.md) antes de implementar: tipos, límites compartidos, clave Agent, aprobaciones, ramas de eventos, fusión determinista y flujo del motor. Los puertos concretos y bytes export V8 necesitan su contrato revisado.
-- El agente principal delega tareas acotadas a subagentes paralelos con contexto propio. Habrá tipos de triage, nube, endpoint, red, Kubernetes e inteligencia de amenazas, y tipos comunitarios definidos en archivo.
+- El agente principal delega tareas acotadas a subagentes paralelos con contexto propio. En v0.5 solo hay tipos de triage, nube, endpoint, red, Kubernetes e inteligencia de amenazas; los comunitarios y límites monetarios quedan para después. El plan se muestra antes de ejecutar; reservar más del 25% de tokens o llamadas restantes exige confirmación firmada del analista.
 - Los subagentes heredan el alcance del caso, no pueden ampliarlo ni aprobar llamadas. Sus solicitudes van al analista, firman con la clave Agent y su salida vuelve como contenido no confiable.
 - Aplicar límites de concurrencia, rondas y tokens por subagente y un presupuesto total por turno. La TUI muestra la actividad y permite cancelarla.
 - Cada subagente usa una rama de eventos que se fusiona de forma determinista con la cadena firmada del caso. La TUI pasa a consumir el flujo de eventos del motor.
