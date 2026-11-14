@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod modules;
+pub mod subagents;
 pub mod tool_catalog;
 
 pub use async_trait::async_trait;
