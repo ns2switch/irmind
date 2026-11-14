@@ -375,8 +375,7 @@ context per ingestion, using the form or `/ingest --cluster kubernetes:urn:k8s:e
 Falco requires that context when a record contains Kubernetes metadata; host-only
 alerts remain usable without inventing a cluster identity. Configure the
 collection identity, not an authority to contact a cluster. See the
-[parser coverage](parsers.md#kubernetes-and-falco-interpretation). Managed-provider
-export wrappers are not part of this native-format support.
+[parser coverage](parsers.md#kubernetes-and-falco-interpretation). Managed EKS and AKS transports use separately identified table mappings; see the [managed export formats](parsers.md#managed-kubernetes-exports).
 
 ## GCP Cloud Audit and GKE
 
@@ -397,3 +396,12 @@ the documented native SignInLogs and AuditLogs export layouts; MFA, Conditional
 Access, changed properties and application details remain evidence.
 See [formats and bounds](parsers.md#microsoft-entra-id) and the
 [mapping contract](development/entra-source-mapping.md).
+
+### EKS and AKS transports
+
+`mapping-eks-audit` and `mapping-aks-audit` are included hash-pinned finite tables
+under the `mapping-kubernetes` feature. They apply the native Event fields and
+rules to `audit_event`, without interpreting arbitrary messages from other
+services. `transport` retains original outer fields. The record bound applies
+to that complete representation. There is no network access, new credential,
+physical schema change or export framing change.

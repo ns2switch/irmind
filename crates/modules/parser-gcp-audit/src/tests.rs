@@ -314,3 +314,21 @@ fn malformed_cluster_labels_reject_only_the_row_without_hiding_the_next_offset()
         &[binding.bindings()[0].identity().clone()]
     );
 }
+
+#[test]
+fn original_gcloud_json_arrays_are_detected_without_consuming_the_live_reader() {
+    for fixture in [
+        include_bytes!("../../../testkit/fixtures/parser-gcp-audit/source/gcp-array.json")
+            .as_slice(),
+        include_bytes!("../../../testkit/fixtures/parser-gcp-audit/source/gke-array.json")
+            .as_slice(),
+    ] {
+        assert_eq!(
+            GcpAuditParser::default()
+                .detect("untrusted-name.bin", fixture)
+                .unwrap()
+                .value(),
+            98
+        );
+    }
+}

@@ -258,3 +258,13 @@ están acotadas al tenant de directorio, no al TenantId del workspace. Actor,
 objetivo e IP de origen son observaciones distintas. Los arrays dinámicos de
 objetivos y JSON codificado se validan con límites; el original no se reescribe.
 Consulta las [decisiones y fuentes oficiales](../development/entra-source-mapping.md).
+
+## Transportes de auditoría EKS y AKS
+
+Los mapeos incluidos `mapping-eks-audit` y `mapping-aks-audit` seleccionan formatos
+de origen disjuntos del Event nativo y entre sí. Usan exclusivamente los campos
+del Event Kubernetes decodificado; el timestamp de transporte no sustituye el
+instante del Event. El resultado depende del código HTTP explícito, no del
+resultado de entrega en la nube. Actor, usuario suplantado y recurso objetivo
+conservan sus roles y el clúster confirmado. Los cuerpos completos de petición y
+respuesta siguen siendo originales sin proyección automática a la búsqueda.

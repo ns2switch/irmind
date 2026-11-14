@@ -190,6 +190,20 @@ mod matrix {
                     .as_slice(),
                 "parser-gcp-audit",
             ),
+            #[cfg(feature = "parser-gcp-audit")]
+            (
+                "gcp-array.json",
+                include_bytes!("../../testkit/fixtures/parser-gcp-audit/source/gcp-array.json")
+                    .as_slice(),
+                "parser-gcp-audit",
+            ),
+            #[cfg(feature = "parser-gcp-audit")]
+            (
+                "gke-array.json",
+                include_bytes!("../../testkit/fixtures/parser-gcp-audit/source/gke-array.json")
+                    .as_slice(),
+                "parser-gcp-audit",
+            ),
             #[cfg(feature = "parser-entra")]
             (
                 "signin-resource.ndjson",
@@ -351,7 +365,7 @@ mod matrix {
             "parser-syslog" => [None; 8],
             "parser-linux" | "parser-zeek" | "parser-suricata" | "parser-kubernetes"
             | "parser-falco" | "parser-gcp-audit" | "parser-entra" => [
-                if sample.first() == Some(&b'{') {
+                if matches!(sample.first(), Some(b'{' | b'[')) {
                     Some(45)
                 } else {
                     None

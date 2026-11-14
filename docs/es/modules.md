@@ -341,8 +341,8 @@ ingesta, mediante el formulario o `/ingest --cluster kubernetes:urn:k8s:example`
 Falco lo exige si un registro contiene metadatos Kubernetes; las alertas del host
 se pueden usar sin inventar una identidad de clúster. Se configura la identidad
 de la colección, no un permiso para contactar con el clúster. Consulta la
-[cobertura](parsers.md#interpretación-de-kubernetes-y-falco). Esta incorporación
-nativa no cubre aún las envolturas de exportación de los proveedores gestionados.
+[cobertura](parsers.md#interpretación-de-kubernetes-y-falco). EKS y AKS usan
+tablas separadas; consulta las [exportaciones gestionadas](parsers.md#exportaciones-de-kubernetes-gestionado).
 
 ## GCP Cloud Audit y GKE
 
@@ -364,3 +364,12 @@ exportaciones nativas documentadas de SignInLogs y AuditLogs; los campos de
 MFA, acceso condicional, cambios y aplicaciones se conservan como evidencia.
 Consulta [formatos y límites](parsers.md#microsoft-entra-id) y el
 [contrato del mapeo](../development/entra-source-mapping.md).
+
+### Transportes EKS y AKS
+
+`mapping-eks-audit` y `mapping-aks-audit` son tablas finitas incluidas y fijadas
+por hash, dentro de la feature `mapping-kubernetes`. Aplican los mismos campos y
+reglas del Event nativo a `audit_event`; no interpretan los mensajes arbitrarios
+de otros servicios. `transport` conserva los campos exteriores originales. El
+límite de registro se aplica a toda esa representación. No hay red, credenciales
+nuevas, cambios de esquema físico ni cambios de framing de exportación.

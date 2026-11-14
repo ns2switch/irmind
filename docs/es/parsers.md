@@ -33,7 +33,7 @@ Los eventos nativos de auditoría Kubernetes no contienen una identidad global d
 
 En automatización: `irmind ingest <case-id> <path> --cluster kubernetes:urn:k8s:team-a`. En el campo de conversación: `/ingest --cluster kubernetes:urn:k8s:team-a <path>`. Ambos usan el mismo contexto tipado y acotado en el manifiesto firmado y la reconstrucción. Sin el contexto obligatorio, no se ingiere. Confirmar una identidad no concede permisos remotos. Los nombres iguales en distintos clústeres o namespaces mantienen identidades distintas. Los decodificadores conservan request/response como campos originales, sin copiarlos automáticamente a la proyección de búsqueda.
 
-Estos módulos cubren por ahora Events nativos y JSON de Falco. Las exportaciones Cloud Audit de GKE usan el módulo GCP descrito abajo. Las envolturas EKS y AKS son trabajo separado; no se activa ningún conector a la API de Kubernetes.
+Estos módulos cubren Events nativos, las envolturas de CloudWatch GetLogEvents de EKS y los diagnósticos kube-audit/kube-audit-admin de AKS. GKE usa Cloud Audit mediante el módulo GCP descrito abajo. No se activa ningún conector a la API de Kubernetes.
 
 ## Lectores actuales y casos existentes
 
@@ -166,3 +166,27 @@ nanosegundos, nombres, tipos, offsets y detalles originales de MFA y acceso
 condicional. Los envoltorios `value` de Graph y las respuestas posicionales
 `tables/columns/rows` necesitan una conversión explícita; no son este formato.
 El [mapeo](mappings.md#microsoft-entra-id) mantiene actor y objetivo separados.
+
+### Exportaciones de Kubernetes gestionado
+
+EKS: activa los logs de auditoría del plano de control y exporta los eventos del
+stream de CloudWatch correspondiente mediante GetLogEvents. `parser-kubernetes`
+reconoce `events[].message` y filas NDJSON con `timestamp` y `message`. Confirma
+el ARN completo como `eks:arn:aws:eks:REGION:ACCOUNT:cluster/NAME`; el stream o
+el nombre de archivo no definen por sí solos el clúster. La envoltura original y
+el Event decodificado se conservan juntos, con el offset real de la fila exterior.
+No se decodifican automáticamente payloads de suscripción base64/gzip.
+
+AKS: configura una exportación de diagnósticos a Storage para kube-audit y/o
+kube-audit-admin y descarga su JSON `records`. Se admite `properties.log`, así
+como filas objeto de AzureDiagnostics con `Category`, `ResourceId` y `log_s`.
+El resourceId completo se muestra como sugerencia y exige confirmación; IDs
+contradictorios se rechazan y un clúster nuevo pide otra confirmación. No se
+inventa un Event a partir de una fila posicional de AKSAudit. Exporta datos de
+los streams y la ventana autorizados; confirma las identidades por archivo.
+
+GKE: usa la exportación LogEntry de Cloud Audit descrita arriba; se detectan tanto
+NDJSON como arrays JSON de gcloud. Conserva las etiquetas completas del clúster.
+En un clúster propio, configura el backend de logs de auditoría del API server y
+recoge sus Events JSON/NDJSON por una ruta autorizada de solo lectura. Consulta
+los [formatos y las fuentes oficiales](../development/managed-kubernetes-transports.md).
