@@ -269,3 +269,12 @@ not the workspace TenantId. Actor, target and source IP remain separate
 observations. Dynamic target arrays and encoded JSON are validated with strict
 bounds; the original is not rewritten. See the
 [decisions and primary references](development/entra-source-mapping.md).
+
+## EKS and AKS audit transports
+
+Included `mapping-eks-audit` and `mapping-aks-audit` select source formats disjoint
+from native Events and each other. They use only decoded Kubernetes Event
+fields; transport timestamps do not replace Event time. Outcome uses the
+explicit API status, not cloud delivery status. Actor, impersonated user and
+target resource retain their roles and confirmed cluster. Complete request and
+response bodies remain originals without automatic search projection.

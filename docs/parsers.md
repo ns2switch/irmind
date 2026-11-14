@@ -31,7 +31,7 @@ Native Kubernetes audit events do not contain a globally unique cluster identity
 
 The automation equivalent is `irmind ingest <case-id> <path> --cluster kubernetes:urn:k8s:team-a`; the conversational input accepts `/ingest --cluster kubernetes:urn:k8s:team-a <path>`. Both use the same bounded typed context in the signed source manifest and reconstruction. A source without required context fails closed; confirming an identity never grants a remote permission. Equal names in different clusters or namespaces remain distinct. Native decoders retain request/response bodies as original source fields, rather than automatically placing them in the searchable projection.
 
-These two modules currently cover native audit Events and Falco JSON. GKE Cloud Audit exports use the dedicated GCP module below. EKS and AKS wrappers are separate work; no live Kubernetes API connector is enabled.
+These modules cover native Events, EKS CloudWatch GetLogEvents envelopes and AKS kube-audit/kube-audit-admin diagnostic exports. GKE Cloud Audit exports use the GCP module below. No live Kubernetes API connector is enabled.
 
 ## Current readers and existing cases
 
@@ -161,3 +161,27 @@ field names/types, offsets, MFA and Conditional Access details remain original.
 Graph `value` wrappers and positional `tables/columns/rows` query responses need
 an explicit conversion; they are not this source format.
 The [mapping](mappings.md#microsoft-entra-id) keeps actor and target separate.
+
+### Managed Kubernetes exports
+
+EKS: enable control-plane audit logging and export the relevant CloudWatch audit
+stream using GetLogEvents. `parser-kubernetes` recognizes `events[].message`
+and NDJSON object rows with `timestamp` and `message`. Confirm the full ARN as
+`eks:arn:aws:eks:REGION:ACCOUNT:cluster/NAME`; a stream or filename alone does
+not establish cluster identity. The original transport row and decoded Event
+remain together, with the actual outer-row offset. Subscription base64/gzip
+payloads are not automatically decoded.
+
+AKS: configure a Storage diagnostic export for kube-audit and/or kube-audit-admin,
+then download its `records` JSON. `properties.log` and AzureDiagnostics object
+rows with `Category`, `ResourceId` and `log_s` are supported. The complete
+resourceId is a suggestion requiring confirmation; conflicting IDs are rejected
+and a newly encountered cluster requests confirmation again. A positional
+AKSAudit query row is not turned into an invented Event. Export only authorized
+streams/windows and confirm identities per source.
+
+GKE: use the Cloud Audit LogEntry export above; both NDJSON and gcloud JSON
+arrays are detected. Retain the complete cluster labels. For a self-managed
+cluster, configure the API server audit log backend and collect its JSON/NDJSON
+Events through an authorized read-only path. See the
+[formats and primary references](development/managed-kubernetes-transports.md).

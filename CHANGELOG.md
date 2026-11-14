@@ -4,6 +4,17 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+### Managed Kubernetes export transports
+
+- Decode EKS CloudWatch GetLogEvents and AKS kube-audit/kube-audit-admin
+  resource-log envelopes, preserving original transport fields and the decoded
+  audit Event with real outer-row provenance.
+- Include separate hash-pinned EKS/AKS tables and explicit cluster confirmation.
+  Reject contradictory source claims and request confirmation for new clusters.
+  Detect GCP/GKE LogEntry arrays produced by gcloud as well as NDJSON.
+- Format impact: additional source-format/mapping identities; native Event
+  decoding, signed envelopes, physical schemas, seals and exports do not change.
+
 ### Microsoft Entra source coverage
 
 - Add experimental, default native SignInLogs and AuditLogs decoding and

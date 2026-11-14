@@ -1,0 +1,32 @@
+[
+  {
+    "timestamp": "2026-11-01T00:00:00.123456789Z",
+    "logName": "projects/synthetic-project/logs/cloudaudit.googleapis.com%2Factivity",
+    "insertId": "synthetic-admin-1",
+    "resource": {
+      "type": "service_account",
+      "labels": {
+        "project_id": "synthetic-project"
+      }
+    },
+    "protoPayload": {
+      "@type": "type.googleapis.com/google.cloud.audit.AuditLog",
+      "serviceName": "iam.googleapis.com",
+      "methodName": "google.iam.admin.v1.CreateServiceAccountKey",
+      "resourceName": "projects/synthetic-project/serviceAccounts/worker@synthetic-project.iam.gserviceaccount.com",
+      "authenticationInfo": {
+        "principalEmail": "analyst@example.invalid"
+      },
+      "requestMetadata": {
+        "callerIp": "203.0.113.77",
+        "callerSuppliedUserAgent": "synthetic-agent"
+      },
+      "status": {
+        "code": 0
+      },
+      "request": {
+        "synthetic_marker": "never-project-this-body"
+      }
+    }
+  }
+]

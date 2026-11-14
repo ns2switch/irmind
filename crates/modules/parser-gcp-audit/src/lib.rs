@@ -104,23 +104,19 @@ impl LogParser for GcpAuditParser {
 
 fn sample_fields(sample: &[u8]) -> Option<irmind_app::source_mapping::SourceValue> {
     let sample = &sample[..sample.len().min(65536)];
-    let first = sample.split(|b| *b == b'\n').next()?;
-    let fields = irmind_app::source_mapping::json::decode_json_fields(
-        if matches!(first.trim_ascii(), b"{" | b"[") {
-            sample
-        } else {
-            first
-        },
+    let mut input = std::io::Cursor::new(sample);
+    let cancel = irmind_app::CancellationToken::new();
+    let frame = irmind_app::source_mapping::json::JsonFrames::new(&mut input, &cancel)
+        .without_record_wrappers()
+        .next_frame()
+        .ok()??;
+    irmind_app::source_mapping::json::decode_json_fields(
+        frame.bytes(),
         irmind_app::source_mapping::json::SourceJsonLimits::default(),
     )
-    .ok()?;
-    match fields {
-        irmind_app::source_mapping::SourceValue::Array(mut rows) if !rows.is_empty() => {
-            Some(rows.remove(0))
-        }
-        fields => Some(fields),
-    }
+    .ok()
 }
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;
