@@ -1,12 +1,14 @@
 # Explicit installation from the community skill catalog
 
-Design proposal; catalog downloads and in-application signature verification are
+Approved architecture; catalog downloads and in-application index verification are
 not implemented by this document. The [community repository](https://github.com/ns2switch/irmind-skills)
 is separate from IRMind. Bundled skills remain the release's core and are not
 copied into that repository. Current local installation, package compilation,
 signed admission and case receipts remain the baseline described in the
 [installation](skills-installation-contract.md) and
 [case/export](skills-case-format-contract.md) contracts.
+
+[Español](../es/skills-catalog-install.md)
 
 ## User flow and network boundary
 
@@ -17,8 +19,8 @@ from that release only. No startup, skill discovery, model tool or background
 update fetches an index, checks for updates or installs content.
 
 Freeze the selected tag, release identity and index digest for the operation.
-Download and verify the index, then download the selected package and its
-verification material. Show the exact source, name, version, package commitment,
+Download the exact index and detached Ed25519 signature, verify them with the
+compiled catalog keys, then download the selected hash-bound package. Show the exact source, name, version, package commitment,
 minimum IRMind version, required parsers/mappings, coverage, tools and content.
 Screen and safely render all metadata and file contents. Verification of the
 publisher never makes methodology a trusted instruction.
@@ -71,7 +73,9 @@ commit; verification tools are prebuilt, version-pinned and checksum-verified.
 ## Index and release identity
 
 The versioned, deterministic index is UTF-8 JSON with unknown/duplicate fields
-rejected. Entries are sorted by skill name and include:
+rejected. Its signed header binds the catalog repository, frozen release tag and
+commit, a sequence number and the catalog key ID. Entries are sorted by skill
+name and include:
 
 | Field | Meaning |
 | --- | --- |
@@ -90,56 +94,69 @@ allowlisted GitHub asset flow and revalidate each destination; never forward
 credentials. Requests use no provider, system cloud credentials or case data.
 The catalog is public and does not require a stored GitHub credential.
 
-Initial proposed limits: 1 MiB index, 1,024 entries, 1 MiB compressed package,
-128 KiB expanded package, 16 resources, 32 KiB per resource, 8 KiB frontmatter,
-4 MiB per signature/provenance proof and 30 seconds per request. Package limits
+Initial proposed limits: 1 MiB index, 1,024 entries, 1 MiB transport package,
+128 KiB of original package text, 16 resources, 32 KiB per resource, 8 KiB frontmatter,
+64 bytes for the detached Ed25519 signature and 30 seconds per request.
+The concrete contract fixes signature preimages and bounded proof retention. Package limits
 must be imported from the current compiler, never enlarged by the index. Bound
 total operation bytes, redirects and proof counts as well. Store downloads in a
 private data-directory staging area, with disk preflight, cancellation and
 cleanup after errors. Refuse absolute/traversal names, symlinks, hard links,
 duplicate paths, case aliases and unsupported files before publication.
 
-Sign the index, checksum file and package assets with keyless Sigstore and
-publish their bundles. Publish GitHub build provenance for the index/packages.
-Only the publishing job receives OIDC, attestation and release-write permissions;
-ordinary validation retains `contents: read`. A dispatch rehearsal signs test
-artifacts without publishing or creating a tag. The index and all selected
-assets must pass verification before preview can be approved.
+Catalog publisher verification and external release verification are distinct,
+as specified below. Neither grants a package permissions.
 
-## Signature verification and trust roots
+## Ed25519 index trust and rotation
 
-The exact expected certificate issuer is
-`https://token.actions.githubusercontent.com`. For catalog tag `<TAG>`, the
-exact expected certificate identity is
+The catalog signs its canonical index with a dedicated Ed25519 catalog key.
+IRMind verifies the exact versioned signature preimage using its existing
+Ed25519 code and an allowlist of at most eight compiled public keys. The index
+contains a key ID, never a trusted replacement public key. The concrete contract
+fixes the ID derivation, field order, domain separation, counts and golden bytes.
+An unknown, removed or mismatched key ID, malformed signature, changed index,
+wrong repository/tag or failed asset/logical package hash rejects the operation.
+There is no checksum-only fallback and no verifier subprocess or new dependency.
+
+No clock, certificate chain, network trust-root fetch or TUF refresh is required.
+The signed index plus signature and selected package are sufficient offline.
+A local directory with no valid catalog proof remains an honest analyst/organization
+installation; it cannot label itself catalog-verified. Model-facing metadata and
+methodology remain UNTRUSTED after publisher and Analyst signatures.
+
+Add or remove a public key only through a reviewed IRMind release. A compromised
+key is removed in the next release; indexes signed by it are no longer accepted
+by that executable. Older executables retain their compiled policy, so revocation
+requires updating IRMind, not an automatic trust-root download. Revalidate active
+catalog admissions against the current compiled keys; unavailable trust disables
+use with a clear explanation rather than silently relabeling the origin. A valid
+old signature is not a freshness guarantee: freeze/show the chosen release and
+never silently downgrade an already admitted package.
+
+The real private signing key exists only as a secret of the protected release
+environment in `ns2switch/irmind-skills`, available only to the publishing job.
+It is absent from Git, artifacts, package contents, command arguments and logs.
+Public PR validation never receives it; no `pull_request_target` signing or
+unreviewed PR artifact promotion. Maintainer-approved tag deployments produce
+the index from the reviewed commit. Provisioning that environment/key follows
+contract approval and requires explicit maintainer setup; no key is provisioned
+by this document. Golden keys are synthetic test identities, never production keys.
+
+## External release verification
+
+Catalog releases additionally keep keyless Sigstore signatures/bundles for their
+index, checksum list and package assets, and GitHub build provenance. These are
+for external verification and the catalog README documents both cosign and
+`gh attestation verify`. IRMind's catalog admission uses Ed25519 plus package
+hashes and does not require those tools or their trust-root lifecycle.
+
+For catalog tag `<TAG>`, external cosign verification requires exact issuer
+`https://token.actions.githubusercontent.com` and identity
 `https://github.com/ns2switch/irmind-skills/.github/workflows/release.yml@refs/tags/<TAG>`.
-Do not accept a prefix, a regular expression matching arbitrary workflows,
-another repository, a branch identity or a pull-request workflow.
-
-Verify the blob digest, Fulcio chain, signing-time certificate validity and
-transparency inclusion using a separately trusted Sigstore root. Never trust a
-root supplied by the downloaded package or index. Verify provenance subject
-digests and the expected repository, source commit and release workflow too.
-A valid signature proves publisher identity and bytes, not harmless methodology.
-See [Sigstore blob verification](https://docs.sigstore.dev/cosign/verifying/verify/)
-and [GitHub attestation verification](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations).
-
-Two implementation choices require a separate review:
-
-1. A maintained in-process Sigstore verification library, with its dependency
-   graph, license and supported bundle versions reviewed before incorporation.
-   Current hashing, TLS and JWT libraries alone are not a complete Sigstore
-   verifier. Do not implement an ad hoc X.509/transparency verifier.
-2. A configured existing `cosign` verifier and GitHub provenance verifier,
-   launched without a shell, with fixed arguments, sanitized environment,
-   bounded time/output and a verified supported version. IRMind must never
-   download or execute a verifier automatically. Offline blob verification uses
-   the bundle and an explicitly provisioned trusted root; no implicit TUF update.
-
-Both choices need an explicit policy for trust-root refresh, stale metadata,
-revoked/replaced releases and old signing keys. Refresh is itself an explicit
-analyst action with displayed network destinations. Without sufficient trust
-material verification fails visibly; it cannot degrade to checksums alone.
-Local manually verified installation remains available with its honest origin.
+Provenance must bind the expected repository, source commit and release workflow.
+Only the publishing job receives OIDC, attestation and release-write permissions;
+ordinary validation retains `contents: read`. Actions/tools remain pinned and
+verified. A dispatch rehearsal signs test artifacts without publishing a release.
 
 ## Application ports and signed admission
 
@@ -147,19 +164,23 @@ Propose two narrow ports before implementation:
 
 - `SkillCatalogSource`: bounded, cancelable retrieval of a frozen release/index
   and named assets, callable only through the analyst installation workflow.
-- `CatalogReleaseVerifier`: verifies the exact bytes and proofs against the
-  expected repository, tag, workflow and trusted root, returning a typed
-  verification receipt rather than a boolean supplied by untrusted input.
+- `CatalogIndexVerifier`: pure bounded Ed25519 verification against compiled keys,
+  expected repository and frozen tag, returning a typed verified-index receipt.
+  It has no filesystem, network, clock, secret or installation capability.
+
+The concrete contract also specifies immutable, hash-addressed retention of the
+signed index proof for recovery, case snapshots and independent export. The
+selected entry alone cannot verify a signature over the full index.
 
 Reuse `SkillCompiler` and `SkillPackageStore`; do not add a second compiler or
 an agent tool for acquisition. Add origin `catalog` to the signed installation
-snapshot with the release tag/commit, index/asset digests, publisher identity,
-verification policy/root identity and existing canonical package hash. Admission
+snapshot with the release tag/commit, index/asset digests, key ID, verification
+policy and existing canonical package hash. Admission
 is an Analyst-signed global operation after inspection, as for local packages.
 Retain immutable historical package versions and verification receipts.
 
-This is a proposed pre-1.0 definition/admission format change, not an approved
-port or dependency addition. Its concrete canonical bytes, case snapshot proof
+The Ed25519 trust strategy is fixed by this architecture. Concrete index,
+admission, proof-storage and export encodings remain a pre-1.0 contract proposal. Its concrete canonical bytes, case snapshot proof
 and export consequences require their own review before implementation.
 Catalog content remains UNTRUSTED after signature/admission and passes through
 ContentGuard before model use. It never enters a system message and cannot
@@ -168,14 +189,17 @@ exact package identities and signed receipts as today.
 
 ## Required tests
 
-Cover valid/invalid bundles; wrong issuer/repository/workflow/tag; missing or
-altered proof; wrong archive or logical hash; unsupported root or interpreter;
-index downgrade; duplicate core names; malformed/oversized archives; missing
-mappings; guarded preview; cancellation; failed signed publication; restart;
-and old/new diff fidelity. Use a fake source/verifier to prove no network occurs
-without the analyst action, on startup, during agent-selected skill loading or
-when canceling preview. A hostile package with a valid publisher signature must
-still fail the existing declaration, scope and approval controls.
+Cover valid/invalid Ed25519 signatures; unknown/removed keys; wrong
+repository/tag/sequence; modified index or selected entry; wrong asset or logical
+hash; missing full-index proof; duplicate core names; malformed/oversized packages;
+missing mappings; guarded preview; cancellation; failed signed publication;
+restart; explicit update diffs and offline operation with network unavailable.
+Use a fake source/verifier to prove no network occurs without the analyst action,
+on startup, during agent-selected skill loading or when cancelling preview.
+A hostile package with a valid publisher signature still fails declaration,
+scope and approval controls. External Sigstore verification has separate release
+workflow tests and never substitutes for the index signature inside IRMind.
 
-Catalog installation implementation waits for design and contract review.
-Subagents and a live Kubernetes connector are independent future designs.
+Next: publish concrete index, catalog-origin admission and case/export contracts
+with vectors for review before implementation. Create the separate repository
+only after that contract is approved. Subagent execution remains a separate feature.
