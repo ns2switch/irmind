@@ -1,6 +1,8 @@
 #![deny(unsafe_code)]
 
+mod catalog;
 mod clock;
+pub use catalog::{Ed25519CatalogIndexVerifier, FileCatalogProofStore};
 mod config_toml;
 mod definition_fs;
 pub use definition_fs::FileDefinitionStore;
