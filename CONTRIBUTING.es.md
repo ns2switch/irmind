@@ -21,6 +21,7 @@ Usa `git commit -s` al crear un commit y `git commit --amend -s` para corregir e
 - Respeta la [arquitectura](docs/development/architecture.md) y documenta cualquier comportamiento público nuevo.
 - Añade pruebas útiles para cambios de política, custodia, parsing o conectores. Usa datos sintéticos.
 - Ejecuta `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo nextest run --workspace --all-features --locked` y `cargo deny check`.
+- Ejecuta `python3 -B .github/scripts/check_locked_workspaces.py` para resolver los cuatro grafos con lockfile, incluido el fuzzing aislado de EVTX, y comprobar las versiones de los paquetes publicados.
 - Describe los efectos sobre seguridad, las pruebas ejecutadas y los límites conocidos en la plantilla de PR.
 
 La documentación inglesa es la fuente de verdad. Si cambias contenido para usuarios, actualiza su traducción española y cita al comienzo el commit de la fuente inglesa.

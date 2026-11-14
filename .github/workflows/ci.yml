@@ -83,6 +83,8 @@ jobs:
         with: {tool: 'cargo-nextest,cargo-deny', fallback: none}
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_select_ci_scope.py
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_release_json_features.py
+      - name: Resolve all locked workspaces and check shipping versions
+        run: python3 -B .github/scripts/check_locked_workspaces.py
       - name: Test documented command ownership
         run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_docs.py
       - name: Test allocation profile attribution

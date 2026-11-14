@@ -6,9 +6,20 @@ This internal plan records historical acceptance criteria and decisions behind t
 
 The approved [installation contract](skills-installation-contract.md) and [case/export contract](skills-case-format-contract.md) govern the implementation. Local compilation and storage are separate ports. The agent receives only active names and descriptions until a bounded, policy-checked load. Analyst-pinned snapshots and Agent-signed load receipts remain methodology, never evidence. Export V7 includes referenced installation admissions; the export port is named `export_case`, independently of the file version. Windows triage, Linux triage and AWS credential compromise must pass scripted synthetic ingestion → method load → investigation → confirmed finding → sealed/offline-verified export before the release. No provider is enabled by default.
 
-The three included methods pass the [scripted synthetic case test](../../crates/bin/tests/skills_runtime.rs), including confirmed findings and independent V7 verification. Broader multi-artifact Windows collection coverage and a separate community skills catalog remain follow-up work. Real-model forensic quality and real-connector deployment are not established by these tests.
+The initial three methods shipped in 0.4.0; the 0.4.2 catalog now contains 15.
+All pass the [scripted synthetic case test](../../crates/bin/tests/skills_runtime.rs),
+including confirmed findings and independent V7 verification. Signed case budgets,
+Kubernetes audit/Falco sources and methods, managed cloud transports, and native
+Entra/GCP/network semantics complete the 0.4.2 A/B scope. The Kubernetes live API
+connector and catalog installation remain design-only. Publication of the
+separate community catalog is deferred; it is not a prerequisite for 0.4.2.
 
-## Current pre-1.0 delivery order
+After 0.4.2, prepare the subagent design for review without implementing it and
+continue the broader multi-artifact Windows collection evaluation (#157).
+Real-model forensic quality and real-connector deployment are not established
+by the scripted tests.
+
+## Historical delivery order through v0.3
 
 The [pre-1.0 format decision](decisions.md#pre-10-format-policy) supersedes compatibility and V2-comparison requirements in the historical sections below. Minor versions may change formats without migrations until stabilization, expected around v0.6–v0.7. Preserve the creating executable for old cases, or re-ingest verified originals into a new case. Decide parser retention and stable compatibility before 1.0.
 

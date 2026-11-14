@@ -50,12 +50,18 @@ La versión 0.3 no lee casos de 0.2: conserva el ejecutable creador o
 
 ## v0.4: skills forenses
 
-La versión preliminar 0.4 incluye skills firmadas y cargadas progresivamente que nunca amplían los permisos de la política. Los tres métodos iniciales pasan casos sintéticos con modelo guionizado, hallazgos confirmados y exportaciones verificadas de forma independiente. La cobertura de colecciones más amplias y el catálogo comunitario separado siguen pendientes.
+La versión preliminar 0.4.2 incluye 15 skills firmadas y de carga progresiva,
+presupuestos de caso firmados, ingesta nativa de Kubernetes audit/Falco y
+cobertura semántica de Entra, GCP y red. Cada skill pasa un caso sintético con
+modelo guionizado, hallazgos confirmados y exportación verificada de forma
+independiente. Siguen pendientes la validación de un conector real, las
+colecciones Windows más amplias y la publicación del catálogo comunitario.
 
 - El [diseño aprobado](../development/skills-design.md), el [contrato de instalación](../development/skills-installation-contract.md) y el [contrato de recibos y exportación V7](../development/skills-case-format-contract.md) definen la implementación 0.4. Consulta la [guía de uso](skills.md).
-- Una skill es una carpeta con `SKILL.md` que describe una metodología, más plantillas de consulta, reglas Sigma o mapeos opcionales. Los tres métodos iniciales son Windows triage, Linux triage y AWS credential compromise. Ransomware de Windows y BEC de M365 quedan como posibles ampliaciones comunitarias.
+- Una skill es una carpeta con `SKILL.md` que describe una metodología, más plantillas de consulta, reglas Sigma o mapeos opcionales. El núcleo cubre AWS, Azure, GCP, Windows, Linux, red y Kubernetes. Windows triage, Linux triage y AWS credential compromise son los tres métodos iniciales; ransomware de Windows y otros nueve llegaron en 0.4.1, y dos métodos de Kubernetes en 0.4.2. BEC de M365 sigue como posible ampliación comunitaria.
 - Incluir [**Windows triage**](https://github.com/ns2switch/irmind/issues/157): guiar una colección sintética y acotada con KAPE o Velociraptor de logs de eventos, registro y sus logs de transacciones, `$MFT`, Prefetch, LNK, SRUM y Amcache. Ingerir primero timelines de Hayabusa derivados de EVTX o CSV de EvtxECmd (EVTX directo si el auxiliar aislado está disponible), y después las exportaciones de PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch y SrumECmd. Investigar en orden: inicio de sesión → ejecución → persistencia → movimiento lateral → exfiltración. Correlacionar fuentes independientes y confirmar hallazgos con evidencia. El analista ejecuta las herramientas externas; una skill no concede permisos de ejecución.
 - Incluir **Linux triage** para autenticación, ejecución y persistencia, y **AWS credential compromise** para CloudTrail, actividad de roles y sesiones, y cambios en IAM.
+- `/budget` muestra consumo y asignaciones firmadas; `/settings limits` fija los valores para casos nuevos por debajo del techo de la organización. La identidad del clúster se confirma explícitamente; el lector de origen permite consultar hechos originales verificados sin proyectar cuerpos completos de peticiones.
 - El modelo recibe primero nombre y descripción y carga el contenido completo solo cuando lo necesita. Las skills pueden venir incluidas, de una organización o instaladas por un analista.
 - La instalación se firma y el caso registra el hash de la versión usada. Una skill declara herramientas necesarias, pero no amplía permisos. La firma admite los bytes exactos del paquete; su contenido sigue siendo no confiable tras la admisión y nunca llega al rol system.
 - `/skills` permite listar, instalar, inspeccionar y deshabilitar. Las skills invocables aparecen como comandos. El catálogo comunitario vive en otro repositorio.
@@ -63,7 +69,7 @@ La versión preliminar 0.4 incluye skills firmadas y cargadas progresivamente qu
 ## v0.5: subagentes y trabajo paralelo
 
 - Aprobar `docs/development/subagents-design.md` antes de implementar: tipos, límites, clave Agent, aprobaciones, ramas de eventos y fusión determinista.
-- El agente principal delega tareas acotadas a subagentes paralelos con contexto propio. Habrá tipos de triage, nube, endpoint, red e inteligencia de amenazas, y tipos comunitarios definidos en archivo.
+- El agente principal delega tareas acotadas a subagentes paralelos con contexto propio. Habrá tipos de triage, nube, endpoint, red, Kubernetes e inteligencia de amenazas, y tipos comunitarios definidos en archivo.
 - Los subagentes heredan el alcance del caso, no pueden ampliarlo ni aprobar llamadas. Sus solicitudes van al analista, firman con la clave Agent y su salida vuelve como contenido no confiable.
 - Aplicar límites de concurrencia, rondas y tokens por subagente y un presupuesto total por turno. La TUI muestra la actividad y permite cancelarla.
 - Cada subagente usa una rama de eventos que se fusiona de forma determinista con la cadena firmada del caso. La TUI pasa a consumir el flujo de eventos del motor.

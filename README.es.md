@@ -11,7 +11,7 @@ IRMind es un asistente agéntico de terminal para respuesta a incidentes y anál
 *La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
 
 > [!WARNING]
-> IRMind 0.4.1 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
+> IRMind 0.4.2 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
 
 > [!WARNING]
 > Antes de 1.0, cada versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración. Conserva la versión de IRMind que creó un caso para abrirlo, verificarlo o exportarlo, o reingiere los originales verificados en un caso nuevo.
@@ -47,13 +47,13 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-La [versión preliminar v0.4.1](https://github.com/ns2switch/irmind/releases/tag/v0.4.1) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.4.2](https://github.com/ns2switch/irmind/releases/tag/v0.4.2) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
-Usa la versión menor que creó el caso para volver a abrirlo. La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable o reingerir los originales verificados.
+Conserva la versión exacta de IRMind que creó el caso. La versión 0.4.2 actualiza los contratos actuales de caso; consulta la [nota de formatos](CHANGELOG.md). La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable creador o reingerir los originales verificados.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.4.1; binary=irmind-linux-x86_64
+tag=v0.4.2; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done

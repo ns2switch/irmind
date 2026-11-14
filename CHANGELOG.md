@@ -4,6 +4,45 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.4.2 — Case budgets and Kubernetes investigations
+
+**Format impact: current case contracts change.** The expanded common-event
+vocabulary changes the mapped target-contract digest. Cluster-aware sources add
+explicit acquisition context and optional physical metadata; new case allocations
+are signed in creation/change receipts. Export V7 framing and seal challenges
+are unchanged, but their current profile/envelope vectors reflect the new
+contract. Retain the creating executable to open, verify or export an older
+case, or re-ingest verified originals into a new case. No automatic migration
+is provided.
+
+All modules and methods remain experimental and tested with synthetic data.
+H5 was accepted by the analyst after a real DeepSeek greeting; the remaining
+manual procedure details and validation of a real connector remain pending.
+
+### Kubernetes investigation methods and verified originals
+
+- Include `k8s-cluster-compromise` and `k8s-workload-compromise`, bringing the core
+  catalog to 15 skills. Both cover source collection, typed local queries,
+  original-field review, coverage gaps and conditional findings. Their scripted
+  synthetic episodes confirm findings and verify, seal and independently verify
+  exported cases; expected answers remain evaluator-only.
+- Add explicit `raw_records view="original"` for bounded, guarded source facts.
+  Local source roots require analyst-origin authorization. Reads verify source
+  bytes, the frozen decoder/context and the signed decoded-record commitment;
+  indexed reads remain the default. No network, decoded cache or spool is used.
+- Add the separate Falco Kubernetes-audit mapping and explicit privilege facts.
+  Kubernetes protocol-upgrade responses remain unknown outcomes, rather than
+  evidence that a command ran successfully.
+- Cover native audit logs and managed EKS, GKE and AKS exports. No live Kubernetes
+  API connector, remote model default or implicit cloud-identity link is added.
+
+
+### Fixed
+
+- Align the isolated EVTX fuzz workspace with the current helper version and
+  check resolution of all four locked workspace graphs during CI. Keep the
+  existing decoder and protocol ASAN campaign budgets.
+
 ### Managed Kubernetes export transports
 
 - Decode EKS CloudWatch GetLogEvents and AKS kube-audit/kube-audit-admin

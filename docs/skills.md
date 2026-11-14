@@ -21,8 +21,6 @@ Open a case, configure a model in `/settings model`, and type `/` to see the act
 | `/linux-persistence` | Cron, systemd, SSH keys, accounts and sudoers. | Linux logs plus collected configuration or DFIR exports. | Partial: sparse logs do not reconstruct complete configuration state. |
 | `/network-c2-beaconing` | Periodic flows, suspicious DNS and alerts. | Zeek and Suricata EVE; optional producer-normalized ECS. | Mapped protocol categories and source/destination roles; missing status stays unknown. Source alerts remain unconfirmed. |
 | `/malware-execution-triage` | Binary origin, execution and observed follow-on activity. | Sysmon 1/3/11 and PECmd/AmcacheParser or other DFIR exports. | Partial: Amcache presence is not proof of execution; raw binary artifacts need an export. |
-
-
 | `/k8s-cluster-compromise` | API access, secret-read attempts, service accounts and RBAC changes. | Native/EKS/AKS Kubernetes audit Events, GKE Cloud Audit exports; optional Falco k8s_audit. | Mapped API outcomes and cluster-scoped identities; binding contents require verified originals. Effective RBAC state and omitted audit bodies remain gaps. |
 | `/k8s-workload-compromise` | Risky pod requests, exec/attach leads and runtime correlation. | Kubernetes audit plus Falco JSON with pod/container metadata. | Original pod specs and mapped runtime observations; an accepted request or privilege flag alone does not prove execution, escape or cryptomining. |
 
