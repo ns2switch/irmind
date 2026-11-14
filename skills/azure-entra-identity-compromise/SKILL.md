@@ -38,10 +38,10 @@ Ask the analyst to download sign-in and audit logs as JSON from Entra Monitoring
 Example tool arguments, not a script to execute automatically:
 
 ```text
-text_search({"query":"login","event_category":"authentication","event_outcome":"failure","limit":20})
+text_search({"query":"Sign-in","event_category":"authentication","event_outcome":"failure","limit":20})
 ```
 
-This query applies to native Entra and explicitly mapped ECS/UDM records with matching original action text. Use entity_role="actor" or "target" only when that observation exists. Authentication and directory IAM events with an absent or contradictory status have outcome unknown. For unmapped generic JSON use original activity names and raw_records without semantic filters.
+This query uses the native sign-in activity text. Adjust the original action term for producer-mapped ECS/UDM, whose action may instead be login. Use entity_role="actor" or "target" only when that observation exists. Authentication and directory IAM events with an absent or contradictory status have outcome unknown. For unmapped generic JSON use original activity names and raw_records without semantic filters.
 
 Start with graph_summary. Results can be sampled, partial or truncated; inspect
 those markers and narrow the UTC window rather than silently extrapolating.
