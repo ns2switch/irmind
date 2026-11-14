@@ -12,6 +12,8 @@ substitute for validating a real signed chain.
 - `plan.json` reserves 250,001 of 1,000,000 remaining tokens and exactly 25 of
   100 calls. Tokens therefore require Analyst-signed threshold consent.
   `signed-plan-approval.json` and its preimage use the unchanged audit challenge.
+- Negative consent files have mathematically valid Agent signatures, including
+  a forged Analyst label; expected-role/key binding must still reject them.
 - `threshold-cases.json` tests exactly 25%, one token/call above, zero remaining
   and wide-integer arithmetic. Its u64-maximum row is arithmetic-only and has
   policy_valid=false: it cannot bypass the current 10,000,000-token maximum.
