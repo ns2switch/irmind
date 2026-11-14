@@ -138,9 +138,15 @@ nonce del receptor, sin ejecutar otra consulta remota equivalente.
 
 Antes de arrancar hijos, la TUI muestra el plan completo: objetivos, tipos,
 fuentes y tokens/llamadas/rondas/bytes reservados, junto al presupuesto restante.
-El analista puede inspeccionarlo, iniciarlo o cancelarlo. No hay temporizador
-ni forma de que el modelo omita esa vista. Iniciar un plan pequeño desde la TUI
-no convierte los eventos del motor en autoridad de aprobación.
+El analista puede cancelar el trabajo pendiente o en marcha. La preferencia
+**Confirmar todos los planes de subagentes** está desactivada por defecto. Así,
+un plan mostrado que reserve como máximo el 25% arranca automáticamente; si está
+activada, todos esperan Start explícito. Por encima del umbral siempre hay Start
+y confirmación firmada, independientemente de la preferencia. No se ejecutan hijos
+antes de mostrar el plan. La preferencia cambia mediante la operación global de
+configuración firmada; ninguna herramienta del modelo puede cambiarla. Los eventos
+no conceden autoridad de aprobación y el arranque automático nunca sustituye un
+consentimiento Analyst obligatorio.
 
 Bajo la transacción del caso se calcula lo restante: intersección entre asignación
 y techo organizativo vigente, menos consumo y reservas pendientes. Se prueba

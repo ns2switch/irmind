@@ -1,6 +1,6 @@
 # Configurar la clave de firma del catálogo
 
-Procedimiento del mantenedor para el [contrato firmado](../development/skills-catalog-format-contract.md).
+Procedimiento del mantenedor para el [contrato firmado](https://github.com/ns2switch/irmind/pull/287).
 La clave de producción se genera en tu máquina, fuera de cualquier clon de Git.
 IRMind y el agente de desarrollo solo necesitan la clave pública y su `key_id`.
 No compartas la semilla ni la clave privada.

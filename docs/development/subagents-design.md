@@ -139,9 +139,15 @@ no second remote execution is needed for an equivalent authorized call.
 
 Before any child starts, the TUI presents the entire frozen plan: objectives,
 types, source subsets and reserved tokens/calls/rounds/cloud bytes, alongside
-remaining case allowances. The analyst can inspect it, start it or cancel it;
-there is no timer or model-controlled bypass of this preview. A visible Start
-intent for a small plan is not an approval capability carried by an engine event.
+remaining case allowances. The analyst can cancel pending or running work.
+The analyst preference **Confirm all subagent plans** defaults to disabled. With
+it disabled, a displayed plan at or below 25% starts automatically; with it
+enabled, every plan waits for explicit Start. A plan above the threshold always
+waits for Start and signed confirmation, regardless of the preference. No child
+starts before its plan is displayed. Preference changes use the existing signed
+global configuration operation; no model tool can change it. Display/start events
+carry no approval capability, and automatic start never substitutes for required
+Analyst consent.
 
 Compute remaining tokens/calls under the case transaction as the effective case
 allocation intersected with the current organization ceiling, minus recorded
