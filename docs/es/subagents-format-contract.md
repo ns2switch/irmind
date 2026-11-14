@@ -1,4 +1,4 @@
-Traducción de docs/development/subagents-format-contract.md en el commit 65df45f6e0b6fa3d587b53bd03579853f21cfa22; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/subagents-format-contract.md en el commit a19361c1b29d874f5c32215ae9106097f07b10cd; si hay diferencias, prevalece la versión en inglés.
 
 # Contrato de puertos, registros canónicos y export V8 de subagentes
 

@@ -173,10 +173,11 @@ def irmind_flag_citations(text: str) -> set[str]:
     """Keep IRMind flags strict while recognizing complete external export commands."""
     lines = []
     for line in text.splitlines():
-        # This is one gcloud invocation, not an IRMind command. Mixed shell
-        # commands and any IRMind mention keep the ordinary strict validation.
-        external = re.match(r"^\s*(?:\$ )?gcloud\s", line)
-        mixed = re.search(r"\birmind(?:\.exe)?\b|&&|\|\||;|\$\(|`", line)
+        # Complete external invocations own their flags. Mixed shell commands
+        # still receive strict validation; a repository named irmind-skills
+        # is not an invocation of the irmind executable.
+        external = re.match(r"^\s*(?:\$ )?(?:gcloud\s|gh\s+secret\s+set\s)", line)
+        mixed = re.search(r"(?<![\w.-])irmind(?:\.exe)?(?=\s|$)|&&|\|\||;|\$\(|`", line)
         if not (external and not mixed):
             lines.append(line)
     return set(FLAG.findall("\n".join(lines))) - NON_IRMIND_FLAGS
