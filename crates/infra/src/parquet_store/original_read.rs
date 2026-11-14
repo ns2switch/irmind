@@ -103,8 +103,10 @@ impl OriginalReader {
         std::thread::Builder::new()
             .name("irmind-source-read".into())
             .spawn(move || {
-                let _permit = permit;
-                let _ = send.send(job.run());
+                let result = job.run();
+                // A completed read must release its slot before its caller can retry.
+                drop(permit);
+                let _ = send.send(result);
             })
             .map_err(|_| unavailable("Original-record worker could not start; retry"))?;
         let result = wait(&receive, cancel, deadline);

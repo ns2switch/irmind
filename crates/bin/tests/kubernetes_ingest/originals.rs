@@ -30,13 +30,37 @@ fn native_eks_aks_and_gke_original_reads_replay_the_frozen_acquisition_context()
         reader
             .authorize_local_root(&case.id, &inputs, std::slice::from_ref(&hash))
             .unwrap();
-        let record = reader
-            .read_verified_record(&case.id, &hash, 0, &CancellationToken::new())
-            .unwrap();
+        let record = read_trials(reader.as_ref(), &case.id, &hash, name, raw.len());
         record.inspect(|r| assert_eq!(r.cluster_identity().unwrap().qualified(), identity));
         assert!(fields(&record).contains(expected));
         assert_eq!(record.provenance().record_index(), Some(0));
     }
+}
+fn read_trials(
+    reader: &dyn irmind_app::SourceEvidenceReader,
+    case: &irmind_domain::CaseId,
+    hash: &EvidenceHash,
+    name: &str,
+    bytes: usize,
+) -> Tainted<SourceRecordV1> {
+    let mut selected = None;
+    for trial in 0..3 {
+        let started = std::time::Instant::now();
+        let record = reader
+            .read_verified_record(case, hash, 0, &CancellationToken::new())
+            .unwrap();
+        let seconds = started.elapsed().as_secs_f64();
+        if let Some(previous) = &selected {
+            assert_eq!(previous, &record);
+        }
+        if !cfg!(debug_assertions) {
+            println!(
+                "ORIGINAL_READ_BENCH source={name} bytes={bytes} trial={trial} seconds={seconds:.6}"
+            );
+        }
+        selected = Some(record);
+    }
+    selected.unwrap()
 }
 fn fields(record: &Tainted<SourceRecordV1>) -> String {
     let mut value = String::new();
@@ -46,7 +70,7 @@ fn fields(record: &Tainted<SourceRecordV1>) -> String {
     value
 }
 fn fixtures() -> Vec<(&'static str, &'static [u8], &'static str, &'static str)> {
-    let mut values = vec![
+    let values = vec![
         (
             "native.ndjson",
             include_bytes!("../../../testkit/fixtures/parser-kubernetes/source/event.ndjson")
@@ -70,12 +94,17 @@ fn fixtures() -> Vec<(&'static str, &'static [u8], &'static str, &'static str)> 
         ),
     ];
     #[cfg(feature = "parser-gcp-audit")]
-    values.push((
-        "gke.ndjson",
-        include_bytes!("../../../testkit/fixtures/parser-gcp-audit/source/gke.ndjson").as_slice(),
-        "gke:projects/synthetic-project/locations/us-central1/clusters/synthetic-cluster",
-        "protoPayload",
-    ));
+    let values = {
+        let mut values = values;
+        values.push((
+            "gke.ndjson",
+            include_bytes!("../../../testkit/fixtures/parser-gcp-audit/source/gke.ndjson")
+                .as_slice(),
+            "gke:projects/synthetic-project/locations/us-central1/clusters/synthetic-cluster",
+            "protoPayload",
+        ));
+        values
+    };
     values
 }
 #[test]

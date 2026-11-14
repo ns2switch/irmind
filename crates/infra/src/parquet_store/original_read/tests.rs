@@ -272,3 +272,11 @@ fn mapping_catalog(decoder: Arc<dyn SourceDecoder>) -> Arc<MappingCatalog> {
         .unwrap(),
     )
 }
+
+#[test]
+fn completed_reads_release_the_worker_slot_before_returning_the_record() {
+    let f = Fixture::new(false);
+    for _ in 0..32 {
+        assert!(fields(&f.read(0).unwrap()).contains("roleRef"));
+    }
+}
