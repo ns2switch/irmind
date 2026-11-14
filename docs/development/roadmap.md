@@ -58,8 +58,9 @@ The 0.4.2 pre-release includes 15 signed, progressively loaded forensic skills,
 signed case budgets, native Kubernetes audit/Falco ingestion and semantic Entra,
 GCP and network coverage. Each skill passes a scripted synthetic case with
 confirmed findings and an independently verified export. Real-connector
-validation, broader Windows collections and publication of the separate
-community catalog remain follow-up work.
+validation and publication of the separate community catalog remain follow-up
+work. A subsequent [multi-artifact Windows evaluation](https://github.com/ns2switch/irmind/pull/284)
+correlates nine synthetic exports; real collection/model validation remains open.
 
 - The approved [skills design](skills-design.md), [installation contract](skills-installation-contract.md) and [case receipt contract](skills-case-format-contract.md) define the 0.4 implementation. See the [usage guide](../skills.md).
 - A skill is a folder with `SKILL.md` for methodology and instructions, plus optional query templates, Sigma rules, or mappings. The core catalog covers AWS, Azure, GCP, Windows, Linux, network and Kubernetes. Windows triage, Linux triage and AWS credential compromise remain the initial methods; Windows ransomware and nine other methods arrived in 0.4.1, and two Kubernetes methods in 0.4.2. M365 business email compromise remains a possible community extension.
@@ -74,7 +75,7 @@ community catalog remain follow-up work.
 
 Run bounded parallel subagents with Agent-key signatures and deterministic case records.
 
-- Approve `docs/development/subagents-design.md` before implementation. It will define types, limits, Agent-key signing, approval routing, event branches, and deterministic merging.
+- Review the proposed [subagent design](subagents-design.md) before implementation: types, shared limits, Agent-key signing, approval routing, event branches, deterministic merging and engine events. Concrete ports and export V8 bytes need their own reviewed contract.
 - The main agent delegates bounded tasks to parallel subagents with separate contexts. Built-in types cover triage, cloud, endpoint, network, Kubernetes, and threat intelligence; community-defined types come from a file.
 - Subagents inherit case scope and never extend it. They cannot approve calls; requests enter the analyst queue. They sign with the Agent key, and their output returns to the main agent as untrusted data.
 - Enforce concurrency, round, and token limits per subagent and a total budget per turn. Show each subagent in the TUI and allow cancellation.

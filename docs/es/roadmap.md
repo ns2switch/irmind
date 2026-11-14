@@ -54,8 +54,10 @@ La versión preliminar 0.4.2 incluye 15 skills firmadas y de carga progresiva,
 presupuestos de caso firmados, ingesta nativa de Kubernetes audit/Falco y
 cobertura semántica de Entra, GCP y red. Cada skill pasa un caso sintético con
 modelo guionizado, hallazgos confirmados y exportación verificada de forma
-independiente. Siguen pendientes la validación de un conector real, las
-colecciones Windows más amplias y la publicación del catálogo comunitario.
+independiente. Siguen pendientes la validación de un conector real y la
+publicación del catálogo comunitario. Una [evaluación Windows posterior](https://github.com/ns2switch/irmind/pull/284)
+correlaciona nueve exportaciones sintéticas; no valida una colección ni un modelo
+reales.
 
 - El [diseño aprobado](../development/skills-design.md), el [contrato de instalación](../development/skills-installation-contract.md) y el [contrato de recibos y exportación V7](../development/skills-case-format-contract.md) definen la implementación 0.4. Consulta la [guía de uso](skills.md).
 - Una skill es una carpeta con `SKILL.md` que describe una metodología, más plantillas de consulta, reglas Sigma o mapeos opcionales. El núcleo cubre AWS, Azure, GCP, Windows, Linux, red y Kubernetes. Windows triage, Linux triage y AWS credential compromise son los tres métodos iniciales; ransomware de Windows y otros nueve llegaron en 0.4.1, y dos métodos de Kubernetes en 0.4.2. BEC de M365 sigue como posible ampliación comunitaria.
@@ -68,7 +70,7 @@ colecciones Windows más amplias y la publicación del catálogo comunitario.
 
 ## v0.5: subagentes y trabajo paralelo
 
-- Aprobar `docs/development/subagents-design.md` antes de implementar: tipos, límites, clave Agent, aprobaciones, ramas de eventos y fusión determinista.
+- Revisar el [diseño de subagentes](subagents-design.md) antes de implementar: tipos, límites compartidos, clave Agent, aprobaciones, ramas de eventos, fusión determinista y flujo del motor. Los puertos concretos y bytes export V8 necesitan su contrato revisado.
 - El agente principal delega tareas acotadas a subagentes paralelos con contexto propio. Habrá tipos de triage, nube, endpoint, red, Kubernetes e inteligencia de amenazas, y tipos comunitarios definidos en archivo.
 - Los subagentes heredan el alcance del caso, no pueden ampliarlo ni aprobar llamadas. Sus solicitudes van al analista, firman con la clave Agent y su salida vuelve como contenido no confiable.
 - Aplicar límites de concurrencia, rondas y tokens por subagente y un presupuesto total por turno. La TUI muestra la actividad y permite cancelarla.
