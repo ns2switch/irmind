@@ -122,6 +122,7 @@ pub struct Engine<'a> {
     >,
     pub(crate) object_progress: ObjectProgressMap,
     pub(crate) skills: Option<Arc<crate::SkillServices>>,
+    pub(crate) subagents: Option<Arc<crate::subagents::SubagentPorts>>,
 }
 
 pub struct EnginePorts {
@@ -133,6 +134,7 @@ pub struct EnginePorts {
     pub verifier: Arc<dyn Verifier>,
     pub guard: Arc<dyn ContentGuard>,
     source_evidence_reader: Option<Arc<dyn crate::SourceEvidenceReader>>,
+    subagents: Option<Arc<crate::subagents::SubagentPorts>>,
 }
 
 pub struct CryptoPorts {
@@ -164,6 +166,7 @@ impl EnginePorts {
             verifier: crypto.verifier,
             guard,
             source_evidence_reader: None,
+            subagents: None,
         }
     }
 
@@ -173,6 +176,12 @@ impl EnginePorts {
         reader: Arc<dyn crate::SourceEvidenceReader>,
     ) -> Self {
         self.source_evidence_reader = Some(reader);
+        self
+    }
+
+    #[must_use]
+    pub fn with_subagents(mut self, ports: crate::subagents::SubagentPorts) -> Self {
+        self.subagents = Some(Arc::new(ports));
         self
     }
 }
@@ -209,6 +218,7 @@ impl<'a> Engine<'a> {
             verified_cases: Arc::clone(&self.verified_cases),
             object_progress: Arc::clone(&self.object_progress),
             skills: self.skills.clone(),
+            subagents: self.subagents.clone(),
         }
     }
 

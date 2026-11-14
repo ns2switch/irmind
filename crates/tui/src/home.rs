@@ -12,6 +12,8 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
 };
 use std::{io, sync::mpsc, time::Instant};
+mod plan_confirmation;
+use plan_confirmation::PlanConfirmation;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum CaseStatus {
@@ -182,6 +184,7 @@ pub(crate) struct HomeState {
     pub(crate) pending_module_change: Option<ConfigChange>,
     resume_last_case: crate::ResumeMode,
     show_hints: HintMode,
+    confirm_all_subagent_plans: PlanConfirmation,
 }
 
 struct UiSelection {
@@ -208,6 +211,7 @@ impl HomeState {
             settings_return: Mode::List,
             preference_selected: 0,
             max_parallel_workers: None,
+            confirm_all_subagent_plans: PlanConfirmation::ThresholdOnly,
             worker_limit_input: None,
             budget_editor: crate::budgets::BudgetEditor::new(
                 irmind_app::CaseBudgetLimits::default(),
@@ -475,6 +479,7 @@ fn prepare_home_state(
     }
     state.resume_last_case = launch.resume_last_case;
     state.max_parallel_workers = launch.max_parallel_workers;
+    state.confirm_all_subagent_plans = engine.confirm_all_subagent_plans()?.into();
     state.show_hints = io_ops.show_hints().into();
     state.ui_selection.mouse_capture = launch.mouse_capture;
     state.theme_choice = launch.theme.unwrap_or("auto").into();

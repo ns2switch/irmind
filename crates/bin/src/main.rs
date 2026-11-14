@@ -375,7 +375,8 @@ impl WorkspaceIo for RootWorkspaceIo {
             | ConfigChange::SetMouseCapture(_)
             | ConfigChange::SetTheme(_)
             | ConfigChange::SetMaxParallelWorkers(_)
-            | ConfigChange::SetCaseBudgetDefaults(_) => false,
+            | ConfigChange::SetCaseBudgetDefaults(_)
+            | ConfigChange::SetConfirmAllSubagentPlans(_) => false,
             ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
             ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
             ConfigChange::SetValue { module, field, .. } => {

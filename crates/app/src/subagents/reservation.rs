@@ -123,6 +123,8 @@ impl SubagentReservationV1 {
                 .find(|t| t.task_id == task)
                 .ok_or(SubagentRecordError)?
                 .budget
+        } else if self.purpose == ReservationPurpose::Model {
+            plan.coordination
         } else {
             plan.reservation
         };
@@ -154,7 +156,10 @@ impl SubagentRecord for SubagentReservationV1 {
         );
         if self.format_version != 1
             || plan_transition != (self.purpose == ReservationPurpose::Plan)
-            || plan_transition != self.task_id.is_none()
+            || (plan_transition && self.task_id.is_some())
+            || (!plan_transition
+                && self.task_id.is_none()
+                && self.purpose != ReservationPurpose::Model)
             || plan_transition != (self.request_ordinal == 0)
             || (self.action == ReservationAction::HoldPreview) != self.parent_operation.is_none()
             || (self.action != ReservationAction::SettleRequest

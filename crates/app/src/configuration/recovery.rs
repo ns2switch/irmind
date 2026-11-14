@@ -58,6 +58,20 @@ fn last_approved(engine: &Engine<'_>, manifests: &[&ModuleManifest]) -> Result<A
 }
 
 fn parse_snapshot(payload: &str, manifests: &[&ModuleManifest]) -> Result<Approved, AppError> {
+    let bytes = snapshot_bytes(payload)?;
+    if let Some(config) = retired_writer_snapshot(&bytes, manifests)? {
+        return Ok(Approved::RetiredWriter(config));
+    }
+    let config: PersistentConfig = serde_json::from_slice(&bytes).map_err(|_| mismatch())?;
+    config.validate(manifests)?;
+    let canonical = serde_json::to_vec(&config).map_err(|_| mismatch())?;
+    if bytes != canonical {
+        return Err(mismatch());
+    }
+    Ok(Approved::Snapshot(config))
+}
+
+fn snapshot_bytes(payload: &str) -> Result<Vec<u8>, AppError> {
     let fields = payload.split(':').collect::<Vec<_>>();
     if fields.len() != 4
         || !valid_hash(fields[0])
@@ -71,16 +85,7 @@ fn parse_snapshot(payload: &str, manifests: &[&ModuleManifest]) -> Result<Approv
     if hex(&sha256(&bytes)) != fields[1] {
         return Err(mismatch());
     }
-    if let Some(config) = retired_writer_snapshot(&bytes, manifests)? {
-        return Ok(Approved::RetiredWriter(config));
-    }
-    let config: PersistentConfig = serde_json::from_slice(&bytes).map_err(|_| mismatch())?;
-    config.validate(manifests)?;
-    let canonical = serde_json::to_vec(&config).map_err(|_| mismatch())?;
-    if bytes != canonical {
-        return Err(mismatch());
-    }
-    Ok(Approved::Snapshot(config))
+    Ok(bytes)
 }
 
 fn retired_writer_snapshot(
@@ -153,6 +158,9 @@ fn fields(config: &PersistentConfig) -> BTreeMap<String, String> {
     if let Some(value) = config.max_parallel_workers {
         out.insert("max_parallel_workers".into(), value.to_string());
     }
+    if let Some(value) = config.confirm_all_subagent_plans {
+        out.insert("confirm_all_subagent_plans".into(), value.to_string());
+    }
     let limits = config.case_budget_defaults.unwrap_or_default();
     for (field, value) in [
         ("model_tokens", limits.model_tokens),
@@ -193,6 +201,28 @@ fn differences(approved: &PersistentConfig, current: &PersistentConfig) -> Vec<C
 }
 
 impl Engine<'_> {
+    /// Read only the Analyst-signed preference, never a model or caller flag.
+    pub fn confirm_all_subagent_plans(&self) -> Result<bool, AppError> {
+        self.verify_global_operations()?;
+        let entries = self.audit_log.global_operations()?;
+        let Some(entry) = entries.iter().rev().find(|entry| {
+            entry.operation.starts_with(SNAPSHOT_PREFIX)
+                || entry.operation.starts_with(LEGACY_PREFIX)
+        }) else {
+            return Ok(false);
+        };
+        let Some(payload) = entry.operation.strip_prefix(SNAPSHOT_PREFIX) else {
+            return Ok(false);
+        };
+        let bytes = snapshot_bytes(payload)?;
+        let config: PersistentConfig = serde_json::from_slice(&bytes).map_err(|_| mismatch())?;
+        config.validate_local_preferences()?;
+        if serde_json::to_vec(&config).map_err(|_| mismatch())? != bytes {
+            return Err(mismatch());
+        }
+        Ok(config.confirm_all_subagent_plans.unwrap_or(false))
+    }
+
     pub fn inspect_configuration(
         &self,
         store: &dyn ConfigurationStore,

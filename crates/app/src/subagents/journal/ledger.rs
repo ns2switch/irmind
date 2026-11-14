@@ -34,7 +34,7 @@ pub(super) struct PlanLedger {
     allocation: Option<SubagentDigest>,
     charged: SubagentResources,
     released: SubagentResources,
-    task_charged: BTreeMap<SubagentDigest, SubagentResources>,
+    task_charged: BTreeMap<Option<SubagentDigest>, SubagentResources>,
     pub checkpoints: BTreeMap<SubagentDigest, Vec<SubagentCheckpointV1>>,
     pub results: BTreeMap<SubagentDigest, SubagentResultV1>,
 }
@@ -69,12 +69,21 @@ impl PlanLedger {
             .plan
             .reservation
             .rounds
-            .checked_sub(self.turn_usage()?.rounds)
+            .checked_sub(self.total_usage()?.rounds)
             .and_then(|n| n.checked_sub(self.released.rounds))
             .ok_or(SubagentRecordError)?;
         Ok(outstanding)
     }
     pub(super) fn turn_usage(&self) -> Result<SubagentResources, SubagentRecordError> {
+        self.task_charged
+            .iter()
+            // Parent requests already count in the journal's root round counter.
+            .filter_map(|(task, amount)| task.is_some().then_some(amount))
+            .try_fold(SubagentResources::default(), |total, used| {
+                total.checked_add(*used)
+            })
+    }
+    fn total_usage(&self) -> Result<SubagentResources, SubagentRecordError> {
         self.task_charged
             .values()
             .try_fold(SubagentResources::default(), |total, used| {
@@ -169,15 +178,20 @@ impl PlanLedger {
         value: &SubagentReservationV1,
         seq: u64,
     ) -> Result<(), SubagentRecordError> {
-        let task = value.task_id.ok_or(SubagentRecordError)?;
-        let spec = self
-            .plan
-            .tasks
-            .iter()
-            .find(|t| t.task_id == task)
-            .ok_or(SubagentRecordError)?;
+        let task = value.task_id;
+        let limit = match task {
+            Some(task) => {
+                self.plan
+                    .tasks
+                    .iter()
+                    .find(|t| t.task_id == task)
+                    .ok_or(SubagentRecordError)?
+                    .budget
+            }
+            None => self.plan.coordination,
+        };
         if self.phase != Phase::Started
-            || self.results.contains_key(&task)
+            || task.is_some_and(|task| self.results.contains_key(&task))
             || value.parent_operation != Some(self.operation(ReservationAction::StartPlan))
             || !self.valid_cause(
                 task,
@@ -191,11 +205,11 @@ impl PlanLedger {
         for request in self
             .requests
             .values()
-            .filter(|r| r.reservation.task_id == Some(task) && !r.settled)
+            .filter(|r| r.reservation.task_id == task && !r.settled)
         {
             used = used.checked_add(request.reservation.amount)?;
         }
-        if !used.checked_add(value.amount)?.within(spec.budget) {
+        if !used.checked_add(value.amount)?.within(limit) {
             return Err(SubagentRecordError);
         }
         self.requests.insert(
@@ -257,7 +271,7 @@ impl PlanLedger {
     }
     fn valid_cause(
         &self,
-        task: SubagentDigest,
+        task: Option<SubagentDigest>,
         hash: SubagentDigest,
         initial: bool,
     ) -> Result<bool, SubagentRecordError> {
@@ -265,13 +279,13 @@ impl PlanLedger {
             return Ok(true);
         }
         self.checkpoints
-            .get(&task)
-            .into_iter()
-            .flatten()
+            .iter()
+            .filter(|(id, _)| task.is_none_or(|task| **id == task))
+            .flat_map(|(_, checkpoints)| checkpoints)
             .try_fold(false, |found, cp| Ok(found || cp.identity()? == hash))
     }
     fn settle(&mut self, value: &SubagentReservationV1) -> Result<(), SubagentRecordError> {
-        let task = value.task_id.ok_or(SubagentRecordError)?;
+        let task = value.task_id;
         if !self.valid_cause(task, value.cause_sha256, false)? {
             return Err(SubagentRecordError);
         }
@@ -280,7 +294,7 @@ impl PlanLedger {
             .get_mut(&value.parent_operation.ok_or(SubagentRecordError)?)
             .ok_or(SubagentRecordError)?;
         if request.settled
-            || request.reservation.task_id != Some(task)
+            || request.reservation.task_id != task
             || request.reservation.request_ordinal != value.request_ordinal
             || request.reservation.purpose != value.purpose
             || !value.amount.within(request.reservation.amount)
@@ -317,12 +331,7 @@ impl PlanLedger {
         {
             return Err(SubagentRecordError);
         }
-        let used = self
-            .task_charged
-            .values()
-            .try_fold(SubagentResources::default(), |n, amount| {
-                n.checked_add(*amount)
-            })?;
+        let used = self.total_usage()?;
         let unused = self.plan.reservation.checked_sub(used)?;
         if value.amount != unused {
             return Err(SubagentRecordError);

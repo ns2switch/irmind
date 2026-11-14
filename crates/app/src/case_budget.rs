@@ -123,18 +123,20 @@ pub fn case_budget_usage(entries: &[SignedEntry]) -> Result<CaseBudgetUsage, App
 
 pub(crate) struct UsageAccumulator {
     usage: CaseBudgetUsage,
+    models: std::collections::BTreeMap<String, ActorModelUsage>,
+    cost_complete: bool,
+}
+#[derive(Default)]
+struct ActorModelUsage {
     requests: u64,
     replies: u64,
     reports: u64,
-    cost_complete: bool,
 }
 impl Default for UsageAccumulator {
     fn default() -> Self {
         Self {
             usage: CaseBudgetUsage::default(),
-            requests: 0,
-            replies: 0,
-            reports: 0,
+            models: std::collections::BTreeMap::new(),
             cost_complete: true,
         }
     }
@@ -144,15 +146,18 @@ impl UsageAccumulator {
         let invalid = || AppError::InvalidChain(entry.seq);
         match entry.kind {
             crate::AuditEventKind::ModelRequest => {
-                self.requests = self.requests.checked_add(1).ok_or_else(invalid)?;
+                let model = self.models.entry(entry.actor.as_storage()).or_default();
+                model.requests = model.requests.checked_add(1).ok_or_else(invalid)?;
             }
             crate::AuditEventKind::ModelReply => {
-                self.replies = self.replies.checked_add(1).ok_or_else(invalid)?;
+                let model = self.models.entry(entry.actor.as_storage()).or_default();
+                model.replies = model.replies.checked_add(1).ok_or_else(invalid)?;
             }
             crate::AuditEventKind::ModelUsage => {
                 let event: UsageEvent =
                     serde_json::from_str(&entry.payload).map_err(|_| invalid())?;
-                self.reports = self.reports.checked_add(1).ok_or_else(invalid)?;
+                let model = self.models.entry(entry.actor.as_storage()).or_default();
+                model.reports = model.reports.checked_add(1).ok_or_else(invalid)?;
                 self.usage.model_tokens = self
                     .usage
                     .model_tokens
@@ -190,7 +195,10 @@ impl UsageAccumulator {
     }
     pub(crate) fn finish(&self) -> CaseBudgetUsage {
         let mut usage = self.usage;
-        usage.provider_usage_available = self.reports >= self.replies.max(self.requests);
+        usage.provider_usage_available = self
+            .models
+            .values()
+            .all(|model| model.reports >= model.replies.max(model.requests));
         if !self.cost_complete || !usage.provider_usage_available {
             usage.cost_microusd = None;
         }
@@ -297,5 +305,48 @@ mod tests {
         };
         assert_eq!(limits.intersection(tighter), tighter);
         assert!(!limits.within(tighter));
+    }
+
+    #[test]
+    fn child_token_charges_never_mask_missing_parent_provider_usage() {
+        let mut child = entry(
+            AuditEventKind::ModelUsage,
+            r#"{"input_tokens":12,"output_tokens":8,"estimated_cost_microusd":30}"#,
+        );
+        child.actor =
+            irmind_domain::Actor::Agent(irmind_domain::AgentId::parse("skills-agent").unwrap());
+        let mut entries = vec![entry(AuditEventKind::ModelRequest, "parent"), child];
+        let unknown = case_budget_usage(&entries).unwrap();
+        assert_eq!(unknown.model_tokens, 20);
+        assert!(!unknown.provider_usage_available);
+        assert_eq!(unknown.cost_microusd, None);
+        entries.push(entry(
+            AuditEventKind::ModelUsage,
+            r#"{"input_tokens":2,"output_tokens":3,"estimated_cost_microusd":10}"#,
+        ));
+        let known = case_budget_usage(&entries).unwrap();
+        assert_eq!(known.model_tokens, 25);
+        assert!(known.provider_usage_available);
+        assert_eq!(known.cost_microusd, Some(40));
+        let mut request = entry(AuditEventKind::ModelRequest, "unattended root");
+        request.actor =
+            irmind_domain::Actor::Agent(irmind_domain::AgentId::parse("automation").unwrap());
+        entries.push(request.clone());
+        assert!(
+            !case_budget_usage(&entries)
+                .unwrap()
+                .provider_usage_available
+        );
+        let mut report = entry(
+            AuditEventKind::ModelUsage,
+            r#"{"input_tokens":1,"output_tokens":1,"estimated_cost_microusd":1}"#,
+        );
+        report.actor = request.actor;
+        entries.push(report);
+        assert!(
+            case_budget_usage(&entries)
+                .unwrap()
+                .provider_usage_available
+        );
     }
 }

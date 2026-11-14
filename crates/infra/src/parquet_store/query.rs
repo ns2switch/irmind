@@ -11,6 +11,18 @@ pub(crate) struct QueryStore<'a> {
     source_subset: Option<&'a std::collections::BTreeSet<String>>,
 }
 impl ParquetStore {
+    pub(crate) fn queries_for_sources<'a>(
+        &'a self,
+        names: &'a std::collections::BTreeMap<String, String>,
+        sources: &'a std::collections::BTreeSet<String>,
+    ) -> QueryStore<'a> {
+        QueryStore {
+            store: self,
+            source_names: names,
+            source_subset: Some(sources),
+        }
+    }
+
     pub(crate) fn queries<'a>(
         &'a self,
         names: &'a std::collections::BTreeMap<String, String>,

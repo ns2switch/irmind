@@ -30,6 +30,7 @@ mod profile;
 pub(crate) use profile::ParquetProfile;
 use profile::PartitionPhase;
 mod query;
+pub(crate) use query::QueryStore;
 mod scan;
 mod spool;
 mod store_bridge;
