@@ -155,6 +155,9 @@ fn aggregate_ids_accounting_and_source_order_cannot_be_rewritten() {
     let mut plan = SubagentPlanV1::decode(PLAN).unwrap();
     plan.tasks[0].deadline_at += 1;
     assert!(plan.validate().is_err());
+    let mut plan = SubagentPlanV1::decode(PLAN).unwrap();
+    plan.tasks[0].nonce.clone_from(&plan.turn_id);
+    assert!(plan.validate().is_err());
     let case = crate::CaseId::parse(&plan.case_id).unwrap();
     let a = SubagentDigest::from_bytes([1; 32]);
     let b = SubagentDigest::from_bytes([2; 32]);

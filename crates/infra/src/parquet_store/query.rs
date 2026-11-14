@@ -35,11 +35,14 @@ impl QueryStore<'_> {
             .artifacts
             .iter()
             .filter(|artifact| {
-                artifact
-                    .source_hashes()
-                    .iter()
-                    .any(|hash| sources.contains(hash.as_str()))
+                super::format::same_family(artifact.schema_version(), spec.schema)
+                    && super::scan::partition_matches(artifact, spec.filter)
+                    && artifact
+                        .source_hashes()
+                        .iter()
+                        .any(|hash| sources.contains(hash.as_str()))
             })
+            .take(super::scan::MAX_QUERY_FILES + 1)
             .cloned()
             .collect::<Vec<_>>();
         self.store.scan_artifacts(

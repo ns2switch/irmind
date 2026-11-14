@@ -271,6 +271,7 @@ impl SubagentRecord for SubagentPlanV1 {
         for (ordinal, task) in self.tasks.iter().enumerate() {
             task.validate()?;
             if task.ordinal != ordinal as u64
+                || task.nonce == self.turn_id
                 || task.task_id != Self::task_id(self.plan_id, task.ordinal)
                 || task.deadline_at > self.deadline_at
                 || !nonces.insert(&task.nonce)

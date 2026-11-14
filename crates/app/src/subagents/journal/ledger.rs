@@ -30,6 +30,8 @@ pub(super) struct PlanLedger {
     consent: Option<SubagentDigest>,
     operations: BTreeSet<SubagentDigest>,
     requests: BTreeMap<SubagentDigest, Request>,
+    request_identities: BTreeMap<SubagentDigest, SubagentDigest>,
+    allocation: Option<SubagentDigest>,
     charged: SubagentResources,
     released: SubagentResources,
     task_charged: BTreeMap<SubagentDigest, SubagentResources>,
@@ -45,6 +47,8 @@ impl PlanLedger {
             consent: None,
             operations: BTreeSet::new(),
             requests: BTreeMap::new(),
+            request_identities: BTreeMap::new(),
+            allocation: None,
             charged: SubagentResources::default(),
             released: SubagentResources::default(),
             task_charged: BTreeMap::new(),
@@ -56,10 +60,35 @@ impl PlanLedger {
         if self.phase == Phase::Prepared {
             return Ok(SubagentResources::default());
         }
-        self.plan
+        let mut outstanding = self
+            .plan
             .reservation
             .checked_sub(self.charged)?
-            .checked_sub(self.released)
+            .checked_sub(self.released)?;
+        outstanding.rounds = self
+            .plan
+            .reservation
+            .rounds
+            .checked_sub(self.turn_usage()?.rounds)
+            .and_then(|n| n.checked_sub(self.released.rounds))
+            .ok_or(SubagentRecordError)?;
+        Ok(outstanding)
+    }
+    pub(super) fn turn_usage(&self) -> Result<SubagentResources, SubagentRecordError> {
+        self.task_charged
+            .values()
+            .try_fold(SubagentResources::default(), |total, used| {
+                total.checked_add(*used)
+            })
+    }
+    pub(super) fn is_open(&self) -> bool {
+        self.phase != Phase::Closed
+    }
+    pub(super) fn is_preview(&self) -> bool {
+        matches!(
+            self.phase,
+            Phase::Prepared | Phase::Preview | Phase::CancelledPreview
+        )
     }
     fn approval(
         &mut self,
@@ -132,6 +161,7 @@ impl PlanLedger {
             return Err(SubagentRecordError);
         }
         self.phase = Phase::Started;
+        self.allocation = Some(value.identity()?);
         Ok(())
     }
     fn reserve(
@@ -176,7 +206,23 @@ impl PlanLedger {
                 settled: false,
             },
         );
+        self.request_identities
+            .insert(value.identity()?, value.operation_id);
         Ok(())
+    }
+    pub(super) fn allocation(&self) -> Option<SubagentDigest> {
+        self.allocation
+    }
+    pub(super) fn request_by_identity(
+        &self,
+        identity: SubagentDigest,
+    ) -> Result<(&SubagentReservationV1, u64), SubagentRecordError> {
+        self.request(
+            *self
+                .request_identities
+                .get(&identity)
+                .ok_or(SubagentRecordError)?,
+        )
     }
     pub(super) fn request(
         &self,
@@ -356,7 +402,11 @@ impl SubagentJournal {
             || plan.usage.tokens != budget.usage.model_tokens
             || plan.usage.calls != budget.usage.tool_calls
             || plan.usage.cloud_bytes != budget.usage.cloud_bytes
-            || plan.prior_reserved != self.outstanding()?.checked_sub(state.outstanding()?)?
+            || plan.usage.rounds != self.rounds_used(&plan.turn_id)?
+            || plan.prior_reserved
+                != self
+                    .outstanding_for_turn(Some(&plan.turn_id))?
+                    .checked_sub(state.outstanding()?)?
         {
             return Err(SubagentRecordError);
         }

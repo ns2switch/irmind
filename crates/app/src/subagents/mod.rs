@@ -7,7 +7,9 @@ pub use chunk::{CheckedBranchChunk, SubagentBranchCursor};
 mod consent;
 mod journal;
 pub use consent::verify_subagent_plan_consent;
-pub use journal::{SubagentJournal, TaskDispatchAttribution, is_subagent_kind};
+pub use journal::{
+    BranchMaterialVerifier, SubagentJournal, TaskDispatchAttribution, is_subagent_kind,
+};
 mod plan;
 pub use plan::{
     SubagentPlanApprovalV1, SubagentPlanContext, SubagentPlanDecision, SubagentPlanV1,

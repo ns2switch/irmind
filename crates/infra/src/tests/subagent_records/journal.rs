@@ -106,12 +106,17 @@ impl History {
         )
         .unwrap()
     }
-    fn replay(&self) -> Result<SubagentResources, AppError> {
+    fn journal(&self) -> Result<SubagentJournal, AppError> {
         let mut journal = SubagentJournal::new(self.case.clone(), self.agent.actor()).unwrap();
         for entry in &self.entries {
             journal.accept(entry, &self.verifier)?;
         }
-        journal.outstanding().map_err(|_| AppError::InvalidChain(0))
+        Ok(journal)
+    }
+    fn replay(&self) -> Result<SubagentResources, AppError> {
+        self.journal()?
+            .outstanding()
+            .map_err(|_| AppError::InvalidChain(0))
     }
 }
 
@@ -304,6 +309,7 @@ fn model_terminal_prefix(
     irmind_app::subagents::SubagentCheckpointV1,
     irmind_app::subagents::BranchTerminal,
     SubagentDigest,
+    Vec<irmind_app::subagents::SubagentBranchEntry>,
 ) {
     use irmind_app::subagents::{
         BranchModelReply, BranchTerminal, CheckedBranchChunk, SubagentBranchPayload, SubagentStatus,
@@ -350,17 +356,15 @@ fn model_terminal_prefix(
         SubagentBranchPayload::Terminal(terminal.clone()),
         reply.hash,
     );
-    let chunk = CheckedBranchChunk::from_entries(
-        &[reply, last],
-        &history.agent.public_key(),
-        &history.verifier,
-    )
-    .unwrap();
+    let entries = vec![reply, last];
+    let chunk =
+        CheckedBranchChunk::from_entries(&entries, &history.agent.public_key(), &history.verifier)
+            .unwrap();
     let checkpoint = chunk
         .checkpoint(Some(first.identity().unwrap()), vec![])
         .unwrap();
     history.record(&checkpoint, false);
-    (checkpoint, terminal, accounting)
+    (checkpoint, terminal, accounting, entries)
 }
 
 #[test]
@@ -379,7 +383,7 @@ fn accounting_has_one_authoritative_charge_and_unknown_usage_stays_reserved() {
     );
     history.record(&start, false);
     let (reserve, request, first) = model_request_prefix(&mut history, &plan, plan_hash, &start);
-    let (last, terminal, accounting) =
+    let (last, terminal, accounting, _) =
         model_terminal_prefix(&mut history, &plan, &reserve, &request, &first);
     let before_settle = history.entries.len();
     let settlement = |accounting| {
@@ -413,7 +417,13 @@ fn accounting_has_one_authoritative_charge_and_unknown_usage_stays_reserved() {
     assert!(history.replay().is_err());
     history.entries.truncate(before_settle);
     history.record(&settlement(None), false);
-    assert_eq!(history.replay().unwrap(), plan.reservation);
+    assert_eq!(
+        history.replay().unwrap(),
+        SubagentResources {
+            rounds: 0,
+            ..plan.reservation
+        }
+    );
     history.record(
         &SubagentResultV1::from_terminal(&last, &terminal).unwrap(),
         false,
@@ -426,7 +436,13 @@ fn accounting_has_one_authoritative_charge_and_unknown_usage_stays_reserved() {
     );
     release.amount = plan.reservation.checked_sub(reserve.amount).unwrap();
     history.record(&release, false);
-    assert_eq!(history.replay().unwrap(), reserve.amount);
+    assert_eq!(
+        history.replay().unwrap(),
+        SubagentResources {
+            rounds: 0,
+            ..reserve.amount
+        }
+    );
 }
 
 #[test]
@@ -439,4 +455,261 @@ fn child_dispatch_attribution_matches_the_approved_canonical_vector() {
     assert_eq!(value.canonical().unwrap(), bytes);
     value.call_id = "invalid call".into();
     assert!(value.canonical().is_err());
+}
+
+#[test]
+fn subagent_round_allowance_includes_parent_requests_and_compaction() {
+    let mut history = History::new();
+    history.append(
+        AuditEventKind::Prompt,
+        "Synthetic analyst question".into(),
+        true,
+    );
+    history.append(
+        AuditEventKind::ModelRequest,
+        "round=1;messages=2".into(),
+        true,
+    );
+    history.append(
+        AuditEventKind::ModelRequest,
+        "conversation compaction".into(),
+        true,
+    );
+    let mut plan = history.plan(100_000);
+    let before = history.entries.len();
+    history.record(&plan, false);
+    assert!(history.replay().is_err());
+    history.entries.truncate(before);
+    plan.usage.rounds = 2;
+    plan.remaining.rounds -= 2;
+    plan.validate().unwrap();
+    let plan_hash = history.record(&plan, false);
+    let hold = transition(&plan, ReservationAction::HoldPreview, None, plan_hash);
+    history.record(&hold, false);
+    history.replay().unwrap();
+    history.append(
+        AuditEventKind::Prompt,
+        "Reset the round count".into(),
+        false,
+    );
+    assert!(history.replay().is_err());
+}
+
+fn completed_model_history() -> (
+    History,
+    Vec<irmind_app::subagents::CheckedBranchChunk>,
+    usize,
+    irmind_app::subagents::SubagentCheckpointV1,
+    irmind_app::subagents::BranchTerminal,
+) {
+    use irmind_app::subagents::{CheckedBranchChunk, SubagentResultV1};
+    let mut history = History::new();
+    let plan = history.plan(100_000);
+    let plan_hash = history.record(&plan, false);
+    let hold = transition(&plan, ReservationAction::HoldPreview, None, plan_hash);
+    history.record(&hold, false);
+    let start = transition(
+        &plan,
+        ReservationAction::StartPlan,
+        Some(hold.operation_id),
+        plan_hash,
+    );
+    history.record(&start, false);
+    let (reserve, request, first) = model_request_prefix(&mut history, &plan, plan_hash, &start);
+    let first_chunk = CheckedBranchChunk::from_entries(
+        std::slice::from_ref(&request),
+        &history.agent.public_key(),
+        &history.verifier,
+    )
+    .unwrap();
+    let (last, terminal, accounting, entries) =
+        model_terminal_prefix(&mut history, &plan, &reserve, &request, &first);
+    let last_chunk =
+        CheckedBranchChunk::from_entries(&entries, &history.agent.public_key(), &history.verifier)
+            .unwrap();
+    let settled = SubagentReservationV1::prepare(
+        &plan,
+        Some(plan.tasks[0].task_id),
+        1,
+        ReservationAction::SettleRequest,
+        ReservationPurpose::Model,
+        ReservationTransition {
+            amount: terminal.usage,
+            parent_operation: Some(reserve.operation_id),
+            cause_sha256: last.identity().unwrap(),
+            accounting_audit_sha256: Some(accounting),
+        },
+    )
+    .unwrap();
+    history.record(&settled, false);
+    let before_result = history.entries.len();
+    history.record(
+        &SubagentResultV1::from_terminal(&last, &terminal).unwrap(),
+        false,
+    );
+    let mut release = transition(
+        &plan,
+        ReservationAction::ReleasePlan,
+        Some(start.operation_id),
+        last.identity().unwrap(),
+    );
+    release.amount = plan.reservation.checked_sub(terminal.usage).unwrap();
+    history.record(&release, false);
+    assert_eq!(history.replay().unwrap(), SubagentResources::default());
+    (
+        history,
+        vec![first_chunk, last_chunk],
+        before_result,
+        last,
+        terminal,
+    )
+}
+
+fn supply_material<'a>(
+    journal: &'a SubagentJournal,
+    history: &History,
+    chunks: &[irmind_app::subagents::CheckedBranchChunk],
+) -> Result<
+    irmind_app::subagents::BranchMaterialVerifier<'a>,
+    irmind_app::subagents::SubagentRecordError,
+> {
+    let mut material = irmind_app::subagents::BranchMaterialVerifier::new(journal)?;
+    let mut skills = irmind_app::SkillReceiptVerifier::default();
+    for chunk in chunks {
+        let descriptor = material.next_descriptor()?.unwrap();
+        material.accept(
+            &descriptor,
+            chunk.bytes(),
+            &history.verifier,
+            &mut skills,
+            &TomlSkillCompiler,
+        )?;
+    }
+    Ok(material)
+}
+
+#[test]
+fn subagent_material_rejects_missing_extra_and_noncanonical_descriptors_without_recovery() {
+    use irmind_app::subagents::BranchMaterialVerifier;
+    let (history, chunks, _, _, _) = completed_model_history();
+    let journal = history.journal().unwrap();
+    assert_eq!(BranchMaterialVerifier::new(&journal).unwrap().count(), 2);
+    assert!(
+        BranchMaterialVerifier::new(&journal)
+            .unwrap()
+            .finish()
+            .is_err()
+    );
+    let mut material = BranchMaterialVerifier::new(&journal).unwrap();
+    let descriptor = material.next_descriptor().unwrap().unwrap();
+    let mut wrong = descriptor.clone();
+    wrong.push(b' ');
+    let mut skills = irmind_app::SkillReceiptVerifier::default();
+    assert!(
+        material
+            .accept(
+                &wrong,
+                chunks[0].bytes(),
+                &history.verifier,
+                &mut skills,
+                &TomlSkillCompiler
+            )
+            .is_err()
+    );
+    assert!(
+        material
+            .accept(
+                &descriptor,
+                chunks[0].bytes(),
+                &history.verifier,
+                &mut skills,
+                &TomlSkillCompiler
+            )
+            .is_err()
+    );
+    assert!(material.next_reference().is_err());
+    assert!(material.finish().is_err());
+    supply_material(&journal, &history, &chunks)
+        .unwrap()
+        .finish()
+        .unwrap();
+    let mut extra = supply_material(&journal, &history, &chunks).unwrap();
+    assert!(extra.next_reference().unwrap().is_none());
+    assert!(
+        extra
+            .accept(
+                b"{}",
+                chunks[0].bytes(),
+                &history.verifier,
+                &mut skills,
+                &TomlSkillCompiler
+            )
+            .is_err()
+    );
+    assert!(extra.finish().is_err());
+}
+
+#[test]
+fn subagent_material_verifies_the_case_local_chunk_store_and_rejects_missing_material() {
+    use irmind_app::subagents::SubagentBranchStore;
+    let (history, chunks, _, _, _) = completed_model_history();
+    let journal = history.journal().unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let store = ParquetStore::open(root.path()).unwrap();
+    let cancel = CancellationToken::new();
+    for chunk in &chunks {
+        store
+            .publish(store.stage(&history.case, chunk, &cancel).unwrap())
+            .unwrap();
+    }
+    let mut skills = irmind_app::SkillReceiptVerifier::default();
+    journal
+        .verify_stored_branches(
+            &store,
+            &history.verifier,
+            &mut skills,
+            &TomlSkillCompiler,
+            &cancel,
+        )
+        .unwrap();
+    let path = root
+        .path()
+        .join("parquet")
+        .join(history.case.as_str())
+        .join(format!(
+            "branches/{}.json",
+            hex(chunks[1].hash().as_bytes())
+        ));
+    fs::remove_file(path).unwrap();
+    assert!(
+        journal
+            .verify_stored_branches(
+                &store,
+                &history.verifier,
+                &mut skills,
+                &TomlSkillCompiler,
+                &cancel
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn subagent_main_result_must_repeat_the_committed_terminal_exactly() {
+    use irmind_app::subagents::SubagentResultV1;
+    let (mut history, chunks, before_result, checkpoint, mut terminal) = completed_model_history();
+    history.entries.truncate(before_result);
+    terminal.guarded_summary = "A different summary.".into();
+    terminal.summary_sha256 =
+        SubagentDigest::from_bytes(sha256(terminal.guarded_summary.as_bytes()));
+    history.record(
+        &SubagentResultV1::from_terminal(&checkpoint, &terminal).unwrap(),
+        false,
+    );
+    let journal = history.journal().unwrap();
+    assert!(
+        supply_material(&journal, &history, &chunks)
+            .and_then(irmind_app::subagents::BranchMaterialVerifier::finish)
+            .is_err()
+    );
 }
