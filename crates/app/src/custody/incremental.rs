@@ -151,6 +151,9 @@ impl Engine<'_> {
         self.verifier
             .verify(&entry.public_key, &entry.hash, &entry.sig)
             .map_err(|_| AppError::InvalidChain(entry.seq))?;
+        if index == 0 {
+            crate::budget_status(std::slice::from_ref(entry), &self.policy)?;
+        }
         Ok(entry.hash)
     }
 }

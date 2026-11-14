@@ -1,4 +1,4 @@
-use super::export_current::{HeaderV7, MAGIC_V7, v7_result};
+use super::export_current::{HeaderV8, MAGIC_V8, v8_result};
 use super::frames::{read_frame, read_hash, read_u64, verify_raw};
 use super::{
     AppError, CaseId, LocalVerifier, Path, Severity, hex, seal_challenge, sha256, storage,
@@ -14,7 +14,7 @@ const MAX_AUDIT_ENTRIES: u64 = 5_000_000;
 const MAX_SOURCE_MANIFESTS: usize = 1_000_000;
 const MAX_PACKAGE_FILE_BYTES: u64 = 2_000_000_000_000;
 
-pub(super) fn verify_export_v7(
+pub(super) fn verify_export_v8(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
@@ -30,19 +30,21 @@ fn verify_open_export(
     size: u64,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
-    let version = 7;
+    let version = 8;
     if size > MAX_PACKAGE_FILE_BYTES {
         return Err(storage_reason("export package exceeds size limit"));
     }
-    let mut magic = [0u8; MAGIC_V7.len()];
-    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V7 {
+    let mut magic = [0u8; MAGIC_V8.len()];
+    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V8 {
         return Err(AppError::Fixed(
             irmind_app::FixedAppError::RetiredExportFormat,
         ));
     }
-    let header: HeaderV7 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
+    let header: HeaderV8 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
     if header.version != version {
-        return Err(storage_reason("unsupported export version"));
+        return Err(AppError::Fixed(
+            irmind_app::FixedAppError::RetiredExportFormat,
+        ));
     }
     let id =
         CaseId::parse(&header.case_id).map_err(|_| storage_reason("invalid case id in export"))?;
@@ -85,11 +87,12 @@ fn verify_open_export(
         &chain.verifier,
         &header.seal.public_key,
     )?;
+    verify_empty_extensions(&mut input)?;
     let mut extra = [0u8; 1];
     if input.read(&mut extra).map_err(storage)? != 0 {
         return Err(storage_reason("export has trailing bytes"));
     }
-    let mut result = v7_result(
+    let mut result = v8_result(
         fingerprint,
         usize::try_from(count).map_err(storage)?,
         chain.source_count,
@@ -99,10 +102,22 @@ fn verify_open_export(
     Ok(result)
 }
 
+fn verify_empty_extensions(input: &mut File) -> Result<(), AppError> {
+    for reason in [
+        "export contains catalog proofs not supported by this build",
+        "export contains subagent branch chunks not supported by this build",
+    ] {
+        if read_u64(input)? != 0 {
+            return Err(storage_reason(reason));
+        }
+    }
+    Ok(())
+}
+
 fn verify_operation_frames(
     input: &mut File,
     chain: &mut ChainState,
-    header: &HeaderV7,
+    header: &HeaderV8,
 ) -> Result<(), AppError> {
     let count = read_u64(input)?;
     if count > MAX_AUDIT_ENTRIES {
@@ -265,6 +280,12 @@ impl ChainState {
             .clone()
             .with_trusted_key(&entry.actor, &entry.public_key)
             .map_err(|_| AppError::InvalidChain(entry.seq))?;
+        if index == 0 {
+            irmind_app::budget_status(
+                std::slice::from_ref(&entry),
+                &irmind_domain::PolicyRules::default(),
+            )?;
+        }
         {
             self.catalog.accept(&entry)?;
             self.inventory.accept(&entry)?;
@@ -336,7 +357,7 @@ impl ChainState {
         Ok(())
     }
 
-    fn verify_seal(&self, id: &CaseId, header: &HeaderV7) -> Result<(), AppError> {
+    fn verify_seal(&self, id: &CaseId, header: &HeaderV8) -> Result<(), AppError> {
         {
             self.catalog.validate()?;
         }

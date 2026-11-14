@@ -77,7 +77,7 @@ Cada paquete contiene `SKILL.md` y hasta 16 recursos, con un máximo total de 12
 
 La metodología siempre es contenido no confiable. Nunca entra en mensajes de sistema, no es evidencia y su hash no puede citarse como evidencia. Las herramientas declaradas limitan las llamadas del método. Siguen vigentes la política, el alcance, el techo de la organización, las comprobaciones de contenido contaminado, las aprobaciones y los presupuestos. Una skill no confirma sus propios hallazgos. La ausencia de mapeos significa cobertura incompleta, no permiso para inventar una clasificación.
 
-El caso conserva el paquete original y los rangos filtrados realmente cargados. La exportación V7 incluye las pruebas de instalación referenciadas para verificarla sin llavero. Autentica el uso de la metodología registrado; no reproduce una respuesta del modelo ni garantiza una conclusión forense.
+El caso conserva el paquete original y los rangos filtrados realmente cargados. La exportación V8 incluye las pruebas de instalación referenciadas para verificarla sin llavero. Autentica el uso de la metodología registrado; no reproduce una respuesta del modelo ni garantiza una conclusión forense.
 
 Antes de la 1.0, las versiones menores pueden cambiar los formatos sin migración. Conserva la versión que creó cada caso. Consulta el [modelo de seguridad](security-model.md), la [configuración](configuration.md) y el [diseño de desarrollo en inglés](../development/skills-design.md).
 

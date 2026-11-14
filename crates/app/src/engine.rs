@@ -15,8 +15,23 @@ struct CaseCreatedEvent {
     #[serde(default)]
     severity: Option<String>,
     scope: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    budget: Option<crate::CaseBudgetLimits>,
+    budget: crate::CaseBudgetLimits,
+}
+
+fn current_case_creation(first: &SignedEntry) -> Result<CaseCreatedEvent, AppError> {
+    #[derive(Deserialize)]
+    struct VersionMarker {
+        version: u8,
+    }
+    if !first.payload.starts_with('{') {
+        return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
+    }
+    let marker: VersionMarker =
+        serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))?;
+    if marker.version != 4 {
+        return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
+    }
+    serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))
 }
 
 #[derive(Deserialize, Serialize)]
@@ -37,14 +52,7 @@ pub fn verify_case_metadata(
     if first.kind != irmind_domain::AuditEventKind::CaseCreated || first.actor != Actor::Analyst {
         return Err(AppError::InvalidChain(first.seq));
     }
-    if !first.payload.starts_with('{') {
-        return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
-    }
-    let created: CaseCreatedEvent =
-        serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))?;
-    if created.version != 3 {
-        return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
-    }
+    let created = current_case_creation(first)?;
     if created.title != title || created.severity.as_deref() != Some(severity.as_str()) {
         return Err(AppError::InvalidChain(first.seq));
     }
@@ -408,7 +416,7 @@ mod format_tests {
             actor: Actor::Analyst,
             origin: "analyst".into(),
             kind: AuditEventKind::CaseCreated,
-            payload: r#"{"version":3,"title":"Synthetic","severity":"medium","scope":"local"}"#
+            payload: r#"{"version":4,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000}}"#
                 .into(),
             evidence: None,
             prev: [0; 32],
@@ -420,6 +428,7 @@ mod format_tests {
             verify_case_metadata("Synthetic", Severity::Medium, "local", &[first.clone()]).is_ok()
         );
         for retired in [
+            r#"{"version":3,"title":"Synthetic","severity":"medium","scope":"local"}"#,
             r#"{"version":2,"title":"Synthetic","severity":"medium","scope":"local"}"#,
             "title=Synthetic;scope=local",
         ] {

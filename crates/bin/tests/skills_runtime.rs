@@ -14,7 +14,7 @@ use irmind_domain::{Actor, AuditEventKind};
 use support::*;
 
 #[test]
-fn three_bundled_methods_complete_scripted_synthetic_investigations_and_v7_exports() {
+fn three_bundled_methods_complete_scripted_synthetic_investigations_and_v8_exports() {
     for (name, parser, fixture, term) in [
         (
             "windows-triage",
@@ -210,7 +210,7 @@ fn seal_export(
     let details = irmind_infra::LocalExportVerifier
         .verify_export_details(&export, Some(&key))
         .unwrap();
-    assert_eq!(details.format_version, 7);
+    assert_eq!(details.format_version, 8);
     let result = std::process::Command::new(env!("CARGO_BIN_EXE_irmind"))
         .arg("--home")
         .arg(root.join("independent-verifier"))
@@ -230,12 +230,12 @@ fn seal_export(
     assert!(
         std::fs::read(&export)
             .unwrap()
-            .starts_with(b"IRMIND-EXPORT-V7\0")
+            .starts_with(b"IRMIND-EXPORT-V8\0")
     );
     if std::env::var_os("IRMIND_REFRESH_SKILL_EXPORT_SEEDS").is_some() {
         let seed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../fuzz/seeds/export")
-            .join(format!("valid-v7-skill-{name}.irmind"));
+            .join(format!("valid-v8-skill-{name}.irmind"));
         std::fs::copy(&export, seed).unwrap();
     }
 }

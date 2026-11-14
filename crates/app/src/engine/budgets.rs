@@ -102,15 +102,14 @@ pub fn budget_status(
     organization: &PolicyRules,
 ) -> Result<CaseBudgetStatus, AppError> {
     let first = entries.first().ok_or(AppError::InvalidChain(0))?;
-    let created: super::CaseCreatedEvent =
-        serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))?;
+    let created = super::current_case_creation(first)?;
     if first.kind != AuditEventKind::CaseCreated
         || first.actor != Actor::Analyst
-        || created.version != 3
+        || created.version != 4
     {
         return Err(AppError::InvalidChain(first.seq));
     }
-    let mut allocated = created.budget;
+    let mut allocated = Some(created.budget);
     if let Some(limits) = allocated {
         limits.validate()?;
     }

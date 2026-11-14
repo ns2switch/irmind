@@ -74,7 +74,7 @@ A package contains `SKILL.md` plus at most 16 resources, with a total limit of 1
 
 Skill text is always untrusted. It never enters a system message, never becomes evidence and cannot be cited as an evidence hash. Declared tools restrict method-assisted calls; normal policy, case scope, organization ceilings, taint checks, approvals and budgets still apply. A skill cannot confirm its own findings. Missing semantic mappings mean incomplete coverage, not permission to invent classification.
 
-The signed case preserves the original package and the screened ranges actually loaded. Export V7 carries the exact referenced installation proofs for independent verification without your keystore. It authenticates recorded methodology use; it does not claim to reproduce a model response or establish the quality of a forensic conclusion.
+The signed case preserves the original package and the screened ranges actually loaded. Development export V8 carries the exact referenced installation proofs for independent verification without your keystore. It authenticates recorded methodology use; it does not claim to reproduce a model response or establish the quality of a forensic conclusion.
 
 Pre-1.0 minor versions may change skill and export formats without migration. Keep the version that created a case. See the [security model](security-model.md), [installation configuration](configuration.md) and [development design](development/skills-design.md).
 

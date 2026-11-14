@@ -345,7 +345,7 @@ pub trait ExportVerifier: Send + Sync {
         Ok(ExportVerification {
             analyst_key_fingerprint,
             entries,
-            format_version: 3,
+            format_version: 8,
             source_manifests: 0,
             source_bytes_verified: 0,
             source_bytes_unavailable: 0,

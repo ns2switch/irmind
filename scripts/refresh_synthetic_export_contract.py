@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh two synthetic V7 vectors after an intentional common-schema change.
+"""Refresh two synthetic V8 vectors after an intentional common-schema change.
 
 Development only; requires Python cryptography. Only the published synthetic
 [43; 32] signing key is accepted. Original signatures and seed digests are checked
@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 ROOT = Path(__file__).resolve().parents[1]
-MAGIC = b'IRMIND-EXPORT-V7\0'
+MAGIC = b'IRMIND-EXPORT-V8\0'
 PROFILE = b'irmind-mapping-profile-v1\0'
 KEY = Ed25519PrivateKey.from_private_bytes(bytes([43]) * 32)
 PUBLIC = KEY.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
@@ -158,7 +158,7 @@ def main():
     parser.add_argument('--write', action='store_true')
     args = parser.parse_args()
     updates = []
-    for name in ['valid-v7-mapped.irmind', 'valid-v7-installed.irmind']:
+    for name in ['valid-v8-mapped.irmind', 'valid-v8-installed.irmind']:
         path = ROOT / 'fuzz/seeds/export' / name
         data, old = refresh(path)
         updates.append((path, data, old))

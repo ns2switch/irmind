@@ -4,6 +4,14 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+**Format impact:** New cases use CaseCreated version 4 with an initial signed
+allocation. Export V8 replaces V7 and always includes catalog-proof and subagent
+branch counts, including zero counts. Older cases/exports require their creating
+IRMind version or re-ingestion of verified originals; there is no automatic migration.
+
+- Establish the shared case/export foundation for catalog admissions and
+  subagent branches, retaining current seal bytes and frame limits.
+
 ## 0.4.2 — Case budgets and Kubernetes investigations
 
 **Format impact: current case contracts change.** The expanded common-event

@@ -1,4 +1,4 @@
-//! Public-key-only V7 authentication includes every retained layout parent.
+//! Public-key-only V8 authentication includes every retained layout parent.
 use super::*;
 use irmind_app::{LargeCaseStore, LargeCaseUseCases};
 use irmind_domain::AuditEventKind;
@@ -154,7 +154,7 @@ fn ingest(
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn v7_export_authenticates_retained_parents_receipts_schema_and_public_key() {
+fn v8_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     let root = tempfile::tempdir().unwrap();
     let (store, engine, signer) = setup(root.path());
     let case = engine
@@ -196,7 +196,7 @@ fn v7_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     let details = crate::LocalExportVerifier
         .verify_export_details(&package, Some(&expected))
         .unwrap();
-    assert_eq!(details.format_version, 7);
+    assert_eq!(details.format_version, 8);
     assert_eq!(details.source_manifests, 2);
     assert!(
         crate::LocalExportVerifier
@@ -204,7 +204,7 @@ fn v7_export_authenticates_retained_parents_receipts_schema_and_public_key() {
             .is_err()
     );
     let mut bytes = fs::read(&package).unwrap();
-    assert!(bytes.starts_with(b"IRMIND-EXPORT-V7\0"));
+    assert!(bytes.starts_with(b"IRMIND-EXPORT-V8\0"));
     bytes[..b"IRMIND-EXPORT-V5\0".len()].copy_from_slice(b"IRMIND-EXPORT-V5\0");
     let downgrade = root.path().join("downgrade.irmind");
     fs::write(&downgrade, bytes).unwrap();
