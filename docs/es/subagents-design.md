@@ -1,3 +1,5 @@
+Traducción de docs/development/subagents-design.md en el commit 332d88742dcf4edf9e9b461956c0d035155ab2cc; si hay diferencias, prevalece la versión en inglés.
+
 # Subagentes acotados y eventos del motor
 
 Propuesta para v0.5 basada en los presupuestos de caso, el esquema común y los
