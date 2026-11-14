@@ -61,6 +61,11 @@ target = "host.name"
 omit_text = ["<NA>", "<NONE>"]
 observation = { kind = "host", role = "subject", scope = { kind = "source_record" } }
 
+[[fields]]
+source = ["output_fields", "container.privileged"]
+target = "container.security_context.privileged"
+omit_text = ["<NA>", "<NONE>"]
+
 [[rules]]
 kind = "alert"
 categories = ["intrusion_detection"]

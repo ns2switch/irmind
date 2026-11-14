@@ -17,7 +17,7 @@
       "records": 2,
       "query": "credential",
       "category": "iam",
-      "type": "creation",
+      "type": "info",
       "outcome": "success",
       "role": "actor"
     },
@@ -27,7 +27,7 @@
       "records": 2,
       "query": "CreateServiceAccountKey",
       "category": null,
-      "type": null,
+      "type": "access",
       "outcome": null,
       "role": null
     },
@@ -100,6 +100,45 @@
       "type": null,
       "outcome": null,
       "role": null
+    },
+    "k8s-cluster-compromise": {
+      "conclusion": "Failed synthetic secret read followed by a successful cluster-role binding; effective privileges need separate RBAC state",
+      "technique": "T1098.006",
+      "malicious_event_ids": [
+        "synthetic-cluster-read",
+        "synthetic-cluster-binding"
+      ],
+      "expected_entities": [
+        "system:serviceaccount:operations:builder",
+        "203.0.113.77",
+        "synthetic-admin-grant"
+      ],
+      "required_source_fragments": [
+        "roleRef",
+        "subjects",
+        "ClusterRole",
+        "cluster-admin"
+      ]
+    },
+    "k8s-workload-compromise": {
+      "conclusion": "Successful synthetic risky pod creation correlates with a Falco source alert; node escape is not established",
+      "technique": "T1610",
+      "malicious_event_ids": [
+        "synthetic-workload-create",
+        "synthetic-workload-exec"
+      ],
+      "expected_entities": [
+        "synthetic-risky-pod",
+        "203.0.113.77",
+        "example.invalid/synthetic-workload"
+      ],
+      "required_source_fragments": [
+        "hostPath",
+        "/synthetic/host",
+        "hostNetwork",
+        "hostPID",
+        "privileged"
+      ]
     }
   }
 }

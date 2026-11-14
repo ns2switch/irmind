@@ -271,6 +271,7 @@ fn run_in_directory(
         Arc::new(MandatoryGuard::new()?),
     );
     let intel = SyntheticIntel;
+    let ports = ports.with_source_evidence_reader(store.source_evidence_reader());
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
         .with_skills(super::skills::services(root, agent)?)?
         .with_threat_intel(&intel)

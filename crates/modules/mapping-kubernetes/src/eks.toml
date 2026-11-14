@@ -145,3 +145,11 @@ outcome = "unknown"
 [[rules.when]]
 path = ["audit_event", "responseStatus", "code"]
 predicate = { op = "null" }
+
+[[rules]]
+categories = ["api"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["audit_event", "responseStatus", "code"]
+predicate = { op = "integer_interval", value = { first = 100, last = 199 } }

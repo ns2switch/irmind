@@ -8,7 +8,7 @@ use irmind_domain::EvidenceHash;
 use irmind_mapping_tables::TableMapping;
 use std::sync::Arc;
 const DEFINITION: &str = include_str!("kubernetes.toml");
-const DIGEST: &str = "87c111421e7ba27f4581236c08d2bdddc6f723041f9a447039f7e8a85cdc4f7c";
+const DIGEST: &str = "832d119ca0d776a13a10ff56c814e98eecd575a5eee5eb25d3d492079d7bd63f";
 pub struct KubernetesMapping {
     table: TableMapping,
     module: &'static ModuleManifest,
@@ -22,12 +22,12 @@ impl KubernetesMapping {
             Self::new()?,
             Self::included(
                 include_str!("eks.toml"),
-                "a364062e21ecfae08e1749c7392115517a28708460b43a3d1feaaa3340a0fa5e",
+                "6946c0c91035030f453ea9a5614c3f199f2324f7440c4753c61130d3fa431b40",
                 &EKS_MODULE,
             )?,
             Self::included(
                 include_str!("aks.toml"),
-                "9fa114c12f152ae73a19f390f0f1cb833c22e1e62f59b47f50ccd339278d907f",
+                "67b131b48babbdec174758e46349e492cf3a71df8abd38e92df20268518e77f5",
                 &AKS_MODULE,
             )?,
         ])

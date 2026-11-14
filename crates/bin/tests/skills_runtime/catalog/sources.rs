@@ -18,6 +18,16 @@ fn modules() -> Vec<Box<dyn Module>> {
     use irmind_mod_mapping_linux::{AuditMapping, HttpMapping};
     use irmind_mod_mapping_network::NetworkMapping;
     let mut modules: Vec<Box<dyn Module>> = vec![
+        #[cfg(feature = "parser-kubernetes")]
+        Box::new(irmind_mod_parser_kubernetes::KubernetesParser::default()),
+        #[cfg(feature = "parser-falco")]
+        Box::new(irmind_mod_parser_falco::FalcoParser::default()),
+        #[cfg(feature = "parser-falco")]
+        Box::new(irmind_mod_mapping_falco::HostMapping::new().unwrap()),
+        #[cfg(feature = "parser-falco")]
+        Box::new(irmind_mod_mapping_falco::KubernetesMapping::new().unwrap()),
+        #[cfg(feature = "parser-falco")]
+        Box::new(irmind_mod_mapping_falco::AuditPluginMapping::new().unwrap()),
         Box::new(irmind_mod_parser_entra::EntraParser),
         Box::new(irmind_mod_parser_gcp_audit::GcpAuditParser::default()),
         Box::new(irmind_mod_mapping_gcp_audit::CloudAuditMapping::new().unwrap()),
@@ -35,6 +45,10 @@ fn modules() -> Vec<Box<dyn Module>> {
         Box::new(irmind_mod_parser_suricata::SuricataParser),
         Box::new(NetworkMapping::new("parser-suricata").unwrap()),
     ];
+    #[cfg(feature = "parser-kubernetes")]
+    for mapper in irmind_mod_mapping_kubernetes::KubernetesMapping::all().unwrap() {
+        modules.push(Box::new(mapper));
+    }
     for mapper in irmind_mod_mapping_entra::EntraMapping::all().unwrap() {
         modules.push(Box::new(mapper));
     }

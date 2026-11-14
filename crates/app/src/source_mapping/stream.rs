@@ -1,6 +1,7 @@
 //! Streaming input accounting uses a caller-owned private tuple spool, not a decoded cache.
 mod commitment;
 mod prepared;
+mod replay;
 mod validation;
 use super::{
     MappingCatalog, MappingDiagnostic, MappingIdentityV1, MappingOutput, SourceMetadata,
@@ -12,6 +13,7 @@ use irmind_domain::{
     SourceRecordSetV1, Tainted,
 };
 pub use prepared::{PreparedSourceRecord, SourceRecordPreparer};
+pub use replay::SourceRecordReplay;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},

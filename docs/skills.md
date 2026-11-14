@@ -4,7 +4,7 @@ This page is for analysts who want a repeatable investigation method without gra
 
 ## Use an included method
 
-Open a case, configure a model in `/settings model`, and type `/` to see the active methods. The binary includes 13 methods. All are experimental and tested with synthetic episodes, not validated forensic conclusions.
+Open a case, configure a model in `/settings model`, and type `/` to see the active methods. The binary includes 15 methods. All are experimental and tested with synthetic episodes, not validated forensic conclusions.
 
 | Command | Purpose | Required sources | Coverage |
 | --- | --- | --- | --- |
@@ -22,6 +22,10 @@ Open a case, configure a model in `/settings model`, and type `/` to see the act
 | `/network-c2-beaconing` | Periodic flows, suspicious DNS and alerts. | Zeek and Suricata EVE; optional producer-normalized ECS. | Mapped protocol categories and source/destination roles; missing status stays unknown. Source alerts remain unconfirmed. |
 | `/malware-execution-triage` | Binary origin, execution and observed follow-on activity. | Sysmon 1/3/11 and PECmd/AmcacheParser or other DFIR exports. | Partial: Amcache presence is not proof of execution; raw binary artifacts need an export. |
 
+
+| `/k8s-cluster-compromise` | API access, secret-read attempts, service accounts and RBAC changes. | Native/EKS/AKS Kubernetes audit Events, GKE Cloud Audit exports; optional Falco k8s_audit. | Mapped API outcomes and cluster-scoped identities; binding contents require verified originals. Effective RBAC state and omitted audit bodies remain gaps. |
+| `/k8s-workload-compromise` | Risky pod requests, exec/attach leads and runtime correlation. | Kubernetes audit plus Falco JSON with pod/container metadata. | Original pod specs and mapped runtime observations; an accepted request or privilege flag alone does not prove execution, escape or cryptomining. |
+
 See the [parser guide](parsers.md) and [module configuration](modules.md) before collecting data. Skills declare only the local tools needed by their methodology. None runs a collector, accesses a provider, installs a mapper or expands case scope.
 
 ### Collect enough evidence
@@ -35,6 +39,17 @@ The methods include common false positives and conditions for an ATT&CK proposal
 You can append a question, for example `/linux-triage Review the failed logins in this case.` The agent can also select a method from its description. No model or remote connector is enabled by a skill. You can inspect all methods without configuring a model.
 
 The model initially receives only active names and descriptions. When it requests `skill_read`, IRMind checks policy, pins the approved package in the case, screens its requested resource and signs a load receipt with the Agent key before exposing the text. The conversation shows a collapsible methodology card. Use Ctrl+O or `/expand` for its details.
+
+
+## Inspect original source facts
+
+`raw_records` reads the indexed projection by default. A method needing a role binding's `roleRef`/subjects or a pod's requested security settings explicitly uses `view="original"`. The original view authenticates the signed source bytes and reproduces its entire decoded-record commitment with the recorded decoder and acquisition context before returning a guarded excerpt. It does not flatten the original bodies into search or contact a cloud provider.
+
+Successful local ingestion authorizes that selected source directory for the current session. After reopening a case, select the originals explicitly with `/verify <source-root>`; only checked sources are authorized. Changing cases clears the previous local directory authorizations. Private originals explicitly copied into the case need no external directory. A missing source, unavailable decoder, changed hash, absent authorization or deadline produces an unavailable result, never a projection presented as an original.
+
+The existing 10-second deadline, pointer limit and 2,000-character excerpt remain. A very large source may not decode within the deadline; truncated excerpts and missing bodies are coverage gaps. Privacy redaction and the guard still apply to identifiers and text. Do not infer missing fields from a projection or from an excerpt that omits them. [The read contract](development/verified-original-record-read.md) describes the bounds.
+
+For Kubernetes, collect authorized API-server audit logs with an audit policy that records the needed metadata or bodies. Enable/export control-plane audit logs for EKS, Kubernetes Cloud Audit entries for GKE, or kube-audit/kube-audit-admin diagnostics for AKS as described in the [parser guide](parsers.md). IRMind performs no collection and implements no live Kubernetes API connector. Falco `source="k8s_audit"` and syscall alerts have separate mappings; source alerts remain unconfirmed, and the collection cluster must be explicitly confirmed. Cloud-to-cluster identity links must exist in the collected evidence; a service-account or pod name alone is not a link.
 
 ## Manage local packages
 
@@ -72,3 +87,5 @@ The methods use original project-licensed prose. Their public sources include
 [Suricata EVE](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html)
 and [MITRE ATT&CK](https://attack.mitre.org/). Links live here rather than in
 loaded methodology: skill content passes the same guard as other untrusted text.
+
+Kubernetes methods reference [auditing](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/) and [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/), the [Falco Kubernetes audit plugin field contract](https://github.com/falcosecurity/plugins/blob/main/plugins/k8saudit/README.md), and ATT&CK [additional container cluster roles](https://attack.mitre.org/techniques/T1098/006/), [container API credential access](https://attack.mitre.org/techniques/T1552/007/), [deployment](https://attack.mitre.org/techniques/T1610/), [administration](https://attack.mitre.org/techniques/T1609/) and [escape to host](https://attack.mitre.org/techniques/T1611/). The methodology is original project text; these references do not establish a finding.

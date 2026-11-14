@@ -83,6 +83,7 @@ pub struct Engine<'a> {
     pub repo: Arc<dyn Repository>,
     pub evidence_store: Arc<dyn EvidenceStore>,
     pub graph: Arc<dyn EvidenceGraph>,
+    pub(crate) source_evidence_reader: Option<Arc<dyn crate::SourceEvidenceReader>>,
     pub audit_log: Arc<dyn AuditLog>,
     pub signer: Arc<dyn Signer>,
     pub verifier: Arc<dyn Verifier>,
@@ -122,6 +123,7 @@ pub struct EnginePorts {
     pub signer: Arc<dyn Signer>,
     pub verifier: Arc<dyn Verifier>,
     pub guard: Arc<dyn ContentGuard>,
+    source_evidence_reader: Option<Arc<dyn crate::SourceEvidenceReader>>,
 }
 
 pub struct CryptoPorts {
@@ -152,7 +154,17 @@ impl EnginePorts {
             signer: crypto.signer,
             verifier: crypto.verifier,
             guard,
+            source_evidence_reader: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_source_evidence_reader(
+        mut self,
+        reader: Arc<dyn crate::SourceEvidenceReader>,
+    ) -> Self {
+        self.source_evidence_reader = Some(reader);
+        self
     }
 }
 
@@ -162,6 +174,7 @@ impl<'a> Engine<'a> {
             repo: Arc::clone(&self.repo),
             evidence_store: Arc::clone(&self.evidence_store),
             graph: Arc::clone(&self.graph),
+            source_evidence_reader: self.source_evidence_reader.clone(),
             audit_log: Arc::clone(&self.audit_log),
             signer: Arc::clone(&self.signer),
             verifier: Arc::clone(&self.verifier),

@@ -23,6 +23,7 @@ mod format;
 pub(crate) use format::validate_common_export_schema;
 mod local;
 mod mapped;
+mod original_read;
 mod partitioning;
 mod profile;
 pub(crate) use profile::ParquetProfile;

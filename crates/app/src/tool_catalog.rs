@@ -65,8 +65,8 @@ fn local_catalog() -> Vec<ToolSpec> {
         },
         ToolSpec {
             name: "raw_records",
-            description: "Read a bounded excerpt of one original JSON record by its hash and zero-based record index",
-            parameters: json!({"type":"object","properties":{"hash":{"type":"string"},"index":{"type":"integer","minimum":0,"maximum":99999}},"required":["hash","index"],"additionalProperties":false}),
+            description: "Read a bounded indexed projection, or explicitly request an authenticated original record from analyst-authorized local evidence; unavailable originals are not replaced with a projection",
+            parameters: json!({"type":"object","properties":{"hash":{"type":"string"},"index":{"type":"integer","minimum":0,"maximum":99999},"view":{"type":"string","enum":["indexed","original"],"default":"indexed"}},"required":["hash","index"],"additionalProperties":false}),
         },
         ToolSpec {
             name: "case_add_finding",

@@ -3,6 +3,8 @@
   "aws-s3-data-exfiltration": "ec8c14a8ed5ecf5e2746821151395f7841ba530a0794d142d4a707e259b855a2",
   "azure-entra-identity-compromise": "fd4e3aa66b15f257cec1564d4065e77b76af9dd617cc16280ff3dcb5863cdc41",
   "gcp-service-account-abuse": "c74d04a881e956d8dd9c820c31d45f1867af4b4384288e45e7ff4f7185dfa4f4",
+  "k8s-cluster-compromise": "8e712497066efbb67ed5e78c9833d75ec74a43bb6716be1aba08216f274e952f",
+  "k8s-workload-compromise": "7f9ff9b98e0dd1f8f835fc5ad8436add069fffbac76dadd06390e7e8bd649dc2",
   "linux-persistence": "ccf593350d5a35921e96818aa876b9bfe78c73595bbf3146cd3f28736dfcf746",
   "linux-triage": "be4a83e88922a5b0fec026cd96d7b3d8eaf6e9f81487e5a60fca411d4d9f42e5",
   "linux-webshell": "0579f0f44188fc36cae19e145b61a8a1cf7993683ef5f82861233c8dba1ae8bb",

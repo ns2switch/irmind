@@ -164,19 +164,30 @@ impl LargeCaseUseCases<'_, '_> {
             .into_iter()
             .map(|source| (source.source.clone(), source))
             .collect::<BTreeMap<_, _>>();
-        self.try_direct(&mut direct::Request {
-            id,
-            source_root,
-            ordered: &ordered,
-            copy_original,
-            selections,
-            known_artifacts: &mut known_artifacts,
-            known_sources: &known_sources,
-            cancel,
-        })?
-        .ok_or(AppError::Fixed(
-            crate::FixedAppError::PolicyMappedSourceDecoderUnavailable,
-        ))
+        let ingested = self
+            .try_direct(&mut direct::Request {
+                id,
+                source_root,
+                ordered: &ordered,
+                copy_original,
+                selections,
+                known_artifacts: &mut known_artifacts,
+                known_sources: &known_sources,
+                cancel,
+            })?
+            .ok_or(AppError::Fixed(
+                crate::FixedAppError::PolicyMappedSourceDecoderUnavailable,
+            ))?;
+        if let Some(reader) = &self.engine.source_evidence_reader {
+            let hashes = ingested
+                .iter()
+                .map(|(_, hash)| hash.clone())
+                .collect::<Vec<_>>();
+            reader.authorize_local_root(id, source_root, &hashes).map_err(|_| AppError::Storage(
+                "Evidence ingestion committed, but original-record access could not be authorized; select the originals directory with /verify <source-root>".into()
+            ))?;
+        }
+        Ok(ingested)
     }
 }
 

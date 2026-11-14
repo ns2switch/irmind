@@ -361,3 +361,34 @@ fn detection_does_not_expand_read_scope() {
         Decision::NeedsApproval(_)
     ));
 }
+
+#[test]
+fn original_record_view_cannot_accept_paths_urls_or_unknown_modes() {
+    for (view, extra, accepted) in [
+        ("original", None, true),
+        ("indexed", None, true),
+        ("https://example.invalid", None, false),
+        ("original", Some(("root", "../outside")), false),
+        ("original", Some(("uri", "s3://bucket/key")), false),
+    ] {
+        let mut args = BTreeMap::from([
+            ("hash".into(), "a".repeat(64)),
+            ("index".into(), "0".into()),
+            ("view".into(), view.into()),
+        ]);
+        if let Some((key, value)) = extra {
+            args.insert(key.into(), value.into());
+        }
+        let decision = evaluate(
+            &case(),
+            ProposedCall {
+                tool: Tool::RawRecords,
+                args,
+            },
+            1,
+            ExecutionMode::Attended,
+            1_700_000_000,
+        );
+        assert_eq!(matches!(decision, Decision::Allow(_)), accepted);
+    }
+}

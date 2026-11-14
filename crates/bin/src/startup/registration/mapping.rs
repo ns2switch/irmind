@@ -106,6 +106,10 @@ fn register_contextual(registry: &mut ModuleRegistry) -> Result<()> {
     #[cfg(feature = "mapping-falco")]
     {
         registry.register(
+            Box::new(irmind_mod_mapping_falco::AuditPluginMapping::new()?),
+            &ModuleConfig::new(),
+        )?;
+        registry.register(
             Box::new(irmind_mod_mapping_falco::HostMapping::new()?),
             &ModuleConfig::new(),
         )?;
@@ -255,7 +259,7 @@ mod tests {
             catalog.snapshots().unwrap().len(),
             2 + 4 * usize::from(cfg!(feature = "mapping-entra"))
                 + 2 * usize::from(cfg!(feature = "mapping-gcp-audit"))
-                + 2 * usize::from(cfg!(feature = "mapping-falco"))
+                + 3 * usize::from(cfg!(feature = "mapping-falco"))
                 + 3 * usize::from(cfg!(feature = "mapping-kubernetes"))
                 + usize::from(cfg!(feature = "mapping-cloudtrail"))
                 + usize::from(cfg!(feature = "mapping-syslog"))

@@ -270,6 +270,13 @@ mod matrix {
             ),
             #[cfg(feature = "parser-falco")]
             (
+                "falco-audit.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-falco/source/audit.ndjson")
+                    .as_slice(),
+                "parser-falco",
+            ),
+            #[cfg(feature = "parser-falco")]
+            (
                 "falco.ndjson",
                 include_bytes!("../../testkit/fixtures/parser-falco/source/events.ndjson")
                     .as_slice(),

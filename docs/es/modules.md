@@ -330,7 +330,7 @@ preciso como evidencia firmada sin clasificar.
 
 ## Paquetes de metodología
 
-Las skills son paquetes de datos locales, no conectores ni módulos ejecutables. `/skills` gestiona los tres métodos incluidos y los paquetes aprobados por el analista. No cambian las herramientas compiladas ni activan proveedores. Consulta [skills forenses](skills.md).
+Las skills son paquetes de datos locales, no conectores ni módulos ejecutables. `/skills` gestiona los métodos incluidos y los paquetes aprobados por el analista. No cambian las herramientas compiladas ni activan proveedores. Consulta [skills forenses](skills.md).
 
 ## Auditoría Kubernetes y Falco
 

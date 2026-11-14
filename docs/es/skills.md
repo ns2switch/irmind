@@ -6,7 +6,7 @@ Esta página ayuda a los analistas a aplicar un método de investigación repeti
 
 ## Usar un método incluido
 
-Abre un caso, configura un modelo en `/settings model` y escribe `/` para ver los métodos activos. El binario incluye 13 métodos. Todos son experimentales y se prueban con episodios sintéticos; no validan por sí solos una conclusión forense.
+Abre un caso, configura un modelo en `/settings model` y escribe `/` para ver los métodos activos. El binario incluye 15 métodos. Todos son experimentales y se prueban con episodios sintéticos; no validan por sí solos una conclusión forense.
 
 | Comando | Para qué sirve | Fuentes necesarias | Cobertura |
 | --- | --- | --- | --- |
@@ -23,6 +23,9 @@ Abre un caso, configura un modelo en `/settings model` y escribe `/` para ver lo
 | `/linux-persistence` | Cron, systemd, claves SSH, cuentas y sudoers. | Registros Linux y configuración recogida o exportaciones DFIR. | Parcial: pocos registros no reconstruyen todo el estado de configuración. |
 | `/network-c2-beaconing` | Flujos periódicos, DNS y alertas. | Zeek y Suricata EVE; ECS ya normalizado, opcional. | Categorías de protocolo y roles de origen/destino mapeados; sin estado, el resultado es desconocido. Alertas sin confirmar. |
 | `/malware-execution-triage` | Origen, ejecución y actividad observada de un binario. | Sysmon 1/3/11 y PECmd/AmcacheParser u otras exportaciones DFIR. | Parcial: presencia en Amcache no prueba ejecución; los artefactos binarios necesitan exportación. |
+| `/k8s-cluster-compromise` | Acceso a la API, intentos de leer secrets, cuentas de servicio y cambios RBAC. | Auditoría Kubernetes nativa/EKS/AKS, exportaciones Cloud Audit de GKE; Falco k8s_audit opcional. | Resultados de API e identidades con ámbito de clúster; el contenido de bindings requiere originales verificados. El estado RBAC efectivo y los cuerpos omitidos siguen siendo lagunas. |
+| `/k8s-workload-compromise` | Peticiones de pods de riesgo, indicios de exec/attach y correlación en ejecución. | Auditoría Kubernetes y Falco JSON con metadatos de pod/contenedor. | Especificaciones originales y observaciones en ejecución; una petición aceptada o un indicador de privilegio no prueban ejecución, escape ni criptominería. |
+
 
 Consulta la [guía de parsers](parsers.md) y la [configuración de módulos](modules.md) antes de recoger datos. Las skills solo declaran las herramientas locales que necesitan. Ninguna ejecuta recolectores, accede a proveedores, instala mapeos ni amplía el alcance.
 
@@ -37,6 +40,17 @@ Los métodos incluyen falsos positivos y condiciones para proponer técnicas ATT
 Puedes añadir una pregunta: `/linux-triage Revisa los accesos fallidos de este caso.` El agente también puede elegir un método por su descripción. Una skill no activa modelos ni conectores remotos. Puedes inspeccionarlas sin configurar un modelo.
 
 Al principio el modelo solo recibe nombres y descripciones activos. Cuando pide `skill_read`, IRMind comprueba la política, fija el paquete aprobado en el caso, filtra el recurso y firma un recibo con la clave Agent antes de mostrar el texto. La conversación incluye una tarjeta plegable de metodología. Ctrl+O o `/expand` muestran sus detalles.
+
+
+## Consultar hechos del original
+
+`raw_records` lee por defecto la proyección indexada. Si un método necesita `roleRef`/subjects de un binding o la configuración solicitada de un pod, pide explícitamente `view="original"`. Esa vista autentica los bytes firmados de la fuente y reproduce el compromiso completo de registros decodificados con el decodificador y contexto de adquisición registrados antes de devolver un extracto filtrado. No proyecta los cuerpos completos en la búsqueda ni contacta proveedores.
+
+La ingesta local correcta autoriza el directorio elegido para la sesión actual. Al reabrir un caso, selecciona los originales con `/verify <source-root>`; solo se autorizan las fuentes comprobadas. Cambiar de caso borra las autorizaciones anteriores. Las copias privadas guardadas explícitamente en el caso no necesitan directorio externo. Una fuente ausente, un decodificador no disponible, un hash cambiado, falta de autorización o un plazo agotado producen un resultado no disponible, nunca una proyección presentada como original.
+
+Siguen vigentes el plazo de 10 segundos, el límite de punteros y el extracto de 2.000 caracteres. Una fuente muy grande puede superar el plazo. Los extractos truncados y los cuerpos ausentes son lagunas de cobertura. La redacción de datos privados y el guard siguen aplicándose a identificadores y texto. No deduzcas campos que la proyección o el extracto no muestran. El [contrato de lectura en inglés](../development/verified-original-record-read.md) define los límites.
+
+Recoge auditoría autorizada del API server de Kubernetes con una política que registre los metadatos o cuerpos necesarios. Exporta auditoría del plano de control de EKS, entradas Kubernetes de Cloud Audit de GKE o diagnósticos kube-audit/kube-audit-admin de AKS como indica la [guía de parsers](parsers.md). IRMind no recoge datos ni implementa un conector Kubernetes en vivo. Las alertas Falco de `source="k8s_audit"` y de syscalls tienen mapeos separados y siguen sin confirmar; hay que confirmar explícitamente el clúster de adquisición. La relación entre identidad de nube y clúster debe existir en la evidencia: compartir nombre de pod o cuenta de servicio no basta.
 
 ## Gestionar paquetes locales
 
@@ -74,3 +88,5 @@ Los métodos usan texto propio bajo la licencia del proyecto. Sus fuentes públi
 [Suricata EVE](https://docs.suricata.io/en/latest/output/eve/eve-json-format.html)
 y [MITRE ATT&CK](https://attack.mitre.org/). Los enlaces viven aquí porque
 el texto cargado de las skills pasa por el mismo guard que otro contenido no confiable.
+
+Los métodos Kubernetes se apoyan en [auditoría](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/) y [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/), el [contrato de campos del plugin de auditoría de Falco](https://github.com/falcosecurity/plugins/blob/main/plugins/k8saudit/README.md) y ATT&CK: [roles adicionales de clúster](https://attack.mitre.org/techniques/T1098/006/), [acceso a credenciales de la API](https://attack.mitre.org/techniques/T1552/007/), [despliegue](https://attack.mitre.org/techniques/T1610/), [administración](https://attack.mitre.org/techniques/T1609/) y [escape al host](https://attack.mitre.org/techniques/T1611/). La metodología es texto propio del proyecto; las referencias no prueban un hallazgo.

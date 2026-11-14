@@ -10,6 +10,8 @@ mod current_sources;
 mod entra;
 #[path = "kubernetes_ingest/managed.rs"]
 mod managed;
+#[path = "kubernetes_ingest/originals.rs"]
+mod originals;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,
@@ -43,7 +45,8 @@ fn engine(store: &Arc<LocalStore>) -> Engine<'static> {
                 Arc::new(LocalVerifier::from_signer(signer.as_ref())),
             ),
             Arc::new(irmind_security::MandatoryGuard::new().unwrap()),
-        ),
+        )
+        .with_source_evidence_reader(store.source_evidence_reader()),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
     )

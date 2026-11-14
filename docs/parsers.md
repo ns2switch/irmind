@@ -124,6 +124,11 @@ queryable within confirmed cluster scope; image tags and pod request bodies
 remain original evidence. No fields from full Kubernetes request/response
 bodies are automatically projected into search.
 
+
+The additional `mapping-falco-kubernetes-audit` table handles Falco's explicit `source="k8s_audit"` format and documented `ka.*` fields. It keeps API actors and impersonated targets separate, retains the audit ID, and requires confirmed cluster context even when no syscall `k8s.*` metadata exists. An alert remains unconfirmed with unknown outcome; its response code is a source observation, not proof of a successful attack. An explicit boolean `container.privileged` is mapped for runtime observations; it is never inferred from a rule title. Kubernetes 1xx protocol-upgrade responses remain unknown rather than successful execution.
+
+Whole pod/RBAC bodies stay out of the index. The [Kubernetes methods](skills.md) use the explicit verified-original view for the necessary source facts, under the existing guard and local-query limits.
+
 ### GCP Cloud Audit Logs and GKE
 
 The default experimental `parser-gcp-audit` module recognizes original Cloud

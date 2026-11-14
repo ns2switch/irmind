@@ -364,7 +364,7 @@ a category, outcome or confirmed finding for a detection collection.
 
 ## Methodology packages
 
-Skills are local data packages, not connectors or executable modules. `/skills` manages the three included methods and analyst-approved packages. They do not change compiled tools or enable providers. See [forensic skills](skills.md).
+Skills are local data packages, not connectors or executable modules. `/skills` manages the included methods and analyst-approved packages. They do not change compiled tools or enable providers. See [forensic skills](skills.md).
 
 ## Kubernetes audit and Falco
 

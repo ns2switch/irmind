@@ -50,13 +50,19 @@ table_module!(
     HostMapping,
     "mapping-falco-host",
     "host.toml",
-    "5f8cebeb48c38c7fda2703bf03a152281494624e35b201c85b7ce43f99fc37c3"
+    "000c426da8641a51750f3a7ebc18e2881d1d3c56c4062e6b9c9deddc62d5ed31"
 );
 table_module!(
     KubernetesMapping,
     "mapping-falco-kubernetes",
     "kubernetes.toml",
-    "69ad17a3c84d93ff9e9fcd94f7acd4b063725b1e225a07f3ca9cf4ddf64ad1fb"
+    "cc16f78e9c2ffe4ebf767ef58296d66a7d88ab27ec4472781a38aeb74b0701b7"
+);
+table_module!(
+    AuditPluginMapping,
+    "mapping-falco-kubernetes-audit",
+    "kubernetes-audit.toml",
+    "319dc7b4cbf1381a96470e0f3927b1e7503a8551e9fb3222a7d7cb510d8ef5ce"
 );
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]

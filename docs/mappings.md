@@ -235,7 +235,7 @@ query, taint, cancellation and custody limits remain in force. See the
 
 `mapping-kubernetes` covers native `audit.k8s.io/v1` Events decoded by
 `parser-kubernetes`. It uses finite response-status tables (200–399 success,
-400–599 failure, absent/null unknown), original verbs, and explicit actor,
+400–599 failure, 100–199 and absent/null unknown), original verbs, and explicit actor,
 impersonation, primary source IP and resource fields. Typed target pod, node,
 namespace and service-account observations require the corresponding resource
 kind. Names are scoped to confirmed acquisition identity; service accounts also
@@ -246,6 +246,9 @@ formats. A Falco rule is an unconfirmed source alert with unknown outcome, not a
 successful attack or confirmed finding. Container OS users do not become API
 principals, and PIDs keep source-record scope. Absent container/image/Kubernetes
 metadata is not fabricated. See the [finite interpreter additions](development/kubernetes-table-mapping-contract.md).
+
+
+`mapping-falco-kubernetes-audit` handles explicit `source="k8s_audit"` records and documented `ka.*` fields, separately from syscall host/Kubernetes records. It keeps actor and impersonated target distinct and requires confirmed cluster context. The source alert remains unconfirmed with unknown outcome. Only an explicit boolean `container.privileged` is mapped; neither a rule title nor a 1xx API protocol upgrade establishes successful execution. Pod/RBAC bodies stay outside the index; the [Kubernetes methods](skills.md) inspect the necessary verified originals with the existing guard and query limits.
 
 ## GCP Cloud Audit and GKE (experimental)
 

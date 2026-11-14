@@ -315,7 +315,8 @@ impl PreparedStartup {
                     self.store.clone(),
                     CryptoPorts::new(self.active.signer.clone(), verifier),
                     self.guard.clone(),
-                ),
+                )
+                .with_source_evidence_reader(self.store.source_evidence_reader()),
                 ExecutionMode::Attended,
                 Arc::new(SystemClock),
             )?

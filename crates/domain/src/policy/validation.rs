@@ -149,7 +149,11 @@ fn valid_local(proposal: &ProposedCall) -> bool {
         Tool::GraphPath => valid_graph_path(&proposal.args),
         Tool::TextSearch => valid_graph_search(&proposal.args),
         Tool::RawRecords => {
-            valid_args(&proposal.args, &["hash", "index"])
+            valid_args(&proposal.args, &["hash", "index", "view"])
+                && proposal
+                    .args
+                    .get("view")
+                    .is_none_or(|v| matches!(v.as_str(), "indexed" | "original"))
                 && proposal.args.get("hash").is_some_and(|hash| {
                     hash.len() == 64 && hash.chars().all(|c| c.is_ascii_hexdigit())
                 })

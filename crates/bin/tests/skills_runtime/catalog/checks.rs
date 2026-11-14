@@ -58,13 +58,55 @@ pub(super) fn requests(scenario: &Scenario, model: &Episode) {
     }
 }
 
-pub(super) fn evaluate(scenario: &Scenario, engine: &Engine<'_>, store: &LocalStore, id: &CaseId) {
+pub(super) fn evaluate(
+    scenario: &Scenario,
+    engine: &Engine<'_>,
+    store: &std::sync::Arc<LocalStore>,
+    id: &CaseId,
+    model: &Episode,
+    root: &Path,
+) {
     // The independent evaluator opens private answers only after the final model reply.
     let expected: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../testkit/fixtures/skills-expanded/private/ground-truth.json"
     ))
     .unwrap();
     let expected = &expected["episodes"][scenario.name];
+    if scenario.cluster.is_some() {
+        let originals = original_facts(scenario, store, id, root);
+        let requests = model.requests.lock().unwrap();
+        let results = requests
+            .iter()
+            .flat_map(|r| &r.messages)
+            .filter(|m| m.role == MessageRole::Tool)
+            .map(|m| m.content.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        for item in expected["malicious_event_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .chain(expected["expected_entities"].as_array().unwrap())
+            .chain(expected["required_source_fragments"].as_array().unwrap())
+        {
+            let original = item.as_str().unwrap();
+            assert!(
+                originals.contains(original),
+                "{} missing original fact: {}",
+                scenario.name,
+                item
+            );
+            // Keep privacy redaction: compare the agent's result with the same
+            // session guard, not with a raw IP that resembles a phone number.
+            let expected = engine.guard.screen(original).unwrap().text;
+            assert!(
+                results.contains(&expected),
+                "{} expected guarded source fact not returned: {}",
+                scenario.name,
+                item
+            );
+        }
+    }
     let findings = engine.findings(id).unwrap();
     assert_eq!(findings.len(), 2);
     assert!(
@@ -198,4 +240,32 @@ pub(super) fn export(
             .unwrap()
             .contains(&format!("signed source manifests: {count};"))
     );
+}
+
+fn original_facts(
+    scenario: &Scenario,
+    store: &std::sync::Arc<LocalStore>,
+    id: &CaseId,
+    root: &Path,
+) -> String {
+    let reader = store.source_evidence_reader();
+    let mut output = String::new();
+    for (n, (name, _, _)) in scenario.files.iter().enumerate() {
+        let bytes = std::fs::read(root.join(name)).unwrap();
+        let hash = irmind_domain::EvidenceHash::from_bytes(irmind_app::sha256(&bytes));
+        reader
+            .authorize_local_root(id, root, std::slice::from_ref(&hash))
+            .unwrap();
+        for index in 0..if n == 0 { 2 } else { 1 } {
+            let record = reader
+                .read_verified_record(id, &hash, index, &CancellationToken::new())
+                .unwrap();
+            record.inspect(|r| {
+                output.push_str(
+                    &irmind_app::source_mapping::json::render_source_fields(r.fields()).unwrap(),
+                );
+            });
+        }
+    }
+    output
 }

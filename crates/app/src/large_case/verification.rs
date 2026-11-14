@@ -18,6 +18,7 @@ impl LargeCaseUseCases<'_, '_> {
         let selected = select_sources(index.sources, mode)?;
         let checked = selected.len();
         let mut missing_or_changed = Vec::new();
+        let mut authorized = Vec::new();
         for source in selected {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
@@ -25,6 +26,9 @@ impl LargeCaseUseCases<'_, '_> {
             let original = self.store.verify_local_source(source_root, &source, cancel);
             if matches!(original, Err(AppError::Cancelled)) {
                 return Err(AppError::Cancelled);
+            }
+            if original.is_ok() && !source.source.contains("://") {
+                authorized.push(source.sha256.clone());
             }
             let copy = if source.copied {
                 self.store.verify_copied_source(id, &source, cancel)
@@ -37,6 +41,11 @@ impl LargeCaseUseCases<'_, '_> {
             if original.is_err() || copy.is_err() {
                 missing_or_changed.push(source.sha256.as_str().to_owned());
             }
+        }
+        if !authorized.is_empty()
+            && let Some(reader) = &self.engine.source_evidence_reader
+        {
+            reader.authorize_local_root(id, source_root, &authorized)?;
         }
         Ok(SourceCheckReport {
             total,
