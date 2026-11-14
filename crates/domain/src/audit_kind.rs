@@ -52,10 +52,18 @@ pub enum AuditEventKind {
     SkillLoadV1,
     /// Recognized only to reject a retired case without interpreting its body.
     RetiredSkillSnapshot,
+    SubagentSourcePageV1,
+    SubagentSourceSetV1,
+    SubagentTypeSnapshotV1,
+    SubagentPlanV1,
+    SubagentPlanApprovalV1,
+    SubagentReservationV1,
+    SubagentCheckpointV1,
+    SubagentResultV1,
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 48] = [
+    pub const ALL: [Self; 56] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -104,6 +112,14 @@ impl AuditEventKind {
         Self::SkillSnapshotV2,
         Self::SkillLoadV1,
         Self::RetiredSkillSnapshot,
+        Self::SubagentSourcePageV1,
+        Self::SubagentSourceSetV1,
+        Self::SubagentTypeSnapshotV1,
+        Self::SubagentPlanV1,
+        Self::SubagentPlanApprovalV1,
+        Self::SubagentReservationV1,
+        Self::SubagentCheckpointV1,
+        Self::SubagentResultV1,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -156,6 +172,14 @@ impl AuditEventKind {
             Self::SkillSnapshotV2 => "skill-snapshot-v2",
             Self::RetiredSkillSnapshot => "skill-snapshot-v1",
             Self::SkillLoadV1 => "skill-load-v1",
+            Self::SubagentSourcePageV1 => "subagent-source-page-v1",
+            Self::SubagentSourceSetV1 => "subagent-source-set-v1",
+            Self::SubagentTypeSnapshotV1 => "subagent-type-v1",
+            Self::SubagentPlanV1 => "subagent-plan-v1",
+            Self::SubagentPlanApprovalV1 => "subagent-plan-approval-v1",
+            Self::SubagentReservationV1 => "subagent-reservation-v1",
+            Self::SubagentCheckpointV1 => "subagent-checkpoint-v1",
+            Self::SubagentResultV1 => "subagent-result-v1",
         }
     }
 
@@ -203,7 +227,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 48] = [
+        const EXPECTED: [&str; 56] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -252,6 +276,14 @@ mod tests {
             "skill-snapshot-v2",
             "skill-load-v1",
             "skill-snapshot-v1",
+            "subagent-source-page-v1",
+            "subagent-source-set-v1",
+            "subagent-type-v1",
+            "subagent-plan-v1",
+            "subagent-plan-approval-v1",
+            "subagent-reservation-v1",
+            "subagent-checkpoint-v1",
+            "subagent-result-v1",
         ];
         for (kind, expected) in AuditEventKind::ALL.into_iter().zip(EXPECTED) {
             assert_eq!(kind.as_str(), expected);
