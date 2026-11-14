@@ -11,6 +11,8 @@ mod catalog;
 mod malicious;
 pub(super) mod measurement;
 mod sequence;
+#[cfg(feature = "parser-eztools")]
+mod windows_collection;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, CancellationToken, CompletionRequest, CryptoPorts, Engine, EnginePorts, LlmPort,

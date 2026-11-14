@@ -1,0 +1,2 @@
+{"Timestamp":"2026-10-23T12:00:00Z","RuleTitle":"Synthetic interactive logon observation","Level":"informational","Computer":"synthetic-win-01","Channel":"Security","EventID":4624,"Details":"TargetUserName=synthetic-analyst LogonType=2"}
+{"Timestamp":"2026-10-23T12:01:00Z","RuleTitle":"Synthetic process launch observation","Level":"informational","Computer":"synthetic-win-01","Channel":"Security","EventID":4688,"Details":"NewProcessName=C:/Synthetic/demo-agent.exe SubjectUserName=synthetic-analyst"}

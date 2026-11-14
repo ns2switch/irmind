@@ -39,6 +39,12 @@ You can append a question, for example `/linux-triage Review the failed logins i
 The model initially receives only active names and descriptions. When it requests `skill_read`, IRMind checks policy, pins the approved package in the case, screens its requested resource and signs a load receipt with the Agent key before exposing the text. The conversation shows a collapsible methodology card. Use Ctrl+O or `/expand` for its details.
 
 
+## Windows collection evaluation
+
+The bundled Windows method also has a [multi-artifact synthetic episode](../crates/testkit/fixtures/windows-triage-collection/README.md) using nine Hayabusa/EZTools exports. It reviews logons, process and cache observations, a registry Run value and task registration, and possible network-usage leads. It runs detection, verified original reads, analyst confirmation, a source-citing report, complete reconstruction, sealing and independent export verification with all originals.
+
+Collect authorized event logs, registry hives and transaction logs, `$MFT`, Prefetch, LNK, SRUM and Amcache with your approved KAPE or Velociraptor workflow. Start with direct EVTX when its verified isolated helper is available, or Hayabusa/EvtxECmd exports; then inspect PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd and SrumECmd outputs. IRMind ingests the supported exported tables, not every binary artifact or arbitrary tool output. It never launches collectors. The synthetic episode does not validate a real collection or prove causality, execution from Amcache alone, or exfiltration from a usage counter.
+
 ## Inspect original source facts
 
 `raw_records` reads the indexed projection by default. A method needing a role binding's `roleRef`/subjects or a pod's requested security settings explicitly uses `view="original"`. The original view authenticates the signed source bytes and reproduces its entire decoded-record commitment with the recorded decoder and acquisition context before returning a guarded excerpt. It does not flatten the original bodies into search or contact a cloud provider.

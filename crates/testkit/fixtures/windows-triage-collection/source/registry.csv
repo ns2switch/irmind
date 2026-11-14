@@ -1,0 +1,2 @@
+HivePath,KeyPath,ValueName,LastWriteTimestamp,ValueData,Computer
+C:/Synthetic/NTUSER.DAT,Software/Microsoft/Windows/CurrentVersion/Run,SyntheticAgent,2026-10-23T12:03:00Z,C:/Synthetic/demo-agent.exe,synthetic-win-01

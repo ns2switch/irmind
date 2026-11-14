@@ -42,6 +42,12 @@ Puedes añadir una pregunta: `/linux-triage Revisa los accesos fallidos de este 
 Al principio el modelo solo recibe nombres y descripciones activos. Cuando pide `skill_read`, IRMind comprueba la política, fija el paquete aprobado en el caso, filtra el recurso y firma un recibo con la clave Agent antes de mostrar el texto. La conversación incluye una tarjeta plegable de metodología. Ctrl+O o `/expand` muestran sus detalles.
 
 
+## Evaluación de una colección Windows
+
+El método Windows incluido tiene además un [episodio sintético con varios artefactos](../../crates/testkit/fixtures/windows-triage-collection/README.md) y nueve exportaciones Hayabusa/EZTools. Revisa accesos, observaciones de procesos y cachés, un valor Run del registro, una tarea registrada e indicios de uso de red. Comprueba detección, originales verificados, confirmación del analista, informe con fuentes, reconstrucción completa, sello y verificación independiente de la exportación con todos los originales.
+
+Recoge los logs autorizados, hives y logs de transacciones del registro, `$MFT`, Prefetch, LNK, SRUM y Amcache con un procedimiento aprobado de KAPE o Velociraptor. Empieza por EVTX directo si su auxiliar aislado está verificado, o por Hayabusa/EvtxECmd; continúa con PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd y SrumECmd. IRMind ingiere las tablas exportadas compatibles, no todos los artefactos binarios ni cualquier salida de herramienta, y no ejecuta recolectores. El episodio sintético no valida una colección real ni prueba causalidad, ejecución por la sola presencia en Amcache o exfiltración por un contador de uso.
+
 ## Consultar hechos del original
 
 `raw_records` lee por defecto la proyección indexada. Si un método necesita `roleRef`/subjects de un binding o la configuración solicitada de un pod, pide explícitamente `view="original"`. Esa vista autentica los bytes firmados de la fuente y reproduce el compromiso completo de registros decodificados con el decodificador y contexto de adquisición registrados antes de devolver un extracto filtrado. No proyecta los cuerpos completos en la búsqueda ni contacta proveedores.
