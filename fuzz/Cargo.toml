@@ -199,3 +199,10 @@ path = "fuzz_targets/parser_entra.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "subagents"
+path = "fuzz_targets/subagents.rs"
+test = false
+doc = false
+bench = false
