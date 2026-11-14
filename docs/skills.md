@@ -55,6 +55,24 @@ The existing 10-second deadline, pointer limit and 2,000-character excerpt remai
 
 For Kubernetes, collect authorized API-server audit logs with an audit policy that records the needed metadata or bodies. Enable/export control-plane audit logs for EKS, Kubernetes Cloud Audit entries for GKE, or kube-audit/kube-audit-admin diagnostics for AKS as described in the [parser guide](parsers.md). IRMind performs no collection and implements no live Kubernetes API connector. Falco `source="k8s_audit"` and syscall alerts have separate mappings; source alerts remain unconfirmed, and the collection cluster must be explicitly confirmed. Cloud-to-cluster identity links must exist in the collected evidence; a service-account or pod name alone is not a link.
 
+## Catalog proof verification
+
+Current installations use signed `SkillInstallationV2` records, and case loads
+pin `SkillSnapshotV2` before the Agent signs a resource-load receipt. A catalog
+package additionally requires its publisher's signed index and your separate
+admission. Publisher signatures never grant tool permissions or make package
+instructions trusted.
+
+Each case keeps its own immutable copy of every referenced catalog proof.
+Verification and export reject missing or changed case copies; they do not
+repair them from global storage or download anything. Complete V8 exports carry
+the exact proofs needed for offline verification against compiled publisher keys.
+Previously installed packages from a retired interpreter stay disabled until
+explicit review and reinstallation. Keep the creating executable for older cases.
+
+No production catalog key is compiled yet. Catalog downloads and publication
+remain unavailable; local package installation continues to work without a network.
+
 ## Manage local packages
 
 Use `/skills` from the home screen or a case. Choose a method with the arrows. Tab selects an action; Enter opens it. Typing an option number followed by Enter also works.

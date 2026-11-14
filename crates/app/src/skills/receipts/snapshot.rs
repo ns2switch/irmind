@@ -21,7 +21,7 @@ struct File {
 }
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct SkillSnapshotV1 {
+pub struct SkillSnapshotV2 {
     format_version: u32,
     name: String,
     skill_version: String,
@@ -31,13 +31,14 @@ pub struct SkillSnapshotV1 {
     origin: SkillOrigin,
     release_inventory_sha256: Option<String>,
     admission_operation_sha256: Option<String>,
+    catalog_receipt_sha256: Option<String>,
     files: Vec<File>,
 }
-impl SkillSnapshotV1 {
+impl SkillSnapshotV2 {
     pub fn new(skill: &CompiledSkill, origin: SkillOrigin, authorization: [u8; 32]) -> Self {
         let bundled = origin == SkillOrigin::Bundled;
         Self {
-            format_version: 1,
+            format_version: 2,
             name: skill.metadata().name().as_str().into(),
             skill_version: skill.metadata().version().as_str().into(),
             target_schema: COMMON_EVENT_V1.into(),
@@ -46,6 +47,7 @@ impl SkillSnapshotV1 {
             origin,
             release_inventory_sha256: bundled.then(|| hex(&authorization)),
             admission_operation_sha256: (!bundled).then(|| hex(&authorization)),
+            catalog_receipt_sha256: None,
             files: skill
                 .package()
                 .resources()
@@ -57,18 +59,28 @@ impl SkillSnapshotV1 {
                 .collect(),
         }
     }
+    pub fn new_catalog(
+        skill: &CompiledSkill,
+        authorization: [u8; 32],
+        receipt: &crate::catalog::CatalogReceipt,
+    ) -> Result<Self, AppError> {
+        let mut snapshot = Self::new(skill, SkillOrigin::Catalog, authorization);
+        snapshot.catalog_receipt_sha256 = Some(hex(receipt.identity()?.as_bytes()));
+        snapshot.validate()?;
+        Ok(snapshot)
+    }
     pub fn encode(&self) -> Result<String, AppError> {
         self.validate()?;
-        encode(AuditEventKind::SkillSnapshotV1, self)
+        encode(AuditEventKind::SkillSnapshotV2, self)
     }
     pub fn decode(value: &str) -> Result<Self, AppError> {
-        let decoded: Self = decode(AuditEventKind::SkillSnapshotV1, value)?;
+        let decoded: Self = decode(AuditEventKind::SkillSnapshotV2, value)?;
         decoded.validate()?;
         Ok(decoded)
     }
     pub fn identity(&self) -> Result<SkillSnapshotId, AppError> {
         self.validate()?;
-        let mut bytes = b"irmind-skill-snapshot-v1\0".to_vec();
+        let mut bytes = b"irmind-skill-snapshot-v2\0".to_vec();
         bytes.extend(serde_json::to_vec(self).map_err(|_| invalid())?);
         Ok(SkillSnapshotId(sha256(&bytes)))
     }
@@ -95,7 +107,7 @@ impl SkillSnapshotV1 {
         Ok(skill)
     }
     fn validate(&self) -> Result<(), AppError> {
-        if self.format_version != 1
+        if self.format_version != 2
             || self.target_schema != COMMON_EVENT_V1
             || self.interpreter != "irmind-skill-interpreter-v1"
             || self.files.len() > 17
@@ -109,10 +121,15 @@ impl SkillSnapshotV1 {
             self.origin,
             &self.release_inventory_sha256,
             &self.admission_operation_sha256,
+            &self.catalog_receipt_sha256,
         ) {
-            (SkillOrigin::Bundled, Some(value), None)
-            | (SkillOrigin::Analyst | SkillOrigin::Organization, None, Some(value)) => {
+            (SkillOrigin::Bundled, Some(value), None, None)
+            | (SkillOrigin::Analyst | SkillOrigin::Organization, None, Some(value), None) => {
                 hash(value)?;
+            }
+            (SkillOrigin::Catalog, None, Some(admission), Some(receipt)) => {
+                hash(admission)?;
+                hash(receipt)?;
             }
             _ => return Err(invalid()),
         }
@@ -134,10 +151,13 @@ impl SkillSnapshotV1 {
     pub fn inventory(&self) -> Option<&str> {
         self.release_inventory_sha256.as_deref()
     }
+    pub fn catalog_receipt(&self) -> Option<&str> {
+        self.catalog_receipt_sha256.as_deref()
+    }
 }
-impl std::fmt::Debug for SkillSnapshotV1 {
+impl std::fmt::Debug for SkillSnapshotV2 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SkillSnapshotV1")
+        f.debug_struct("SkillSnapshotV2")
             .field("name", &self.name)
             .field("sha256", &self.package_sha256)
             .finish_non_exhaustive()

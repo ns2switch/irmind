@@ -206,7 +206,7 @@ impl Engine<'_> {
         }
         verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
         self.verify_mapping_events(entries.iter().map(|e| (e.kind, e.payload.as_str())))?;
-        self.verify_skill_receipts(&entries)?;
+        self.verify_skill_receipts(&entries, cancel)?;
         let manifest = crate::large_case::read_manifest_index(&entries)?;
         let source_hashes = manifest
             .sources

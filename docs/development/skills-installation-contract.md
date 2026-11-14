@@ -1,5 +1,9 @@
 # Skill compilation and local installation contracts
 
+> Historical v0.4 contract. The current skill admission and snapshot formats are
+> defined in [the catalog format contract](skills-catalog-format-contract.md).
+> The old snapshot reader is not retained under the pre-1.0 format policy.
+
 This proposal is for reviewers implementing [the skills design](skills-design.md).
 It specifies the next application boundaries. The package-foundation code does
 not implement these ports, sign skill operations or expose an agent/TUI action.

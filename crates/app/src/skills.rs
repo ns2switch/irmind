@@ -7,7 +7,7 @@ mod receipts;
 pub(crate) mod runtime;
 pub use receipts::SkillReadReceipt;
 pub use receipts::{
-    SkillLoadResult, SkillLoadV1, SkillReceiptVerifier, SkillSnapshotId, SkillSnapshotV1,
+    SkillLoadResult, SkillLoadV1, SkillReceiptVerifier, SkillSnapshotId, SkillSnapshotV2,
     skill_admission_references, verify_skill_admission,
 };
 pub use runtime::SkillServices;
@@ -40,6 +40,7 @@ pub enum SkillOrigin {
     Bundled,
     Organization,
     Analyst,
+    Catalog,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]

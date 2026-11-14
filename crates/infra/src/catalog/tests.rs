@@ -2,6 +2,8 @@ use super::*;
 use ed25519_dalek::SigningKey;
 use irmind_app::catalog::{CatalogIndex, CatalogProofId};
 use std::sync::OnceLock;
+mod case;
+mod frames;
 
 const INDEX: &[u8] =
     include_bytes!("../../../../docs/development/catalog-format-vectors/index.json");
@@ -158,6 +160,22 @@ fn catalog_key_rotation_preserves_accepted_signers_and_rejects_removed_signers()
         .unwrap();
     assert_eq!(admitted.proof_id(), verified().proof_id());
     assert_ne!(admitted.keyset_hash(), verified().keyset_hash());
+    let receipt =
+        irmind_app::catalog::CatalogReceipt::new(&verified(), "synthetic-triage", false, false)
+            .unwrap();
+    let package = irmind_app::catalog::BoundedPackageBytes::new(
+        include_bytes!(
+            "../../../../docs/development/catalog-format-vectors/synthetic-triage-1.skill.json"
+        )
+        .to_vec(),
+    )
+    .unwrap();
+    let skill = admitted
+        .asset("synthetic-triage")
+        .unwrap()
+        .compile(&package, "0.5.0", &crate::TomlSkillCompiler)
+        .unwrap();
+    receipt.check(&admitted, &skill).unwrap();
     assert!(
         Ed25519CatalogIndexVerifier::from_release_keys(replaced)
             .unwrap()
@@ -195,6 +213,122 @@ fn catalog_asset_uses_existing_compiler_and_checks_version_and_both_commitments(
     assert!(
         asset
             .compile(&bad, "0.5.0", &crate::TomlSkillCompiler)
+            .is_err()
+    );
+}
+
+#[test]
+fn catalog_receipt_binds_the_whole_index_entry_asset_and_logical_package() {
+    use irmind_app::catalog::{BoundedPackageBytes, CatalogReceipt};
+    let index = verified();
+    let receipt = CatalogReceipt::new(&index, "synthetic-triage", true, false).unwrap();
+    assert_eq!(
+        receipt.canonical().unwrap(),
+        include_bytes!("../../../../docs/development/catalog-format-vectors/catalog-receipt.json")
+    );
+    let raw = BoundedPackageBytes::new(
+        include_bytes!(
+            "../../../../docs/development/catalog-format-vectors/synthetic-triage-1.skill.json"
+        )
+        .to_vec(),
+    )
+    .unwrap();
+    let skill = index
+        .asset("synthetic-triage")
+        .unwrap()
+        .compile(&raw, "0.5.0", &crate::TomlSkillCompiler)
+        .unwrap();
+    receipt.check(&index, &skill).unwrap();
+    let source = std::str::from_utf8(&receipt.canonical().unwrap())
+        .unwrap()
+        .to_owned();
+    for changed in [
+        source.replace("v0.1.0", "v0.1.1"),
+        source.replace("\"release_sequence\":1", "\"release_sequence\":2"),
+        source.replace("\"asset_bytes\":403", "\"asset_bytes\":404"),
+        source.replace("synthetic-triage-1.skill.json", "different.skill.json"),
+        source.replace(
+            "df8cd53705dceb000ff823863f45549a8e9b3650f901567aad806d92f4ba0970",
+            &"a".repeat(64),
+        ),
+    ] {
+        assert!(
+            CatalogReceipt::decode(changed.as_bytes())
+                .unwrap()
+                .check(&index, &skill)
+                .is_err()
+        );
+    }
+}
+
+#[test]
+fn catalog_admission_requires_publisher_proof_beyond_a_valid_analyst_signature() {
+    use irmind_app::{SignedEntry, SignedOperation, SkillReceiptVerifier, Verifier};
+    let snapshot: SignedEntry = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/catalog-format-vectors/signed-snapshot.json"
+    ))
+    .unwrap();
+    let admission: SignedOperation = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/catalog-format-vectors/signed-installation.json"
+    ))
+    .unwrap();
+    let verifier = crate::LocalVerifier {
+        trusted: std::collections::BTreeMap::new(),
+    }
+    .with_trusted_key(&irmind_domain::Actor::Analyst, &admission.public_key)
+    .unwrap();
+    assert_eq!(snapshot.hash, irmind_app::sha256(&snapshot.canonical()));
+    verifier
+        .verify(&snapshot.public_key, &snapshot.hash, &snapshot.sig)
+        .unwrap();
+    let mut checked = SkillReceiptVerifier::default();
+    checked
+        .accept(&snapshot, &crate::TomlSkillCompiler)
+        .unwrap();
+    let proofs = [admission];
+    let analyst = proofs[0].public_key.clone();
+    assert!(
+        checked
+            .verify_admissions(&proofs, &verifier, &analyst)
+            .is_err()
+    );
+    let requirements = checked
+        .catalog_requirements(&proofs, &verifier, &analyst)
+        .unwrap();
+    assert_eq!(requirements.len(), 1);
+    assert_eq!(requirements[0].proof(), verified().proof_id());
+    assert_eq!(requirements[0].release().tag(), "v0.1.0");
+    checked
+        .verify_catalog_admissions(
+            &proofs,
+            &[verified()],
+            &verifier,
+            &analyst,
+            &crate::TomlSkillCompiler,
+        )
+        .unwrap();
+    checked
+        .verify_admissions(&proofs, &verifier, &analyst)
+        .unwrap();
+    assert!(
+        checked
+            .verify_catalog_admissions(&proofs, &[], &verifier, &analyst, &crate::TomlSkillCompiler)
+            .is_err()
+    );
+    assert!(
+        checked
+            .verify_admissions(&proofs, &verifier, &analyst)
+            .is_err()
+    );
+    assert!(
+        SkillReceiptVerifier::default()
+            .verify_catalog_admissions(
+                &[],
+                &[verified()],
+                &verifier,
+                &analyst,
+                &crate::TomlSkillCompiler
+            )
             .is_err()
     );
 }

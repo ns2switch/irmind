@@ -25,6 +25,8 @@ impl LocalStore {
             evidence_dir,
             seal_dir,
             lock_dir,
+            catalog_proofs: crate::FileCatalogProofStore::new(root),
+            catalog_verifier: crate::Ed25519CatalogIndexVerifier::production()?,
         };
         store.reconcile_pending_seals()?;
         Ok(store)

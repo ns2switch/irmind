@@ -132,7 +132,8 @@ impl Engine<'_> {
             })
             .await?;
         let (case, mut turn) = self.make_turn(prepared);
-        self.initialize_turn_skills(&case, &mut turn, alert).await?;
+        self.initialize_turn_skills(&case, &mut turn, alert, cancel)
+            .await?;
         if let Some(answer) = self
             .compact_or_finish_budget(&case.id, model, &mut turn, cancel)
             .await?
@@ -404,7 +405,7 @@ impl Engine<'_> {
             let result = if turn.cloud_limit_reached {
                 "denied: turn stopped at the case cloud transfer limit; review /budget".into()
             } else if call.proposal().tool == crate::Tool::SkillRead {
-                self.read_turn_skill(case, turn, &call).await?
+                self.read_turn_skill(case, turn, &call, cancel).await?
             } else if !self
                 .skill_call_declared(case, turn, call.proposal())
                 .await?

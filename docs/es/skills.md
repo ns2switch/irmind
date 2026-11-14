@@ -96,3 +96,22 @@ y [MITRE ATT&CK](https://attack.mitre.org/). Los enlaces viven aquí porque
 el texto cargado de las skills pasa por el mismo guard que otro contenido no confiable.
 
 Los métodos Kubernetes se apoyan en [auditoría](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/) y [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/), el [contrato de campos del plugin de auditoría de Falco](https://github.com/falcosecurity/plugins/blob/main/plugins/k8saudit/README.md) y ATT&CK: [roles adicionales de clúster](https://attack.mitre.org/techniques/T1098/006/), [acceso a credenciales de la API](https://attack.mitre.org/techniques/T1552/007/), [despliegue](https://attack.mitre.org/techniques/T1610/), [administración](https://attack.mitre.org/techniques/T1609/) y [escape al host](https://attack.mitre.org/techniques/T1611/). La metodología es texto propio del proyecto; las referencias no prueban un hallazgo.
+
+## Verificación de las pruebas del catálogo
+
+Las instalaciones actuales usan registros firmados `SkillInstallationV2`; cada
+caso fija `SkillSnapshotV2` antes del recibo de carga firmado por Agent. Una skill
+del catálogo necesita tanto el índice firmado por su editor como la admisión
+separada del analista. La firma del editor no concede permisos ni convierte las
+instrucciones del paquete en contenido confiable.
+
+Cada caso conserva su propia copia inmutable de las pruebas del catálogo que
+referencia. La verificación y la exportación rechazan las copias ausentes o
+modificadas, sin repararlas desde el almacén global ni descargar nada. Las
+exportaciones V8 completas incluyen las pruebas necesarias para verificarlas sin
+conexión con las claves públicas compiladas. Las instalaciones de un intérprete
+retirado quedan desactivadas hasta revisarlas y reinstalarlas explícitamente.
+Conserva el ejecutable creador para los casos antiguos.
+
+Todavía no hay ninguna clave de producción del catálogo compilada. Su publicación
+y las descargas siguen pendientes; la instalación local funciona sin red.

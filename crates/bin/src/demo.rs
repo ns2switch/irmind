@@ -273,7 +273,7 @@ fn run_in_directory(
     let intel = SyntheticIntel;
     let ports = ports.with_source_evidence_reader(store.source_evidence_reader());
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
-        .with_skills(super::skills::services(root, agent)?)?
+        .with_skills(super::skills::services(root, agent)?.with_catalog(store.catalog_services()))?
         .with_threat_intel(&intel)
         .with_large_case_pipeline(store.clone(), irmind_mod_parser_json::source_log_parser())
         .with_parser_catalog(parser_catalog.clone());

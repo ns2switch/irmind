@@ -1,8 +1,20 @@
 use super::{ResolvedSkill, SkillServices};
-use crate::{AppError, CompiledSkill, Engine, SkillOrigin, SkillSnapshotV1, SkillStatus};
+use crate::{
+    AppError, CancellationToken, CompiledSkill, Engine, SkillOrigin, SkillSnapshotV2, SkillStatus,
+};
 use irmind_domain::SkillName;
 impl Engine<'_> {
     pub(crate) fn resolve_skill(&self, name: &SkillName) -> Result<ResolvedSkill, AppError> {
+        self.resolve_skill_cancelable(name, &CancellationToken::new())
+    }
+    pub(crate) fn resolve_skill_cancelable(
+        &self,
+        name: &SkillName,
+        cancel: &CancellationToken,
+    ) -> Result<ResolvedSkill, AppError> {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
         let services = self
             .skills
             .as_ref()
@@ -16,16 +28,51 @@ impl Engine<'_> {
             } else {
                 super::super::receipts::hash(&installed.operation_hash)?
             };
-            let snapshot = SkillSnapshotV1::new(&skill, installed.snapshot.origin, authorization);
-            return Ok(ResolvedSkill { skill, snapshot });
+            let catalog = self.check_installed_catalog(&installed.snapshot, &skill, cancel)?;
+            let snapshot = if let Some(receipt) = &installed.snapshot.catalog {
+                SkillSnapshotV2::new_catalog(&skill, authorization, receipt)?
+            } else {
+                SkillSnapshotV2::new(&skill, installed.snapshot.origin, authorization)
+            };
+            return Ok(ResolvedSkill {
+                skill,
+                snapshot,
+                catalog,
+            });
+        }
+        if approved.retired.contains(name) {
+            return Err(super::super::SkillServiceError::NotInstalled.into());
         }
         let package = services
             .bundled
             .get(name)
             .ok_or(super::super::SkillServiceError::NotInstalled)?;
         let skill = services.compiler.compile(package.clone())?;
-        let snapshot = SkillSnapshotV1::new(&skill, SkillOrigin::Bundled, services.inventory);
-        Ok(ResolvedSkill { skill, snapshot })
+        let snapshot = SkillSnapshotV2::new(&skill, SkillOrigin::Bundled, services.inventory);
+        Ok(ResolvedSkill {
+            skill,
+            snapshot,
+            catalog: None,
+        })
+    }
+    pub(in crate::skills) fn check_installed_catalog(
+        &self,
+        snapshot: &super::super::history::Snapshot,
+        skill: &CompiledSkill,
+        cancel: &CancellationToken,
+    ) -> Result<Option<crate::catalog::VerifiedCatalogIndex>, AppError> {
+        match (&snapshot.catalog, snapshot.origin) {
+            (Some(receipt), SkillOrigin::Catalog) => {
+                let catalog = self
+                    .skills
+                    .as_ref()
+                    .and_then(|s| s.catalog.as_ref())
+                    .ok_or(crate::catalog::CatalogError::Unavailable)?;
+                catalog.read_global(receipt, skill, cancel).map(Some)
+            }
+            (None, origin) if origin != SkillOrigin::Catalog => Ok(None),
+            _ => Err(super::super::receipts::invalid()),
+        }
     }
     pub fn installed_skill_statuses(&self) -> Result<Vec<SkillStatus>, AppError> {
         let services = self

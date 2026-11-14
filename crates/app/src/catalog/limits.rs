@@ -1,7 +1,7 @@
 use super::{CatalogError, MAX_CATALOG_INDEX_BYTES};
 use serde::de::{DeserializeSeed, Error as _, MapAccess, SeqAccess, Visitor};
 
-pub(super) fn check(bytes: &[u8]) -> Result<(), CatalogError> {
+pub(crate) fn check(bytes: &[u8]) -> Result<(), CatalogError> {
     if bytes.is_empty() || bytes.len() > MAX_CATALOG_INDEX_BYTES {
         return Err(CatalogError::InvalidData);
     }

@@ -56,6 +56,8 @@ pub struct LocalStore {
     evidence_dir: PathBuf,
     seal_dir: PathBuf,
     lock_dir: PathBuf,
+    catalog_proofs: FileCatalogProofStore,
+    catalog_verifier: Ed25519CatalogIndexVerifier,
 }
 
 struct HeldCaseFile {

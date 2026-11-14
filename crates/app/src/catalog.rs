@@ -1,14 +1,21 @@
 //! Explicit catalog downloads and signed methodology provenance. Never evidence.
 mod digest;
+mod frames;
 mod limits;
+pub(crate) use limits::check as bounded_metadata;
 mod package;
+mod receipt;
 mod schema;
+mod services;
 mod store;
 mod verified;
 mod version;
 pub use digest::{CatalogDigest, CatalogProofId};
+pub use frames::{CatalogProofReader, catalog_proof_chunk, catalog_proof_descriptor};
 pub use package::BoundedPackageBytes;
+pub use receipt::CatalogReceipt;
 pub use schema::{CatalogCoverage, CatalogCoverageStatus, CatalogEntry, CatalogIndex};
+pub use services::{CatalogProofRequirement, CatalogServices};
 pub use store::CatalogProofStore;
 pub use verified::{
     CatalogAsset, CatalogIndexVerifier, VerifiedCatalogIndex, VerifiedCatalogRelease,

@@ -10,6 +10,7 @@ impl Engine<'_> {
         case: &Case,
         turn: &mut TurnContext,
         input: &str,
+        cancel: &crate::CancellationToken,
     ) -> Result<(), AppError> {
         if self.skills.is_none() {
             return Ok(());
@@ -43,7 +44,7 @@ impl Engine<'_> {
                 String::new(),
                 vec![call.clone()],
             ));
-        let result = self.read_turn_skill(case, turn, &call).await?;
+        let result = self.read_turn_skill(case, turn, &call, cancel).await?;
         turn.messages.push(crate::CompletionMessage::tool_result(
             call.id().into(),
             untrusted_user_message(&result, &turn.nonce).content,
@@ -71,6 +72,7 @@ impl Engine<'_> {
         case: &Case,
         turn: &TurnContext,
         call: &ModelToolCall,
+        cancel: &crate::CancellationToken,
     ) -> Result<String, AppError> {
         let decision = self
             .evaluate_proposal(case, call.proposal().clone(), AuditOrigin::Model)
@@ -116,12 +118,20 @@ impl Engine<'_> {
             .min(23_000)
             .min(self.policy.max_model_result_bytes.saturating_sub(1024))
             .min(usize::try_from(remaining).unwrap_or(usize::MAX));
+        let cancel = cancel.clone();
         self.blocking_local(move |local| {
             let mut state = budget
                 .lock()
                 .map_err(|_| crate::SkillServiceError::InvalidReceipt)?;
             state.read_limit = text_limit;
-            match local.read_skill_local(&id, &name, &resource, &mut state, nonce, &call_id) {
+            match local.read_skill_local(
+                &id,
+                &name,
+                &resource,
+                &mut state,
+                (nonce, &call_id),
+                &cancel,
+            ) {
                 Ok(text) => Ok(text),
                 Err(error) => local.failed_skill_result(&id, &error),
             }

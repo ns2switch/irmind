@@ -1,5 +1,9 @@
 # Skill use receipts and export V7
 
+> Historical v0.4 contract. The current skill admission and snapshot formats are
+> defined in [the catalog format contract](skills-catalog-format-contract.md).
+> The old snapshot reader is not retained under the pre-1.0 format policy.
+
 This contract is for implementers and reviewers of progressive skill loading. It fixes the current encoding vectors for case methodology and export V7. Local installation has its separate [contract](skills-installation-contract.md). The 0.4 implementation follows these encodings.
 
 ## Scope and unchanged boundaries
