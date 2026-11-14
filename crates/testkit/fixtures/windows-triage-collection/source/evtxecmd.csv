@@ -1,0 +1,2 @@
+TimeCreated,EventId,Channel,Computer,TaskName,TaskAction
+2026-10-23T12:03:00Z,4698,Security,synthetic-win-01,SyntheticAgent,C:/Synthetic/demo-agent.exe
