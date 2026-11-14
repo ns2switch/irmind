@@ -3,72 +3,52 @@ use irmind_app::{AuditLog, CaseMutation, SignedEntry, sha256};
 use irmind_domain::{Actor, AuditEventKind, Case, CaseId, Severity};
 
 #[test]
-fn missing_allocation_requires_explicit_initialization_without_resetting_usage() {
-    let root = tempfile::tempdir().unwrap();
-    let (store, engine) = setup(root.path());
-    let case = create_unallocated_case(&engine, store.as_ref());
-    engine.verify(&case.id).unwrap();
-    assert!(engine.case_budget(&case.id).unwrap().allocated.is_none());
-    let model = BudgetModel {
-        requests: std::sync::Mutex::default(),
-        output: Some("Synthetic reply."),
-        usage: Some(irmind_app::ModelUsage {
-            input_tokens: 8,
-            output_tokens: 2,
-        }),
-    };
-    assert!(
-        engine
-            .investigate(&case.id, "Review this case.", &model)
-            .unwrap_err()
-            .to_string()
-            .contains("/budget")
-    );
-    assert!(model.requests.lock().unwrap().is_empty());
-    assert!(
-        engine
-            .change_case_budget(&case.id, limits(2_000, 5), false)
+fn missing_initial_allocation_cannot_open_verify_or_export() {
+    for current in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let (store, engine) = setup(root.path());
+        let case = create_unallocated_case(&engine, store.as_ref(), current);
+        let before = store.entries(&case.id).unwrap();
+        let cancel = irmind_app::CancellationToken::new();
+        let error = engine.open_case_verified(&case.id, &cancel).unwrap_err();
+        if !current {
+            assert!(error.to_string().contains("version that created it"));
+        }
+        assert!(engine.verify(&case.id).is_err());
+        assert!(
+            engine
+                .change_case_budget(&case.id, limits(2_000, 5), true)
+                .is_err()
+        );
+        let destination = root.path().join("unsupported.irmind");
+        assert!(
+            irmind_app::export_case_with_originals(
+                &engine,
+                store.as_ref(),
+                &case.id,
+                &destination,
+                None,
+                false,
+                &cancel
+            )
             .is_err()
-    );
-    assert!(engine.case_budget(&case.id).unwrap().allocated.is_none());
-    engine
-        .change_case_budget(&case.id, limits(2_000, 5), true)
-        .unwrap();
-    assert_eq!(engine.case_budget(&case.id).unwrap().usage.model_tokens, 10);
-    engine
-        .investigate(&case.id, "Review this case.", &model)
-        .unwrap();
-    let status = engine.case_budget(&case.id).unwrap();
-    assert_eq!(status.allocated, Some(limits(2_000, 5)));
-    assert_eq!(status.usage.model_tokens, 20);
-    engine.verify(&case.id).unwrap();
-    engine.seal(&case.id).unwrap();
-    let destination = root.path().join("initialized-budget.irmind");
-    let key = irmind_app::export_case_with_originals(
-        &engine,
-        store.as_ref(),
-        &case.id,
-        &destination,
-        None,
-        false,
-        &irmind_app::CancellationToken::new(),
-    )
-    .unwrap();
-    irmind_app::verify_export_details(&irmind_infra::LocalExportVerifier, &destination, Some(&key))
-        .unwrap();
-    if std::env::var_os("IRMIND_REFRESH_SKILL_EXPORT_SEEDS").is_some() {
-        std::fs::copy(
-            destination,
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../fuzz/seeds/export/valid-v7-budget-initialization.irmind"),
-        )
-        .unwrap();
+        );
+        assert!(!destination.exists());
+        assert_eq!(store.entries(&case.id).unwrap().len(), before.len());
+        let model = BudgetModel {
+            requests: std::sync::Mutex::default(),
+            output: Some("Synthetic reply."),
+            usage: None,
+        };
+        assert!(engine.investigate(&case.id, "Hello", &model).is_err());
+        assert!(model.requests.lock().unwrap().is_empty());
     }
 }
 
 fn create_unallocated_case(
     engine: &irmind_app::Engine<'_>,
     store: &irmind_infra::LocalStore,
+    current: bool,
 ) -> Case {
     let case = Case {
         id: CaseId::parse("00000000-0000-4000-8000-000000000001").unwrap(),
@@ -77,12 +57,13 @@ fn create_unallocated_case(
         scope: "local".into(),
         sealed: false,
     };
+    let created = format!(
+        r#"{{"version":{},"title":"Synthetic unallocated case","severity":"medium","scope":"local"}}"#,
+        if current { 4 } else { 3 }
+    );
     let mut previous = None;
     for (kind, payload) in [
-        (
-            AuditEventKind::CaseCreated,
-            r#"{"version":3,"title":"Synthetic unallocated case","severity":"medium","scope":"local"}"#,
-        ),
+        (AuditEventKind::CaseCreated, created.as_str()),
         (AuditEventKind::ModelRequest, "synthetic prior request"),
         (AuditEventKind::ModelReply, "synthetic prior response"),
         (

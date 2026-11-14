@@ -254,7 +254,7 @@ fn export(
     let verified = irmind_infra::LocalExportVerifier
         .verify_export_details(&file, Some(&key))
         .unwrap();
-    assert_eq!(verified.format_version, 7);
+    assert_eq!(verified.format_version, 8);
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_irmind"))
         .args([
             "--home",

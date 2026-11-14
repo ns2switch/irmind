@@ -8,12 +8,12 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Write};
 
-pub(super) const MAGIC_V7: &[u8] = b"IRMIND-EXPORT-V7\0";
+pub(super) const MAGIC_V8: &[u8] = b"IRMIND-EXPORT-V8\0";
 pub(super) const MAX_FRAME_BYTES: u64 = 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct HeaderV7 {
+pub(super) struct HeaderV8 {
     pub version: u32,
     pub case_id: String,
     pub title: String,
@@ -28,7 +28,7 @@ struct ExportRequest<'a> {
     source_root: Option<&'a Path>,
     include_originals: bool,
     cancel: &'a CancellationToken,
-    header: HeaderV7,
+    header: HeaderV8,
     entry_count: u64,
     evidence: Vec<String>,
     source_count: u64,
@@ -58,14 +58,16 @@ impl LocalStore {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        irmind_app::artifact_catalog(&self.entries(id)?)?;
         let case = self.get_case(id)?;
+        let entries = self.entries(id)?;
+        irmind_app::verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
+        irmind_app::artifact_catalog(&entries)?;
         if !case.sealed {
             return Err(AppError::Sealed);
         }
         let seal = self.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
-        let header = HeaderV7 {
-            version: 7,
+        let header = HeaderV8 {
+            version: 8,
             case_id: id.as_str().into(),
             title: case.title,
             severity: case.severity.as_str().into(),
@@ -132,7 +134,7 @@ impl LocalStore {
         let mut out = options.open(path).map_err(storage)?;
         *created = true;
         private_file(path).map_err(storage)?;
-        out.write_all(MAGIC_V7).map_err(storage)?;
+        out.write_all(MAGIC_V8).map_err(storage)?;
         write_frame(&mut out, &serde_json::to_vec(&header).map_err(storage)?)?;
         out.write_all(&entry_count.to_be_bytes()).map_err(storage)?;
         let written = self.for_each_audit_entry(id, |entry| {
@@ -177,6 +179,9 @@ impl LocalStore {
             self.write_artifact_frames(id, &mut out, cancel)?;
             super::skill_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
         }
+        // Both V8 extension counts are mandatory, including when unused.
+        out.write_all(&0u64.to_be_bytes()).map_err(storage)?; // catalog proofs
+        out.write_all(&0u64.to_be_bytes()).map_err(storage)?; // branch chunks
         out.sync_all().map_err(storage)?;
         Ok(header.seal.analyst_key_fingerprint.clone())
     }
@@ -259,7 +264,7 @@ pub(super) fn write_frame(out: &mut File, bytes: &[u8]) -> Result<(), AppError> 
     out.write_all(bytes).map_err(storage)
 }
 
-pub(super) fn v7_result(
+pub(super) fn v8_result(
     fingerprint: String,
     entries: usize,
     source_manifests: usize,
@@ -268,7 +273,7 @@ pub(super) fn v7_result(
     ExportVerification {
         analyst_key_fingerprint: fingerprint,
         entries,
-        format_version: 7,
+        format_version: 8,
         source_manifests,
         source_bytes_verified,
         source_bytes_unavailable: source_manifests.saturating_sub(source_bytes_verified),

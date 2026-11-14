@@ -109,4 +109,4 @@ Usa **Ctrl+O** o `/expand` para plegar o desplegar la tarjeta seleccionada mient
 
 ## Métodos forenses
 
-Abre `/skills` para inspeccionar los 13 métodos incluidos de nube, Windows, Linux y red, instalar una carpeta local revisada o firmar un cambio de activación. En un caso, escribe `/windows-triage`, `/linux-triage` o `/aws-credential-compromise` y añade tu pregunta. El agente también puede elegir un método por su descripción. La carga es progresiva y siempre no confiable; la política y las aprobaciones no cambian. La [guía de skills](skills.md) explica los límites y los recibos firmados en la exportación V7.
+Abre `/skills` para inspeccionar los 15 métodos incluidos de nube, Windows, Linux y red, instalar una carpeta local revisada o firmar un cambio de activación. En un caso, escribe `/windows-triage`, `/linux-triage` o `/aws-credential-compromise` y añade tu pregunta. El agente también puede elegir un método por su descripción. La carga es progresiva y siempre no confiable; la política y las aprobaciones no cambian. La [guía de skills](skills.md) explica los límites y los recibos firmados en la exportación V8.

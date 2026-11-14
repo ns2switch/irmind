@@ -119,7 +119,7 @@ fn synthetic_export(path: &std::path::Path) -> String {
         actor: Actor::Analyst,
         origin: "analyst".into(),
         kind: irmind_domain::AuditEventKind::CaseCreated,
-        payload: json!({"version": 3, "title": "Synthetic", "severity": "medium", "scope": scope})
+        payload: json!({"version": 4, "title": "Synthetic", "severity": "medium", "scope": scope, "budget": irmind_app::CaseBudgetLimits::default()})
             .to_string(),
         evidence: None,
         prev: [0; 32],
@@ -170,20 +170,20 @@ fn synthetic_export(path: &std::path::Path) -> String {
         analyst_key_fingerprint: fingerprint.clone(),
     };
     let header = json!({
-        "version": 7,
+        "version": 8,
         "case_id": case_id,
         "title": "Synthetic",
         "severity": "medium",
         "scope": scope,
         "seal": seal,
     });
-    let mut output = b"IRMIND-EXPORT-V7\0".to_vec();
+    let mut output = b"IRMIND-EXPORT-V8\0".to_vec();
     append_frame(&mut output, &header);
     output.extend_from_slice(&2u64.to_be_bytes());
     append_frame(&mut output, &created);
     append_frame(&mut output, &sealed);
-    // Zero copied evidence, originals, operations, mapping proofs, artifacts and skill admissions.
-    output.extend_from_slice(&[0; 6 * 8]);
+    // Zero copied evidence, originals, operations, mapping proofs, artifacts, skill admissions, catalog proofs and branch chunks.
+    output.extend_from_slice(&[0; 8 * 8]);
     std::fs::write(path, output).unwrap();
     fingerprint
 }

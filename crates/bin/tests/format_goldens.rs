@@ -271,7 +271,7 @@ fn export_goldens(
         actor: Actor::Analyst,
         origin: "system".into(),
         kind: AuditEventKind::CaseCreated,
-        payload: r#"{"version":3,"title":"Synthetic","severity":"medium","scope":"local"}"#.into(),
+        payload: r#"{"version":4,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000}}"#.into(),
         evidence: None,
         prev: [0; 32],
         hash: [0; 32],
@@ -298,10 +298,10 @@ fn export_goldens(
     let seal_path = root.join("seals").join(format!("{}.json", id.as_str()));
     record(out, "seal/file", &fs::read(seal_path).unwrap());
     let cancel = CancellationToken::new();
-    let current = root.join("export-v7.bin");
+    let current = root.join("export-v8.bin");
     irmind_app::export_case_with_originals(engine, store, &id, &current, None, false, &cancel)
         .unwrap();
-    assert!(fs::read(current).unwrap().starts_with(b"IRMIND-EXPORT-V7"));
+    assert!(fs::read(current).unwrap().starts_with(b"IRMIND-EXPORT-V8"));
 }
 
 #[test]
@@ -322,6 +322,14 @@ fn signed_and_reconstructed_format_goldens_are_unchanged() {
     let engine = engine(&store);
     signed_configuration_goldens(&mut actual, &store, &engine, root.path());
     export_goldens(&mut actual, &store, &engine, root.path());
+    if std::env::var_os("IRMIND_REFRESH_CURRENT_FORMAT_GOLDENS").is_some() {
+        fs::write(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/formats-readers-v3.json"),
+            serde_json::to_string_pretty(&actual).unwrap() + "\n",
+        )
+        .unwrap();
+    }
     let expected: Goldens =
         serde_json::from_str(include_str!("fixtures/formats-readers-v3.json")).unwrap();
     assert_eq!(

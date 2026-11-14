@@ -142,11 +142,11 @@ impl<'a> Engine<'a> {
             crate::AuditOrigin::System,
             irmind_domain::AuditEventKind::CaseCreated,
             &serde_json::to_string(&CaseCreatedEvent {
-                version: 3,
+                version: 4,
                 title: title.to_owned(),
                 severity: Some(severity.as_str().to_owned()),
                 scope: scope.to_owned(),
-                budget: Some(self.new_case_budget_limits()),
+                budget: self.new_case_budget_limits(),
             })
             .map_err(|error| AppError::Storage(error.to_string()))?,
             None,
