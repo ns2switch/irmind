@@ -149,7 +149,59 @@ pub struct SubagentPlanV1 {
     pub deadline_at: u64,
     pub tasks: Vec<SubagentTaskSpec>,
 }
+/// Inputs observed under the case transaction, not supplied by a model.
+#[derive(Clone, Debug)]
+pub struct SubagentPlanContext {
+    pub parent_checkpoint_sha256: SubagentDigest,
+    pub budget_checkpoint_sha256: SubagentDigest,
+    pub policy: SubagentPolicySnapshot,
+    pub case_limits: SubagentResources,
+    pub usage: SubagentResources,
+    pub prior_reserved: SubagentResources,
+}
+
 impl SubagentPlanV1 {
+    pub fn prepare(
+        case: &crate::CaseId,
+        turn_id: &str,
+        ordinal: u64,
+        context: SubagentPlanContext,
+        mut tasks: Vec<SubagentTaskSpec>,
+        coordination: SubagentResources,
+        deadline_at: u64,
+    ) -> Result<Self, SubagentRecordError> {
+        let plan_id = Self::plan_id(case.as_str(), turn_id, ordinal)?;
+        let mut reservation = coordination;
+        for (ordinal, task) in tasks.iter_mut().enumerate() {
+            task.ordinal = ordinal as u64;
+            task.task_id = Self::task_id(plan_id, task.ordinal);
+            reservation = reservation.checked_add(task.budget)?;
+        }
+        let remaining = context
+            .case_limits
+            .checked_sub(context.usage)?
+            .checked_sub(context.prior_reserved)?;
+        let value = Self {
+            format_version: 1,
+            plan_id,
+            case_id: case.as_str().into(),
+            turn_id: turn_id.into(),
+            ordinal,
+            parent_checkpoint_sha256: context.parent_checkpoint_sha256,
+            budget_checkpoint_sha256: context.budget_checkpoint_sha256,
+            policy: context.policy,
+            case_limits: context.case_limits,
+            usage: context.usage,
+            prior_reserved: context.prior_reserved,
+            remaining,
+            reservation,
+            coordination,
+            deadline_at,
+            tasks,
+        };
+        value.validate()?;
+        Ok(value)
+    }
     pub fn plan_id(
         case: &str,
         turn: &str,
