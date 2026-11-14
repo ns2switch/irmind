@@ -1,3 +1,5 @@
+Traducción de docs/development/skills-catalog-install.md en el commit 92d6396bc6c516d304852f6e76314a59b609d50b; si hay diferencias, prevalece la versión en inglés.
+
 # Instalación explícita desde el catálogo comunitario de skills
 
 Arquitectura aprobada; la descarga y verificación dentro de IRMind aún no están
