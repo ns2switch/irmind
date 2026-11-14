@@ -11,12 +11,16 @@ All pass the [scripted synthetic case test](../../crates/bin/tests/skills_runtim
 including confirmed findings and independent V7 verification. Signed case budgets,
 Kubernetes audit/Falco sources and methods, managed cloud transports, and native
 Entra/GCP/network semantics complete the 0.4.2 A/B scope. The Kubernetes live API
-connector and catalog installation remain design-only. Publication of the
+connector and [catalog installation](https://github.com/ns2switch/irmind/pull/271) remain design-only. Publication of the
 separate community catalog is deferred; it is not a prerequisite for 0.4.2.
 
-After 0.4.2, prepare the subagent design for review without implementing it and
-continue the broader multi-artifact Windows collection evaluation (#157).
-Real-model forensic quality and real-connector deployment are not established
+The [subagent design](subagents-design.md) proposes bounded parallel tasks,
+shared reservations, signed event branches and an engine event stream; it is
+design-only. The separate [Windows collection evaluation](https://github.com/ns2switch/irmind/pull/284)
+correlates nine synthetic Hayabusa/EZTools exports and ten observations through
+confirmed findings, reconstruction, sealing and independently verified export.
+It neither launches a collector nor validates a real collection or model.
+Real-model forensic quality and real-connector deployment remain unestablished
 by the scripted tests.
 
 ## Historical delivery order through v0.3
