@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit c471d3e7e80a6cc16765d90e5ff4528eedce4126; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit db8cff9c095e616be5bbb56072849b131258900d; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
