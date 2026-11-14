@@ -11,13 +11,14 @@ use irmind_domain::{Actor, ExecutionMode, ParserSelectionMode};
 
 const RAW: &[u8] = b"{\"eventTime\":\"2026-11-01T00:00:00Z\",\"eventName\":\"synthetic\",\"requestObject\":{\"roleRef\":\"synthetic-role\"}}\n{\"eventTime\":\"2026-11-01T00:00:01Z\",\"eventName\":\"second\"}\n";
 struct Fixture {
-    temp: tempfile::TempDir,
     root: std::path::PathBuf,
     store: Arc<LocalStore>,
     reader: Arc<OriginalReader>,
     engine: Engine<'static>,
     case: CaseId,
     hash: EvidenceHash,
+    // Close the reader/database before removing synthetic files on Windows.
+    temp: tempfile::TempDir,
 }
 impl Fixture {
     fn new(copy: bool) -> Self {
