@@ -20,7 +20,7 @@ pub(crate) struct CachedCatalog {
 }
 
 impl LocalStore {
-    pub(super) fn query_catalog(&self, id: &CaseId) -> Result<super::QueryCatalog, AppError> {
+    pub(crate) fn query_catalog(&self, id: &CaseId) -> Result<super::QueryCatalog, AppError> {
         self.signed_parquet_artifacts(id)?;
         let cache = self.graph_catalog.lock().map_err(storage)?;
         let data = cache.get(id).ok_or(AppError::InvalidChain(0))?;

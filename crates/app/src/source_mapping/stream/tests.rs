@@ -1,3 +1,4 @@
+mod replay;
 use super::*;
 use crate::source_mapping::{
     DecodeAnnotationsV1, SourceDecoder, SourceFormatV1, SourceInput, SourceNumber,

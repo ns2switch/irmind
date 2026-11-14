@@ -19,6 +19,7 @@ impl<'a> Engine<'a> {
         }
         self.verify_unlocked_cancelable(id, cancel)?;
         let case = self.repo.get_case(id)?;
+        self.select_original_case(id)?;
         self.record_source_scopes_unlocked(&case)?;
         Ok(case)
     }
@@ -38,6 +39,7 @@ impl<'a> Engine<'a> {
             repo: ports.repo,
             evidence_store: ports.evidence_store,
             graph: ports.graph,
+            source_evidence_reader: ports.source_evidence_reader,
             audit_log: ports.audit_log,
             signer: ports.signer,
             verifier: ports.verifier,
@@ -151,6 +153,7 @@ impl<'a> Engine<'a> {
         )?;
         self.audit_log
             .transact(&entry, CaseMutation::Create(case.clone()))?;
+        self.select_original_case(&case.id)?;
         Ok(case)
     }
 
@@ -222,6 +225,15 @@ impl<'a> Engine<'a> {
             return Err(AppError::Fixed(
                 crate::FixedAppError::PolicyScopeExceedsOrganizationCeiling,
             ));
+        }
+        Ok(())
+    }
+}
+
+impl Engine<'_> {
+    fn select_original_case(&self, id: &CaseId) -> Result<(), AppError> {
+        if let Some(reader) = &self.source_evidence_reader {
+            reader.authorize_local_root(id, std::path::Path::new(""), &[])?;
         }
         Ok(())
     }

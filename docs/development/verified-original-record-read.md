@@ -1,6 +1,6 @@
 # Verified original-record reads
 
-Status: proposed additive contract. No implementation or change to custody formats.
+Status: approved additive contract. Custody formats and query limits are unchanged.
 
 ## Purpose and current behavior
 
@@ -10,11 +10,11 @@ That distinction matters to the Kubernetes methods. An API operation and its out
 
 Preserve the small projection for search. Add verified, explicitly authorized access to an individual original record instead of flattening all request/response bodies into the index. This is not the decoded-record cache or remapping facility deferred in [the source-mapping design](source-mapping-design.md).
 
-## Proposed application port
+## Application port
 
 Add an optional local `SourceEvidenceReader` port. Preserve `EnginePorts::new`; initialize the optional reader to `None` and attach it through an additive builder. Propagate it to local engine handles. Existing engines without this port keep projection reads, clearly labeled as projections. A method requiring original fields reports missing coverage rather than treating a projection as the original.
 
-The conceptual signatures are:
+The port signatures are:
 
 ```rust
 trait SourceEvidenceReader: Send + Sync {
@@ -39,7 +39,7 @@ Use the existing typed case/hash identities and source-record bounds. The caller
 
 `authorize_local_root` is an analyst-origin application action, never a callable model tool. After a successful signed local ingestion, register the root selected in that ingestion and the hashes actually committed. Opening an existing case does not implicitly authorize its manifest paths. For a later session, the analyst can explicitly select the originals directory for that case before original-record reads. This selection is local acquisition state, not evidence custody, and grants no network authority.
 
-The adapter stores at most 16 local root capabilities and at most 16,384 hash associations for the current case, in memory only. Replacing the current case clears them. If capacity is reached, refuse additional authorization with a clear message; do not broaden an existing capability or evict it silently. A copied original already held privately by the case needs no external root. Neither a source URI nor a relative path in a manifest is an authority to open a file.
+The adapter stores at most 16 local root capabilities and at most 16,384 hash associations for the current case, in memory only. Replacing the current case clears them. An empty hash batch selects the current case without authorizing or opening any root; opening or creating a case uses that lifecycle call. If capacity is reached, refuse additional authorization with a clear message; do not broaden an existing capability or evict it silently. A copied original already held privately by the case needs no external root. Neither a source URI nor a relative path in a manifest is an authority to open a file.
 
 ## Authentication and bounded decoding
 

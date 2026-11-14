@@ -22,6 +22,8 @@ pub(super) const METHODS: &[Method] = &[
     method!("aws-s3-data-exfiltration", "coverage.csv"),
     method!("azure-entra-identity-compromise", "coverage.csv"),
     method!("gcp-service-account-abuse", "coverage.csv"),
+    method!("k8s-cluster-compromise", "coverage.csv"),
+    method!("k8s-workload-compromise", "coverage.csv"),
     method!("linux-persistence", "coverage.csv"),
     method!("linux-triage", "coverage.csv"),
     method!("linux-webshell", "coverage.csv"),

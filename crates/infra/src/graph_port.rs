@@ -5,7 +5,7 @@ use crate::{
 use irmind_app::CancellationToken;
 use irmind_domain::{CaseScope, GraphQueryFilter, ParquetArtifact};
 
-struct QueryCatalog {
+pub(crate) struct QueryCatalog {
     artifacts: Vec<ParquetArtifact>,
     source_names: std::collections::BTreeMap<String, String>,
 }

@@ -1,0 +1,140 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-falco-kubernetes-audit"
+version = "falco-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-falco"
+parser_versions = ["falco-source-v1"]
+format = "falco-kubernetes-audit"
+format_version = "falco-source-v1"
+action = ["output_fields", "ka.verb"]
+
+[[fields]]
+source = ["rule"]
+target = "rule.name"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+observation = { kind = "rule", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["output_fields", "ka.user.name"]
+target = "user.name"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+observation = { kind = "k8s_user", role = "actor", scope = { kind = "cluster", path = {} } }
+
+[[fields]]
+source = ["output_fields", "ka.impuser.name"]
+target = "user.target.name"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+observation = { kind = "k8s_user", role = "target", scope = { kind = "cluster", path = {} } }
+
+[[fields]]
+source = ["output_fields", "ka.user.groups"]
+target = "user.group.name"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+
+[[fields]]
+source = ["output_fields", "ka.user.name"]
+target = "irmind.kubernetes.service_account"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+conversion = "kubernetes_service_account_name"
+observation = { kind = "k8s_service_account", role = "actor", scope = { kind = "cluster", path = { service_account_principal = ["output_fields", "ka.user.name"] } } }
+
+[[fields]]
+source = ["output_fields", "ka.target.namespace"]
+target = "orchestrator.namespace"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+observation = { kind = "k8s_namespace", role = "subject", scope = { kind = "cluster", path = {} } }
+
+[[fields]]
+source = ["output_fields", "ka.target.resource"]
+target = "orchestrator.resource.type"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+
+[[fields]]
+source = ["output_fields", "ka.target.name"]
+target = "orchestrator.resource.name"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+[[fields.observations]]
+kind = "k8s_pod"
+role = "target"
+scope = { kind = "cluster", path = { namespace = ["output_fields", "ka.target.namespace"] } }
+[[fields.observations.when]]
+path = ["output_fields", "ka.target.resource"]
+predicate = { op = "text", value = "pods" }
+[[fields.observations]]
+kind = "k8s_node"
+role = "target"
+scope = { kind = "cluster", path = {} }
+[[fields.observations.when]]
+path = ["output_fields", "ka.target.resource"]
+predicate = { op = "text", value = "nodes" }
+[[fields.observations]]
+kind = "k8s_namespace"
+role = "target"
+scope = { kind = "cluster", path = {} }
+[[fields.observations.when]]
+path = ["output_fields", "ka.target.resource"]
+predicate = { op = "text", value = "namespaces" }
+[[fields.observations]]
+kind = "k8s_service_account"
+role = "target"
+scope = { kind = "cluster", path = { namespace = ["output_fields", "ka.target.namespace"] } }
+[[fields.observations.when]]
+path = ["output_fields", "ka.target.resource"]
+predicate = { op = "text", value = "serviceaccounts" }
+
+[[fields]]
+source = ["output_fields", "ka.target.subresource"]
+target = "irmind.kubernetes.subresource"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+
+[[fields]]
+source = ["output_fields", "ka.stage"]
+target = "irmind.kubernetes.stage"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+
+[[fields]]
+source = ["output_fields", "ka.auth.decision"]
+target = "irmind.kubernetes.authorization_decision"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+
+[[fields]]
+source = ["output_fields", "ka.useragent"]
+target = "user_agent.original"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+
+[[fields]]
+source = ["output_fields", "ka.uri"]
+target = "url.original"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+
+[[fields]]
+source = ["output_fields", "ka.cluster.name"]
+target = "orchestrator.cluster.name"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+
+[[fields]]
+source = ["output_fields", "ka.response.code"]
+target = "http.response.status_code"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+conversion = "decimal"
+
+[[fields]]
+source = ["output_fields", "ka.sourceips"]
+target = "source.ip"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+source_index = 0
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["output_fields", "ka.auditid"]
+target = "irmind.source_event.id"
+omit_text = ["", "<NA>", "<NONE>", "N/A"]
+observation = { kind = "event", role = "subject", scope = { kind = "source_record" } }
+
+[[rules]]
+kind = "alert"
+categories = ["api", "intrusion_detection"]
+types = ["info"]
+outcome = "unknown"

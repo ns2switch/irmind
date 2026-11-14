@@ -1,14 +1,18 @@
 use crate::{AppError, AuthorizedCall, Engine, EntityDetails, FindingKind, GraphQueryFilter, Tool};
 
 impl Engine<'_> {
-    pub(crate) fn execute_local_tool(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+    pub(crate) fn execute_local_tool(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &crate::CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
         match call.tool() {
             Tool::EvidenceSearch | Tool::EvidenceRead => self.execute_evidence_tool(call),
             Tool::GraphSummary | Tool::EntityLookup | Tool::Neighbors | Tool::EntityTimeline => {
                 self.execute_graph_lookup_tool(call)
             }
             Tool::GraphPath | Tool::TextSearch | Tool::RawRecords => {
-                self.execute_graph_search_tool(call)
+                self.execute_graph_search_tool(call, cancel)
             }
             Tool::CaseAddFinding => self.execute_finding_tool(call),
             _ => Err(AppError::Fixed(
@@ -100,7 +104,11 @@ impl Engine<'_> {
         })
     }
 
-    fn execute_graph_search_tool(&self, call: &AuthorizedCall) -> Result<Vec<u8>, AppError> {
+    fn execute_graph_search_tool(
+        &self,
+        call: &AuthorizedCall,
+        cancel: &crate::CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
         let filter = graph_filter(call)?;
         Ok(match call.tool() {
             Tool::GraphPath => self
@@ -135,17 +143,7 @@ impl Engine<'_> {
                         .unwrap_or(10),
                 )?
                 .into_bytes(),
-            Tool::RawRecords => self
-                .graph
-                .raw_record(
-                    call.case_id(),
-                    call.arg("hash")
-                        .ok_or(AppError::Fixed(crate::FixedAppError::PolicyMissingHash))?,
-                    call.arg("index")
-                        .and_then(|value| value.parse().ok())
-                        .ok_or(AppError::Fixed(crate::FixedAppError::PolicyMissingIndex))?,
-                )?
-                .into_bytes(),
+            Tool::RawRecords => self.execute_raw_record_tool(call, cancel)?,
             _ => {
                 return Err(AppError::Fixed(
                     crate::FixedAppError::PolicyInvalidLocalTool,

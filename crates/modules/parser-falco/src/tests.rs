@@ -169,3 +169,47 @@ fn host_only_falco_passes_the_shared_decoder_contract_without_a_fake_cluster() {
     )
     .unwrap();
 }
+#[test]
+fn audit_plugin_source_requires_explicit_cluster_and_keeps_original_fields() {
+    let bytes = include_bytes!("../../../testkit/fixtures/parser-falco/source/audit.ndjson");
+    let parser = FalcoParser::default();
+    assert_eq!(parser.detect("unknown.bin", bytes).unwrap().value(), 98);
+    assert!(
+        parser
+            .cluster_context_requirement("unknown.bin", bytes)
+            .unwrap()
+            .unwrap()
+            .required()
+    );
+    assert!(matches!(
+        decode(bytes, None),
+        Err(AppError::ParserClusterContextRequired { .. })
+    ));
+    let (report, rows) = decode(bytes, Some(&context())).unwrap();
+    assert_eq!((report.accepted, report.rejected), (1, 0));
+    assert_eq!(rows[0].format().id(), "falco-kubernetes-audit");
+    assert_eq!(
+        rows[0].cluster_identity().unwrap().id(),
+        "urn:k8s:synthetic"
+    );
+    let original = irmind_app::source_mapping::json::decode_json_fields(
+        bytes,
+        irmind_app::source_mapping::json::SourceJsonLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(rows[0].fields(), &original);
+}
+#[test]
+fn original_json_arrays_detect_the_first_falco_record_without_consuming_input() {
+    let mut bytes = b"[".to_vec();
+    bytes.extend_from_slice(EVENT.trim_ascii_end());
+    bytes.push(b']');
+    assert_eq!(
+        FalcoParser::default()
+            .detect("unknown.bin", &bytes)
+            .unwrap()
+            .value(),
+        98
+    );
+    assert_eq!(decode(&bytes, Some(&context())).unwrap().0.accepted, 1);
+}

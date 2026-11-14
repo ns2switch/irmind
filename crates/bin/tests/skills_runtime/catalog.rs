@@ -10,6 +10,7 @@ use scenarios::SCENARIOS;
 
 struct Scenario {
     name: &'static str,
+    cluster: Option<&'static str>,
     files: &'static [(&'static str, &'static str, &'static str)],
     query: &'static str,
     conclusion: &'static str,
@@ -29,21 +30,14 @@ fn episode(index: usize) {
     let mut hashes = vec![];
     for (name, parser, content) in scenario.files {
         std::fs::write(root.path().join(name), content).unwrap();
-        let parser = crate::current_sources::parser(parser);
-        let large = LargeCaseUseCases {
-            engine: &engine,
-            store: store.as_ref(),
-            parser: parser.as_ref(),
-        };
-        let ingested = large
-            .ingest_local_batch(
-                &case.id,
-                root.path(),
-                &[(*name).into()],
-                false,
-                &CancellationToken::new(),
-            )
-            .unwrap();
+        let ingested = ingest_source(
+            scenario,
+            &engine,
+            store.as_ref(),
+            &case.id,
+            root.path(),
+            (name, parser, content),
+        );
         assert_eq!(ingested.len(), 1, "{} {name}", scenario.name);
         hashes.push(ingested[0].1.as_str().to_owned());
     }
@@ -58,7 +52,7 @@ fn episode(index: usize) {
         &case.id,
         "single",
     );
-    checks::evaluate(scenario, &engine, store.as_ref(), &case.id);
+    checks::evaluate(scenario, &engine, &store, &case.id, &model, root.path());
     checks::export(
         &engine,
         store.as_ref(),
@@ -66,6 +60,54 @@ fn episode(index: usize) {
         root.path(),
         scenario.files.len(),
     );
+}
+
+fn ingest_source(
+    scenario: &Scenario,
+    engine: &irmind_app::Engine<'_>,
+    store: &irmind_infra::LocalStore,
+    id: &irmind_domain::CaseId,
+    root: &std::path::Path,
+    source: (&str, &str, &str),
+) -> Vec<(String, irmind_domain::EvidenceHash)> {
+    let (name, parser_id, content) = source;
+    let parser = crate::current_sources::parser(parser_id);
+    if scenario.cluster.is_none() {
+        return LargeCaseUseCases {
+            engine,
+            store,
+            parser: parser.as_ref(),
+        }
+        .ingest_local_batch(id, root, &[name.into()], false, &CancellationToken::new())
+        .unwrap();
+    }
+    let acquisition = irmind_app::command_cluster_context(scenario.cluster).unwrap();
+    let catalog = crate::current_sources::catalog();
+    let selected = catalog
+        .select_source(irmind_app::modules::ParserSelectionRequest {
+            source: name,
+            sample: content.as_bytes(),
+            parser_override: None,
+            forced: false,
+            time_context: None,
+            cluster_context: acquisition.as_ref(),
+        })
+        .unwrap();
+    assert_eq!(selected.parser.parser_name(), parser_id);
+    LargeCaseUseCases {
+        engine,
+        store,
+        parser: selected.parser.as_ref(),
+    }
+    .ingest_local_batch_selected(
+        id,
+        root,
+        &[name.into()],
+        false,
+        &std::collections::BTreeMap::from([(name.into(), selected.selection)]),
+        &CancellationToken::new(),
+    )
+    .unwrap()
 }
 
 macro_rules! skill_tests {
@@ -102,6 +144,18 @@ skill_tests!(
     8
 );
 skill_tests!(network_episode, network_rejects_hostile_evidence, 9);
+#[cfg(all(feature = "parser-kubernetes", feature = "parser-falco"))]
+skill_tests!(
+    k8s_cluster_episode,
+    k8s_cluster_rejects_hostile_evidence,
+    10
+);
+#[cfg(all(feature = "parser-kubernetes", feature = "parser-falco"))]
+skill_tests!(
+    k8s_workload_episode,
+    k8s_workload_rejects_hostile_evidence,
+    11
+);
 
 #[test]
 fn six_turn_scripted_investigation_records_budget_inputs_without_a_provider() {

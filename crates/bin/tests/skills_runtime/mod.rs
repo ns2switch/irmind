@@ -89,7 +89,8 @@ pub(super) fn setup_with_store(
             store.clone(),
             CryptoPorts::new(analyst, Arc::new(verifier)),
             Arc::new(MandatoryGuard::new().unwrap()),
-        ),
+        )
+        .with_source_evidence_reader(store.source_evidence_reader()),
         ExecutionMode::Attended,
         Arc::new(SystemClock),
     )

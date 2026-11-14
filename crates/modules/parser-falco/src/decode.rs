@@ -73,7 +73,13 @@ pub(super) fn is_falco(fields: &SourceValue) -> bool {
             .and_then(SourceValue::as_text)
             .is_some()
 }
+pub(super) fn is_audit_plugin(fields: &SourceValue) -> bool {
+    fields.field("source").and_then(SourceValue::as_text) == Some("k8s_audit")
+}
 pub(super) fn is_kubernetes(fields: &SourceValue) -> bool {
+    if is_audit_plugin(fields) {
+        return true;
+    }
     fields.field("output_fields").is_some_and(|fields| {
         [
             "k8s.ns.name",
@@ -100,7 +106,9 @@ fn prepare(fields: SourceValue) -> Result<DecodedSourceFrame, AppError> {
         .and_then(SourceValue::as_text)
         .ok_or_else(invalid)?;
     let timestamp = IndexedTime::from_rfc3339(time, false).map_err(|_| invalid())?;
-    let format = if is_kubernetes(&fields) {
+    let format = if is_audit_plugin(&fields) {
+        "falco-kubernetes-audit"
+    } else if is_kubernetes(&fields) {
         "falco-kubernetes"
     } else {
         "falco"

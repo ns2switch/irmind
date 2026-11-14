@@ -1,0 +1,6 @@
+source,required,limitation
+Kubernetes audit,confirmed cluster plus original user/verb/objectRef/status,metadata policy may omit request and response
+EKS GetLogEvents,complete declared EKS ARN and native Event message,stream name is not a global cluster identity
+GKE Cloud Audit,confirmed project/location/cluster and original protoPayload,cloud and Kubernetes principals need an explicit link
+AKS diagnostics,confirmed complete resource ID and kube-audit Event,unsupported positional query wrappers need conversion
+Falco k8s_audit,explicit source plus original ka fields,source alerts never prove effective privilege

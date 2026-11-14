@@ -38,6 +38,25 @@ impl Episode {
                 args.extend_from_slice(s.filters);
                 vec![call(Tool::TextSearch, &args)]
             }
+            3 if s.cluster.is_some() => {
+                let mut reads = vec![
+                    call(
+                        Tool::RawRecords,
+                        &[("hash", hash), ("index", "0"), ("view", "original")],
+                    ),
+                    call(
+                        Tool::RawRecords,
+                        &[("hash", hash), ("index", "1"), ("view", "original")],
+                    ),
+                ];
+                for other in self.hashes.iter().skip(1) {
+                    reads.push(call(
+                        Tool::RawRecords,
+                        &[("hash", other), ("index", "0"), ("view", "original")],
+                    ));
+                }
+                reads
+            }
             3 => vec![call(Tool::RawRecords, &[("hash", hash), ("index", "0")])],
             4 if s.name == "linux-persistence" => vec![call(
                 Tool::TextSearch,

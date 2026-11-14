@@ -128,6 +128,9 @@ clúster confirmado. Las etiquetas de imagen y los cuerpos de solicitudes de
 pods quedan en el original. Los cuerpos completos de solicitudes y respuestas
 no se proyectan automáticamente en la búsqueda.
 
+
+`mapping-falco-kubernetes-audit` interpreta registros explícitos `source="k8s_audit"` y los campos documentados `ka.*`, separados de los registros syscall de host/Kubernetes. Mantiene actor y objetivo suplantado distintos y exige contexto de clúster confirmado. La alerta de origen sigue sin confirmar y con resultado desconocido. Solo mapea `container.privileged` si es un booleano explícito: ni el título de una regla ni una respuesta API 1xx de cambio de protocolo prueban ejecución exitosa. Los cuerpos de pods y RBAC quedan fuera del índice; los [métodos Kubernetes](skills.md) consultan los originales verificados necesarios, con el guard y los límites actuales.
+
 ### Cloud Audit Logs de GCP y GKE
 
 El módulo experimental `parser-gcp-audit`, incluido por defecto, reconoce

@@ -244,6 +244,12 @@ fn registry() -> ModuleRegistry {
     {
         registry
             .register(
+                Box::new(irmind_mod_mapping_falco::AuditPluginMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
                 Box::new(irmind_mod_parser_falco::FalcoParser::default()),
                 &ModuleConfig::new(),
             )

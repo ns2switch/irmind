@@ -84,6 +84,8 @@ pub use skills::{
 };
 pub mod source_mapping;
 pub use source_mapping::{SourceDecoder, SourceMapper};
+mod source_evidence;
+pub use source_evidence::SourceEvidenceReader;
 
 pub use approvals::{ApprovalRequest, ApprovalSource};
 use audit_origin::AuditOrigin;

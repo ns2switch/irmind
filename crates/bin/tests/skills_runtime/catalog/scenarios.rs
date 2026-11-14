@@ -2,6 +2,7 @@ use super::Scenario;
 
 pub(super) const SCENARIOS: &[Scenario] = &[
     Scenario {
+        cluster: None,
         name: "aws-s3-data-exfiltration",
         files: &[(
             "cloudtrail.json",
@@ -22,6 +23,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         ],
     },
     Scenario {
+        cluster: None,
         name: "azure-entra-identity-compromise",
         files: &[
             (
@@ -58,6 +60,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         ],
     },
     Scenario {
+        cluster: None,
         name: "gcp-service-account-abuse",
         files: &[
             (
@@ -87,6 +90,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         ],
     },
     Scenario {
+        cluster: None,
         name: "windows-ransomware",
         files: &[(
             "normalized-ecs.jsonl",
@@ -107,6 +111,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         ],
     },
     Scenario {
+        cluster: None,
         name: "windows-lateral-movement",
         files: &[(
             "normalized-ecs.jsonl",
@@ -127,6 +132,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         ],
     },
     Scenario {
+        cluster: None,
         name: "windows-persistence",
         files: &[(
             "normalized-ecs.jsonl",
@@ -147,6 +153,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         ],
     },
     Scenario {
+        cluster: None,
         name: "malware-execution-triage",
         files: &[(
             "normalized-ecs.jsonl",
@@ -167,6 +174,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         ],
     },
     Scenario {
+        cluster: None,
         name: "linux-webshell",
         files: &[
             (
@@ -196,6 +204,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         ],
     },
     Scenario {
+        cluster: None,
         name: "linux-persistence",
         files: &[
             (
@@ -224,6 +233,7 @@ pub(super) const SCENARIOS: &[Scenario] = &[
         ],
     },
     Scenario {
+        cluster: None,
         name: "network-c2-beaconing",
         files: &[
             (
@@ -250,6 +260,59 @@ pub(super) const SCENARIOS: &[Scenario] = &[
             ("event_type", "connection"),
             ("event_outcome", "unknown"),
             ("entity_role", "destination"),
+        ],
+    },
+    #[cfg(all(feature = "parser-kubernetes", feature = "parser-falco"))]
+    Scenario {
+        cluster: Some("kubernetes:urn:k8s:synthetic"),
+        name: "k8s-cluster-compromise",
+        files: &[(
+            "audit.ndjson",
+            "parser-kubernetes",
+            include_str!(
+                "../../../../testkit/fixtures/skills-expanded/k8s-cluster-compromise/source/audit.ndjson"
+            ),
+        )],
+        query: "secrets",
+        conclusion: "Failed synthetic secret read followed by a successful cluster-role binding; effective privileges need separate RBAC state",
+        technique: "T1098.006",
+        selected_source: 0,
+        filters: &[
+            ("event_category", "api"),
+            ("event_type", "access"),
+            ("event_outcome", "failure"),
+            ("entity_role", "actor"),
+        ],
+    },
+    #[cfg(all(feature = "parser-kubernetes", feature = "parser-falco"))]
+    Scenario {
+        cluster: Some("kubernetes:urn:k8s:synthetic"),
+        name: "k8s-workload-compromise",
+        files: &[
+            (
+                "audit.ndjson",
+                "parser-kubernetes",
+                include_str!(
+                    "../../../../testkit/fixtures/skills-expanded/k8s-workload-compromise/source/audit.ndjson"
+                ),
+            ),
+            (
+                "falco.ndjson",
+                "parser-falco",
+                include_str!(
+                    "../../../../testkit/fixtures/skills-expanded/k8s-workload-compromise/source/falco.ndjson"
+                ),
+            ),
+        ],
+        query: "pods",
+        conclusion: "Successful synthetic risky pod creation correlates with a Falco source alert; node escape is not established",
+        technique: "T1610",
+        selected_source: 0,
+        filters: &[
+            ("event_category", "api"),
+            ("event_type", "access"),
+            ("event_outcome", "success"),
+            ("entity_role", "actor"),
         ],
     },
 ];

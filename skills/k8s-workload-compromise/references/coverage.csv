@@ -1,0 +1,6 @@
+source,required,limitation
+Kubernetes audit,confirmed cluster plus workload request and response details,requested configuration does not prove runtime state
+Falco syscall JSON,explicit pod/namespace/container metadata and source time,OS users are not Kubernetes API actors
+Falco k8s_audit,explicit source and documented ka fields,alert outcome is unknown
+Managed control plane,exports supported by the Kubernetes or GKE source modules,no live cluster API collection
+Node or endpoint evidence,independent runtime and execution observations,privilege flags alone do not establish node escape

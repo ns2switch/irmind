@@ -226,7 +226,8 @@ impl Engine<'_> {
                 Err(AppError::Cancelled)
             } else {
                 let call = call.clone();
-                self.blocking_local(move |local| local.execute_local_tool(&call))
+                let cancel = cancel.clone();
+                self.blocking_local(move |local| local.execute_local_tool(&call, &cancel))
                     .await
             }
         } else {

@@ -85,6 +85,11 @@ target = "irmind.kubernetes.service_account"
 omit_text = ["<NA>", "<NONE>"]
 observation = { kind = "k8s_service_account", role = "actor", scope = { kind = "cluster", path = { namespace = ["output_fields", "k8s.ns.name"] } } }
 
+[[fields]]
+source = ["output_fields", "container.privileged"]
+target = "container.security_context.privileged"
+omit_text = ["<NA>", "<NONE>"]
+
 [[rules]]
 kind = "alert"
 categories = ["intrusion_detection"]

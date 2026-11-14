@@ -37,7 +37,7 @@ pub use selector::{SelectorCondition, SelectorPredicate, SelectorScalar, SourceS
 
 pub use stream::{
     DecodedSourceCommitmentV1, MappedSourceRecord, PreparedSourceRecord, SourceRecordAccumulator,
-    SourceRecordPreparer,
+    SourceRecordPreparer, SourceRecordReplay,
 };
 
 pub use time::{decode_source_time_context, parser_time_context, source_time_snapshot};

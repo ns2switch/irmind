@@ -52,7 +52,7 @@ mod tests {
     #[test]
     fn bundled_methods_use_the_shared_compiler_guard_and_immutable_package_contract() {
         let methods = bundled_skill_candidates().unwrap();
-        assert_eq!(methods.len(), 13);
+        assert_eq!(methods.len(), 15);
         let names: Vec<_> = methods
             .iter()
             .map(|m| m.metadata().name().as_str())
@@ -64,6 +64,8 @@ mod tests {
                 "aws-s3-data-exfiltration",
                 "azure-entra-identity-compromise",
                 "gcp-service-account-abuse",
+                "k8s-cluster-compromise",
+                "k8s-workload-compromise",
                 "linux-persistence",
                 "linux-triage",
                 "linux-webshell",

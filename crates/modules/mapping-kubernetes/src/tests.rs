@@ -217,3 +217,24 @@ fn native_acquisition_passes_the_shared_mapping_contract() {
     )
     .unwrap();
 }
+#[test]
+fn informational_protocol_upgrade_retains_api_category_without_claiming_execution_success() {
+    let mut value = fixture();
+    value["responseStatus"]["code"] = json!(101);
+    value["verb"] = json!("create");
+    value["objectRef"]["subresource"] = json!("exec");
+    let source = decode(&value);
+    let output = KubernetesMapping::new().unwrap().map(&source).unwrap();
+    assert!(
+        output
+            .record()
+            .common
+            .event()
+            .categories()
+            .contains(EventCategory::Api)
+    );
+    assert_eq!(
+        output.record().common.event().outcome(),
+        EventOutcome::Unknown
+    );
+}

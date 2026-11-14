@@ -79,7 +79,7 @@ Usa **Enter** para avanzar, **Retroceso** para revisar un paso, **Espacio** para
 Ningún LLM está habilitado por defecto. Puedes ingerir y verificar evidencia local sin uno.
 En los siguientes arranques, IRMind verifica y reabre el último caso abierto que usaste. Usa `/home` para volver a la lista o `/settings preferences` para desactivar esta opción. `/settings` también reúne conectores, credenciales, ratón y tema. `/help` enumera los comandos y las teclas reservadas: Enter, Esc, flechas, Tab/Shift+Tab, PgUp/PgDn, Ctrl+C, Ctrl+K y Ctrl+O. Ctrl+O o `/expand` despliega o pliega la tarjeta seleccionada o la última plegable sin salir del campo de entrada. Los caracteres imprimibles, incluido `/`, se escriben en el campo de formulario que tiene el foco; el pegado también funciona allí.
 
-Usa `/skills` para inspeccionar y gestionar los 13 métodos incluidos de nube, Windows, Linux y red. Invoca `/windows-triage`, `/linux-triage` o `/aws-credential-compromise` dentro de un caso. El modelo los carga cuando hacen falta; no amplían permisos. Consulta la [guía de skills](docs/es/skills.md).
+Usa `/skills` para inspeccionar y gestionar los 15 métodos incluidos de nube, Windows, Linux, red y Kubernetes. Invoca `/windows-triage`, `/linux-triage` o `/aws-credential-compromise` dentro de un caso. El modelo los carga cuando hacen falta; no amplían permisos. Consulta la [guía de skills](docs/es/skills.md).
 
 ## Módulos
 
