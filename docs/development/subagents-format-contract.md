@@ -93,8 +93,12 @@ this view before aggregation, sampling, expansion, sorting and result limits.
 Unsupported views fail `TaskSourceViewUnsupported`, not an unfiltered call.
 Remote calls use the same task lease in the normal policy/approval dispatcher.
 
-`AnalystPlanChoice` is Start or Cancel from the trusted in-process analyst UI
-adapter, not model JSON or an engine event. It carries the displayed plan and
+`AnalystPlanChoice` is Start or Cancel from the trusted in-process UI adapter,
+not model JSON or an engine event. The signed configuration preference
+`confirm_all_subagent_plans` defaults to false. A displayed plan at or below 25%
+may return automatic Start only with that preference disabled; otherwise the UI
+waits for explicit Start. Above 25%, explicit Start and Analyst-signed consent
+are mandatory regardless of preference. The choice carries the displayed plan and
 budget commitments back for comparison. The broker, which alone holds the
 Analyst signer, creates the signed consent when required. No model tool accepts
 a choice, approval signature, `confirmed` flag or source-view capability. A
@@ -113,8 +117,12 @@ deadline checks so a blocked callback cannot stop time-limit enforcement.
 ## Visible plan and reservation state machine
 
 A safe preview shows all tasks, six-type IDs, source subsets, quotas and case
-remaining values. Start/Cancel are real analyst actions, with no timer. One pending
-preview per case bounds UI state; child work may run in parallel only after start.
+remaining values. No child starts before this display. Above the threshold, or
+with Confirm all subagent plans enabled, Start is an explicit analyst action.
+Other displayed plans auto-start by default; cancellation remains available at
+any time. The preference is changed only by an Analyst-signed global configuration
+operation, never a model tool or caller-supplied flag. One pending preview per
+case bounds UI state; child work may run in parallel only after start.
 A preview hold reserves capacity but cannot dispatch anything. Expired/cancelled
 unused preview holds can be released with a signed reason; incurred/uncertain
 execution reservations cannot be refunded as unused.
@@ -132,7 +140,8 @@ For proposed tokens T and calls C and recomputed remaining RT/RC:
    overflows. Never divide by a remaining value.
 2. Require signed consent iff `(u128(T) * 4 > RT) || (u128(C) * 4 > RC)`.
    Exactly 25% does not trigger it. Apply to the whole plan, not each child.
-3. Append the Agent plan, display its exact commitment, obtain Start, and for a
+3. Append the Agent plan, display its exact commitment, obtain explicit Start
+   when required (otherwise record the displayed automatic start), and for a
    threshold plan append an Analyst `SubagentPlanApprovalV1` before execution.
 4. Recompute policy, consumption and other holds at admission under the same
    transaction. Changed inputs require a new preview/consent; a stale signature

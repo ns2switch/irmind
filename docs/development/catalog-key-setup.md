@@ -1,6 +1,6 @@
 # Provision the catalog signing key
 
-Maintainer procedure for the [signed catalog contract](skills-catalog-format-contract.md).
+Maintainer procedure for the [signed catalog contract](https://github.com/ns2switch/irmind/pull/287).
 Do this on your own machine, outside any Git checkout. IRMind and the development
 agent need only the public key and its ID. Do not send the seed or a private key.
 The publishing workflow uses the protected `release` environment in

@@ -76,8 +76,13 @@ cancelación independiente de callbacks bloqueados.
 ## Vista y reservas
 
 La vista muestra todas las tareas, tipos, fuentes, cuotas y presupuesto restante.
-No hay temporizador. Un solo preview pendiente por caso; ningún hijo arranca hasta
-Start. La retención de preview no ejecuta herramientas/proveedores. Cancelar o
+La preferencia firmada confirm_all_subagent_plans está desactivada por defecto.
+Un plan mostrado que reserve como máximo el 25% arranca automáticamente y puede
+cancelarse en cualquier momento. Activarla exige Start explícito en todos.
+Superar el 25% siempre exige Start y consentimiento Analyst firmado. Solo el
+analista cambia la preferencia con la operación global firmada; nunca el modelo.
+Un solo preview pendiente por caso; ningún hijo arranca antes de mostrarlo.
+La retención de preview no ejecuta herramientas/proveedores. Cancelar o
 expirar devuelve solo capacidad que se sabe no utilizada, con motivo firmado.
 Nunca se devuelve gasto incurrido o incierto como si estuviera libre.
 
@@ -90,8 +95,9 @@ coordinación/resumen y todos los hijos.
 1. Rechazar T > RT, C > RC, exceso de rondas/bytes o error aritmético.
 2. Exigir firma si `u128(T)*4 > RT || u128(C)*4 > RC`. Sin división. Exactamente
    25% no la exige; superar cualquiera de los dos recursos sí.
-3. Registrar plan Agent, mostrar su compromiso exacto, recoger Start y, cuando
-   corresponda, registrar SubagentPlanApprovalV1 Analyst antes de ejecutar.
+3. Registrar plan Agent y mostrar su compromiso exacto. Recoger Start explícito
+   cuando corresponda; en los demás, registrar el arranque automático mostrado.
+   Superar el umbral exige SubagentPlanApprovalV1 Analyst antes de ejecutar.
 4. Recalcular bajo bloqueo al admitir: cambios requieren nueva vista/decisión.
 
 start_plan es único por plan; repetir consentimiento/Start no arranca hijos dos

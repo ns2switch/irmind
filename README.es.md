@@ -83,7 +83,7 @@ Usa `/skills` para inspeccionar y gestionar los 15 métodos incluidos de nube, W
 
 ## Módulos
 
-La versión 0.4 usa una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo lee los formatos actuales de caso y la exportación V8. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/development/case-migration.md).
+Las compilaciones de desarrollo para 0.5 usan una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo leen CaseCreated versión 4 y la exportación V8. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/development/case-migration.md).
 
 La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Los modelos remotos y conectores permanecen desactivados hasta seleccionarlos y configurarlos. Los parsers locales se eligen por detección del contenido. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre se necesita firma y un backend de secretos. Todos siguen siendo experimentales.
 
