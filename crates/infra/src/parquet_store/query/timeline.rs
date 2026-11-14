@@ -46,6 +46,19 @@ impl QueryStore<'_> {
         limit: usize,
         newest: bool,
     ) -> Result<Vec<EventHit>, AppError> {
+        if self.source_subset.is_some() {
+            let precise = spec
+                .artifacts
+                .iter()
+                .any(|a| a.precise_metadata().is_some());
+            let mut hits = Vec::new();
+            let status = self.scan_artifacts(spec, |batch| {
+                super::retained::retain_batch(batch, &mut hits, limit, newest, precise)?;
+                Ok(super::ScanFlow::Continue)
+            })?;
+            complete(status)?;
+            return Ok(hits);
+        }
         let files = self
             .store
             .time_ordered_artifacts(&spec, newest, self.source_names)?;

@@ -26,7 +26,7 @@ impl ReservationAction {
         }
     }
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ReservationPurpose {
     Plan,
@@ -61,6 +61,30 @@ pub struct SubagentReservationV1 {
     pub accounting_audit_sha256: Option<SubagentDigest>,
 }
 impl SubagentReservationV1 {
+    pub fn prepare(
+        plan: &SubagentPlanV1,
+        task: Option<SubagentDigest>,
+        ordinal: u64,
+        action: ReservationAction,
+        purpose: ReservationPurpose,
+        transition: ReservationTransition,
+    ) -> Result<Self, SubagentRecordError> {
+        let value = Self {
+            format_version: 1,
+            operation_id: Self::operation_id(plan.plan_id, task, action, purpose, ordinal),
+            plan_sha256: plan.identity()?,
+            task_id: task,
+            request_ordinal: ordinal,
+            action,
+            purpose,
+            amount: transition.amount,
+            parent_operation: transition.parent_operation,
+            cause_sha256: transition.cause_sha256,
+            accounting_audit_sha256: transition.accounting_audit_sha256,
+        };
+        value.validate_against(plan)?;
+        Ok(value)
+    }
     pub fn operation_id(
         plan_id: SubagentDigest,
         task: Option<SubagentDigest>,
@@ -107,6 +131,14 @@ impl SubagentReservationV1 {
         }
         Ok(())
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ReservationTransition {
+    pub amount: SubagentResources,
+    pub parent_operation: Option<SubagentDigest>,
+    pub cause_sha256: SubagentDigest,
+    pub accounting_audit_sha256: Option<SubagentDigest>,
 }
 impl SubagentRecord for SubagentReservationV1 {
     const KIND: AuditEventKind = AuditEventKind::SubagentReservationV1;

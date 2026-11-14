@@ -150,15 +150,17 @@ impl QueryStore<'_> {
             first.map_or_else(String::new, |t| t.display()),
             last.map_or_else(String::new, |t| t.display())
         );
-        if artifacts.iter().any(|a| {
-            a.precise_metadata().is_some_and(|v| {
-                matches!(
-                    v.builder_version.as_str(),
-                    crate::parquet_store::common_format::BUILDER
-                        | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
-                )
+        if self.source_subset.is_none()
+            && artifacts.iter().any(|a| {
+                a.precise_metadata().is_some_and(|v| {
+                    matches!(
+                        v.builder_version.as_str(),
+                        crate::parquet_store::common_format::BUILDER
+                            | irmind_domain::PARQUET_LAYOUT_BUILDER_V1
+                    )
+                })
             })
-        }) {
+        {
             summary.push_str(&partition_coverage(artifacts));
         }
         if super::scoped::available(artifacts) {

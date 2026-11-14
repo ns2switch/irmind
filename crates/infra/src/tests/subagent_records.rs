@@ -1,5 +1,6 @@
 use super::*;
 use irmind_app::subagents::{SubagentPlanV1, SubagentRecord, verify_subagent_plan_consent};
+mod journal;
 
 #[test]
 fn mathematically_valid_agent_signatures_cannot_authorize_a_threshold_plan() {

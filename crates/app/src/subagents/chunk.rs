@@ -23,7 +23,7 @@ impl CheckedBranchChunk {
             serde_json::from_slice(bytes).map_err(|_| SubagentRecordError)?;
         if entries.is_empty()
             || entries.len() > 64
-            || serde_json::to_vec(&entries).map_err(|_| SubagentRecordError)? != bytes
+            || super::codec::bounded_json(&entries, 1024 * 1024)? != bytes
         {
             return Err(SubagentRecordError);
         }
@@ -65,7 +65,7 @@ impl CheckedBranchChunk {
             return Err(SubagentRecordError);
         }
         Self::decode(
-            &serde_json::to_vec(entries).map_err(|_| SubagentRecordError)?,
+            &super::codec::bounded_json(entries, 1024 * 1024)?,
             agent,
             verifier,
         )

@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 pub(crate) struct QueryStore<'a> {
     store: &'a ParquetStore,
     source_names: &'a std::collections::BTreeMap<String, String>,
+    source_subset: Option<&'a std::collections::BTreeSet<String>>,
 }
 impl ParquetStore {
     pub(crate) fn queries<'a>(
@@ -17,6 +18,7 @@ impl ParquetStore {
         QueryStore {
             store: self,
             source_names: names,
+            source_subset: None,
         }
     }
 }
@@ -24,9 +26,55 @@ impl QueryStore<'_> {
     fn scan_artifacts(
         &self,
         spec: ScanSpec<'_>,
-        visit: impl FnMut(&RecordBatch) -> Result<ScanFlow, AppError>,
+        mut visit: impl FnMut(&RecordBatch) -> Result<ScanFlow, AppError>,
     ) -> Result<ScanStatus, AppError> {
-        self.store.scan_artifacts(spec, self.source_names, visit)
+        let Some(sources) = self.source_subset else {
+            return self.store.scan_artifacts(spec, self.source_names, visit);
+        };
+        let artifacts = spec
+            .artifacts
+            .iter()
+            .filter(|artifact| {
+                artifact
+                    .source_hashes()
+                    .iter()
+                    .any(|hash| sources.contains(hash.as_str()))
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        self.store.scan_artifacts(
+            ScanSpec {
+                artifacts: &artifacts,
+                ..spec
+            },
+            self.source_names,
+            |batch| {
+                let batch = self.source_rows(batch)?;
+                if batch.num_rows() == 0 {
+                    return Ok(ScanFlow::Continue);
+                }
+                visit(&batch)
+            },
+        )
+    }
+
+    fn source_rows(&self, batch: &RecordBatch) -> Result<RecordBatch, AppError> {
+        use arrow::array::Array as _;
+        let Some(sources) = self.source_subset else {
+            return Ok(batch.clone());
+        };
+        let hashes = batch
+            .column_by_name("source_hash")
+            .and_then(|v| v.as_any().downcast_ref::<StringArray>())
+            .ok_or_else(super::invalid_source)?;
+        if hashes.null_count() != 0 {
+            return Err(super::invalid_source());
+        }
+        let selected: arrow::array::BooleanArray = hashes
+            .iter()
+            .map(|hash| Some(hash.is_some_and(|hash| sources.contains(hash))))
+            .collect();
+        arrow::compute::filter_record_batch(batch, &selected).map_err(super::storage)
     }
 }
 
@@ -38,6 +86,8 @@ mod neighbors;
 mod path;
 mod retained;
 mod scoped;
+#[cfg(test)]
+mod source_tests;
 mod timeline;
 use coobservations::coobservation_available;
 
