@@ -8,8 +8,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod accounting;
 mod ledger;
+mod material;
 pub use accounting::TaskDispatchAttribution;
 use ledger::PlanLedger;
+pub use material::BranchMaterialVerifier;
 
 pub struct SubagentJournal {
     case: CaseId,
@@ -30,6 +32,9 @@ pub struct SubagentJournal {
     accounting: BTreeMap<SubagentDigest, accounting::Accounted>,
     accounted: BTreeSet<(SubagentDigest, super::ReservationPurpose)>,
     checkpoint_sequences: BTreeMap<SubagentDigest, u64>,
+    parent_rounds: u64,
+    turn: Option<String>,
+    closed_turns: BTreeSet<String>,
 }
 impl SubagentJournal {
     pub fn new(case: CaseId, agent: Actor) -> Result<Self, SubagentRecordError> {
@@ -55,6 +60,9 @@ impl SubagentJournal {
             accounting: BTreeMap::new(),
             accounted: BTreeSet::new(),
             checkpoint_sequences: BTreeMap::new(),
+            parent_rounds: 0,
+            turn: None,
+            closed_turns: BTreeSet::new(),
         })
     }
 
@@ -111,6 +119,21 @@ impl SubagentJournal {
 
     fn accept_metadata(&mut self, entry: &SignedEntry) -> Result<(), SubagentRecordError> {
         match entry.kind {
+            AuditEventKind::Prompt => {
+                if entry.actor != Actor::Analyst || self.plans.values().any(PlanLedger::is_open) {
+                    return Err(SubagentRecordError);
+                }
+                if let Some(turn) = self.turn.take() {
+                    self.closed_turns.insert(turn);
+                }
+                self.parent_rounds = 0;
+            }
+            AuditEventKind::ModelRequest if entry.actor == Actor::Analyst => {
+                self.parent_rounds = self
+                    .parent_rounds
+                    .checked_add(1)
+                    .ok_or(SubagentRecordError)?;
+            }
             AuditEventKind::CaseCreated | AuditEventKind::CaseScopeChanged => {
                 #[derive(serde::Deserialize)]
                 struct Scope {
@@ -206,6 +229,7 @@ impl SubagentJournal {
             cloud_bytes: effective.cloud_bytes,
         };
         if plan.case_id != self.case.as_str()
+            || self.plans.values().any(PlanLedger::is_preview)
             || self.tasks.len() + plan.tasks.len() > 256
             || plan.parent_checkpoint_sha256 != self.previous
             || plan.budget_checkpoint_sha256.as_bytes() != &self.budget.checkpoint()
@@ -214,8 +238,18 @@ impl SubagentJournal {
             || plan.usage.tokens != budget.usage.model_tokens
             || plan.usage.calls != budget.usage.tool_calls
             || plan.usage.cloud_bytes != budget.usage.cloud_bytes
-            || plan.prior_reserved != self.outstanding()?
+            || plan.usage.rounds != self.rounds_used(&plan.turn_id)?
+            || plan.prior_reserved != self.outstanding_for_turn(Some(&plan.turn_id))?
             || self.plans.contains_key(&plan.identity()?)
+            || self.turn.as_ref().is_some_and(|turn| turn != &plan.turn_id)
+            || self.closed_turns.contains(&plan.turn_id)
+            || plan.ordinal
+                != self
+                    .plans
+                    .values()
+                    .filter(|p| p.plan.turn_id == plan.turn_id)
+                    .count() as u64
+                    + 1
         {
             return Err(SubagentRecordError);
         }
@@ -239,6 +273,7 @@ impl SubagentJournal {
                 }
             }
         }
+        self.turn = Some(plan.turn_id.clone());
         self.plans.insert(
             plan.identity()?,
             PlanLedger::new(plan, SubagentDigest::from_bytes(entry.hash)),
@@ -250,10 +285,30 @@ impl SubagentJournal {
         if self.failed {
             return Err(SubagentRecordError);
         }
+        self.outstanding_for_turn(self.turn.as_deref())
+    }
+    fn outstanding_for_turn(
+        &self,
+        turn: Option<&str>,
+    ) -> Result<SubagentResources, SubagentRecordError> {
         self.plans
             .values()
             .try_fold(SubagentResources::default(), |total, plan| {
-                total.checked_add(plan.outstanding()?)
+                let mut held = plan.outstanding()?;
+                if turn != Some(plan.plan.turn_id.as_str()) {
+                    held.rounds = 0;
+                }
+                total.checked_add(held)
+            })
+    }
+    fn rounds_used(&self, turn: &str) -> Result<u64, SubagentRecordError> {
+        self.plans
+            .values()
+            .filter(|plan| plan.plan.turn_id == turn)
+            .try_fold(self.parent_rounds, |total, plan| {
+                total
+                    .checked_add(plan.turn_usage()?.rounds)
+                    .ok_or(SubagentRecordError)
             })
     }
 }
