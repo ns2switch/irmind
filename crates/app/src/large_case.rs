@@ -183,8 +183,8 @@ impl LargeCaseUseCases<'_, '_> {
                 .iter()
                 .map(|(_, hash)| hash.clone())
                 .collect::<Vec<_>>();
-            reader.authorize_local_root(id, source_root, &hashes).map_err(|_| AppError::Storage(
-                "Evidence ingestion committed, but original-record access could not be authorized; select the originals directory with /verify <source-root>".into()
+            reader.authorize_local_root(id, source_root, &hashes).map_err(|error| AppError::Storage(
+                format!("Evidence ingestion committed, but original-record access is unavailable: {error}. Use indexed queries or explicitly select originals with /verify <source-root>")
             ))?;
         }
         Ok(ingested)

@@ -1,6 +1,41 @@
 # Evidence scan benchmarks
 
 
+
+## Kubernetes methods and verified-original reads (release)
+
+A sequential [paired smoke](benchmarks/kubernetes-skills-original-reads.json)
+uses the unchanged native Kubernetes/Falco fixtures, synthetic padding and
+optimized executables on the same local runner. The candidate includes the new
+Falco audit table, explicit privilege field and session-local original-reader
+authorization. Generation and complete verification are outside the ingestion
+timer. Compilation, tests and both fuzz campaigns finished before measurement.
+This one-pair local smoke is not a standard-runner or varied 15 GB gate.
+
+| Source (at least 1 GiB) | Records | Rejected | Baseline s | Candidate s | Candidate MiB/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Native Kubernetes | 746,692 | 0 | 19.645 | 18.622 | 54.988 |
+| Falco runtime | 797,136 | 0 | 30.431 | 30.914 | 33.124 |
+
+Process peak RSS was 116.2 MiB for the baseline and 113.2 MiB for the
+candidate, including corpus setup. The differences are a paired observation,
+not a statistically established speedup or regression.
+
+Separately timed verified-original adapter reads cover native, EKS, AKS and
+GKE, with three reads per 390–740-byte synthetic source. Individual samples
+were 2.441–3.416 ms, all below the unchanged 10-second deadline. The read smoke
+process peaked at 30.0 MiB RSS including its small fixture setup; this does not
+isolate reader heap or predict large-source latency. Every returned record
+reproduced the signed decoded-input commitment and original source bytes. No
+mapping or provider request ran during a read, and no spool or decoded cache
+was created.
+
+The [34-fixture detection matrix](benchmarks/kubernetes-skills-detection.json)
+has one unique high-confidence detector for each fixture. Additional ASAN
+campaigns each used a 600-second budget without failures: Falco processed
+1,824,942 inputs (492 MiB peak), and Kubernetes plus its included mappings
+processed 578,425 (526 MiB peak). Both included the new audit/pod-request seeds.
+
 ## Managed Kubernetes transports: optimized 1 GiB smoke
 
 Production detection, hash, source decoding, mapping, Parquet and signed custody,

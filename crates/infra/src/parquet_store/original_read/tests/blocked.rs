@@ -50,11 +50,7 @@ fn a_blocked_decoder_cannot_stop_the_deadline_or_spawn_unbounded_read_workers() 
     assert!(f.reader.busy.load(Ordering::Acquire));
     assert!(f.read(0).is_err());
     release.send(()).unwrap();
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while f.reader.busy.load(Ordering::Acquire) && Instant::now() < deadline {
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    assert!(!f.reader.busy.load(Ordering::Acquire));
+    await_cleanup(&f.reader);
 }
 #[test]
 fn cancellation_returns_while_the_decoder_callback_is_blocked() {
@@ -86,4 +82,13 @@ fn cancellation_returns_while_the_decoder_callback_is_blocked() {
     token.cancel();
     assert!(matches!(worker.join().unwrap(), Err(AppError::Cancelled)));
     release.send(()).unwrap();
+    await_cleanup(&f.reader);
+}
+
+fn await_cleanup(reader: &OriginalReader) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while reader.busy.load(Ordering::Acquire) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(!reader.busy.load(Ordering::Acquire));
 }

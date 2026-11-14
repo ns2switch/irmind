@@ -63,7 +63,7 @@ Show whether a result is an indexed projection or a verified original excerpt. I
 
 No new production dependency, source-record format, artifact schema, signed event, export version, seal encoding or parser version is required. Original bytes and complete decoded input commitments already exist in the signed pipeline. Authentication is not a substitute for mapping reproduction: this read reproduces only the decoder input set, and does not claim to run `verify_graph` or reproduce mapped artifacts.
 
-No persistent decoded cache or implicit cloud read is introduced. Remote originals remain unavailable unless the analyst explicitly obtains them through the existing authorized acquisition path or retained a private case copy.
+The ordinary bounded tool-result excerpt is retained in the case through the existing signed tool-result path; the complete decoded source set is never cached. No persistent decoded cache or implicit cloud read is introduced. Remote originals remain unavailable unless the analyst explicitly obtains them through the existing authorized acquisition path or retained a private case copy.
 
 ## Required tests
 

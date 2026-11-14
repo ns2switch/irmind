@@ -1,0 +1,161 @@
+{
+  "source_commit": "83f54deff5e7ed097d581314a771c43bae19973a",
+  "baseline_source_commit": "f5edf23fd31c8c200c1e4a4aa0ef4319145ab18e",
+  "profile": "release (optimized; debug assertions disabled)",
+  "platform": "Linux x86_64",
+  "runner": "local paired smoke; not a standard GitHub performance-gate run",
+  "method": "Sequential baseline and candidate executables in one driver after compilation, other tests and fuzzing completed. Repeat the unchanged synthetic fixtures with 1024 bytes of padding to at least 1 GiB. Time production selection, hash, source decode, mapping, Parquet, signed custody and candidate session-root authorization. Generation and complete verification are outside the timer. No provider, credential or network is used. One pair only; these are not confidence intervals or 15 GB gates.",
+  "commands": {
+    "ingestion": "cargo test -p irmind --all-features --test kubernetes_ingest --release benchmark::one_gib_release_throughput -- --exact --ignored --nocapture --test-threads=1",
+    "original_reads": "cargo test -p irmind --all-features --test kubernetes_ingest --release originals::native_eks_aks_and_gke_original_reads_replay_the_frozen_acquisition_context -- --exact --nocapture --test-threads=1"
+  },
+  "ingestion": {
+    "baseline": {
+      "measurements": [
+        {
+          "source": "kubernetes",
+          "bytes": 1073743096,
+          "records": 746692,
+          "ingestion_seconds": 19.645,
+          "mib_per_second": 52.126,
+          "rejected": 0,
+          "fixture": "crates/testkit/fixtures/parser-kubernetes/source/event.ndjson",
+          "fixture_sha256": "1b9ae434d1157b3f278d20bbfdf3f240f0c453fadb5df3255532843fd8edbe0c"
+        },
+        {
+          "source": "falco",
+          "bytes": 1073742192,
+          "records": 797136,
+          "ingestion_seconds": 30.431,
+          "mib_per_second": 33.649,
+          "rejected": 0,
+          "fixture": "crates/testkit/fixtures/parser-falco/source/event.ndjson",
+          "fixture_sha256": "d55ca33e4a793d24578e0d54c4e5baf4afe8ffc735c11c3b126e8d9ba54bcd25"
+        }
+      ],
+      "returncode": 0,
+      "peak_process_rss_kib": 119008
+    },
+    "candidate": {
+      "measurements": [
+        {
+          "source": "kubernetes",
+          "bytes": 1073743096,
+          "records": 746692,
+          "ingestion_seconds": 18.622,
+          "mib_per_second": 54.988,
+          "rejected": 0,
+          "fixture": "crates/testkit/fixtures/parser-kubernetes/source/event.ndjson",
+          "fixture_sha256": "1b9ae434d1157b3f278d20bbfdf3f240f0c453fadb5df3255532843fd8edbe0c"
+        },
+        {
+          "source": "falco",
+          "bytes": 1073742192,
+          "records": 797136,
+          "ingestion_seconds": 30.914,
+          "mib_per_second": 33.124,
+          "rejected": 0,
+          "fixture": "crates/testkit/fixtures/parser-falco/source/event.ndjson",
+          "fixture_sha256": "d55ca33e4a793d24578e0d54c4e5baf4afe8ffc735c11c3b126e8d9ba54bcd25"
+        }
+      ],
+      "returncode": 0,
+      "peak_process_rss_kib": 115920
+    }
+  },
+  "verified_original_reads": {
+    "measurements": [
+      {
+        "source": "native.ndjson",
+        "bytes": 390,
+        "trial": 0,
+        "seconds": 0.003416
+      },
+      {
+        "source": "native.ndjson",
+        "bytes": 390,
+        "trial": 1,
+        "seconds": 0.002707
+      },
+      {
+        "source": "native.ndjson",
+        "bytes": 390,
+        "trial": 2,
+        "seconds": 0.002611
+      },
+      {
+        "source": "eks.ndjson",
+        "bytes": 519,
+        "trial": 0,
+        "seconds": 0.003079
+      },
+      {
+        "source": "eks.ndjson",
+        "bytes": 519,
+        "trial": 1,
+        "seconds": 0.003037
+      },
+      {
+        "source": "eks.ndjson",
+        "bytes": 519,
+        "trial": 2,
+        "seconds": 0.002597
+      },
+      {
+        "source": "aks.ndjson",
+        "bytes": 691,
+        "trial": 0,
+        "seconds": 0.003234
+      },
+      {
+        "source": "aks.ndjson",
+        "bytes": 691,
+        "trial": 1,
+        "seconds": 0.002625
+      },
+      {
+        "source": "aks.ndjson",
+        "bytes": 691,
+        "trial": 2,
+        "seconds": 0.002441
+      },
+      {
+        "source": "gke.ndjson",
+        "bytes": 740,
+        "trial": 0,
+        "seconds": 0.003093
+      },
+      {
+        "source": "gke.ndjson",
+        "bytes": 740,
+        "trial": 1,
+        "seconds": 0.002599
+      },
+      {
+        "source": "gke.ndjson",
+        "bytes": 740,
+        "trial": 2,
+        "seconds": 0.003166
+      }
+    ],
+    "returncode": 0,
+    "peak_process_rss_kib": 30700
+  },
+  "read_method": "Three sequential authenticated adapter reads per tiny native/EKS/AKS/GKE source, timed after fixture ingestion and explicit root authorization. Hashes, complete decoded input commitments, acquisition context and repeated record equality are checked. Read-process peak RSS includes the small fixture setup and does not isolate incremental reader heap. These samples do not predict large-file latency.",
+  "fuzz": {
+    "parser_falco": {
+      "sanitizer": "AddressSanitizer",
+      "budget_seconds": 600,
+      "inputs": 1824942,
+      "peak_rss_mib": 492,
+      "failures": 0
+    },
+    "parser_kubernetes": {
+      "sanitizer": "AddressSanitizer",
+      "budget_seconds": 600,
+      "inputs": 578425,
+      "peak_rss_mib": 526,
+      "failures": 0
+    }
+  }
+}
