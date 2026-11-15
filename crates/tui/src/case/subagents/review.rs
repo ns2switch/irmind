@@ -64,6 +64,9 @@ impl Review {
                 label(&kind),
                 task.objective
             ));
+            if let Some(summary) = preview.source_summary(task.source_set_sha256) {
+                lines.push(summary.into());
+            }
             lines.push(format!(
                 "   Source set {} · {} tokens · {} calls · {}",
                 &digest(task.source_set_sha256)[..8],

@@ -303,6 +303,12 @@ impl Engine<'_> {
         let deadline = self.clock.now()?.checked_add(600).ok_or_else(invalid)?;
         let specs = self.prepare_task_specs(case, tasks, deadline, cancel)?;
         let mut batch = AgentBatch::new(self, case, self.verifier.as_ref())?;
+        let wanted = specs
+            .iter()
+            .flat_map(|(_, sources, _)| sources.iter().take(16).copied())
+            .collect();
+        let labels = self.preview_source_labels(case, &wanted)?;
+        let mut source_summaries = std::collections::BTreeMap::new();
         let mut tasks = Vec::with_capacity(specs.len());
         for (mut task, sources, kind) in specs {
             task.type_snapshot_sha256 = batch.metadata(&kind)?;
@@ -318,6 +324,7 @@ impl Engine<'_> {
             let set = SubagentSourceSetV1::new(case, sources.len() as u64, pages)
                 .map_err(|_| invalid())?;
             task.source_set_sha256 = batch.metadata(&set)?;
+            source_summaries.insert(task.source_set_sha256, preview_sources(&sources, &labels));
             tasks.push(task);
         }
         let (ordinal, context) = batch
@@ -344,6 +351,7 @@ impl Engine<'_> {
             preview: SafePlanPreview {
                 plan,
                 confirmation_required,
+                source_summaries: std::sync::Arc::new(source_summaries),
             },
             entry_hash,
             hold,
@@ -516,4 +524,47 @@ pub(super) fn plan_transition(
         },
     )
     .map_err(|_| invalid())
+}
+
+impl Engine<'_> {
+    fn preview_source_labels(
+        &self,
+        case: &CaseId,
+        wanted: &std::collections::BTreeSet<SubagentDigest>,
+    ) -> Result<std::collections::BTreeMap<SubagentDigest, String>, AppError> {
+        let index = crate::large_case::read_manifest_index(&self.audit_log.entries(case)?)?;
+        let mut labels = std::collections::BTreeMap::new();
+        for source in index.sources {
+            let hash = SubagentDigest::parse(source.sha256.as_str()).map_err(|_| invalid())?;
+            if !wanted.contains(&hash) {
+                continue;
+            }
+            let mut label = self.guard.screen(&source.source)?.text;
+            label.truncate(label.floor_char_boundary(label.len().min(160)));
+            labels
+                .entry(hash)
+                .or_insert(serde_json::to_string(&label).map_err(|_| invalid())?);
+        }
+        Ok(labels)
+    }
+}
+fn preview_sources(
+    sources: &[SubagentDigest],
+    labels: &std::collections::BTreeMap<SubagentDigest, String>,
+) -> String {
+    let mut lines = vec![format!("Sources ({}):", sources.len())];
+    lines.extend(sources.iter().take(16).map(|source| {
+        format!(
+            "   {} {}",
+            &crate::hex(source.as_bytes())[..8],
+            labels.get(source).map_or("[signed source]", String::as_str)
+        )
+    }));
+    if sources.len() > 16 {
+        lines.push(format!(
+            "   {} more sources in the signed source set",
+            sources.len() - 16
+        ));
+    }
+    lines.join("\n")
 }

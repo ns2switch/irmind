@@ -319,3 +319,53 @@ fn block_on_review(
         std::thread::park_timeout(std::time::Duration::from_millis(10));
     }
 }
+
+#[test]
+fn plan_preview_names_only_its_frozen_signed_sources_before_start() {
+    let history = History::new();
+    let root = tempfile::tempdir().unwrap();
+    let (store, engine) = stored_history_engine(root.path(), &history, &[]);
+    let own = super::findings::source(
+        root.path(),
+        store.as_ref(),
+        &engine,
+        &history.case,
+        "assigned.json",
+        br#"{"eventTime":"2026-11-01T00:00:00Z","eventName":"ConsoleLogin"}"#,
+    );
+    super::findings::source(
+        root.path(),
+        store.as_ref(),
+        &engine,
+        &history.case,
+        "unassigned.json",
+        br#"{"eventTime":"2026-11-01T01:00:00Z","eventName":"GetRole"}"#,
+    );
+    let mut task = proposal(100_000);
+    task.sources = vec![own.clone()];
+    task.objective = "The model cannot rename signed sources".into();
+    let cancel = CancellationToken::new();
+    let prepared = engine
+        .prepare_subagent_plan(
+            &history.case,
+            "00000000-0000-0000-0000-000000000009".parse().unwrap(),
+            vec![task],
+            SubagentResources::default(),
+            &cancel,
+        )
+        .unwrap();
+    let preview = prepared.preview();
+    let summary = preview
+        .source_summary(preview.tasks()[0].source_set_sha256)
+        .unwrap();
+    assert!(
+        summary.contains("Sources (1)")
+            && summary.contains("assigned.json")
+            && summary.contains(&own.as_str()[..8])
+    );
+    assert!(!summary.contains("unassigned.json"));
+    engine
+        .admit_subagent_plan(&prepared, &preview.cancel().unwrap(), &cancel)
+        .unwrap();
+    engine.verify(&history.case).unwrap();
+}

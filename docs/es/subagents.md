@@ -10,7 +10,9 @@ una pregunta sencilla no necesita delegación.
 
 Pide al agente que investigue el caso o que reparta una investigación concreta
 entre las fuentes pertinentes. Antes de empezar, IRMind muestra las tareas, sus
-tipos incluidos, las fuentes asignadas y los tokens y llamadas reservados.
+tipos incluidos, los nombres firmados de fuentes con hashes abreviados y los
+tokens y llamadas reservados. Los conjuntos grandes muestran su tamaño y las
+primeras dieciséis fuentes.
 
 Si el plan reserva **más del 25 %** de los tokens o llamadas restantes del caso,
 exige **Start** con firma del analista. Elige Start o Cancel con flechas y Enter,

@@ -88,6 +88,7 @@ fn automatic_plan_choice_never_substitutes_for_required_explicit_start() {
     let mut preview = SafePlanPreview {
         plan: plan.clone(),
         confirmation_required: true,
+        source_summaries: std::sync::Arc::default(),
     };
     assert!(preview.automatic_start().is_err());
     let choice = preview.start().unwrap();
