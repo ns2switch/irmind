@@ -76,7 +76,7 @@ impl Engine<'_> {
         self.signed_entry_after(id, last.as_ref(), origin, kind, payload, evidence)
     }
 
-    fn signed_entry_after(
+    pub(crate) fn signed_entry_after(
         &self,
         id: &CaseId,
         last: Option<&SignedEntry>,

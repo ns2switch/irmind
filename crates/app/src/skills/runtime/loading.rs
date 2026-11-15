@@ -135,7 +135,7 @@ impl Engine<'_> {
         )?;
         Ok(())
     }
-    fn pin_skill_snapshot(
+    pub(crate) fn pin_skill_snapshot(
         &self,
         id: &CaseId,
         resolved: &ResolvedSkill,

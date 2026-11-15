@@ -321,7 +321,7 @@ impl Engine<'_> {
     }
 
     pub(crate) fn completed_calls_unlocked(&self, id: &CaseId) -> Result<usize, AppError> {
-        Ok(self
+        let recorded = self
             .audit_log
             .entries(id)?
             .iter()
@@ -331,6 +331,9 @@ impl Engine<'_> {
                     AuditEventKind::Allowed | AuditEventKind::ToolDispatch
                 )
             })
-            .count())
+            .count();
+        let held = usize::try_from(self.subagent_holds_unlocked(id)?.calls)
+            .map_err(|_| AppError::InvalidChain(0))?;
+        recorded.checked_add(held).ok_or(AppError::InvalidChain(0))
     }
 }

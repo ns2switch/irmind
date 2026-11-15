@@ -72,7 +72,10 @@ impl Engine<'_> {
                 })
                 .filter_map(|entry| serde_json::from_str::<ObjectReservation>(&entry.payload).ok())
                 .filter(|entry| entry.version == 1 && entry.tool == "object_read")
-                .try_fold(0u64, |used, entry| used.checked_add(entry.reserved_bytes))
+                .try_fold(
+                    local.subagent_holds_unlocked(&id)?.cloud_bytes,
+                    |used, entry| used.checked_add(entry.reserved_bytes),
+                )
                 .ok_or_else(|| AppError::Policy("object transfer budget exceeded".into()))?;
             if used
                 .checked_add(requested)

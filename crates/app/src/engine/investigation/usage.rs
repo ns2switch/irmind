@@ -6,13 +6,17 @@ impl Engine<'_> {
         let spent = self
             .blocking_local(move |local| summarize_usage(&local.audit_log.entries(&id_owned)?))
             .await?;
-        let used_tokens =
-            spent
-                .input_tokens
-                .checked_add(spent.output_tokens)
-                .ok_or(AppError::Fixed(
-                    crate::FixedAppError::PolicyModelTokenCountOverflow,
-                ))?;
+        let owned = id.clone();
+        let reserved = self
+            .blocking_local(move |local| local.subagent_holds_unlocked(&owned))
+            .await?;
+        let used_tokens = spent
+            .input_tokens
+            .checked_add(spent.output_tokens)
+            .and_then(|tokens| tokens.checked_add(reserved.tokens))
+            .ok_or(AppError::Fixed(
+                crate::FixedAppError::PolicyModelTokenCountOverflow,
+            ))?;
         Ok(used_tokens)
     }
 
