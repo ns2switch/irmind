@@ -207,6 +207,20 @@ impl CaseRuntime<'_, '_, '_> {
         Ok(())
     }
 
+    fn active_overlay(&self) -> Result<Option<String>> {
+        let overlay = if self.state.confirm_exit == crate::ExitConfirmation::Pending {
+            overlay_text(&self.state, self.engine)?
+        } else {
+            self.subagents
+                .overlay()
+                .or(overlay_text(&self.state, self.engine)?)
+        };
+        overlay
+            .map(|text| self.engine.guard.screen(&text).map(|safe| safe.text))
+            .transpose()
+            .map_err(Into::into)
+    }
+
     pub(super) fn render(&mut self) -> Result<()> {
         self.sync_conversation()?;
         self.refresh_usage()?;
@@ -222,7 +236,7 @@ impl CaseRuntime<'_, '_, '_> {
         } else {
             self.engine.guard.screen(&panel)?.text
         };
-        let overlay = overlay_text(&self.state, self.engine)?;
+        let overlay = self.active_overlay()?;
         let menu = menu_text(&self.state, self.modules)
             .map(|content| {
                 self.engine

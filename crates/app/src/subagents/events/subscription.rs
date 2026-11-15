@@ -11,6 +11,7 @@ pub(super) struct Subscription {
     engine: Engine<'static>,
     case: CaseId,
     generation: Option<[u8; 32]>,
+    tasks: std::collections::BTreeMap<super::SubagentDigest, TaskPresentation>,
 }
 impl Subscription {
     pub(super) const fn new(engine: Engine<'static>, case: CaseId) -> Self {
@@ -18,6 +19,7 @@ impl Subscription {
             engine,
             case,
             generation: None,
+            tasks: std::collections::BTreeMap::new(),
         }
     }
     fn authenticate(
@@ -48,6 +50,7 @@ impl Subscription {
             services.compiler.as_ref(),
             cancel,
         )?;
+        self.tasks = presentations(entries)?;
         self.generation = Some(generation);
         Ok(())
     }
@@ -85,6 +88,13 @@ impl Subscription {
         }
         if let Some(event) = projection::main(&self.engine, entry)? {
             events.push(event);
+        }
+        for event in &mut events {
+            if let Some(task) = event.task_id.and_then(|id| self.tasks.get(&id)) {
+                event.plan_id = Some(task.plan);
+                event.task_type = Some(task.type_id.clone());
+                event.objective = Some(self.engine.guard.screen(&task.objective)?.text);
+            }
         }
         Ok(events)
     }
@@ -129,12 +139,12 @@ impl EngineEventSubscription for Subscription {
                     continue;
                 }
                 if result.events.len() == usize::from(max)
-                    || bytes + event.payload.len() + 512 > 1024 * 1024
+                    || bytes + event.buffered_bytes() > 1024 * 1024
                 {
                     result.more = true;
                     return Ok(result);
                 }
-                bytes += event.payload.len() + 512;
+                bytes += event.buffered_bytes();
                 result.next = event.cursor;
                 result.events.push(event);
             }
@@ -163,4 +173,43 @@ fn fingerprint(entries: &[SignedEntry], cancel: &CancellationToken) -> Result<[u
         }
     }
     Ok(state.finalize().into())
+}
+
+struct TaskPresentation {
+    plan: super::SubagentDigest,
+    type_id: String,
+    objective: String,
+}
+fn presentations(
+    entries: &[SignedEntry],
+) -> Result<std::collections::BTreeMap<super::SubagentDigest, TaskPresentation>, AppError> {
+    use crate::subagents::{SubagentPlanV1, SubagentTypeSnapshotV1};
+    let mut types = std::collections::BTreeMap::new();
+    let mut tasks = std::collections::BTreeMap::new();
+    for entry in entries {
+        if entry.kind == AuditEventKind::SubagentTypeSnapshotV1 {
+            let snapshot: SubagentTypeSnapshotV1 = projection::decode(entry)?;
+            types.insert(
+                snapshot.identity().map_err(|_| invalid())?,
+                snapshot.definition().id().to_owned(),
+            );
+        } else if entry.kind == AuditEventKind::SubagentPlanV1 {
+            let plan: SubagentPlanV1 = projection::decode(entry)?;
+            for task in plan.tasks {
+                let type_id = types
+                    .get(&task.type_snapshot_sha256)
+                    .ok_or_else(invalid)?
+                    .clone();
+                tasks.insert(
+                    task.task_id,
+                    TaskPresentation {
+                        plan: plan.plan_id,
+                        type_id,
+                        objective: task.objective,
+                    },
+                );
+            }
+        }
+    }
+    Ok(tasks)
 }

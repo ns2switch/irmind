@@ -40,10 +40,16 @@ pub struct EngineEvent {
     pub case_id: CaseId,
     pub turn_id: Option<String>,
     pub task_id: Option<SubagentDigest>,
+    pub plan_id: Option<SubagentDigest>,
+    pub task_type: Option<String>,
+    pub objective: Option<String>,
     pub kind: EngineEventKind,
     /// Guarded presentation text, never a request or an approval capability.
     pub payload: String,
     pub usage: Option<SubagentResources>,
+    pub model_reply: bool,
+    pub model_usage: Option<crate::ModelUsage>,
+    pub estimated_cost_microusd: Option<u64>,
     pub clipped: bool,
 }
 pub struct EngineEventBatch {
@@ -92,4 +98,13 @@ fn position(seq: u64, slot: usize) -> Result<u64, AppError> {
     seq.checked_mul(65)
         .and_then(|seq| seq.checked_add(slot as u64))
         .ok_or_else(invalid)
+}
+
+impl EngineEvent {
+    pub(super) fn buffered_bytes(&self) -> usize {
+        self.payload.len()
+            + self.task_type.as_ref().map_or(0, String::len)
+            + self.objective.as_ref().map_or(0, String::len)
+            + 512
+    }
 }

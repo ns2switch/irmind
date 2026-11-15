@@ -77,6 +77,12 @@ pub(super) fn main(
     };
     let mut event = build(engine, entry, 64, kind, &text)?;
     event.task_id = task;
+    if matches!(
+        kind,
+        EngineEventKind::PlanPreview | EngineEventKind::ConsentRequired
+    ) {
+        event.plan_id = Some(decode::<SubagentPlanV1>(entry)?.plan_id);
+    }
     event.turn_id = turn;
     event.usage = usage;
     Ok(Some(event))
@@ -128,6 +134,15 @@ pub(super) fn branch(
     let mut event = build(engine, main, index, kind, &text)?;
     event.task_id = Some(item.body.task_id);
     event.turn_id = Some(item.body.turn_id.clone());
+    if let SubagentBranchPayload::ModelReply(reply) = &item.body.payload {
+        event.model_reply = true;
+        event.model_usage = reply.usage;
+        event.estimated_cost_microusd = reply
+            .usage
+            .map(|usage| engine.usage_cost(usage))
+            .transpose()?
+            .flatten();
+    }
     Ok(event)
 }
 fn build(
@@ -152,9 +167,15 @@ fn build(
         case_id: crate::CaseId::parse(&entry.case_id).map_err(|_| invalid())?,
         turn_id: None,
         task_id: None,
+        plan_id: None,
+        task_type: None,
+        objective: None,
         kind,
         payload: safe,
         usage: None,
+        model_reply: false,
+        model_usage: None,
+        estimated_cost_microusd: None,
         clipped,
     })
 }

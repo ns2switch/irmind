@@ -15,6 +15,7 @@ pub(super) struct HomeRuntime<'scope, 'env, 'ports> {
     pub model: Option<&'env dyn LlmPort>,
     pub io_ops: &'env dyn WorkspaceIo,
     pub modules: &'env [ModuleStatus],
+    pub subagent_review: Option<&'env irmind_app::subagents::AnalystPlanMailbox>,
     pub shutdown: &'env CancellationToken,
     pub scope: &'scope std::thread::Scope<'scope, 'env>,
     pub state: HomeState,
@@ -432,6 +433,7 @@ impl HomeRuntime<'_, '_, '_> {
             id,
             self.shutdown,
             case::CasePresentation {
+                subagent_review: self.subagent_review,
                 demo_speed: self.demo_speed,
                 overrides_active: self.state.overrides_active,
                 modules: self.modules,
@@ -506,6 +508,7 @@ impl HomeRuntime<'_, '_, '_> {
                     &case_id,
                     self.shutdown,
                     case::CasePresentation {
+                        subagent_review: self.subagent_review,
                         demo_speed: self.demo_speed,
                         overrides_active: self.state.overrides_active,
                         modules: self.modules,

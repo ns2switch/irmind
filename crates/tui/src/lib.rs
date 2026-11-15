@@ -102,6 +102,7 @@ pub use startup_review::{
 
 #[derive(Clone, Copy)]
 pub struct WorkspaceLaunch<'a> {
+    pub subagent_review: Option<&'a irmind_app::subagents::AnalystPlanMailbox>,
     pub initial_case: Option<&'a irmind_app::CaseId>,
     pub resume_last_case: ResumeMode,
     pub new_analyst_key: bool,

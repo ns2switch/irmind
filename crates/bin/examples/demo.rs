@@ -250,6 +250,7 @@ fn main() -> Result<()> {
         &modules,
         &CancellationToken::new(),
         WorkspaceLaunch {
+            subagent_review: None,
             initial_case: None,
             resume_last_case: irmind_tui::ResumeMode::Enabled,
             new_analyst_key: false,
