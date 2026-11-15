@@ -139,6 +139,16 @@ impl Engine<'_> {
                 crate::FixedAppError::PolicyPendingApprovalNotFound,
             ))?;
         self.require_root_approval_unlocked(id, &request)?;
+        self.record_request_resolution_unlocked(id, &case, &request, denial)
+    }
+
+    fn record_request_resolution_unlocked(
+        &self,
+        id: &CaseId,
+        case: &Case,
+        request: &ApprovalRequest,
+        denial: Option<&str>,
+    ) -> Result<Option<AuthorizedCall>, AppError> {
         if denial.is_none() {
             self.policy_for_case_unlocked(id)?
                 .permits(&request.tool, self.completed_calls_unlocked(id)?)
@@ -151,13 +161,27 @@ impl Engine<'_> {
                 None,
             )?;
         }
-        let pending = PendingApproval::recover_with_rules(
-            &case,
-            request.mode,
-            &request.challenge,
-            self.clock.now()?,
-            &self.policy,
-        )
+        let recovery_case = if denial.is_some() {
+            super::scope::case_at(case, &self.audit_log.entries(id)?, request.decision_seq)?
+        } else {
+            case.clone()
+        };
+        let pending = if denial.is_some() {
+            PendingApproval::recover(
+                &recovery_case,
+                request.mode,
+                &request.challenge,
+                self.clock.now()?,
+            )
+        } else {
+            PendingApproval::recover_with_rules(
+                &recovery_case,
+                request.mode,
+                &request.challenge,
+                self.clock.now()?,
+                &self.policy,
+            )
+        }
         .map_err(|_| {
             AppError::Fixed(crate::FixedAppError::PolicyStoredApprovalChallengeIsInvalid)
         })?;
@@ -216,6 +240,43 @@ impl Engine<'_> {
         Ok(result)
     }
 
+    fn deny_task_approval(
+        &self,
+        id: &CaseId,
+        request_id: &str,
+        reason: &str,
+    ) -> Result<bool, AppError> {
+        self.require_attended_analyst("deny subagent approval")?;
+        if reason.trim().is_empty() || reason.len() > 500 {
+            return Err(AppError::Fixed(
+                crate::FixedAppError::PolicyDenialReasonMustBe1500Bytes,
+            ));
+        }
+        let _lock = self.repo.lock_case(id)?;
+        let case = self.repo.get_case(id)?;
+        if case.sealed {
+            return Err(AppError::Sealed);
+        }
+        self.verify_unlocked(id)?;
+        let request = self
+            .pending_requests_unlocked(&case, &self.audit_log.entries(id)?)?
+            .into_iter()
+            .find(|request| request.id == request_id)
+            .ok_or(AppError::Fixed(
+                crate::FixedAppError::PolicyPendingApprovalNotFound,
+            ))?;
+        if self.task_pending_binding_unlocked(id, &request)?.is_none() {
+            return Ok(false);
+        }
+        if self
+            .record_request_resolution_unlocked(id, &case, &request, Some(reason))?
+            .is_some()
+        {
+            return Err(AppError::InvalidChain(request.decision_seq));
+        }
+        Ok(true)
+    }
+
     pub(crate) async fn resolve_approval(
         &self,
         id: &CaseId,
@@ -224,6 +285,17 @@ impl Engine<'_> {
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
         self.require_attended_analyst("resolve approval")?;
+        if let Some(reason) = denial {
+            let case = id.clone();
+            let request = request_id.to_owned();
+            let reason = reason.to_owned();
+            if self
+                .blocking_local(move |local| local.deny_task_approval(&case, &request, &reason))
+                .await?
+            {
+                return Ok("Subagent request denied and recorded; no tool was executed".into());
+            }
+        }
         let id_owned = id.clone();
         let _case_lock = self
             .blocking_local(move |local| local.repo.lock_case(&id_owned))
@@ -262,9 +334,11 @@ impl Engine<'_> {
     ) -> Result<Vec<ApprovalRequest>, AppError> {
         let mut open = BTreeMap::<String, ApprovalRequest>::new();
         let verifier = AnalystVerifierAdapter(self.verifier.as_ref());
+        let mut scope = super::scope::ScopeReplay::default();
         for entry in entries {
+            scope.accept(entry)?;
             if entry.kind == irmind_domain::AuditEventKind::NeedsApproval {
-                let request = Self::parse_pending_event(case, entry)?;
+                let request = Self::parse_pending_event(&scope.case(case, entry.seq)?, entry)?;
                 if open.insert(request.id.clone(), request).is_some() {
                     return Err(AppError::InvalidChain(entry.seq));
                 }
