@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(super) struct Request {
     reservation: SubagentReservationV1,
     seq: u64,
-    settled: bool,
+    settled: Option<SubagentResources>,
 }
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum Phase {
@@ -217,7 +217,7 @@ impl PlanLedger {
         for request in self
             .requests
             .values()
-            .filter(|r| r.reservation.task_id == task && !r.settled)
+            .filter(|r| r.reservation.task_id == task && r.settled.is_none())
         {
             used = used.checked_add(request.reservation.amount)?;
         }
@@ -229,12 +229,22 @@ impl PlanLedger {
             Request {
                 reservation: value.clone(),
                 seq,
-                settled: false,
+                settled: None,
             },
         );
         self.request_identities
             .insert(value.identity()?, value.operation_id);
         Ok(())
+    }
+    pub(super) fn recovery_requests(
+        &self,
+        task: SubagentDigest,
+    ) -> Vec<(SubagentReservationV1, Option<SubagentResources>)> {
+        self.requests
+            .values()
+            .filter(|request| request.reservation.task_id == Some(task))
+            .map(|request| (request.reservation.clone(), request.settled))
+            .collect()
     }
     pub(super) fn allocation(&self) -> Option<SubagentDigest> {
         self.allocation
@@ -305,7 +315,7 @@ impl PlanLedger {
             .requests
             .get_mut(&value.parent_operation.ok_or(SubagentRecordError)?)
             .ok_or(SubagentRecordError)?;
-        if request.settled
+        if request.settled.is_some()
             || request.reservation.task_id != task
             || request.reservation.request_ordinal != value.request_ordinal
             || request.reservation.purpose != value.purpose
@@ -324,7 +334,7 @@ impl PlanLedger {
         if value.accounting_audit_sha256.is_some() {
             self.charged = self.charged.checked_add(amount)?;
         }
-        request.settled = true;
+        request.settled = Some(amount);
         Ok(())
     }
     fn release(&mut self, value: &SubagentReservationV1) -> Result<(), SubagentRecordError> {
@@ -339,7 +349,7 @@ impl PlanLedger {
             || value.parent_operation != Some(parent)
             || (!expire
                 && (self.results.len() != self.plan.tasks.len()
-                    || self.requests.values().any(|r| !r.settled)))
+                    || self.requests.values().any(|r| r.settled.is_none())))
         {
             return Err(SubagentRecordError);
         }

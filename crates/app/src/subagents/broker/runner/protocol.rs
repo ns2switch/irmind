@@ -6,7 +6,7 @@ use crate::subagents::{
 use crate::subagents::{SubagentDigest, SubagentTaskSpec};
 use crate::{AppError, CancellationToken, CaseId, Engine};
 impl Engine<'_> {
-    pub(super) fn child_entry(
+    pub(in crate::subagents::broker) fn child_entry(
         &self,
         started: &StartedSubagentPlan,
         task: &SubagentTaskSpec,
@@ -42,7 +42,7 @@ impl Engine<'_> {
         .map_err(|_| invalid())
     }
 
-    pub(super) fn publish_child_prefix(
+    pub(in crate::subagents::broker) fn publish_child_prefix(
         &self,
         case: &CaseId,
         entries: &[SubagentBranchEntry],

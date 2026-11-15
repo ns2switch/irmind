@@ -11,9 +11,11 @@ mod findings;
 mod ledger;
 mod material;
 mod preparation;
+mod recovery;
 pub use accounting::TaskDispatchAttribution;
 use ledger::PlanLedger;
 pub use material::BranchMaterialVerifier;
+pub(in crate::subagents) use recovery::TaskRecovery;
 
 pub struct SubagentJournal {
     case: CaseId,

@@ -9,6 +9,7 @@ use crate::{AppError, CancellationToken, CaseId, CompletionRequest, Engine, LlmP
 mod messages;
 mod model;
 mod outcome;
+mod parallel;
 mod protocol;
 mod session;
 mod skills;
@@ -39,6 +40,32 @@ impl Engine<'_> {
     /// Executes one child without recursion. A started plan remains reserved
     /// until its terminal children have been reconciled by the broker.
     pub async fn execute_subagent_task(
+        &self,
+        started: &StartedSubagentPlan,
+        task_id: SubagentDigest,
+        model: &dyn LlmPort,
+        cancel: &CancellationToken,
+    ) -> Result<SubagentResultV1, AppError> {
+        match self
+            .execute_child_session(started, task_id, model, cancel)
+            .await
+        {
+            Ok(result) => Ok(result),
+            Err(error) => self
+                .reconcile_subagent_task(
+                    started,
+                    task_id,
+                    if cancel.is_cancelled() {
+                        crate::subagents::SubagentStatus::Cancelled
+                    } else {
+                        crate::subagents::SubagentStatus::Error
+                    },
+                )
+                .or(Err(error)),
+        }
+    }
+
+    async fn execute_child_session(
         &self,
         started: &StartedSubagentPlan,
         task_id: SubagentDigest,
