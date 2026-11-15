@@ -30,6 +30,7 @@ impl CaseRuntime<'_, '_, '_> {
             return;
         }
         if self.state.picker.is_some()
+            || self.state.help.is_some()
             || self.state.confirmation.is_some()
             || self.state.parser_prompt.is_some()
         {
@@ -282,6 +283,7 @@ impl CaseRuntime<'_, '_, '_> {
             _ => return,
         };
         if self.state.picker.is_some()
+            || self.state.help.is_some()
             || self.state.confirmation.is_some()
             || self.state.palette.is_some()
             || self.state.time_prompt.is_some()

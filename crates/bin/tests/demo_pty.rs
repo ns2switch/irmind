@@ -271,6 +271,7 @@ fn newcomer_commands_respond_after_the_demo_at_supported_sizes() {
         session.expect("Demo exploration").unwrap();
         session.send("/help\r").unwrap();
         session.expect("Help · PgUp/PgDn").unwrap();
+        session.send("\x1b[200~/quit\x1b[201~").unwrap();
         session.send("\x1b").unwrap();
         session.expect_screen("Help · PgUp/PgDn", false).unwrap();
         session.expect("Ask about the case").unwrap();

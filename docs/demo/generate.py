@@ -7,6 +7,7 @@ import argparse
 import getpass
 import hashlib
 import os
+import re
 from pathlib import Path
 import shutil
 import struct
@@ -68,6 +69,8 @@ def validate(directory: Path) -> None:
     missing = [phrase for phrase in EXPECTED_FLOW if phrase not in transcript]
     if missing:
         raise ValueError(f"demo flow is incomplete: {', '.join(missing)}")
+    if not re.search(r'Recent synthetic case[^\n]+[0-9]{2} [A-Z][a-z]{2} [0-9]{4} [0-9]{2}:[0-9]{2} UTC', transcript):
+        raise ValueError("case activity date is not readable after display filtering")
     for value in (
         str(Path.home()), getpass.getuser(), os.uname().nodename,
         "/home/", "/Users/", "C:\\Users\\",

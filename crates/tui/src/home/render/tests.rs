@@ -152,7 +152,7 @@ fn case_list_and_command_menu_use_accent_selection() {
         false,
     );
     let cases = vec![ListItem::new(
-        "> Synthetic alert  ·  high  ·  open  ·  2026-10-29 12:00 UTC",
+        "> Synthetic alert  ·  high  ·  open  ·  29 Oct 2026 12:00 UTC",
     )];
     insta::assert_snapshot!("home_cases", snapshot_screen(&state, cases.clone()));
     state.input = "/".into();

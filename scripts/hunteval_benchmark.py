@@ -13,7 +13,6 @@ import re
 import sqlite3
 import subprocess
 import time
-import tomllib
 from hunteval_model_eval import PINNED_COMMIT, checked_files, score, verify_checksum
 
 EPISODES = [f'{p}-iam-{i:03}' for p in ('aws', 'azure', 'gcp') for i in range(1, 7)]
@@ -44,6 +43,10 @@ def invoke(binary, home, password, *args, timeout=1200):
 
 
 def models_from(path):
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        raise ValueError('Reading configured model homes requires Python 3.11 or newer') from None
     data = json.loads(path.read_text())
     models = data.get('models', [])
     if not 1 <= len(models) <= 16:
@@ -148,8 +151,11 @@ def evaluate(observed, source, truth):
     retrieved_events.update(re.findall(r'"event_id"\s*:\s*"(evt-[0-9]{4})"', text))
     retrieved_entities = {e for e in public_entities if re.search(r'(?<![\w])' + re.escape(e) + r'(?![\w])', text)}
     findings = final['findings']
+    # The ingested original was verified too; its manifest hash is not the audit
+    # entry's optional tool-result evidence column. Both are valid citations.
+    known_hashes = observed['known_hashes'] | {source_hash}
     supported = sum(bool(f['event_ids']) and set(f['event_ids']) <= events
-                    and bool(f['evidence_hashes']) and set(f['evidence_hashes']) <= observed['known_hashes'] for f in findings)
+                    and bool(f['evidence_hashes']) and set(f['evidence_hashes']) <= known_hashes for f in findings)
     return {'events': score(events, set(final['events'])),
             'entities': score(entities, set(final['entities'])),
             'techniques': score(set(truth['expected_attack_techniques']), set(final['techniques'])),
