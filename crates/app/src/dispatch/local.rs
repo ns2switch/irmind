@@ -184,12 +184,6 @@ impl Engine<'_> {
 }
 
 fn graph_filter(call: &AuthorizedCall) -> Result<GraphQueryFilter, AppError> {
-    GraphQueryFilter::parse(
-        call.arg("from"),
-        call.arg("to"),
-        call.arg("account"),
-        call.arg("project"),
-        call.arg("region"),
-    )
-    .map_err(|_| AppError::Policy("invalid graph filter".into()))
+    GraphQueryFilter::from_args(call.proposal_args())
+        .map_err(|_| AppError::Policy("invalid graph filter".into()))
 }

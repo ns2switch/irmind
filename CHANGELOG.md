@@ -9,6 +9,8 @@ allocation. Export V8 replaces V7 and always includes catalog-proof and subagent
 branch counts, including zero counts. Older cases/exports require their creating
 IRMind version or re-ingestion of verified originals; there is no automatic migration.
 
+- Honor validated host, cluster, category, type, outcome and entity-role filters
+  in local model-tool queries.
 - Use SkillInstallationV2 and SkillSnapshotV2 for current methodology admissions.
   Catalog provenance requires a signed index from a compiled publisher key and
   an independent, immutable proof in every referencing case. Export V8 carries

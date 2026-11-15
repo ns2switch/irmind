@@ -1,3 +1,4 @@
+mod model_tools;
 use super::*;
 use irmind_app::source_mapping::{
     MappingError, MappingIdentityV1, MappingManifest, MappingOutput, MappingPartition,
