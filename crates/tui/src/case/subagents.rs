@@ -1,3 +1,4 @@
+mod approvals;
 mod feed;
 mod panel;
 mod review;
@@ -13,6 +14,9 @@ pub(super) struct SubagentUi<'scope, 'env> {
     review: Option<review::Review>,
     panel: panel::Panel,
     event_failure: bool,
+    scope: &'scope Scope<'scope, 'env>,
+    approval_work: Option<approvals::Work<'scope>>,
+    approval_refresh: bool,
 }
 impl<'scope, 'env> SubagentUi<'scope, 'env> {
     pub(super) fn new(
@@ -28,14 +32,19 @@ impl<'scope, 'env> SubagentUi<'scope, 'env> {
             review: None,
             panel: panel::Panel::default(),
             event_failure: false,
+            scope,
+            approval_work: None,
+            approval_refresh: false,
         }
     }
     pub(super) fn tick(
         &mut self,
-        engine: &Engine<'_>,
-        case: &CaseId,
-        conversation: &mut Conversation,
+        engine: &'env Engine<'_>,
+        case: &'env CaseId,
+        state: &mut super::state::CaseState,
     ) -> anyhow::Result<()> {
+        self.poll_approval_work(state);
+        let conversation = &mut state.conversation;
         if self
             .review
             .as_ref()
@@ -49,10 +58,10 @@ impl<'scope, 'env> SubagentUi<'scope, 'env> {
         {
             self.review = Some(review::Review::new(request));
         }
-        let Some(feed) = &self.feed else {
-            return Ok(());
-        };
         for _ in 0..16 {
+            let Some(feed) = &self.feed else {
+                break;
+            };
             let batch = match feed.receiver.try_recv() {
                 Ok(batch) => batch,
                 Err(std::sync::mpsc::TryRecvError::Empty) => break,
@@ -73,23 +82,109 @@ impl<'scope, 'env> SubagentUi<'scope, 'env> {
                     break;
                 }
             };
-            for event in batch.events {
-                self.panel.accept(&event);
-                let kind = match event.kind {
-                    EngineEventKind::PlanPreview | EngineEventKind::ConsentRequired => {
-                        CardKind::Notice
-                    }
-                    EngineEventKind::Message => CardKind::Model,
-                    EngineEventKind::ToolProposal => CardKind::Proposal,
-                    EngineEventKind::ToolResult => CardKind::ToolResult,
-                    EngineEventKind::Status => CardKind::Notice,
-                    _ => continue,
-                };
-                let name = event.task_type.as_deref().map_or("Subagents", panel::label);
-                conversation.push(Card::new(kind, name, event.payload, true));
-            }
+            self.accept_events(batch.events, conversation);
+        }
+        if self.approval_refresh && self.approval_work.is_none() {
+            self.approval_refresh = false;
+            self.approval_work = Some(approvals::Work::start(
+                self.scope,
+                engine,
+                case,
+                approvals::Intent::Refresh,
+            ));
         }
         Ok(())
+    }
+    fn accept_events(
+        &mut self,
+        events: Vec<irmind_app::subagents::EngineEvent>,
+        conversation: &mut Conversation,
+    ) {
+        for event in events {
+            self.panel.accept(&event);
+            if event.kind == EngineEventKind::Approval {
+                self.approval_refresh = true;
+            }
+            let kind = match event.kind {
+                EngineEventKind::PlanPreview
+                | EngineEventKind::ConsentRequired
+                | EngineEventKind::Status
+                | EngineEventKind::Approval => CardKind::Notice,
+                EngineEventKind::Message => CardKind::Model,
+                EngineEventKind::ToolProposal => CardKind::Proposal,
+                EngineEventKind::ToolResult => CardKind::ToolResult,
+                _ => continue,
+            };
+            let name = event.task_type.as_deref().map_or("Subagents", panel::label);
+            conversation.push(Card::new(kind, name, event.payload, true));
+        }
+    }
+    fn poll_approval_work(&mut self, state: &mut super::state::CaseState) {
+        if !self
+            .approval_work
+            .as_ref()
+            .is_some_and(approvals::Work::finished)
+        {
+            return;
+        }
+        let Some(update) = self.approval_work.take().and_then(|mut work| work.take()) else {
+            state.messages.push(
+                "Analyst request stopped unexpectedly. Inspect /approvals before retrying.".into(),
+            );
+            return;
+        };
+        match update.message {
+            Ok(Some(message)) => state.messages.push(message),
+            Ok(None) => {}
+            Err(error) => state.messages.push(format!("Approval error: {error}")),
+        }
+        match update.snapshot {
+            Ok(snapshot) => {
+                state.approvals = snapshot.requests;
+                state.approval_sources = snapshot.sources;
+                state.entries = snapshot.entries;
+                state.needs_refresh = true;
+            }
+            Err(error) => state
+                .messages
+                .push(format!("Approval display could not refresh: {error}")),
+        }
+    }
+    pub(super) fn approval_command(
+        &mut self,
+        prompt: &str,
+        engine: &'env Engine<'_>,
+        case: &'env CaseId,
+        state: &mut super::state::CaseState,
+    ) -> bool {
+        let Some(intent) = approvals::Intent::parse(prompt) else {
+            return false;
+        };
+        let intent = match intent {
+            Ok(intent) => intent,
+            Err(error) => {
+                state.messages.push(error.to_string());
+                return true;
+            }
+        };
+        if intent
+            .request_id()
+            .is_some_and(|id| !approvals::is_task_request(state, id))
+        {
+            state.messages.push("This request is not in the active subagent queue. Wait for the current turn, or use /pause before resolving a main-agent request.".into());
+            return true;
+        }
+        if self.approval_work.is_some() {
+            state.messages.push(
+                "An Analyst request is being processed; retry when its result appears.".into(),
+            );
+            return true;
+        }
+        if prompt == "/approvals" {
+            state.tab = 4;
+        }
+        self.approval_work = Some(approvals::Work::start(self.scope, engine, case, intent));
+        true
     }
     pub(super) fn overlay(&self) -> Option<String> {
         self.review

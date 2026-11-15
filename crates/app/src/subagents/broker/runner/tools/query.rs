@@ -94,15 +94,15 @@ pub(super) fn from_call(call: &crate::ProposedCall) -> Result<TaskEvidenceQuery,
         _ => return Err(invalid()),
     })
 }
-pub(super) fn text(value: TaskEvidenceResult) -> Result<(String, bool), AppError> {
+pub(super) fn text(value: &TaskEvidenceResult) -> Result<(String, bool), AppError> {
     match value {
-        TaskEvidenceResult::Text(text) => Ok((text, false)),
-        TaskEvidenceResult::Timeline(events) => timeline(&events).map(|text| (text, false)),
+        TaskEvidenceResult::Text(text) => Ok((text.clone(), false)),
+        TaskEvidenceResult::Timeline(events) => timeline(events).map(|text| (text, false)),
         TaskEvidenceResult::PartialText { text, reason } => {
             Ok((format!("{}\n{text}", reason.notice()), true))
         }
         TaskEvidenceResult::PartialTimeline { events, reason } => {
-            timeline(&events).map(|text| (format!("{}\n{text}", reason.notice()), true))
+            timeline(events).map(|text| (format!("{}\n{text}", reason.notice()), true))
         }
         TaskEvidenceResult::Original(record) => {
             let mut fields = Err(invalid());
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn source_words_do_not_control_status_and_typed_partial_rows_keep_their_order() {
         let source = r#"{"truncated":true,"partial":true,"message":"query time budget"}"#;
-        let (text, partial) = super::text(TaskEvidenceResult::Text(source.into())).unwrap();
+        let (text, partial) = super::text(&TaskEvidenceResult::Text(source.into())).unwrap();
         assert_eq!(text, source);
         assert!(!partial);
         for reason in [
@@ -161,7 +161,7 @@ mod tests {
             TaskQueryPartialReason::ExcerptLimit,
             TaskQueryPartialReason::Coverage,
         ] {
-            let (text, partial) = super::text(TaskEvidenceResult::PartialText {
+            let (text, partial) = super::text(&TaskEvidenceResult::PartialText {
                 text: source.into(),
                 reason,
             })
@@ -183,7 +183,7 @@ mod tests {
             },
         ];
         let expected = timeline(&events).unwrap();
-        let (text, partial) = super::text(TaskEvidenceResult::PartialTimeline {
+        let (text, partial) = super::text(&TaskEvidenceResult::PartialTimeline {
             events,
             reason: TaskQueryPartialReason::Deadline,
         })

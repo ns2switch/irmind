@@ -22,6 +22,9 @@ impl Engine<'_> {
                 crate::FixedAppError::PolicyPendingApprovalNotFound,
             ));
         }
+        if let Some(source) = self.task_approval_source_unlocked(id, request, &entries)? {
+            return Ok(source);
+        }
         for entry in entries
             .iter()
             .rev()
@@ -78,6 +81,42 @@ impl Engine<'_> {
                 .screen_and_audit(id, &proposal, "ApprovalSource", None)?
                 .text,
         })
+    }
+}
+
+impl Engine<'_> {
+    fn task_approval_source_unlocked(
+        &self,
+        id: &CaseId,
+        request: &ApprovalRequest,
+        entries: &[crate::SignedEntry],
+    ) -> Result<Option<ApprovalSource>, AppError> {
+        let Some((task, proposal)) = self.task_pending_proposal_unlocked(id, request)? else {
+            return Ok(None);
+        };
+        let Some(source) = proposal.source else {
+            return Ok(None);
+        };
+        let hash = crate::hex(source.hash.as_bytes());
+        let mut kind = SourceKind::Graph;
+        for entry in entries.iter().filter(|entry| {
+            entry.seq < request.decision_seq && entry.kind == AuditEventKind::SourceRecordSetV1
+        }) {
+            let records = irmind_domain::SourceRecordSetV1::decode(&entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            if records.source().as_str() == hash {
+                kind = records.reference().kind();
+            }
+        }
+        Ok(Some(ApprovalSource {
+            provenance: Provenance::new(*source.hash.as_bytes(), Some(source.index), kind),
+            source_label: format!(
+                "Subagent {} · verified original {hash} · record {}",
+                crate::hex(task.as_bytes()),
+                source.index
+            ),
+            excerpt: self.guard.screen(&proposal.guarded_excerpt)?.text,
+        }))
     }
 }
 

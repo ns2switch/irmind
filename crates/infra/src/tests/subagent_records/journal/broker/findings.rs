@@ -2,7 +2,7 @@ use super::*;
 use irmind_app::subagents::SubagentStatus;
 use irmind_domain::EvidenceHash;
 
-fn source(
+pub(super) fn source(
     root: &std::path::Path,
     store: &LocalStore,
     engine: &Engine<'_>,

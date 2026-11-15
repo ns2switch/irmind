@@ -40,8 +40,11 @@ impl Engine<'_> {
             Ok(response) => sources::references(response, &effect.call, &view)?,
             Err(_) => vec![],
         };
-        let (payload, text) = self.child_read_payload(task, effect, response)?;
+        let (payload, text) = self.child_read_payload(task, effect, response.as_ref())?;
         let (payload, sources) = sources::attach(payload, sources);
+        if let Ok(TaskEvidenceResult::Original(record)) = &response {
+            super::indicators::observe(self, state, record, &sources)?;
+        }
         mark_partial_read(state, &payload, method.as_deref());
         let mut entries = Vec::new();
         if let Some(method) = &method {
@@ -93,7 +96,7 @@ impl Engine<'_> {
         &self,
         task: &SubagentTaskSpec,
         effect: &ReadEffect,
-        response: Result<TaskEvidenceResult, AppError>,
+        response: Result<&TaskEvidenceResult, &AppError>,
     ) -> Result<(SubagentBranchPayload, String), AppError> {
         if self.clock.now()? > task.deadline_at {
             return Ok((

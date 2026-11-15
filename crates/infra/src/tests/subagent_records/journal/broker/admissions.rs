@@ -185,7 +185,7 @@ fn dispatched_remote(
         proposal_hash,
     }
 }
-fn publish(
+pub(super) fn publish(
     store: &LocalStore,
     history: &History,
     entries: &[irmind_app::subagents::SubagentBranchEntry],

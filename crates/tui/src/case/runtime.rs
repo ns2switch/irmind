@@ -45,8 +45,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                 update(&mut self.state, CaseMessage::Progress(progress));
             }
             self.poll_model_progress()?;
-            self.subagents
-                .tick(self.engine, self.id, &mut self.state.conversation)?;
+            self.subagents.tick(self.engine, self.id, &mut self.state)?;
             self.finish_task()?;
             self.refresh()?;
             self.presentation_tick()?;
@@ -368,6 +367,15 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
     }
 
     pub(super) fn start_approval(&mut self, request_id: String) {
+        if self.active.is_some() {
+            self.subagents.approval_command(
+                &format!("/approve {request_id}"),
+                self.engine,
+                self.id,
+                &mut self.state,
+            );
+            return;
+        }
         let workflow = CaseWorkflow {
             engine: self.engine,
             model: self.model,

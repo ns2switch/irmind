@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod accounting;
 mod admissions;
+mod approvals;
 mod findings;
 mod ledger;
 mod material;
@@ -32,6 +33,8 @@ pub struct SubagentJournal {
     checkpoint_admissions: BTreeMap<SubagentDigest, Vec<admissions::SourceEffect>>,
     request_dispatches: BTreeMap<SubagentDigest, SubagentDigest>,
     checkpoint_audit_hashes: BTreeMap<SubagentDigest, SubagentDigest>,
+    task_approvals: BTreeMap<SubagentDigest, approvals::TaskApprovalReceipt>,
+    latest_checkpoint: Option<(u64, super::SubagentCheckpointV1)>,
     pages: BTreeMap<SubagentDigest, SubagentSourcePageV1>,
     sets: BTreeMap<SubagentDigest, Vec<SubagentDigest>>,
     types: BTreeMap<SubagentDigest, SubagentTypeSnapshotV1>,
@@ -68,6 +71,8 @@ impl SubagentJournal {
             checkpoint_admissions: BTreeMap::new(),
             request_dispatches: BTreeMap::new(),
             checkpoint_audit_hashes: BTreeMap::new(),
+            task_approvals: BTreeMap::new(),
+            latest_checkpoint: None,
             pages: BTreeMap::new(),
             sets: BTreeMap::new(),
             types: BTreeMap::new(),
@@ -163,6 +168,7 @@ impl SubagentJournal {
         self.observe_accounting(entry)?;
         self.observe_finding(entry)?;
         self.observe_source_effect(entry)?;
+        self.observe_task_approval(entry, verifier)?;
         self.budget.accept(entry).map_err(|_| SubagentRecordError)?;
         if entry.kind == AuditEventKind::CaseBudgetChanged {
             let status = self
