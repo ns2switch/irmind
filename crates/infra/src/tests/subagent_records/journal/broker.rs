@@ -1,3 +1,4 @@
+mod events;
 mod findings;
 mod parallel;
 mod pending;

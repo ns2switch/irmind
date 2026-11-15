@@ -41,6 +41,7 @@ impl<'a> Engine<'a> {
             graph: ports.graph,
             source_evidence_reader: ports.source_evidence_reader,
             subagents: ports.subagents,
+            subagent_runtime: Arc::default(),
             audit_log: ports.audit_log,
             signer: ports.signer,
             verifier: ports.verifier,

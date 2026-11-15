@@ -46,6 +46,10 @@ impl Engine<'_> {
         model: &dyn LlmPort,
         cancel: &CancellationToken,
     ) -> Result<SubagentResultV1, AppError> {
+        self.require_attended_analyst("run subagent task")?;
+        let case = CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
+        let control = self.register_live_subagent(&case, started.plan.plan_id, task_id, cancel)?;
+        let cancel = &control.token;
         match self
             .execute_child_session(started, task_id, model, cancel)
             .await

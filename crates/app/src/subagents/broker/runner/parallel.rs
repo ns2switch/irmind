@@ -29,9 +29,17 @@ impl Engine<'_> {
             return Err(invalid());
         }
         let case = CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
-        let mut runs = self.initialize_parallel_plan(started, cancel).await?;
+        let controls = started
+            .plan
+            .tasks
+            .iter()
+            .map(|task| {
+                self.register_live_subagent(&case, started.plan.plan_id, task.task_id, cancel)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut runs = self.initialize_parallel_plan(started, controls).await?;
         loop {
-            let pending = self.prepare_parallel_wave(&case, started, model, &mut runs, cancel)?;
+            let pending = self.prepare_parallel_wave(&case, started, model, &mut runs)?;
             if pending.is_empty() {
                 break;
             }
@@ -40,7 +48,8 @@ impl Engine<'_> {
                     .deadline_at
                     .saturating_sub(self.clock.now()?)
                     .min(600);
-                step.complete(model, remaining, cancel).await
+                step.complete(model, remaining, &runs.controls[*index].token)
+                    .await
             }))
             .buffered(workers)
             .collect::<Vec<_>>()
@@ -50,15 +59,16 @@ impl Engine<'_> {
             for ((index, step), response) in pending.into_iter().zip(responses) {
                 let task = &started.plan.tasks[index];
                 let state = runs.states[index].as_mut().ok_or_else(invalid)?;
+                let signal = &runs.controls[index].token;
                 let result = self
-                    .commit_parallel_step(&case, started, task, state, (step, response), cancel)
+                    .commit_parallel_step(&case, started, task, state, (step, response), signal)
                     .await;
                 let result = match result {
                     Ok(result) => result,
                     Err(_) => Some(self.reconcile_subagent_task(
                         started,
                         task.task_id,
-                        if cancel.is_cancelled() {
+                        if signal.is_cancelled() {
                             SubagentStatus::Cancelled
                         } else {
                             SubagentStatus::Error
@@ -77,14 +87,16 @@ impl Engine<'_> {
     async fn initialize_parallel_plan(
         &self,
         started: &StartedSubagentPlan,
-        cancel: &CancellationToken,
+        controls: Vec<crate::subagents::runtime::RunningTask>,
     ) -> Result<PlanSessions, AppError> {
         let mut runs = PlanSessions {
+            controls,
             states: Vec::with_capacity(started.plan.tasks.len()),
             results: vec![None; started.plan.tasks.len()],
         };
         for (index, task) in started.plan.tasks.iter().enumerate() {
-            let initialized = self.initialize_parallel_child(started, task, cancel).await;
+            let signal = &runs.controls[index].token;
+            let initialized = self.initialize_parallel_child(started, task, signal).await;
             let result = match initialized {
                 Ok(Some(state)) => {
                     runs.states.push(Some(state));
@@ -96,7 +108,7 @@ impl Engine<'_> {
                 Err(_) => self.reconcile_subagent_task(
                     started,
                     task.task_id,
-                    if cancel.is_cancelled() {
+                    if signal.is_cancelled() {
                         SubagentStatus::Cancelled
                     } else {
                         SubagentStatus::Error
@@ -115,7 +127,6 @@ impl Engine<'_> {
         started: &StartedSubagentPlan,
         model: &dyn LlmPort,
         runs: &mut PlanSessions,
-        cancel: &CancellationToken,
     ) -> Result<Vec<(usize, ModelStep)>, AppError> {
         let mut pending = Vec::new();
         // Reserve in task ordinal order before polling provider futures.
@@ -124,7 +135,8 @@ impl Engine<'_> {
                 continue;
             };
             let task = &started.plan.tasks[index];
-            let result = match self.prepare_parallel_step(case, started, task, model, state, cancel)
+            let signal = &runs.controls[index].token;
+            let result = match self.prepare_parallel_step(case, started, task, model, state, signal)
             {
                 Ok(Some(step)) => {
                     pending.push((index, step));
@@ -132,7 +144,7 @@ impl Engine<'_> {
                 }
                 Ok(None) => {
                     let completion =
-                        if cancel.is_cancelled() || self.clock.now()? >= task.deadline_at {
+                        if signal.is_cancelled() || self.clock.now()? >= task.deadline_at {
                             SubagentStatus::Cancelled
                         } else {
                             SubagentStatus::Partial
@@ -219,6 +231,7 @@ impl Engine<'_> {
 }
 
 struct PlanSessions {
+    controls: Vec<crate::subagents::runtime::RunningTask>,
     states: Vec<Option<TaskSession>>,
     results: Vec<Option<SubagentResultV1>>,
 }

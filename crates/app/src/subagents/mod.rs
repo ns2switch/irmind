@@ -9,12 +9,18 @@ mod codec;
 pub use branch::*;
 pub use chunk::{CheckedBranchChunk, SubagentBranchCursor};
 mod consent;
+mod events;
 mod finding;
+pub use events::{
+    EngineEvent, EngineEventBatch, EngineEventKind, EngineEventSubscription, EventCursor,
+};
 mod interaction;
 mod journal;
 mod queries;
 pub use consent::verify_subagent_plan_consent;
-pub use interaction::{AnalystPlanChoice, AnalystPlanInteraction, SafePlanPreview};
+pub use interaction::{
+    AnalystPlanChoice, AnalystPlanInteraction, AnalystPlanMailbox, PlanReview, SafePlanPreview,
+};
 pub use journal::{
     BranchMaterialVerifier, SubagentJournal, TaskDispatchAttribution, is_subagent_kind,
 };
@@ -24,6 +30,7 @@ pub use queries::{
 };
 mod pending;
 mod plan;
+pub(crate) mod runtime;
 pub use plan::{
     SubagentPlanApprovalV1, SubagentPlanContext, SubagentPlanDecision, SubagentPlanV1,
     SubagentPolicySnapshot, SubagentTaskSpec,

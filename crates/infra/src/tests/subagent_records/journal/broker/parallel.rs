@@ -195,3 +195,118 @@ fn check_determinism(partial: bool) {
         }
     }
 }
+
+struct SelectiveQueries {
+    target: SubagentDigest,
+    entered: AtomicBool,
+    exited: AtomicBool,
+}
+impl TaskEvidenceQueries for SelectiveQueries {
+    fn execute(
+        &self,
+        view: &VerifiedTaskQueryView,
+        query: TaskEvidenceQuery,
+        cancel: &CancellationToken,
+    ) -> Result<TaskEvidenceResult, AppError> {
+        query.validate(view)?;
+        if view.task() == self.target {
+            self.entered.store(true, Ordering::SeqCst);
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while !cancel.is_cancelled() && std::time::Instant::now() < deadline {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            self.exited.store(true, Ordering::SeqCst);
+            assert!(
+                cancel.is_cancelled(),
+                "individual cancellation did not reach its query"
+            );
+            return Err(AppError::Cancelled);
+        }
+        Ok(TaskEvidenceResult::Text(
+            "Unaffected sibling result.".into(),
+        ))
+    }
+}
+
+#[test]
+fn individual_live_cancellation_is_case_scoped_does_not_cancel_siblings_and_keeps_signed_results() {
+    let history = History::new();
+    let root = tempfile::tempdir().unwrap();
+    let (_, first) = stored_history_engine(root.path(), &history, &[]);
+    let cancel = CancellationToken::new();
+    let prepared = first
+        .prepare_subagent_plan(
+            &history.case,
+            "00000000-0000-0000-0000-000000000009".parse().unwrap(),
+            (0..2).map(|_| proposal(100_000)).collect(),
+            SubagentResources::default(),
+            &cancel,
+        )
+        .unwrap();
+    let started = first
+        .admit_subagent_plan(
+            &prepared,
+            &prepared.preview().automatic_start().unwrap(),
+            &cancel,
+        )
+        .unwrap()
+        .unwrap();
+    let target = started.plan().tasks[0].task_id;
+    let queries = Arc::new(SelectiveQueries {
+        target,
+        entered: AtomicBool::new(false),
+        exited: AtomicBool::new(false),
+    });
+    // Reuse the same store through a fresh Engine so the signed prepared plan is retained.
+    let mut fork = History::new();
+    fork.entries = first.audit_log.entries(&history.case).unwrap();
+    let second_root = tempfile::tempdir().unwrap();
+    let (store, engine) =
+        stored_history_engine_with_queries(second_root.path(), &fork, &[], queries.clone());
+    let model = ParallelModel::new();
+    let results = std::thread::scope(|scope| {
+        let controller = scope.spawn(|| {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while !queries.entered.load(Ordering::SeqCst) && std::time::Instant::now() < deadline {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            assert!(queries.entered.load(Ordering::SeqCst));
+            assert!(
+                engine
+                    .cancel_interrupted_subagent_plans(&history.case)
+                    .is_err()
+            );
+            let other = CaseId::parse("00000000-0000-0000-0000-000000000088").unwrap();
+            assert!(!engine.cancel_live_subagent_task(&other, target).unwrap());
+            assert!(
+                engine
+                    .cancel_live_subagent_task(&history.case, target)
+                    .unwrap()
+            );
+        });
+        let result = engine
+            .run_subagent_plan(&started, &model, 2, &cancel)
+            .unwrap();
+        controller.join().unwrap();
+        result
+    });
+    assert_eq!(results[0].status, SubagentStatus::Cancelled);
+    assert_eq!(results[1].status, SubagentStatus::Completed);
+    assert_eq!(results[0].usage.calls, 1);
+    assert_eq!(results[1].usage.calls, 1);
+    assert!(!cancel.is_cancelled());
+    assert!(queries.exited.load(Ordering::SeqCst));
+    assert!(
+        !engine
+            .cancel_live_subagent_task(&history.case, target)
+            .unwrap()
+    );
+    assert_eq!(
+        engine
+            .cancel_live_subagent_plan(&history.case, started.plan().plan_id)
+            .unwrap(),
+        0
+    );
+    engine.finish_subagent_plan(&started).unwrap();
+    tools::verify_and_export(store.as_ref(), &engine, &history, second_root.path());
+}
