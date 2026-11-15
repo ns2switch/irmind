@@ -2,7 +2,7 @@ use crate::{AppError, AuthorizedCall, ObjectEntry};
 use irmind_domain::{SourceManifestV1, UtcTimestamp};
 use std::collections::BTreeSet;
 
-pub(super) fn validated_listing(
+pub(crate) fn validated_listing(
     call: &AuthorizedCall,
     objects: &[ObjectEntry],
     total_bytes: u64,

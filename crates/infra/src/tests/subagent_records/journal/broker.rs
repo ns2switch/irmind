@@ -5,6 +5,7 @@ mod live_approvals;
 mod parallel;
 mod pending;
 mod recovery;
+mod remote;
 mod root;
 mod scope;
 mod skills;

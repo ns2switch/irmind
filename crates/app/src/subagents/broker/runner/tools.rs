@@ -12,22 +12,29 @@ mod completion;
 mod finding;
 pub(super) mod indicators;
 mod query;
+mod remote;
 mod worker;
 
 enum ChildAction {
     Query(Box<TaskEvidenceQuery>),
+    Remote(crate::AuthorizedCall),
     Method,
     Finding(Box<crate::Finding>),
 }
 
 enum ChildReadResponse {
     Evidence(TaskEvidenceResult),
+    Remote {
+        result: TaskEvidenceResult,
+        admitted: Vec<SubagentDigest>,
+    },
     Method(Box<crate::skills::runtime::PreparedSkillRead>),
 }
 
 struct ReadEffect {
     call: BranchToolCall,
     reservation: SubagentReservationV1,
+    cloud: Option<SubagentReservationV1>,
     proposal: SubagentDigest,
     decision: SubagentDigest,
 }
@@ -66,7 +73,8 @@ impl Engine<'_> {
             .filter(|spec| {
                 tools.contains(spec.name)
                     && (query::supported(spec.name)
-                        || matches!(spec.name, "skill_read" | "case_add_finding"))
+                        || matches!(spec.name, "skill_read" | "case_add_finding")
+                        || remote::supported(spec.name) && task.remote_scope.is_some())
                     || tools.contains(spec.name)
                         && spec.name == "ti_lookup_external"
                         && task.remote_scope.is_some()
@@ -99,12 +107,17 @@ impl Engine<'_> {
                 return Ok(false);
             }
             let case = CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
-            if call.tool == Tool::ThreatIntelExternal.as_str() {
+            if matches!(
+                Tool::parse(&call.tool),
+                Ok(Tool::ThreatIntelExternal | Tool::ObjectRead)
+            ) {
                 if self.queue_child_approval(started, task, state, &call, cancel)? {
                     return Ok(true);
                 }
-                state.coverage.insert("The external lookup was not authorized for this task or its observed evidence.".into());
-                return Ok(false);
+                if call.tool == Tool::ThreatIntelExternal.as_str() {
+                    state.coverage.insert("The external lookup was not authorized for this task or its observed evidence.".into());
+                    return Ok(false);
+                }
             }
             let Some(ticket) =
                 self.reserve_child_read(&case, started, task, state, &call, cancel)?
@@ -124,6 +137,10 @@ impl Engine<'_> {
                     .run_child_query(view, *query, task.deadline_at, cancel)
                     .await
                     .map(ChildReadResponse::Evidence),
+                ChildAction::Remote(call) => {
+                    self.run_child_remote(started, task, &effect, &call, cancel)
+                        .await
+                }
                 ChildAction::Finding(finding) => self
                     .publish_child_finding(started, task, &effect, *finding, cancel)
                     .await
@@ -143,7 +160,7 @@ impl Engine<'_> {
         started: &StartedSubagentPlan,
         state: &TaskSession,
         proposal: &crate::ProposedCall,
-    ) -> Result<bool, AppError> {
+    ) -> Result<Option<crate::AuthorizedCall>, AppError> {
         let rules = self.policy_for_case_unlocked(view.case())?;
         if rules
             .permits(
@@ -153,7 +170,7 @@ impl Engine<'_> {
             )
             .is_err()
         {
-            return Ok(false);
+            return Ok(None);
         }
         let case = crate::Case {
             id: view.case().clone(),
@@ -170,18 +187,42 @@ impl Engine<'_> {
                 irmind_domain::SourceKind::ModelProposal,
             ),
         );
-        Ok(matches!(
-            irmind_domain::evaluate_tainted_with_rules(
+        Ok(
+            match irmind_domain::evaluate_tainted_with_rules(
                 &case,
                 tainted,
                 1,
                 self.mode,
                 false,
                 self.clock.now()?,
-                &rules
-            ),
-            crate::Decision::Allow(_)
-        ))
+                &rules,
+            ) {
+                crate::Decision::Allow(call) => Some(call),
+                _ => None,
+            },
+        )
+    }
+
+    fn checked_child_action(
+        &self,
+        case: &CaseId,
+        task: &SubagentTaskSpec,
+        call: &BranchToolCall,
+        view: &crate::subagents::VerifiedTaskQueryView,
+        proposal: &crate::ProposedCall,
+        authorized: crate::AuthorizedCall,
+    ) -> Result<Option<ChildAction>, AppError> {
+        if remote::supported(&call.tool) {
+            if task.remote_scope.is_none() || !self.permit_child_remote(&authorized)? {
+                return Ok(None);
+            }
+            if authorized.tool() == &Tool::ObjectRead {
+                self.child_listed_object(case, task, &authorized)?;
+            }
+            Ok(Some(ChildAction::Remote(authorized)))
+        } else {
+            Ok(query::checked(proposal, call, task.task_id, view).ok())
+        }
     }
 
     fn reserve_child_read(
@@ -207,10 +248,12 @@ impl Engine<'_> {
             tool: Tool::parse(&call.tool).map_err(|_| invalid())?,
             args: call.arguments.clone(),
         };
-        if !self.permit_child_read(&view, started, state, &proposal)? {
+        let Some(authorized) = self.permit_child_read(&view, started, state, &proposal)? else {
             return Ok(None);
-        }
-        let Ok(action) = query::checked(&proposal, call, task.task_id, &view) else {
+        };
+        let Some(action) =
+            self.checked_child_action(case, task, call, &view, &proposal, authorized)?
+        else {
             return Ok(None);
         };
         let body = child_read_proposal(started, call)?;
@@ -247,7 +290,10 @@ impl Engine<'_> {
         )
         .map_err(|_| invalid())?;
         batch.push(&reservation)?;
+        let cloud =
+            Self::reserve_child_bytes(&mut batch, started, task, call, state.call, &checkpoint)?;
         let effect = ReadEffect {
+            cloud,
             call: call.clone(),
             reservation,
             proposal: entry.hash,
@@ -262,7 +308,7 @@ impl Engine<'_> {
         state.seq = entry.body.seq;
         state.previous = entry.hash;
         state.checkpoint = Some(checkpoint);
-        state.reservations.insert(effect.reservation.operation_id);
+        effect.remember_reservations(state);
         Ok(Some(ReadTicket {
             effect: ReadEffect { decision, ..effect },
             view,
@@ -272,11 +318,20 @@ impl Engine<'_> {
 }
 
 impl ReadEffect {
+    fn remember_reservations(&self, state: &mut TaskSession) {
+        state.reservations.insert(self.reservation.operation_id);
+        if let Some(cloud) = &self.cloud {
+            state.reservations.insert(cloud.operation_id);
+        }
+    }
     fn attribution(&self, task: &SubagentTaskSpec) -> Result<String, AppError> {
         let attribution = TaskDispatchAttribution {
             version: 1,
             tool: self.call.tool.clone(),
-            reserved_bytes: 0,
+            reserved_bytes: self
+                .cloud
+                .as_ref()
+                .map_or(0, |reservation| reservation.amount.cloud_bytes),
             task_id: task.task_id,
             call_id: self.call.id.clone(),
             proposal_sha256: self.proposal,

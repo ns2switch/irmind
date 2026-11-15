@@ -155,6 +155,7 @@ See the [public roadmap](docs/development/roadmap.md) for scope and limits; thes
 ## Documentation
 
 - [Getting started](docs/getting-started.md) · [Configuration](docs/configuration.md) · [Modules](docs/modules.md)
+- [Parallel investigations](docs/subagents.md) · [Forensic skills](docs/skills.md)
 - [Platforms](docs/platforms.md) · [Security model](docs/security-model.md)
 - [Architecture and development](docs/development/architecture.md) · [CLI automation](docs/development/cli.md) · [Roadmap](docs/development/roadmap.md)
 

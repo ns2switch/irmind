@@ -218,3 +218,14 @@ Un mapeo puede conservar campos y entidades consultables sin clasificar el event
 ## Skills locales
 
 `/skills` gestiona las instalaciones y activaciones mediante operaciones globales firmadas, separadas de `config.toml`. La vista previa muestra el hash, las herramientas y los recursos antes de firmar. No hay descarga automática ni credenciales adicionales. Los 13 métodos incluidos se pueden inspeccionar sin modelo. Consulta la [guía de skills](skills.md).
+
+## Confirmación de planes de subagentes
+
+En `/settings preferences`, **Confirm all subagent plans** está desactivado por
+defecto. Un plan que reserva como máximo el 25 % de los tokens y llamadas
+restantes empieza después de mostrar la vista previa. Por encima de cualquiera
+de esos umbrales, Start siempre exige la firma del analista. Activar la preferencia
+exige Start para todos los planes. El cambio es una operación global firmada;
+ninguna herramienta del modelo puede aplicarlo. Consulta
+[investigaciones en paralelo](subagents.md) para cancelar tareas, compartir
+presupuestos y entender las carencias de los resultados parciales.

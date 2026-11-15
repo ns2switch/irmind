@@ -213,3 +213,13 @@ A mapping may preserve searchable fields and entities without classifying an eve
 ## Local skills
 
 `/skills` manages installations and activation through signed global operations, separate from `config.toml`. The preview shows package hashes, tools and resources before signing. No automatic download or additional credential is involved. You can inspect the 13 included methods without a model. See the [skills guide](skills.md).
+
+## Subagent plan confirmation
+
+In `/settings preferences`, **Confirm all subagent plans** defaults to off.
+Plans at or below 25% of both remaining tokens and calls start after their preview
+is displayed. Above either threshold, Start always requires the Analyst signature.
+Turning this preference on requires Start for every plan. The preference change
+is a signed global operation; model tools cannot change it. See
+[parallel investigations](subagents.md) for task cancellation, shared budgets
+and partial-result coverage.

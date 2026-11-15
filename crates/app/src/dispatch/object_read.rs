@@ -130,10 +130,28 @@ impl Engine<'_> {
         cancel: &CancellationToken,
     ) -> Result<(String, String), AppError> {
         let listed = self.signed_object_for_read(id, call).await?;
+        let (spool, manifest) = self
+            .download_listed_object(id, call, listed, cancel)
+            .await?;
+        if let Some(verified) = self.compare_existing_object(id, &manifest).await? {
+            return Ok(verified);
+        }
+        self.prepare_and_sign_object(id, spool.path(), manifest, cancel)
+            .await
+    }
+
+    pub(crate) async fn download_listed_object(
+        &self,
+        id: &CaseId,
+        call: &AuthorizedCall,
+        listed: ObjectEntry,
+        cancel: &CancellationToken,
+    ) -> Result<(tempfile::NamedTempFile, SourceManifestV1), AppError> {
         let store = self.large_case_store.clone().ok_or(AppError::RemoteTool)?;
         let case = id.clone();
+        let expected_size = listed.size;
         let spool = self
-            .blocking_local(move |_| store.create_object_spool(&case, listed.size))
+            .blocking_local(move |_| store.create_object_spool(&case, expected_size))
             .await?;
         let ObjectSourceOutput::Object { metadata, chunks } =
             self.dispatch_object_source(call, cancel).await?
@@ -141,8 +159,9 @@ impl Engine<'_> {
             return Err(AppError::RemoteTool);
         };
         validate_metadata(call, &metadata)?;
-        self.validate_against_signed_listing(id, call, &metadata)
-            .await?;
+        if metadata != listed {
+            return Err(AppError::RemoteTool);
+        }
         let progress = Arc::new(AtomicU64::new(0));
         self.object_progress
             .lock()
@@ -170,11 +189,7 @@ impl Engine<'_> {
             copied: copy_original,
         };
         manifest.validate().map_err(|_| AppError::RemoteTool)?;
-        if let Some(verified) = self.compare_existing_object(id, &manifest).await? {
-            return Ok(verified);
-        }
-        self.prepare_and_sign_object(id, spool.path(), manifest, cancel)
-            .await
+        Ok((spool, manifest))
     }
 
     async fn signed_object_for_read(
@@ -194,19 +209,6 @@ impl Engine<'_> {
             require_signed_listing(&local, &id, &entries, &args, &uri, max_bytes)
         })
         .await
-    }
-
-    async fn validate_against_signed_listing(
-        &self,
-        id: &CaseId,
-        call: &AuthorizedCall,
-        actual: &ObjectEntry,
-    ) -> Result<(), AppError> {
-        let listed = self.signed_object_for_read(id, call).await?;
-        if listed != *actual {
-            return Err(AppError::RemoteTool);
-        }
-        Ok(())
     }
 
     async fn compare_existing_object(
@@ -325,7 +327,7 @@ impl Engine<'_> {
     }
 }
 
-fn select_object_parser(
+pub(crate) fn select_object_parser(
     catalog: &crate::modules::ParserCatalog,
     root: &std::path::Path,
     relative: &str,
