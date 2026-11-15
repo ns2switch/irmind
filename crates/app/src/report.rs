@@ -64,7 +64,7 @@ impl FindingKind {
 }
 
 impl Finding {
-    fn valid_for(&self, known_evidence: &std::collections::BTreeSet<String>) -> bool {
+    pub(crate) fn valid_for(&self, known_evidence: &std::collections::BTreeSet<String>) -> bool {
         known_evidence.contains(&self.evidence_hash)
             && self
                 .details

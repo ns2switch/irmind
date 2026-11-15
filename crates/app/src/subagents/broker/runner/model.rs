@@ -20,27 +20,19 @@ impl Engine<'_> {
     ) -> Result<Option<ModelStep>, AppError> {
         let _lock = self.repo.lock_case(case)?;
         let mut batch = AgentBatch::new(self, case, self.verifier.as_ref())?;
-        let _view = batch
+        let view = batch
             .journal
             .task_view(started, task.task_id, &self.policy)
             .map_err(|_| invalid())?;
         if cancel.is_cancelled() || self.clock.now()? >= task.deadline_at {
             return Err(AppError::Cancelled);
         }
+        if state.round == 0 {
+            messages::assigned_sources(&mut state.messages, task, &view)?;
+        }
         let messages = state.messages.clone();
         let tools = self.child_read_catalog(started, task, state)?;
-        let input = messages::canonical(&messages)?;
-        let catalog_bytes = serde_json::to_vec(
-            &tools
-                .iter()
-                .map(|tool| (&tool.name, &tool.parameters))
-                .collect::<Vec<_>>(),
-        )
-        .map_err(|_| invalid())?;
-        let input_bound = (input.len() as u64)
-            .checked_add(catalog_bytes.len() as u64)
-            .and_then(|n| n.checked_add(512))
-            .ok_or_else(invalid)?;
+        let (input, input_bound) = messages::reserved_input(&messages, &tools)?;
         let available = task.budget.tokens.saturating_sub(state.usage.tokens);
         if input.len() > 48_000 || input_bound >= available {
             return Ok(None);
@@ -123,11 +115,11 @@ impl Engine<'_> {
                 )
             })
             .transpose()?;
-        state.usage = state
-            .usage
-            .checked_add(outcome.terminal.usage)
-            .map_err(|_| invalid())?;
-        state.summary = outcome.terminal.guarded_summary;
+        state.record_model_result(
+            outcome.terminal.usage,
+            outcome.terminal.guarded_summary,
+            outcome.reply.as_ref().is_some_and(|reply| reply.truncated),
+        )?;
         let calls = outcome
             .reply
             .as_ref()

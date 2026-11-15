@@ -22,6 +22,7 @@ pub(super) struct TaskMaterial<'a> {
     results: BTreeSet<SubagentDigest>,
     usage: SubagentResources,
     terminal: Option<BranchTerminal>,
+    partial: bool,
     parent_tools: Option<BTreeSet<String>>,
     child_tools: Option<BTreeSet<String>>,
     checkpoint: Option<SubagentCheckpointV1>,
@@ -81,6 +82,7 @@ impl<'a> TaskMaterial<'a> {
             results: BTreeSet::new(),
             usage: SubagentResources::default(),
             terminal: None,
+            partial: false,
             parent_tools,
             child_tools: None,
             checkpoint: None,
@@ -135,6 +137,7 @@ impl<'a> TaskMaterial<'a> {
                     {
                         return Err(SubagentRecordError);
                     }
+                    self.finding_effect(entry.hash, value, sequence)?;
                     self.proposals.insert(entry.hash, (sequence, value.clone()));
                 }
                 SubagentBranchPayload::ToolResult(value) => self.tool_result(value, sequence)?,
@@ -146,13 +149,68 @@ impl<'a> TaskMaterial<'a> {
                         return Err(SubagentRecordError);
                     }
                 }
-                SubagentBranchPayload::BudgetNotice(_) => {}
+                SubagentBranchPayload::BudgetNotice(value) => {
+                    self.partial |= value.partial;
+                }
                 SubagentBranchPayload::Terminal(value) => self.terminal(value)?,
             }
         }
         self.checkpoint = Some(checkpoint.clone());
         Ok(())
     }
+    fn finding_effect(
+        &self,
+        proposal: SubagentDigest,
+        value: &BranchToolProposal,
+        proposal_sequence: u64,
+    ) -> Result<(), SubagentRecordError> {
+        let Some(effect) = self.journal.findings.get(&proposal) else {
+            return Ok(());
+        };
+        let accounted = self
+            .journal
+            .accounting
+            .get(&effect.decision)
+            .ok_or(SubagentRecordError)?;
+        let attr = accounted.attribution.as_ref().ok_or(SubagentRecordError)?;
+        if attr.task_id != self.task.task_id
+            || attr.proposal_sha256 != proposal
+            || attr.call_id != value.call_id
+            || attr.tool != value.tool
+            || attr.source_set_sha256 != self.task.source_set_sha256
+            || attr.arguments_sha256.as_bytes()
+                != &crate::sha256(
+                    &serde_json::to_vec(&value.arguments).map_err(|_| SubagentRecordError)?,
+                )
+            || effect.at > self.task.deadline_at
+            || effect.seq <= accounted.seq
+        {
+            return Err(SubagentRecordError);
+        }
+        let rules = self.plan.plan.policy.rules()?;
+        self.require_method_allow(value, &rules)?;
+        self.require_policy_allow(value, &rules)?;
+        self.require_tool_reservation(attr.reservation_sha256, proposal_sequence, accounted.seq)?;
+        let sources = self
+            .sources
+            .iter()
+            .map(|hash| crate::hex(hash.as_bytes()))
+            .collect();
+        let call = crate::subagents::BranchToolCall {
+            id: value.call_id.clone(),
+            tool: value.tool.clone(),
+            arguments: value.arguments.clone(),
+        };
+        let expected =
+            crate::subagents::finding::proposed_finding(self.task.task_id, &call, &sources)?;
+        if &crate::sha256(&serde_json::to_vec(&expected).map_err(|_| SubagentRecordError)?)
+            != effect.canonical_sha256.as_bytes()
+        {
+            return Err(SubagentRecordError);
+        }
+        Ok(())
+    }
+
     fn skill_load(
         &mut self,
         value: &str,
@@ -189,6 +247,8 @@ impl<'a> TaskMaterial<'a> {
             .map_err(|_| SubagentRecordError)?;
         if load.result() == crate::SkillLoadResult::Loaded {
             self.child_tools = Some(tools);
+        } else {
+            self.partial = true;
         }
         Ok(())
     }
@@ -241,6 +301,7 @@ impl<'a> TaskMaterial<'a> {
         if !self.usage.within(self.task.budget) {
             return Err(SubagentRecordError);
         }
+        self.partial |= value.truncated;
         Ok(())
     }
     fn tool_result(
@@ -258,30 +319,9 @@ impl<'a> TaskMaterial<'a> {
             .get(&value.decision_audit_sha256)
             .ok_or(SubagentRecordError)?;
         let attribution = accounted.attribution.as_ref().ok_or(SubagentRecordError)?;
-        let tool = Tool::parse(&proposal.tool).map_err(|_| SubagentRecordError)?;
-        let kind = self
-            .journal
-            .types
-            .get(&self.task.type_snapshot_sha256)
-            .ok_or(SubagentRecordError)?;
         let rules = self.plan.plan.policy.rules()?;
-        if tool.risk() != irmind_domain::RiskLevel::Read
-            || !kind.definition().permits_tool(&tool)
-            || tool != Tool::SkillRead
-                && self
-                    .parent_tools
-                    .as_ref()
-                    .is_some_and(|tools| !tools.contains(tool.as_str()))
-            || tool != Tool::SkillRead
-                && self
-                    .child_tools
-                    .as_ref()
-                    .is_some_and(|tools| !tools.contains(tool.as_str()))
-            || (tool != Tool::SkillRead
-                && self.task.skill_snapshot_sha256.is_some()
-                && self.child_tools.is_none())
-            || rules.denied_tools.contains(&tool)
-            || proposal_sequence >= &accounted.seq
+        self.require_method_allow(proposal, &rules)?;
+        if proposal_sequence >= &accounted.seq
             || accounted.seq >= sequence
             || accounted.at > self.task.deadline_at
             || attribution.task_id != self.task.task_id
@@ -304,13 +344,14 @@ impl<'a> TaskMaterial<'a> {
             return Err(SubagentRecordError);
         }
         self.require_policy_allow(proposal, &rules)?;
-        let (request, admitted) = self.plan.request_by_identity(value.reservation_sha256)?;
-        if request.task_id != Some(self.task.task_id)
-            || request.purpose != ReservationPurpose::Tool
-            || admitted >= accounted.seq
+        if proposal.tool == Tool::CaseAddFinding.as_str()
+            && !value.partial
+            && !self.journal.findings.contains_key(&value.proposal_sha256)
         {
             return Err(SubagentRecordError);
         }
+        self.partial |= value.partial;
+        self.require_tool_reservation(value.reservation_sha256, *proposal_sequence, accounted.seq)?;
         self.usage.calls = self.usage.calls.checked_add(1).ok_or(SubagentRecordError)?;
         self.usage.cloud_bytes = self
             .usage
@@ -322,6 +363,57 @@ impl<'a> TaskMaterial<'a> {
         }
         Ok(())
     }
+    fn require_tool_reservation(
+        &self,
+        id: SubagentDigest,
+        proposal_seq: u64,
+        decision_seq: u64,
+    ) -> Result<(), SubagentRecordError> {
+        let (request, admitted) = self.plan.request_by_identity(id)?;
+        if request.task_id != Some(self.task.task_id)
+            || request.purpose != ReservationPurpose::Tool
+            || admitted <= proposal_seq
+            || admitted >= decision_seq
+            || self.journal.checkpoint_sequences.get(&request.cause_sha256) != Some(&proposal_seq)
+        {
+            return Err(SubagentRecordError);
+        }
+        Ok(())
+    }
+
+    fn require_method_allow(
+        &self,
+        proposal: &BranchToolProposal,
+        rules: &irmind_domain::PolicyRules,
+    ) -> Result<(), SubagentRecordError> {
+        let tool = Tool::parse(&proposal.tool).map_err(|_| SubagentRecordError)?;
+        let kind = self
+            .journal
+            .types
+            .get(&self.task.type_snapshot_sha256)
+            .ok_or(SubagentRecordError)?;
+        if tool.risk() != irmind_domain::RiskLevel::Read
+            || !kind.definition().permits_tool(&tool)
+            || tool != Tool::SkillRead
+                && self
+                    .parent_tools
+                    .as_ref()
+                    .is_some_and(|tools| !tools.contains(tool.as_str()))
+            || tool != Tool::SkillRead
+                && self
+                    .child_tools
+                    .as_ref()
+                    .is_some_and(|tools| !tools.contains(tool.as_str()))
+            || (tool != Tool::SkillRead
+                && self.task.skill_snapshot_sha256.is_some()
+                && self.child_tools.is_none())
+            || rules.denied_tools.contains(&tool)
+        {
+            return Err(SubagentRecordError);
+        }
+        Ok(())
+    }
+
     fn require_policy_allow(
         &self,
         proposal: &BranchToolProposal,
@@ -387,7 +479,7 @@ impl<'a> TaskMaterial<'a> {
     fn terminal(&mut self, value: &BranchTerminal) -> Result<(), SubagentRecordError> {
         if self.terminal.is_some()
             || (value.status == crate::subagents::SubagentStatus::Completed
-                && self.requests.len() != self.replies.len())
+                && (self.requests.len() != self.replies.len() || self.partial))
             || !self.usage.within(value.usage)
             || !value.usage.within(self.task.budget)
             || value
