@@ -8,6 +8,9 @@ use std::collections::BTreeSet;
 
 pub(super) struct TaskSession {
     pub messages: Vec<CompletionMessage>,
+    pub skills: crate::skills::runtime::SkillTurn,
+    pub method: Option<crate::SkillSnapshotId>,
+    pub partial: bool,
     pub checkpoint: Option<SubagentCheckpointV1>,
     pub previous: SubagentDigest,
     pub seq: u64,
@@ -20,10 +23,21 @@ pub(super) struct TaskSession {
     pub coverage: BTreeSet<String>,
 }
 impl TaskSession {
-    pub(super) fn new(task: &SubagentTaskSpec, objective: &str) -> Result<Self, AppError> {
+    pub(super) fn new(
+        started: &super::StartedSubagentPlan,
+        task: &SubagentTaskSpec,
+        objective: &str,
+    ) -> Result<Self, AppError> {
         let nonce = uuid::Uuid::parse_str(&task.nonce).map_err(|_| invalid())?;
         Ok(Self {
             messages: messages::initial(objective, &nonce, task.source_set_sha256),
+            skills: crate::skills::runtime::SkillTurn {
+                budget: started.skill_budget.clone(),
+                active: None,
+                read_limit: 16 * 1024,
+            },
+            method: None,
+            partial: false,
             checkpoint: None,
             previous: SubagentDigest::from_bytes([0; 32]),
             seq: 0,
@@ -45,7 +59,11 @@ impl TaskSession {
     }
     pub(super) fn terminal(&self, status: SubagentStatus) -> BranchTerminal {
         BranchTerminal {
-            status,
+            status: if status == SubagentStatus::Completed && self.partial {
+                SubagentStatus::Partial
+            } else {
+                status
+            },
             guarded_summary: self.summary.clone(),
             summary_sha256: SubagentDigest::from_bytes(crate::sha256(self.summary.as_bytes())),
             sources: self.sources.iter().copied().collect(),

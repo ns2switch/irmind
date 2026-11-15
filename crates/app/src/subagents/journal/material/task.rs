@@ -267,15 +267,19 @@ impl<'a> TaskMaterial<'a> {
         let rules = self.plan.plan.policy.rules()?;
         if tool.risk() != irmind_domain::RiskLevel::Read
             || !kind.definition().permits_tool(&tool)
-            || self
-                .parent_tools
-                .as_ref()
-                .is_some_and(|tools| !tools.contains(tool.as_str()))
-            || self
-                .child_tools
-                .as_ref()
-                .is_some_and(|tools| !tools.contains(tool.as_str()))
-            || (self.task.skill_snapshot_sha256.is_some() && self.child_tools.is_none())
+            || tool != Tool::SkillRead
+                && self
+                    .parent_tools
+                    .as_ref()
+                    .is_some_and(|tools| !tools.contains(tool.as_str()))
+            || tool != Tool::SkillRead
+                && self
+                    .child_tools
+                    .as_ref()
+                    .is_some_and(|tools| !tools.contains(tool.as_str()))
+            || (tool != Tool::SkillRead
+                && self.task.skill_snapshot_sha256.is_some()
+                && self.child_tools.is_none())
             || rules.denied_tools.contains(&tool)
             || proposal_sequence >= &accounted.seq
             || accounted.seq >= sequence

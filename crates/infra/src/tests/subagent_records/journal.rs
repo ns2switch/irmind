@@ -948,7 +948,11 @@ fn stored_history_engine_with_queries(
         Arc::new(crate::FileSkillPackageStore::new(root)),
         Arc::new(TomlSkillCompiler),
         agent,
-        Vec::new(),
+        crate::bundled_skill_candidates()
+            .unwrap()
+            .into_iter()
+            .map(|skill| skill.package().clone())
+            .collect(),
     )
     .unwrap();
     let engine = Engine::new(

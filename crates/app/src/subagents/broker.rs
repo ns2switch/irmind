@@ -37,8 +37,17 @@ pub struct StartedSubagentPlan {
     pub(super) plan: SubagentPlanV1,
     pub(super) entry_hash: SubagentDigest,
     pub(super) allocation: SubagentReservationV1,
+    pub(super) skill_budget:
+        std::sync::Arc<std::sync::Mutex<crate::skills::runtime::SkillReadBudget>>,
 }
 impl StartedSubagentPlan {
+    pub(super) fn task(&self, id: SubagentDigest) -> Result<&SubagentTaskSpec, AppError> {
+        self.plan
+            .tasks
+            .iter()
+            .find(|task| task.task_id == id)
+            .ok_or_else(invalid)
+    }
     pub const fn plan(&self) -> &SubagentPlanV1 {
         &self.plan
     }
@@ -153,6 +162,19 @@ impl<'a> AgentBatch<'a> {
 }
 
 impl Engine<'_> {
+    fn subagent_skill_budget(
+        &self,
+        case: &CaseId,
+        turn: &str,
+    ) -> Result<crate::skills::runtime::SkillReadBudget, AppError> {
+        let services = self.skills.as_ref().ok_or_else(invalid)?;
+        let mut receipts = crate::SkillReceiptVerifier::default();
+        for entry in self.audit_log.entries(case)? {
+            receipts.accept(&entry, services.compiler.as_ref())?;
+        }
+        receipts.read_budget_for_turn(turn)
+    }
+
     pub fn finish_subagent_plan(&self, started: &StartedSubagentPlan) -> Result<(), AppError> {
         self.require_attended_analyst("finish subagent plan")?;
         let case = CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
@@ -307,11 +329,16 @@ impl Engine<'_> {
             approval_hash,
         )?;
         batch.push(&allocation)?;
+        let skill_budget = self.subagent_skill_budget(
+            &CaseId::parse(&plan.case_id).map_err(|_| invalid())?,
+            &plan.turn_id,
+        )?;
         batch.publish(cancel)?;
         Ok(Some(StartedSubagentPlan {
             plan: prepared.preview.plan.clone(),
             entry_hash: prepared.entry_hash,
             allocation,
+            skill_budget: std::sync::Arc::new(std::sync::Mutex::new(skill_budget)),
         }))
     }
 }
