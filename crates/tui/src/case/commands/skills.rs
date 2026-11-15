@@ -1,14 +1,16 @@
 use super::CaseRuntime;
 impl CaseRuntime<'_, '_, '_> {
     pub(super) fn skill_command(&mut self, prompt: &str) -> Option<bool> {
-        if prompt != "/skills" {
+        if prompt != "/skills" && !prompt.starts_with("/skills ") {
             return None;
         }
         match crate::skills::run(
             self.terminal,
             self.engine,
+            self.io_ops,
             self.shutdown,
             self.io_ops.demo_mode(),
+            prompt,
         ) {
             Ok(crate::skills::ManagerExit::Quit) => {
                 self.exit_to = super::super::CaseExit::Quit;

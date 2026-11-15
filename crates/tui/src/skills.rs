@@ -1,9 +1,10 @@
 //! Presentation over the signed local skill use cases.
+mod download;
 mod state;
 mod view;
 use irmind_app::{CancellationToken, CompiledSkill, Engine, SkillOrigin};
 use ratatui::{Terminal, backend::Backend};
-use state::{Action, Screen, State};
+use state::{Action, Candidate, Screen, State};
 use std::fmt::Write as _;
 use std::{path::Path, time::Duration};
 pub(crate) enum ManagerExit {
@@ -14,15 +15,21 @@ pub(crate) enum ManagerExit {
 pub(crate) fn run<B: Backend>(
     terminal: &mut Terminal<B>,
     engine: &Engine<'_>,
+    io: &dyn crate::WorkspaceIo,
     shutdown: &CancellationToken,
     readonly: bool,
+    command: &str,
 ) -> anyhow::Result<ManagerExit>
 where
     B::Error: std::error::Error + Send + Sync + 'static,
 {
     let mut state = State::new(readonly);
     refresh(terminal, engine, &mut state);
+    download::initial_command(&mut state, command);
     loop {
+        if let Some(exit) = state.pending_exit.take() {
+            return Ok(exit);
+        }
         view::draw(terminal, &state, engine)?;
         if shutdown.is_cancelled() {
             return Ok(ManagerExit::Quit);
@@ -45,21 +52,35 @@ where
                     Err(error) => state.notice = format!("{error}. Retry or return with Esc."),
                 }
             }
-            Action::Prepare => match background(terminal, engine, &state, || {
-                prepare(engine, &state.path, shutdown)
-            }) {
-                Ok((candidate, preview)) => {
-                    state.candidate = Some(candidate);
-                    state.preview = preview;
-                    state.screen = Screen::Review;
-                    state.scroll = 0;
-                    state.option = 0;
+            Action::Prepare => {
+                match download::prepare_background(terminal, engine, io, &mut state, shutdown) {
+                    Ok((candidate, preview)) => {
+                        state.downgrade_confirmed = false;
+                        state.screen = if matches!(&candidate, Candidate::Catalog(p) if p.downgrade_confirmation_required())
+                        {
+                            Screen::Downgrade
+                        } else {
+                            Screen::Review
+                        };
+                        state.candidate = Some(candidate);
+                        state.preview = preview;
+                        state.scroll = 0;
+                        state.option = 0;
+                    }
+                    Err(error) => {
+                        state.notice = format!(
+                            "{error}. Correct the selection and retry; your form is preserved."
+                        );
+                    }
                 }
-                Err(error) => {
-                    state.notice =
-                        format!("{error}. Correct the folder and retry; your form is preserved.");
-                }
-            },
+            }
+            Action::AcceptDowngrade => {
+                state.downgrade_confirmed = true;
+                state.screen = Screen::Review;
+                state.option = 0;
+                state.notice =
+                    "Downgrade accepted for this preview; review and sign separately.".into();
+            }
             Action::Apply => match background(terminal, engine, &state, || apply(engine, &state)) {
                 Ok(()) => {
                     state.screen = Screen::List;
@@ -96,7 +117,7 @@ fn prepare(
     engine: &Engine<'_>,
     directory: &str,
     cancel: &CancellationToken,
-) -> anyhow::Result<(CompiledSkill, String)> {
+) -> anyhow::Result<(Candidate, String)> {
     let services = engine
         .skill_services()
         .ok_or_else(|| anyhow::anyhow!("skill signing services are unavailable"))?;
@@ -108,7 +129,7 @@ fn prepare(
     )?;
     let preview = describe(engine, &candidate)?;
     Ok((
-        candidate,
+        Candidate::Local(Box::new(candidate)),
         format!(
             "Sign installation or replacement? Active names and descriptions are advertised to the configured model; full content is sent only when loaded.\n{preview}"
         ),
@@ -155,6 +176,16 @@ fn apply(engine: &Engine<'_>, state: &State) -> anyhow::Result<()> {
             .candidate
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("preview a skill first"))?;
+        if let Candidate::Catalog(preview) = candidate {
+            engine.confirm_catalog_preview(
+                preview,
+                state.downgrade_confirmed,
+                &super::case::command_registry::reserved_names(),
+                &CancellationToken::new(),
+            )?;
+            return Ok(());
+        }
+        let candidate = candidate.skill();
         let existing = engine
             .installed_skill_statuses()?
             .iter()

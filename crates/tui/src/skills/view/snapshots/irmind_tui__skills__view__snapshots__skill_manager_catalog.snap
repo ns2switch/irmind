@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/skills/view/snapshots.rs
+expression: text
+---
+Forensic skills · methodology never grants permissions
+
+┌Skill name────────────────────────────────────────────────────────────────────┐
+│community-triage                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+┌Release tag · empty means latest──────────────────────────────────────────────┐
+│v1.2.3                                                                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+
+Enter explicitly downloads a bounded package for review. Nothing installs until
+your signed confirmation.
+
+Synthetic inline error · Esc returns without applying.
+
+↑/↓ choose · Tab actions · Enter confirm · PgUp/PgDn scroll · Esc back

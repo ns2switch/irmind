@@ -3,6 +3,7 @@
 #[cfg(not(any(feature = "keystore-os", feature = "keystore-file")))]
 compile_error!("IRMind requires at least one signer and secret backend");
 
+mod catalog_source;
 mod cli;
 mod configuration;
 #[cfg(all(feature = "keystore-file", feature = "parser-json"))]

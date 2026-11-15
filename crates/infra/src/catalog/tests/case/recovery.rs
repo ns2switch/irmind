@@ -44,7 +44,12 @@ fn catalog_failed_publication_requires_explicit_recovery_against_the_current_pro
         vec![],
     )
     .unwrap()
-    .with_catalog(f.store.catalog_services());
+    .with_catalog(
+        f.store
+            .catalog_services()
+            .with_runtime_version("0.5.0")
+            .unwrap(),
+    );
     let engine = f.engine.with_skills(services).unwrap();
     let package = BoundedPackageBytes::new(include_bytes!(
         "../../../../../../docs/development/catalog-format-vectors/synthetic-triage-1.skill.json"
@@ -63,7 +68,7 @@ fn catalog_failed_publication_requires_explicit_recovery_against_the_current_pro
         .unwrap();
     assert!(
         engine
-            .confirm_catalog_preview(preview, false, &reserved, &cancel)
+            .confirm_catalog_preview(&preview, false, &reserved, &cancel)
             .is_err()
     );
     assert_eq!(f.store.global_operations().unwrap().len(), 1);
@@ -79,4 +84,46 @@ fn catalog_failed_publication_requires_explicit_recovery_against_the_current_pro
         .compile(store.read_active(&name).unwrap().unwrap())
         .unwrap();
     assert_eq!(compiled.metadata().name(), &name);
+}
+
+#[test]
+fn catalog_load_activation_and_recovery_recheck_the_running_version() {
+    let f = fixture_mode(false, true);
+    let cancel = CancellationToken::new();
+    f.store.publish(&f.index, &cancel).unwrap();
+    let agent = Arc::new(LocalSigner {
+        actor: Actor::Agent(AgentId::parse("skills-agent").unwrap()),
+        key: SigningKey::from_bytes(&[44; 32]),
+    });
+    let services = SkillServices::new(
+        Arc::new(crate::FileSkillPackageStore::new(f.root.path())),
+        Arc::new(TomlSkillCompiler),
+        agent,
+        vec![],
+    )
+    .unwrap()
+    .with_catalog(
+        f.store
+            .catalog_services()
+            .with_runtime_version("0.4.2")
+            .unwrap(),
+    );
+    let engine = f.engine.with_skills(services).unwrap();
+    assert!(!engine.installed_skill_statuses().unwrap()[0].available);
+    assert!(engine.skill_catalog_text().unwrap().is_empty());
+    let name = SkillName::parse("synthetic-triage").unwrap();
+    let store = crate::FileSkillPackageStore::new(f.root.path());
+    assert!(
+        engine
+            .restore_skill(&store, &TomlSkillCompiler, &name)
+            .is_err()
+    );
+    engine
+        .set_skill_active(&store, &TomlSkillCompiler, &name, false)
+        .unwrap();
+    assert!(
+        engine
+            .set_skill_active(&store, &TomlSkillCompiler, &name, true)
+            .is_err()
+    );
 }

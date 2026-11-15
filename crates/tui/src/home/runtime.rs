@@ -210,7 +210,7 @@ impl HomeRuntime<'_, '_, '_> {
 
     fn apply_action(&mut self, action: HomeAction) -> Result<bool> {
         match action {
-            HomeAction::Skills => return Ok(self.manage_skills()),
+            HomeAction::Skills(command) => return Ok(self.manage_skills(&command)),
             HomeAction::Parsers(command) => return Ok(self.manage_parsers(&command)),
             HomeAction::None => {}
             HomeAction::Quit => return Ok(true),
@@ -282,8 +282,15 @@ impl HomeRuntime<'_, '_, '_> {
         Ok(false)
     }
 
-    fn manage_skills(&mut self) -> bool {
-        match crate::skills::run(self.terminal, self.engine, self.shutdown, false) {
+    fn manage_skills(&mut self, command: &str) -> bool {
+        match crate::skills::run(
+            self.terminal,
+            self.engine,
+            self.io_ops,
+            self.shutdown,
+            false,
+            command,
+        ) {
             Ok(crate::skills::ManagerExit::Quit) => return true,
             Ok(crate::skills::ManagerExit::Palette) => self.state.input = "/".into(),
             Ok(crate::skills::ManagerExit::Back) => {}

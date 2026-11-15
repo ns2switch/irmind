@@ -69,6 +69,46 @@ impl crate::Engine<'_> {
             tag: tag.map(FrozenCatalogRelease::new).transpose()?,
         })
     }
+    pub fn verify_offline_catalog_index(
+        &self,
+        raw: &CatalogIndexBytes,
+        release: &FrozenCatalogRelease,
+    ) -> Result<VerifiedCatalogIndex, AppError> {
+        self.require_attended_analyst("review an offline catalog index")?;
+        self.skill_services()
+            .and_then(|s| s.catalog.as_ref())
+            .ok_or(super::CatalogError::Unavailable)?
+            .verifier
+            .verify(raw, release)
+    }
+    pub fn configured_catalog_preview(
+        &self,
+        name: &str,
+        tag: Option<&str>,
+        reserved: &BTreeSet<String>,
+        cancel: &CancellationToken,
+    ) -> Result<CatalogInstallPreview, AppError> {
+        let request = self.catalog_request(name, tag)?;
+        let catalog = self
+            .skill_services()
+            .and_then(|s| s.catalog.as_ref())
+            .ok_or(super::CatalogError::Unavailable)?;
+        let source = catalog
+            .source
+            .as_ref()
+            .ok_or(super::CatalogError::Unavailable)?;
+        let runtime = catalog
+            .runtime_version
+            .as_deref()
+            .ok_or(super::CatalogError::Unavailable)?;
+        crate::run_async(self.download_catalog_preview(
+            source.as_ref(),
+            &request,
+            runtime,
+            reserved,
+            cancel,
+        ))
+    }
     pub async fn download_catalog_preview(
         &self,
         source: &dyn SkillCatalogSource,

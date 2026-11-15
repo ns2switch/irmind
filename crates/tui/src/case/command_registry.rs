@@ -28,6 +28,7 @@ impl Command {
         match self.name {
             "approve" | "deny" | "edit" => " <id>",
             "parsers" => " [test <definition> <file>]",
+            "skills" => " [install catalog:<name>[@tag] | update <name>]",
             "settings" => " [model|connectors|keystore|preferences|limits]",
             "open" => " <case title or ID>",
             "demo" => " [check|exit]",
@@ -174,7 +175,7 @@ pub(super) fn shortcut_name(code: KeyCode, modifiers: KeyModifiers) -> Option<&'
         .map(|command| command.name)
 }
 
-pub(super) fn argument_candidates(
+pub(crate) fn argument_candidates(
     input: &str,
     approvals: &[String],
     findings: &[String],
@@ -220,6 +221,10 @@ pub(super) fn argument_candidates(
         "/add" => ["ioc", "hypothesis", "technique"]
             .iter()
             .map(|value| (*value).into())
+            .collect(),
+        "/skills" => ["install catalog:", "update "]
+            .into_iter()
+            .map(str::to_owned)
             .collect(),
         "/settings" => ["model", "connectors", "keystore", "preferences"]
             .iter()

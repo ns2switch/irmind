@@ -115,3 +115,24 @@ Conserva el ejecutable creador para los casos antiguos.
 
 Todavía no hay ninguna clave de producción del catálogo compilada. Su publicación
 y las descargas siguen pendientes; la instalación local funciona sin red.
+
+## Instalar y actualizar desde el catálogo
+
+La acción **Install/update** ofrece carpeta local, release del catálogo o catálogo
+sin conexión, con campos separados para cada valor. `/skills install catalog:<nombre>`
+abre el formulario; `@v1.2.3` preselecciona una etiqueta y dejarla vacía solicita
+explícitamente la última release. `/skills update <nombre>` revisa una sustitución.
+Siempre se muestran el paquete exacto y las diferencias antes de firmar. Un
+descenso de versión exige otra confirmación antes de la admisión firmada.
+
+No hay descargas al arrancar ni actualizaciones automáticas. Esc cancela la vista
+previa; Ctrl+K la cancela y vuelve a la paleta. Si falla, el formulario se conserva.
+
+En **Offline catalog**, indica carpeta, nombre y etiqueta exacta. La carpeta debe
+contener `index.json`, la firma binaria de 64 bytes `index.ed25519` y el paquete
+`.skill.json` indicado en el índice. Se usan las mismas claves compiladas y el
+mismo compilador, sin invocar la fuente de red. El primer índice sin conexión no
+garantiza frescura. No se permite sustituir silenciosamente una skill del núcleo.
+
+Todavía no hay claves de producción compiladas: los controles del catálogo lo
+indican antes de hacer ninguna petición. Su publicación sigue pendiente.

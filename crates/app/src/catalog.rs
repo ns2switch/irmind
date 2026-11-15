@@ -9,6 +9,8 @@ mod frames;
 mod limits;
 pub(crate) use limits::check as bounded_metadata;
 mod package;
+mod release_metadata;
+pub use release_metadata::CatalogReleaseMetadata;
 mod receipt;
 mod schema;
 mod services;

@@ -35,7 +35,7 @@ fn catalog_offline_preview_is_inert_and_admission_load_seal_export_are_complete(
     assert!(f.store.global_operations().unwrap().is_empty());
     let name = f
         .engine
-        .confirm_catalog_preview(preview, false, &reserved, &cancel)
+        .confirm_catalog_preview(&preview, false, &reserved, &cancel)
         .unwrap();
     assert_eq!(name.as_str(), "synthetic-triage");
     let status = f.engine.installed_skill_statuses().unwrap();
@@ -87,12 +87,12 @@ fn catalog_preview_rejects_cancellation_reserved_names_and_stale_admissions() {
     let first = preview();
     let stale = preview();
     f.engine
-        .confirm_catalog_preview(first, false, &reserved, &cancel)
+        .confirm_catalog_preview(&first, false, &reserved, &cancel)
         .unwrap();
     let count = f.store.global_operations().unwrap().len();
     assert!(
         f.engine
-            .confirm_catalog_preview(stale, false, &reserved, &cancel)
+            .confirm_catalog_preview(&stale, false, &reserved, &cancel)
             .is_err()
     );
     assert_eq!(f.store.global_operations().unwrap().len(), count);
@@ -100,7 +100,7 @@ fn catalog_preview_rejects_cancellation_reserved_names_and_stale_admissions() {
     cancel.cancel();
     assert!(
         f.engine
-            .confirm_catalog_preview(pending, false, &reserved, &cancel)
+            .confirm_catalog_preview(&pending, false, &reserved, &cancel)
             .is_err()
     );
     assert_eq!(f.store.global_operations().unwrap().len(), count);
@@ -202,7 +202,7 @@ fn catalog_history_rejects_equivocation_and_retains_downgrade_high_water_across_
     let newer = release("v0.2.0", 2, 'b');
     let prepared = preview(&newer, "v0.2.0").unwrap();
     f.engine
-        .confirm_catalog_preview(prepared, false, &reserved, &cancel)
+        .confirm_catalog_preview(&prepared, false, &reserved, &cancel)
         .unwrap();
     for (raw, tag) in [
         (release("v0.2.0", 2, 'c'), "v0.2.0"),
@@ -216,13 +216,13 @@ fn catalog_history_rejects_equivocation_and_retains_downgrade_high_water_across_
     assert!(prepared.downgrade_confirmation_required());
     assert!(
         f.engine
-            .confirm_catalog_preview(prepared, false, &reserved, &cancel)
+            .confirm_catalog_preview(&prepared, false, &reserved, &cancel)
             .is_err()
     );
     let prepared = preview(&older, "v0.1.0").unwrap();
     let name = f
         .engine
-        .confirm_catalog_preview(prepared, true, &reserved, &cancel)
+        .confirm_catalog_preview(&prepared, true, &reserved, &cancel)
         .unwrap();
     let services = f.engine.skill_services().unwrap();
     f.engine
@@ -282,7 +282,7 @@ fn catalog_signature_failure_and_unattended_requests_never_admit_or_publish_a_pa
         .unwrap();
     assert!(
         engine
-            .confirm_catalog_preview(preview, false, &reserved, &cancel)
+            .confirm_catalog_preview(&preview, false, &reserved, &cancel)
             .is_err()
     );
     assert!(f.store.global_operations().unwrap().is_empty());
@@ -344,4 +344,42 @@ fn catalog_misleading_latest_metadata_never_fetches_a_package_or_signs() {
     assert!(result.is_err());
     assert_eq!(source.calls.load(Ordering::SeqCst), 1);
     assert!(f.store.global_operations().unwrap().is_empty());
+}
+
+#[test]
+fn configured_catalog_source_uses_the_composed_runtime_and_remains_inert_until_confirmation() {
+    let f = fixture_mode(false, false);
+    let source = Arc::new(Source {
+        calls: AtomicUsize::new(0),
+        tag: "v0.1.0",
+    });
+    let agent = Arc::new(LocalSigner {
+        actor: Actor::Agent(AgentId::parse("skills-agent").unwrap()),
+        key: SigningKey::from_bytes(&[44; 32]),
+    });
+    let services = SkillServices::new(
+        Arc::new(crate::FileSkillPackageStore::new(f.root.path())),
+        Arc::new(TomlSkillCompiler),
+        agent,
+        vec![],
+    )
+    .unwrap()
+    .with_catalog(
+        f.store
+            .catalog_services()
+            .with_source(source.clone(), "0.5.0")
+            .unwrap(),
+    );
+    let engine = f.engine.with_skills(services).unwrap();
+    let cancel = CancellationToken::new();
+    let preview = engine
+        .configured_catalog_preview("synthetic-triage", None, &BTreeSet::new(), &cancel)
+        .unwrap();
+    assert_eq!(source.calls.load(Ordering::SeqCst), 2);
+    assert!(f.store.global_operations().unwrap().is_empty());
+    assert!(!preview.receipt().offline());
+    engine
+        .confirm_catalog_preview(&preview, false, &BTreeSet::new(), &cancel)
+        .unwrap();
+    assert!(engine.installed_skill_statuses().unwrap()[0].available);
 }
