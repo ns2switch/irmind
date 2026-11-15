@@ -1,3 +1,5 @@
+Traducción de docs/development/native-signing.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+
 # Preparar la firma nativa
 
 La firma macOS está preparada pero **desactivada**, sin prueba con certificado de

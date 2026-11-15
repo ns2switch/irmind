@@ -1,3 +1,5 @@
+Traducción de docs/development/real-validation.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+
 # Validación con servicios reales en unas dos horas
 
 Recorrido para el analista con IRMind v0.5.0 verificado, Elasticsearch local y un

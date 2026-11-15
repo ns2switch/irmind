@@ -1,3 +1,5 @@
+Traducción de docs/development/writing-a-skill.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+
 # Escribir una skill forense
 
 Una skill es metodología, no código ni evidencia. Consulta [la guía de uso](skills.md)

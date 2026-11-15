@@ -1,3 +1,5 @@
+Traducción de docs/development/hunteval-model-benchmark.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+
 # Benchmark manual de modelos con HuntEval
 
 El [arnés de desarrollo](../development/hunteval-model-benchmark.md) prepara #95;
