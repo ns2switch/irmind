@@ -14,7 +14,7 @@ pub(super) fn write(
     analyst: &[u8],
     out: &mut File,
     cancel: &CancellationToken,
-) -> Result<Vec<VerifiedCatalogIndex>, AppError> {
+) -> Result<(Vec<VerifiedCatalogIndex>, SkillReceiptVerifier), AppError> {
     let entries = store.entries(case)?;
     let mut checked = SkillReceiptVerifier::default();
     for entry in &entries {
@@ -55,7 +55,7 @@ pub(super) fn write(
         }
         super::export_current::write_frame(out, &serde_json::to_vec(&proof).map_err(storage)?)?;
     }
-    Ok(indices)
+    Ok((indices, checked))
 }
 pub(super) fn read(
     input: &mut File,

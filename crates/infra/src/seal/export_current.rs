@@ -176,11 +176,18 @@ impl LocalStore {
             super::mapping_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
         }
         self.write_artifact_frames(id, &mut out, cancel)?;
-        let catalog =
+        let (catalog, mut skills) =
             super::skill_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
         // Both V8 extension counts are mandatory, including when unused.
         super::catalog_proofs::write(&mut out, &catalog, cancel)?;
-        out.write_all(&0u64.to_be_bytes()).map_err(storage)?; // branch chunks
+        super::subagent_branches::write(
+            self,
+            id,
+            &header.seal.public_key,
+            &mut skills,
+            &mut out,
+            cancel,
+        )?;
         out.sync_all().map_err(storage)?;
         Ok(header.seal.analyst_key_fingerprint.clone())
     }

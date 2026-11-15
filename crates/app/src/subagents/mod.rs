@@ -51,3 +51,29 @@ pub struct SubagentPorts {
 
 #[cfg(test)]
 mod tests;
+
+impl crate::Engine<'_> {
+    pub(crate) fn require_no_active_subagents(
+        &self,
+        case: &crate::CaseId,
+    ) -> Result<(), crate::AppError> {
+        let entries = self.audit_log.entries(case)?;
+        if !entries.iter().any(|entry| is_subagent_kind(entry.kind)) {
+            return Ok(());
+        }
+        let mut journal = SubagentJournal::for_verification(case.clone())
+            .map_err(|_| crate::AppError::InvalidChain(0))?;
+        for entry in &entries {
+            journal.accept(entry, self.verifier.as_ref())?;
+        }
+        if journal
+            .has_open_plans()
+            .map_err(|_| crate::AppError::InvalidChain(0))?
+        {
+            return Err(crate::AppError::Policy(
+                "Subagent plan is still active; cancel or finish it before sealing".into(),
+            ));
+        }
+        Ok(())
+    }
+}

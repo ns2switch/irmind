@@ -25,6 +25,8 @@ enum Phase {
 
 pub(super) struct PlanLedger {
     pub plan: SubagentPlanV1,
+    pub seq: u64,
+    pub parent_skill: Option<crate::SkillSnapshotId>,
     entry_hash: SubagentDigest,
     phase: Phase,
     consent: Option<SubagentDigest>,
@@ -39,9 +41,16 @@ pub(super) struct PlanLedger {
     pub results: BTreeMap<SubagentDigest, SubagentResultV1>,
 }
 impl PlanLedger {
-    pub(super) fn new(plan: SubagentPlanV1, entry_hash: SubagentDigest) -> Self {
+    pub(super) fn new(
+        plan: SubagentPlanV1,
+        entry_hash: SubagentDigest,
+        seq: u64,
+        parent_skill: Option<crate::SkillSnapshotId>,
+    ) -> Self {
         Self {
             plan,
+            seq,
+            parent_skill,
             entry_hash,
             phase: Phase::Prepared,
             consent: None,

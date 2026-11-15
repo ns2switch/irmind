@@ -29,6 +29,7 @@ impl Engine<'_> {
             return Err(AppError::Sealed);
         }
         self.verify_unlocked_cancelable(id, cancel)?;
+        self.require_no_active_subagents(id)?;
         if !self
             .pending_requests_unlocked(&case, &self.audit_log.entries(id)?)?
             .is_empty()
@@ -72,6 +73,7 @@ impl Engine<'_> {
             return Err(AppError::Sealed);
         }
         self.verify_unlocked(&id)?;
+        self.require_no_active_subagents(&id)?;
         let last = self
             .audit_log
             .last_entry(&id)?

@@ -869,3 +869,165 @@ fn subagent_main_result_must_repeat_the_committed_terminal_exactly() {
             .is_err()
     );
 }
+
+struct NoTaskQueries;
+impl irmind_app::subagents::TaskEvidenceQueries for NoTaskQueries {
+    fn execute(
+        &self,
+        _: &irmind_app::subagents::VerifiedTaskQueryView,
+        _: irmind_app::subagents::TaskEvidenceQuery,
+        _: &CancellationToken,
+    ) -> Result<irmind_app::subagents::TaskEvidenceResult, AppError> {
+        Err(AppError::InvalidChain(0))
+    }
+}
+struct NoPlanInteraction;
+impl irmind_app::subagents::AnalystPlanInteraction for NoPlanInteraction {
+    fn review<'a>(
+        &'a self,
+        _: &'a irmind_app::subagents::SafePlanPreview,
+        _: &'a CancellationToken,
+    ) -> irmind_app::subagents::PortFuture<'a, irmind_app::subagents::AnalystPlanChoice> {
+        Box::pin(async { Err(AppError::InvalidChain(0)) })
+    }
+}
+fn stored_history_engine(
+    root: &std::path::Path,
+    history: &History,
+    chunks: &[irmind_app::subagents::CheckedBranchChunk],
+) -> (Arc<LocalStore>, Engine<'static>) {
+    use irmind_app::{
+        CaseMutation, SkillServices,
+        subagents::{SubagentBranchStore, SubagentPorts},
+    };
+    let store = Arc::new(LocalStore::open(root).unwrap());
+    store
+        .transact(
+            &history.entries[0],
+            CaseMutation::Create(Case {
+                id: history.case.clone(),
+                title: "Contract synthetic case".into(),
+                severity: Severity::Medium,
+                scope: "local".into(),
+                sealed: false,
+            }),
+        )
+        .unwrap();
+    store.append_batch(&history.entries[1..]).unwrap();
+    for chunk in chunks {
+        store
+            .parquet
+            .publish(
+                store
+                    .parquet
+                    .stage(&history.case, chunk, &CancellationToken::new())
+                    .unwrap(),
+            )
+            .unwrap();
+    }
+    let agent = Arc::new(LocalSigner {
+        key: SigningKey::from_bytes(&[43; 32]),
+        actor: history.agent.actor(),
+    });
+    let analyst = Arc::new(LocalSigner {
+        key: SigningKey::from_bytes(&[42; 32]),
+        actor: Actor::Analyst,
+    });
+    let services = SkillServices::new(
+        Arc::new(crate::FileSkillPackageStore::new(root)),
+        Arc::new(TomlSkillCompiler),
+        agent,
+        Vec::new(),
+    )
+    .unwrap();
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(analyst, Arc::new(history.verifier.clone())),
+            Arc::new(MandatoryGuard::new().unwrap()),
+        )
+        .with_subagents(SubagentPorts {
+            branches: Arc::new(ParquetStore::open(root).unwrap()),
+            queries: Arc::new(NoTaskQueries),
+            analyst: Arc::new(NoPlanInteraction),
+        }),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )
+    .unwrap()
+    .with_skills(services)
+    .unwrap();
+    (store, engine)
+}
+
+#[test]
+fn subagent_case_verification_seal_and_offline_v8_keep_every_committed_chunk() {
+    let (history, chunks, _, _, _) = completed_model_history();
+    let root = tempfile::tempdir().unwrap();
+    let (store, engine) = stored_history_engine(root.path(), &history, &chunks);
+    engine.verify(&history.case).unwrap();
+    engine.seal(&history.case).unwrap();
+    let output = root.path().join("branch-export.irmind");
+    CaseExporter::export_case(
+        store.as_ref(),
+        &history.case,
+        &output,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    let fingerprint = hex(&sha256(&history.analyst.public_key()));
+    verify_export_expected(&output, Some(&fingerprint)).unwrap();
+    let bytes = fs::read(&output).unwrap();
+    let chunk = chunks[1].bytes();
+    let position = bytes
+        .windows(chunk.len())
+        .position(|candidate| candidate == chunk)
+        .unwrap();
+    let mut tampered = bytes.clone();
+    tampered[position + chunk.len() / 2] ^= 1;
+    let broken = root.path().join("changed.irmind");
+    fs::write(&broken, tampered).unwrap();
+    assert!(verify_export_expected(&broken, Some(&fingerprint)).is_err());
+    let path = root
+        .path()
+        .join("parquet")
+        .join(history.case.as_str())
+        .join(format!(
+            "branches/{}.json",
+            hex(chunks[1].hash().as_bytes())
+        ));
+    fs::remove_file(path).unwrap();
+    assert!(engine.verify(&history.case).is_err());
+    let failed = root.path().join("missing.irmind");
+    assert!(
+        CaseExporter::export_case(
+            store.as_ref(),
+            &history.case,
+            &failed,
+            &CancellationToken::new()
+        )
+        .is_err()
+    );
+    assert!(!failed.exists());
+    // The completed export is independent of the local branch store.
+    verify_export_expected(&output, Some(&fingerprint)).unwrap();
+}
+
+#[test]
+fn subagent_open_plan_prevents_sealing_and_a_new_root_turn() {
+    let mut history = History::new();
+    let plan = history.plan(100_000);
+    let plan_hash = history.record(&plan, false);
+    history.record(
+        &transition(&plan, ReservationAction::HoldPreview, None, plan_hash),
+        false,
+    );
+    let root = tempfile::tempdir().unwrap();
+    let (_, engine) = stored_history_engine(root.path(), &history, &[]);
+    assert!(engine.seal(&history.case).is_err());
+    history.append(AuditEventKind::Prompt, "a second turn".into(), true);
+    assert!(history.replay().is_err());
+}
