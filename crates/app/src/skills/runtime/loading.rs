@@ -1,4 +1,4 @@
-use super::{ResolvedSkill, SkillTurn};
+use super::{PreparedSkillRead, ResolvedSkill, SkillTurn};
 use crate::{
     Actor, AppError, AuditEventKind, AuditOrigin, CaseId, Engine, ExecutionMode, SkillLoadResult,
     SkillLoadV1, SkillReadReceipt, SkillReceiptVerifier,
@@ -14,6 +14,22 @@ impl Engine<'_> {
         invocation: (uuid::Uuid, &str),
         cancel: &crate::CancellationToken,
     ) -> Result<String, AppError> {
+        let prepared = self.prepare_skill_read(id, name, resource, turn, invocation, cancel)?;
+        self.audit_skill_load(id, &prepared.receipt)?;
+        if let Some(active) = prepared.active {
+            turn.active = Some(active);
+        }
+        Ok(prepared.output)
+    }
+    pub(crate) fn prepare_skill_read(
+        &self,
+        id: &CaseId,
+        name: &SkillName,
+        resource: &str,
+        turn: &mut SkillTurn,
+        invocation: (uuid::Uuid, &str),
+        cancel: &crate::CancellationToken,
+    ) -> Result<PreparedSkillRead, AppError> {
         let (nonce, call) = invocation;
         let resolved = self.resolve_skill_cancelable(name, cancel)?;
         SkillResourcePath::parse(resource)?;
@@ -30,10 +46,15 @@ impl Engine<'_> {
             0..original.len()
         };
         let snapshot = self.pin_skill_snapshot(id, &resolved, cancel)?;
+        let mut budget = turn
+            .budget
+            .lock()
+            .map_err(|_| super::super::receipts::invalid())?;
         let mut result = SkillLoadResult::Loaded;
         let mut text = String::new();
         let mut detections = 0;
-        if turn.reads >= 8 || (!turn.packages.contains(&snapshot) && turn.packages.len() >= 4) {
+        if budget.reads >= 8 || (!budget.packages.contains(&snapshot) && budget.packages.len() >= 4)
+        {
             result = SkillLoadResult::Limit;
         } else {
             let tainted = irmind_domain::TaintedSkillResource::new(
@@ -48,7 +69,7 @@ impl Engine<'_> {
                 .map_err(|_| super::super::receipts::invalid())?;
             if detections > 0 {
                 result = SkillLoadResult::Blocked;
-            } else if turn.bytes + screened.text.len() > 64 * 1024
+            } else if budget.bytes + screened.text.len() > 64 * 1024
                 || screened.text.len() > turn.read_limit
             {
                 result = SkillLoadResult::Limit;
@@ -67,32 +88,24 @@ impl Engine<'_> {
             detections,
             result,
         })?;
-        self.audit_skill_load(id, &receipt)?;
         if matches!(result, SkillLoadResult::Loaded | SkillLoadResult::Blocked) {
-            turn.reads += 1;
-            turn.bytes += text.len();
-            turn.packages.insert(snapshot);
+            budget.reads += 1;
+            budget.bytes += text.len();
+            budget.packages.insert(snapshot);
         }
-        if result == SkillLoadResult::Loaded {
-            turn.active = Some(super::ActiveSkill {
-                name: name.clone(),
-                package: *package.hash(),
-                tools: resolved.skill.metadata().tools().clone(),
-            });
-            Ok(format!(
-                "Skill {} · version {} · package {} · resource {}\n{}",
-                name.as_str(),
-                resolved.skill.metadata().version().as_str(),
-                crate::hex(package.hash().as_bytes()),
-                resource,
-                text
-            ))
-        } else {
-            Ok(format!(
-                "Skill content unavailable: {result:?}. No methodology was exposed."
-            ))
-        }
+        let active = (result == SkillLoadResult::Loaded).then(|| super::ActiveSkill {
+            name: name.clone(),
+            package: *package.hash(),
+            tools: resolved.skill.metadata().tools().clone(),
+        });
+        let output = skill_read_output(&resolved, name, resource, &text, result);
+        Ok(PreparedSkillRead {
+            receipt,
+            output,
+            active,
+        })
     }
+
     pub(crate) fn failed_skill_result(
         &self,
         id: &CaseId,
@@ -171,5 +184,26 @@ impl Engine<'_> {
         state.accept(&entry, services.compiler.as_ref())?;
         self.audit_log.append(&entry)?;
         Ok(identity)
+    }
+}
+
+fn skill_read_output(
+    resolved: &ResolvedSkill,
+    name: &SkillName,
+    resource: &str,
+    text: &str,
+    result: SkillLoadResult,
+) -> String {
+    if result == SkillLoadResult::Loaded {
+        format!(
+            "Skill {} · version {} · package {} · resource {}\n{}",
+            name.as_str(),
+            resolved.skill.metadata().version().as_str(),
+            crate::hex(resolved.skill.package().hash().as_bytes()),
+            resource,
+            text
+        )
+    } else {
+        format!("Skill content unavailable: {result:?}. No methodology was exposed.")
     }
 }
