@@ -68,13 +68,20 @@ impl SubagentJournal {
         {
             return Err(SubagentRecordError);
         }
+        let policy_bytes = serde_json::to_vec(&SubagentPolicySnapshot::new(rules)?)
+            .map_err(|_| SubagentRecordError)?;
+        if policy_bytes
+            != serde_json::to_vec(&state.plan.policy).map_err(|_| SubagentRecordError)?
+        {
+            return Err(SubagentRecordError);
+        }
         let scope = task
             .remote_scope
             .as_deref()
             .map(CaseScope::parse)
             .transpose()
             .map_err(|_| SubagentRecordError)?
-            .unwrap_or_else(|| self.scope.clone());
+            .unwrap_or_else(|| state.case_scope.clone());
         if !scope.is_within(&self.scope)
             || rules
                 .scope
@@ -98,10 +105,7 @@ impl SubagentJournal {
                 .collect(),
             scope,
             ceiling: rules.scope.clone(),
-            policy_fingerprint: SubagentDigest::from_bytes(crate::sha256(
-                &serde_json::to_vec(&SubagentPolicySnapshot::new(rules)?)
-                    .map_err(|_| SubagentRecordError)?,
-            )),
+            policy_fingerprint: SubagentDigest::from_bytes(crate::sha256(&policy_bytes)),
         })
     }
 

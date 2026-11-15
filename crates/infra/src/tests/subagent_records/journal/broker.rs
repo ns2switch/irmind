@@ -1,4 +1,5 @@
 mod findings;
+mod scope;
 mod skills;
 mod tools;
 use super::*;

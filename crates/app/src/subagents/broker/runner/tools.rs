@@ -121,13 +121,12 @@ impl Engine<'_> {
 
     fn permit_child_read(
         &self,
-        case: &CaseId,
+        view: &crate::subagents::VerifiedTaskQueryView,
         started: &StartedSubagentPlan,
-        task: &SubagentTaskSpec,
         state: &TaskSession,
         proposal: &crate::ProposedCall,
     ) -> Result<bool, AppError> {
-        let rules = self.policy_for_case_unlocked(case)?;
+        let rules = self.policy_for_case_unlocked(view.case())?;
         if rules
             .permits(
                 &proposal.tool,
@@ -139,10 +138,10 @@ impl Engine<'_> {
             return Ok(false);
         }
         let case = crate::Case {
-            id: case.clone(),
+            id: view.case().clone(),
             title: "Delegated task".into(),
             severity: crate::Severity::Low,
-            scope: task.remote_scope.clone().unwrap_or_else(|| "local".into()),
+            scope: crate::subagents::queries::scope_text(&view.scope).map_err(|_| invalid())?,
             sealed: false,
         };
         let tainted = irmind_domain::Tainted::from_external(
@@ -190,7 +189,7 @@ impl Engine<'_> {
             tool: Tool::parse(&call.tool).map_err(|_| invalid())?,
             args: call.arguments.clone(),
         };
-        if !self.permit_child_read(case, started, task, state, &proposal)? {
+        if !self.permit_child_read(&view, started, state, &proposal)? {
             return Ok(None);
         }
         let Ok(action) = query::checked(&proposal, call, task.task_id, &view) else {

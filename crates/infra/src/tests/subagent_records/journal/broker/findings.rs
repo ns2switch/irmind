@@ -18,9 +18,7 @@ fn source(
     }
     .ingest_local(case, root, name, false, &CancellationToken::new())
     .unwrap();
-    let hash = EvidenceHash::from_bytes(sha256(bytes));
-    store.put_evidence(case, hash.as_str(), bytes).unwrap();
-    hash
+    EvidenceHash::from_bytes(sha256(bytes))
 }
 struct FindingModel {
     hash: String,

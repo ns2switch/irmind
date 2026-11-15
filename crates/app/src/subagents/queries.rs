@@ -3,6 +3,15 @@ use crate::{AppError, CancellationToken, CaseId, CaseScope, GraphQueryFilter, Ti
 use irmind_domain::{EvidenceHash, SourceRecordV1, Tainted};
 use std::collections::BTreeSet;
 
+pub(super) fn scope_text(scope: &CaseScope) -> Result<String, super::SubagentRecordError> {
+    match scope {
+        CaseScope::LocalOnly => Ok("local".into()),
+        CaseScope::Remote { .. } => scope
+            .to_current_string()
+            .map_err(|_| super::SubagentRecordError),
+    }
+}
+
 /// A broker-created frozen query generation, never a model argument.
 /// It does not authorize a tool dispatch, remote read, approval or source root.
 pub struct VerifiedTaskQueryView {

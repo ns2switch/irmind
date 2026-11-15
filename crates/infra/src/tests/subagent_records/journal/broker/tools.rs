@@ -23,10 +23,10 @@ impl TaskEvidenceQueries for Queries {
         ))
     }
 }
-struct ToolModel {
-    requests: std::sync::Mutex<Vec<CompletionRequest>>,
-    repeat: bool,
-    tool: Tool,
+pub(super) struct ToolModel {
+    pub(super) requests: std::sync::Mutex<Vec<CompletionRequest>>,
+    pub(super) repeat: bool,
+    pub(super) tool: Tool,
 }
 #[async_trait]
 impl LlmPort for ToolModel {
@@ -72,7 +72,10 @@ impl LlmPort for ToolModel {
         ))
     }
 }
-fn start(engine: &Engine<'_>, history: &History) -> irmind_app::subagents::StartedSubagentPlan {
+pub(super) fn start(
+    engine: &Engine<'_>,
+    history: &History,
+) -> irmind_app::subagents::StartedSubagentPlan {
     let prepared = engine
         .prepare_subagent_plan(
             &history.case,
@@ -88,7 +91,7 @@ fn start(engine: &Engine<'_>, history: &History) -> irmind_app::subagents::Start
         .unwrap()
         .unwrap()
 }
-fn verify_and_export(
+pub(super) fn verify_and_export(
     store: &LocalStore,
     engine: &Engine<'_>,
     history: &History,
