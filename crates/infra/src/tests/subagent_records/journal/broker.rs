@@ -1,3 +1,4 @@
+mod tools;
 use super::*;
 use irmind_app::subagents::{SubagentResources, SubagentTaskProposal};
 
@@ -242,7 +243,16 @@ fn one_child_reserves_before_model_dispatch_records_branches_and_exports_offline
     assert_eq!(result.usage.rounds, 1);
     let requests = model.requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
-    assert!(requests[0].tools.is_empty());
+    assert!(
+        requests[0]
+            .tools
+            .iter()
+            .any(|tool| tool.name == "entity_lookup")
+    );
+    assert!(!requests[0].tools.iter().any(|tool| matches!(
+        tool.name,
+        "delegate_task" | "ti_lookup_external" | "case_add_finding"
+    )));
     let user = &requests[0].messages[1];
     assert_eq!(user.role, irmind_app::MessageRole::User);
     assert!(user.content.contains("<UNTRUSTED_"));
