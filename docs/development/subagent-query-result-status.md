@@ -1,6 +1,6 @@
 # Typed completeness of delegated evidence queries
 
-Proposed additive refinement of the
+Approved additive refinement of the
 [subagent query contract](subagents-format-contract.md).
 [Español](../es/subagent-query-result-status.md).
 
