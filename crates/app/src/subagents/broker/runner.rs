@@ -79,24 +79,29 @@ impl Engine<'_> {
         self.require_attended_analyst("run subagent task")?;
         let case = CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
         let task = started.task(task_id)?;
-        let objective = self.guard.screen(&task.objective)?;
-        if !objective.detections.is_empty() {
-            return Err(invalid());
-        }
-        let mut state = TaskSession::new(started, task, &objective.text)?;
-        if !self
-            .initialize_child_method(started, task, &mut state, cancel)
+        let Some(mut state) = self
+            .initialize_parallel_child(started, task, cancel)
             .await?
-        {
-            return self.finish_child_session(
-                &case,
+        else {
+            return self.reconcile_subagent_task(
                 started,
-                task,
-                &mut state,
+                task.task_id,
                 crate::subagents::SubagentStatus::Partial,
             );
-        }
+        };
         loop {
+            if state.pending.is_some() {
+                if !self
+                    .poll_child_approval(started, task, &mut state, cancel)
+                    .await?
+                {
+                    return self.stop_child_session(&case, started, task, &mut state, cancel);
+                }
+                if state.pending.is_some() {
+                    tokio::select! {biased;()=cancel.cancelled()=>{},()=tokio::time::sleep(std::time::Duration::from_millis(100))=>{}}
+                    continue;
+                }
+            }
             if state.round >= task.budget.rounds
                 || cancel.is_cancelled()
                 || self.clock.now()? >= task.deadline_at
@@ -111,12 +116,10 @@ impl Engine<'_> {
                     .insert("The task limit was reached; completed work is retained.".into());
                 return self.finish_child_session(&case, started, task, &mut state, status);
             }
-            let Some(step) =
-                self.reserve_child_model(&case, started, task, model, &mut state, cancel)?
+            let Some(progress) = self
+                .single_child_step(&case, started, task, &mut state, model, cancel)
+                .await?
             else {
-                state
-                    .coverage
-                    .insert("Insufficient task tokens remain for another model request.".into());
                 return self.finish_child_session(
                     &case,
                     started,
@@ -125,15 +128,6 @@ impl Engine<'_> {
                     crate::subagents::SubagentStatus::Partial,
                 );
             };
-            let response = step
-                .complete(
-                    model,
-                    task.deadline_at.saturating_sub(self.clock.now()?).min(600),
-                    cancel,
-                )
-                .await;
-            let progress =
-                self.finish_child_model(&case, started, task, &step, &mut state, response)?;
             match progress {
                 ChildProgress::Done(result) => return Ok(*result),
                 ChildProgress::Tools(calls) => {
@@ -154,6 +148,56 @@ impl Engine<'_> {
         }
     }
 
+    fn stop_child_session(
+        &self,
+        case: &CaseId,
+        started: &StartedSubagentPlan,
+        task: &SubagentTaskSpec,
+        state: &mut TaskSession,
+        cancel: &CancellationToken,
+    ) -> Result<SubagentResultV1, AppError> {
+        self.finish_child_session(
+            case,
+            started,
+            task,
+            state,
+            if cancel.is_cancelled() {
+                crate::subagents::SubagentStatus::Cancelled
+            } else {
+                crate::subagents::SubagentStatus::Partial
+            },
+        )
+    }
+
+    async fn single_child_step(
+        &self,
+        case: &CaseId,
+        started: &StartedSubagentPlan,
+        task: &SubagentTaskSpec,
+        state: &mut TaskSession,
+        model: &dyn LlmPort,
+        cancel: &CancellationToken,
+    ) -> Result<Option<ChildProgress>, AppError> {
+        let Some(step) = self.reserve_child_model(case, started, task, model, state, cancel)?
+        else {
+            if state.seq <= 4093 {
+                state
+                    .coverage
+                    .insert("Insufficient task tokens remain for another model request.".into());
+            }
+            return Ok(None);
+        };
+        let response = step
+            .complete(
+                model,
+                task.deadline_at.saturating_sub(self.clock.now()?).min(600),
+                cancel,
+            )
+            .await;
+        self.finish_child_model(case, started, task, &step, state, response)
+            .map(Some)
+    }
+
     fn finish_child_session(
         &self,
         case: &CaseId,
@@ -164,6 +208,7 @@ impl Engine<'_> {
     ) -> Result<SubagentResultV1, AppError> {
         let _lock = self.repo.lock_case(case)?;
         let mut batch = AgentBatch::new(self, case, self.verifier.as_ref())?;
+        state.pending_approvals = self.task_pending_ids_unlocked(case, task.task_id)?;
         let terminal = state.terminal(status);
         let entry = self.child_entry(
             started,

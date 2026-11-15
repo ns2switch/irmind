@@ -39,23 +39,23 @@ impl std::fmt::Debug for ApprovalRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-struct PendingEvent {
-    version: u8,
-    id: String,
-    mode: String,
-    decision_seq: u64,
-    tool: String,
-    args: BTreeMap<String, String>,
-    challenge: String,
+pub(crate) struct PendingEvent {
+    pub(crate) version: u8,
+    pub(crate) id: String,
+    pub(crate) mode: String,
+    pub(crate) decision_seq: u64,
+    pub(crate) tool: String,
+    pub(crate) args: BTreeMap<String, String>,
+    pub(crate) challenge: String,
 }
 
 #[derive(Serialize, Deserialize)]
-struct ApprovalEvent {
-    version: u8,
-    id: String,
-    signature: String,
-    reason: Option<String>,
-    executed: bool,
+pub(crate) struct ApprovalEvent {
+    pub(crate) version: u8,
+    pub(crate) id: String,
+    pub(crate) signature: String,
+    pub(crate) reason: Option<String>,
+    pub(crate) executed: bool,
 }
 
 struct AnalystVerifierAdapter<'a>(&'a dyn Verifier);
@@ -72,3 +72,4 @@ mod request;
 mod resolution;
 mod scope;
 mod source;
+mod task;

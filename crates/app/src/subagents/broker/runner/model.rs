@@ -18,6 +18,10 @@ impl Engine<'_> {
         state: &mut TaskSession,
         cancel: &CancellationToken,
     ) -> Result<Option<ModelStep>, AppError> {
+        if state.seq > 4093 {
+            state.coverage.insert("The 4096-entry task branch limit was reached; no further model request was sent and terminal capacity is retained.".into());
+            return Ok(None);
+        }
         let _lock = self.repo.lock_case(case)?;
         let mut batch = AgentBatch::new(self, case, self.verifier.as_ref())?;
         let view = batch

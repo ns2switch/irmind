@@ -42,6 +42,9 @@ impl Engine<'_> {
             .ok_or(AppError::Fixed(
                 crate::FixedAppError::PolicyPendingApprovalNotFound,
             ))?;
+        if let Some(task) = self.task_pending_binding_unlocked(id, &request)? {
+            return self.edit_live_task_approval_unlocked(id, &case, &request, task, new_args);
+        }
         self.require_root_approval_unlocked(id, &request)?;
         let proposal = ProposedCall {
             tool: request.tool.clone(),
@@ -151,7 +154,7 @@ impl Engine<'_> {
         self.record_request_resolution_unlocked(id, &case, &request, denial)
     }
 
-    fn record_request_resolution_unlocked(
+    pub(super) fn record_request_resolution_unlocked(
         &self,
         id: &CaseId,
         case: &Case,
@@ -274,15 +277,21 @@ impl Engine<'_> {
             .ok_or(AppError::Fixed(
                 crate::FixedAppError::PolicyPendingApprovalNotFound,
             ))?;
-        if self.task_pending_binding_unlocked(id, &request)?.is_none() {
+        let Some(task) = self.task_pending_binding_unlocked(id, &request)? else {
             return Ok(false);
-        }
+        };
         if self
             .record_request_resolution_unlocked(id, &case, &request, Some(reason))?
             .is_some()
         {
             return Err(AppError::InvalidChain(request.decision_seq));
         }
+        self.deliver_task_approval(
+            id,
+            request_id,
+            task,
+            crate::subagents::runtime::approvals::TaskApprovalDecision::Denied,
+        )?;
         Ok(true)
     }
 
@@ -303,6 +312,15 @@ impl Engine<'_> {
                 .await?
             {
                 return Ok("Subagent request denied and recorded; no tool was executed".into());
+            }
+        } else {
+            let case = id.clone();
+            let request = request_id.to_owned();
+            if let Some(message) = self
+                .blocking_local(move |local| local.grant_live_task_approval(&case, &request))
+                .await?
+            {
+                return Ok(message);
             }
         }
         let id_owned = id.clone();

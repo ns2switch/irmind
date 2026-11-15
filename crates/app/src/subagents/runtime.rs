@@ -5,17 +5,20 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
 };
+pub(crate) mod approvals;
 
 type TaskKey = (String, SubagentDigest);
 pub(crate) struct SubagentRuntime {
     pub(super) session: uuid::Uuid,
     tasks: Mutex<BTreeMap<TaskKey, LiveTask>>,
+    approvals: Mutex<BTreeMap<(String, String), approvals::LiveApproval>>,
 }
 impl Default for SubagentRuntime {
     fn default() -> Self {
         Self {
             session: uuid::Uuid::new_v4(),
             tasks: Mutex::default(),
+            approvals: Mutex::default(),
         }
     }
 }

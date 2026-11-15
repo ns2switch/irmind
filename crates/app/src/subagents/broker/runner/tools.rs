@@ -7,8 +7,10 @@ use crate::subagents::{
 };
 use crate::{AppError, CancellationToken, CaseId, Engine, GraphQueryFilter, Tool};
 
+pub(super) mod approvals;
 mod completion;
 mod finding;
+pub(super) mod indicators;
 mod query;
 mod worker;
 
@@ -65,6 +67,10 @@ impl Engine<'_> {
                 tools.contains(spec.name)
                     && (query::supported(spec.name)
                         || matches!(spec.name, "skill_read" | "case_add_finding"))
+                    || tools.contains(spec.name)
+                        && spec.name == "ti_lookup_external"
+                        && task.remote_scope.is_some()
+                        && !state.observed.is_empty()
             })
             .collect())
     }
@@ -77,7 +83,12 @@ impl Engine<'_> {
         calls: Vec<BranchToolCall>,
         cancel: &CancellationToken,
     ) -> Result<bool, AppError> {
-        for call in calls {
+        state.queued.extend(calls);
+        while let Some(call) = state.queued.pop_front() {
+            if state.seq > 4092 {
+                state.coverage.insert("The 4096-entry task branch limit was reached; terminal capacity is retained and no further tool was executed.".into());
+                return Ok(false);
+            }
             if cancel.is_cancelled()
                 || self.clock.now()? >= task.deadline_at
                 || state.usage.calls >= task.budget.calls
@@ -88,6 +99,13 @@ impl Engine<'_> {
                 return Ok(false);
             }
             let case = CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
+            if call.tool == Tool::ThreatIntelExternal.as_str() {
+                if self.queue_child_approval(started, task, state, &call, cancel)? {
+                    return Ok(true);
+                }
+                state.coverage.insert("The external lookup was not authorized for this task or its observed evidence.".into());
+                return Ok(false);
+            }
             let Some(ticket) =
                 self.reserve_child_read(&case, started, task, state, &call, cancel)?
             else {

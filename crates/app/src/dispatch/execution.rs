@@ -215,7 +215,7 @@ impl Engine<'_> {
         stored
     }
 
-    async fn run_authorized_tool(
+    pub(crate) async fn run_authorized_tool(
         &self,
         call: &AuthorizedCall,
         local_tool: bool,

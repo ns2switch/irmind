@@ -5,6 +5,51 @@ use super::{
 use crate::subagents::{SubagentPlanContext, SubagentPolicySnapshot};
 
 impl SubagentJournal {
+    pub(crate) fn pending_task_scope(
+        &self,
+        task_id: SubagentDigest,
+        tool: &crate::Tool,
+        rules: &irmind_domain::PolicyRules,
+        now: u64,
+    ) -> Result<String, SubagentRecordError> {
+        let state = self
+            .plans
+            .values()
+            .find(|state| state.plan.tasks.iter().any(|task| task.task_id == task_id))
+            .ok_or(SubagentRecordError)?;
+        let task = state
+            .plan
+            .tasks
+            .iter()
+            .find(|task| task.task_id == task_id)
+            .ok_or(SubagentRecordError)?;
+        let scope = task.remote_scope.as_ref().ok_or(SubagentRecordError)?;
+        let narrowed = CaseScope::parse(scope).map_err(|_| SubagentRecordError)?;
+        if matches!(narrowed, CaseScope::LocalOnly)
+            || self.failed
+            || !state.is_open()
+            || state.is_preview()
+            || state.results.contains_key(&task_id)
+            || now >= task.deadline_at
+            || !narrowed.is_within(&self.scope)
+            || rules
+                .scope
+                .as_ref()
+                .is_some_and(|ceiling| !narrowed.is_within(ceiling))
+            || serde_json::to_vec(&SubagentPolicySnapshot::new(rules)?)
+                .map_err(|_| SubagentRecordError)?
+                != serde_json::to_vec(&state.plan.policy).map_err(|_| SubagentRecordError)?
+            || !self
+                .types
+                .get(&task.type_snapshot_sha256)
+                .ok_or(SubagentRecordError)?
+                .definition()
+                .permits_tool(tool)
+        {
+            return Err(SubagentRecordError);
+        }
+        Ok(scope.clone())
+    }
     pub(in crate::subagents) fn check_task_pending_owner(
         &self,
         checkpoint: &crate::subagents::SubagentCheckpointV1,

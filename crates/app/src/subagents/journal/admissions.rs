@@ -36,11 +36,7 @@ impl SubagentJournal {
             .ok_or(SubagentRecordError)?;
         let dispatched = self.accounting.get(&decision).ok_or(SubagentRecordError)?;
         let original = dispatched.attribution.as_ref().ok_or(SubagentRecordError)?;
-        if original.canonical()? != attribution.canonical()?
-            || dispatched.seq >= entry.seq
-            || !self.sources.contains(&source)
-            || !self.indexed_sources.contains(&source)
-        {
+        if original.canonical()? != attribution.canonical()? || dispatched.seq >= entry.seq {
             return Err(SubagentRecordError);
         }
         let effects = self
@@ -89,6 +85,13 @@ impl SubagentJournal {
         if task.remote_scope.is_none() || entry.at > task.deadline_at {
             return Err(SubagentRecordError);
         }
+        if checkpoint
+            .admitted_sources
+            .iter()
+            .any(|hash| !self.sources.contains(hash) || !self.indexed_sources.contains(hash))
+        {
+            return Err(SubagentRecordError);
+        }
         let effects = checkpoint
             .admitted_sources
             .iter()
@@ -116,7 +119,7 @@ impl SubagentJournal {
     }
 }
 
-fn remote(name: &str) -> bool {
+pub(super) fn remote(name: &str) -> bool {
     matches!(
         Tool::parse(name),
         Ok(Tool::SiemSearch

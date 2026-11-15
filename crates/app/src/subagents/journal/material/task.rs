@@ -16,6 +16,7 @@ pub(super) struct TaskMaterial<'a> {
     task: &'a SubagentTaskSpec,
     cursor: SubagentBranchCursor,
     sources: BTreeSet<SubagentDigest>,
+    observed_originals: BTreeSet<crate::subagents::SubagentSourceRef>,
     requests: BTreeMap<String, SubagentDigest>,
     replies: BTreeSet<String>,
     proposals: BTreeMap<SubagentDigest, (u64, BranchToolProposal)>,
@@ -76,6 +77,7 @@ impl<'a> TaskMaterial<'a> {
                 &task.nonce,
             )?,
             sources: sources.iter().copied().collect(),
+            observed_originals: BTreeSet::new(),
             requests: BTreeMap::new(),
             replies: BTreeSet::new(),
             proposals: BTreeMap::new(),
@@ -169,7 +171,7 @@ impl<'a> TaskMaterial<'a> {
                 SubagentBranchPayload::BudgetNotice(value) => {
                     self.partial |= value.partial;
                 }
-                SubagentBranchPayload::Terminal(value) => self.terminal(value)?,
+                SubagentBranchPayload::Terminal(value) => self.terminal(value, sequence)?,
             }
         }
         if admitted.len() != checkpoint.admitted_sources.len() {
@@ -209,7 +211,13 @@ impl<'a> TaskMaterial<'a> {
         }
         let rules = self.plan.plan.policy.rules()?;
         self.require_method_allow(value, &rules)?;
-        self.require_policy_allow(value, &rules, &accounted.scope)?;
+        self.require_policy_allow(
+            value,
+            &rules,
+            &accounted.scope,
+            proposal_sequence,
+            accounted.seq,
+        )?;
         self.require_tool_reservation(attr.reservation_sha256, proposal_sequence, accounted.seq)?;
         let sources = self
             .sources
@@ -363,7 +371,25 @@ impl<'a> TaskMaterial<'a> {
         {
             return Err(SubagentRecordError);
         }
-        self.require_policy_allow(proposal, &rules, &accounted.scope)?;
+        self.require_policy_allow(
+            proposal,
+            &rules,
+            &accounted.scope,
+            *proposal_sequence,
+            accounted.seq,
+        )?;
+        if proposal.tool == Tool::ThreatIntelExternal.as_str()
+            && (proposal
+                .source
+                .is_none_or(|source| !self.observed_originals.contains(&source))
+                || !proposal.tainted
+                || proposal.guarded_excerpt.is_empty())
+        {
+            return Err(SubagentRecordError);
+        }
+        if let Some(reference) = original_reference(proposal, value)? {
+            self.observed_originals.insert(reference);
+        }
         if proposal.tool == Tool::CaseAddFinding.as_str()
             && !value.partial
             && !self.journal.findings.contains_key(&value.proposal_sha256)
@@ -412,7 +438,13 @@ impl<'a> TaskMaterial<'a> {
             .types
             .get(&self.task.type_snapshot_sha256)
             .ok_or(SubagentRecordError)?;
-        if tool.risk() != irmind_domain::RiskLevel::Read
+        let remote_scope = self
+            .task
+            .remote_scope
+            .as_deref()
+            .and_then(|scope| crate::CaseScope::parse(scope).ok())
+            .is_some_and(|scope| !matches!(scope, crate::CaseScope::LocalOnly));
+        if super::super::admissions::remote(&proposal.tool) && !remote_scope
             || !kind.definition().permits_tool(&tool)
             || tool != Tool::SkillRead
                 && self
@@ -439,6 +471,8 @@ impl<'a> TaskMaterial<'a> {
         proposal: &BranchToolProposal,
         rules: &irmind_domain::PolicyRules,
         effect_scope: &crate::CaseScope,
+        proposal_seq: u64,
+        dispatch_seq: u64,
     ) -> Result<(), SubagentRecordError> {
         let case = irmind_domain::Case {
             id: self.journal.case.clone(),
@@ -473,17 +507,30 @@ impl<'a> TaskMaterial<'a> {
                 usize::try_from(completed).map_err(|_| SubagentRecordError)?,
             )
             .map_err(|_| SubagentRecordError)?;
-        if !matches!(
-            irmind_domain::evaluate_with_rules(
-                &case,
-                call,
-                1,
-                irmind_domain::ExecutionMode::Attended,
-                0,
-                rules
-            ),
-            irmind_domain::Decision::Allow(_)
-        ) {
+        let decision = irmind_domain::evaluate_with_rules(
+            &case,
+            call,
+            1,
+            irmind_domain::ExecutionMode::Attended,
+            0,
+            rules,
+        );
+        let permitted = match decision {
+            irmind_domain::Decision::Allow(_) => true,
+            irmind_domain::Decision::NeedsApproval(_) => {
+                self.journal.task_approvals.values().any(|receipt| {
+                    receipt.task == self.task.task_id
+                        && receipt.checkpoint_seq == proposal_seq
+                        && receipt.request.tool.as_str() == proposal.tool
+                        && receipt.request.args == proposal.arguments
+                        && receipt
+                            .decision
+                            .is_some_and(|(granted, sequence)| granted && sequence < dispatch_seq)
+                })
+            }
+            irmind_domain::Decision::Deny(_) => false,
+        };
+        if !permitted {
             return Err(SubagentRecordError);
         }
         for field in [
@@ -502,8 +549,24 @@ impl<'a> TaskMaterial<'a> {
         }
         Ok(())
     }
-    fn terminal(&mut self, value: &BranchTerminal) -> Result<(), SubagentRecordError> {
+    fn terminal(
+        &mut self,
+        value: &BranchTerminal,
+        sequence: u64,
+    ) -> Result<(), SubagentRecordError> {
+        let pending = self
+            .journal
+            .task_approvals
+            .iter()
+            .filter(|(_, receipt)| {
+                receipt.task == self.task.task_id
+                    && receipt.request.decision_seq < sequence
+                    && receipt.decision.is_none_or(|(_, at)| at > sequence)
+            })
+            .map(|(id, _)| *id)
+            .collect::<Vec<_>>();
         if self.terminal.is_some()
+            || pending != value.pending_approvals
             || (value.status == crate::subagents::SubagentStatus::Completed
                 && (self.requests.len() != self.replies.len() || self.partial))
             || !self.usage.within(value.usage)
@@ -533,4 +596,29 @@ impl<'a> TaskMaterial<'a> {
         }
         Ok(())
     }
+}
+
+fn original_reference(
+    proposal: &BranchToolProposal,
+    value: &BranchToolResult,
+) -> Result<Option<crate::subagents::SubagentSourceRef>, SubagentRecordError> {
+    if proposal.tool != Tool::RawRecords.as_str()
+        || proposal
+            .arguments
+            .get("view")
+            .is_none_or(|view| view != "original")
+    {
+        return Ok(None);
+    }
+    let hash = SubagentDigest::parse(proposal.arguments.get("hash").ok_or(SubagentRecordError)?)?;
+    let index = proposal
+        .arguments
+        .get("index")
+        .and_then(|index| index.parse::<u64>().ok())
+        .ok_or(SubagentRecordError)?;
+    let reference = crate::subagents::SubagentSourceRef { hash, index };
+    if !value.sources.is_empty() && value.sources.as_slice() != [reference] {
+        return Err(SubagentRecordError);
+    }
+    Ok(value.sources.first().copied())
 }

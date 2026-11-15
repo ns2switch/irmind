@@ -50,6 +50,12 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return Ok(false);
         }
         if self.active.is_some() {
+            if self
+                .subagents
+                .approval_command(&prompt, self.engine, self.id, &mut self.state)
+            {
+                return Ok(false);
+            }
             let message = if self
                 .state
                 .demo_guide

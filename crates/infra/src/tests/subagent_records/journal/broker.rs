@@ -1,6 +1,7 @@
 mod admissions;
 mod events;
 mod findings;
+mod live_approvals;
 mod parallel;
 mod pending;
 mod recovery;

@@ -9,7 +9,12 @@ pub(super) fn main(
     engine: &Engine<'_>,
     entry: &SignedEntry,
 ) -> Result<Option<EngineEvent>, AppError> {
-    if entry.kind == AuditEventKind::NeedsApproval {
+    if matches!(
+        entry.kind,
+        AuditEventKind::NeedsApproval
+            | AuditEventKind::ApprovalGranted
+            | AuditEventKind::ApprovalDenied
+    ) {
         return approval(engine, entry);
     }
     let (kind, text, task, turn, usage) = match entry.kind {
@@ -78,6 +83,21 @@ pub(super) fn main(
         }
         _ => return Ok(None),
     };
+    main_event(engine, entry, (kind, text, task, turn, usage))
+}
+
+type MainFields = (
+    EngineEventKind,
+    String,
+    Option<crate::subagents::SubagentDigest>,
+    Option<String>,
+    Option<crate::subagents::SubagentResources>,
+);
+fn main_event(
+    engine: &Engine<'_>,
+    entry: &SignedEntry,
+    (kind, text, task, turn, usage): MainFields,
+) -> Result<Option<EngineEvent>, AppError> {
     let mut event = build(engine, entry, 64, kind, &text)?;
     event.task_id = task;
     if matches!(
@@ -93,16 +113,48 @@ pub(super) fn main(
 
 fn approval(engine: &Engine<'_>, entry: &SignedEntry) -> Result<Option<EngineEvent>, AppError> {
     let case = crate::CaseId::parse(&entry.case_id).map_err(|_| invalid())?;
-    let request = engine.historical_pending_request_unlocked(&case, entry)?;
+    let request_entry = if entry.kind == AuditEventKind::NeedsApproval {
+        entry.clone()
+    } else {
+        let event: crate::approvals::ApprovalEvent =
+            serde_json::from_str(&entry.payload).map_err(|_| invalid())?;
+        let Some(original) = engine
+            .audit_log
+            .entries(&case)?
+            .into_iter()
+            .find(|candidate| {
+                candidate.kind == AuditEventKind::NeedsApproval
+                    && candidate.seq < entry.seq
+                    && serde_json::from_str::<crate::approvals::PendingEvent>(&candidate.payload)
+                        .is_ok_and(|pending| pending.id == event.id)
+            })
+        else {
+            return Ok(None);
+        };
+        original
+    };
+    let request = engine.historical_pending_request_unlocked(&case, &request_entry)?;
     let Some(task) = engine.task_pending_binding_unlocked(&case, &request)? else {
         return Ok(None);
     };
-    let text = format!(
-        "Analyst approval required: {} · request {} · arguments {}",
-        request.tool.as_str(),
-        request.id,
-        serde_json::to_string(&request.args).map_err(|_| invalid())?,
-    );
+    let text = if entry.kind == AuditEventKind::NeedsApproval {
+        format!(
+            "Analyst approval required: {} · request {} · arguments {}",
+            request.tool.as_str(),
+            request.id,
+            serde_json::to_string(&request.args).map_err(|_| invalid())?,
+        )
+    } else {
+        format!(
+            "Analyst {} subagent request {}",
+            if entry.kind == AuditEventKind::ApprovalGranted {
+                "approved"
+            } else {
+                "denied"
+            },
+            request.id
+        )
+    };
     let mut event = build(engine, entry, 64, EngineEventKind::Approval, &text)?;
     event.task_id = Some(task);
     Ok(Some(event))

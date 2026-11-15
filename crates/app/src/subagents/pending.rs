@@ -60,6 +60,15 @@ impl Engine<'_> {
         case: &CaseId,
         request: &ApprovalRequest,
     ) -> Result<Option<SubagentDigest>, AppError> {
+        self.task_pending_proposal_unlocked(case, request)
+            .map(|binding| binding.map(|(task, _)| task))
+    }
+
+    pub(crate) fn task_pending_proposal_unlocked(
+        &self,
+        case: &CaseId,
+        request: &ApprovalRequest,
+    ) -> Result<Option<(SubagentDigest, super::BranchToolProposal)>, AppError> {
         let invalid = || AppError::InvalidChain(request.decision_seq);
         let entries = self.audit_log.entries(case)?;
         let index = entries
@@ -135,6 +144,6 @@ impl Engine<'_> {
         {
             return Err(invalid());
         }
-        Ok(Some(checkpoint.task_id))
+        Ok(Some((checkpoint.task_id, proposal.clone())))
     }
 }

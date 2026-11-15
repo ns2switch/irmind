@@ -39,8 +39,19 @@ impl Engine<'_> {
             .collect::<Result<Vec<_>, _>>()?;
         let mut runs = self.initialize_parallel_plan(started, controls).await?;
         loop {
+            self.poll_parallel_approvals(&case, started, &mut runs)
+                .await?;
             let pending = self.prepare_parallel_wave(&case, started, model, &mut runs)?;
             if pending.is_empty() {
+                if runs
+                    .states
+                    .iter()
+                    .flatten()
+                    .any(|state| state.pending.is_some())
+                {
+                    tokio::select! {biased;()=cancel.cancelled()=>{},()=tokio::time::sleep(std::time::Duration::from_millis(100))=>{}}
+                    continue;
+                }
                 break;
             }
             let responses = stream::iter(pending.iter().map(|(index, step)| async {
@@ -82,6 +93,49 @@ impl Engine<'_> {
             .into_iter()
             .map(|result| result.ok_or_else(invalid))
             .collect()
+    }
+
+    async fn poll_parallel_approvals(
+        &self,
+        case: &CaseId,
+        started: &StartedSubagentPlan,
+        runs: &mut PlanSessions,
+    ) -> Result<(), AppError> {
+        for index in 0..runs.states.len() {
+            let Some(state) = &mut runs.states[index] else {
+                continue;
+            };
+            if state.pending.is_none() {
+                continue;
+            }
+            let task = &started.plan.tasks[index];
+            let cancel = &runs.controls[index].token;
+            let result = match self.poll_child_approval(started, task, state, cancel).await {
+                Ok(true) => continue,
+                Ok(false) => self.finish_child_session(
+                    case,
+                    started,
+                    task,
+                    state,
+                    if cancel.is_cancelled() {
+                        SubagentStatus::Cancelled
+                    } else {
+                        SubagentStatus::Partial
+                    },
+                )?,
+                Err(_) => self.reconcile_subagent_task(
+                    started,
+                    task.task_id,
+                    if cancel.is_cancelled() {
+                        SubagentStatus::Cancelled
+                    } else {
+                        SubagentStatus::Error
+                    },
+                )?,
+            };
+            runs.complete(index, Some(result));
+        }
+        Ok(())
     }
 
     async fn initialize_parallel_plan(
@@ -134,6 +188,9 @@ impl Engine<'_> {
             let Some(state) = &mut runs.states[index] else {
                 continue;
             };
+            if state.pending.is_some() {
+                continue;
+            }
             let task = &started.plan.tasks[index];
             let signal = &runs.controls[index].token;
             let result = match self.prepare_parallel_step(case, started, task, model, state, signal)
@@ -188,7 +245,7 @@ impl Engine<'_> {
         }
     }
 
-    async fn initialize_parallel_child(
+    pub(super) async fn initialize_parallel_child(
         &self,
         started: &StartedSubagentPlan,
         task: &SubagentTaskSpec,
