@@ -72,13 +72,27 @@ explicit review and reinstallation. Keep the creating executable for older cases
 
 No production catalog key is compiled yet. Catalog downloads and publication
 remain unavailable; local package installation continues to work without a network.
+The catalog controls report this explicitly before making a request.
+
+With compiled publisher keys, `/skills install catalog:<name>` opens the catalog
+form; append `@v1.2.3` to preselect a frozen tag or leave it empty for an explicit
+latest-release lookup. `/skills update <name>` reviews a replacement. There are
+no startup downloads or automatic updates. Esc cancels a preview; Ctrl+K cancels
+it and returns to the palette. A failed admission preserves the form.
+
+For offline catalog admission, choose **Offline catalog** and enter the downloaded
+folder, skill name and exact release tag. Keep `index.json`, the raw 64-byte
+`index.ed25519` signature and the named `.skill.json` asset together. This uses
+the same compiled keys, package compiler and signed admission without calling a
+network source. The first offline index provides no freshness guarantee. Installed
+packages cannot replace a bundled method with the same name.
 
 ## Manage local packages
 
 Use `/skills` from the home screen or a case. Choose a method with the arrows. Tab selects an action; Enter opens it. Typing an option number followed by Enter also works.
 
 1. **Inspect** shows the version, package hash, declared tools and resources.
-2. **Install/update** opens a folder field. Select a local folder with `SKILL.md`, inspect the exact preview and sign the installation or replacement.
+2. **Install/update** offers a local folder, a catalog release or an offline catalog. All values have separate form fields. Select a local folder with `SKILL.md`, or explicitly choose a catalog package, inspect the exact content and differences, and sign the admission. A catalog downgrade requires a separate confirmation before signing.
 3. **Enable/disable** signs the activation change. Disabling prevents future loads; it does not remove earlier case receipts.
 4. **Restore approved file** explicitly restores an installed package from its signed installation record after local files were removed or changed.
 

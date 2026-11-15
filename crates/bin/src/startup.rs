@@ -305,8 +305,12 @@ impl PreparedStartup {
                 .clone()
                 .with_trusted_key(&agent.actor(), &agent.public_key())?,
         );
-        let services =
-            super::skills::services(&self.home, agent)?.with_catalog(self.store.catalog_services());
+        let services = super::skills::services(&self.home, agent)?.with_catalog(
+            self.store.catalog_services().with_source(
+                Arc::new(super::catalog_source::GitHubCatalogSource),
+                env!("CARGO_PKG_VERSION"),
+            )?,
+        );
         let engine = registry.bind(
             Engine::new(
                 EnginePorts::new(

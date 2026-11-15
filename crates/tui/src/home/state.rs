@@ -8,7 +8,7 @@ pub(crate) enum HomeAction {
     Restart,
     Demo,
     Parsers(String),
-    Skills,
+    Skills(String),
     OpenCase(CaseId),
     CreateCase,
     LoadKeystore,
@@ -229,6 +229,12 @@ fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
             .map(|value| format!("/settings {value}"))
             .collect();
     }
+    if source.starts_with("/skills ") {
+        return case::command_registry::argument_candidates(source, &[], &[], &[], &[])
+            .into_iter()
+            .map(|value| format!("/skills {value}"))
+            .collect();
+    }
     if source.contains(' ') {
         return Vec::new();
     }
@@ -280,7 +286,9 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
             state.mode = Mode::New;
         }
         "/demo" => return HomeAction::Demo,
-        "/skills" => return HomeAction::Skills,
+        value if value == "/skills" || value.starts_with("/skills ") => {
+            return HomeAction::Skills(value.into());
+        }
         value if value == "/parsers" || value.starts_with("/parsers ") => {
             return HomeAction::Parsers(value.into());
         }

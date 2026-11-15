@@ -89,7 +89,12 @@ fn new_engine(
         Vec::new(),
     )
     .unwrap()
-    .with_catalog(store.catalog_services());
+    .with_catalog(
+        store
+            .catalog_services()
+            .with_runtime_version("0.5.0")
+            .unwrap(),
+    );
     Engine::new(
         EnginePorts::new(
             store.clone(),

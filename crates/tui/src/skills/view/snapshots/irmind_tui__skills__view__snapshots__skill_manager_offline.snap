@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/skills/view/snapshots.rs
+expression: text
+---
+Forensic skills · methodology never grants permissions
+
+┌Downloaded catalog folder─────────────────────────────────────────────────────┐
+│examples/skills/linux-triage                                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+┌Skill name────────────────────────────────────────────────────────────────────┐
+│community-triage                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+┌Frozen release tag────────────────────────────────────────────────────────────┐
+│v1.2.3                                                                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+No network. Select index.json, index.ed25519 and the package from the same
+downloaded release. Offline freshness is not guaranteed.
+
+Synthetic inline error · Esc returns without applying.
+
+↑/↓ choose · Tab actions · Enter confirm · PgUp/PgDn scroll · Esc back

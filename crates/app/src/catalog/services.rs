@@ -10,13 +10,34 @@ use std::sync::Arc;
 pub struct CatalogServices {
     pub(crate) verifier: Arc<dyn CatalogIndexVerifier>,
     pub(crate) proofs: Arc<dyn CatalogProofStore>,
+    pub(crate) source: Option<Arc<dyn super::SkillCatalogSource>>,
+    pub(crate) runtime_version: Option<String>,
 }
 impl CatalogServices {
     pub fn new(
         verifier: Arc<dyn CatalogIndexVerifier>,
         proofs: Arc<dyn CatalogProofStore>,
     ) -> Self {
-        Self { verifier, proofs }
+        Self {
+            verifier,
+            proofs,
+            source: None,
+            runtime_version: None,
+        }
+    }
+    pub fn with_source(
+        mut self,
+        source: Arc<dyn super::SkillCatalogSource>,
+        runtime_version: &str,
+    ) -> Result<Self, super::CatalogError> {
+        self = self.with_runtime_version(runtime_version)?;
+        self.source = Some(source);
+        Ok(self)
+    }
+    pub fn with_runtime_version(mut self, version: &str) -> Result<Self, super::CatalogError> {
+        super::version::Version::parse(version)?;
+        self.runtime_version = Some(version.into());
+        Ok(self)
     }
     pub(crate) fn read_global(
         &self,
@@ -29,6 +50,22 @@ impl CatalogServices {
             .verifier
             .verify(&raw, &FrozenCatalogRelease::new(receipt.release_tag())?)?;
         receipt.check(&index, skill)?;
+        let version = self.runtime_version.as_deref().ok_or_else(|| {
+            AppError::Policy(
+                "Catalog runtime context is unavailable; review with the current IRMind version."
+                    .into(),
+            )
+        })?;
+        if !index
+            .asset(skill.metadata().name().as_str())?
+            .entry()
+            .supports_version(version)?
+        {
+            return Err(AppError::Policy(
+                "This catalog skill requires a newer IRMind version; it remains unavailable."
+                    .into(),
+            ));
+        }
         Ok(index)
     }
     pub(crate) fn read_case(

@@ -17,14 +17,18 @@ fn manager_sections_and_inline_error_have_eighty_column_snapshots() {
     for (name, screen) in [
         ("list", Screen::List),
         ("folder", Screen::Path),
+        ("source", Screen::Source),
+        ("catalog", Screen::Catalog),
+        ("offline", Screen::Offline),
         ("review", Screen::Review),
         ("inspect", Screen::Inspect),
         ("activation", Screen::Confirm),
+        ("catalog_downgrade", Screen::Downgrade),
     ] {
         state.screen = screen;
         state.action = 2;
         let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
-        terminal.draw(|frame|paint(frame,&state,"Synthetic inline error · Esc returns without applying.","linux-triage · 0.1.0\nSHA-256: synthetic\nTools: text_search\n\nReview synthetic authentication evidence.","examples/skills/linux-triage",&["linux-triage · 0.1.0 · active · Bundled".into()])).unwrap();
+        terminal.draw(|frame|paint(frame,&state,"Synthetic inline error · Esc returns without applying.","linux-triage · 0.1.0\nSHA-256: synthetic\nTools: text_search\n\nReview synthetic authentication evidence.",&Fields { folder: "examples/skills/linux-triage".into(), name: "community-triage".into(), tag: "v1.2.3".into() },&["linux-triage · 0.1.0 · active · Bundled".into()])).unwrap();
         let buffer = terminal.backend().buffer();
         let text = (0..24)
             .map(|y| {

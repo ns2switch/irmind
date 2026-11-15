@@ -1,3 +1,4 @@
+mod forms;
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 use irmind_app::{CompiledSkill, SkillStatus};
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -7,6 +8,10 @@ pub(super) enum Screen {
     Review,
     Inspect,
     Confirm,
+    Downgrade,
+    Source,
+    Catalog,
+    Offline,
 }
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(super) enum Action {
@@ -17,6 +22,25 @@ pub(super) enum Action {
     Inspect,
     Prepare,
     Apply,
+    AcceptDowngrade,
+}
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(super) enum SourceKind {
+    Local,
+    Catalog,
+    Offline,
+}
+pub(super) enum Candidate {
+    Local(Box<CompiledSkill>),
+    Catalog(Box<irmind_app::catalog::CatalogInstallPreview>),
+}
+impl Candidate {
+    pub(super) fn skill(&self) -> &CompiledSkill {
+        match self {
+            Self::Local(skill) => skill,
+            Self::Catalog(preview) => preview.skill(),
+        }
+    }
 }
 pub(super) struct State {
     pub rows: Vec<SkillStatus>,
@@ -24,13 +48,19 @@ pub(super) struct State {
     pub action: usize,
     pub screen: Screen,
     pub path: String,
+    pub catalog_name: String,
+    pub catalog_tag: String,
+    pub source: SourceKind,
+    pub field: usize,
     pub input: String,
     pub notice: String,
     pub preview: String,
-    pub candidate: Option<CompiledSkill>,
+    pub candidate: Option<Candidate>,
+    pub downgrade_confirmed: bool,
     pub scroll: u16,
     pub option: usize,
     pub confirm_exit: bool,
+    pub pending_exit: Option<super::ManagerExit>,
     pub readonly: bool,
 }
 impl State {
@@ -41,13 +71,19 @@ impl State {
             action: 0,
             screen: Screen::List,
             path: String::new(),
+            catalog_name: String::new(),
+            catalog_tag: String::new(),
+            source: SourceKind::Local,
+            field: 0,
             input: String::new(),
             notice: String::new(),
             preview: String::new(),
             candidate: None,
+            downgrade_confirmed: false,
             scroll: 0,
             option: 0,
             confirm_exit: false,
+            pending_exit: None,
             readonly,
         }
     }
@@ -68,7 +104,7 @@ impl State {
             match key.code {
                 KeyCode::Char('c') => self.confirm_exit = true,
                 KeyCode::Char('k') => return Action::Palette,
-                KeyCode::Char('u') if self.screen == Screen::Path => self.path.clear(),
+                KeyCode::Char('u') if self.is_form() => self.form_value().0.clear(),
                 _ => {}
             }
             return Action::None;
@@ -85,26 +121,20 @@ impl State {
             if self.screen == Screen::List {
                 return Action::Back;
             }
-            self.screen = Screen::List;
+            self.screen = if self.is_form() {
+                Screen::Source
+            } else {
+                Screen::List
+            };
             self.input.clear();
             self.candidate = None;
             return Action::None;
         }
         match self.screen {
             Screen::List => self.list_key(key.code),
-            Screen::Path => match key.code {
-                KeyCode::Enter => Action::Prepare,
-                KeyCode::Backspace => {
-                    self.path.pop();
-                    Action::None
-                }
-                KeyCode::Char(ch) => {
-                    self.insert(ch);
-                    Action::None
-                }
-                _ => Action::None,
-            },
-            Screen::Review | Screen::Confirm => self.confirm_key(key.code),
+            Screen::Path | Screen::Catalog | Screen::Offline => self.form_key(key.code),
+            Screen::Source => self.source_key(key.code),
+            Screen::Review | Screen::Confirm | Screen::Downgrade => self.confirm_key(key.code),
             Screen::Inspect => {
                 self.scroll_key(key.code);
                 Action::None
@@ -112,15 +142,10 @@ impl State {
         }
     }
     fn insert(&mut self, ch: char) {
-        let target = if self.screen == Screen::Path {
-            &mut self.path
+        let (target, limit) = if self.is_form() {
+            self.form_value()
         } else {
-            &mut self.input
-        };
-        let limit = if self.screen == Screen::Path {
-            4096
-        } else {
-            16
+            (&mut self.input, 16)
         };
         if !ch.is_control() && target.len() + ch.len_utf8() <= limit {
             target.push(ch);
@@ -171,7 +196,7 @@ impl State {
                 self.option = 0;
                 self.input.clear();
                 if self.action == 1 {
-                    self.screen = Screen::Path;
+                    self.screen = Screen::Source;
                 } else {
                     self.screen = Screen::Confirm;
                 }
@@ -203,7 +228,11 @@ impl State {
                     self.input.clear();
                 }
                 if self.option == 1 {
-                    return Action::Apply;
+                    return if self.screen == Screen::Downgrade {
+                        Action::AcceptDowngrade
+                    } else {
+                        Action::Apply
+                    };
                 }
                 self.screen = Screen::List;
             }
@@ -224,12 +253,16 @@ mod tests {
         assert!(matches!(state.event(key(KeyCode::Char('2'))), Action::None));
         assert!(state.screen == Screen::List);
         state.event(key(KeyCode::Enter));
+        assert!(state.screen == Screen::Source);
+        state.event(key(KeyCode::Enter));
         assert!(state.screen == Screen::Path);
         state.event(Event::Paste("examples/skills\n/test\u{1b}".into()));
         assert_eq!(state.path, "examples/skills/test");
         state.event(Event::Paste("x".repeat(8192)));
         assert_eq!(state.path.len(), 4096);
         assert!(matches!(state.event(key(KeyCode::Enter)), Action::Prepare));
+        state.event(key(KeyCode::Esc));
+        assert!(state.screen == Screen::Source);
         state.event(key(KeyCode::Esc));
         assert!(state.screen == Screen::List);
     }
@@ -258,5 +291,29 @@ mod tests {
         state.event(key(KeyCode::PageDown));
         assert_eq!(state.scroll, 10);
         assert!(matches!(state.event(key(KeyCode::Enter)), Action::Apply));
+    }
+}
+
+#[cfg(test)]
+mod catalog_tests {
+    use super::*;
+    #[test]
+    fn downgrade_acceptance_and_signed_application_are_separate_enter_actions() {
+        let mut state = State::new(false);
+        state.screen = Screen::Downgrade;
+        state.option = 1;
+        let enter = Event::Key(crossterm::event::KeyEvent::new(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+        ));
+        assert!(matches!(
+            state.event(enter.clone()),
+            Action::AcceptDowngrade
+        ));
+        assert!(!state.downgrade_confirmed);
+        state.downgrade_confirmed = true;
+        state.screen = Screen::Review;
+        state.option = 1;
+        assert!(matches!(state.event(enter), Action::Apply));
     }
 }

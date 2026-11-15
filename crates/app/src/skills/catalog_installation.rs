@@ -52,7 +52,7 @@ impl Engine<'_> {
     }
     pub fn confirm_catalog_preview(
         &self,
-        preview: CatalogInstallPreview,
+        preview: &CatalogInstallPreview,
         downgrade_confirmed: bool,
         reserved: &BTreeSet<String>,
         cancel: &CancellationToken,
@@ -104,7 +104,7 @@ impl Engine<'_> {
             return Err(AppError::Cancelled);
         }
         let mut snapshot = Snapshot::new(&skill, SkillOrigin::Catalog);
-        snapshot.previous_operation = preview.previous;
+        snapshot.previous_operation.clone_from(&preview.previous);
         snapshot.active = old.is_none_or(|o| o.snapshot.active);
         snapshot.catalog = Some(CatalogReceipt::new(
             &index,

@@ -1,4 +1,10 @@
+mod forms;
 use super::state::{Screen, State};
+struct Fields {
+    folder: String,
+    name: String,
+    tag: String,
+}
 use crate::{case::escape_display, theme::Theme};
 use irmind_app::Engine;
 use ratatui::{
@@ -20,7 +26,11 @@ where
     };
     let notice = safe(&state.notice)?;
     let preview = safe(&state.preview)?;
-    let path = safe(&state.path)?;
+    let fields = Fields {
+        folder: safe(&state.path)?,
+        name: safe(&state.catalog_name)?,
+        tag: safe(&state.catalog_tag)?,
+    };
     let rows = state
         .rows
         .iter()
@@ -41,7 +51,7 @@ where
             ))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
-    terminal.draw(|frame| paint(frame, state, &notice, &preview, &path, &rows))?;
+    terminal.draw(|frame| paint(frame, state, &notice, &preview, &fields, &rows))?;
     Ok(())
 }
 fn paint(
@@ -49,7 +59,7 @@ fn paint(
     state: &State,
     notice: &str,
     preview: &str,
-    path: &str,
+    fields: &Fields,
     rows: &[String],
 ) {
     let theme = Theme::detect();
@@ -89,9 +99,13 @@ fn paint(
             );
         }
         Screen::Path => {
-            paint_path(frame, areas[1], areas[2], path, theme);
+            paint_path(frame, areas[1], areas[2], &fields.folder, theme);
         }
-        Screen::Inspect | Screen::Review | Screen::Confirm => {
+        Screen::Source => forms::source(frame, areas[1], state, theme),
+        Screen::Catalog | Screen::Offline => {
+            forms::fields(frame, areas[1], areas[2], state, fields, theme);
+        }
+        Screen::Inspect | Screen::Review | Screen::Confirm | Screen::Downgrade => {
             let confirmation = confirmation(state);
             let body = if state.screen == Screen::Confirm {
                 &confirmation
@@ -106,7 +120,13 @@ fn paint(
             );
             if state.screen != Screen::Inspect {
                 frame.render_widget(
-                    Paragraph::new(if state.option == 0 {
+                    Paragraph::new(if state.screen == Screen::Downgrade {
+                        if state.option == 0 {
+                            "> 1. Cancel     2. Accept downgrade and review"
+                        } else {
+                            "  1. Cancel   > 2. Accept downgrade and review"
+                        }
+                    } else if state.option == 0 {
                         "> 1. Cancel     2. Sign and apply"
                     } else {
                         "  1. Cancel   > 2. Sign and apply"
@@ -187,7 +207,11 @@ mod tests {
                         &state,
                         "Synthetic notice",
                         "Synthetic methodology",
-                        "examples/skill",
+                        &Fields {
+                            folder: "examples/skill".into(),
+                            name: "community-triage".into(),
+                            tag: "v1.2.3".into(),
+                        },
                         &[],
                     );
                 })
