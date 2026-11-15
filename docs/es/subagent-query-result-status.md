@@ -1,6 +1,6 @@
 # Completitud tipada de las consultas delegadas de evidencia
 
-Propuesta de ampliación aditiva del
+Ampliación aditiva aprobada del
 [contrato de consultas de subagentes](subagents-format-contract.md).
 [English](../development/subagent-query-result-status.md).
 
