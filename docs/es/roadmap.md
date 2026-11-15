@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit db8cff9c095e616be5bbb56072849b131258900d; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 60abd690dcc81be506807463ae4c0fda71bd98a6; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -68,13 +68,18 @@ reales.
 - La instalación se firma y el caso registra el hash de la versión usada. Una skill declara herramientas necesarias, pero no amplía permisos. La firma admite los bytes exactos del paquete; su contenido sigue siendo no confiable tras la admisión y nunca llega al rol system.
 - `/skills` permite listar, instalar, inspeccionar y deshabilitar. Las skills invocables aparecen como comandos. El catálogo comunitario vive en otro repositorio.
 
-## v0.5: subagentes y trabajo paralelo
+## v0.5: subagentes y trabajo paralelo (entregada)
 
-- Revisar el [diseño de subagentes](subagents-design.md) antes de implementar: tipos, límites compartidos, clave Agent, aprobaciones, ramas de eventos, fusión determinista y flujo del motor. Los puertos concretos y bytes export V8 necesitan su contrato revisado.
-- El agente principal delega tareas acotadas a subagentes paralelos con contexto propio. En v0.5 solo hay tipos de triage, nube, endpoint, red, Kubernetes e inteligencia de amenazas; los comunitarios y límites monetarios quedan para después. El plan se muestra antes de ejecutar; reservar más del 25% de tokens o llamadas restantes exige confirmación firmada del analista.
-- Los subagentes heredan el alcance del caso, no pueden ampliarlo ni aprobar llamadas. Sus solicitudes van al analista, firman con la clave Agent y su salida vuelve como contenido no confiable.
-- Aplicar límites de concurrencia, rondas y tokens por subagente y un presupuesto total por turno. La TUI muestra la actividad y permite cancelarla.
-- Cada subagente usa una rama de eventos que se fusiona de forma determinista con la cadena firmada del caso. La TUI pasa a consumir el flujo de eventos del motor.
+El [diseño aprobado](subagents-design.md) y el
+[contrato de formatos y puertos](subagents-format-contract.md) están implementados
+con marcador de caso 4, ramas autenticadas y export V8. La
+[guía de uso](subagents.md) explica revisión, cancelación, presupuestos y cobertura parcial.
+
+- El principal delega tareas acotadas con contextos propios. Hay seis tipos incluidos: triaje, nube, endpoint, red, Kubernetes e inteligencia. Los tipos comunitarios y límites en dinero se aplazan.
+- El plan se muestra antes de empezar. Más del 25 % de los tokens o llamadas restantes exige confirmación firmada; una preferencia firmada puede exigir Start siempre.
+- Los hijos heredan el alcance sin ampliarlo, no aprueban y envían sus solicitudes al analista. Firman con Agent y sus resultados vuelven al principal como contenido no confiable.
+- Tokens, llamadas, rondas y bytes tienen límites propios y compartidos con el caso. La TUI permite seguir y cancelar tareas y muestra el coste estimado o no disponible.
+- Las ramas y checkpoints se fusionan de forma determinista. La TUI consume eventos de solo lectura del motor como preparación para su API futura.
 
 ## Lanzamiento público
 

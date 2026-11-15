@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 614b667d19f048743fb6f7b1365b52f61724595f; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 60abd690dcc81be506807463ae4c0fda71bd98a6; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — Respuesta asistida a incidentes
 
@@ -11,7 +11,7 @@ IRMind es un asistente agéntico de terminal para respuesta a incidentes y anál
 *La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
 
 > [!WARNING]
-> IRMind 0.4.2 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
+> IRMind 0.5.0 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
 
 > [!WARNING]
 > Antes de 1.0, cada versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración. Conserva la versión de IRMind que creó un caso para abrirlo, verificarlo o exportarlo, o reingiere los originales verificados en un caso nuevo.
@@ -47,13 +47,13 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-La [versión preliminar v0.4.2](https://github.com/ns2switch/irmind/releases/tag/v0.4.2) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.5.0](https://github.com/ns2switch/irmind/releases/tag/v0.5.0) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
-Conserva la versión exacta de IRMind que creó el caso. La versión 0.4.2 actualiza los contratos actuales de caso; consulta la [nota de formatos](CHANGELOG.md). La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable creador o reingerir los originales verificados.
+Conserva la versión exacta de IRMind que creó el caso. La versión 0.5.0 usa el marcador de caso 4 y export V8; consulta la [nota de formatos](CHANGELOG.md). La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable creador o reingerir los originales verificados.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.4.2; binary=irmind-linux-x86_64
+tag=v0.5.0; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -83,7 +83,7 @@ Usa `/skills` para inspeccionar y gestionar los 15 métodos incluidos de nube, W
 
 ## Módulos
 
-Las compilaciones de desarrollo para 0.5 usan una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo leen CaseCreated versión 4 y la exportación V8. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/development/case-migration.md).
+La versión 0.5 usa una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo lee CaseCreated versión 4 y la exportación V8. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/development/case-migration.md).
 
 La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Los modelos remotos y conectores permanecen desactivados hasta seleccionarlos y configurarlos. Los parsers locales se eligen por detección del contenido. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre se necesita firma y un backend de secretos. Todos siguen siendo experimentales.
 
@@ -147,7 +147,7 @@ Lee [security-model.md](docs/es/security-model.md) antes de conectar un proveedo
 - **v0.2 (entregada):** Parsers modulares, artefactos precisos y auxiliar EVTX aislado.
 - **v0.3:** Eventos comunes tipados, decodificadores y mapeos separados, solo escritura V3, ingesta multinúcleo y conectores SIEM experimentales.
 - **v0.4:** Añadir skills forenses firmadas y de carga progresiva.
-- **v0.5:** Añadir subagentes paralelos acotados y eventos en streaming.
+- **v0.5 (entregada):** Subagentes paralelos acotados, ramas firmadas y eventos en streaming.
 - **Lanzamiento público:** Publicar la demo, el benchmark y el catálogo inicial de skills.
 - **v0.6:** Añadir consultas en origen con presupuestos.
 - **v0.7:** Añadir detecciones locales, informes exportables, extensiones controladas y una API del motor.

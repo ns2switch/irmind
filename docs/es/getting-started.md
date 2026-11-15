@@ -1,4 +1,4 @@
-Traducción de docs/getting-started.md en el commit 5ad1686a6192d11c42c1b2b8b3a09759a774cc80; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/getting-started.md en el commit 60abd690dcc81be506807463ae4c0fda71bd98a6; si hay diferencias, prevalece la versión en inglés.
 
 # Primeros pasos
 
@@ -110,3 +110,12 @@ Usa **Ctrl+O** o `/expand` para plegar o desplegar la tarjeta seleccionada mient
 ## Métodos forenses
 
 Abre `/skills` para inspeccionar los 15 métodos incluidos de nube, Windows, Linux y red, instalar una carpeta local revisada o firmar un cambio de activación. En un caso, escribe `/windows-triage`, `/linux-triage` o `/aws-credential-compromise` y añade tu pregunta. El agente también puede elegir un método por su descripción. La carga es progresiva y siempre no confiable; la política y las aprobaciones no cambian. La [guía de skills](skills.md) explica los límites y los recibos firmados en la exportación V8.
+
+## Investigar con subagentes
+
+Una pregunta amplia puede producir un plan visible de tareas paralelas acotadas.
+Revisa fuentes y presupuesto antes de Start. `/subagents` muestra actividad y
+cobertura; `/subagents cancel <task>` cancela una tarea y `/pause` la investigación.
+Más del 25 % de los tokens o llamadas restantes exige tu firma. La
+[guía de subagentes](subagents.md) explica las preferencias de confirmación, los
+límites compartidos y la exportación de ramas firmadas.
