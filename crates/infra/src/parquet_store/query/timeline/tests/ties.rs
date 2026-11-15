@@ -1,4 +1,5 @@
 use super::*;
+use crate::parquet_store::query::complete;
 use std::fmt::Write as _;
 
 #[test]
@@ -57,7 +58,7 @@ fn precise_same_time_ties_keep_all_candidate_groups_without_changing_order() {
             )
             .unwrap();
             ordered(&mut expected, 10, newest).unwrap();
-            assert!(query.timeline_hits(spec, 10, newest).unwrap() == expected);
+            assert!(query.timeline_hits_answer(spec, 10, newest).unwrap().value == expected);
             assert!(expected.iter().all(|hit| hit.event.starts_with("a.json")));
             assert_eq!(
                 expected.iter().map(|hit| hit.index).collect::<Vec<_>>(),

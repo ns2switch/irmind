@@ -19,7 +19,8 @@ pub use journal::{
     BranchMaterialVerifier, SubagentJournal, TaskDispatchAttribution, is_subagent_kind,
 };
 pub use queries::{
-    TaskEvidenceQueries, TaskEvidenceQuery, TaskEvidenceResult, VerifiedTaskQueryView,
+    TaskEvidenceQueries, TaskEvidenceQuery, TaskEvidenceResult, TaskQueryPartialReason,
+    VerifiedTaskQueryView,
 };
 mod pending;
 mod plan;

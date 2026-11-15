@@ -6,7 +6,7 @@ use irmind_app::subagents::{
 };
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-struct Queries(AtomicUsize);
+struct Queries(AtomicUsize, bool);
 impl TaskEvidenceQueries for Queries {
     fn execute(
         &self,
@@ -16,9 +16,15 @@ impl TaskEvidenceQueries for Queries {
     ) -> Result<TaskEvidenceResult, AppError> {
         query.validate(view)?;
         self.0.fetch_add(1, Ordering::SeqCst);
-        Ok(TaskEvidenceResult::Text(
-            "Synthetic source-restricted summary.".into(),
-        ))
+        let text = "Synthetic source-restricted summary.".into();
+        Ok(if self.1 {
+            TaskEvidenceResult::PartialText {
+                text,
+                reason: irmind_app::subagents::TaskQueryPartialReason::Sampling,
+            }
+        } else {
+            TaskEvidenceResult::Text(text)
+        })
     }
 }
 
@@ -119,6 +125,11 @@ impl LlmPort for ParallelModel {
 
 #[test]
 fn parallel_child_models_overlap_but_signed_checkpoints_and_export_bytes_match_one_worker() {
+    check_determinism(false);
+    check_determinism(true);
+}
+
+fn check_determinism(partial: bool) {
     let history = History::new();
     let root = tempfile::tempdir().unwrap();
     let (store, engine) = stored_history_engine(root.path(), &history, &[]);
@@ -146,7 +157,7 @@ fn parallel_child_models_overlap_but_signed_checkpoints_and_export_bytes_match_o
         let root = tempfile::tempdir().unwrap();
         let mut fork = History::new();
         fork.entries.clone_from(&prefix);
-        let queries = Arc::new(Queries(AtomicUsize::new(0)));
+        let queries = Arc::new(Queries(AtomicUsize::new(0), partial));
         let (store, engine) =
             stored_history_engine_with_queries(root.path(), &fork, &[], queries.clone());
         let model = ParallelModel::new();
@@ -154,14 +165,15 @@ fn parallel_child_models_overlap_but_signed_checkpoints_and_export_bytes_match_o
             .run_subagent_plan(&started, &model, workers, &cancel)
             .unwrap();
         assert_eq!(results.len(), 4);
-        assert!(
-            results
-                .iter()
-                .all(|result| result.status == SubagentStatus::Completed
-                    && result.usage.calls == 1
-                    && result.usage.tokens == 14
-                    && result.usage.rounds == 2)
-        );
+        assert!(results.iter().all(|result| result.status
+            == if partial {
+                SubagentStatus::Partial
+            } else {
+                SubagentStatus::Completed
+            }
+            && result.usage.calls == 1
+            && result.usage.tokens == 14
+            && result.usage.rounds == 2));
         assert_eq!(model.peak.load(Ordering::SeqCst), workers.min(4));
         assert_eq!(model.live.load(Ordering::SeqCst), 0);
         assert_eq!(queries.0.load(Ordering::SeqCst), 4);

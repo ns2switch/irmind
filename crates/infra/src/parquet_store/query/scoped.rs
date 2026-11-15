@@ -38,7 +38,7 @@ fn spec<'a>(
     }
 }
 impl QueryStore<'_> {
-    pub(in crate::parquet_store::query) fn scoped_neighbors(
+    pub(in crate::parquet_store::query) fn scoped_neighbors_answer(
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifact],
@@ -46,7 +46,7 @@ impl QueryStore<'_> {
         entity: (&str, &str),
         limit: usize,
         cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
+    ) -> Result<super::QueryAnswer<String>, AppError> {
         let selected = Selection {
             kind: entity.0,
             value: entity.1,
@@ -62,7 +62,13 @@ impl QueryStore<'_> {
             ),
             selected,
         )?;
-        super::complete(result.status)?;
+        let reason = if result.status == ScanStatus::Deadline {
+            Some(irmind_app::subagents::TaskQueryPartialReason::Deadline)
+        } else if result.sampled {
+            Some(irmind_app::subagents::TaskQueryPartialReason::Sampling)
+        } else {
+            None
+        };
         let mut rows = result.neighbors.into_iter().collect::<Vec<_>>();
         rows.sort_by(|a, b| b.1.0.cmp(&a.1.0).then_with(|| a.0.cmp(&b.0)));
         rows.truncate(limit.min(20));
@@ -77,6 +83,9 @@ impl QueryStore<'_> {
         if result.sampled {
             output.push_str("\nPartial result: sampled 4096 matching records; refine the entity.");
         }
-        Ok(output)
+        Ok(super::QueryAnswer {
+            value: output,
+            reason,
+        })
     }
 }

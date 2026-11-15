@@ -13,6 +13,18 @@ impl QueryStore<'_> {
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        self.search_answer(id, artifacts, filter, term, limit, cancel)?
+            .strict()
+    }
+    pub(crate) fn search_answer(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifact],
+        filter: &GraphQueryFilter,
+        term: &str,
+        limit: usize,
+        cancel: &CancellationToken,
+    ) -> Result<super::QueryAnswer<String>, AppError> {
         if term.trim().is_empty() || term.len() > 128 || !(1..=20).contains(&limit) {
             return Err(AppError::Policy("invalid Parquet search arguments".into()));
         }
@@ -36,19 +48,23 @@ impl QueryStore<'_> {
                 Ok(ScanFlow::Continue)
             },
         )?;
-        complete(status)?;
         if hits.is_empty() {
-            return Ok("no indexed matches".into());
+            return Ok(super::QueryAnswer::scanned(
+                "no indexed matches".into(),
+                status,
+            ));
         }
-        Ok(hits
-            .into_iter()
-            .map(|hit| {
-                let at = hit.at.chars().take(32).collect::<String>();
-                let event = hit.annotated_event().chars().take(160).collect::<String>();
-                format!("{at} {event} source={}", hit.source())
-            })
-            .collect::<Vec<_>>()
-            .join("\n"))
+        Ok(super::QueryAnswer::scanned(
+            hits.into_iter()
+                .map(|hit| {
+                    let at = hit.at.chars().take(32).collect::<String>();
+                    let event = hit.annotated_event().chars().take(160).collect::<String>();
+                    format!("{at} {event} source={}", hit.source())
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            status,
+        ))
     }
 
     pub(crate) fn raw_native(
@@ -103,6 +119,14 @@ impl QueryStore<'_> {
         artifacts: &[ParquetArtifact],
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        self.summary_answer(id, artifacts, cancel)?.strict()
+    }
+    pub(crate) fn summary_answer(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifact],
+        cancel: &CancellationToken,
+    ) -> Result<super::QueryAnswer<String>, AppError> {
         let (mut count, mut first, mut last) = (
             0u64,
             None::<super::super::time_cell::TimeCell>,
@@ -144,7 +168,6 @@ impl QueryStore<'_> {
                 Ok(ScanFlow::Continue)
             },
         )?;
-        complete(status)?;
         let mut summary = format!(
             "Parquet records={count}; first={}; last={}",
             first.map_or_else(String::new, |t| t.display()),
@@ -167,7 +190,7 @@ impl QueryStore<'_> {
             use std::fmt::Write as _;
             write!(summary, "; common records={common_records}/{count}; categorized={classified_records}/{count}; known outcomes={known_outcomes}/{count}; other records remain unclassified").map_err(super::super::storage)?;
         }
-        Ok(summary)
+        Ok(super::QueryAnswer::scanned(summary, status))
     }
 }
 

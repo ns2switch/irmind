@@ -10,6 +10,18 @@ impl QueryStore<'_> {
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        self.scoped_neighbors(id, artifacts, filter, entity, limit, cancel)
+        self.neighbors_answer(id, artifacts, filter, entity, limit, cancel)?
+            .strict()
+    }
+    pub(crate) fn neighbors_answer(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifact],
+        filter: &GraphQueryFilter,
+        entity: (&str, &str),
+        limit: usize,
+        cancel: &CancellationToken,
+    ) -> Result<super::QueryAnswer<String>, AppError> {
+        self.scoped_neighbors_answer(id, artifacts, filter, entity, limit, cancel)
     }
 }

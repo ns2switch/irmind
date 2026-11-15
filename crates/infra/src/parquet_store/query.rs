@@ -93,7 +93,9 @@ impl QueryStore<'_> {
     }
 }
 
+mod answer;
 mod coobservations;
+pub(crate) use answer::QueryAnswer;
 mod entity;
 mod events;
 mod extrema;

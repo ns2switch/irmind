@@ -112,7 +112,7 @@ impl Engine<'_> {
             ));
         }
         let (text, partial) = match response {
-            Ok(value) => (query::text(value)?, false),
+            Ok(value) => query::text(value)?,
             Err(_) => (
                 "The restricted evidence query failed; no unrestricted fallback was used.".into(),
                 true,
