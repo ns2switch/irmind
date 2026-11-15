@@ -27,8 +27,18 @@ pub(super) struct TaskSession {
     pub edited_calls: u8,
     pub edited_ids: std::collections::BTreeMap<String, String>,
     pub pending_approvals: Vec<SubagentDigest>,
+    call_ids: BTreeSet<String>,
 }
 impl TaskSession {
+    pub(super) fn accept_call_id(&mut self, id: &str) -> bool {
+        if self.call_ids.insert(id.to_owned()) {
+            true
+        } else {
+            self.partial = true;
+            self.coverage.insert("The provider repeated a tool-call identifier; the task stopped without repeating the effect.".into());
+            false
+        }
+    }
     pub(super) fn queue_edited_call(
         &mut self,
         call: &crate::subagents::BranchToolCall,
@@ -93,6 +103,7 @@ impl TaskSession {
             edited_calls: 0,
             edited_ids: std::collections::BTreeMap::new(),
             pending_approvals: vec![],
+            call_ids: BTreeSet::new(),
         })
     }
     pub(super) fn record_model_result(
