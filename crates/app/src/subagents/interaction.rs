@@ -10,6 +10,7 @@ pub use mailbox::{AnalystPlanMailbox, PlanReview};
 pub struct SafePlanPreview {
     pub(super) plan: SubagentPlanV1,
     pub(super) confirmation_required: bool,
+    pub(super) source_summaries: std::sync::Arc<std::collections::BTreeMap<SubagentDigest, String>>,
 }
 impl SafePlanPreview {
     pub fn case_id(&self) -> &str {
@@ -17,6 +18,10 @@ impl SafePlanPreview {
     }
     pub fn plan_id(&self) -> SubagentDigest {
         self.plan.plan_id
+    }
+    /// Guarded, bounded labels from the signed inventory; presentation only.
+    pub fn source_summary(&self, source_set: SubagentDigest) -> Option<&str> {
+        self.source_summaries.get(&source_set).map(String::as_str)
     }
     pub fn tasks(&self) -> &[SubagentTaskSpec] {
         &self.plan.tasks

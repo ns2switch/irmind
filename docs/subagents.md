@@ -10,7 +10,8 @@ or a simple question does not require delegation.
 
 Ask the agent to investigate the case or to divide a specific investigation
 across the relevant sources. Before work starts, IRMind shows the tasks, their
-included types, assigned sources and reserved tokens and tool calls.
+included types, signed source names with short hashes and reserved tokens and
+tool calls. Large source sets show their count and the first sixteen labels.
 
 A plan reserving **more than 25%** of either the remaining case tokens or tool
 calls requires **Start** with an Analyst signature. Select Start or Cancel with
