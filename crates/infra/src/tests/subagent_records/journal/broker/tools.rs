@@ -182,3 +182,63 @@ fn subagent_tool_round_limit_preserves_work_and_disallowed_tools_never_reach_que
         verify_and_export(store.as_ref(), &engine, &history, root.path());
     }
 }
+
+struct RepeatedProtocolId;
+#[async_trait]
+impl LlmPort for RepeatedProtocolId {
+    async fn complete(
+        &self,
+        request: CompletionRequest,
+        _: &CancellationToken,
+    ) -> Result<ModelStream, AppError> {
+        request.validate()?;
+        Ok(irmind_app::single_completion_stream(
+            ModelResponse {
+                text: "Synthetic repeated provider identifier".into(),
+                calls: vec![
+                    ModelToolCall::from_proposal(
+                        "same_call",
+                        ProposedCall {
+                            tool: Tool::GraphSummary,
+                            args: BTreeMap::new(),
+                        },
+                    )
+                    .unwrap(),
+                ],
+                raw: "synthetic".into(),
+                truncated: false,
+            },
+            Some(ModelUsage {
+                input_tokens: 5,
+                output_tokens: 2,
+            }),
+        ))
+    }
+}
+#[test]
+fn repeated_provider_call_identifier_preserves_a_partial_verifiable_task_without_reexecuting() {
+    let history = History::new();
+    let root = tempfile::tempdir().unwrap();
+    let queries = Arc::new(Queries(AtomicUsize::new(0)));
+    let (store, engine) =
+        stored_history_engine_with_queries(root.path(), &history, &[], queries.clone());
+    let started = start(&engine, &history);
+    let result = engine
+        .run_subagent_task(
+            &started,
+            started.plan().tasks[0].task_id,
+            &RepeatedProtocolId,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    engine.finish_subagent_plan(&started).unwrap();
+    verify_and_export(store.as_ref(), &engine, &history, root.path());
+    assert_eq!(queries.0.load(Ordering::SeqCst), 1);
+    assert_eq!(result.status, SubagentStatus::Partial);
+    assert!(
+        result
+            .coverage
+            .iter()
+            .any(|text| text.contains("identifier"))
+    );
+}
