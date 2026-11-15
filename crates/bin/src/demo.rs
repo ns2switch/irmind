@@ -309,6 +309,7 @@ fn run_in_directory(
         &modules,
         shutdown,
         WorkspaceLaunch {
+            subagent_review: None,
             initial_case: Some(&case.id),
             resume_last_case: irmind_tui::ResumeMode::Disabled,
             new_analyst_key: false,

@@ -2,6 +2,12 @@ use super::Command;
 
 pub(super) const COMMANDS: &[Command] = &[
     Command {
+        name: "subagents",
+        description: "Inspect delegated tasks or cancel a task by identifier",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
         name: "budget",
         description: "Inspect consumption and adjust signed case limits",
         shortcut: "",

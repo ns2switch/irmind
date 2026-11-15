@@ -11,8 +11,8 @@ impl Command {
     pub(crate) fn category(&self) -> &'static str {
         match self.name {
             "skills" => "Skills",
-            "budget" | "ingest" | "verify" | "seal" | "export" | "report" | "scope" | "home"
-            | "rebuild" => "Case",
+            "subagents" | "budget" | "ingest" | "verify" | "seal" | "export" | "report"
+            | "scope" | "home" | "rebuild" => "Case",
             "evidence" | "evidence-save" | "raw" | "graph" | "timeline" | "entity"
             | "neighbors" | "path" | "search" | "entity-timeline" | "siem-alert"
             | "verify-graph" | "objects" | "object-read" => "Evidence",
@@ -30,6 +30,7 @@ impl Command {
             "parsers" => " [test <definition> <file>]",
             "skills" => " [install catalog:<name>[@tag] | update <name>]",
             "settings" => " [model|connectors|keystore|preferences|limits]",
+            "subagents" => " [cancel <task>]",
             "open" => " <case title or ID>",
             "demo" => " [check|exit]",
             "evidence" | "raw" => " <hash>",
@@ -127,6 +128,7 @@ pub(crate) fn help_for(name: &str) -> String {
         "search" => "/search 203.0.113.77",
         "neighbors" => "/neighbors ip 203.0.113.77",
         "settings" => "/settings model",
+        "subagents" => "/subagents",
         "help" => "/help search",
         _ => "",
     };

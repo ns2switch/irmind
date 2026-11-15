@@ -28,6 +28,7 @@ pub(crate) use render::{approval_panel, entity_panel};
 mod cluster_prompt;
 mod runtime;
 mod state;
+mod subagents;
 mod time_prompt;
 mod view;
 pub(crate) use confirmation::escape_display;
@@ -70,6 +71,7 @@ impl Drop for MouseCapture {
 
 #[derive(Clone, Copy)]
 pub(crate) struct CasePresentation<'a> {
+    pub subagent_review: Option<&'a irmind_app::subagents::AnalystPlanMailbox>,
     pub modules: &'a [crate::ModuleStatus],
     pub overrides_active: bool,
     pub mouse_capture: bool,
@@ -379,6 +381,13 @@ pub(crate) fn run_case(
             scope,
             state,
             active: None,
+            subagents: subagents::SubagentUi::new(
+                scope,
+                engine,
+                id,
+                shutdown,
+                presentation.subagent_review,
+            ),
             progress_tx,
             progress_rx,
             model_tx,

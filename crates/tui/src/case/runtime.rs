@@ -20,6 +20,7 @@ pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub scope: &'scope std::thread::Scope<'scope, 'env>,
     pub state: CaseState,
     pub active: Option<ActiveTask<'scope>>,
+    pub(super) subagents: super::subagents::SubagentUi<'scope, 'env>,
     pub progress_tx: mpsc::Sender<String>,
     pub progress_rx: mpsc::Receiver<String>,
     pub model_tx: mpsc::Sender<irmind_app::ModelProgress>,
@@ -43,52 +44,16 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                 };
                 update(&mut self.state, CaseMessage::Progress(progress));
             }
-            let mut preview_dirty = false;
-            for _ in 0..256 {
-                let Ok(progress) = self.model_rx.try_recv() else {
-                    break;
-                };
-                match progress {
-                    irmind_app::ModelProgress::RoundStarted { round, limit } => {
-                        if self.state.model_preview.is_empty() {
-                            self.state.conversation.discard_preview();
-                        } else {
-                            let safe = self.engine.guard.screen(&self.state.model_preview)?.text;
-                            self.state.conversation.set_preview(safe);
-                            self.state.conversation.finish_preview();
-                        }
-                        update(
-                            &mut self.state,
-                            CaseMessage::ModelRoundStarted { round, limit },
-                        );
-                        preview_dirty = false;
-                    }
-                    irmind_app::ModelProgress::TextDelta(delta) => {
-                        update(&mut self.state, CaseMessage::ModelDelta(delta));
-                        preview_dirty = true;
-                    }
-                    irmind_app::ModelProgress::ToolProposed(summary) => {
-                        let safe = self.engine.guard.screen(&summary)?.text;
-                        self.state.conversation.push(
-                            super::conversation::Card::new(
-                                super::conversation::CardKind::Proposal,
-                                safe,
-                                "waiting for policy decision",
-                                false,
-                            )
-                            .with_summary("waiting for policy decision"),
-                        );
-                    }
-                }
-            }
-            if preview_dirty {
-                let safe = self.engine.guard.screen(&self.state.model_preview)?.text;
-                self.state.conversation.set_preview(safe);
-            }
+            self.poll_model_progress()?;
+            self.subagents
+                .tick(self.engine, self.id, &mut self.state.conversation)?;
             self.finish_task()?;
             self.refresh()?;
             self.presentation_tick()?;
             self.render()?;
+            if self.state.confirm_exit == crate::ExitConfirmation::Inactive {
+                self.subagents.rendered();
+            }
             if event::poll(Duration::from_millis(100))? {
                 match event::read()? {
                     Event::Key(key)
@@ -102,6 +67,13 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     _ => {}
                 }
             }
+            if self.state.confirm_exit == crate::ExitConfirmation::Inactive
+                && let Err(error) = self.subagents.automatic_start()
+            {
+                self.state.messages.push(format!(
+                    "Plan review expired: {error}. No additional tasks were started."
+                ));
+            }
         }
         if let Some((cancel, task, label)) = self.active.take() {
             cancel.cancel();
@@ -111,6 +83,52 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             }
         }
         Ok(self.exit_to.clone())
+    }
+
+    fn poll_model_progress(&mut self) -> Result<()> {
+        let mut preview_dirty = false;
+        for _ in 0..256 {
+            let Ok(progress) = self.model_rx.try_recv() else {
+                break;
+            };
+            match progress {
+                irmind_app::ModelProgress::RoundStarted { round, limit } => {
+                    if self.state.model_preview.is_empty() {
+                        self.state.conversation.discard_preview();
+                    } else {
+                        let safe = self.engine.guard.screen(&self.state.model_preview)?.text;
+                        self.state.conversation.set_preview(safe);
+                        self.state.conversation.finish_preview();
+                    }
+                    update(
+                        &mut self.state,
+                        CaseMessage::ModelRoundStarted { round, limit },
+                    );
+                    preview_dirty = false;
+                }
+                irmind_app::ModelProgress::TextDelta(delta) => {
+                    update(&mut self.state, CaseMessage::ModelDelta(delta));
+                    preview_dirty = true;
+                }
+                irmind_app::ModelProgress::ToolProposed(summary) => {
+                    let safe = self.engine.guard.screen(&summary)?.text;
+                    self.state.conversation.push(
+                        super::conversation::Card::new(
+                            super::conversation::CardKind::Proposal,
+                            safe,
+                            "waiting for policy decision",
+                            false,
+                        )
+                        .with_summary("waiting for policy decision"),
+                    );
+                }
+            }
+        }
+        if preview_dirty {
+            let safe = self.engine.guard.screen(&self.state.model_preview)?.text;
+            self.state.conversation.set_preview(safe);
+        }
+        Ok(())
     }
 
     fn finish_task(&mut self) -> Result<()> {

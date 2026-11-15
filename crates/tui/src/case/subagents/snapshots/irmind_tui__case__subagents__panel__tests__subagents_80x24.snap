@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/case/subagents/panel.rs
+expression: screen
+---
+
+
+  ┌ Detail · PgUp/PgDn scroll · Esc close ───────────────────────────────────┐
+  │Subagents                                                                 │
+  │Plan: two source-restricted synthetic tasks                               │
+  │                                                                          │
+  │› Endpoint · 01010101 · Partial: sampled evidence; no conclusion of       │
+  │absence                                                                   │
+  │  Review synthetic Windows authentication failures                        │
+  │  1200 tokens charged/reserved · 3 calls · 2 rounds · 0 cloud bytes · cost│
+  │not available                                                             │
+  │  Task: 0101010101010101010101010101010101010101010101010101010101010101  │
+  │Verified synthetic source only.                                           │
+  │  Cloud · 02020202 · Round 2 · scripted                                   │
+  │  Review synthetic AWS access                                             │
+  │                                                                          │
+  │↑/↓ choose · Enter details · Esc close · /subagents cancel <task>         │
+  │                                                                          │
+  │                                                                          │
+  │                                                                          │
+╭─│                                                                          │─╮
+│A└──────────────────────────────────────────────────────────────────────────┘ │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Synthetic investi… · scripted · 1200 tok · delegated investigation

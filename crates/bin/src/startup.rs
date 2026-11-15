@@ -35,6 +35,7 @@ mod storage;
 use preflight::{decide_overrides, reconcile_configuration};
 
 struct PreparedStartup {
+    subagent_review: Arc<irmind_app::subagents::AnalystPlanMailbox>,
     #[cfg(feature = "parser-declarative")]
     definitions: irmind_app::ApprovedDefinitions,
     cli: Cli,
@@ -143,6 +144,7 @@ impl PreparedStartup {
         };
         configuration::resolve_cli(&mut cli, &saved, allow_environment)?;
         Ok(Some(Self {
+            subagent_review: Arc::default(),
             #[cfg(feature = "parser-declarative")]
             definitions,
             cli,
@@ -215,6 +217,7 @@ impl PreparedStartup {
             return Ok(false);
         };
         let Self {
+            subagent_review,
             cli,
             interactive,
             home,
@@ -235,6 +238,7 @@ impl PreparedStartup {
         let signer_backend = active.signer_backend;
         let new_analyst_key = interactive && active.new_analyst_key;
         let workspace_io = RootWorkspaceIo {
+            subagent_review,
             parser_catalog: catalog,
             definition_store: irmind_infra::FileDefinitionStore::new(&home),
             home: home.clone(),
@@ -311,23 +315,29 @@ impl PreparedStartup {
                 env!("CARGO_PKG_VERSION"),
             )?,
         );
+        let mut ports = EnginePorts::new(
+            self.store.clone(),
+            self.store.clone(),
+            self.store.clone(),
+            self.store.clone(),
+            CryptoPorts::new(self.active.signer.clone(), verifier),
+            self.guard.clone(),
+        )
+        .with_source_evidence_reader(self.store.source_evidence_reader());
+        if self.interactive {
+            ports = ports.with_subagents(irmind_app::subagents::SubagentPorts {
+                branches: Arc::new(irmind_infra::ParquetStore::open(&self.home)?),
+                queries: self
+                    .store
+                    .task_evidence_queries(self.store.source_evidence_reader()),
+                analyst: self.subagent_review.clone(),
+            });
+        }
         let engine = registry.bind(
-            Engine::new(
-                EnginePorts::new(
-                    self.store.clone(),
-                    self.store.clone(),
-                    self.store.clone(),
-                    self.store.clone(),
-                    CryptoPorts::new(self.active.signer.clone(), verifier),
-                    self.guard.clone(),
-                )
-                .with_source_evidence_reader(self.store.source_evidence_reader()),
-                ExecutionMode::Attended,
-                Arc::new(SystemClock),
-            )?
-            .with_skills(services)?
-            .with_large_case_pipeline(self.store.clone(), Arc::new(JsonParser))
-            .with_parser_catalog(catalog),
+            Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
+                .with_skills(services)?
+                .with_large_case_pipeline(self.store.clone(), Arc::new(JsonParser))
+                .with_parser_catalog(catalog),
         )?;
         apply_session_policy(
             engine,
@@ -446,6 +456,7 @@ fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) ->
                 context.module_statuses,
                 context.cancel,
                 irmind_tui::WorkspaceLaunch {
+                    subagent_review: Some(context.workspace_io.subagent_review.as_ref()),
                     initial_case: None,
                     resume_last_case: saved.resume_last_case.unwrap_or(true).into(),
                     new_analyst_key: context.new_analyst_key,

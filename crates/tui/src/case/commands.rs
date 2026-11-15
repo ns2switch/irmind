@@ -28,21 +28,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if prompt == "/home" || prompt == "/cases" {
             return Ok(true);
         }
-        if let Some(destination) = match prompt.as_str() {
-            "/new" => Some(super::CaseExit::New),
-            "/settings" => Some(super::CaseExit::Settings(None, false)),
-            "/model" => Some(super::CaseExit::Settings(Some("model".into()), true)),
-            "/modules" | "/edit-param" => {
-                Some(super::CaseExit::Settings(Some("connectors".into()), true))
-            }
-            "/config" => Some(super::CaseExit::Settings(Some("preferences".into()), true)),
-            "/keystore" | "/cred-add" | "/cred-delete" | "/passphrase" | "/migrate-signer"
-            | "/migrate-secrets" => Some(super::CaseExit::Settings(Some("keystore".into()), true)),
-            "/open" => Some(super::CaseExit::Home),
-            _ => prompt
-                .strip_prefix("/open ")
-                .map(|value| super::CaseExit::Open(value.into())),
-        } {
+        if let Some(destination) = command_destination(&prompt) {
             self.exit_to = destination;
             return Ok(true);
         }
@@ -55,6 +41,12 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return Ok(true);
         }
         if self.session_command(&prompt) {
+            return Ok(false);
+        }
+        if self
+            .subagents
+            .command(&prompt, self.engine, self.id, &mut self.state.messages)
+        {
             return Ok(false);
         }
         if self.active.is_some() {
@@ -678,6 +670,24 @@ mod approval;
 mod graph;
 mod objects;
 mod siem;
+
+fn command_destination(prompt: &str) -> Option<super::CaseExit> {
+    match prompt {
+        "/new" => Some(super::CaseExit::New),
+        "/settings" => Some(super::CaseExit::Settings(None, false)),
+        "/model" => Some(super::CaseExit::Settings(Some("model".into()), true)),
+        "/modules" | "/edit-param" => {
+            Some(super::CaseExit::Settings(Some("connectors".into()), true))
+        }
+        "/config" => Some(super::CaseExit::Settings(Some("preferences".into()), true)),
+        "/keystore" | "/cred-add" | "/cred-delete" | "/passphrase" | "/migrate-signer"
+        | "/migrate-secrets" => Some(super::CaseExit::Settings(Some("keystore".into()), true)),
+        "/open" => Some(super::CaseExit::Home),
+        _ => prompt
+            .strip_prefix("/open ")
+            .map(|value| super::CaseExit::Open(value.into())),
+    }
+}
 
 #[cfg(test)]
 mod tests {

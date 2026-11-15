@@ -102,6 +102,7 @@ macro_rules! register_configured {
 }
 
 struct RootWorkspaceIo {
+    subagent_review: Arc<irmind_app::subagents::AnalystPlanMailbox>,
     parser_catalog: irmind_app::modules::ParserCatalog,
     definition_store: irmind_infra::FileDefinitionStore,
     home: PathBuf,

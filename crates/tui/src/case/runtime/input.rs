@@ -6,6 +6,9 @@ use crossterm::event::{MouseEvent, MouseEventKind};
 
 impl CaseRuntime<'_, '_, '_> {
     pub(super) fn handle_paste(&mut self, value: &str) {
+        if self.subagents.paste(value) {
+            return;
+        }
         if self
             .state
             .demo_guide
@@ -293,24 +296,10 @@ impl CaseRuntime<'_, '_, '_> {
     }
 
     pub(super) fn handle_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<bool> {
-        if self.io_ops.demo_mode()
-            && command_registry::shortcut_name(code, modifiers) != Some("expand")
-            && let Some(exit) = self.presentation_key(code, modifiers)
-        {
+        if let Some(exit) = self.handle_session_key(code, modifiers)? {
             return Ok(exit);
         }
-        if self.state.confirm_exit == crate::ExitConfirmation::Pending {
-            return Ok(self.exit_confirmation_key(code));
-        }
-
         let shortcut = command_registry::shortcut_name(code, modifiers);
-        if shortcut == Some("exit") {
-            self.state.confirm_exit = crate::ExitConfirmation::Pending;
-            self.state
-                .messages
-                .push("Exit IRMind? Enter confirms; Esc cancels.".into());
-            return Ok(false);
-        }
         if shortcut == Some("pause")
             && let Some((cancel, _, _)) = &self.active
         {
@@ -373,6 +362,42 @@ impl CaseRuntime<'_, '_, '_> {
             CaseMessage::Key(code, modifiers, self.active.is_some()),
         );
         self.apply_action(action)
+    }
+
+    fn handle_session_key(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> Result<Option<bool>> {
+        if self.io_ops.demo_mode()
+            && command_registry::shortcut_name(code, modifiers) != Some("expand")
+            && let Some(exit) = self.presentation_key(code, modifiers)
+        {
+            return Ok(Some(exit));
+        }
+        if self.state.confirm_exit == crate::ExitConfirmation::Pending {
+            return Ok(Some(self.exit_confirmation_key(code)));
+        }
+
+        let shortcut = command_registry::shortcut_name(code, modifiers);
+        if shortcut == Some("exit") {
+            self.state.confirm_exit = crate::ExitConfirmation::Pending;
+            self.state
+                .messages
+                .push("Exit IRMind? Enter confirms; Esc cancels.".into());
+            return Ok(Some(false));
+        }
+        if shortcut == Some("expand") {
+            return Ok(None);
+        }
+        if self.subagents.key(
+            code,
+            &mut self.state.overlay_scroll,
+            self.state.input.is_empty(),
+        )? {
+            return Ok(Some(false));
+        }
+        Ok(None)
     }
 
     fn exit_confirmation_key(&mut self, code: KeyCode) -> bool {

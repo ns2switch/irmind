@@ -429,6 +429,7 @@ pub(crate) fn run_home(
             Ok(())
         });
         let mut runtime = HomeRuntime {
+            subagent_review: launch.subagent_review,
             demo_speed: options.demo_speed,
             terminal,
             engine,
@@ -553,6 +554,7 @@ impl StartupCaseView<'_, '_> {
             id,
             self.shutdown,
             case::CasePresentation {
+                subagent_review: launch.subagent_review,
                 demo_speed: self.demo_speed,
                 overrides_active: launch.overrides_active,
                 modules: self.modules,

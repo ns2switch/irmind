@@ -327,6 +327,7 @@ impl AutomationContext<'_, '_> {
                     module_statuses,
                     cancel,
                     irmind_tui::WorkspaceLaunch {
+                        subagent_review: Some(workspace_io.subagent_review.as_ref()),
                         initial_case: Some(&parse_id(&case_id)?),
                         resume_last_case: irmind_tui::ResumeMode::Disabled,
                         new_analyst_key,
