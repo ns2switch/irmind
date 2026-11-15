@@ -905,6 +905,21 @@ fn stored_history_engine_with_queries(
     chunks: &[irmind_app::subagents::CheckedBranchChunk],
     queries: Arc<dyn irmind_app::subagents::TaskEvidenceQueries>,
 ) -> (Arc<LocalStore>, Engine<'static>) {
+    stored_history_engine_with_interaction(
+        root,
+        history,
+        chunks,
+        queries,
+        Arc::new(NoPlanInteraction),
+    )
+}
+fn stored_history_engine_with_interaction(
+    root: &std::path::Path,
+    history: &History,
+    chunks: &[irmind_app::subagents::CheckedBranchChunk],
+    queries: Arc<dyn irmind_app::subagents::TaskEvidenceQueries>,
+    interaction: Arc<dyn irmind_app::subagents::AnalystPlanInteraction>,
+) -> (Arc<LocalStore>, Engine<'static>) {
     use irmind_app::{
         CaseMutation, SkillServices,
         subagents::{SubagentBranchStore, SubagentPorts},
@@ -967,7 +982,7 @@ fn stored_history_engine_with_queries(
         .with_subagents(SubagentPorts {
             branches: Arc::new(ParquetStore::open(root).unwrap()),
             queries,
-            analyst: Arc::new(NoPlanInteraction),
+            analyst: interaction,
         }),
         ExecutionMode::Attended,
         Arc::new(irmind_testkit::FixedClock::new(10)),

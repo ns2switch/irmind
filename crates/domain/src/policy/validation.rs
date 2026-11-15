@@ -23,6 +23,13 @@ pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
         | Tool::EdrDetections
         | Tool::ThreatIntelExternal => valid_edr_and_external_intel(proposal),
         Tool::ObjectList | Tool::ObjectRead => valid_object_request(proposal),
+        Tool::DelegateTask => {
+            valid_args(&proposal.args, &["tasks"])
+                && proposal
+                    .args
+                    .get("tasks")
+                    .is_some_and(|value| !value.trim().is_empty() && value.len() <= 16 * 1024)
+        }
         Tool::SkillRead => {
             valid_args(&proposal.args, &["name", "resource"])
                 && proposal

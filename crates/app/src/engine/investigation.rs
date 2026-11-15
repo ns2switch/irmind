@@ -1,4 +1,5 @@
 mod compaction;
+mod delegation;
 mod limits;
 mod preparation;
 mod skills;
@@ -23,12 +24,29 @@ struct PreparedInvestigation {
 
 struct TurnContext {
     cloud_limit_reached: bool,
+    delegated_rounds: usize,
+    case_lock: std::sync::Mutex<Option<Box<dyn crate::CaseLock>>>,
     budget: crate::CaseBudgetLimits,
     messages: Vec<CompletionMessage>,
     catalog: Vec<crate::tool_catalog::ToolSpec>,
     nonce: uuid::Uuid,
     previous: std::collections::HashMap<String, String>,
     skills: std::sync::Arc<std::sync::Mutex<crate::skills::runtime::SkillTurn>>,
+}
+
+impl TurnContext {
+    fn request(&self, used_tokens: u64) -> CompletionRequest {
+        CompletionRequest {
+            messages: self.messages.clone(),
+            tools: self.catalog.clone(),
+            max_output_tokens: 2048,
+            remaining_case_tokens: self
+                .budget
+                .model_tokens
+                .saturating_sub(used_tokens)
+                .saturating_sub(512.min(self.budget.model_tokens / 4)),
+        }
+    }
 }
 
 fn system_prompt() -> &'static str {
@@ -120,7 +138,7 @@ impl Engine<'_> {
             ));
         }
         let id_owned = id.clone();
-        let _case_lock = self
+        let case_lock = self
             .blocking_local(move |local| local.repo.lock_case(&id_owned))
             .await?;
         let id_owned = id.clone();
@@ -132,6 +150,10 @@ impl Engine<'_> {
             })
             .await?;
         let (case, mut turn) = self.make_turn(prepared);
+        *turn
+            .case_lock
+            .lock()
+            .map_err(|_| AppError::InvalidChain(0))? = Some(case_lock);
         self.initialize_turn_skills(&case, &mut turn, alert, cancel)
             .await?;
         if let Some(answer) = self
@@ -142,6 +164,10 @@ impl Engine<'_> {
         }
         let limit = self.policy.max_model_rounds_per_turn;
         for number in 1..=limit {
+            let number = number.saturating_add(turn.delegated_rounds);
+            if number > limit {
+                break;
+            }
             if let Some(reply) = self
                 .investigation_round(&case, model, &mut turn, (number, limit), cancel, on_text)
                 .await?
@@ -204,6 +230,8 @@ impl Engine<'_> {
         };
         let turn = TurnContext {
             cloud_limit_reached: false,
+            delegated_rounds: 0,
+            case_lock: std::sync::Mutex::new(None),
             budget,
             messages,
             catalog,
@@ -228,6 +256,13 @@ impl Engine<'_> {
         let id = &case.id;
         self.compact_history_if_needed(id, model, turn, cancel)
             .await?;
+        let round = self.shared_round_number(id, turn, round).await?;
+        if round.0 > round.1 {
+            return self
+                .finish_limited_turn(id, model, turn, "model round limit", cancel, on_text)
+                .await
+                .map(Some);
+        }
         let used_tokens = self.used_model_tokens(id).await?;
         self.audit_local(
             id,
@@ -237,16 +272,7 @@ impl Engine<'_> {
             None,
         )
         .await?;
-        let request = CompletionRequest {
-            messages: turn.messages.clone(),
-            tools: turn.catalog.clone(),
-            max_output_tokens: 2048,
-            remaining_case_tokens: turn
-                .budget
-                .model_tokens
-                .saturating_sub(used_tokens)
-                .saturating_sub(512.min(turn.budget.model_tokens / 4)),
-        };
+        let request = turn.request(used_tokens);
         if request.remaining_case_tokens == 0 {
             return self
                 .finish_limited_turn(id, model, turn, "model token limit", cancel, on_text)
@@ -344,7 +370,7 @@ impl Engine<'_> {
             answer.text,
             calls.clone(),
         ));
-        self.dispatch_model_calls(case, turn, calls, cancel, on_text)
+        self.dispatch_model_calls(case, model, turn, calls, cancel, on_text)
             .await?;
         let id_owned = id.clone();
         let completed = self
@@ -375,6 +401,7 @@ impl Engine<'_> {
     async fn dispatch_model_calls(
         &self,
         case: &Case,
+        model: &dyn LlmPort,
         turn: &mut TurnContext,
         calls: Vec<ModelToolCall>,
         cancel: &CancellationToken,
@@ -384,6 +411,16 @@ impl Engine<'_> {
         for call in &calls {
             if !ids.insert(call.id()) {
                 return Err(AppError::Model("duplicate tool call ID".into()));
+            }
+        }
+        let mut delegated = None;
+        for call in &calls {
+            if call.proposal().tool == crate::Tool::DelegateTask {
+                delegated = Some(
+                    self.delegate_turn_plan(case, model, turn, &calls, cancel)
+                        .await?,
+                );
+                break;
             }
         }
         for call in calls {
@@ -404,6 +441,10 @@ impl Engine<'_> {
             )));
             let result = if turn.cloud_limit_reached {
                 "denied: turn stopped at the case cloud transfer limit; review /budget".into()
+            } else if call.proposal().tool == crate::Tool::DelegateTask {
+                delegated
+                    .clone()
+                    .unwrap_or_else(|| "Delegation was not available.".into())
             } else if call.proposal().tool == crate::Tool::SkillRead {
                 self.read_turn_skill(case, turn, &call, cancel).await?
             } else if !self
