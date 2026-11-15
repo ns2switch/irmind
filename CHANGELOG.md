@@ -15,6 +15,7 @@ IRMind version or re-ingestion of verified originals; there is no automatic migr
   loaded skills, source-restricted queries and shared case budgets. The TUI shows
   plans before start, requires signed confirmation above 25% of remaining tokens
   or calls, and offers signed confirmation for every plan as a preference.
+- Stop before an object transfer that cannot fit its task byte allocation, preserving a partial result with the remaining budget.
 - Keep a partial, verifiable task result when a provider repeats a tool-call identifier, without repeating its effect.
 - Follow activity and partial coverage with `/subagents`; cancel individual tasks
   without discarding completed work. Child approval requests return to the owning

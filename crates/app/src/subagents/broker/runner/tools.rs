@@ -93,7 +93,9 @@ impl Engine<'_> {
     ) -> Result<bool, AppError> {
         state.queued.extend(calls);
         while let Some(call) = state.queued.pop_front() {
-            if !state.accept_call_id(&call.id) {
+            if !state.accept_call_id(&call.id)
+                || !state.transfer_fits(&call, task.budget.cloud_bytes)
+            {
                 return Ok(false);
             }
             if state.seq > 4092 {
