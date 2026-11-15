@@ -11,6 +11,7 @@ Set Height 660
 Set Padding 0
 Set Theme "Catppuccin Mocha"
 Set Framerate 12
+Set PlaybackSpeed 1.0
 Set TypingSpeed 15 ms
 Set CursorBlink false
 
@@ -24,7 +25,7 @@ Env TERM "xterm-256color"
 Hide
 Type "mkdir -p /tmp/irmind-demo-home && clear && env -i HOME=/tmp/irmind-demo-home USER=demo LOGNAME=demo HOSTNAME=demo PATH=/usr/local/bin:/usr/bin:/bin TERM=xterm-256color /vhs/target/debug/examples/demo --resume"
 Enter
-Sleep 6 s
+Wait+Screen /Resumed · \/home to view all cases/
 Show
 Screenshot docs/assets/resumed.png
 Sleep 700 ms
@@ -75,7 +76,8 @@ Screenshot docs/assets/new.png
 Sleep 700 ms
 Type "Demo CloudTrail alert"
 Enter
-Sleep 1200 ms
+Wait+Screen /Ask about the case/
+Sleep 500 ms
 
 Type "/"
 Sleep 350 ms
@@ -85,22 +87,50 @@ Type "ing"
 Tab
 Type " examples/cloudtrail-alert.json"
 Enter
-Sleep 1400 ms
+Wait+Screen /Ingest: Ingested 1 file/
+Sleep 500 ms
 
 Type "What does this synthetic role assumption show?"
 Enter
 Sleep 1 s
 Screenshot docs/assets/conversation.png
 Sleep 1 s
-Sleep 1700 ms
+Wait+Screen /Approval required/
 Screenshot docs/assets/approval-card.png
 Sleep 700 ms
 
 Type "/approve "
 Tab
 Enter
-Sleep 2 s
-Type "/ver"
-Tab
+Wait+Screen /approval executed/
+Sleep 500 ms
+Type "/verify examples"
 Enter
-Sleep 2200 ms
+Sleep 200 ms
+Enter
+Wait+Screen /Verified 1 of 1 original sources/
+Sleep 500 ms
+
+Type "/help"
+Enter
+Wait+Screen /Help · PgUp/
+Sleep 500 ms
+Screenshot docs/assets/help.png
+Escape
+Sleep 300 ms
+Type "/skills"
+Enter
+Wait+Screen /Forensic skills/
+Sleep 500 ms
+Screenshot docs/assets/skills.png
+Escape
+Sleep 300 ms
+Type "/subagents"
+Enter
+Wait+Screen /No delegated tasks/
+Sleep 500 ms
+Screenshot docs/assets/subagents.png
+Escape
+Sleep 300 ms
+
+Sleep 2 s

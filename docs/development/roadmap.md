@@ -4,6 +4,8 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 
 [Español](../es/roadmap.md)
 
+Launch preparation: [real-service validation](real-validation.md), [model evaluation](hunteval-model-benchmark.md) and [native signing setup](native-signing.md). These guides are procedures, not completed field validations.
+
 This page is for contributors and evaluators. It describes intentions, not release commitments. Read the [security model](../security-model.md) before connecting a service.
 
 Current pre-1.0 policy: minor versions may break formats without migration. V3 is the sole artifact layout in v0.3; compatibility statements in delivered-release sections describe those historical releases only.
@@ -18,7 +20,7 @@ Stabilize the pre-release with manual validation, verifiable installation, and s
 
 - H5 is complete by analyst decision after a real DeepSeek greeting test. Record the remaining procedure details and test one connector against a real test environment. See the [validation record](manual-validation.md#result-record).
 - Maintain Sigstore keyless signatures, GitHub artifact attestations, and an SBOM for release assets, delivered in v0.1.1.
-- Sign macOS binaries with Developer ID, hardened runtime, and `notarytool` notarization in a protected release environment that runs only on tags. The maintainer must provision the certificate and App Store Connect API key before implementation; secrets are never configured through a roadmap issue.
+- Sign macOS binaries with Developer ID, hardened runtime, and `notarytool` notarization in a protected release environment that runs only on tags. The maintainer must provision the certificate and App Store Connect API key before activation; secrets are never configured through a roadmap issue.
 - Apply to the SignPath Foundation open-source program for Windows Authenticode signing. Publish `CODE_SIGNING.md` to describe signed assets, release approval, and build provenance. The application is a maintainer task.
 - Maintain checksum-verified install scripts and the Linux aarch64 binary, delivered in v0.1.1. Homebrew, AUR, Nix, winget, and Scoop packaging is open to community maintainers.
 - Reduce co-observation disk use, improve `entity_lookup`, and bound worst-case three-hop `path` queries ([issue #37](https://github.com/ns2switch/irmind/issues/37)).

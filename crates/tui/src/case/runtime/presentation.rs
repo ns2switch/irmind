@@ -176,6 +176,7 @@ impl CaseRuntime<'_, '_, '_> {
                 KeyCode::Enter => match guide.final_option {
                     0 => {
                         guide.hide();
+                        self.state.conversation.scroll_by(isize::MAX);
                         self.state.messages.push("Demo exploration · sealed case · /help lists commands; /demo exit deletes this session.".into());
                     }
                     1 if !guide.show_real_case_help => guide.show_real_case_help = true,

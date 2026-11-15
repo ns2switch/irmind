@@ -6,17 +6,11 @@ Esta guía es para analistas que evalúan IRMind con datos sintéticos. Explica 
 
 > IRMind está en desarrollo. No lo uses para incidentes reales ni datos sensibles.
 
-## Instalación
+## Instala una release verificada
 
-La opción recomendada para uso interno es compilar desde el código. Instala Rust 1.95.0 y un terminal compatible. Puedes elegir el archivo cifrado sin disponer de un llavero del sistema. Después ejecuta:
+Empieza por la [guía de plataformas](platforms.md): descarga el instalador, verifica su lista de checksums firmada y la identidad del editor y ejecuta el script guardado. Hay binarios para Linux x86_64/aarch64, macOS Apple Silicon y Windows x86_64. La firma y notarización nativas de Apple y Authenticode en Windows siguen pendientes; sí hay firmas Sigstore y attestations.
 
-```sh
-rustup toolchain install 1.95.0
-cargo build --release --locked -p irmind
-./target/release/irmind
-```
-
-En Windows, ejecuta `.\target\release\irmind.exe` desde Windows Terminal. Para un binario de versión, comprueba `SHA256SUMS`, su bundle Sigstore y la procedencia de GitHub antes de usarlo. La versión preliminar v0.1.0 solo tiene hashes; consulta [plataformas](platforms.md) para los pasos de cada versión.
+Después ejecuta `irmind demo` antes de configurar un modelo. Compilar es opcional para contribuir: `cargo build --release --locked -p irmind` con Rust 1.95.0. Conserva el ejecutable que creó cada caso.
 
 ## Pruébalo en cinco minutos
 
@@ -119,3 +113,11 @@ cobertura; `/subagents cancel <task>` cancela una tarea y `/pause` la investigac
 Más del 25 % de los tokens o llamadas restantes exige tu firma. La
 [guía de subagentes](subagents.md) explica las preferencias de confirmación, los
 límites compartidos y la exportación de ramas firmadas.
+
+## Ayuda e inspección de métodos
+
+`/help` abre una vista desplazable; PgUp/PgDn desplaza y Esc vuelve. `/skills` lista métodos sin modelo. `/subagents` muestra trabajo delegado o un estado vacío explícito. El fixture de configuración sintético se limita a tres módulos ilustrativos; el producto incluye todos por defecto.
+
+![Ayuda desplazable de comandos en la interfaz sintética actual.](../assets/help.png)
+
+![Inspección de métodos forenses incluidos sin configurar un modelo.](../assets/skills.png)

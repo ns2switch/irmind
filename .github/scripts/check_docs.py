@@ -42,6 +42,12 @@ TRANSLATIONS = {
     ROOT / "CONTRIBUTING.es.md": ROOT / "CONTRIBUTING.md",
     ROOT / "CODE_OF_CONDUCT.es.md": ROOT / "CODE_OF_CONDUCT.md",
     ROOT / "SECURITY.es.md": ROOT / "SECURITY.md",
+    ROOT / "CODE_SIGNING.es.md": ROOT / "CODE_SIGNING.md",
+    **{
+        ROOT / "docs/es" / name: ROOT / "docs/development" / name
+        for name in ("adding-a-module.md", "adding-a-mapping.md", "writing-a-skill.md",
+                     "native-signing.md", "real-validation.md", "hunteval-model-benchmark.md")
+    },
     ROOT / "docs/es/roadmap.md": ROOT / "docs/development/roadmap.md",
     ROOT / "docs/es/manual-validation.md": ROOT / "docs/development/manual-validation.md",
     **{
@@ -176,8 +182,13 @@ def irmind_flag_citations(text: str) -> set[str]:
         # Complete external invocations own their flags. Mixed shell commands
         # still receive strict validation; a repository named irmind-skills
         # is not an invocation of the irmind executable.
-        external = re.match(r"^\s*(?:\$ )?(?:gcloud\s|gh\s+secret\s+set\s)", line)
-        mixed = re.search(r"(?<![\w.-])irmind(?:\.exe)?(?=\s|$)|&&|\|\||;|\$\(|`", line)
+        external = re.match(
+            r"^\s*(?:\$ )?(?:gcloud\s|gh\s+secret\s+set\s|docker\s+compose\s|curl\s|"
+            r"python3\s+(?:scripts/hunteval_benchmark\.py|tools/real-validation/lab\.py)\s)",
+            line,
+        )
+        ownership_line = re.sub(r"--repo\s+[A-Za-z0-9_.-]+/irmind(?=\s|$)", "--repo REPOSITORY", line)
+        mixed = re.search(r"(?<![\w.-])irmind(?:\.exe)?(?=\s|$)|&&|\|\||;|\$\(|`", ownership_line)
         if not (external and not mixed):
             lines.append(line)
     return set(FLAG.findall("\n".join(lines))) - NON_IRMIND_FLAGS

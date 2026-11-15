@@ -461,7 +461,10 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                     } else {
                         format!(" · {rejected} rejected; expand the rejection cards for details")
                     };
-                    Ok(format!("Ingested {count} files{rejected}"))
+                    Ok(format!(
+                        "Ingested {count} {}{rejected}",
+                        if count == 1 { "file" } else { "files" }
+                    ))
                 })
         });
     }
@@ -519,9 +522,13 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
 
     fn case_command(&mut self, prompt: &str) -> Result<bool> {
         match prompt {
-            "/help" => self.state.messages.push(command_registry::help_with_skills(
-                &self.state.skill_commands,
-            )),
+            "/help" => {
+                self.state.overlay_scroll = 0;
+                self.state.help = Some(format!(
+                    "Help · PgUp/PgDn scroll · Esc back\n{}",
+                    command_registry::help_with_skills(&self.state.skill_commands)
+                ));
+            }
             "/scope" => {
                 self.state
                     .messages

@@ -22,15 +22,18 @@ impl DemoSession {
         })
     }
     pub(super) fn expect(&mut self, needle: impl AsRef<str>) -> Result<Vec<u8>, String> {
-        let needle = needle.as_ref();
+        self.expect_screen(needle.as_ref(), true)
+    }
+
+    pub(super) fn expect_screen(&mut self, needle: &str, present: bool) -> Result<Vec<u8>, String> {
         let started = Instant::now();
         loop {
-            if !self.sent && self.screen.text().contains(needle) {
+            if !self.sent && self.screen.text().contains(needle) == present {
                 return Ok(self.seen.clone());
             }
             if started.elapsed() > self.timeout {
                 return Err(format!(
-                    "no matching screen within {:?}: {needle}; screen: {}",
+                    "no matching screen within {:?}: {needle} present={present}; screen: {}",
                     self.timeout,
                     self.screen.text()
                 ));

@@ -24,4 +24,4 @@ The manual [demo workflow](../../.github/workflows/demo.yml) uses this generator
 
 ## Non-demo workspace screenshots
 
-The older [generate.py](generate.py) drives a synthetic example to capture settings, forms and the first-run wizard. It uses the same pinned VHS image and a reviewed fixture hash. Its 120 × 32 workspace and short-clip checks apply to that example, not to the full presentation. Running it also replaces the GIF, so regenerate the current presentation afterward before publishing README assets.
+The older [generate.py](generate.py) drives a synthetic example to capture settings, forms, scrollable help, skills and the subagent panel. It uses the same pinned VHS image and a reviewed fixture hash. Its 120 × 32 workspace and short-clip checks apply to that example, not to the full presentation. Running it also replaces the GIF, so regenerate the current presentation afterward before publishing README assets.

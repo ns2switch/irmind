@@ -75,7 +75,7 @@ Use a terminal compatible with xterm, such as GNOME Terminal or Konsole. The `os
 
 ## macOS
 
-Use Terminal.app or iTerm2. The `os` backend uses Keychain; the `file` backend is available for explicit SSH use. CI targets Apple Silicon. After verifying the release, Gatekeeper may block a downloaded binary without Apple code signing. Allow **that binary only** in System Settings → Privacy & Security, or remove only its quarantine attribute with `xattr -d com.apple.quarantine ./irmind`. Never disable Gatekeeper system-wide. For a separately downloaded helper, verify it first and apply the same per-file quarantine removal to `./irmind-evtx` if needed.
+Use Terminal.app or iTerm2. The `os` backend uses Keychain; the `file` backend is available for explicit SSH use. CI targets Apple Silicon. After verifying the release, Gatekeeper may block a downloaded binary without Apple code signing. Follow your organization’s policy and the macOS Privacy & Security review for that verified binary only. Do not disable Gatekeeper or remove quarantine to bypass an unresolved block. The helper requires the same independent verification. Native signing preparation is described below.
 
 ## Windows
 
@@ -92,3 +92,18 @@ The TUI uses the alternate screen and sanitizes external text before display. Au
 Ctrl+O expands or folds the selected expandable card from the input box, conversation or sidebar. Without a suitable selection, it uses the last expandable card. `/expand` performs the same action and remains available if a terminal, SSH client or custom tmux keymap intercepts the key. No focus change or draft clearing is needed.
 
 The byte `0x0f` is covered by the real-binary PTY regression on the CI operating systems. This does not certify individual GUI terminal keymaps. Interactive confirmation in macOS Terminal.app, iTerm2, GNOME Terminal/Konsole, Windows Terminal, SSH and tmux remains a maintainer check. No terminal-specific interception has been confirmed by this automated test; use `/expand` rather than disabling terminal safety settings.
+
+## Native signing preparation
+
+Developer ID signing and notarization are prepared but disabled. See the
+[maintainer setup](development/native-signing.md); current releases still lack
+Apple native signatures. No production secret or activation is required to use
+the existing Sigstore verification. SignPath application/acceptance remains
+unrecorded in [#66](https://github.com/ns2switch/irmind/issues/66).
+
+Windows may show “Windows protected your PC”, an unrecognized-app warning or an
+unknown publisher. Windows 11 Smart App Control can block an unsigned file;
+Sigstore verification does not override it. Verify SHA256SUMS, the exact-tag
+Sigstore identity and GitHub provenance **before** execution. Follow organizational
+policy if execution remains blocked; do not disable protections to make the demo
+run. See [Microsoft's explanation](https://learn.microsoft.com/windows/apps/package-and-deploy/smartscreen-reputation).

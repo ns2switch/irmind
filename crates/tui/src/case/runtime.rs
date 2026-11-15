@@ -361,6 +361,12 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                 irmind_app::recorded_instance_sources(&self.state.entries)?;
             self.state.operations = self.engine.audit_log.operations(self.id)?;
             self.state.timeline = self.engine.graph.timeline(self.id, 30)?;
+            if !super::no_case_evidence(
+                self.state.hashes.is_empty(),
+                self.state.entries.iter().map(|entry| entry.kind),
+            ) {
+                self.state.conversation.clear_empty_evidence_hint();
+            }
             self.state.needs_refresh = false;
         }
         Ok(())

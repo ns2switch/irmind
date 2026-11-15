@@ -125,3 +125,7 @@ and [MITRE ATT&CK](https://attack.mitre.org/). Links live here rather than in
 loaded methodology: skill content passes the same guard as other untrusted text.
 
 Kubernetes methods reference [auditing](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/) and [RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/), the [Falco Kubernetes audit plugin field contract](https://github.com/falcosecurity/plugins/blob/main/plugins/k8saudit/README.md), and ATT&CK [additional container cluster roles](https://attack.mitre.org/techniques/T1098/006/), [container API credential access](https://attack.mitre.org/techniques/T1552/007/), [deployment](https://attack.mitre.org/techniques/T1610/), [administration](https://attack.mitre.org/techniques/T1609/) and [escape to host](https://attack.mitre.org/techniques/T1611/). The methodology is original project text; these references do not establish a finding.
+
+## Write a skill
+
+See the [contributor walkthrough](development/writing-a-skill.md) for current frontmatter, limits, signed installation and synthetic end-to-end tests.

@@ -1,0 +1,51 @@
+# Disposable developer lab. No production credentials; port is loopback only.
+name: irmind-validation
+services:
+  certificates:
+    image: ${ELASTIC_IMAGE:?Run lab.py prepare and pass its env file}
+    user: '0'
+    network_mode: none
+    entrypoint: /bin/bash
+    command:
+      - -euc
+      - |
+        if test ! -f /certs/es/es.crt; then
+          bin/elasticsearch-certutil ca --silent --pem --out /certs/ca.zip
+          unzip -q /certs/ca.zip -d /certs
+          printf 'instances:\n  - name: es\n    dns: [es, localhost]\n    ip: [127.0.0.1]\n' > /certs/instances.yml
+          bin/elasticsearch-certutil cert --silent --pem --in /certs/instances.yml --ca-cert /certs/ca/ca.crt --ca-key /certs/ca/ca.key --out /certs/es.zip
+          unzip -q /certs/es.zip -d /certs
+          rm -f /certs/ca/ca.key /certs/ca.zip
+          chown -R 1000:0 /certs
+          find /certs -type d -exec chmod 750 {} \;
+          find /certs -type f -exec chmod 640 {} \;
+        fi
+    volumes: [certificates:/certs]
+  es:
+    image: ${ELASTIC_IMAGE:?Run lab.py prepare and pass its env file}
+    depends_on:
+      certificates: {condition: service_completed_successfully}
+    ports: ['127.0.0.1:9200:9200']
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: 'true'
+      xpack.security.enrollment.enabled: 'false'
+      xpack.security.http.ssl.enabled: 'true'
+      xpack.security.http.ssl.key: certs/es/es.key
+      xpack.security.http.ssl.certificate: certs/es/es.crt
+      xpack.security.http.ssl.certificate_authorities: certs/ca/ca.crt
+      ELASTIC_PASSWORD_FILE: /run/secrets/elastic_password
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+    secrets: [elastic_password]
+    volumes: [certificates:/usr/share/elasticsearch/config/certs:ro, data:/usr/share/elasticsearch/data]
+    mem_limit: 2g
+    networks: [lab]
+secrets:
+  elastic_password:
+    file: ../../target/real-validation/elastic-password.txt
+volumes:
+  certificates:
+  data:
+networks:
+  lab:
+    internal: true

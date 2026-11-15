@@ -154,7 +154,7 @@ portable-pty = "=0.9.0"
 
 [[example]]
 name = "demo"
-required-features = ["keystore-file", "parser-json"]
+required-features = ["keystore-file", "parser-json", "mapping-cloudtrail"]
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

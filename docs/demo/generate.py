@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import getpass
 import hashlib
 import os
@@ -22,7 +23,7 @@ EXAMPLE_SHA256 = "0b7f3a97647d64d5d917b09002f069f2cf15a058ea2406bceaf2d5fe5f02d0
 FILES = (
     "demo.gif", "resumed.png", "home.png", "model.png", "modules.png",
     "new.png", "command-menu.png", "conversation.png", "approval-card.png",
-    "settings.png", "keystore.png", "preferences.png",
+    "settings.png", "keystore.png", "preferences.png", "help.png", "skills.png", "subagents.png",
 )
 EXPECTED_FLOW = (
     "Resumed · /home to view all cases",
@@ -34,7 +35,7 @@ EXPECTED_FLOW = (
     "Preferences",
     "New case",
     "Demo CloudTrail alert",
-    "Evidence ingested",
+    "Ingest: Ingested 1 file",
     "Commands",
     "⏺ The synthetic record",
     "Approval required",
@@ -44,8 +45,11 @@ EXPECTED_FLOW = (
     "2. Deny with reason",
     "3. Edit arguments",
     "approval executed",
-    "Verify: Verified",
-    "audit entries",
+    "Verify originals: Verified 1 of 1 original sources",
+    "original sources",
+    "Help · PgUp/PgDn",
+    "Forensic skills",
+    "No delegated tasks",
 )
 
 
@@ -114,7 +118,11 @@ def install(source: Path, destination: Path) -> None:
 
 
 def main() -> None:
-    binary = ROOT / "target/debug/examples/demo"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/examples/demo")
+    binary = parser.parse_args().binary.resolve()
+    if not binary.is_relative_to(ROOT):
+        raise ValueError("capture binary must be built inside the checkout")
     if not binary.is_file():
         raise SystemExit("build the fixture: cargo build -p irmind --example demo --locked")
     example = ROOT / "examples/cloudtrail-alert.json"
@@ -124,14 +132,23 @@ def main() -> None:
         raise ValueError("unexpected VHS version")
     with tempfile.TemporaryDirectory(prefix="irmind-demo-") as directory:
         output = Path(directory)
+        tape = (ROOT / "docs/demo/demo.tape").read_text()
+        tape = tape.replace("/vhs/target/debug/examples/demo", "/vhs/" + binary.relative_to(ROOT).as_posix())
+        (output / "capture.tape").write_text(tape)
         docker(
             "--init", "--user", f"{os.getuid()}:{os.getgid()}",
             "--env", "HOME=/tmp/irmind-demo-home",
             "--mount", f"type=bind,src={ROOT},dst=/vhs,readonly",
             "--mount", f"type=bind,src={output},dst=/vhs/docs/assets",
-            "--workdir", "/vhs", IMAGE, "docs/demo/demo.tape",
+            "--workdir", "/vhs", IMAGE, "docs/assets/capture.tape",
         )
-        validate(output)
+        try:
+            validate(output)
+        except ValueError:
+            diagnostics = ROOT / "target/launch"
+            diagnostics.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(output / "demo.ascii", diagnostics / "workspace-capture.ascii")
+            raise
         for name in FILES:
             install(output / name, ASSETS / name)
     print("Generated the synthetic TUI GIF and screenshots; temporary files removed.")

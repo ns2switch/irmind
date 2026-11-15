@@ -1,0 +1,26 @@
+[
+  {
+    "name": "splunk-aws.json",
+    "url": "https://media.githubusercontent.com/media/splunk/attack_data/4b19e4b6824a8ba91b0f5345a3a8de488619e823/datasets/attack_techniques/T1110.001/aws_login_failure/aws_cloudtrail_events.json",
+    "commit": "4b19e4b6824a8ba91b0f5345a3a8de488619e823",
+    "sha256": "d9d0ebbaf9a6aebd504b03f665eb1f35dfee4e34c0c6a5cf1c5318b7a12c1e9b",
+    "size": 8107,
+    "license": "Apache-2.0"
+  },
+  {
+    "name": "splunk-windows.log",
+    "url": "https://media.githubusercontent.com/media/splunk/attack_data/4b19e4b6824a8ba91b0f5345a3a8de488619e823/datasets/attack_techniques/T1003.001/atomic_red_team/windows-security.log",
+    "commit": "4b19e4b6824a8ba91b0f5345a3a8de488619e823",
+    "sha256": "962debff1935335a6c6396a19d778127af1316b964226ba4427fae4fb9c9361b",
+    "size": 8480,
+    "license": "Apache-2.0"
+  },
+  {
+    "name": "windows-logons.evtx",
+    "url": "https://raw.githubusercontent.com/sbousseaden/EVTX-ATTACK-SAMPLES/4ceed2f4706daf601c212a8f91c113dd85349a2c/Credential%20Access/CA_4624_4625_LogonType2_LogonProc_chrome.evtx",
+    "commit": "4ceed2f4706daf601c212a8f91c113dd85349a2c",
+    "sha256": "75f199b68d473172705bf874720b01820317fdd7aa4843545c98720dd6de197f",
+    "size": 69632,
+    "license": "GPL-3.0"
+  }
+]

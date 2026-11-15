@@ -4,17 +4,11 @@ This guide is for analysts evaluating IRMind with synthetic data. It takes you f
 
 > IRMind is under development. Do not use it for real incidents or sensitive data.
 
-## Install
+## Install a verified release
 
-The recommended internal path is a source build. Install Rust 1.95.0 and a supported terminal. An OS keyring is optional if you explicitly select the encrypted-file backend. Then run:
+Start with the [platform guide](platforms.md#verify-a-release-before-installing): download the installer, verify its signed checksum list and publisher identity, then run the saved script. Linux x86_64/aarch64, macOS Apple Silicon and Windows x86_64 binaries are available. Native Apple signing/notarization and Windows Authenticode remain pending; Sigstore signatures and provenance are available.
 
-```sh
-rustup toolchain install 1.95.0
-cargo build --release --locked -p irmind
-./target/release/irmind
-```
-
-On Windows, run `.\target\release\irmind.exe` in Windows Terminal. For a release binary, check `SHA256SUMS`, its Sigstore bundle, and GitHub provenance before use. The v0.1.0 pre-release has only checksums; see [platforms](platforms.md) for the exact version-dependent steps.
+After installation, run `irmind demo` before configuring a model. Building from source is optional for contributors: `cargo build --release --locked -p irmind` with Rust 1.95.0. Keep the executable that created each case.
 
 ## Try it in five minutes
 
@@ -115,3 +109,11 @@ and coverage; `/subagents cancel <task>` cancels one task and `/pause` cancels
 the investigation. Plans above 25% of remaining tokens or calls require your
 signature. [The subagent guide](subagents.md) explains confirmation preferences,
 shared limits and signed branch exports.
+
+## Help and method inspection
+
+`/help` opens a scrollable view; PgUp/PgDn scroll and Esc returns. `/skills` lists methods without requiring a model. `/subagents` shows delegated work or an explicit empty state. The synthetic settings fixture below is limited to three illustrative module rows; default product builds contain all modules.
+
+![Scrollable command help in the current synthetic interface.](assets/help.png)
+
+![Included forensic methods can be inspected without configuring a model.](assets/skills.png)

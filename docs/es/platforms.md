@@ -77,7 +77,7 @@ Usa un terminal compatible con xterm, como GNOME Terminal o Konsole. El backend 
 
 ## macOS
 
-Usa Terminal.app o iTerm2. `os` utiliza Keychain; `file` se puede elegir explícitamente por SSH. CI compila para Apple Silicon. Después de verificar la versión, Gatekeeper puede bloquear un binario descargado sin firma de código de Apple. Autoriza **solo ese binario** en Ajustes del Sistema → Privacidad y seguridad, o elimina únicamente su atributo de cuarentena con `xattr -d com.apple.quarantine ./irmind`. Nunca desactives Gatekeeper para todo el sistema. Si has descargado el auxiliar por separado, verifícalo primero y elimina solo la cuarentena de `./irmind-evtx` si es necesario.
+Usa Terminal.app o iTerm2. `os` utiliza Keychain; `file` se puede elegir explícitamente por SSH. CI compila para Apple Silicon. Después de verificar la versión, Gatekeeper puede bloquear un binario descargado sin firma de código de Apple. Sigue la política de tu organización y la revisión de Privacidad y seguridad de macOS solo para ese binario verificado. No desactives Gatekeeper ni elimines la cuarentena para eludir un bloqueo sin resolver. El auxiliar necesita la misma verificación independiente. La preparación de firma nativa se explica más abajo.
 
 ## Windows
 
@@ -94,3 +94,14 @@ La TUI usa la pantalla alternativa y sanea el texto externo antes de mostrarlo. 
 Ctrl+O despliega o pliega la tarjeta plegable seleccionada desde la caja de texto, la conversación o el panel lateral. Si no hay una selección adecuada, usa la última tarjeta plegable. `/expand` hace lo mismo si el terminal, el cliente SSH o una configuración propia de tmux intercepta la tecla. No hace falta cambiar el foco ni borrar el borrador.
 
 La prueba PTY del binario real en los sistemas de CI cubre el byte `0x0f`. Esto no certifica los mapas de teclas de cada aplicación gráfica. Sigue pendiente la comprobación interactiva en Terminal.app de macOS, iTerm2, GNOME Terminal/Konsole, Windows Terminal, SSH y tmux. Esta prueba automática no ha confirmado ninguna interceptación específica; usa `/expand` en vez de desactivar ajustes de seguridad del terminal.
+
+## Preparación de firma nativa
+
+Developer ID y notarización están preparados pero desactivados; consulta
+[la guía del mantenedor](native-signing.md). Las releases actuales siguen sin
+firma nativa de Apple. #66 no contiene aceptación de SignPath registrada.
+Windows puede mostrar «Windows protected your PC», aplicación no reconocida o
+editor desconocido. Smart App Control de Windows 11 puede bloquear un fichero
+sin firma: verificar Sigstore no anula esa protección. Comprueba SHA256SUMS,
+identidad exacta del tag y procedencia antes de ejecutar. Si sigue bloqueado,
+sigue la política de tu organización; no desactives las protecciones para la demo.

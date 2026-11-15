@@ -4,6 +4,12 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+**Format impact:** No case, artifact, skill or export format change in this preparation.
+
+- Show case help in a scrollable view and resume the conversation at its end after the demo presentation.
+- Refresh the verified-install quick start and synthetic v0.5.0 images, and add clean-release PTY checks for Linux, macOS and Windows.
+- Add opt-in real-service validation and multi-model HuntEval development helpers. Prepare disabled tag-only Developer ID signing and notarization; native signing remains unavailable until provisioned and validated.
+
 ## 0.5.0 — Bounded parallel investigations
 
 **Format impact:** New cases use CaseCreated version 4 with an initial signed

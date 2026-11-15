@@ -10,6 +10,11 @@ mod terminal_screen;
 mod demo_session;
 use demo_session::DemoSession;
 
+fn test_binary() -> std::ffi::OsString {
+    std::env::var_os("IRMIND_DEMO_PTY_BINARY")
+        .unwrap_or_else(|| env!("CARGO_BIN_EXE_irmind").into())
+}
+
 fn demo_command(real_home: &std::path::Path, demo_parent: &std::path::Path) -> Command {
     sized_demo_command(real_home, demo_parent, 120, 40)
 }
@@ -26,7 +31,7 @@ fn sized_demo_command(
         command
             .arg("-c")
             .arg("stty cols \"$2\" rows \"$3\"; exec \"$0\" --home \"$1\" demo --scripted --presentation-speed 50")
-            .arg(env!("CARGO_BIN_EXE_irmind"))
+            .arg(test_binary())
             .arg(real_home)
             .arg(columns.to_string())
             .arg(rows.to_string());
@@ -45,7 +50,7 @@ fn sized_demo_command(
             .arg("65001")
             .arg(">nul")
             .arg("&&")
-            .arg(env!("CARGO_BIN_EXE_irmind"))
+            .arg(test_binary())
             .arg("--home")
             .arg(real_home)
             .arg("demo")
@@ -250,6 +255,76 @@ fn eighty_by_twenty_four_completes_the_automatic_presentation() {
     session.expect("1. Explore this demo case").unwrap();
     session.expect("3. Exit").unwrap();
     session.send("\x1b").unwrap();
+    session.expect("Demo data deleted").unwrap();
+    assert_deleted(real_home.path(), demo_parent.path());
+}
+
+#[test]
+fn newcomer_commands_respond_after_the_demo_at_supported_sizes() {
+    for (columns, rows) in [(80, 24), (100, 40)] {
+        let real_home = tempfile::tempdir().unwrap();
+        let demo_parent = tempfile::tempdir().unwrap();
+        let command = sized_demo_command(real_home.path(), demo_parent.path(), columns, rows);
+        let mut session = DemoSession::spawn_sized(&command, columns, rows).unwrap();
+        reach_final(&mut session);
+        session.send("\r").unwrap();
+        session.expect("Demo exploration").unwrap();
+        session.send("/help\r").unwrap();
+        session.expect("Help · PgUp/PgDn").unwrap();
+        session.send("\x1b").unwrap();
+        session.expect_screen("Help · PgUp/PgDn", false).unwrap();
+        session.expect("Ask about the case").unwrap();
+        session.send("/skills\r").unwrap();
+        session.expect("Forensic skills").unwrap();
+        session.expect("aws-credential-compromise").unwrap();
+        session.send("\x1b").unwrap();
+        session.expect_screen("Forensic skills", false).unwrap();
+        session.expect("Ask about the case").unwrap();
+        session.send("/subagents\r").unwrap();
+        session.expect("No delegated tasks").unwrap();
+        session.send("\x1b").unwrap();
+        session.expect_screen("No delegated tasks", false).unwrap();
+        session.expect("Ask about the case").unwrap();
+        session.send("/demo exit\r\r").unwrap();
+        session.expect("Demo data deleted").unwrap();
+        assert_deleted(real_home.path(), demo_parent.path());
+    }
+}
+
+#[test]
+fn hundred_by_forty_completes_the_automatic_presentation() {
+    let real_home = tempfile::tempdir().unwrap();
+    let demo_parent = tempfile::tempdir().unwrap();
+    let command = sized_demo_command(real_home.path(), demo_parent.path(), 100, 40);
+    let mut session = DemoSession::spawn_sized(&command, 100, 40).unwrap();
+    reach_final(&mut session);
+    session.send("\x1b").unwrap();
+    session.expect("Demo data deleted").unwrap();
+    assert_deleted(real_home.path(), demo_parent.path());
+}
+
+#[test]
+fn release_exploration_lists_skills_subagents_and_specific_help() {
+    let real_home = tempfile::tempdir().unwrap();
+    let demo_parent = tempfile::tempdir().unwrap();
+    let command = sized_demo_command(real_home.path(), demo_parent.path(), 100, 40);
+    let mut session = DemoSession::spawn_sized(&command, 100, 40).unwrap();
+    reach_final(&mut session);
+    session.send("\r").unwrap();
+    session.expect("Demo exploration").unwrap();
+    session.send("/skills\r").unwrap();
+    session.expect("Forensic skills").unwrap();
+    session.send("\x1b").unwrap();
+    session.expect_screen("Forensic skills", false).unwrap();
+    session.send("/subagents\r").unwrap();
+    session.expect("No delegated tasks").unwrap();
+    session.send("\x1b").unwrap();
+    session.expect_screen("No delegated tasks", false).unwrap();
+    session.send("/help subagents\r").unwrap();
+    session.expect("/subagents [cancel <task>]").unwrap();
+    session.send("\x0f").unwrap();
+    session.expect("Inspect delegated tasks").unwrap();
+    session.send("/demo exit\r\r").unwrap();
     session.expect("Demo data deleted").unwrap();
     assert_deleted(real_home.path(), demo_parent.path());
 }

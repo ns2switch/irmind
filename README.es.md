@@ -1,10 +1,21 @@
 Traducción de README.md en el commit ca27a569d02a9bbd423dc3fc34adfe4a94e2f2eb; si hay diferencias, prevalece la versión en inglés.
 
-# IRMind — Respuesta asistida a incidentes
+# IRMind — investigaciones en terminal con registro firmado
 
-Cliente de IA en terminal para investigaciones de seguridad, con llamadas a herramientas sujetas a política y cadena de custodia firmada.
+IRMind es un asistente de terminal de software libre para analistas DFIR que evalúan flujos de respuesta a incidentes. Investiga evidencia local y remota mediante una conversación, carga **skills** forenses cuando hacen falta y delega tareas acotadas en **subagentes** paralelos. El modelo propone, la **política** decide y la **custodia firmada** conserva lo ocurrido.
 
-IRMind es un asistente agéntico de terminal para respuesta a incidentes y análisis forense: el analista conversa con un agente que investiga evidencia local y remota, carga skills forenses cuando hacen falta y delega trabajo acotado en subagentes paralelos. El modelo propone, la política decide y todo queda firmado.
+
+**Pre-1.0 · evaluación con datos sintéticos; no validado para incidentes reales.**
+
+## Prueba la demo sin conexión en dos minutos
+
+Después de [instalar una release verificada](docs/es/platforms.md#verificar-una-versión-antes-de-instalar), ejecuta:
+
+```sh
+irmind demo
+```
+
+Sin configurar modelos, claves de API, cuentas ni coste. La interfaz real investiga datos sintéticos con un modelo identificado como guionizado; la demo no hace peticiones de red. Enter avanza, Espacio pausa y Esc sale. Al salir se borran la evidencia y las claves temporales. El recorrido narrado completo dura más; puedes explorar los primeros resultados inmediatamente.
 
 ![Presentación automática de IRMind con narración a todo el ancho, evidencia sintética, respuesta en streaming, aprobación firmada y verificación de custodia](docs/assets/demo.gif)
 
@@ -20,7 +31,8 @@ IRMind es un asistente agéntico de terminal para respuesta a incidentes y anál
 
 - Abrir un caso, definir su alcance e investigar una alerta desde la terminal.
 - Ingerir evidencia local y consultar la cronología y el grafo de entidades.
-- Pedir a un modelo seleccionado que proponga consultas de investigación.
+- Pedir a un modelo seleccionado que proponga consultas y cargue una [skill](docs/es/skills.md) forense firmada.
+- Revisar planes acotados, seguir tareas paralelas con `/subagents` y cancelarlas sin descartar lo ya terminado.
 - Revisar y firmar aprobaciones antes de un enriquecimiento externo.
 - Consultar registros indexados y originales disponibles mientras el modelo recibe datos limitados y redactados.
 - Verificar, sellar, exportar y volver a verificar un paquete de caso.
@@ -39,13 +51,9 @@ Consulta el [modelo de seguridad](docs/es/security-model.md) para conocer las ga
 
 ## Instalación
 
-Para una evaluación interna, se recomienda compilar desde el código:
+Empieza por [la instalación verificada](docs/es/platforms.md#verificar-una-versión-antes-de-instalar): descarga y verifica el instalador antes de ejecutarlo, sin pasar scripts de red directamente a una shell. Compilar desde código es opcional para [contribuir](CONTRIBUTING.es.md).
 
-```sh
-rustup toolchain install 1.95.0
-cargo build --release --locked -p irmind
-./target/release/irmind
-```
+
 
 La [versión preliminar v0.5.0](https://github.com/ns2switch/irmind/releases/tag/v0.5.0) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
@@ -61,7 +69,7 @@ awk -v name="$binary" '$2 == name { print }' SHA256SUMS | sha256sum -c -
 gh attestation verify "$binary" -R ns2switch/irmind
 ```
 
-## Pruébalo en cinco minutos
+## Explora la demo guiada
 
 Ejecuta `irmind demo` o escribe `/demo` en el inicio. El producto teclea comandos y realiza una investigación de diez pasos por ti. Un panel de narración grande explica la evidencia, las consultas locales, la respuesta en streaming, la aprobación firmada y las comprobaciones de custodia. No necesitas clave de API, passphrase, cuenta ni red. El caso temporal aislado y las claves se borran al salir.
 

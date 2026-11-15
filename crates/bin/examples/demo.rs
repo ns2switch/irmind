@@ -106,6 +106,7 @@ impl ThreatIntelPort for DemoIntel {
 struct DemoIo {
     store: Arc<LocalStore>,
     recent: Option<CaseId>,
+    parsers: irmind_app::modules::ParserCatalog,
 }
 
 fn checked_example(path: &Path) -> Result<()> {
@@ -123,7 +124,30 @@ fn checked_example(path: &Path) -> Result<()> {
     Ok(())
 }
 
+static VERIFICATION_PARSER: irmind_mod_parser_json::JsonParser = irmind_mod_parser_json::JsonParser;
+
 impl WorkspaceIo for DemoIo {
+    fn parser_catalog(&self) -> Option<&irmind_app::modules::ParserCatalog> {
+        Some(&self.parsers)
+    }
+    fn read_format_sample(&self, path: &Path) -> Result<Vec<u8>> {
+        use std::io::Read as _;
+        checked_example(path)?;
+        let mut bytes = Vec::new();
+        std::fs::File::open(path)?
+            .take(64 * 1024)
+            .read_to_end(&mut bytes)?;
+        Ok(bytes)
+    }
+    fn large_case_store(&self) -> Option<&dyn irmind_app::LargeCaseStore> {
+        Some(self.store.as_ref())
+    }
+    fn large_case_exporter(&self) -> Option<&dyn irmind_app::LargeCaseExporter> {
+        Some(self.store.as_ref())
+    }
+    fn streaming_parser(&self) -> Option<&dyn irmind_app::StreamingEventParser> {
+        Some(&VERIFICATION_PARSER)
+    }
     fn load_last_case(&self) -> Result<Option<CaseId>> {
         Ok(self.recent.clone())
     }
@@ -202,6 +226,28 @@ impl WorkspaceIo for DemoIo {
     }
 }
 
+fn demo_storage(root: &Path) -> Result<(Arc<LocalStore>, irmind_app::modules::ParserCatalog)> {
+    use irmind_app::modules::{ModuleConfig, ModuleRegistry};
+    let mut registry = ModuleRegistry::new();
+    registry.register(
+        Box::new(irmind_mod_parser_json::JsonParser),
+        &ModuleConfig::new(),
+    )?;
+    registry.register(
+        Box::new(irmind_mod_mapping_json_compat::JsonCompatibilityMapping::generic_only()?),
+        &ModuleConfig::new(),
+    )?;
+    registry.register(
+        Box::new(irmind_mod_mapping_cloudtrail::CloudTrailMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
+    let parsers = registry
+        .parser_catalog()
+        .with_source_parser(irmind_mod_parser_json::source_log_parser())?;
+    let store = LocalStore::open_mapped(root, Arc::new(registry.mapping_catalog()?))?;
+    Ok((Arc::new(store), parsers))
+}
+
 fn main() -> Result<()> {
     let resume = match std::env::args().nth(1).as_deref() {
         None => false,
@@ -209,10 +255,14 @@ fn main() -> Result<()> {
         Some(_) => bail!("the offline demo only supports --resume"),
     };
     let data = tempfile::tempdir()?;
-    let store = Arc::new(LocalStore::open(data.path())?);
+    let (store, parsers) = demo_storage(data.path())?;
     let phrase = SecretString::from("offline synthetic demo phrase".to_owned());
     let keystore = FileKeystore::open(data.path(), &phrase, true)?;
     let signer = keystore.create(Actor::Analyst)?;
+    let agent = keystore.create(Actor::Agent(
+        irmind_domain::AgentId::parse("demo-agent")
+            .map_err(|_| anyhow::anyhow!("invalid synthetic agent ID"))?,
+    ))?;
     let ports = EnginePorts::new(
         store.clone(),
         store.clone(),
@@ -220,14 +270,28 @@ fn main() -> Result<()> {
         store.clone(),
         CryptoPorts::new(
             signer.clone(),
-            Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            Arc::new(
+                LocalVerifier::from_signer(signer.as_ref())
+                    .with_trusted_key(&agent.actor(), &agent.public_key())?,
+            ),
         ),
         Arc::new(MandatoryGuard::new()?),
     );
     let intel = DemoIntel;
     let model = DemoModel(AtomicUsize::new(0));
     let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
-        .with_threat_intel(&intel);
+        .with_threat_intel(&intel)
+        .with_large_case_pipeline(store.clone(), irmind_mod_parser_json::source_log_parser())
+        .with_parser_catalog(parsers.clone())
+        .with_skills(irmind_app::SkillServices::new(
+            Arc::new(irmind_infra::FileSkillPackageStore::new(data.path())),
+            Arc::new(irmind_infra::TomlSkillCompiler),
+            agent,
+            irmind_infra::bundled_skill_candidates()?
+                .into_iter()
+                .map(|s| s.package().clone())
+                .collect(),
+        )?)?;
     let recent = if resume {
         Some(
             engine
@@ -241,7 +305,11 @@ fn main() -> Result<()> {
     } else {
         None
     };
-    let io = DemoIo { store, recent };
+    let io = DemoIo {
+        store,
+        recent,
+        parsers,
+    };
     let modules = demo_modules();
     irmind_tui::run_workspace(
         &engine,
@@ -314,4 +382,45 @@ fn demo_modules() -> [ModuleStatus; 3] {
             missing: vec!["SPLUNK_TOKEN".into()],
         },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn synthetic_original_verifies_after_mapped_preparation() -> anyhow::Result<()> {
+        use irmind_app::LargeCaseStore as _;
+        let directory = tempfile::tempdir()?;
+        let (store, _) = super::demo_storage(directory.path())?;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+        let paths = ["cloudtrail-alert.json".into()];
+        let case = irmind_app::CaseId::parse("33333333-3333-3333-3333-333333333333")
+            .map_err(|_| anyhow::anyhow!("invalid synthetic case"))?;
+        let parser = irmind_mod_parser_json::source_log_parser();
+        let cancel = irmind_app::CancellationToken::new();
+        let prepared = store
+            .prepare_mapped_ingest(
+                irmind_app::MappedIngestRequest {
+                    case_id: &case,
+                    source_root: &root,
+                    relative_paths: &paths,
+                    copy_original: false,
+                    parser: parser.as_ref(),
+                    committed_artifacts: irmind_app::mapped_ingest::CommittedArtifacts::Slice(&[]),
+                    limits: irmind_app::PartitionLimits::default(),
+                },
+                &cancel,
+            )?
+            .ok_or_else(|| anyhow::anyhow!("no mapped preparation"))?;
+        for source in &prepared.metadata().sources {
+            store.verify_local_source(&root, &source.manifest, &cancel)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_catalog_keeps_cloudtrail_and_generic_selectors_disjoint() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let (_store, _parsers) = super::demo_storage(directory.path())?;
+        Ok(())
+    }
 }

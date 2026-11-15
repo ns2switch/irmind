@@ -1,10 +1,21 @@
 [Spanish version](README.es.md)
 
-# IRMind — Assisted Incident Response
+# IRMind — terminal investigations with a signed record
 
-A terminal AI client for security investigations with policy-enforced tool calls and a signed chain of custody.
+IRMind is an open-source terminal assistant for DFIR analysts evaluating incident response workflows. Investigate local and remote evidence in a conversation, load forensic **skills** on demand and delegate bounded tasks to parallel **subagents**. The model proposes, **policy** decides, and a **signed custody record** preserves what happened.
 
-IRMind is an agentic terminal assistant for incident response and digital forensics: the analyst converses with an agent that investigates local and remote evidence, loads forensic skills when needed, and delegates bounded work to parallel subagents. The model proposes, policy decides, and every action is signed.
+
+**Pre-1.0 · synthetic-data evaluation; not validated for real incidents.**
+
+## Try the offline demo in two minutes
+
+After [installing a verified release](docs/platforms.md#verify-a-release-before-installing), run:
+
+```sh
+irmind demo
+```
+
+No model setup, API key, account or cost. The real interface runs a synthetic investigation with an explicitly scripted model; no network request leaves the demo. Press Enter to advance, Space to pause and Esc to exit. Temporary evidence and keys are deleted on exit. The complete narrated walkthrough takes longer; you can explore its first results immediately.
 
 ![Automatic IRMind presentation with a full-width narration panel, synthetic evidence, streaming responses, signed approval, and custody verification](docs/assets/demo.gif)
 
@@ -21,6 +32,7 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 - Open a case, set its scope, and investigate an alert from one terminal workspace.
 - Ingest local evidence and search a case timeline and entity graph.
 - Ask a selected AI model to suggest queries and load a signed forensic [skill](docs/skills.md) when needed.
+- Review bounded plans, follow parallel tasks with `/subagents`, and cancel them without discarding completed work.
 - Review and sign approvals before any external enrichment call.
 - Inspect indexed records and available originals while the model receives bounded, redacted data.
 - Verify, seal, export, and independently verify a case package.
@@ -39,13 +51,9 @@ See the [security model](docs/security-model.md) for the guarantees and their li
 
 ## Install
 
-Build from source for internal evaluation:
+Start with the [verified release instructions](docs/platforms.md#verify-a-release-before-installing). Download and verify the saved installer before running it; do not pipe a network script to a shell. Source builds are optional for [contributors](CONTRIBUTING.md).
 
-```sh
-rustup toolchain install 1.95.0
-cargo build --release --locked -p irmind
-./target/release/irmind
-```
+
 
 The [v0.5.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.5.0) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
 
@@ -61,7 +69,7 @@ awk -v name="$binary" '$2 == name { print }' SHA256SUMS | sha256sum -c -
 gh attestation verify "$binary" -R ns2switch/irmind
 ```
 
-## Try it in five minutes
+## Explore the guided demo
 
 Run `irmind demo`, or type `/demo` on the home screen. The product types commands and runs a ten-step investigation for you. A large narration panel explains the evidence, local queries, streaming response, signed approval and custody checks. No API key, passphrase, account or network is needed. The isolated temporary case and keys are deleted when you exit.
 

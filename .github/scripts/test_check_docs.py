@@ -26,5 +26,14 @@ class CommandOwnership(unittest.TestCase):
         self.assertIn('--repo', check_docs.irmind_flag_citations('irmind --repo=unexpected'))
         self.assertIn('--env', check_docs.irmind_flag_citations('irmind --env=unexpected'))
 
+class LaunchCommandOwners(unittest.TestCase):
+    def test_external_lab_and_benchmark_flags_have_their_own_owner(self):
+        text = "docker compose --env-file lab.env up\ncurl --cacert ca.crt https://localhost:9200\npython3 scripts/hunteval_benchmark.py --models local.json --execute\npython3 tools/real-validation/lab.py load --windows-utc-offset +00:00\n"
+        self.assertEqual(check_docs.irmind_flag_citations(text), set())
+        self.assertEqual(check_docs.irmind_flag_citations("gh secret set APPLE_API_KEY_ID --repo ns2switch/irmind --env release"), set())
+        self.assertIn("--bad-irmind-option", check_docs.irmind_flag_citations(
+            "docker compose up && irmind --bad-irmind-option"))
+
+
 if __name__ == '__main__':
     unittest.main()
