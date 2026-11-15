@@ -118,41 +118,26 @@ amendment is separate from merely replacing an output-token constant. New and
 changed accounting vectors must be reviewed; no historical golden is edited to
 make an unrelated change pass.
 
-## 3. Preserve complete text without raising frame limits
+## 3. Complete answers within existing security limits
 
-Removing token ceilings alone does not remove current byte/retention limits:
-shared preview collection stops at 200,000 bytes, adapters limit the entire
-stream to 2,000,000 bytes, the guard screens at most 1,000,000 bytes per call,
-and child summaries are bounded to 16 KiB. A model's legitimate maximum can
-exceed those totals. These bounds must not simply be deleted or increased.
+Keep the 1 MiB signed-frame ceiling, the 1,000,000-byte guard input limit and
+the 2,000,000-byte stream limit. Raise the 200,000-byte preview limit so that it
+does not truncate an answer that fits these existing limits. No segmented answer
+storage, new spool or new export representation is introduced.
 
-Propose bounded streaming assembly and private case-local spooling, with
-independent limits on individual transport events, resident buffers, signed
-frames and disk resources. Preserve every received answer segment that passes
-the guard, ordered under one logical answer identity. A short child summary
-and a bounded future context are distinct from the complete retained answer.
-Model output remains model-derived content, never original evidence or a
-confirmed finding by virtue of storage.
+Retain and sign the entire guarded answer that fits its enclosing frame, allowing
+for record metadata and encoding overhead. If an answer exceeds that capacity,
+retain the largest UTF-8-safe prefix that fits and mark it explicitly as
+“Truncated by IRMind's security limit”. Never label that prefix complete or
+confuse this condition with the provider's output maximum. Preserve guard
+validation of all displayed or retained text; do not weaken it to admit a larger
+answer. Test a representative synthetic 128,000-token-size answer through
+retention, signing and export, and test the explicit frame-overflow case. Tokens
+are not bytes: an unusually byte-heavy answer can still reach the security limit.
 
-Keep the **1 MiB signed-frame ceiling**. A response larger than one frame needs
-ordered signed content references/segments and a completion commitment rather
-than one oversized `ModelReply`. Before implementing that storage change, define
-its exact records, application/store interface, export/verifier representation
-and golden vectors in this same PR. Do not overload tool-result records, parser
-identities or unrelated branch fields to store model text.
-
-Streaming guard behavior must preserve detection/redaction across segment
-boundaries, including private-key blocks, credentials, hidden instructions,
-UTF-8 and terminal control sequences. Independent guard calls with an arbitrary
-fixed overlap are not an acceptable equivalence proof. The new storage/guard
-contract is a required follow-up design step, not an approved implementation
-hidden in this document.
-
-Resource failure, explicit cancellation and existing deadlines remain visible
-interruptions, with a retained verified prefix and an incomplete marker. They
-must never be labelled a complete response. There is no claim that a finite
-machine can retain an infinite or malicious stream. No protocol/resource guard
-is disabled to obtain a larger model answer.
+The bounded 16 KiB child summary returned to the parent remains unchanged. The
+complete child answer is retained in its branch within the same frame limit.
+Resource failure, explicit cancellation and deadlines remain visible interruptions.
 
 ## 4. One automatic provider continuation
 
@@ -174,9 +159,9 @@ native stop is labelled explicitly; it cannot trigger an unbounded retry loop.
 ## 5. Implementation gates and tests
 
 1. Review the model-capability port and exceptional token-settlement amendment.
-2. Define/review exact bounded text storage and guard contracts plus any new
-   signed/export vectors; keep all current frame and security limits.
-3. Implement profiles/settings and request-boundary accounting, then full text
+2. Keep existing stream, guard and frame limits; review new accounting vectors
+   and explicit security-truncation tests.
+3. Implement profiles/settings and request-boundary accounting, then complete in-frame text
    retention and the single logical-answer continuation. Do not ship a state that
    merely removes `2048` while silently losing longer content later.
 4. Test full long output, positive balance followed by a completed overrun and a
