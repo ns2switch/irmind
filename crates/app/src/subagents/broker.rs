@@ -42,6 +42,23 @@ pub struct StartedSubagentPlan {
         std::sync::Arc<std::sync::Mutex<crate::skills::runtime::SkillReadBudget>>,
 }
 impl StartedSubagentPlan {
+    pub(crate) fn share_parent_skill_budget(
+        &mut self,
+        parent: std::sync::Arc<std::sync::Mutex<crate::skills::runtime::SkillReadBudget>>,
+    ) -> Result<(), AppError> {
+        {
+            let live = parent.lock().map_err(|_| invalid())?;
+            let signed = self.skill_budget.lock().map_err(|_| invalid())?;
+            if live.reads != signed.reads
+                || live.bytes != signed.bytes
+                || live.packages != signed.packages
+            {
+                return Err(invalid());
+            }
+        }
+        self.skill_budget = parent;
+        Ok(())
+    }
     pub(super) fn task(&self, id: SubagentDigest) -> Result<&SubagentTaskSpec, AppError> {
         self.plan
             .tasks
@@ -174,6 +191,20 @@ impl<'a> AgentBatch<'a> {
 }
 
 impl Engine<'_> {
+    pub(crate) fn expire_subagent_preview(
+        &self,
+        prepared: &PreparedSubagentPlan,
+    ) -> Result<(), AppError> {
+        let choice = AnalystPlanChoice {
+            plan: prepared.preview.plan.identity().map_err(|_| invalid())?,
+            budget: prepared.preview.plan.budget_checkpoint_sha256,
+            start: false,
+            explicit: false,
+        };
+        self.admit_subagent_plan(prepared, &choice, &CancellationToken::new())
+            .map(|_| ())
+    }
+
     fn subagent_skill_budget(
         &self,
         case: &CaseId,

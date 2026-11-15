@@ -56,6 +56,21 @@ pub struct SubagentPorts {
 mod tests;
 
 impl crate::Engine<'_> {
+    pub(crate) fn turn_model_rounds_unlocked(
+        &self,
+        case: &crate::CaseId,
+        turn: &str,
+    ) -> Result<u64, crate::AppError> {
+        let mut journal = SubagentJournal::for_verification(case.clone())
+            .map_err(|_| crate::AppError::InvalidChain(0))?;
+        for entry in self.audit_log.entries(case)? {
+            journal.accept(&entry, self.verifier.as_ref())?;
+        }
+        journal
+            .rounds_used(turn)
+            .map_err(|_| crate::AppError::InvalidChain(0))
+    }
+
     pub(crate) fn subagent_holds_unlocked(
         &self,
         case: &crate::CaseId,

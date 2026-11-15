@@ -147,6 +147,10 @@ impl Engine<'_> {
         let case_owned = case.clone();
         self.blocking_local(move |local| {
             let id = &case_owned.id;
+            let current = local.repo.get_case(id)?;
+            if current.sealed {
+                return Ok(Decision::Deny("case is sealed"));
+            }
             let policy = local.policy_for_case_unlocked(id)?;
             local.audit(
                 id,
@@ -174,7 +178,7 @@ impl Engine<'_> {
                     ),
                 );
                 Ok(irmind_domain::evaluate_tainted_with_rules(
-                    &case_owned,
+                    &current,
                     tainted,
                     next_seq,
                     local.mode,
@@ -184,12 +188,7 @@ impl Engine<'_> {
                 ))
             } else {
                 Ok(irmind_domain::evaluate_with_rules(
-                    &case_owned,
-                    proposal,
-                    next_seq,
-                    local.mode,
-                    now,
-                    &policy,
+                    &current, proposal, next_seq, local.mode, now, &policy,
                 ))
             }
         })
@@ -197,6 +196,9 @@ impl Engine<'_> {
     }
 
     pub(crate) fn unavailable_reason(&self, call: &AuthorizedCall) -> Option<&'static str> {
+        if call.tool() == &Tool::DelegateTask {
+            return Some("delegation is available only inside an attended model turn");
+        }
         self.source_unavailable_reason(call.tool(), call.arg("source"))
             .or_else(|| {
                 (call.tool() == &Tool::ThreatIntelExternal && self.threat_intel.is_none())

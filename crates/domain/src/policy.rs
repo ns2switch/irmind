@@ -117,6 +117,7 @@ pub enum Tool {
     ObjectList,
     ObjectRead,
     SkillRead,
+    DelegateTask,
 }
 
 mod scope;
@@ -152,6 +153,7 @@ impl Tool {
             "object_list" => Ok(Self::ObjectList),
             "object_read" => Ok(Self::ObjectRead),
             "skill_read" => Ok(Self::SkillRead),
+            "delegate_task" => Ok(Self::DelegateTask),
             _ => Err(DomainError::UnknownTool),
         }
     }
@@ -180,6 +182,7 @@ impl Tool {
             Self::ObjectList => "object_list",
             Self::ObjectRead => "object_read",
             Self::SkillRead => "skill_read",
+            Self::DelegateTask => "delegate_task",
         }
     }
 

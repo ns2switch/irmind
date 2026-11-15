@@ -390,7 +390,7 @@ impl SubagentJournal {
                 total.checked_add(held)
             })
     }
-    fn rounds_used(&self, turn: &str) -> Result<u64, SubagentRecordError> {
+    pub(super) fn rounds_used(&self, turn: &str) -> Result<u64, SubagentRecordError> {
         self.plans
             .values()
             .filter(|plan| plan.plan.turn_id == turn)

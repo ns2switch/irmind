@@ -1,6 +1,7 @@
 mod findings;
 mod parallel;
 mod recovery;
+mod root;
 mod scope;
 mod skills;
 mod tools;

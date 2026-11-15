@@ -62,7 +62,10 @@ impl Engine<'_> {
             turn.catalog = self
                 .available_tools()
                 .into_iter()
-                .filter(|tool| tool.name == "skill_read" || active.tools.contains(tool.name))
+                .filter(|tool| {
+                    matches!(tool.name, "skill_read" | "delegate_task")
+                        || active.tools.contains(tool.name)
+                })
                 .collect();
         }
         Ok(())

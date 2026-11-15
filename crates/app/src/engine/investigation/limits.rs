@@ -74,7 +74,10 @@ impl Engine<'_> {
                 Ok(local.case_budget_unlocked(&owned)?.notice(&reason_owned))
             })
             .await?;
-        if remaining == 0 {
+        let rounds = self
+            .shared_round_number(id, turn, (1, self.policy.max_model_rounds_per_turn))
+            .await?;
+        if remaining == 0 || rounds.0 > rounds.1 {
             let summary = self.completed_work_summary(id).await?;
             return self
                 .finish_answer(id, &format!("{summary}\n\n{notice} {hint}"))
