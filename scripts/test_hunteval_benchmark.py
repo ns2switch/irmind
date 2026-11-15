@@ -26,6 +26,15 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(result['event_supported_finding_proxy']['supported'], 1)
         self.assertIsNone(result['human_correct_findings'])
 
+    def test_finding_proxy_accepts_verified_originals_but_not_unknown_hashes(self):
+        final = dict(events=['evt-0001'], entities=[], techniques=[], findings=[
+            dict(claim='Check original', event_ids=['evt-0001'], evidence_hashes=[HASH]),
+            dict(claim='Unknown citation', event_ids=['evt-0001'], evidence_hashes=['b' * 64])])
+        observed = dict(final=json.dumps(final), tool_text='', known_hashes=set(), source_hash=HASH)
+        result = b.evaluate(observed, [], dict(malicious_event_ids=['evt-0001'],
+            malicious_entity_ids=[], expected_attack_techniques=[]))
+        self.assertEqual(result['event_supported_finding_proxy'], dict(supported=1, reported=2))
+
     def test_invalid_answer_and_unsupported_citations_are_not_success(self):
         with self.assertRaises(ValueError):
             b.final_object('There may be a compromise.')

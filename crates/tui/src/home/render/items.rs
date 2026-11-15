@@ -358,7 +358,7 @@ fn case_items(state: &HomeState, engine: &Engine<'_>) -> Result<Vec<ListItem<'st
                 .and_then(|at| chrono::DateTime::<chrono::Utc>::from_timestamp(at, 0))
                 .map_or_else(
                     || "unknown".into(),
-                    |at| at.format("%Y-%m-%d %H:%M UTC").to_string(),
+                    |at| at.format("%d %b %Y %H:%M UTC").to_string(),
                 );
             Ok(ListItem::new(safe(&format!(
                 "{marker} {}  ·  {}  ·  {}  ·  {}",
