@@ -123,6 +123,7 @@ pub struct Engine<'a> {
     pub(crate) object_progress: ObjectProgressMap,
     pub(crate) skills: Option<Arc<crate::SkillServices>>,
     pub(crate) subagents: Option<Arc<crate::subagents::SubagentPorts>>,
+    pub(crate) subagent_runtime: Arc<crate::subagents::runtime::SubagentRuntime>,
 }
 
 pub struct EnginePorts {
@@ -219,6 +220,7 @@ impl<'a> Engine<'a> {
             object_progress: Arc::clone(&self.object_progress),
             skills: self.skills.clone(),
             subagents: self.subagents.clone(),
+            subagent_runtime: self.subagent_runtime.clone(),
         }
     }
 

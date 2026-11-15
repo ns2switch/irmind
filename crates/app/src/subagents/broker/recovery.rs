@@ -12,6 +12,11 @@ impl Engine<'_> {
     /// is exposed as an execution lease and no provider request is replayed.
     pub fn cancel_interrupted_subagent_plans(&self, case: &CaseId) -> Result<usize, AppError> {
         self.require_attended_analyst("close interrupted subagent plans")?;
+        if self.has_live_subagents(case)? {
+            return Err(AppError::Policy(
+                "Cancel and join the live subagent plan before reconciling interrupted work".into(),
+            ));
+        }
         let recoveries = {
             let _lock = self.repo.lock_case(case)?;
             self.verify_unlocked(case)?;

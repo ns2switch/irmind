@@ -1,14 +1,20 @@
+mod mailbox;
 use super::PortFuture;
 use super::{SubagentDigest, SubagentPlanV1, SubagentRecord, SubagentResources, SubagentTaskSpec};
 use crate::{AppError, CancellationToken};
+pub use mailbox::{AnalystPlanMailbox, PlanReview};
 
 /// Immutable guarded preview. Its bindings are returned by the trusted UI.
 /// There is no deserializer and no model-facing confirmation field.
+#[derive(Clone)]
 pub struct SafePlanPreview {
     pub(super) plan: SubagentPlanV1,
     pub(super) confirmation_required: bool,
 }
 impl SafePlanPreview {
+    pub fn case_id(&self) -> &str {
+        &self.plan.case_id
+    }
     pub fn plan_id(&self) -> SubagentDigest {
         self.plan.plan_id
     }
