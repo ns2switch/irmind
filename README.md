@@ -11,7 +11,7 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 *The complete presentation runs the real product with synthetic evidence, ephemeral keys and an offline scripted model. Enter advances; Space pauses; Esc exits.*
 
 > [!WARNING]
-> IRMind 0.4.2 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
+> IRMind 0.5.0 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
 
 > [!WARNING]
 > Pre-1.0: each minor version may change case, export and definition formats without migration. Keep the IRMind version that created a case to open, verify or export it, or re-ingest the verified originals into a new case.
@@ -47,13 +47,13 @@ cargo build --release --locked -p irmind
 ./target/release/irmind
 ```
 
-The [v0.4.2 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.4.2) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
+The [v0.5.0 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.5.0) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
 
-Keep the exact IRMind version that created an existing case. Version 0.4.2 updates current case contracts; see the [format-impact note](CHANGELOG.md). The [version policy](docs/development/decisions.md#pre-10-format-policy) explains how to retain the creating executable or re-ingest verified originals.
+Keep the exact IRMind version that created an existing case. Version 0.5.0 uses case marker 4 and export V8; see the [format-impact note](CHANGELOG.md). The [version policy](docs/development/decisions.md#pre-10-format-policy) explains how to retain the creating executable or re-ingest verified originals.
 
 ```sh
 # After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:
-tag=v0.4.2; binary=irmind-linux-x86_64
+tag=v0.5.0; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -80,7 +80,7 @@ You can ingest, inspect, and verify local evidence without a model. On later sta
 
 ## Modules
 
-Development builds targeting 0.5 use one source-decoder → identified mapping → V3 writer pipeline in the CLI, TUI and demo. It reads only CaseCreated version 4 and export V8; [earlier cases require their creating version or a new ingestion](docs/development/case-migration.md).
+Version 0.5 uses one source-decoder → identified mapping → V3 writer pipeline in the CLI, TUI and demo. It reads only CaseCreated version 4 and export V8; [earlier cases require their creating version or a new ingestion](docs/development/case-migration.md).
 
 The normal build includes every current product module and both keystores. No remote connector or LLM is enabled until selected and configured. A smaller build uses `--no-default-features --features keystore-file` (at least one signer and secrets backend is required). All modules are experimental.
 
@@ -144,7 +144,7 @@ Read [security-model.md](docs/security-model.md) before connecting a provider.
 - **v0.2 (delivered):** Modular log parsers, precise artifacts and an isolated EVTX helper.
 - **v0.3:** Typed common events, separate decoders and mappings, sole V3 writing, multicore ingestion and experimental SIEM connectors.
 - **v0.4:** Add signed, progressively loaded forensic skills.
-- **v0.5:** Add bounded parallel subagents and streamed engine events.
+- **v0.5 (delivered):** Bounded parallel subagents, signed event branches and streamed engine events.
 - **Public launch:** Publish the demo, benchmark, and initial community skills catalog.
 - **v0.6:** Add budgeted source-side cloud queries.
 - **v0.7:** Add local detections, exportable reports, controlled extensions, and a headless engine API.

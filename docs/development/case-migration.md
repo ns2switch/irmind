@@ -2,7 +2,7 @@
 
 This guide helps analysts keep a verifiable record when a pre-1.0 case or export uses a retired format.
 
-The current writer uses CaseCreated version 4, mapped V3 Parquet artifacts and export V8. Opening a case does not migrate or rewrite it. A retired case or export format is rejected before reconstruction or export.
+Version 0.5.0 uses CaseCreated version 4, mapped V3 Parquet artifacts and export V8. Cases and exports from 0.4.x require their creating executable. Opening a case does not migrate or rewrite it. A retired case or export format is rejected before reconstruction or export.
 
 1. Keep the IRMind version that created the case. Use it to open and verify the original chain and to export any record you need to retain.
 2. Verify the original sources against that case's signed manifests. Preserve its original case and any sealed package separately.
