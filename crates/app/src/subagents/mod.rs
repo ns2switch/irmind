@@ -21,6 +21,7 @@ pub use journal::{
 pub use queries::{
     TaskEvidenceQueries, TaskEvidenceQuery, TaskEvidenceResult, VerifiedTaskQueryView,
 };
+mod pending;
 mod plan;
 pub use plan::{
     SubagentPlanApprovalV1, SubagentPlanContext, SubagentPlanDecision, SubagentPlanV1,

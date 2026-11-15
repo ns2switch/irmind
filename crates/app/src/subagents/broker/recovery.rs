@@ -39,6 +39,7 @@ impl Engine<'_> {
         let task = started.task(task_id)?;
         let (mut terminal, seq, previous) =
             self.read_interrupted_prefix(&case, &recovery, status)?;
+        terminal.pending_approvals = self.task_pending_ids_unlocked(&case, task_id)?;
         let cancel = CancellationToken::new();
         terminal.summary_sha256 =
             SubagentDigest::from_bytes(crate::sha256(terminal.guarded_summary.as_bytes()));

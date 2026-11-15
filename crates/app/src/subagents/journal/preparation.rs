@@ -5,6 +5,48 @@ use super::{
 use crate::subagents::{SubagentPlanContext, SubagentPolicySnapshot};
 
 impl SubagentJournal {
+    pub(in crate::subagents) fn check_task_pending_owner(
+        &self,
+        checkpoint: &crate::subagents::SubagentCheckpointV1,
+        actor: &crate::Actor,
+    ) -> Result<
+        (
+            &crate::subagents::SubagentTaskSpec,
+            &SubagentPlanV1,
+            SubagentDigest,
+        ),
+        SubagentRecordError,
+    > {
+        if self.failed || self.agent.as_ref() != Some(actor) {
+            return Err(SubagentRecordError);
+        }
+        for state in self.plans.values() {
+            if let Some(task) = state
+                .plan
+                .tasks
+                .iter()
+                .find(|task| task.task_id == checkpoint.task_id)
+            {
+                let identity = checkpoint.identity()?;
+                if !state
+                    .checkpoints
+                    .get(&task.task_id)
+                    .into_iter()
+                    .flatten()
+                    .any(|signed| signed.identity().is_ok_and(|actual| actual == identity))
+                {
+                    return Err(SubagentRecordError);
+                }
+                return Ok((
+                    task,
+                    &state.plan,
+                    state.allocation().ok_or(SubagentRecordError)?,
+                ));
+            }
+        }
+        Err(SubagentRecordError)
+    }
+
     pub(in crate::subagents) fn release_transition(
         &self,
         started: &crate::subagents::StartedSubagentPlan,
