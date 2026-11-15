@@ -190,3 +190,119 @@ fn interrupted_tool_result_reconciles_its_existing_dispatch_once_without_repeati
     engine.finish_subagent_plan(&started).unwrap();
     tools::verify_and_export(store.as_ref(), &engine, &history, root.path());
 }
+
+#[test]
+fn a_new_engine_closes_durable_preview_and_started_plans_without_an_execution_lease() {
+    for admitted in [false, true] {
+        let mut history = History::new();
+        let root = tempfile::tempdir().unwrap();
+        let (store, engine) = stored_history_engine(root.path(), &history, &[]);
+        let prepared = engine
+            .prepare_subagent_plan(
+                &history.case,
+                "00000000-0000-0000-0000-000000000009".parse().unwrap(),
+                vec![proposal(100_000)],
+                SubagentResources::default(),
+                &CancellationToken::new(),
+            )
+            .unwrap();
+        if admitted {
+            let started = engine
+                .admit_subagent_plan(
+                    &prepared,
+                    &prepared.preview().automatic_start().unwrap(),
+                    &CancellationToken::new(),
+                )
+                .unwrap()
+                .unwrap();
+            drop(started);
+        }
+        history.entries = store.entries(&history.case).unwrap();
+        drop(prepared);
+        drop(engine);
+        let reopened = tempfile::tempdir().unwrap();
+        let (store, engine) = stored_history_engine(reopened.path(), &history, &[]);
+        assert_eq!(
+            engine
+                .cancel_interrupted_subagent_plans(&history.case)
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            engine
+                .cancel_interrupted_subagent_plans(&history.case)
+                .unwrap(),
+            0
+        );
+        tools::verify_and_export(store.as_ref(), &engine, &history, reopened.path());
+    }
+}
+
+#[test]
+fn restart_reconciliation_preserves_the_committed_prefix_and_unknown_provider_reservation() {
+    use irmind_app::subagents::{
+        BranchChunkRef, CheckedBranchChunk, SubagentBranchStore, SubagentCheckpointV1,
+    };
+    let mut history = History::new();
+    let root = tempfile::tempdir().unwrap();
+    let (store, engine) = stored_history_engine(root.path(), &history, &[]);
+    let started = tools::start(&engine, &history);
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            engine.run_subagent_task(
+                &started,
+                started.plan().tasks[0].task_id,
+                &InterruptedModel,
+                &CancellationToken::new(),
+            )
+        }))
+        .is_err()
+    );
+    history.entries = store.entries(&history.case).unwrap();
+    let branches = ParquetStore::open(root.path()).unwrap();
+    let chunks = history
+        .entries
+        .iter()
+        .filter(|entry| entry.kind == AuditEventKind::SubagentCheckpointV1)
+        .map(|entry| {
+            let checkpoint = SubagentCheckpointV1::decode(
+                &hex::decode(entry.payload.split_once(':').unwrap().1).unwrap(),
+            )
+            .unwrap();
+            let reference =
+                BranchChunkRef::new(checkpoint.chunk_sha256, checkpoint.chunk_bytes).unwrap();
+            let bytes = branches
+                .read(&history.case, &reference, &CancellationToken::new())
+                .unwrap();
+            CheckedBranchChunk::decode(
+                bytes.as_bytes(),
+                &history.agent.public_key(),
+                &history.verifier,
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    drop(started);
+    drop(engine);
+    let reopened = tempfile::tempdir().unwrap();
+    let (store, engine) = stored_history_engine(reopened.path(), &history, &chunks);
+    assert_eq!(
+        engine
+            .cancel_interrupted_subagent_plans(&history.case)
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        engine
+            .cancel_interrupted_subagent_plans(&history.case)
+            .unwrap(),
+        0
+    );
+    let mut journal = SubagentJournal::new(history.case.clone(), history.agent.actor()).unwrap();
+    for entry in store.entries(&history.case).unwrap() {
+        journal.accept(&entry, &history.verifier).unwrap();
+    }
+    assert!(!journal.has_open_plans().unwrap());
+    assert!(journal.outstanding().unwrap().tokens > 0);
+    tools::verify_and_export(store.as_ref(), &engine, &history, reopened.path());
+}

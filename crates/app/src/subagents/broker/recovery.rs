@@ -8,6 +8,67 @@ use crate::subagents::{
 use crate::{AppError, CancellationToken, CaseId, Engine};
 
 impl Engine<'_> {
+    /// Explicitly closes interrupted plans after a restart. No recovered value
+    /// is exposed as an execution lease and no provider request is replayed.
+    pub fn cancel_interrupted_subagent_plans(&self, case: &CaseId) -> Result<usize, AppError> {
+        self.require_attended_analyst("close interrupted subagent plans")?;
+        let recoveries = {
+            let _lock = self.repo.lock_case(case)?;
+            self.verify_unlocked(case)?;
+            let mut journal = crate::subagents::SubagentJournal::for_verification(case.clone())
+                .map_err(|_| invalid())?;
+            for entry in self.audit_log.entries(case)? {
+                journal.accept(&entry, self.verifier.as_ref())?;
+            }
+            journal.recovery_plans().map_err(|_| invalid())?
+        };
+        let mut closed = 0;
+        for recovery in recoveries {
+            if let Some(allocation) = recovery.allocation {
+                let started = StartedSubagentPlan {
+                    plan: recovery.plan,
+                    entry_hash: recovery.entry_hash,
+                    allocation,
+                    // This private value is used solely for reconciliation.
+                    skill_budget: std::sync::Arc::default(),
+                };
+                for task in &started.plan.tasks {
+                    self.cancel_subagent_task(&started, task.task_id)?;
+                }
+                self.finish_subagent_plan(&started)?;
+            } else {
+                let _lock = self.repo.lock_case(case)?;
+                let mut batch = AgentBatch::new(self, case, self.verifier.as_ref())?;
+                if !batch
+                    .journal
+                    .plan_is_open(recovery.plan.identity().map_err(|_| invalid())?)
+                    .map_err(|_| invalid())?
+                {
+                    continue;
+                }
+                let hold = super::plan_transition(
+                    &recovery.plan,
+                    ReservationAction::HoldPreview,
+                    None,
+                    recovery.entry_hash,
+                )?;
+                if recovery.needs_hold {
+                    batch.push(&hold)?;
+                }
+                let expire = super::plan_transition(
+                    &recovery.plan,
+                    ReservationAction::ExpirePreview,
+                    Some(hold.operation_id),
+                    recovery.entry_hash,
+                )?;
+                batch.push(&expire)?;
+                batch.publish(&CancellationToken::new())?;
+            }
+            closed += 1;
+        }
+        Ok(closed)
+    }
+
     /// Cancellation does not authorize retries or free uncertain provider usage.
     /// The caller cancels and joins its worker before reconciling its task.
     pub fn cancel_subagent_task(
