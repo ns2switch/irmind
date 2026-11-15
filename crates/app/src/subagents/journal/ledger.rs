@@ -111,6 +111,27 @@ impl PlanLedger {
             Phase::Prepared | Phase::Preview | Phase::CancelledPreview
         )
     }
+    pub(super) fn needs_preview_hold(&self) -> bool {
+        self.phase == Phase::Prepared
+    }
+    pub(super) fn recovery_allocation(
+        &self,
+    ) -> Result<Option<SubagentReservationV1>, SubagentRecordError> {
+        if self.phase != Phase::Started {
+            return Ok(None);
+        }
+        let allocation = crate::subagents::broker::plan_transition(
+            &self.plan,
+            ReservationAction::StartPlan,
+            Some(self.operation(ReservationAction::HoldPreview)),
+            self.consent.unwrap_or(self.entry_hash),
+        )
+        .map_err(|_| SubagentRecordError)?;
+        if Some(allocation.identity()?) != self.allocation {
+            return Err(SubagentRecordError);
+        }
+        Ok(Some(allocation))
+    }
     fn approval(
         &mut self,
         value: &SubagentPlanApprovalV1,
@@ -248,6 +269,9 @@ impl PlanLedger {
     }
     pub(super) fn allocation(&self) -> Option<SubagentDigest> {
         self.allocation
+    }
+    pub(super) fn entry_hash(&self) -> SubagentDigest {
+        self.entry_hash
     }
     pub(super) fn request_by_identity(
         &self,
