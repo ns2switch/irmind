@@ -7,6 +7,7 @@ use crate::{Actor, AppError, AuditEventKind, CaseId, CaseScope, SignedEntry, Ver
 use std::collections::{BTreeMap, BTreeSet};
 
 mod accounting;
+mod admissions;
 mod findings;
 mod ledger;
 mod material;
@@ -26,6 +27,11 @@ pub struct SubagentJournal {
     budget: crate::engine::BudgetReplay,
     scope: CaseScope,
     sources: BTreeSet<SubagentDigest>,
+    indexed_sources: BTreeSet<SubagentDigest>,
+    source_effects: BTreeMap<(SubagentDigest, SubagentDigest), Vec<admissions::SourceEffect>>,
+    checkpoint_admissions: BTreeMap<SubagentDigest, Vec<admissions::SourceEffect>>,
+    request_dispatches: BTreeMap<SubagentDigest, SubagentDigest>,
+    checkpoint_audit_hashes: BTreeMap<SubagentDigest, SubagentDigest>,
     pages: BTreeMap<SubagentDigest, SubagentSourcePageV1>,
     sets: BTreeMap<SubagentDigest, Vec<SubagentDigest>>,
     types: BTreeMap<SubagentDigest, SubagentTypeSnapshotV1>,
@@ -57,6 +63,11 @@ impl SubagentJournal {
             budget: crate::engine::BudgetReplay::default(),
             scope: CaseScope::LocalOnly,
             sources: BTreeSet::new(),
+            indexed_sources: BTreeSet::new(),
+            source_effects: BTreeMap::new(),
+            checkpoint_admissions: BTreeMap::new(),
+            request_dispatches: BTreeMap::new(),
+            checkpoint_audit_hashes: BTreeMap::new(),
             pages: BTreeMap::new(),
             sets: BTreeMap::new(),
             types: BTreeMap::new(),
@@ -151,6 +162,7 @@ impl SubagentJournal {
         self.accept_metadata(entry)?;
         self.observe_accounting(entry)?;
         self.observe_finding(entry)?;
+        self.observe_source_effect(entry)?;
         self.budget.accept(entry).map_err(|_| SubagentRecordError)?;
         if entry.kind == AuditEventKind::CaseBudgetChanged {
             let status = self
@@ -226,6 +238,15 @@ impl SubagentJournal {
                     .map_err(|_| SubagentRecordError)?;
                 self.sources
                     .insert(SubagentDigest::parse(source.source.sha256.as_str())?);
+            }
+            AuditEventKind::SourceRecordSetV1 => {
+                let records = irmind_domain::SourceRecordSetV1::decode(&entry.payload)
+                    .map_err(|_| SubagentRecordError)?;
+                let hash = SubagentDigest::parse(records.source().as_str())?;
+                if !self.sources.contains(&hash) {
+                    return Err(SubagentRecordError);
+                }
+                self.indexed_sources.insert(hash);
             }
             AuditEventKind::SubagentSourcePageV1 => self.page(decode_entry(entry)?)?,
             AuditEventKind::SubagentSourceSetV1 => self.source_set(&decode_entry(entry)?)?,

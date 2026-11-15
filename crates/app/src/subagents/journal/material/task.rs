@@ -105,11 +105,13 @@ impl<'a> TaskMaterial<'a> {
             .checkpoint_sequences
             .get(&checkpoint.identity()?)
             .ok_or(SubagentRecordError)?;
-        // New receipts need effect-attribution validation before source admission.
-        // Until that path is connected, reject rather than widen a frozen view.
-        if !checkpoint.admitted_sources.is_empty() {
-            return Err(SubagentRecordError);
-        }
+        let effects = self
+            .journal
+            .checkpoint_admissions
+            .get(&checkpoint.identity()?)
+            .cloned()
+            .unwrap_or_default();
+        let mut admitted = BTreeSet::new();
         for entry in chunk.entries() {
             if entry.body.at > self.task.deadline_at
                 && !matches!(
@@ -140,7 +142,22 @@ impl<'a> TaskMaterial<'a> {
                     self.finding_effect(entry.hash, value, sequence)?;
                     self.proposals.insert(entry.hash, (sequence, value.clone()));
                 }
-                SubagentBranchPayload::ToolResult(value) => self.tool_result(value, sequence)?,
+                SubagentBranchPayload::ToolResult(value) => {
+                    for effect in effects.iter().filter(|effect| {
+                        effect.attribution.proposal_sha256 == value.proposal_sha256
+                    }) {
+                        if effect.decision != value.decision_audit_sha256
+                            || effect.attribution.task_id != self.task.task_id
+                            || effect.attribution.call_id != value.call_id
+                            || effect.attribution.reservation_sha256 != value.reservation_sha256
+                            || !self.sources.insert(effect.source)
+                            || !admitted.insert(effect.source)
+                        {
+                            return Err(SubagentRecordError);
+                        }
+                    }
+                    self.tool_result(value, sequence)?;
+                }
                 SubagentBranchPayload::SkillLoad(value) => {
                     self.skill_load(value, sequence, skills, compiler)?;
                 }
@@ -154,6 +171,9 @@ impl<'a> TaskMaterial<'a> {
                 }
                 SubagentBranchPayload::Terminal(value) => self.terminal(value)?,
             }
+        }
+        if admitted.len() != checkpoint.admitted_sources.len() {
+            return Err(SubagentRecordError);
         }
         self.checkpoint = Some(checkpoint.clone());
         Ok(())

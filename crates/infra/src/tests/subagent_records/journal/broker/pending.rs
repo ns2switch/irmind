@@ -59,7 +59,7 @@ fn task_pending_requests_keep_their_owner_after_cancellation_and_cannot_use_pare
     tools::verify_and_export(store.as_ref(), &engine, &history, root.path());
 }
 
-fn publish_pending(
+pub(super) fn publish_pending(
     store: &LocalStore,
     root: &std::path::Path,
     history: &mut History,

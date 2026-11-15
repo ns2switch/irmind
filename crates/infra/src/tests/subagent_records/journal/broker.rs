@@ -1,3 +1,4 @@
+mod admissions;
 mod events;
 mod findings;
 mod parallel;

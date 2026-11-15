@@ -55,6 +55,43 @@ fn drain(
 }
 
 #[test]
+fn task_approval_replay_is_attributed_guarded_and_does_not_resolve_or_dispatch() {
+    let mut history = History::new();
+    let root = tempfile::tempdir().unwrap();
+    let (store, engine) = stored_history_engine(root.path(), &history, &[]);
+    let started = tools::start(&engine, &history);
+    let request =
+        super::pending::publish_pending(store.as_ref(), root.path(), &mut history, &started);
+    let before = store.entries(&history.case).unwrap();
+    let (mut cursor, mut subscription) = engine.subscribe_case_events(&history.case).unwrap();
+    let events = drain(subscription.as_mut(), &mut cursor, 1);
+    let approvals = events
+        .iter()
+        .filter(|event| event.kind == EngineEventKind::Approval)
+        .collect::<Vec<_>>();
+    assert_eq!(approvals.len(), 1);
+    assert_eq!(approvals[0].task_id, Some(started.plan().tasks[0].task_id));
+    assert_eq!(approvals[0].task_type.as_deref(), Some("triage"));
+    assert!(approvals[0].payload.contains(&request));
+    assert!(approvals[0].payload.contains("ti_lookup_external"));
+    assert!(
+        approvals[0]
+            .payload
+            .contains(&engine.guard.screen("203.0.113.77").unwrap().text)
+    );
+    assert_eq!(engine.pending_approvals(&history.case).unwrap().len(), 1);
+    assert_eq!(
+        store
+            .entries(&history.case)
+            .unwrap()
+            .iter()
+            .map(|entry| entry.hash)
+            .collect::<Vec<_>>(),
+        before.iter().map(|entry| entry.hash).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn event_poll_is_read_only_bounded_cursor_based_and_reconnect_replays_without_effects() {
     let history = History::new();
     let root = tempfile::tempdir().unwrap();

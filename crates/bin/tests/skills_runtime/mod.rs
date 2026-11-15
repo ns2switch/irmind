@@ -11,6 +11,8 @@ mod catalog;
 mod malicious;
 pub(super) mod measurement;
 mod sequence;
+#[cfg(all(feature = "parser-kubernetes", feature = "mapping-cloudtrail"))]
+mod subagents;
 #[cfg(feature = "parser-eztools")]
 mod windows_collection;
 use ed25519_dalek::{Signer as _, SigningKey};
@@ -59,6 +61,14 @@ pub(super) fn setup_with_store(
     store: Arc<LocalStore>,
     fail: bool,
 ) -> (Arc<LocalStore>, Engine<'static>) {
+    setup_with_subagents(root, store, fail, None)
+}
+fn setup_with_subagents(
+    root: &Path,
+    store: Arc<LocalStore>,
+    fail: bool,
+    analyst_review: Option<Arc<dyn irmind_app::subagents::AnalystPlanInteraction>>,
+) -> (Arc<LocalStore>, Engine<'static>) {
     let analyst = Arc::new(FixedSigner(
         Actor::Analyst,
         SigningKey::from_bytes(&[73; 32]),
@@ -83,22 +93,26 @@ pub(super) fn setup_with_store(
             .collect(),
     )
     .unwrap();
-    let engine = Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(analyst, Arc::new(verifier)),
-            Arc::new(MandatoryGuard::new().unwrap()),
-        )
-        .with_source_evidence_reader(store.source_evidence_reader()),
-        ExecutionMode::Attended,
-        Arc::new(SystemClock),
+    let mut ports = EnginePorts::new(
+        store.clone(),
+        store.clone(),
+        store.clone(),
+        store.clone(),
+        CryptoPorts::new(analyst, Arc::new(verifier)),
+        Arc::new(MandatoryGuard::new().unwrap()),
     )
-    .unwrap()
-    .with_skills(skills)
-    .unwrap();
+    .with_source_evidence_reader(store.source_evidence_reader());
+    if let Some(analyst) = analyst_review {
+        ports = ports.with_subagents(irmind_app::subagents::SubagentPorts {
+            branches: Arc::new(irmind_infra::ParquetStore::open(&root.join("data")).unwrap()),
+            queries: store.task_evidence_queries(store.source_evidence_reader()),
+            analyst,
+        });
+    }
+    let engine = Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))
+        .unwrap()
+        .with_skills(skills)
+        .unwrap();
     (store, engine)
 }
 pub(super) struct Episode {

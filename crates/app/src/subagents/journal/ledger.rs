@@ -448,6 +448,9 @@ impl SubagentJournal {
             }
             AuditEventKind::SubagentCheckpointV1 => {
                 let value: SubagentCheckpointV1 = decode_entry(entry)?;
+                self.validate_checkpoint_admissions(&value, entry)?;
+                self.checkpoint_audit_hashes
+                    .insert(value.identity()?, SubagentDigest::from_bytes(entry.hash));
                 self.checkpoint_sequences
                     .insert(value.identity()?, entry.seq);
                 self.checkpoint(value)
