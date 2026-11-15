@@ -95,9 +95,7 @@ impl Engine<'_> {
             limit: self.policy.max_model_rounds_per_turn,
         });
         let (answer, usage) = self
-            .complete_model_request(id, model, request, cancel, &|text| {
-                on_text(ModelProgress::TextDelta(text.to_owned()));
-            })
+            .complete_model_request(id, model, request, cancel, on_text)
             .await?;
         if !answer.calls.is_empty() {
             return Err(AppError::Model(

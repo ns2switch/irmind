@@ -622,7 +622,7 @@ impl SubagentJournal {
         if value.case_id != self.case.as_str()
             || !last.terminal
             || value.checkpoint_sha256 != last.identity()?
-            || value.usage != plan.task_usage(value.task_id)
+            || !value.usage.within(plan.task_usage(value.task_id))
             || !value.usage.within_non_tokens(
                 plan.plan
                     .tasks

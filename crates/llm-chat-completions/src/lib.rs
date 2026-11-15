@@ -201,7 +201,12 @@ impl ChatCompletionsClient {
                 if let Some(limit) = limit {
                     body["max_tokens"] = json!(limit);
                 }
-                if !request.tools.is_empty() {
+                if !request.tools.is_empty()
+                    || request
+                        .messages
+                        .iter()
+                        .any(|message| !message.tool_calls.is_empty())
+                {
                     body["thinking"] = json!({"type":"disabled"});
                 }
             }
@@ -535,6 +540,9 @@ mod tests {
             let final_body = adapter.request_body(&final_request);
             assert!(final_body.get("tools").is_none());
             assert!(final_body.get("tool_choice").is_none());
+            if matches!(profile, ChatProfile::DeepSeek) {
+                assert_eq!(final_body["thinking"]["type"], "disabled");
+            }
         }
     }
 

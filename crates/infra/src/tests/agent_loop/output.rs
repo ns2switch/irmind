@@ -5,6 +5,8 @@ struct OutputModel {
     text: String,
     replies: Mutex<usize>,
     truncated_first: bool,
+    truncate_followups: bool,
+    fail_followup: bool,
     usage: ModelUsage,
 }
 #[async_trait]
@@ -18,6 +20,9 @@ impl LlmPort for OutputModel {
         let mut count = self.replies.lock().unwrap();
         let first = *count == 0;
         *count += 1;
+        if !first && self.fail_followup {
+            return Err(AppError::Model("synthetic continuation failure".into()));
+        }
         if !first && self.truncated_first {
             assert!(request.tools.is_empty());
             assert!(request.messages.iter().any(|m| m.role == irmind_app::MessageRole::Assistant && m.content == self.text));
@@ -39,7 +44,7 @@ impl LlmPort for OutputModel {
                 raw: text.clone(),
                 text,
                 calls: vec![],
-                truncated: first && self.truncated_first,
+                truncated: (first && self.truncated_first) || (!first && self.truncate_followups),
             },
             Some(self.usage),
         ))
@@ -50,6 +55,8 @@ fn output_model(text: String, truncated: bool, output_tokens: u64) -> OutputMode
         text,
         replies: Mutex::new(0),
         truncated_first: truncated,
+        truncate_followups: false,
+        fail_followup: false,
         usage: ModelUsage {
             input_tokens: 20,
             output_tokens,
@@ -199,4 +206,65 @@ fn escaped_text_that_exceeds_a_frame_is_explicitly_marked_and_still_exports() {
     )
     .unwrap();
     irmind_app::verify_export_details(&crate::LocalExportVerifier, &path, Some(&key)).unwrap();
+}
+
+#[test]
+fn a_second_provider_stop_does_not_create_a_retry_loop() {
+    let (_root, _store, engine, id) = engine_fixture();
+    let mut model = output_model("First part".into(), true, 10);
+    model.truncate_followups = true;
+    let reply = engine
+        .investigate(&id, "Explain the case.", &model)
+        .unwrap();
+    assert_eq!(*model.replies.lock().unwrap(), 2);
+    assert!(reply.contains("First part and the final part."));
+    assert!(reply.contains("model reached its maximum output"));
+    assert!(!reply.contains("Use /continue"));
+}
+
+#[test]
+fn a_security_prefix_and_streaming_preview_do_not_expose_an_open_private_key() {
+    let (_root, _store, engine, id) = engine_fixture();
+    let mut text = "safe ".repeat(190_000);
+    text.push_str("-----BEGIN PRIVATE KEY-----\n");
+    text.push_str(&"synthetic private material\n".repeat(6_000));
+    let preview =
+        irmind_app::screen_model_preview(engine.guard.as_ref(), &text[..990_000]).unwrap();
+    assert!(!preview.text.contains("synthetic private material"));
+    text.push_str("-----END PRIVATE KEY-----");
+    let model = output_model(text, false, 128_000);
+    let reply = engine
+        .investigate(&id, "Explain the case.", &model)
+        .unwrap();
+    assert!(!reply.contains("synthetic private material"));
+    assert!(reply.contains("Truncated by IRMind's security limit"));
+    engine.verify(&id).unwrap();
+}
+
+#[test]
+fn a_failed_automatic_continuation_retains_the_received_prefix_and_known_charge() {
+    let (_root, store, engine, id) = engine_fixture();
+    let mut model = output_model("Received and paid prefix".into(), true, 10);
+    model.fail_followup = true;
+    assert!(
+        engine
+            .investigate(&id, "Explain the case.", &model)
+            .is_err()
+    );
+    let entries = store.entries(&id).unwrap();
+    let answer = entries
+        .iter()
+        .find(|e| e.kind == AuditEventKind::FinalAnswer)
+        .unwrap();
+    assert!(answer.payload.starts_with("Received and paid prefix"));
+    assert!(answer.payload.contains("did not complete"));
+    assert_eq!(engine.case_budget(&id).unwrap().usage.model_tokens, 30);
+    assert!(
+        !engine
+            .case_budget(&id)
+            .unwrap()
+            .usage
+            .provider_usage_available
+    );
+    engine.verify(&id).unwrap();
 }

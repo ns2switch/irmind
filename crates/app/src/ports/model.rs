@@ -398,6 +398,11 @@ pub async fn collect_model_stream_with_progress(
     ))
 }
 
+/// Screen a bounded, possibly unfinished preview without exposing open PEM data.
+pub fn screen_model_preview(guard: &dyn ContentGuard, text: &str) -> Result<Screened, AppError> {
+    guard.screen(output::complete_prefix(text))
+}
+
 pub fn single_completion_stream(response: ModelResponse, usage: Option<ModelUsage>) -> ModelStream {
     Box::pin(futures_util::stream::once(async move {
         Ok(ModelEvent::Completed { response, usage })

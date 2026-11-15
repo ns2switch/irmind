@@ -1,4 +1,5 @@
 mod broker;
+mod output_vectors;
 use super::*;
 use irmind_app::subagents::{
     ReservationAction, ReservationPurpose, ReservationTransition, SubagentDigest, SubagentJournal,
@@ -312,12 +313,48 @@ fn model_terminal_prefix(
     SubagentDigest,
     Vec<irmind_app::subagents::SubagentBranchEntry>,
 ) {
+    model_terminal_prefix_with_usage(
+        history,
+        plan,
+        reserve,
+        request,
+        first,
+        ModelUsage {
+            input_tokens: 10,
+            output_tokens: 5,
+        },
+        Some(ModelUsage {
+            input_tokens: 10,
+            output_tokens: 5,
+        }),
+    )
+}
+
+fn model_terminal_prefix_with_usage(
+    history: &mut History,
+    plan: &SubagentPlanV1,
+    reserve: &SubagentReservationV1,
+    request: &irmind_app::subagents::SubagentBranchEntry,
+    first: &irmind_app::subagents::SubagentCheckpointV1,
+    reported: ModelUsage,
+    reply_usage: Option<ModelUsage>,
+) -> (
+    irmind_app::subagents::SubagentCheckpointV1,
+    irmind_app::subagents::BranchTerminal,
+    SubagentDigest,
+    Vec<irmind_app::subagents::SubagentBranchEntry>,
+) {
     use irmind_app::subagents::{
         BranchModelReply, BranchTerminal, CheckedBranchChunk, SubagentBranchPayload, SubagentStatus,
     };
     let accounting = history.append(
         AuditEventKind::ModelUsage,
-        "{\"input_tokens\":10,\"output_tokens\":5,\"estimated_cost_microusd\":null}".into(),
+        serde_json::to_string(&irmind_app::UsageEvent {
+            input_tokens: reported.input_tokens,
+            output_tokens: reported.output_tokens,
+            estimated_cost_microusd: None,
+        })
+        .unwrap(),
         false,
     );
     let terminal = BranchTerminal {
@@ -327,7 +364,7 @@ fn model_terminal_prefix(
         sources: vec![],
         coverage: vec![],
         usage: SubagentResources {
-            tokens: 15,
+            tokens: reported.input_tokens + reported.output_tokens,
             rounds: 1,
             ..SubagentResources::default()
         },
@@ -343,10 +380,7 @@ fn model_terminal_prefix(
             guarded_text: terminal.guarded_summary.clone(),
             truncated: false,
             tool_calls: vec![],
-            usage: Some(ModelUsage {
-                input_tokens: 10,
-                output_tokens: 5,
-            }),
+            usage: reply_usage,
         }),
         request.hash,
     );
@@ -659,6 +693,28 @@ fn completed_model_history() -> (
     irmind_app::subagents::SubagentCheckpointV1,
     irmind_app::subagents::BranchTerminal,
 ) {
+    completed_model_history_with_usage(
+        ModelUsage {
+            input_tokens: 10,
+            output_tokens: 5,
+        },
+        Some(ModelUsage {
+            input_tokens: 10,
+            output_tokens: 5,
+        }),
+    )
+}
+
+fn completed_model_history_with_usage(
+    reported: ModelUsage,
+    reply_usage: Option<ModelUsage>,
+) -> (
+    History,
+    Vec<irmind_app::subagents::CheckedBranchChunk>,
+    usize,
+    irmind_app::subagents::SubagentCheckpointV1,
+    irmind_app::subagents::BranchTerminal,
+) {
     use irmind_app::subagents::{CheckedBranchChunk, SubagentResultV1};
     let mut history = History::new();
     let plan = history.plan(100_000);
@@ -679,8 +735,15 @@ fn completed_model_history() -> (
         &history.verifier,
     )
     .unwrap();
-    let (last, terminal, accounting, entries) =
-        model_terminal_prefix(&mut history, &plan, &reserve, &request, &first);
+    let (last, terminal, accounting, entries) = model_terminal_prefix_with_usage(
+        &mut history,
+        &plan,
+        &reserve,
+        &request,
+        &first,
+        reported,
+        reply_usage,
+    );
     let last_chunk =
         CheckedBranchChunk::from_entries(&entries, &history.agent.public_key(), &history.verifier)
             .unwrap();
@@ -710,7 +773,19 @@ fn completed_model_history() -> (
         Some(start.operation_id),
         last.identity().unwrap(),
     );
-    release.amount = plan.reservation.checked_sub(terminal.usage).unwrap();
+    release.amount = SubagentResources {
+        tokens: 0,
+        ..plan.reservation
+    }
+    .checked_sub(SubagentResources {
+        tokens: 0,
+        ..terminal.usage
+    })
+    .unwrap();
+    release.amount.tokens = plan
+        .reservation
+        .tokens
+        .saturating_sub(terminal.usage.tokens);
     history.record(&release, false);
     assert_eq!(history.replay().unwrap(), SubagentResources::default());
     (
