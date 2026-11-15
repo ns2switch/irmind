@@ -46,7 +46,7 @@ This is a manual, synthetic-data check after the deterministic weekly evaluation
 2. Build IRMind and configure a model in the dedicated test directory. Run one episode with the development command below, replacing the paths and module ID. The command creates a case, ingests only `source/events.json`, asks the model to propose evidence-backed findings, verifies custody, and then scores exact IDs in the findings. It never auto-approves a tool call.
 
 ```sh
-python3 scripts/hunteval_model_eval.py \
+python3 scripts/hunteval_benchmark.py --help
   ../HuntEval \
   aws-iam-001 \
   target/debug/irmind \
@@ -65,7 +65,7 @@ python3 scripts/hunteval_model_eval.py \
 
 This check is for community testers with Windows 11. Automated Windows Server tests do not establish Windows client compatibility. Use only the synthetic fixture and run as a standard user. EVTX remains experimental until this check is confirmed.
 
-1. Download the matching Windows main and EVTX helper binaries from the [v0.3.0 release](https://github.com/ns2switch/irmind/releases/tag/v0.3.0). Put them in the same directory as `irmind.exe` and `irmind-evtx.exe`. Check `SHA256SUMS`, the cosign bundles and GitHub provenance as described in [platforms](../platforms.md), before renaming either file. The expected signing identity is `https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/v0.3.0`, the issuer is `https://token.actions.githubusercontent.com`, and the provenance source digest must match that tag.
+1. Download the matching Windows main and EVTX helper binaries from the [v0.5.0 release](https://github.com/ns2switch/irmind/releases/tag/v0.5.0). Put them in the same directory as `irmind.exe` and `irmind-evtx.exe`. Check `SHA256SUMS`, the cosign bundles and GitHub provenance as described in [platforms](../platforms.md), before renaming either file. The expected signing identity is `https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/v0.5.0`, the issuer is `https://token.actions.githubusercontent.com`, and the provenance source digest must match that tag.
 2. Start the candidate in Windows Terminal using a fresh test data directory and the file keystore. Do not configure a model or remote connector. Starting IRMind automatically runs the EVTX enforcement self-test before enabling the parser. In `/settings preferences`, check that the experimental EVTX parser is available. If it is unavailable, record its displayed reason; do not disable the firewall, add loopback exemptions or run as administrator to bypass the check.
 3. Download `crates/testkit/fixtures/parser-evtx/source/Security.evtx` from the exact candidate commit. Create a synthetic case with `/new`, then use `/ingest` to select that file. Confirm detection of `parser-evtx`, completion with 14 records, and a visible source manifest. Inspect `/timeline` and `/evidence` and run `/verify` with the source still present.
 4. Close and reopen the candidate. Confirm the self-test runs for the new session and the synthetic case still verifies. Remove the disposable case data after the check.
@@ -76,3 +76,5 @@ Publish only the Windows version/build, architecture, candidate commit, availabl
 | --- | --- | --- | --- | --- | --- |
 | Windows 11 | Not yet confirmed | Pending | Expected: 14 | Pending | Experimental |
 | Windows 10 | Not yet tested | Pending | Expected: 14 | Pending | No compatibility claim |
+
+For the full pinned 18-episode, multi-model procedure, use [the current benchmark guide](hunteval-model-benchmark.md). Its default is a dry plan; provider credentials stay in the IRMind keystore and human finding adjudication remains separate.

@@ -179,6 +179,7 @@ fn initial_state(
         sidebar_visible: false,
         sidebar_scroll: 0,
         overlay_scroll: 0,
+        help: None,
         focus: Focus::Composer,
         menu_open: false,
         menu_selected: 0,

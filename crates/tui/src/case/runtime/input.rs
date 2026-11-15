@@ -300,6 +300,9 @@ impl CaseRuntime<'_, '_, '_> {
             return Ok(exit);
         }
         let shortcut = command_registry::shortcut_name(code, modifiers);
+        if self.handle_help_key(code, shortcut) {
+            return Ok(false);
+        }
         if shortcut == Some("pause")
             && let Some((cancel, _, _)) = &self.active
         {
@@ -362,6 +365,24 @@ impl CaseRuntime<'_, '_, '_> {
             CaseMessage::Key(code, modifiers, self.active.is_some()),
         );
         self.apply_action(action)
+    }
+
+    fn handle_help_key(&mut self, code: KeyCode, shortcut: Option<&str>) -> bool {
+        if self.state.help.is_none() {
+            return false;
+        }
+        match code {
+            KeyCode::Esc | KeyCode::Enter => self.state.help = None,
+            KeyCode::PageUp | KeyCode::Up => {
+                self.state.overlay_scroll = self.state.overlay_scroll.saturating_sub(8);
+            }
+            KeyCode::PageDown | KeyCode::Down => {
+                self.state.overlay_scroll = self.state.overlay_scroll.saturating_add(8);
+            }
+            _ if shortcut == Some("palette") => self.state.help = None,
+            _ => {}
+        }
+        shortcut != Some("palette")
     }
 
     fn handle_session_key(

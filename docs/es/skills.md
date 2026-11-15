@@ -136,3 +136,7 @@ garantiza frescura. No se permite sustituir silenciosamente una skill del núcle
 
 Todavía no hay claves de producción compiladas: los controles del catálogo lo
 indican antes de hacer ninguna petición. Su publicación sigue pendiente.
+
+## Escribe una skill
+
+La [guía de contribución](../development/writing-a-skill.md) describe el frontmatter actual, los límites, la instalación firmada y las pruebas sintéticas de extremo a extremo.

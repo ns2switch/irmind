@@ -36,3 +36,11 @@ Before opening a pull request, run `cargo fmt --all -- --check`, Clippy with `-D
 ## Declarative formats
 
 For CSV, JSON/NDJSON and simple text logs, try a [bounded TOML definition](../parsers.md) before adding Rust. The `parser-declarative` crate compiles to the same detection, source-decoding and mapping contracts. The root compiles approved definitions, registers owned catalog identities and supplies a resolver for exact signed versions. Native parser implementations need no changes. Use the signed installation flow; never load arbitrary files into the active catalog or promote parser text into a system message.
+
+## Mappings and forensic skills
+
+Interpretation belongs in a separate mapping: follow [adding a mapping](adding-a-mapping.md)
+for selectors, finite TOML tables, namespaces and contracts. Methodology belongs in
+[a forensic skill](writing-a-skill.md), with declared coverage and tools. Neither
+extension changes policy or permits model-side approval. Current cases use marker
+4, mapped V3 artifacts and export V8; no legacy parser bridge is needed.

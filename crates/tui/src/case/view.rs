@@ -99,9 +99,11 @@ where
             }
         }
         draw_thread(frame, view, area, sections[0], theme);
-        draw_prompt(frame, view, sections[1], theme);
+        if view.overlay.is_none() {
+            draw_prompt(frame, view, sections[1], theme);
+            draw_menu(frame, view, area, sections[1], theme);
+        }
         draw_footer(frame, view, sections[2], theme);
-        draw_menu(frame, view, area, sections[1], theme);
         let overlay_area = if view.status.starts_with("FULL INSTANCE SCOPE") {
             Rect::new(area.x, area.y, area.width, sections[2].y.saturating_sub(area.y))
         } else if view.guide.is_some() && presentation_compact(area) {

@@ -380,6 +380,30 @@ impl Conversation {
         self.total_lines = cursor;
     }
 
+    pub(super) fn clear_empty_evidence_hint(&mut self) {
+        let Some(index) = self.cards.iter().position(|card| {
+            matches!(card.kind, CardKind::Notice)
+                && card.title == "Hint"
+                && card.body == "No evidence yet · use /ingest to add a file."
+        }) else {
+            return;
+        };
+        let card = self.cards.remove(index);
+        let offset = self.offsets.remove(index);
+        if let Some(next) = self.offsets.get_mut(index) {
+            *next = offset;
+        }
+        self.recalculate_from(index);
+        self.selected = self
+            .selected
+            .map(|selected| selected.saturating_sub(usize::from(selected >= index)))
+            .filter(|selected| *selected < self.cards.len());
+        if self.scroll > offset {
+            self.scroll = self.scroll.saturating_sub(card.lines.len());
+        }
+        self.scroll = self.scroll.min(self.max_scroll());
+    }
+
     pub(super) fn set_viewport(&mut self, width: usize, height: usize) {
         let width = width.max(1);
         self.viewport = height.max(1);
@@ -537,6 +561,32 @@ impl Conversation {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn completed_ingest_removes_only_the_empty_hint_and_rebuilds_offsets() {
+        let mut chat = Conversation::new(false);
+        chat.set_viewport(80, 20);
+        chat.push(Card::new(CardKind::Notice, "", "Case opened", false));
+        chat.push(Card::new(
+            CardKind::Notice,
+            "Hint",
+            "No evidence yet · use /ingest to add a file.",
+            false,
+        ));
+        chat.push(Card::new(CardKind::Notice, "", "Ingested 1 file", false));
+        chat.clear_empty_evidence_hint();
+        assert_eq!(chat.cards.len(), 2);
+        assert_eq!(chat.offsets, vec![0, chat.cards[0].lines.len()]);
+        assert_eq!(
+            chat.total_lines,
+            chat.cards
+                .iter()
+                .map(|card| card.lines.len())
+                .sum::<usize>()
+        );
+        chat.clear_empty_evidence_hint();
+        assert_eq!(chat.cards.len(), 2);
+    }
 
     #[test]
     fn missing_or_nonfoldable_selection_uses_last_expandable_card() {

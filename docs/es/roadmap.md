@@ -8,6 +8,8 @@ Esta página es para quienes contribuyen o evalúan el proyecto. Expresa intenci
 
 Política anterior a 1.0: las versiones menores pueden cambiar formatos sin migración. V3 es el único formato de v0.3; las notas de compatibilidad de versiones publicadas describen solo aquellas versiones históricas.
 
+Preparación del lanzamiento: [validación real](real-validation.md), [evaluación de modelos](hunteval-model-benchmark.md) y [firma nativa](native-signing.md). Son procedimientos, no validaciones reales ya completadas.
+
 ## Entregado en 0.1.0 y 0.1.1
 
 Las versiones preliminares incluyen la TUI para casos, conectores sujetos a política, custodia firmada, conversaciones protegidas, consultas acotadas sobre Parquet, demo sintética, registro de detección de parsers, instaladores verificados y binarios firmados y atestados con Sigstore. El [registro de cambios](../../CHANGELOG.md) detalla lo entregado. H5 está hecha por decisión del analista; siguen pendientes de registro los pasos no descritos y la validación de un conector real.

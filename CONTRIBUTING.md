@@ -1,6 +1,6 @@
 # Contributing to IRMind
 
-This guide is for contributors preparing an issue or pull request. IRMind is under development: use only synthetic data in issues, tests, examples, and review discussions. Never attach real incident evidence, credentials, or personal data. Report vulnerabilities privately through [SECURITY.md](SECURITY.md).
+This guide is for contributors preparing an issue or pull request. IRMind is under development: use only synthetic data in issues, tests, examples, and review discussions. Never attach real incident evidence, credentials, or personal data. Report problems according to [SECURITY.md](SECURITY.md).
 
 ## License and DCO
 
@@ -28,4 +28,8 @@ English documentation is authoritative. Update a Spanish translation when its us
 
 We welcome parsers, read-only connectors, accessibility and terminal improvements, better synthetic fixtures, documentation, and performance improvements that preserve custody and verification. Start with [the module guide](docs/development/adding-a-module.md) for a parser or connector. Be kind and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-We do not accept changes that weaken policy enforcement, signed custody, TLS certificate or hostname verification, secret isolation, or the mandatory content guard. Do not submit real incident records, personal data, private keys, or live service responses. Report a security issue through the private process in [SECURITY.md](SECURITY.md), not a public issue.
+We do not accept changes that weaken policy enforcement, signed custody, TLS certificate or hostname verification, secret isolation, or the mandatory content guard. Do not submit real incident records, personal data, private keys, or live service responses. Follow [SECURITY.md](SECURITY.md) for a minimal synthetic report and the optional private contact channel. Never post sensitive details.
+
+## Extension guides
+
+[Parser/connector](docs/development/adding-a-module.md) · [Mapping](docs/development/adding-a-mapping.md) · [Skill](docs/development/writing-a-skill.md).

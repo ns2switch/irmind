@@ -2,7 +2,7 @@ Traducción de CONTRIBUTING.md en el commit 5292adaf925f9f0c3dc701c308e575cffa02
 
 # Contribuir a IRMind
 
-Esta guía es para quienes preparan una incidencia o una solicitud de cambios. IRMind está en desarrollo: usa solo datos sintéticos en incidencias, pruebas, ejemplos y revisiones. Nunca adjuntes evidencias reales, credenciales ni datos personales. Informa de vulnerabilidades por el proceso privado de [SECURITY.md](SECURITY.md).
+Esta guía es para quienes preparan una incidencia o una solicitud de cambios. IRMind está en desarrollo: usa solo datos sintéticos en incidencias, pruebas, ejemplos y revisiones. Nunca adjuntes evidencias reales, credenciales ni datos personales. Informa de problemas según [SECURITY.es.md](SECURITY.es.md), con un caso mínimo sintético.
 
 ## Licencia y DCO
 
@@ -30,4 +30,8 @@ La documentación inglesa es la fuente de verdad. Si cambias contenido para usua
 
 Aceptamos parsers, conectores de solo lectura, mejoras de accesibilidad y terminal, mejores fixtures sintéticos, documentación y mejoras de rendimiento que conserven la custodia y la verificación. Empieza por la [guía de módulos](docs/development/adding-a-module.md) para un parser o conector. Respeta el [Código de conducta](CODE_OF_CONDUCT.es.md).
 
-No aceptamos cambios que debiliten la política, la cadena de custodia firmada, la verificación TLS o del nombre de host, el aislamiento de secretos ni el guard obligatorio. No envíes registros de incidentes reales, datos personales, claves privadas ni respuestas de servicios en producción. Informa de problemas de seguridad por el canal privado de [SECURITY.md](SECURITY.md), nunca en una incidencia pública.
+No aceptamos cambios que debiliten la política, la cadena de custodia firmada, la verificación TLS o del nombre de host, el aislamiento de secretos ni el guard obligatorio. No envíes registros de incidentes reales, datos personales, claves privadas ni respuestas de servicios en producción. Sigue [SECURITY.es.md](SECURITY.es.md): reproducción sintética y canal privado opcional; nunca publiques datos sensibles.
+
+## Guías de extensiones
+
+[Parser/connector](docs/es/adding-a-module.md) · [Mapping](docs/es/adding-a-mapping.md) · [Skill](docs/es/writing-a-skill.md).

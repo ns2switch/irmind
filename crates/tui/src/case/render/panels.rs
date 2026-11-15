@@ -127,6 +127,9 @@ fn audit_panel(state: &CaseState) -> String {
 }
 
 pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Option<String>> {
+    if let Some(help) = &state.help {
+        return Ok(Some(engine.guard.screen(help)?.text));
+    }
     if let Some(editor) = &state.budget.editor {
         return Ok(Some(engine.guard.screen(&editor.text())?.text));
     }
