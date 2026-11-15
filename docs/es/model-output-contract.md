@@ -103,34 +103,25 @@ sin cambiar su disposición de bytes; sí cambia su interpretación y los
 invariantes del verificador. Por eso se requiere la decisión antes de
 implementarla y revisar los vectores de contabilidad afectados.
 
-## Texto completo con límites de seguridad intactos
+## Respuestas completas dentro de los límites de seguridad actuales
 
-La colección actual del preview se detiene en 200.000 bytes; el streaming total
-en 2.000.000; el guard procesa hasta 1.000.000 por llamada; el resumen del hijo
-hasta 16 KiB. Un máximo legítimo del modelo puede superar esos totales. No se
-propone borrar o subir esos límites sin un contrato que sustituya su función.
+Se conservan el frame firmado de **1 MiB**, el límite del guard de **1.000.000
+bytes** y el del stream de **2.000.000 bytes**. Se eleva la vista previa de
+200.000 bytes para que no recorte una respuesta que quepa en esos límites.
+No se añade almacenamiento segmentado, spool ni otra representación de exportación.
 
-La propuesta es ensamblado incremental y spool privado del caso, con límites
-independientes por evento de transporte, búfer residente, frame y recursos de
-disco. Los segmentos filtrados conservan orden e identidad de una respuesta
-lógica. Un resumen corto para el principal o un contexto futuro acotado no
-sustituyen a la respuesta completa conservada. La salida del modelo no se
-convierte en evidencia original ni en un hallazgo confirmado por almacenarla.
+La respuesta filtrada se conserva y firma completa si cabe en el frame, contando
+metadatos y sobrecoste de codificación. Si no cabe, se conserva el mayor prefijo
+UTF-8 válido que permita el frame y se indica claramente «Recortada por el límite
+de seguridad de IRMind». No se presenta como completa ni se confunde con el
+máximo del proveedor. El guard sigue validando todo texto mostrado o conservado.
 
-El frame firmado mantiene su máximo de **1 MiB**. Antes de implementar la
-persistencia segmentada se deben concretar, en esta misma PR, sus registros,
-interfaz de almacén, exportación, verificación y vectores golden. No se sobrecargan
-resultados de herramientas, identidades de parser u otros campos de rama.
-
-El guard incremental debe mantener detección y redacción a través de límites de
-segmento: claves privadas, credenciales, instrucciones ocultas, UTF-8 y secuencias
-de terminal. Un solape arbitrario entre llamadas independientes no demuestra esa
-equivalencia. Este contrato adicional queda pendiente; no se considera aprobado
-por describirlo aquí.
-
-Cancelación, plazos y fallo de recursos siguen siendo interrupciones explícitas,
-con el prefijo verificado conservado y estado incompleto. No se promete que una
-máquina finita almacene un stream infinito o malicioso.
+Se prueba una respuesta sintética representativa de 128.000 tokens, su firma y
+exportación, además del caso que excede el frame. Tokens y bytes no son equivalentes:
+una respuesta con muchos bytes por token puede alcanzar el límite de seguridad.
+El resumen de 16 KiB del hijo al principal se mantiene; la respuesta completa queda
+en la rama, dentro del mismo límite de frame. Cancelación, plazos y fallos de
+recursos siguen siendo interrupciones visibles.
 
 ## Una continuación automática
 
@@ -149,7 +140,8 @@ no se crea un bucle ilimitado de reintentos ni se borra texto para unir partes.
 ## Orden y pruebas
 
 1. Revisar el puerto de capacidades y la excepción de liquidación de tokens.
-2. Concretar y revisar almacenamiento/guard segmentados y sus vectores firmados.
+2. Conservar los límites de stream, guard y frame; revisar los vectores de
+   contabilidad nuevos y las pruebas de recorte de seguridad.
 3. Implementar perfiles, Ajustes, admisión entre peticiones, retención íntegra y
    continuación única. No entregar solo el cambio de 2.048 dejando recortes atrás.
 4. Probar respuestas largas, exceso con respuesta completada, siguiente petición
