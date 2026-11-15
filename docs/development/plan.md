@@ -11,12 +11,16 @@ All pass the [scripted synthetic case test](../../crates/bin/tests/skills_runtim
 including confirmed findings and independent V7 verification. Signed case budgets,
 Kubernetes audit/Falco sources and methods, managed cloud transports, and native
 Entra/GCP/network semantics complete the 0.4.2 A/B scope. The Kubernetes live API
-connector and [catalog installation](https://github.com/ns2switch/irmind/pull/271) remain design-only. Publication of the
-separate community catalog is deferred; it is not a prerequisite for 0.4.2.
+connector remains design-only. [Catalog installation](skills-catalog-install.md)
+now has an offline-capable implementation; publication of the separate community
+catalog is deferred until a publisher key is configured.
 
 The approved [subagent architecture](subagents-design.md) specifies bounded parallel tasks,
 shared reservations, signed event branches and an engine event stream; it is
-design-only: concrete ports/formats and golden vectors precede implementation.
+implemented with the approved [concrete contracts and vectors](subagents-format-contract.md),
+authenticated child branches, deterministic parallel waves and a read-only engine
+event stream. The interactive preview and `/subagents` panel retain Analyst-only
+confirmation and cancellation.
 Version 0.5 includes six bundled types, resource limits and signed confirmation
 above 25% of remaining tokens/calls; community types and monetary caps are deferred.
 The separate [Windows collection evaluation](https://github.com/ns2switch/irmind/pull/284)

@@ -398,6 +398,7 @@ impl<'a> TaskMaterial<'a> {
         }
         self.partial |= value.partial;
         self.require_tool_reservation(value.reservation_sha256, *proposal_sequence, accounted.seq)?;
+        self.require_cloud_reservation(proposal, value, accounted, *proposal_sequence)?;
         self.usage.calls = self.usage.calls.checked_add(1).ok_or(SubagentRecordError)?;
         self.usage.cloud_bytes = self
             .usage
@@ -406,6 +407,41 @@ impl<'a> TaskMaterial<'a> {
             .ok_or(SubagentRecordError)?;
         if !self.usage.within(self.task.budget) {
             return Err(SubagentRecordError);
+        }
+        Ok(())
+    }
+    fn require_cloud_reservation(
+        &self,
+        proposal: &BranchToolProposal,
+        value: &BranchToolResult,
+        accounted: &super::super::accounting::Accounted,
+        proposal_sequence: u64,
+    ) -> Result<(), SubagentRecordError> {
+        if proposal.tool == Tool::ObjectRead.as_str() {
+            let requested = proposal
+                .arguments
+                .get("max_bytes")
+                .and_then(|value| value.parse::<u64>().ok())
+                .ok_or(SubagentRecordError)?;
+            if requested != accounted.amount.cloud_bytes {
+                return Err(SubagentRecordError);
+            }
+            let (tool, _) = self.plan.request_by_identity(value.reservation_sha256)?;
+            let cloud_id = crate::subagents::SubagentReservationV1::operation_id(
+                self.plan.plan.plan_id,
+                Some(self.task.task_id),
+                crate::subagents::ReservationAction::ReserveRequest,
+                ReservationPurpose::Cloud,
+                tool.request_ordinal,
+            );
+            let (cloud, admitted) = self.plan.request(cloud_id)?;
+            if cloud.amount.cloud_bytes != requested
+                || cloud.cause_sha256 != tool.cause_sha256
+                || admitted <= proposal_sequence
+                || admitted >= accounted.seq
+            {
+                return Err(SubagentRecordError);
+            }
         }
         Ok(())
     }
@@ -507,13 +543,15 @@ impl<'a> TaskMaterial<'a> {
                 usize::try_from(completed).map_err(|_| SubagentRecordError)?,
             )
             .map_err(|_| SubagentRecordError)?;
+        let mut rules = rules.clone();
+        rules.scope = Some(crate::CaseScope::parse(&case.scope).map_err(|_| SubagentRecordError)?);
         let decision = irmind_domain::evaluate_with_rules(
             &case,
             call,
             1,
             irmind_domain::ExecutionMode::Attended,
             0,
-            rules,
+            &rules,
         );
         let permitted = match decision {
             irmind_domain::Decision::Allow(_) => true,

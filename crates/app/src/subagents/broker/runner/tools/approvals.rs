@@ -41,19 +41,26 @@ impl Engine<'_> {
         {
             return Ok(false);
         }
-        let Some(observed) = call
-            .arguments
-            .get("ioc")
-            .and_then(|value| state.observed.get(value))
-        else {
+        let observed = if call.tool == Tool::ThreatIntelExternal.as_str() {
+            let Some(observed) = call
+                .arguments
+                .get("ioc")
+                .and_then(|value| state.observed.get(value))
+            else {
+                return Ok(false);
+            };
+            if !view
+                .sources()
+                .contains(&crate::hex(observed.source.hash.as_bytes()))
+            {
+                return Ok(false);
+            }
+            Some(observed)
+        } else if call.tool == Tool::ObjectRead.as_str() {
+            None
+        } else {
             return Ok(false);
         };
-        if !view
-            .sources()
-            .contains(&crate::hex(observed.source.hash.as_bytes()))
-        {
-            return Ok(false);
-        }
         let Some(pending) = self.pending_child_lookup(&case, task, call)? else {
             return Ok(false);
         };
@@ -68,8 +75,8 @@ impl Engine<'_> {
                 arguments: call.arguments.clone(),
                 allocation_sha256: started.allocation.identity().map_err(|_| invalid())?,
                 tainted: true,
-                source: Some(observed.source),
-                guarded_excerpt: observed.excerpt.clone(),
+                source: observed.map(|value| value.source),
+                guarded_excerpt: observed.map_or_else(String::new, |value| value.excerpt.clone()),
             }),
         )?;
         let checkpoint = self.publish_child_prefix(
@@ -105,7 +112,7 @@ impl Engine<'_> {
         call: &BranchToolCall,
     ) -> Result<Option<crate::PendingApproval>, AppError> {
         let proposal = ProposedCall {
-            tool: Tool::ThreatIntelExternal,
+            tool: Tool::parse(&call.tool).map_err(|_| invalid())?,
             args: call.arguments.clone(),
         };
         let narrowed = crate::Case {
@@ -115,7 +122,8 @@ impl Engine<'_> {
             scope: task.remote_scope.clone().ok_or_else(invalid)?,
             sealed: false,
         };
-        let rules = self.policy_for_case_unlocked(case)?;
+        let mut rules = self.policy_for_case_unlocked(case)?;
+        rules.scope = Some(crate::CaseScope::parse(&narrowed.scope).map_err(|_| invalid())?);
         rules
             .permits(&proposal.tool, self.completed_calls_unlocked(case)?)
             .map_err(|_| invalid())?;
@@ -188,15 +196,9 @@ impl Engine<'_> {
             TaskApprovalDecision::Granted(call) => {
                 let effect =
                     self.reserve_approved_child(started, task, state, &pending, &call, cancel)?;
-                let remaining = task.deadline_at.saturating_sub(self.clock.now()?).min(600);
-                let signal = cancel.child_token();
-                let result = tokio::select! {biased;()=cancel.cancelled()=>Err(AppError::Cancelled),result=tokio::time::timeout(std::time::Duration::from_secs(remaining),self.run_authorized_tool(&call,false,&signal))=>result.unwrap_or(Err(AppError::Cancelled))};
-                signal.cancel();
-                let response = result
-                    .and_then(|raw| {
-                        self.retain_child_remote_result(started, task, &effect, &raw, cancel)
-                    })
-                    .map(super::ChildReadResponse::Evidence);
+                let response = self
+                    .run_child_remote(started, task, &effect, &call, cancel)
+                    .await;
                 self.finish_child_read(started, task, state, &effect, response)?;
             }
         }
@@ -246,7 +248,17 @@ impl Engine<'_> {
         )
         .map_err(|_| invalid())?;
         batch.push(&reservation)?;
+        let checkpoint = state.checkpoint.as_ref().ok_or_else(invalid)?;
+        let cloud = Self::reserve_child_bytes(
+            &mut batch,
+            started,
+            task,
+            &pending.call,
+            state.call,
+            checkpoint,
+        )?;
         let mut effect = ReadEffect {
+            cloud,
             call: pending.call.clone(),
             reservation,
             proposal: pending.proposal,
@@ -258,17 +270,18 @@ impl Engine<'_> {
             false,
         )?;
         batch.publish(cancel)?;
-        state.reservations.insert(effect.reservation.operation_id);
+        effect.remember_reservations(state);
         Ok(effect)
     }
-    fn retain_child_remote_result(
+    pub(super) fn retain_child_remote_result(
         &self,
         started: &StartedSubagentPlan,
         task: &SubagentTaskSpec,
         effect: &ReadEffect,
         raw: &[u8],
+        complete: bool,
         cancel: &CancellationToken,
-    ) -> Result<TaskEvidenceResult, AppError> {
+    ) -> Result<super::ChildReadResponse, AppError> {
         if raw.len() > 5_000_000 {
             return Err(AppError::RemoteTool);
         }
@@ -277,11 +290,16 @@ impl Engine<'_> {
         if cancel.is_cancelled() || self.clock.now()? > task.deadline_at {
             return Err(AppError::Cancelled);
         }
+        let mut local = self.local_handle();
+        local.signer = self.skills.as_ref().ok_or_else(invalid)?.agent.clone();
+        let admitted = local.index_child_remote_result(&case, &effect.call, raw, cancel)?;
         let mut batch = AgentBatch::new(self, &case, self.verifier.as_ref())?;
-        batch
+        let view = batch
             .journal
             .task_view(started, task.task_id, &self.policy)
             .map_err(|_| invalid())?;
+        let admitted =
+            admitted.filter(|hash| !view.sources().contains(&crate::hex(hash.as_bytes())));
         let hash = crate::hex(&crate::sha256(raw));
         self.evidence_store.put_evidence(&case, &hash, raw)?;
         batch.push_evidenced_payload(
@@ -291,14 +309,23 @@ impl Engine<'_> {
             Some(&hash),
         )?;
         batch.publish(cancel)?;
-        Ok(TaskEvidenceResult::PartialText {
-            text: format!(
-                "Remote response retained as evidence {hash}. This adapter does not attest completeness.\n{}",
-                String::from_utf8_lossy(&raw[..raw.len().min(16 * 1024)])
-            ),
-            reason: TaskQueryPartialReason::Coverage,
+        let text = format!(
+            "Remote response retained as evidence {hash}.\n{}",
+            String::from_utf8_lossy(&raw[..raw.len().min(16 * 1024)])
+        );
+        Ok(super::ChildReadResponse::Remote {
+            admitted: admitted.into_iter().collect(),
+            result: if complete {
+                TaskEvidenceResult::Text(text)
+            } else {
+                TaskEvidenceResult::PartialText {
+                    text,
+                    reason: TaskQueryPartialReason::Coverage,
+                }
+            },
         })
     }
+
     fn child_approval_notice(
         &self,
         started: &StartedSubagentPlan,

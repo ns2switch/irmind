@@ -50,6 +50,18 @@ impl Engine<'_> {
         batch: &mut AgentBatch<'_>,
         cancel: &CancellationToken,
     ) -> Result<SubagentCheckpointV1, AppError> {
+        self.publish_child_prefix_with_sources(case, entries, previous, vec![], batch, cancel)
+    }
+
+    pub(in crate::subagents::broker) fn publish_child_prefix_with_sources(
+        &self,
+        case: &CaseId,
+        entries: &[SubagentBranchEntry],
+        previous: Option<SubagentDigest>,
+        admitted: Vec<SubagentDigest>,
+        batch: &mut AgentBatch<'_>,
+        cancel: &CancellationToken,
+    ) -> Result<SubagentCheckpointV1, AppError> {
         let ports = self.subagents.as_ref().ok_or_else(invalid)?;
         let agent = &self.skills.as_ref().ok_or_else(invalid)?.agent;
         let chunk =
@@ -64,7 +76,9 @@ impl Engine<'_> {
         {
             return Err(invalid());
         }
-        let checkpoint = chunk.checkpoint(previous, vec![]).map_err(|_| invalid())?;
+        let checkpoint = chunk
+            .checkpoint(previous, admitted)
+            .map_err(|_| invalid())?;
         batch.push(&checkpoint)?;
         Ok(checkpoint)
     }

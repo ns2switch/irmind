@@ -20,17 +20,8 @@ impl Engine<'_> {
         let case = &CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
         let call = &effect.call;
         let _lock = self.repo.lock_case(case)?;
-        let (response, method) = match response {
-            Ok(ChildReadResponse::Method(method)) if self.clock.now()? <= task.deadline_at => (
-                Ok(TaskEvidenceResult::Text(method.output.clone())),
-                Some(method),
-            ),
-            Ok(ChildReadResponse::Evidence(value)) => (Ok(value), None),
-            Ok(ChildReadResponse::Method(_)) | Err(AppError::Cancelled) => {
-                (Err(AppError::Cancelled), None)
-            }
-            Err(error) => (Err(error), None),
-        };
+        let (response, method, admitted) =
+            unpack_response(response, self.clock.now()? <= task.deadline_at);
         let mut batch = AgentBatch::new(self, case, self.verifier.as_ref())?;
         let view = batch
             .journal
@@ -46,6 +37,11 @@ impl Engine<'_> {
             super::indicators::observe(self, state, record, &sources)?;
         }
         mark_partial_read(state, &payload, method.as_deref());
+        let admitted = if matches!(payload, SubagentBranchPayload::ToolResult(_)) {
+            admitted
+        } else {
+            vec![]
+        };
         let mut entries = Vec::new();
         if let Some(method) = &method {
             entries.push(self.child_entry(
@@ -64,10 +60,11 @@ impl Engine<'_> {
             prev,
             payload,
         )?);
-        let checkpoint = self.publish_child_prefix(
+        let checkpoint = self.publish_child_prefix_with_sources(
             case,
             &entries,
             state.checkpoint_id()?,
+            admitted,
             &mut batch,
             &CancellationToken::new(),
         )?;
@@ -77,6 +74,9 @@ impl Engine<'_> {
         };
         let settlement = effect.settlement(started, task, state.call, usage, &checkpoint)?;
         batch.push(&settlement)?;
+        if let Some(settlement) = effect.cloud_settlement(started, task, state.call, &checkpoint)? {
+            batch.push(&settlement)?;
+        }
         batch.publish(&CancellationToken::new())?;
         state.seq = entries.last().ok_or_else(invalid)?.body.seq;
         state.previous = entries.last().ok_or_else(invalid)?.hash;
@@ -87,7 +87,10 @@ impl Engine<'_> {
             state.skills.active = Some(active);
             state.method = Some(method.receipt.snapshot()?);
         }
-        state.usage = state.usage.checked_add(usage).map_err(|_| invalid())?;
+        state.usage = state
+            .usage
+            .checked_add(effect.resources())
+            .map_err(|_| invalid())?;
         state.retain_sources(sources);
         state.tool_message(task, &call.id, &text)?;
         Ok(())
@@ -135,6 +138,46 @@ impl Engine<'_> {
     }
 }
 impl ReadEffect {
+    fn resources(&self) -> SubagentResources {
+        SubagentResources {
+            calls: 1,
+            cloud_bytes: self
+                .cloud
+                .as_ref()
+                .map_or(0, |value| value.amount.cloud_bytes),
+            ..SubagentResources::default()
+        }
+    }
+    fn cloud_settlement(
+        &self,
+        started: &StartedSubagentPlan,
+        task: &SubagentTaskSpec,
+        ordinal: u64,
+        checkpoint: &crate::subagents::SubagentCheckpointV1,
+    ) -> Result<Option<SubagentReservationV1>, AppError> {
+        self.cloud
+            .as_ref()
+            .map(|reservation| {
+                SubagentReservationV1::prepare(
+                    &started.plan,
+                    Some(task.task_id),
+                    ordinal,
+                    ReservationAction::SettleRequest,
+                    ReservationPurpose::Cloud,
+                    ReservationTransition {
+                        amount: SubagentResources {
+                            cloud_bytes: reservation.amount.cloud_bytes,
+                            ..SubagentResources::default()
+                        },
+                        parent_operation: Some(reservation.operation_id),
+                        cause_sha256: checkpoint.identity()?,
+                        accounting_audit_sha256: Some(self.decision),
+                    },
+                )
+            })
+            .transpose()
+            .map_err(|_| invalid())
+    }
     fn settlement(
         &self,
         started: &StartedSubagentPlan,
@@ -172,5 +215,24 @@ fn mark_partial_read(
         state
             .coverage
             .insert("A tool result was incomplete or unavailable.".into());
+    }
+}
+
+type PreparedRead = (
+    Result<TaskEvidenceResult, AppError>,
+    Option<Box<crate::skills::runtime::PreparedSkillRead>>,
+    Vec<crate::subagents::SubagentDigest>,
+);
+fn unpack_response(response: Result<ChildReadResponse, AppError>, on_time: bool) -> PreparedRead {
+    match response {
+        Ok(ChildReadResponse::Remote { result, admitted }) => (Ok(result), None, admitted),
+        Ok(ChildReadResponse::Method(method)) if on_time => (
+            Ok(TaskEvidenceResult::Text(method.output.clone())),
+            Some(method),
+            vec![],
+        ),
+        Ok(ChildReadResponse::Evidence(value)) => (Ok(value), None, vec![]),
+        Ok(ChildReadResponse::Method(_)) => (Err(AppError::Cancelled), None, vec![]),
+        Err(error) => (Err(error), None, vec![]),
     }
 }

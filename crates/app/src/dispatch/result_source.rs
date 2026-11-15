@@ -9,42 +9,125 @@ use irmind_domain::{
 };
 use std::{io::Write as _, sync::Arc};
 impl Engine<'_> {
-    pub(super) fn index_remote_result(
+    pub(crate) fn index_remote_result(
         &self,
         id: &CaseId,
         call: &AuthorizedCall,
         raw: &[u8],
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
-        if !matches!(call.tool(), Tool::SiemSearch | Tool::SiemGetAlert) {
-            return Ok(());
+        self.index_identified_result(id, call.tool(), call.proposal_args(), raw, cancel)
+            .map(|_| ())
+    }
+    pub(crate) fn index_child_remote_result(
+        &self,
+        id: &CaseId,
+        call: &crate::subagents::BranchToolCall,
+        raw: &[u8],
+        cancel: &CancellationToken,
+    ) -> Result<Option<crate::subagents::SubagentDigest>, AppError> {
+        let tool = Tool::parse(&call.tool).map_err(|_| AppError::RemoteTool)?;
+        let hash = if matches!(tool, Tool::SiemSearch | Tool::SiemGetAlert) {
+            self.index_identified_result(id, &tool, &call.arguments, raw, cancel)?
+        } else if matches!(
+            tool,
+            Tool::CloudAuditEvents
+                | Tool::CloudIdentity
+                | Tool::EdrHostInfo
+                | Tool::EdrProcessTree
+                | Tool::EdrDetections
+        ) {
+            let Some(catalog) = &self.parser_catalog else {
+                return Ok(None);
+            };
+            let logical = format!("remote/{}.json", crate::hex(&crate::sha256(raw)));
+            let selected = match catalog.select_source(crate::modules::ParserSelectionRequest {
+                source: &logical,
+                sample: &raw[..raw.len().min(65536)],
+                parser_override: None,
+                forced: false,
+                time_context: None,
+                cluster_context: None,
+            }) {
+                Ok(selected) => selected,
+                Err(
+                    AppError::ParserSelection { .. }
+                    | AppError::ParserTimeContextRequired { .. }
+                    | AppError::ParserClusterContextRequired { .. },
+                ) => return Ok(None),
+                Err(error) => return Err(error),
+            };
+            self.index_decoded_result(
+                id,
+                &logical,
+                selected.parser.as_ref(),
+                &selected.selection,
+                raw,
+                cancel,
+            )?
+        } else {
+            None
+        };
+        hash.map(|hash| {
+            crate::subagents::SubagentDigest::parse(hash.as_str()).map_err(|_| AppError::RemoteTool)
+        })
+        .transpose()
+    }
+
+    fn index_identified_result(
+        &self,
+        id: &CaseId,
+        tool: &Tool,
+        args: &std::collections::BTreeMap<String, String>,
+        raw: &[u8],
+        cancel: &CancellationToken,
+    ) -> Result<Option<EvidenceHash>, AppError> {
+        if !matches!(tool, Tool::SiemSearch | Tool::SiemGetAlert) {
+            return Ok(None);
         }
-        if call.tool() == &Tool::SiemSearch
-            && SiemQuery::parse(call.proposal_args())
-                .is_some_and(|q| q.aggregation() != SiemAggregation::Events)
+        if tool == &Tool::SiemSearch
+            && SiemQuery::parse(args).is_some_and(|q| q.aggregation() != SiemAggregation::Events)
         {
-            return Ok(());
+            return Ok(None);
         }
-        let Some(decoder) = call
-            .arg("source")
+        let Some(decoder) = args
+            .get("source")
             .and_then(|source| self.result_decoders.get(source))
         else {
-            return Ok(());
+            return Ok(None);
         };
-        let store = self.large_case_store.as_ref().ok_or(AppError::RemoteTool)?;
         let hash = EvidenceHash::from_bytes(crate::sha256(raw));
         let logical = format!("siem/{}/{}.json", decoder.identity().name, hash.as_str());
-        let index = crate::large_case::read_manifest_index(&self.audit_log.entries(id)?)?;
-        if index
-            .sources
-            .iter()
-            .any(|source| source.source == logical && source.sha256 == hash)
-        {
-            return Ok(());
-        }
         if !has_events(decoder.as_ref(), raw, &logical, cancel)? {
-            return Ok(());
+            return Ok(None);
         }
+        let selection = SourceDecoderSelection::new(Arc::clone(decoder));
+        self.index_decoded_result(
+            id,
+            &logical,
+            &selection,
+            &parser_selection(decoder.as_ref(), raw),
+            raw,
+            cancel,
+        )
+    }
+
+    fn index_decoded_result(
+        &self,
+        id: &CaseId,
+        logical: &str,
+        selection: &dyn crate::StreamingEventParser,
+        parser: &ParserSelection,
+        raw: &[u8],
+        cancel: &CancellationToken,
+    ) -> Result<Option<EvidenceHash>, AppError> {
+        let store = self.large_case_store.as_ref().ok_or(AppError::RemoteTool)?;
+        let hash = EvidenceHash::from_bytes(crate::sha256(raw));
+        let index = crate::large_case::read_manifest_index(&self.audit_log.entries(id)?)?;
+        if index.sources.iter().any(|source| source.sha256 == hash) {
+            return Ok(Some(hash));
+        }
+
         let mut spool = store.create_object_spool(id, raw.len() as u64)?;
         spool.write_all(raw).map_err(|_| {
             AppError::Storage("cannot write remote result inside the case spool".into())
@@ -60,8 +143,7 @@ impl Engine<'_> {
             .and_then(std::ffi::OsStr::to_str)
             .ok_or(AppError::RemoteTool)?
             .to_owned();
-        let selection = SourceDecoderSelection::new(Arc::clone(decoder));
-        let routed = SourceParser::new(&selection, &logical);
+        let routed = SourceParser::new(selection, logical);
         let mut prepared = store
             .prepare_mapped_ingest(
                 crate::MappedIngestRequest {
@@ -78,7 +160,12 @@ impl Engine<'_> {
                 cancel,
             )?
             .ok_or(AppError::RemoteTool)?;
-        let parser = parser_selection(decoder.as_ref(), raw);
+        let [source] = prepared.metadata().sources.as_slice() else {
+            return Err(AppError::RemoteTool);
+        };
+        if source.report.accepted == 0 {
+            return Ok(None);
+        }
         LargeCaseUseCases {
             engine: self,
             store: store.as_ref(),
@@ -86,12 +173,12 @@ impl Engine<'_> {
         }
         .sign_mapped_object(
             id,
-            manifest(&logical, raw, hash),
-            &parser,
+            manifest(logical, raw, hash.clone()),
+            parser,
             prepared.as_mut(),
             cancel,
         )?;
-        Ok(())
+        Ok(Some(hash))
     }
 }
 fn has_events(

@@ -1,7 +1,7 @@
 mod execution;
-mod listing;
+pub(crate) mod listing;
 mod local;
-mod object_read;
+pub(crate) mod object_read;
 mod original;
 mod remote;
 mod result_source;

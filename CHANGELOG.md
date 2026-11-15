@@ -9,6 +9,17 @@ allocation. Export V8 replaces V7 and always includes catalog-proof and subagent
 branch counts, including zero counts. Older cases/exports require their creating
 IRMind version or re-ingestion of verified originals; there is no automatic migration.
 
+- Delegate bounded investigations to six included subagent types with progressively
+  loaded skills, source-restricted queries and shared case budgets. The TUI shows
+  plans before start, requires signed confirmation above 25% of remaining tokens
+  or calls, and offers signed confirmation for every plan as a preference.
+- Follow activity and partial coverage with `/subagents`; cancel individual tasks
+  without discarding completed work. Child approval requests return to the owning
+  live task, and siblings continue while an Analyst decision is pending.
+- Verify and export Agent-signed child branches, canonical checkpoints, task-owned
+  remote acquisitions and deterministic results. Restart recovery closes
+  interrupted work without retrying remote effects. Children cannot delegate,
+  approve requests, change settings or expand their assigned sources or scope.
 - Honor validated host, cluster, category, type, outcome and entity-role filters
   in local model-tool queries.
 - Use SkillInstallationV2 and SkillSnapshotV2 for current methodology admissions.

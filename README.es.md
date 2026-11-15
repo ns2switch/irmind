@@ -158,6 +158,7 @@ La [hoja de ruta pública](docs/es/roadmap.md) describe intenciones, sin comprom
 ## Más información
 
 - [Inicio](docs/es/getting-started.md) · [Configuración](docs/es/configuration.md) · [Módulos](docs/es/modules.md)
+- [Investigaciones en paralelo](docs/es/subagents.md) · [Skills forenses](docs/es/skills.md)
 - [Plataformas](docs/es/platforms.md) · [Seguridad](docs/es/security-model.md)
 - [Arquitectura](docs/development/architecture.md) y [CLI](docs/development/cli.md), solo en inglés
 - [Hoja de ruta](docs/es/roadmap.md)
