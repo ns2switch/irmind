@@ -220,7 +220,7 @@ fn homogeneous<'a>(
         .then_some(key)
 }
 impl QueryStore<'_> {
-    pub(in crate::parquet_store::query) fn scoped_entity(
+    pub(in crate::parquet_store::query) fn scoped_entity_answer(
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifact],
@@ -228,7 +228,7 @@ impl QueryStore<'_> {
         kind: &str,
         value: &str,
         cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
+    ) -> Result<super::super::QueryAnswer<String>, AppError> {
         let mut rules = time_rules(filter);
         rules.extend([
             Predicate::Equal("entity_kind", kind.into()),
@@ -260,7 +260,11 @@ impl QueryStore<'_> {
                 view.visit(batch)
             },
         )?;
-        super::super::complete(status)?;
-        view.output()
+        let omitted = view.truncated;
+        let mut answer = super::super::QueryAnswer::scanned(view.output()?, status);
+        if omitted && answer.reason.is_none() {
+            answer.reason = Some(irmind_app::subagents::TaskQueryPartialReason::ResultLimit);
+        }
+        Ok(answer)
     }
 }

@@ -2,8 +2,57 @@
 use super::super::ordered;
 use super::*;
 use crate::parquet_store::ParquetStore;
+use crate::parquet_store::query::complete;
 use crate::parquet_store::scan::ScanFlow;
 use irmind_app::LargeCaseStore as _;
+
+#[test]
+fn an_expired_timeline_scan_returns_typed_partial_rows_and_the_legacy_wrapper_still_errors() {
+    let root = tempfile::tempdir().unwrap();
+    let store = crate::parquet_store::fixtures::store(root.path());
+    let case = CaseId::parse("00000000-0000-0000-0000-000000000035").unwrap();
+    std::fs::write(
+        root.path().join("time.json"),
+        r#"{"eventTime":"2026-11-01T00:00:00Z","eventName":"Synthetic"}"#,
+    )
+    .unwrap();
+    let token = CancellationToken::new();
+    let prepared = crate::parquet_store::fixtures::one_source(
+        &store,
+        &case,
+        root.path(),
+        "time.json",
+        false,
+        &token,
+    )
+    .unwrap();
+    let names = std::collections::BTreeMap::from([(
+        prepared.manifest.sha256.as_str().into(),
+        "time.json".into(),
+    )]);
+    let sources = std::collections::BTreeSet::from([prepared.manifest.sha256.as_str().into()]);
+    let query = store.queries_for_sources(&names, &sources);
+    let filter = GraphQueryFilter::default();
+    let spec = ScanSpec {
+        id: &case,
+        artifacts: &prepared.artifacts,
+        filter: &filter,
+        schema: "irmind-events-v4",
+        columns: &["event_time", "event", "source_hash", "record_index"],
+        predicates: &[],
+        deadline: Instant::now()
+            .checked_sub(std::time::Duration::from_secs(1))
+            .unwrap(),
+        cancel: &token,
+    };
+    let answer = query.timeline_hits_answer(spec, 10, true).unwrap();
+    assert_eq!(
+        answer.reason,
+        Some(irmind_app::subagents::TaskQueryPartialReason::Deadline)
+    );
+    assert!(answer.value.is_empty());
+    assert!(answer.strict().is_err());
+}
 
 #[test]
 fn bounded_precise_timeline_matches_the_full_scan_in_both_directions() {
@@ -69,7 +118,13 @@ fn bounded_precise_timeline_matches_the_full_scan_in_both_directions() {
             )
             .unwrap();
             ordered(&mut expected, limit, newest).unwrap();
-            assert!(query.timeline_hits(spec, limit, newest).unwrap() == expected);
+            assert!(
+                query
+                    .timeline_hits_answer(spec, limit, newest)
+                    .unwrap()
+                    .value
+                    == expected
+            );
         }
     }
     // Even an older file that could be pruned must authenticate its statistics.
@@ -145,7 +200,7 @@ fn compacted_style_files_prune_row_groups_in_both_directions() {
                 (0..10).collect()
             };
             assert_eq!(hits.iter().map(|h| h.index).collect::<Vec<_>>(), expected);
-            assert!(query.timeline_hits(spec, 10, newest).unwrap() == hits);
+            assert!(query.timeline_hits_answer(spec, 10, newest).unwrap().value == hits);
         }
     }
 }

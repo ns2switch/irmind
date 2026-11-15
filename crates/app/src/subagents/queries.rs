@@ -149,10 +149,39 @@ impl TaskEvidenceQuery {
 }
 
 /// Untrusted adapter data: screen it before exposing it to any model or UI.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TaskQueryPartialReason {
+    Sampling,
+    Expansion,
+    Deadline,
+    ResultLimit,
+    ExcerptLimit,
+    Coverage,
+}
+impl TaskQueryPartialReason {
+    pub(crate) const fn notice(self) -> &'static str {
+        match self {
+            Self::Sampling => "Query is partial: the matching-record sampling limit was reached.",
+            Self::Expansion => "Query is partial: the graph expansion limit was reached.",
+            Self::Deadline => "Query is partial: the query time budget was reached.",
+            Self::ResultLimit => "Query is partial: additional result details were omitted.",
+            Self::ExcerptLimit => "Query is partial: only a bounded excerpt is shown.",
+            Self::Coverage => "Query is partial: the requested semantic coverage is incomplete.",
+        }
+    }
+}
 pub enum TaskEvidenceResult {
     Text(String),
     Timeline(Vec<TimelineEvent>),
     Original(Box<Tainted<SourceRecordV1>>),
+    PartialText {
+        text: String,
+        reason: TaskQueryPartialReason,
+    },
+    PartialTimeline {
+        events: Vec<TimelineEvent>,
+        reason: TaskQueryPartialReason,
+    },
 }
 pub trait TaskEvidenceQueries: Send + Sync {
     fn execute(

@@ -1,6 +1,6 @@
 use super::{
     AppError, CancellationToken, CaseId, EventHit, GraphQueryFilter, Instant, ParquetArtifact,
-    QUERY_DEADLINE, QueryStore, ScanSpec, complete, time_rules,
+    QUERY_DEADLINE, QueryStore, ScanSpec, time_rules,
 };
 use irmind_app::TimelineEvent;
 
@@ -13,8 +13,19 @@ impl QueryStore<'_> {
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<Vec<TimelineEvent>, AppError> {
+        self.timeline_answer(id, artifacts, filter, limit, cancel)?
+            .strict()
+    }
+    pub(crate) fn timeline_answer(
+        &self,
+        id: &CaseId,
+        artifacts: &[ParquetArtifact],
+        filter: &GraphQueryFilter,
+        limit: usize,
+        cancel: &CancellationToken,
+    ) -> Result<super::QueryAnswer<Vec<TimelineEvent>>, AppError> {
         let rules = time_rules(filter);
-        let hits = self.timeline_hits(
+        let hits = self.timeline_hits_answer(
             ScanSpec {
                 id,
                 artifacts,
@@ -28,24 +39,26 @@ impl QueryStore<'_> {
             limit.min(100),
             true,
         )?;
-        hits.into_iter()
-            .map(|hit| {
-                Ok(TimelineEvent {
-                    at: hit.at.clone(),
-                    event: hit.annotated_event(),
-                    evidence_hash: hit.hash,
-                    record_index: usize::try_from(hit.index).map_err(super::super::storage)?,
+        hits.try_map(|hits| {
+            hits.into_iter()
+                .map(|hit| {
+                    Ok(TimelineEvent {
+                        at: hit.at.clone(),
+                        event: hit.annotated_event(),
+                        evidence_hash: hit.hash,
+                        record_index: usize::try_from(hit.index).map_err(super::super::storage)?,
+                    })
                 })
-            })
-            .collect()
+                .collect()
+        })
     }
 
-    fn timeline_hits(
+    fn timeline_hits_answer(
         &self,
         spec: ScanSpec<'_>,
         limit: usize,
         newest: bool,
-    ) -> Result<Vec<EventHit>, AppError> {
+    ) -> Result<super::QueryAnswer<Vec<EventHit>>, AppError> {
         if self.source_subset.is_some() {
             let precise = spec
                 .artifacts
@@ -56,8 +69,7 @@ impl QueryStore<'_> {
                 super::retained::retain_batch(batch, &mut hits, limit, newest, precise)?;
                 Ok(super::ScanFlow::Continue)
             })?;
-            complete(status)?;
-            return Ok(hits);
+            return Ok(super::QueryAnswer::scanned(hits, status));
         }
         let files = self
             .store
@@ -103,9 +115,11 @@ impl QueryStore<'_> {
                     })
                 },
             )?;
-            complete(status)?;
+            if status == super::ScanStatus::Deadline {
+                return Ok(super::QueryAnswer::scanned(hits, status));
+            }
         }
-        Ok(hits)
+        Ok(super::QueryAnswer::complete(hits))
     }
 }
 

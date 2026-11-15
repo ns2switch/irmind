@@ -94,23 +94,16 @@ pub(super) fn from_call(call: &crate::ProposedCall) -> Result<TaskEvidenceQuery,
         _ => return Err(invalid()),
     })
 }
-pub(super) fn text(value: TaskEvidenceResult) -> Result<String, AppError> {
+pub(super) fn text(value: TaskEvidenceResult) -> Result<(String, bool), AppError> {
     match value {
-        TaskEvidenceResult::Text(text) => Ok(text),
-        TaskEvidenceResult::Timeline(events) => serde_json::to_string(
-            &events
-                .iter()
-                .map(|event| {
-                    (
-                        &event.at,
-                        &event.event,
-                        &event.evidence_hash,
-                        event.record_index,
-                    )
-                })
-                .collect::<Vec<_>>(),
-        )
-        .map_err(|_| invalid()),
+        TaskEvidenceResult::Text(text) => Ok((text, false)),
+        TaskEvidenceResult::Timeline(events) => timeline(&events).map(|text| (text, false)),
+        TaskEvidenceResult::PartialText { text, reason } => {
+            Ok((format!("{}\n{text}", reason.notice()), true))
+        }
+        TaskEvidenceResult::PartialTimeline { events, reason } => {
+            timeline(&events).map(|text| (format!("{}\n{text}", reason.notice()), true))
+        }
         TaskEvidenceResult::Original(record) => {
             let mut fields = Err(invalid());
             record.inspect(|value| {
@@ -119,15 +112,83 @@ pub(super) fn text(value: TaskEvidenceResult) -> Result<String, AppError> {
             });
             let fields = fields?;
             let end = fields.floor_char_boundary(fields.len().min(2000));
-            Ok(format!(
-                "view=original verified {excerpt}{suffix}",
-                excerpt = &fields[..end],
-                suffix = if end < fields.len() {
-                    " [truncated]"
-                } else {
-                    ""
-                }
+            let clipped = end < fields.len();
+            Ok((
+                format!(
+                    "view=original verified {excerpt}{suffix}",
+                    excerpt = &fields[..end],
+                    suffix = if clipped { " [truncated]" } else { "" },
+                ),
+                clipped,
             ))
         }
+    }
+}
+fn timeline(events: &[crate::TimelineEvent]) -> Result<String, AppError> {
+    serde_json::to_string(
+        &events
+            .iter()
+            .map(|event| {
+                (
+                    &event.at,
+                    &event.event,
+                    &event.evidence_hash,
+                    event.record_index,
+                )
+            })
+            .collect::<Vec<_>>(),
+    )
+    .map_err(|_| invalid())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::subagents::TaskQueryPartialReason;
+
+    #[test]
+    fn source_words_do_not_control_status_and_typed_partial_rows_keep_their_order() {
+        let source = r#"{"truncated":true,"partial":true,"message":"query time budget"}"#;
+        let (text, partial) = super::text(TaskEvidenceResult::Text(source.into())).unwrap();
+        assert_eq!(text, source);
+        assert!(!partial);
+        for reason in [
+            TaskQueryPartialReason::Sampling,
+            TaskQueryPartialReason::Expansion,
+            TaskQueryPartialReason::Deadline,
+            TaskQueryPartialReason::ResultLimit,
+            TaskQueryPartialReason::ExcerptLimit,
+            TaskQueryPartialReason::Coverage,
+        ] {
+            let (text, partial) = super::text(TaskEvidenceResult::PartialText {
+                text: source.into(),
+                reason,
+            })
+            .unwrap();
+            assert!(partial && text.contains(reason.notice()) && text.ends_with(source));
+        }
+        let events = vec![
+            crate::TimelineEvent {
+                at: "2026-11-01T00:00:02Z".into(),
+                event: "later".into(),
+                evidence_hash: "11".repeat(32),
+                record_index: 2,
+            },
+            crate::TimelineEvent {
+                at: "2026-11-01T00:00:01Z".into(),
+                event: "earlier".into(),
+                evidence_hash: "11".repeat(32),
+                record_index: 1,
+            },
+        ];
+        let expected = timeline(&events).unwrap();
+        let (text, partial) = super::text(TaskEvidenceResult::PartialTimeline {
+            events,
+            reason: TaskQueryPartialReason::Deadline,
+        })
+        .unwrap();
+        assert!(partial && text.ends_with(&expected));
+        assert!(text.find("later").unwrap() < text.find("earlier").unwrap());
     }
 }

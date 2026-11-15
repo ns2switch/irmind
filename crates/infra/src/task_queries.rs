@@ -1,9 +1,10 @@
 //! Mandatory frozen-generation and source filtering for delegated local reads.
 use crate::LocalStore;
 use irmind_app::{
-    AppError, CancellationToken, EvidenceStore, SourceEvidenceReader,
+    AppError, AuditLog, CancellationToken, EvidenceStore, SourceEvidenceReader,
     subagents::{
-        TaskEvidenceQueries, TaskEvidenceQuery, TaskEvidenceResult, VerifiedTaskQueryView,
+        TaskEvidenceQueries, TaskEvidenceQuery, TaskEvidenceResult, TaskQueryPartialReason,
+        VerifiedTaskQueryView,
     },
 };
 use std::{
@@ -55,14 +56,30 @@ impl TaskEvidenceQueries for TaskQueries {
             .store
             .parquet
             .queries_for_sources(&catalog.source_names, view.sources());
+        let indexed = !matches!(
+            &query,
+            TaskEvidenceQuery::EvidenceRead { .. }
+                | TaskEvidenceQuery::EvidenceSearch { .. }
+                | TaskEvidenceQuery::RawRecords { .. }
+        );
+        let incomplete = indexed && self.incomplete_coverage(view, coverage.is_some(), cancel)?;
         let result = match query {
             TaskEvidenceQuery::EvidenceRead { hash, limit } => {
                 let mut bytes = self.store.get_evidence(view.case(), hash.as_str())?;
+                let clipped = bytes.len() > limit * 500;
                 bytes.truncate(limit * 500);
-                TaskEvidenceResult::Text(String::from_utf8_lossy(&bytes).into_owned())
+                let text = String::from_utf8_lossy(&bytes).into_owned();
+                if clipped {
+                    TaskEvidenceResult::PartialText {
+                        text,
+                        reason: TaskQueryPartialReason::ExcerptLimit,
+                    }
+                } else {
+                    TaskEvidenceResult::Text(text)
+                }
             }
             TaskEvidenceQuery::EvidenceSearch { query, limit } => {
-                TaskEvidenceResult::Text(self.search(view, &query, limit, cancel)?)
+                self.search(view, &query, limit, cancel)?
             }
             TaskEvidenceQuery::RawRecords {
                 hash,
@@ -78,25 +95,45 @@ impl TaskEvidenceQueries for TaskQueries {
                 hash,
                 index,
                 original: false,
-            } => TaskEvidenceResult::Text(raw(
-                &queries,
-                view.case(),
-                &catalog,
-                &hash,
-                index,
-                cancel,
-            )?),
+            } => raw(&queries, view.case(), &catalog, &hash, index, cancel)?,
             query => graph(&queries, view.case(), &catalog, query, cancel)?,
         };
         check(cancel)?;
-        Ok(match (coverage, result) {
-            (Some(notice), TaskEvidenceResult::Text(text)) => {
-                TaskEvidenceResult::Text(format!("{notice}\n{text}"))
-            }
-            (_, result) => result,
-        })
+        Ok(with_coverage(result, coverage, incomplete))
     }
 }
+
+fn with_coverage(
+    result: TaskEvidenceResult,
+    coverage: Option<&str>,
+    incomplete: bool,
+) -> TaskEvidenceResult {
+    let notice = coverage.unwrap_or("");
+    let prefix = |text: String| {
+        if notice.is_empty() {
+            text
+        } else {
+            format!("{notice}\n{text}")
+        }
+    };
+    match result {
+        TaskEvidenceResult::Text(text) if incomplete => TaskEvidenceResult::PartialText {
+            text: prefix(text),
+            reason: TaskQueryPartialReason::Coverage,
+        },
+        TaskEvidenceResult::Text(text) => TaskEvidenceResult::Text(prefix(text)),
+        TaskEvidenceResult::PartialText { text, reason } => TaskEvidenceResult::PartialText {
+            text: prefix(text),
+            reason,
+        },
+        TaskEvidenceResult::Timeline(events) if incomplete => TaskEvidenceResult::PartialTimeline {
+            events,
+            reason: TaskQueryPartialReason::Coverage,
+        },
+        result => result,
+    }
+}
+
 fn graph(
     queries: &crate::parquet_store::QueryStore<'_>,
     id: &irmind_domain::CaseId,
@@ -105,35 +142,40 @@ fn graph(
     cancel: &CancellationToken,
 ) -> Result<TaskEvidenceResult, AppError> {
     let text = match query {
-        TaskEvidenceQuery::GraphSummary => queries.summary_native(id, catalog, cancel)?,
+        TaskEvidenceQuery::GraphSummary => queries.summary_answer(id, catalog, cancel)?,
         TaskEvidenceQuery::EntityLookup {
             filter,
             kind,
             value,
-        } => queries.entity_native(id, catalog, &filter, &kind, &value, cancel)?,
+        } => queries.entity_answer(id, catalog, &filter, &kind, &value, cancel)?,
         TaskEvidenceQuery::Neighbors {
             filter,
             kind,
             value,
             limit,
-        } => queries.neighbors_native(id, catalog, &filter, (&kind, &value), limit, cancel)?,
+        } => queries.neighbors_answer(id, catalog, &filter, (&kind, &value), limit, cancel)?,
         TaskEvidenceQuery::Timeline {
             filter,
             entity: Some((kind, value)),
             limit,
         } => {
-            queries.entity_timeline_native(id, catalog, &filter, (&kind, &value), limit, cancel)?
+            queries.entity_timeline_answer(id, catalog, &filter, (&kind, &value), limit, cancel)?
         }
         TaskEvidenceQuery::Timeline {
             filter,
             entity: None,
             limit,
         } => {
-            return Ok(TaskEvidenceResult::Timeline(
-                queries.timeline_native(id, catalog, &filter, limit, cancel)?,
-            ));
+            let answer = queries.timeline_answer(id, catalog, &filter, limit, cancel)?;
+            return Ok(match answer.reason {
+                Some(reason) => TaskEvidenceResult::PartialTimeline {
+                    events: answer.value,
+                    reason,
+                },
+                None => TaskEvidenceResult::Timeline(answer.value),
+            });
         }
-        TaskEvidenceQuery::Path { filter, from, to } => queries.path_native(
+        TaskEvidenceQuery::Path { filter, from, to } => queries.path_answer(
             id,
             catalog,
             &filter,
@@ -145,10 +187,16 @@ fn graph(
             filter,
             query,
             limit,
-        } => queries.search_native(id, catalog, &filter, &query, limit, cancel)?,
+        } => queries.search_answer(id, catalog, &filter, &query, limit, cancel)?,
         _ => return Err(invalid()),
     };
-    Ok(TaskEvidenceResult::Text(text))
+    Ok(match text.reason {
+        Some(reason) => TaskEvidenceResult::PartialText {
+            text: text.value,
+            reason,
+        },
+        None => TaskEvidenceResult::Text(text.value),
+    })
 }
 fn raw(
     queries: &crate::parquet_store::QueryStore<'_>,
@@ -157,7 +205,7 @@ fn raw(
     hash: &irmind_domain::EvidenceHash,
     index: u64,
     cancel: &CancellationToken,
-) -> Result<String, AppError> {
+) -> Result<TaskEvidenceResult, AppError> {
     let raw = queries
         .raw_native(
             id,
@@ -173,19 +221,62 @@ fn raw(
     } else {
         ""
     };
-    Ok(format!(
+    let text = format!(
         "view=indexed source={}#{index} {excerpt}{suffix}",
         hash.as_str()
-    ))
+    );
+    Ok(if excerpt.len() < raw.len() {
+        TaskEvidenceResult::PartialText {
+            text,
+            reason: TaskQueryPartialReason::ExcerptLimit,
+        }
+    } else {
+        TaskEvidenceResult::Text(text)
+    })
 }
 impl TaskQueries {
+    fn incomplete_coverage(
+        &self,
+        view: &VerifiedTaskQueryView,
+        classifications: bool,
+        cancel: &CancellationToken,
+    ) -> Result<bool, AppError> {
+        for entry in self
+            .store
+            .entries(view.case())?
+            .into_iter()
+            .take_while(|entry| entry.seq <= view.generation_seq())
+        {
+            check(cancel)?;
+            if entry.kind == irmind_domain::AuditEventKind::SourceManifestV2 {
+                let manifest = irmind_domain::SourceManifestV2::decode(&entry.payload)
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                if view.sources().contains(manifest.source.sha256.as_str())
+                    && manifest.rejected_records != 0
+                {
+                    return Ok(true);
+                }
+            } else if classifications && entry.kind == irmind_domain::AuditEventKind::MappingRunV1 {
+                let run = irmind_domain::MappingRunV1::decode(&entry.payload)
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                if run.routes().iter().any(|route| {
+                    view.sources().contains(route.source().as_str())
+                        && route.counts().unclassified() != 0
+                }) {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
     fn search(
         &self,
         view: &VerifiedTaskQueryView,
         query: &str,
         limit: usize,
         cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
+    ) -> Result<TaskEvidenceResult, AppError> {
         let mut result = Vec::new();
         let deadline = Instant::now() + Duration::from_secs(10);
         let query_lower = query.to_ascii_lowercase();
@@ -198,9 +289,10 @@ impl TaskQueries {
         {
             check(cancel)?;
             if Instant::now() >= deadline {
-                return Err(AppError::Policy(
-                    "task evidence search exceeded its query deadline".into(),
-                ));
+                return Ok(TaskEvidenceResult::PartialText {
+                    text: result.join("\n"),
+                    reason: TaskQueryPartialReason::Deadline,
+                });
             }
             let bytes = self.store.get_evidence(view.case(), &hash)?;
             let text = String::from_utf8_lossy(&bytes);
@@ -213,7 +305,7 @@ impl TaskQueries {
                 }
             }
         }
-        Ok(result.join("\n"))
+        Ok(TaskEvidenceResult::Text(result.join("\n")))
     }
 }
 fn check(cancel: &CancellationToken) -> Result<(), AppError> {

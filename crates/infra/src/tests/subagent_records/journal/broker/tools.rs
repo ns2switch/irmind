@@ -1,4 +1,5 @@
 mod cancellation;
+mod partial;
 use super::*;
 use irmind_app::subagents::{
     SubagentStatus, TaskEvidenceQueries, TaskEvidenceQuery, TaskEvidenceResult,

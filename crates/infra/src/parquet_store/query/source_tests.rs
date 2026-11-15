@@ -77,6 +77,129 @@ fn fixture() -> Fixture {
     }
 }
 
+fn sampled_fixture(large_allowed: bool) -> Fixture {
+    use std::io::Write as _;
+    let root = tempfile::tempdir().unwrap();
+    let store = crate::parquet_store::fixtures::store(root.path());
+    let case = CaseId::parse("00000000-0000-0000-0000-000000000034").unwrap();
+    let mut names = BTreeMap::new();
+    let mut artifacts = Vec::new();
+    let mut hashes = Vec::new();
+    let token = CancellationToken::new();
+    for (name, large) in [
+        ("allowed.jsonl", large_allowed),
+        ("denied.jsonl", !large_allowed),
+    ] {
+        let mut output =
+            std::io::BufWriter::new(std::fs::File::create(root.path().join(name)).unwrap());
+        for index in 0..if large { MAX_NEIGHBOR_RECORDS + 1 } else { 1 } {
+            writeln!(output, "{{\"eventTime\":\"2026-11-01T00:00:01Z\",\"eventName\":\"{name}-{index}\",\"user\":\"alice\",\"sourceIPAddress\":\"203.0.113.77\"}}").unwrap();
+        }
+        output.flush().unwrap();
+        let prepared = crate::parquet_store::fixtures::one_source(
+            &store,
+            &case,
+            root.path(),
+            name,
+            false,
+            &token,
+        )
+        .unwrap();
+        names.insert(prepared.manifest.sha256.as_str().into(), name.into());
+        hashes.push(prepared.manifest.sha256.as_str().to_owned());
+        artifacts.extend(prepared.artifacts);
+    }
+    let mut compacted = Vec::new();
+    for schema in [
+        "irmind-events-v4",
+        "irmind-entities-v4",
+        "irmind-coobservations-v3",
+    ] {
+        let selected = artifacts
+            .iter()
+            .filter(|artifact| artifact.schema_version() == schema)
+            .cloned()
+            .collect::<Vec<_>>();
+        compacted.push(store.compact_artifacts(&case, &selected, &token).unwrap());
+    }
+    Fixture {
+        _root: root,
+        store,
+        case,
+        artifacts: compacted,
+        names,
+        allowed: BTreeSet::from([hashes[0].clone()]),
+        denied: hashes[1].clone(),
+    }
+}
+
+#[test]
+fn typed_sampling_status_uses_only_assigned_rows_and_keeps_the_existing_rendered_result() {
+    for large_allowed in [true, false] {
+        let fixture = sampled_fixture(large_allowed);
+        let query = fixture
+            .store
+            .queries_for_sources(&fixture.names, &fixture.allowed);
+        let filter = GraphQueryFilter::default();
+        let token = CancellationToken::new();
+        let answer = query
+            .neighbors_answer(
+                &fixture.case,
+                &fixture.artifacts,
+                &filter,
+                ("user", "alice"),
+                20,
+                &token,
+            )
+            .unwrap();
+        assert_eq!(
+            answer.reason,
+            large_allowed.then_some(irmind_app::subagents::TaskQueryPartialReason::Sampling)
+        );
+        assert_eq!(
+            answer.value,
+            query
+                .neighbors_native(
+                    &fixture.case,
+                    &fixture.artifacts,
+                    &filter,
+                    ("user", "alice"),
+                    20,
+                    &token
+                )
+                .unwrap()
+        );
+        let path = query
+            .path_answer(
+                &fixture.case,
+                &fixture.artifacts,
+                &filter,
+                ("user", "alice"),
+                ("ip", "203.0.113.99"),
+                &token,
+            )
+            .unwrap();
+        assert_eq!(
+            path.reason,
+            large_allowed.then_some(irmind_app::subagents::TaskQueryPartialReason::Sampling)
+        );
+        assert_eq!(
+            path.value,
+            query
+                .path_native(
+                    &fixture.case,
+                    &fixture.artifacts,
+                    &filter,
+                    ("user", "alice"),
+                    ("ip", "203.0.113.99"),
+                    &token
+                )
+                .unwrap()
+        );
+        assert!(!answer.value.contains(&fixture.denied));
+    }
+}
+
 #[test]
 fn subagent_source_view_filters_mixed_files_before_counts_and_top_n() {
     let fixture = fixture();

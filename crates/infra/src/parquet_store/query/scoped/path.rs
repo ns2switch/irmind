@@ -1,14 +1,16 @@
+use super::super::QueryAnswer;
 use super::{
     AppError, CancellationToken, CaseId, GraphQueryFilter, Instant, Node, ParquetArtifact,
     QUERY_DEADLINE, QueryStore, ScanStatus, Selection, spec,
 };
+use irmind_app::subagents::TaskQueryPartialReason as Reason;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 const HOPS: usize = 3;
 const EXPANSIONS: usize = 200;
 const NEIGHBORS: usize = 50;
 type Parents = BTreeMap<Node, (Option<Node>, String)>;
 impl QueryStore<'_> {
-    pub(in crate::parquet_store::query) fn scoped_path(
+    pub(in crate::parquet_store::query) fn scoped_path_answer(
         &self,
         id: &CaseId,
         artifacts: &[ParquetArtifact],
@@ -16,12 +18,12 @@ impl QueryStore<'_> {
         from: (&str, &str),
         to: (&str, &str),
         cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
+    ) -> Result<QueryAnswer<String>, AppError> {
         if from == to {
-            return Ok(format!(
+            return Ok(QueryAnswer::complete(format!(
                 "{} {} is the same queried value; individual identity scopes remain distinct",
                 from.0, from.1
-            ));
+            )));
         }
         let deadline = Instant::now() + QUERY_DEADLINE;
         let first = self.scoped_candidates(
@@ -33,17 +35,17 @@ impl QueryStore<'_> {
             },
         )?;
         if first.status == ScanStatus::Deadline {
-            return Ok(truncated("10-second time budget"));
+            return Ok(truncated("10-second time budget", Reason::Deadline));
         }
         let mut parents = Parents::new();
         let mut visited = BTreeSet::new();
         let mut queue = VecDeque::new();
-        let mut partial = first.sampled || first.neighbors.len() > NEIGHBORS;
+        let mut partial = candidate_partial(first.sampled, first.neighbors.len());
         for (node, (_, source)) in first.neighbors.into_iter().take(NEIGHBORS) {
             parents.insert(node.clone(), (None, source));
             visited.insert(node.clone());
             if node.matches(to.0, to.1) {
-                return format_path(from, &node, &parents);
+                return format_path(from, &node, &parents).map(QueryAnswer::complete);
             }
             queue.push_back((node, 1usize));
         }
@@ -56,10 +58,10 @@ impl QueryStore<'_> {
                 return Err(AppError::Cancelled);
             }
             if expanded >= EXPANSIONS {
-                return Ok(truncated("200-entity expansion limit"));
+                return Ok(truncated("200-entity expansion limit", Reason::Expansion));
             }
             if Instant::now() >= deadline {
-                return Ok(truncated("10-second time budget"));
+                return Ok(truncated("10-second time budget", Reason::Deadline));
             }
             expanded += 1;
             let result = self.scoped_candidates(
@@ -71,30 +73,33 @@ impl QueryStore<'_> {
                 },
             )?;
             if result.status == ScanStatus::Deadline {
-                return Ok(truncated("10-second time budget"));
+                return Ok(truncated("10-second time budget", Reason::Deadline));
             }
-            partial |= result.sampled || result.neighbors.len() > NEIGHBORS;
+            partial = partial.or_else(|| candidate_partial(result.sampled, result.neighbors.len()));
             for (next, (_, source)) in result.neighbors.into_iter().take(NEIGHBORS) {
                 if !visited.insert(next.clone()) {
                     continue;
                 }
                 parents.insert(next.clone(), (Some(current.clone()), source));
                 if next.matches(to.0, to.1) {
-                    return format_path(from, &next, &parents);
+                    return format_path(from, &next, &parents).map(QueryAnswer::complete);
                 }
                 queue.push_back((next, depth + 1));
             }
         }
-        Ok(if partial {
-            truncated("sample or 50-neighbor limit")
+        Ok(if let Some(reason) = partial {
+            truncated("sample or 50-neighbor limit", reason)
         } else {
-            "no co-observation path found within 3 hops".into()
+            QueryAnswer::complete("no co-observation path found within 3 hops".into())
         })
     }
 }
-fn truncated(reason: &str) -> String {
-    format!(
-        "no path found within 3 hops / 200 expanded entities / 50 neighbors per entity / 10 seconds; search was truncated ({reason})"
+fn truncated(reason: &str, status: Reason) -> QueryAnswer<String> {
+    QueryAnswer::partial(
+        format!(
+            "no path found within 3 hops / 200 expanded entities / 50 neighbors per entity / 10 seconds; search was truncated ({reason})"
+        ),
+        status,
     )
 }
 fn format_path(start: (&str, &str), goal: &Node, parents: &Parents) -> Result<String, AppError> {
@@ -123,4 +128,14 @@ fn format_path(start: (&str, &str), goal: &Node, parents: &Parents) -> Result<St
         }
     }
     Err(crate::parquet_store::invalid_source())
+}
+
+fn candidate_partial(sampled: bool, neighbors: usize) -> Option<Reason> {
+    if sampled {
+        Some(Reason::Sampling)
+    } else if neighbors > NEIGHBORS {
+        Some(Reason::ResultLimit)
+    } else {
+        None
+    }
 }
