@@ -33,6 +33,7 @@ impl Engine<'_> {
             .ok_or(AppError::Fixed(
                 crate::FixedAppError::PolicyPendingApprovalNotFound,
             ))?;
+        self.require_root_approval_unlocked(id, &request)?;
         let proposal = ProposedCall {
             tool: request.tool.clone(),
             args: new_args,
@@ -137,6 +138,7 @@ impl Engine<'_> {
             .ok_or(AppError::Fixed(
                 crate::FixedAppError::PolicyPendingApprovalNotFound,
             ))?;
+        self.require_root_approval_unlocked(id, &request)?;
         if denial.is_none() {
             self.policy_for_case_unlocked(id)?
                 .permits(&request.tool, self.completed_calls_unlocked(id)?)

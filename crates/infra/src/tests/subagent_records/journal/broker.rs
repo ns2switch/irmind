@@ -1,5 +1,6 @@
 mod findings;
 mod parallel;
+mod pending;
 mod recovery;
 mod root;
 mod scope;
