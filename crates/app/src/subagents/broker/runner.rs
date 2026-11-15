@@ -11,6 +11,7 @@ mod model;
 mod outcome;
 mod protocol;
 mod session;
+mod skills;
 mod tools;
 use session::TaskSession;
 
@@ -46,17 +47,24 @@ impl Engine<'_> {
     ) -> Result<SubagentResultV1, AppError> {
         self.require_attended_analyst("run subagent task")?;
         let case = CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
-        let task = started
-            .plan
-            .tasks
-            .iter()
-            .find(|task| task.task_id == task_id)
-            .ok_or_else(invalid)?;
+        let task = started.task(task_id)?;
         let objective = self.guard.screen(&task.objective)?;
         if !objective.detections.is_empty() {
             return Err(invalid());
         }
-        let mut state = TaskSession::new(task, &objective.text)?;
+        let mut state = TaskSession::new(started, task, &objective.text)?;
+        if !self
+            .initialize_child_method(started, task, &mut state, cancel)
+            .await?
+        {
+            return self.finish_child_session(
+                &case,
+                started,
+                task,
+                &mut state,
+                crate::subagents::SubagentStatus::Partial,
+            );
+        }
         loop {
             if state.round >= task.budget.rounds
                 || cancel.is_cancelled()
@@ -86,21 +94,13 @@ impl Engine<'_> {
                     crate::subagents::SubagentStatus::Partial,
                 );
             };
-            let remaining = task.deadline_at.saturating_sub(self.clock.now()?).min(600);
-            let task_cancel = cancel.child_token();
-            let response = if remaining == 0 {
-                Err(AppError::Cancelled)
-            } else {
-                tokio::select! {
-                    biased;
-                    () = cancel.cancelled() => Err(AppError::Cancelled),
-                    result = tokio::time::timeout(std::time::Duration::from_secs(remaining), async {
-                        let stream = model.complete(step.request.clone(), &task_cancel).await?;
-                        crate::collect_model_stream(stream, &task_cancel).await
-                    }) => match result { Ok(response) => response, Err(_) => Err(AppError::Cancelled) },
-                }
-            };
-            task_cancel.cancel();
+            let response = step
+                .complete(
+                    model,
+                    task.deadline_at.saturating_sub(self.clock.now()?).min(600),
+                    cancel,
+                )
+                .await;
             let progress =
                 self.finish_child_model(&case, started, task, &step, &mut state, response)?;
             match progress {

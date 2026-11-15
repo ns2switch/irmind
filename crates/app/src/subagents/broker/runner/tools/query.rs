@@ -14,6 +14,17 @@ pub(super) fn supported(name: &str) -> bool {
             | "raw_records"
     )
 }
+pub(super) fn checked(
+    call: &crate::ProposedCall,
+    view: &crate::subagents::VerifiedTaskQueryView,
+) -> Result<Option<TaskEvidenceQuery>, AppError> {
+    if call.tool == Tool::SkillRead {
+        return Ok(None);
+    }
+    let query = from_call(call)?;
+    query.validate(view)?;
+    Ok(Some(query))
+}
 pub(super) fn from_call(call: &crate::ProposedCall) -> Result<TaskEvidenceQuery, AppError> {
     let field = |name: &str| call.args.get(name).cloned().ok_or_else(invalid);
     let limit = call

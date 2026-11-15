@@ -202,6 +202,7 @@ impl SubagentJournal {
         task_id: SubagentDigest,
         skills: &crate::SkillReceiptVerifier,
         compiler: &dyn crate::SkillCompiler,
+        child_method: Option<crate::SkillSnapshotId>,
     ) -> Result<std::collections::BTreeSet<String>, SubagentRecordError> {
         let state = self
             .plans
@@ -229,10 +230,25 @@ impl SubagentJournal {
                 .map_err(|_| SubagentRecordError)?;
             tools.retain(|tool| parent.contains(tool));
         }
-        if task.skill_snapshot_sha256.is_some() {
-            // The pinned child methodology must be durably loaded before use.
+        if let Some(snapshot) = child_method {
+            let (name, child) = skills
+                .snapshot_method(snapshot, self.seq + 1, compiler)
+                .map_err(|_| SubagentRecordError)?;
+            if !self
+                .types
+                .get(&task.type_snapshot_sha256)
+                .ok_or(SubagentRecordError)?
+                .definition()
+                .skills()
+                .contains(&name)
+            {
+                return Err(SubagentRecordError);
+            }
+            tools.retain(|tool| child.contains(tool));
+        } else if task.skill_snapshot_sha256.is_some() {
             tools.clear();
         }
+        tools.insert("skill_read".into());
         Ok(tools)
     }
 }

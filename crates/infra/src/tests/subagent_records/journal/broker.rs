@@ -1,3 +1,4 @@
+mod skills;
 mod tools;
 use super::*;
 use irmind_app::subagents::{SubagentResources, SubagentTaskProposal};

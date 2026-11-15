@@ -16,6 +16,20 @@ pub struct SkillReceiptVerifier {
     catalog_verified: BTreeSet<SkillSnapshotId>,
 }
 impl SkillReceiptVerifier {
+    pub(crate) fn read_budget_for_turn(
+        &self,
+        turn: &str,
+    ) -> Result<crate::skills::runtime::SkillReadBudget, AppError> {
+        let Some((packages, reads, bytes)) = self.turns.get(turn) else {
+            return Ok(crate::skills::runtime::SkillReadBudget::default());
+        };
+        Ok(crate::skills::runtime::SkillReadBudget {
+            packages: packages.clone(),
+            reads: *reads,
+            bytes: usize::try_from(*bytes).map_err(|_| invalid())?,
+        })
+    }
+
     pub fn catalog_requirements(
         &self,
         proofs: &[SignedOperation],

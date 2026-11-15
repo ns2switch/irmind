@@ -1,14 +1,20 @@
 use super::{AgentBatch, StartedSubagentPlan, TaskSession, invalid};
 use crate::subagents::{
-    BranchToolCall, BranchToolProposal, BranchToolResult, ReservationAction, ReservationPurpose,
+    BranchToolCall, BranchToolProposal, ReservationAction, ReservationPurpose,
     ReservationTransition, SubagentBranchPayload, SubagentDigest, SubagentRecord,
     SubagentReservationV1, SubagentResources, SubagentTaskSpec, TaskDispatchAttribution,
     TaskEvidenceQuery, TaskEvidenceResult,
 };
 use crate::{AppError, CancellationToken, CaseId, Engine, GraphQueryFilter, Tool};
 
+mod completion;
 mod query;
 mod worker;
+
+enum ChildReadResponse {
+    Evidence(TaskEvidenceResult),
+    Method(Box<crate::skills::runtime::PreparedSkillRead>),
+}
 
 struct ReadEffect {
     call: BranchToolCall,
@@ -19,13 +25,14 @@ struct ReadEffect {
 struct ReadTicket {
     effect: ReadEffect,
     view: crate::subagents::VerifiedTaskQueryView,
-    query: TaskEvidenceQuery,
+    query: Option<TaskEvidenceQuery>,
 }
 impl Engine<'_> {
     pub(super) fn child_read_catalog(
         &self,
         started: &StartedSubagentPlan,
         task: &SubagentTaskSpec,
+        state: &TaskSession,
     ) -> Result<Vec<crate::tool_catalog::ToolSpec>, AppError> {
         let case = CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
         let batch = AgentBatch::new(self, &case, self.verifier.as_ref())?;
@@ -36,12 +43,21 @@ impl Engine<'_> {
         }
         let tools = batch
             .journal
-            .task_method_tools(started, task.task_id, &skills, services.compiler.as_ref())
+            .task_method_tools(
+                started,
+                task.task_id,
+                &skills,
+                services.compiler.as_ref(),
+                state.method,
+            )
             .map_err(|_| invalid())?;
         Ok(self
             .available_tools()
             .into_iter()
-            .filter(|spec| tools.contains(spec.name) && query::supported(spec.name))
+            .filter(|spec| {
+                tools.contains(spec.name)
+                    && (query::supported(spec.name) || spec.name == "skill_read")
+            })
             .collect())
     }
 
@@ -77,9 +93,15 @@ impl Engine<'_> {
                 view,
                 query,
             } = ticket;
-            let response = self
-                .run_child_query(view, query, task.deadline_at, cancel)
-                .await;
+            let response = match query {
+                Some(query) => self
+                    .run_child_query(view, query, task.deadline_at, cancel)
+                    .await
+                    .map(ChildReadResponse::Evidence),
+                None => self
+                    .prepare_child_method(started, task, state, &effect.call, cancel)
+                    .map(ChildReadResponse::Method),
+            };
             self.finish_child_read(started, task, state, &effect, response)?;
         }
         Ok(true)
@@ -148,7 +170,7 @@ impl Engine<'_> {
             .journal
             .task_view(started, task.task_id, &self.policy)
             .map_err(|_| invalid())?;
-        let allowed = self.child_read_catalog(started, task)?;
+        let allowed = self.child_read_catalog(started, task, state)?;
         if !allowed.iter().any(|spec| spec.name == call.tool) {
             return Ok(None);
         }
@@ -159,8 +181,9 @@ impl Engine<'_> {
         if !self.permit_child_read(case, started, task, state, &proposal)? {
             return Ok(None);
         }
-        let query = query::from_call(&proposal)?;
-        query.validate(&view)?;
+        let Ok(query) = query::checked(&proposal, &view) else {
+            return Ok(None);
+        };
         let body = child_read_proposal(started, call)?;
         let entry = self.child_entry(
             started,
@@ -216,98 +239,6 @@ impl Engine<'_> {
             view,
             query,
         }))
-    }
-
-    fn finish_child_read(
-        &self,
-        started: &StartedSubagentPlan,
-        task: &SubagentTaskSpec,
-        state: &mut TaskSession,
-        effect: &ReadEffect,
-        response: Result<TaskEvidenceResult, AppError>,
-    ) -> Result<(), AppError> {
-        let case = &CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
-        let call = &effect.call;
-        let reservation = &effect.reservation;
-        let decision = effect.decision;
-        let _lock = self.repo.lock_case(case)?;
-        let mut batch = AgentBatch::new(self, case, self.verifier.as_ref())?;
-        let (payload, text) = self.child_read_payload(task, effect, response)?;
-        let entry = self.child_entry(started, task, state.seq + 1, state.previous, payload)?;
-        let checkpoint = self.publish_child_prefix(
-            case,
-            std::slice::from_ref(&entry),
-            state.checkpoint_id()?,
-            &mut batch,
-            &CancellationToken::new(),
-        )?;
-        let usage = SubagentResources {
-            calls: 1,
-            ..SubagentResources::default()
-        };
-        let settlement = SubagentReservationV1::prepare(
-            &started.plan,
-            Some(task.task_id),
-            state.call,
-            ReservationAction::SettleRequest,
-            ReservationPurpose::Tool,
-            ReservationTransition {
-                amount: usage,
-                parent_operation: Some(reservation.operation_id),
-                cause_sha256: checkpoint.identity().map_err(|_| invalid())?,
-                accounting_audit_sha256: Some(decision),
-            },
-        )
-        .map_err(|_| invalid())?;
-        batch.push(&settlement)?;
-        batch.publish(&CancellationToken::new())?;
-        state.seq = entry.body.seq;
-        state.previous = entry.hash;
-        state.checkpoint = Some(checkpoint);
-        state.usage = state.usage.checked_add(usage).map_err(|_| invalid())?;
-        state.tool_message(task, &call.id, &text)?;
-        Ok(())
-    }
-    fn child_read_payload(
-        &self,
-        task: &SubagentTaskSpec,
-        effect: &ReadEffect,
-        response: Result<TaskEvidenceResult, AppError>,
-    ) -> Result<(SubagentBranchPayload, String), AppError> {
-        if self.clock.now()? > task.deadline_at {
-            return Ok((
-                SubagentBranchPayload::BudgetNotice(crate::subagents::BranchBudgetNotice {
-                    resource: crate::subagents::BranchBudgetResource::Calls,
-                    reserved: 1,
-                    consumed: 1,
-                    limit: task.budget.calls,
-                    partial: true,
-                }),
-                "The query exceeded the task deadline; its late result was not accepted.".into(),
-            ));
-        }
-        let (text, partial) = match response {
-            Ok(value) => (query::text(value)?, false),
-            Err(_) => (
-                "The restricted evidence query failed; no unrestricted fallback was used.".into(),
-                true,
-            ),
-        };
-        let screened = self.guard.screen(&text)?;
-        let max = self.policy.max_model_result_bytes.min(16 * 1024);
-        let truncated = screened.text.len() > max;
-        let mut text = screened.text;
-        text.truncate(text.floor_char_boundary(text.len().min(max)));
-        let body = BranchToolResult {
-            call_id: effect.call.id.clone(),
-            proposal_sha256: effect.proposal,
-            decision_audit_sha256: effect.decision,
-            reservation_sha256: effect.reservation.identity().map_err(|_| invalid())?,
-            guarded_text: text.clone(),
-            sources: vec![],
-            partial: partial || truncated,
-        };
-        Ok((SubagentBranchPayload::ToolResult(body), text))
     }
 }
 

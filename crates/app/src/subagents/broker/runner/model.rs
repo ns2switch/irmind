@@ -28,7 +28,7 @@ impl Engine<'_> {
             return Err(AppError::Cancelled);
         }
         let messages = state.messages.clone();
-        let tools = self.child_read_catalog(started, task)?;
+        let tools = self.child_read_catalog(started, task, state)?;
         let input = messages::canonical(&messages)?;
         let catalog_bytes = serde_json::to_vec(
             &tools
@@ -224,5 +224,29 @@ impl Engine<'_> {
             state.previous,
             SubagentBranchPayload::ModelReply(reply),
         )
+    }
+}
+
+impl ModelStep {
+    pub(super) async fn complete(
+        &self,
+        model: &dyn LlmPort,
+        remaining: u64,
+        cancel: &CancellationToken,
+    ) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
+        if remaining == 0 {
+            return Err(AppError::Cancelled);
+        }
+        let task_cancel = cancel.child_token();
+        let response = tokio::select! {
+            biased;
+            () = cancel.cancelled() => Err(AppError::Cancelled),
+            result = tokio::time::timeout(std::time::Duration::from_secs(remaining), async {
+                let stream = model.complete(self.request.clone(), &task_cancel).await?;
+                crate::collect_model_stream(stream, &task_cancel).await
+            }) => match result { Ok(response) => response, Err(_) => Err(AppError::Cancelled) },
+        };
+        task_cancel.cancel();
+        response
     }
 }
