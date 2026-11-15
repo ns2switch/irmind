@@ -69,16 +69,15 @@ fn changed_organization_policy_prevents_dispatch_under_a_stale_task_plan() {
     let started = super::tools::start(&engine, &history);
     engine.policy.denied_tools.push(Tool::GraphSummary);
     let model = child_model(true);
-    assert!(
-        engine
-            .run_subagent_task(
-                &started,
-                started.plan().tasks[0].task_id,
-                &model,
-                &CancellationToken::new()
-            )
-            .is_err()
-    );
+    let result = engine
+        .run_subagent_task(
+            &started,
+            started.plan().tasks[0].task_id,
+            &model,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    assert_eq!(result.status, irmind_app::subagents::SubagentStatus::Error);
     assert!(model.requests.lock().unwrap().is_empty());
     let cancel = CancellationToken::new();
     cancel.cancel();

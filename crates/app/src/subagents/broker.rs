@@ -7,6 +7,7 @@ use super::{
 };
 use crate::{AppError, AuditOrigin, CancellationToken, CaseId, Engine, SignedEntry};
 use irmind_domain::{CaseScope, EvidenceHash, SkillName};
+mod recovery;
 mod runner;
 
 /// Untrusted proposal. The broker supplies all identities and checkpoints.
