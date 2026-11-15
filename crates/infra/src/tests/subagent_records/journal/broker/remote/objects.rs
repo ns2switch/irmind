@@ -191,28 +191,7 @@ fn scenario(mode: Mode) {
         control.join().unwrap();
         result
     });
-    let downloaded = !matches!(mode, Mode::Deny | Mode::NoListing | Mode::OverBudget);
-    assert_eq!(
-        objects.reads.load(Ordering::SeqCst),
-        usize::from(downloaded),
-        "{mode:?}: {result:?}"
-    );
-    let ingested = matches!(mode, Mode::Automatic | Mode::Approve);
-    assert_eq!(
-        result[0].usage.cloud_bytes,
-        if downloaded { RESPONSE.len() as u64 } else { 0 },
-        "{mode:?}: {result:?}"
-    );
-    if ingested {
-        assert!(
-            views
-                .0
-                .lock()
-                .unwrap()
-                .iter()
-                .any(|(_, sources)| sources == &[hex(&sha256(RESPONSE))])
-        );
-    }
+    check_outcome(mode, &objects, views.as_ref(), &result[0]);
     assert_no_spools(root.path());
     engine.finish_subagent_plan(&started).unwrap();
     tools::verify_and_export(store.as_ref(), &engine, &history, root.path());
@@ -320,4 +299,46 @@ fn start_object_plan(
         )
         .unwrap()
         .unwrap()
+}
+
+fn check_outcome(
+    mode: Mode,
+    objects: &Objects,
+    views: &Views,
+    result: &irmind_app::subagents::SubagentResultV1,
+) {
+    let downloaded = !matches!(mode, Mode::Deny | Mode::NoListing | Mode::OverBudget);
+    assert_eq!(
+        objects.reads.load(Ordering::SeqCst),
+        usize::from(downloaded),
+        "{mode:?}: {result:?}"
+    );
+    let ingested = matches!(mode, Mode::Automatic | Mode::Approve);
+    if matches!(mode, Mode::OverBudget) {
+        assert_eq!(
+            result.status,
+            irmind_app::subagents::SubagentStatus::Partial
+        );
+        assert!(
+            result
+                .coverage
+                .iter()
+                .any(|line| line.contains("cloud-byte budget"))
+        );
+    }
+    assert_eq!(
+        result.usage.cloud_bytes,
+        if downloaded { RESPONSE.len() as u64 } else { 0 },
+        "{mode:?}: {result:?}"
+    );
+    if ingested {
+        assert!(
+            views
+                .0
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|(_, sources)| sources == &[hex(&sha256(RESPONSE))])
+        );
+    }
 }

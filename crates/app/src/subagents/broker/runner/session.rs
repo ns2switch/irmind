@@ -30,6 +30,29 @@ pub(super) struct TaskSession {
     call_ids: BTreeSet<String>,
 }
 impl TaskSession {
+    pub(super) fn transfer_fits(
+        &mut self,
+        call: &crate::subagents::BranchToolCall,
+        limit: u64,
+    ) -> bool {
+        if call.tool != crate::Tool::ObjectRead.as_str() {
+            return true;
+        }
+        let Some(bytes) = call
+            .arguments
+            .get("max_bytes")
+            .and_then(|value| value.parse::<u64>().ok())
+        else {
+            return true;
+        };
+        let remaining = limit.saturating_sub(self.usage.cloud_bytes);
+        if bytes <= remaining {
+            return true;
+        }
+        self.partial = true;
+        self.coverage.insert(format!("The task cloud-byte budget cannot reserve {bytes} bytes; {remaining} remain. No transfer started. Review the case allocation with /budget and propose a new bounded plan."));
+        false
+    }
     pub(super) fn accept_call_id(&mut self, id: &str) -> bool {
         if self.call_ids.insert(id.to_owned()) {
             true
