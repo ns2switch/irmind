@@ -103,14 +103,16 @@ impl<'a> AgentBatch<'a> {
         for entry in &history {
             journal.accept(entry, verifier)?;
         }
-        Ok(Self {
+        let batch = Self {
             engine: local,
             verifier,
             case,
             journal,
             prior: history.last().cloned(),
             entries: Vec::new(),
-        })
+        };
+        batch.verify_source_admissions(&CancellationToken::new())?;
+        Ok(batch)
     }
     fn push<T: SubagentRecord>(&mut self, record: &T) -> Result<SubagentDigest, AppError> {
         self.push_as(record, false)
@@ -186,7 +188,35 @@ impl<'a> AgentBatch<'a> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
+        self.verify_source_admissions(cancel)?;
         self.engine.audit_log.append_batch(&self.entries)
+    }
+    fn verify_source_admissions(&self, cancel: &CancellationToken) -> Result<(), AppError> {
+        if !self.journal.has_source_admissions() {
+            return Ok(());
+        }
+        let services = self.engine.skills.as_ref().ok_or_else(invalid)?;
+        let ports = self.engine.subagents.as_ref().ok_or_else(invalid)?;
+        let mut skills = crate::SkillReceiptVerifier::default();
+        for entry in self
+            .engine
+            .audit_log
+            .entries(self.case)?
+            .iter()
+            .chain(&self.entries)
+        {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            skills.accept(entry, services.compiler.as_ref())?;
+        }
+        self.journal.verify_stored_branches(
+            ports.branches.as_ref(),
+            self.verifier,
+            &mut skills,
+            services.compiler.as_ref(),
+            cancel,
+        )
     }
 }
 

@@ -108,6 +108,14 @@ impl SubagentJournal {
                 return Err(SubagentRecordError);
             }
         }
+        if let Some(attr) = &attribution
+            && self
+                .request_dispatches
+                .insert(attr.proposal_sha256, SubagentDigest::from_bytes(entry.hash))
+                .is_some()
+        {
+            return Err(SubagentRecordError);
+        }
         self.accounting.insert(
             SubagentDigest::from_bytes(entry.hash),
             Accounted {

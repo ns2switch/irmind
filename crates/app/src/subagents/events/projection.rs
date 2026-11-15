@@ -9,6 +9,9 @@ pub(super) fn main(
     engine: &Engine<'_>,
     entry: &SignedEntry,
 ) -> Result<Option<EngineEvent>, AppError> {
+    if entry.kind == AuditEventKind::NeedsApproval {
+        return approval(engine, entry);
+    }
     let (kind, text, task, turn, usage) = match entry.kind {
         AuditEventKind::SubagentPlanV1 => {
             let plan: SubagentPlanV1 = decode(entry)?;
@@ -85,6 +88,23 @@ pub(super) fn main(
     }
     event.turn_id = turn;
     event.usage = usage;
+    Ok(Some(event))
+}
+
+fn approval(engine: &Engine<'_>, entry: &SignedEntry) -> Result<Option<EngineEvent>, AppError> {
+    let case = crate::CaseId::parse(&entry.case_id).map_err(|_| invalid())?;
+    let request = engine.historical_pending_request_unlocked(&case, entry)?;
+    let Some(task) = engine.task_pending_binding_unlocked(&case, &request)? else {
+        return Ok(None);
+    };
+    let text = format!(
+        "Analyst approval required: {} · request {} · arguments {}",
+        request.tool.as_str(),
+        request.id,
+        serde_json::to_string(&request.args).map_err(|_| invalid())?,
+    );
+    let mut event = build(engine, entry, 64, EngineEventKind::Approval, &text)?;
+    event.task_id = Some(task);
     Ok(Some(event))
 }
 

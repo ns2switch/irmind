@@ -145,7 +145,7 @@ fn child_findings_are_source_bounded_agent_signed_and_only_the_analyst_confirms_
     }
 }
 
-fn verify_prefix(
+pub(super) fn verify_prefix(
     history: &History,
     entries: &[SignedEntry],
     store: &LocalStore,

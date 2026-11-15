@@ -132,23 +132,60 @@ impl SubagentJournal {
         {
             return Err(SubagentRecordError);
         }
+        let (generation_seq, generation_hash, sources) =
+            self.task_source_generation(state, task)?;
         Ok(crate::subagents::VerifiedTaskQueryView {
             case: self.case.clone(),
             task: task_id,
-            generation_seq: state.seq.checked_sub(1).ok_or(SubagentRecordError)?,
-            generation_hash: state.plan.parent_checkpoint_sha256,
+            generation_seq,
+            generation_hash,
             source_set: task.source_set_sha256,
-            sources: self
-                .sets
-                .get(&task.source_set_sha256)
-                .ok_or(SubagentRecordError)?
-                .iter()
-                .map(|hash| crate::hex(hash.as_bytes()))
-                .collect(),
+            sources,
             scope,
             ceiling: rules.scope.clone(),
             policy_fingerprint: SubagentDigest::from_bytes(crate::sha256(&policy_bytes)),
         })
+    }
+
+    fn task_source_generation(
+        &self,
+        state: &PlanLedger,
+        task: &crate::subagents::SubagentTaskSpec,
+    ) -> Result<(u64, SubagentDigest, std::collections::BTreeSet<String>), SubagentRecordError>
+    {
+        let mut sources: std::collections::BTreeSet<_> = self
+            .sets
+            .get(&task.source_set_sha256)
+            .ok_or(SubagentRecordError)?
+            .iter()
+            .map(|hash| crate::hex(hash.as_bytes()))
+            .collect();
+        let mut sequence = state.seq.checked_sub(1).ok_or(SubagentRecordError)?;
+        let mut hash = state.plan.parent_checkpoint_sha256;
+        for checkpoint in state.checkpoints.get(&task.task_id).into_iter().flatten() {
+            if checkpoint.admitted_sources.is_empty() {
+                continue;
+            }
+            let identity = checkpoint.identity()?;
+            if !self.checkpoint_admissions.contains_key(&identity) {
+                return Err(SubagentRecordError);
+            }
+            sequence = *self
+                .checkpoint_sequences
+                .get(&identity)
+                .ok_or(SubagentRecordError)?;
+            hash = *self
+                .checkpoint_audit_hashes
+                .get(&identity)
+                .ok_or(SubagentRecordError)?;
+            sources.extend(
+                checkpoint
+                    .admitted_sources
+                    .iter()
+                    .map(|hash| crate::hex(hash.as_bytes())),
+            );
+        }
+        Ok((sequence, hash, sources))
     }
 
     pub(in crate::subagents) fn preparation_context(

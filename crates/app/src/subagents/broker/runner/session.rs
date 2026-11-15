@@ -75,6 +75,20 @@ impl TaskSession {
             .transpose()
             .map_err(|_| invalid())
     }
+    pub(super) fn retain_sources(&mut self, sources: Vec<SubagentSourceRef>) {
+        for source in sources {
+            // References are a bounded summary, not the complete branch inventory.
+            // Leave room in the 256 KiB terminal frame for reservations and text.
+            if self.sources.len() < 1024 || self.sources.contains(&source) {
+                self.sources.insert(source);
+            } else {
+                self.partial = true;
+                self.coverage.insert(
+                    "The terminal reference summary was bounded; complete references remain in the task branch.".into(),
+                );
+            }
+        }
+    }
     pub(super) fn terminal(&self, status: SubagentStatus) -> BranchTerminal {
         BranchTerminal {
             status: if status == SubagentStatus::Completed && self.partial {

@@ -7,6 +7,7 @@ use crate::subagents::{
     SubagentTaskSpec, TaskEvidenceResult,
 };
 use crate::{AppError, CancellationToken, CaseId, Engine};
+mod sources;
 impl Engine<'_> {
     pub(super) fn finish_child_read(
         &self,
@@ -18,8 +19,6 @@ impl Engine<'_> {
     ) -> Result<(), AppError> {
         let case = &CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
         let call = &effect.call;
-        let reservation = &effect.reservation;
-        let decision = effect.decision;
         let _lock = self.repo.lock_case(case)?;
         let (response, method) = match response {
             Ok(ChildReadResponse::Method(method)) if self.clock.now()? <= task.deadline_at => (
@@ -33,7 +32,16 @@ impl Engine<'_> {
             Err(error) => (Err(error), None),
         };
         let mut batch = AgentBatch::new(self, case, self.verifier.as_ref())?;
+        let view = batch
+            .journal
+            .task_view(started, task.task_id, &self.policy)
+            .map_err(|_| invalid())?;
+        let sources = match &response {
+            Ok(response) => sources::references(response, &effect.call, &view)?,
+            Err(_) => vec![],
+        };
         let (payload, text) = self.child_read_payload(task, effect, response)?;
+        let (payload, sources) = sources::attach(payload, sources);
         mark_partial_read(state, &payload, method.as_deref());
         let mut entries = Vec::new();
         if let Some(method) = &method {
@@ -64,20 +72,7 @@ impl Engine<'_> {
             calls: 1,
             ..SubagentResources::default()
         };
-        let settlement = SubagentReservationV1::prepare(
-            &started.plan,
-            Some(task.task_id),
-            state.call,
-            ReservationAction::SettleRequest,
-            ReservationPurpose::Tool,
-            ReservationTransition {
-                amount: usage,
-                parent_operation: Some(reservation.operation_id),
-                cause_sha256: checkpoint.identity().map_err(|_| invalid())?,
-                accounting_audit_sha256: Some(decision),
-            },
-        )
-        .map_err(|_| invalid())?;
+        let settlement = effect.settlement(started, task, state.call, usage, &checkpoint)?;
         batch.push(&settlement)?;
         batch.publish(&CancellationToken::new())?;
         state.seq = entries.last().ok_or_else(invalid)?.body.seq;
@@ -90,6 +85,7 @@ impl Engine<'_> {
             state.method = Some(method.receipt.snapshot()?);
         }
         state.usage = state.usage.checked_add(usage).map_err(|_| invalid())?;
+        state.retain_sources(sources);
         state.tool_message(task, &call.id, &text)?;
         Ok(())
     }
@@ -133,6 +129,31 @@ impl Engine<'_> {
             partial: partial || truncated,
         };
         Ok((SubagentBranchPayload::ToolResult(body), text))
+    }
+}
+impl ReadEffect {
+    fn settlement(
+        &self,
+        started: &StartedSubagentPlan,
+        task: &SubagentTaskSpec,
+        ordinal: u64,
+        usage: SubagentResources,
+        checkpoint: &crate::subagents::SubagentCheckpointV1,
+    ) -> Result<SubagentReservationV1, AppError> {
+        SubagentReservationV1::prepare(
+            &started.plan,
+            Some(task.task_id),
+            ordinal,
+            ReservationAction::SettleRequest,
+            ReservationPurpose::Tool,
+            ReservationTransition {
+                amount: usage,
+                parent_operation: Some(self.reservation.operation_id),
+                cause_sha256: checkpoint.identity().map_err(|_| invalid())?,
+                accounting_audit_sha256: Some(self.decision),
+            },
+        )
+        .map_err(|_| invalid())
     }
 }
 fn mark_partial_read(

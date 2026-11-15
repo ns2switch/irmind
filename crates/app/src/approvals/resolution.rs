@@ -13,6 +13,15 @@ type SignedResolution = (
 );
 
 impl Engine<'_> {
+    pub(crate) fn historical_pending_request_unlocked(
+        &self,
+        id: &CaseId,
+        entry: &SignedEntry,
+    ) -> Result<ApprovalRequest, AppError> {
+        let case = self.repo.get_case(id)?;
+        let entries = self.audit_log.entries(id)?;
+        Self::parse_pending_event(&super::scope::case_at(&case, &entries, entry.seq)?, entry)
+    }
     pub fn edit_approval(
         &self,
         id: &CaseId,
