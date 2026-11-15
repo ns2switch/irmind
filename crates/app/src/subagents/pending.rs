@@ -55,7 +55,7 @@ impl Engine<'_> {
 
     /// Returns an authenticated owner identity, never an execution lease.
     /// Missing live task state must not turn this request into a parent request.
-    fn task_pending_binding_unlocked(
+    pub(crate) fn task_pending_binding_unlocked(
         &self,
         case: &CaseId,
         request: &ApprovalRequest,

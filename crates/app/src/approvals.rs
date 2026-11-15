@@ -70,4 +70,5 @@ impl AnalystApprovalVerifier for AnalystVerifierAdapter<'_> {
 
 mod request;
 mod resolution;
+mod scope;
 mod source;
