@@ -38,6 +38,44 @@ impl Engine<'_> {
         self.audit_log.append(&entry)
     }
 
+    pub(crate) fn audit_model_text(
+        &self,
+        id: &CaseId,
+        kind: AuditEventKind,
+        text: &str,
+    ) -> Result<String, AppError> {
+        let mut entry = self.signed_entry(id, AuditOrigin::Model, kind, text, None)?;
+        let visible = crate::ports::model::output::fit_frame(text, |candidate| {
+            candidate.clone_into(&mut entry.payload);
+            // Fixed-width signatures and bounded metadata; hash is recomputed below.
+            serde_json::to_vec(&entry)
+                .map(|bytes| bytes.len())
+                .map_err(|e| AppError::Storage(e.to_string()))
+        })?;
+        // Audit hashes and signatures cover the retained text, including its notice.
+        let mut entry = self.signed_entry(id, AuditOrigin::Model, kind, &visible, None)?;
+        // Hash byte arrays can change JSON width after signing. Recheck the final
+        // representation and trim only the explicit security-limit edge case.
+        while serde_json::to_vec(&entry)
+            .map_err(|e| AppError::Storage(e.to_string()))?
+            .len()
+            > crate::ports::model::output::FRAME_BYTES
+        {
+            let shortened = crate::ports::model::output::utf8_prefix(
+                &entry.payload,
+                entry.payload.len().saturating_sub(256),
+            );
+            let text = format!(
+                "{shortened}\n\n{}",
+                crate::ports::model::output::SECURITY_NOTICE
+            );
+            entry = self.signed_entry(id, AuditOrigin::Model, kind, &text, None)?;
+        }
+        let visible = entry.payload.clone();
+        self.audit_log.append(&entry)?;
+        Ok(visible)
+    }
+
     pub(crate) fn audit_batch(
         &self,
         id: &CaseId,

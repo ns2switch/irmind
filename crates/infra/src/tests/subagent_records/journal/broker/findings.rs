@@ -26,6 +26,9 @@ struct FindingModel {
 }
 #[async_trait]
 impl LlmPort for FindingModel {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        irmind_app::ModelOutputProfile::known(2048, false).unwrap()
+    }
     async fn complete(
         &self,
         request: CompletionRequest,

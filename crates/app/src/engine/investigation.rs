@@ -35,16 +35,10 @@ struct TurnContext {
 }
 
 impl TurnContext {
-    fn request(&self, used_tokens: u64) -> CompletionRequest {
+    fn request(&self) -> CompletionRequest {
         CompletionRequest {
             messages: self.messages.clone(),
             tools: self.catalog.clone(),
-            max_output_tokens: 2048,
-            remaining_case_tokens: self
-                .budget
-                .model_tokens
-                .saturating_sub(used_tokens)
-                .saturating_sub(512.min(self.budget.model_tokens / 4)),
         }
     }
 }
@@ -264,6 +258,13 @@ impl Engine<'_> {
                 .map(Some);
         }
         let used_tokens = self.used_model_tokens(id).await?;
+        let request = turn.request();
+        if used_tokens >= turn.budget.model_tokens {
+            return self
+                .finish_limited_turn(id, model, turn, "model token limit", cancel, on_text)
+                .await
+                .map(Some);
+        }
         self.audit_local(
             id,
             crate::AuditOrigin::System,
@@ -272,13 +273,6 @@ impl Engine<'_> {
             None,
         )
         .await?;
-        let request = turn.request(used_tokens);
-        if request.remaining_case_tokens == 0 {
-            return self
-                .finish_limited_turn(id, model, turn, "model token limit", cancel, on_text)
-                .await
-                .map(Some);
-        }
         on_text(ModelProgress::RoundStarted {
             round: round.0,
             limit: round.1,
@@ -288,6 +282,7 @@ impl Engine<'_> {
                 on_text(ModelProgress::TextDelta(text.to_owned()));
             })
             .await?;
+        let used_tokens = self.used_model_tokens(id).await?;
         let (answer, quota_exhausted) = self
             .record_round_response(id, (answer, usage), used_tokens, turn.budget.model_tokens)
             .await?;
@@ -310,14 +305,7 @@ impl Engine<'_> {
         token_limit: u64,
     ) -> Result<(ModelResponse, bool), AppError> {
         let (answer, usage) = response;
-        self.audit_local(
-            id,
-            crate::AuditOrigin::Model,
-            irmind_domain::AuditEventKind::ModelReply,
-            &answer.raw,
-            None,
-        )
-        .await?;
+        self.record_model_reply(id, &answer.raw).await?;
         let quota_exhausted = usage.is_some_and(|usage| {
             used_tokens
                 .saturating_add(usage.input_tokens)
@@ -347,7 +335,7 @@ impl Engine<'_> {
                 .map(Some);
         }
         if answer.truncated {
-            return self.finish_answer(id, &format!("{}\n\nResponse cut off by the provider's output limit. Use /continue to continue.", answer.text)).await.map(Some);
+            return self.finish_answer(id, &format!("{}\n\n{} Automatic continuation stopped at the available budget or round limit, or was already attempted once.", answer.text, crate::ports::model::output::PROVIDER_NOTICE)).await.map(Some);
         }
         if answer.calls.is_empty() {
             return self.finish_answer(id, &answer.text).await.map(Some);
@@ -484,18 +472,20 @@ impl Engine<'_> {
     }
 
     async fn finish_answer(&self, id: &CaseId, text: &str) -> Result<String, AppError> {
+        let text = crate::ports::model::output::screen_output(self.guard.as_ref(), text)?;
         let screened = self
-            .screen_and_audit_local(id, text, AuditEventKind::FinalAnswer.as_str(), None)
+            .screen_and_audit_local(
+                id,
+                crate::ports::model::output::utf8_prefix(&text, 1_000_000),
+                AuditEventKind::FinalAnswer.as_str(),
+                None,
+            )
             .await?;
-        self.audit_local(
-            id,
-            crate::AuditOrigin::Model,
-            AuditEventKind::FinalAnswer,
-            &screened.text,
-            None,
-        )
-        .await?;
-        Ok(screened.text)
+        let owned = id.clone();
+        self.blocking_local(move |local| {
+            local.audit_model_text(&owned, AuditEventKind::FinalAnswer, &screened.text)
+        })
+        .await
     }
 }
 

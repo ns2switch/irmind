@@ -117,6 +117,7 @@ pub(crate) fn clear_active_field(state: &mut HomeState) {
                 state.model_setup.url_edited = true;
             }
             model::ModelStep::Name => state.model_setup.name.clear(),
+            model::ModelStep::OutputMaximum => state.model_setup.output_maximum.clear(),
             model::ModelStep::Key => {
                 state.model_setup.key = secrecy::SecretString::from(String::new());
             }

@@ -13,6 +13,7 @@ pub(super) struct Request {
     reservation: SubagentReservationV1,
     seq: u64,
     settled: Option<SubagentResources>,
+    settlement: Option<SubagentReservationV1>,
 }
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum Phase {
@@ -72,10 +73,15 @@ impl PlanLedger {
         if self.phase == Phase::Prepared {
             return Ok(SubagentResources::default());
         }
+        let mut capacity = self.charged;
+        capacity.tokens = capacity
+            .tokens
+            .checked_sub(self.overrun_tokens()?)
+            .ok_or(SubagentRecordError)?;
         let mut outstanding = self
             .plan
             .reservation
-            .checked_sub(self.charged)?
+            .remaining_after_usage(capacity)?
             .checked_sub(self.released)?;
         outstanding.rounds = self
             .plan
@@ -92,14 +98,14 @@ impl PlanLedger {
             // Parent requests already count in the journal's root round counter.
             .filter_map(|(task, amount)| task.is_some().then_some(amount))
             .try_fold(SubagentResources::default(), |total, used| {
-                total.checked_add(*used)
+                total.checked_add_usage(*used)
             })
     }
     pub(super) fn total_usage(&self) -> Result<SubagentResources, SubagentRecordError> {
         self.task_charged
             .values()
             .try_fold(SubagentResources::default(), |total, used| {
-                total.checked_add(*used)
+                total.checked_add_usage(*used)
             })
     }
     pub(super) fn is_open(&self) -> bool {
@@ -251,6 +257,7 @@ impl PlanLedger {
                 reservation: value.clone(),
                 seq,
                 settled: None,
+                settlement: None,
             },
         );
         self.request_identities
@@ -343,7 +350,13 @@ impl PlanLedger {
             || request.reservation.task_id != task
             || request.reservation.request_ordinal != value.request_ordinal
             || request.reservation.purpose != value.purpose
-            || !value.amount.within(request.reservation.amount)
+            || !(if value.purpose == ReservationPurpose::Model
+                && value.accounting_audit_sha256.is_some()
+            {
+                value.amount.within_non_tokens(request.reservation.amount)
+            } else {
+                value.amount.within(request.reservation.amount)
+            })
         {
             return Err(SubagentRecordError);
         }
@@ -354,12 +367,63 @@ impl PlanLedger {
             request.reservation.amount
         };
         let charged = self.task_charged.entry(task).or_default();
-        *charged = charged.checked_add(amount)?;
+        *charged = charged.checked_add_usage(amount)?;
         if value.accounting_audit_sha256.is_some() {
-            self.charged = self.charged.checked_add(amount)?;
+            self.charged = self.charged.checked_add_usage(amount)?;
         }
         request.settled = Some(amount);
+        request.settlement = Some(value.clone());
         Ok(())
+    }
+    pub(super) fn model_settlement(
+        &self,
+        identity: SubagentDigest,
+    ) -> Result<Option<&SubagentReservationV1>, SubagentRecordError> {
+        let id = self
+            .request_identities
+            .get(&identity)
+            .ok_or(SubagentRecordError)?;
+        Ok(self
+            .requests
+            .get(id)
+            .ok_or(SubagentRecordError)?
+            .settlement
+            .as_ref())
+    }
+    pub(super) fn task_usage(&self, task: SubagentDigest) -> SubagentResources {
+        self.task_charged
+            .get(&Some(task))
+            .copied()
+            .unwrap_or_default()
+    }
+    fn overrun_tokens(&self) -> Result<u64, SubagentRecordError> {
+        self.task_charged
+            .iter()
+            .try_fold(0u64, |total, (task, used)| {
+                let limit = match task {
+                    None => self.plan.coordination.tokens,
+                    Some(task) => {
+                        self.plan
+                            .tasks
+                            .iter()
+                            .find(|t| t.task_id == *task)
+                            .ok_or(SubagentRecordError)?
+                            .budget
+                            .tokens
+                    }
+                };
+                total
+                    .checked_add(used.tokens.saturating_sub(limit))
+                    .ok_or(SubagentRecordError)
+            })
+    }
+    pub(super) fn releasable(&self) -> Result<SubagentResources, SubagentRecordError> {
+        let mut used = self.total_usage()?;
+        used.tokens = used
+            .tokens
+            .checked_sub(self.overrun_tokens()?)
+            .ok_or(SubagentRecordError)?;
+        self.plan.reservation.remaining_after_usage(used)
     }
     fn release(&mut self, value: &SubagentReservationV1) -> Result<(), SubagentRecordError> {
         let expire = value.action == ReservationAction::ExpirePreview;
@@ -378,7 +442,12 @@ impl PlanLedger {
             return Err(SubagentRecordError);
         }
         let used = self.total_usage()?;
-        let unused = self.plan.reservation.checked_sub(used)?;
+        let mut capacity = used;
+        capacity.tokens = capacity
+            .tokens
+            .checked_sub(self.overrun_tokens()?)
+            .ok_or(SubagentRecordError)?;
+        let unused = self.plan.reservation.remaining_after_usage(capacity)?;
         if value.amount != unused {
             return Err(SubagentRecordError);
         }
@@ -427,6 +496,18 @@ impl SubagentJournal {
                         .get(&value.plan_sha256)
                         .ok_or(SubagentRecordError)?
                         .plan;
+                    let status = self
+                        .budget
+                        .status(&plan.policy.rules()?)
+                        .map_err(|_| SubagentRecordError)?;
+                    if status.usage.model_tokens
+                        >= status
+                            .require_effective()
+                            .map_err(|_| SubagentRecordError)?
+                            .model_tokens
+                    {
+                        return Err(SubagentRecordError);
+                    }
                     let deadline = value
                         .task_id
                         .map_or(Some(plan.deadline_at), |task| {
@@ -541,7 +622,8 @@ impl SubagentJournal {
         if value.case_id != self.case.as_str()
             || !last.terminal
             || value.checkpoint_sha256 != last.identity()?
-            || !value.usage.within(
+            || value.usage != plan.task_usage(value.task_id)
+            || !value.usage.within_non_tokens(
                 plan.plan
                     .tasks
                     .iter()

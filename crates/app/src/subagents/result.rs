@@ -61,7 +61,7 @@ impl SubagentRecord for SubagentResultV1 {
     const DOMAIN: &'static [u8] = b"irmind-subagent-result-v1\0";
     fn validate(&self) -> Result<(), SubagentRecordError> {
         codec::uuid(&self.case_id)?;
-        self.usage.validate()?;
+        self.usage.validate_usage()?;
         codec::sorted(&self.sources, 16_384)?;
         codec::sorted(&self.pending_approvals, 4096)?;
         if self.format_version != 1

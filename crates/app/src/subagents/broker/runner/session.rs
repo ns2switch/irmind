@@ -11,6 +11,8 @@ pub(super) struct TaskSession {
     pub skills: crate::skills::runtime::SkillTurn,
     pub method: Option<crate::SkillSnapshotId>,
     pub partial: bool,
+    pub continuations: u8,
+    pub continuing: bool,
     pub checkpoint: Option<SubagentCheckpointV1>,
     pub previous: SubagentDigest,
     pub seq: u64,
@@ -110,6 +112,8 @@ impl TaskSession {
             },
             method: None,
             partial: false,
+            continuations: 0,
+            continuing: false,
             checkpoint: None,
             previous: SubagentDigest::from_bytes([0; 32]),
             seq: 0,
@@ -135,7 +139,7 @@ impl TaskSession {
         summary: String,
         truncated: bool,
     ) -> Result<(), AppError> {
-        self.usage = self.usage.checked_add(usage).map_err(|_| invalid())?;
+        self.usage = self.usage.checked_add_usage(usage).map_err(|_| invalid())?;
         self.summary = summary;
         if truncated {
             self.partial = true;

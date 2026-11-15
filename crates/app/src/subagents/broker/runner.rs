@@ -11,6 +11,7 @@ mod model;
 mod outcome;
 mod parallel;
 mod protocol;
+mod retention;
 mod session;
 mod skills;
 mod tools;

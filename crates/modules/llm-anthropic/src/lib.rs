@@ -20,6 +20,11 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
     tools: &[],
     config: &[
         ConfigField {
+            name: "IRMIND_MODEL_MAX_OUTPUT_TOKENS",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "IRMIND_ANTHROPIC_BASE_URL",
             required: false,
             secret: false,
@@ -42,6 +47,7 @@ pub struct Anthropic {
     endpoint: reqwest::Url,
     key: SecretString,
     model: String,
+    output: irmind_app::ModelOutputProfile,
 }
 
 fn trusted_system(messages: &[CompletionMessage]) -> Result<String, AppError> {
@@ -67,13 +73,17 @@ impl Anthropic {
             .required_secret("ANTHROPIC_API_KEY")?
             .expose_secret()
             .to_owned();
-        Self::new_with_base(
+        let mut client = Self::new_with_base(
             config
                 .value("IRMIND_ANTHROPIC_BASE_URL")
                 .unwrap_or("https://api.anthropic.com/"),
             model,
             key,
-        )
+        )?;
+        client.output = client
+            .output
+            .configured(config.value("IRMIND_MODEL_MAX_OUTPUT_TOKENS"), None)?;
+        Ok(client)
     }
 
     pub fn new(model: &str, key: String) -> Result<Self, AppError> {
@@ -120,19 +130,16 @@ impl Anthropic {
             })?;
         Ok(Self {
             async_client,
-            endpoint,
+            endpoint: endpoint.clone(),
             key: SecretString::from(key),
             model: model.to_owned(),
+            output: native_output_profile(endpoint.host_str(), model),
         })
     }
 
     fn body(&self, request: &CompletionRequest) -> Result<serde_json::Value, AppError> {
         request.validate()?;
-        if request.max_output_tokens == 0 || request.remaining_case_tokens == 0 {
-            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                irmind_app::AdapterModelError::ModelTokenBudgetIsEmpty,
-            )));
-        }
+        let maximum = self.output.parameter_value()?;
         let tools = request
             .tools
             .iter()
@@ -188,7 +195,7 @@ impl Anthropic {
         }
         let mut body = json!({
             "model": self.model,
-            "max_tokens": u64::from(request.max_output_tokens).min(request.remaining_case_tokens),
+            "max_tokens": maximum,
             "system": system,
             "messages": messages,
             "stream": true,
@@ -198,6 +205,24 @@ impl Anthropic {
             body["tool_choice"] = json!({"type":"auto","disable_parallel_tool_use":true});
         }
         Ok(body)
+    }
+}
+
+fn native_output_profile(host: Option<&str>, model: &str) -> irmind_app::ModelOutputProfile {
+    // Exact IDs from https://platform.claude.com/docs/en/models/overview.
+    let maximum = if host == Some("api.anthropic.com") {
+        match model {
+            "claude-fable-5-2" | "claude-opus-5-5" | "claude-sonnet-5-5" | "claude-haiku-5-5"
+            | "claude-opus-4-6" | "claude-sonnet-4-6" => Some(128_000),
+            "claude-opus-4-5" | "claude-sonnet-4-5" | "claude-haiku-4-5" => Some(64_000),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    irmind_app::ModelOutputProfile {
+        maximum_output_tokens: maximum.and_then(std::num::NonZeroU32::new),
+        parameter_requirement: irmind_app::OutputParameterRequirement::Required,
     }
 }
 
@@ -216,6 +241,9 @@ impl Module for Anthropic {
 
 #[async_trait]
 impl LlmPort for Anthropic {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        self.output
+    }
     fn descriptor(&self) -> String {
         format!(
             "module={MODULE_ID};model={};endpoint_sha256={}",
@@ -229,6 +257,9 @@ impl LlmPort for Anthropic {
         request: CompletionRequest,
         cancel: &CancellationToken,
     ) -> Result<ModelStream, AppError> {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
         let body = self.body(&request)?;
         let response = tokio::select! {
             biased;
@@ -278,6 +309,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn mandatory_unknown_maximum_fails_before_request_construction() {
+        let request = CompletionRequest {
+            messages: vec![CompletionMessage::text(
+                MessageRole::User,
+                "Synthetic".into(),
+            )],
+            tools: Vec::new(),
+        };
+        let adapter = Anthropic::new("unknown-native-model", "synthetic".into()).unwrap();
+        assert!(
+            adapter
+                .body(&request)
+                .unwrap_err()
+                .to_string()
+                .contains("/settings model")
+        );
+        let known = Anthropic::new("claude-sonnet-4-6", "synthetic".into()).unwrap();
+        assert_eq!(known.body(&request).unwrap()["max_tokens"], 128_000);
+    }
+
+    #[test]
     fn native_request_maps_common_tools_and_keeps_key_out_of_audit() {
         let adapter = Anthropic::new("claude-sonnet-4-6", "test-secret".into()).unwrap();
         let catalog = irmind_app::tool_catalog::catalog();
@@ -290,8 +342,6 @@ mod tests {
                     tool_call_id: None,
                 }],
                 tools: catalog[..1].to_vec(),
-                max_output_tokens: 2048,
-                remaining_case_tokens: 10_000,
             })
             .unwrap();
         assert_eq!(body["tools"][0]["name"], "evidence_search");
@@ -304,7 +354,7 @@ mod tests {
 
     #[test]
     fn native_request_uses_tool_use_and_tool_result_blocks_with_matching_ids() {
-        let adapter = Anthropic::new("synthetic", "test-secret".into()).unwrap();
+        let adapter = Anthropic::new("claude-sonnet-4-6", "test-secret".into()).unwrap();
         let proposal = irmind_app::ProposedCall {
             tool: irmind_app::Tool::EvidenceSearch,
             args: std::collections::BTreeMap::from([("query".into(), "AssumeRole".into())]),
@@ -320,8 +370,6 @@ mod tests {
                 ),
             ],
             tools: irmind_app::tool_catalog::catalog()[..1].to_vec(),
-            max_output_tokens: 128,
-            remaining_case_tokens: 1_000,
         };
         let body = adapter.body(&request).unwrap();
         assert_eq!(body["messages"][1]["content"][1]["type"], "tool_use");
@@ -339,7 +387,7 @@ mod tests {
 
     #[test]
     fn untrusted_system_content_is_rejected_before_anthropic_request() {
-        let adapter = Anthropic::new("synthetic", "test-secret".into()).unwrap();
+        let adapter = Anthropic::new("claude-sonnet-4-6", "test-secret".into()).unwrap();
         let request = CompletionRequest {
             messages: vec![
                 irmind_app::CompletionMessage::text(
@@ -349,8 +397,6 @@ mod tests {
                 irmind_app::CompletionMessage::text(MessageRole::User, "hello".into()),
             ],
             tools: Vec::new(),
-            max_output_tokens: 64,
-            remaining_case_tokens: 128,
         };
         assert!(adapter.body(&request).is_err());
         let safe = CompletionRequest {
@@ -378,7 +424,7 @@ mod tests {
 
     #[test]
     fn recorded_two_round_native_tool_exchange_preserves_tool_use_id() {
-        let adapter = Anthropic::new("synthetic", "test-secret".into()).unwrap();
+        let adapter = Anthropic::new("claude-sonnet-4-6", "test-secret".into()).unwrap();
         let tool_wire = concat!(
             "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":8}}}\n\n",
             "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_recorded\",\"name\":\"evidence_search\",\"input\":{}}}\n\n",
@@ -406,8 +452,6 @@ mod tests {
                 ),
             ],
             tools: irmind_app::tool_catalog::catalog()[..1].to_vec(),
-            max_output_tokens: 128,
-            remaining_case_tokens: 1_000,
         };
         let body = adapter.body(&request).unwrap();
         assert_eq!(body["messages"][1]["content"][0]["id"], call.id());

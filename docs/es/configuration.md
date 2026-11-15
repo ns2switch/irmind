@@ -4,6 +4,44 @@ Traducción de docs/configuration.md en el commit c40dd4cea095a85049a80fee79c72d
 
 Esta página es para quienes preparan una evaluación controlada. Explica el alcance de los casos, la política, los ajustes no secretos y la selección del backend. Los permisos de los conectores están en [módulos](modules.md).
 
+## Salida del modelo
+
+IRMind no fija un tope propio de tokens de salida para el agente principal,
+subagentes, resúmenes ni compactación. Envía el máximo nativo conocido del modelo;
+si es desconocido y opcional, omite el parámetro. Si la API lo exige, no inicia la
+petición y explica cómo configurarlo en `/settings model`.
+
+En la revisión de `/settings model`, **Model output profile** permite escribir el
+máximo nativo y elegir si la API compatible/local exige el parámetro. Vacío
+significa desconocido. Son valores no secretos firmados del módulo:
+`IRMIND_MODEL_MAX_OUTPUT_TOKENS` y `IRMIND_MODEL_OUTPUT_REQUIRED` para APIs
+compatibles. No sirven para introducir un presupuesto de respuesta más bajo.
+Los perfiles incluidos solo se aplican al proveedor y modelo exactos, nunca a un
+modelo local que reutilice el nombre. La ventana de contexto no es el máximo de
+salida.
+
+El presupuesto se comprueba entre peticiones. Con saldo positivo, la respuesta
+termina aunque lo supere; se registra todo el consumo informado y la siguiente
+petición queda bloqueada. `/budget` permite revisar o ampliar la asignación
+firmada dentro del techo de la organización. El hijo reserva antes de empezar
+la entrada acotada más el máximo conocido del modelo. Si no cabe o se desconoce,
+no empieza; una respuesta en curso no se recorta para ajustarla al saldo.
+
+Cuando el proveedor termina por `length` o `max_tokens`, se muestra **The model
+reached its maximum output** y se intenta una sola continuación sin herramientas,
+si caben el presupuesto y las rondas. Ambas llamadas se cobran y se muestran en
+una sola respuesta continua. Un segundo corte no provoca más reintentos.
+`/continue` queda para el límite de rondas o el presupuesto agotado.
+
+Se conservan los límites de seguridad: stream de 2.000.000 bytes, entrada del
+guard de 1.000.000 bytes y frame firmado de 1 MiB, contando metadatos y
+codificación. Si el texto no cabe, se conserva un prefijo UTF-8 y se indica
+**Truncated by IRMind's security limit**. Tokens y bytes no son equivalentes.
+El resumen que recibe el principal sigue limitado a 16 KiB; la respuesta del
+hijo que cabe en el frame se conserva completa en su rama. Cancelación, plazos,
+protocolo inválido y fallos de recursos siguen siendo interrupciones explícitas.
+Las fuentes oficiales de los perfiles figuran en la [versión inglesa](../configuration.md#model-output).
+
 ## Alcance del caso
 
 Un caso puede ser solo local. Para permitir lecturas remotas, el formulario de caso nuevo pide fuentes, cuentas, proyectos, hosts, prefijos de objetos y una ventana UTC. Un prefijo tiene la forma `s3://bucket/AWSLogs/123/`, `gs://bucket/export/` o `az://contenedor/export/`. Añádelo con `/scope add object <URI>`; el ID de fuente también debe estar en el alcance. Los demás destinos usan `/scope add project <id>` (o `source`, `account`, `host`). Amplía la ventana con `/scope window <from> <to>`. El analista firma los cambios. Las lecturas de objetos fuera del prefijo del caso o de la organización se deniegan. La codificación para automatización está en la [referencia de la CLI](../development/cli.md).

@@ -204,8 +204,6 @@ async fn llm_and_edr_share_registry_without_replacing_each_other() {
             CompletionRequest {
                 messages: Vec::new(),
                 tools: Vec::new(),
-                max_output_tokens: 1,
-                remaining_case_tokens: 1,
             },
             &cancel,
         )

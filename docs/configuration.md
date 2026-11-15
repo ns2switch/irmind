@@ -2,6 +2,49 @@
 
 This page is for operators setting up a controlled evaluation. It explains case scope, policy, non-secret settings, and keystore selection. For connector permissions, see [modules](modules.md).
 
+## Model output
+
+IRMind does not impose an output-token allowance on the main agent, subagents,
+summaries or compaction. Adapters send the selected model's native output maximum
+when known. Unknown optional maxima are omitted; an API requiring an unknown
+maximum fails before dispatch and points to `/settings model`.
+
+In `/settings model`, select **Model output profile** in the model review. Enter
+the model's documented native output maximum and whether the compatible/local API
+requires that parameter. Empty means unknown. These are signed non-secret module
+settings, `IRMIND_MODEL_MAX_OUTPUT_TOKENS` and, for compatible APIs,
+`IRMIND_MODEL_OUTPUT_REQUIRED`. They describe capabilities, not a smaller response
+budget. Exact built-in profiles apply only to their documented provider endpoint;
+a local model with the same name does not inherit them.
+
+A positive case balance admits a request. Its complete response and actual reported
+usage are retained even if they exceed that balance; the excess is visible in the
+recorded usage. No further request starts at an exhausted balance. Use `/budget`
+to review or increase the signed allocation within the organization ceiling.
+Children reserve their input bound plus the known model maximum before dispatch.
+An unknown maximum or an insufficient child slice prevents that request from
+starting. In-flight calls are not cut short to fit a remaining token allowance.
+
+A provider `length`/`max_tokens` stop is labelled **The model reached its maximum
+output**. IRMind attempts one tool-free continuation when budget and rounds permit,
+using one continuous answer card and accounting for both calls. A second native
+stop does not start another retry. `/continue` is for round or budget exhaustion.
+
+Existing security bounds remain: 2,000,000 stream bytes, 1,000,000 bytes per guard
+input and a 1 MiB signed frame, including encoding and metadata. If text cannot
+fit, the retained UTF-8 prefix explicitly says **Truncated by IRMind's security
+limit**. Tokens and bytes are not equivalent. The parent receives a child summary
+of at most 16 KiB; complete in-frame child text belongs in the signed branch.
+Cancellation, deadlines, malformed provider responses and resource failures remain
+explicit interruptions.
+
+Native specifications: [OpenAI models](https://developers.openai.com/api/docs/models),
+[DeepSeek limits](https://api-docs.deepseek.com/quick_start/pricing/),
+[Anthropic models](https://platform.claude.com/docs/en/models/overview), and
+[OpenRouter parameters](https://openrouter.ai/docs/api_reference/parameters).
+Unknown models use omission or an analyst-declared maximum; context length is not
+an output maximum.
+
 ## Case scope
 
 A case can remain local-only. To permit remote reads, the TUI's new-case form asks for sources, accounts, projects, hosts, object prefixes, and a UTC start and end time. An object prefix looks like `s3://audit-bucket/AWSLogs/123/CloudTrail/`, `gs://bucket/export/`, or `az://container/export/`. Add one with `/scope add object <URI>`; the source ID must also be in the case scope. Other targets use `/scope add project <id>` (or `source`, `account`, `host`). Widen the window with `/scope window <from> <to>`. Changes are signed by the analyst. Object reads outside the case or organization prefix are denied. The automation encoding is documented in the [CLI reference](development/cli.md).
@@ -59,7 +102,7 @@ estimates are not provider billing measurements.
 At 80% the status line warns and points to `/budget`. At exhaustion the turn
 preserves its results and finishes with a summary and the consumed/effective
 limits. The normal limit path uses a tool-free summary when tokens remain. If no
-tokens remain, or history compaction cannot fit its reserved allowance, IRMind
+tokens remain, or history compaction has no remaining token balance, IRMind
 shows a local summary without another model request. Review `/budget` before
 `/continue`, or ask the organization administrator if its ceiling prevents an
 increase. The model cannot apply allocation changes.

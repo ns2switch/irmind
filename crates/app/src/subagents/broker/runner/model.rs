@@ -35,13 +35,19 @@ impl Engine<'_> {
             messages::assigned_sources(&mut state.messages, task, &view)?;
         }
         let messages = state.messages.clone();
-        let tools = self.child_read_catalog(started, task, state)?;
+        let tools = if state.continuing {
+            Vec::new()
+        } else {
+            self.child_read_catalog(started, task, state)?
+        };
         let (input, input_bound) = messages::reserved_input(&messages, &tools)?;
         let available = task.budget.tokens.saturating_sub(state.usage.tokens);
         if input.len() > 48_000 || input_bound >= available {
             return Ok(None);
         }
-        let output_limit = (available - input_bound).min(2048);
+        let Some(output_limit) = model_output_bound(model, state, input_bound, available) else {
+            return Ok(None);
+        };
         let amount = SubagentResources {
             tokens: input_bound + output_limit,
             rounds: 1,
@@ -87,12 +93,7 @@ impl Engine<'_> {
         state.reservations.insert(reservation.operation_id);
         Ok(Some(ModelStep {
             reservation,
-            request: CompletionRequest {
-                messages,
-                tools,
-                max_output_tokens: u32::try_from(output_limit).map_err(|_| invalid())?,
-                remaining_case_tokens: amount.tokens,
-            },
+            request: CompletionRequest { messages, tools },
         }))
     }
 
@@ -107,29 +108,23 @@ impl Engine<'_> {
     ) -> Result<ChildProgress, AppError> {
         let _lock = self.repo.lock_case(case)?;
         let mut batch = AgentBatch::new(self, case, self.verifier.as_ref())?;
-        let outcome = self.child_model_outcome(task, step, response)?;
-        let accounting = outcome
-            .report
-            .as_ref()
-            .map(|report| {
-                batch.push_payload(
-                    crate::AuditEventKind::ModelUsage,
-                    &serde_json::to_string(report).map_err(|_| invalid())?,
-                    false,
-                )
-            })
-            .transpose()?;
+        let mut outcome = self.child_model_outcome(task, step, response)?;
+        let accounting = record_child_usage(&mut batch, outcome.report.as_ref())?;
         state.record_model_result(
             outcome.terminal.usage,
-            outcome.terminal.guarded_summary,
+            std::mem::take(&mut outcome.terminal.guarded_summary),
             outcome.reply.as_ref().is_some_and(|reply| reply.truncated),
         )?;
+        let continue_output = self.prepare_child_answer(started, task, state, &mut outcome)?;
         let calls = outcome
             .reply
             .as_ref()
             .map(|reply| reply.tool_calls.clone())
             .unwrap_or_default();
-        let done = outcome.reply.is_none() || calls.is_empty();
+        let done = !continue_output
+            && (outcome.reply.is_none()
+                || calls.is_empty()
+                || state.usage.tokens >= task.budget.tokens);
         let mut entries = Vec::new();
         if let Some(reply) = outcome.reply {
             entries.push(self.child_model_reply(started, task, state, reply)?);
@@ -143,6 +138,12 @@ impl Engine<'_> {
                 prev,
                 SubagentBranchPayload::Terminal(state.terminal(outcome.terminal.status)),
             )?);
+        }
+        if continue_output {
+            state.messages.push(crate::CompletionMessage::text(
+                crate::MessageRole::System,
+                crate::ports::model::output::CONTINUE_INSTRUCTION.into(),
+            ));
         }
         let checkpoint = self.publish_child_prefix(
             case,
@@ -185,6 +186,33 @@ impl Engine<'_> {
             Some(result) => ChildProgress::Done(Box::new(result)),
             None => ChildProgress::Tools(calls),
         })
+    }
+
+    fn prepare_child_answer(
+        &self,
+        started: &StartedSubagentPlan,
+        task: &SubagentTaskSpec,
+        state: &mut TaskSession,
+        outcome: &mut super::outcome::ModelOutcome,
+    ) -> Result<bool, AppError> {
+        if let Some(reply) = &mut outcome.reply {
+            self.retain_child_reply(started, task, state, reply, &mut outcome.terminal.status)?;
+        }
+        let continue_output = outcome.reply.as_ref().is_some_and(|reply| {
+            reply.truncated
+                && !reply
+                    .guarded_text
+                    .ends_with(crate::ports::model::output::SECURITY_NOTICE)
+        }) && state.continuations == 0
+            && state.usage.tokens < task.budget.tokens;
+        if continue_output {
+            state.continuations += 1;
+            state.continuing = true;
+            state.coverage.insert("The model reached its maximum output. One automatic continuation is requested subject to the remaining reservation and rounds.".into());
+        } else if state.continuing {
+            state.continuing = false;
+        }
+        Ok(continue_output)
     }
 
     fn child_model_reply(
@@ -245,4 +273,40 @@ impl ModelStep {
         task_cancel.cancel();
         response
     }
+}
+
+fn model_output_bound(
+    model: &dyn LlmPort,
+    state: &mut TaskSession,
+    input_bound: u64,
+    available: u64,
+) -> Option<u64> {
+    let Some(maximum) = model.output_profile().maximum_output_tokens else {
+        state.coverage.insert("The model output maximum is unknown. Configure its native maximum in /settings model before running this subagent.".into());
+        return None;
+    };
+    let output_limit = u64::from(maximum.get());
+    if input_bound
+        .checked_add(output_limit)
+        .is_none_or(|required| required > available)
+    {
+        state.coverage.insert("The model maximum and input reservation do not fit the child token allocation. Review /budget and propose a plan with a sufficient child allocation.".into());
+        return None;
+    }
+    Some(output_limit)
+}
+
+fn record_child_usage(
+    batch: &mut AgentBatch<'_>,
+    report: Option<&crate::UsageEvent>,
+) -> Result<Option<SubagentDigest>, AppError> {
+    report
+        .map(|report| {
+            batch.push_payload(
+                crate::AuditEventKind::ModelUsage,
+                &serde_json::to_string(report).map_err(|_| invalid())?,
+                false,
+            )
+        })
+        .transpose()
 }

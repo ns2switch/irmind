@@ -483,6 +483,9 @@ pub(in crate::home) fn model_items(
             rows.push("Model name:".into());
             rows.push(format!("> {}", setup.name));
         }
+        model::ModelStep::OutputMaximum | model::ModelStep::OutputRequirement => {
+            rows.extend(model_output_rows(setup));
+        }
         model::ModelStep::Key => {
             rows.push(
                 "API key (stored in the selected SecretBackend; Enter skips if optional):".into(),
@@ -538,6 +541,32 @@ pub(in crate::home) fn model_items(
         .collect()
 }
 
+fn model_output_rows(setup: &model::ModelSetup) -> Vec<String> {
+    let mut rows = Vec::new();
+    if setup.step == model::ModelStep::OutputMaximum {
+        rows.push("Native model output maximum (tokens; empty means unknown):".into());
+        rows.push(format!(
+            "┌──────────────────────────────┐\n│ {}\n└──────────────────────────────┘",
+            setup.output_maximum
+        ));
+        rows.push(
+            "Enter the provider's supported maximum, not a smaller response allowance.".into(),
+        );
+        rows.push("Unknown optional values are omitted; subagents need a known maximum.".into());
+    } else {
+        rows.push("Does this API require the output-maximum parameter?".into());
+        rows.push(format!(
+            "{} 1. Optional",
+            if setup.output_required { " " } else { ">" }
+        ));
+        rows.push(format!(
+            "{} 2. Required",
+            if setup.output_required { ">" } else { " " }
+        ));
+    }
+    rows
+}
+
 fn model_choice_rows(setup: &model::ModelSetup) -> Vec<String> {
     let mut rows = Vec::new();
     if setup.step == model::ModelStep::Provider {
@@ -584,6 +613,7 @@ fn model_review_rows(setup: &model::ModelSetup) -> Vec<String> {
         "Test connection with synthetic text",
         "Save and enable model",
         "Back",
+        "Model output profile",
     ]
     .iter()
     .enumerate()

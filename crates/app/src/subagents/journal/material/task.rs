@@ -127,7 +127,7 @@ impl<'a> TaskMaterial<'a> {
                 SubagentBranchPayload::ModelRequest(value) => {
                     self.model_request(value, sequence)?;
                 }
-                SubagentBranchPayload::ModelReply(value) => self.model_reply(value)?,
+                SubagentBranchPayload::ModelReply(value) => self.model_reply(value, checkpoint)?,
                 SubagentBranchPayload::ToolProposal(value) => {
                     if value.allocation_sha256
                         != self.plan.allocation().ok_or(SubagentRecordError)?
@@ -292,6 +292,7 @@ impl<'a> TaskMaterial<'a> {
             || value.output_limit > request.amount.tokens
             || value.round != self.requests.len() as u64 + 1
             || value.round > self.task.budget.rounds
+            || self.usage.tokens >= self.task.budget.tokens
             || self
                 .requests
                 .insert(value.call_id.clone(), value.reservation_sha256)
@@ -306,7 +307,11 @@ impl<'a> TaskMaterial<'a> {
             .ok_or(SubagentRecordError)?;
         Ok(())
     }
-    fn model_reply(&mut self, value: &BranchModelReply) -> Result<(), SubagentRecordError> {
+    fn model_reply(
+        &mut self,
+        value: &BranchModelReply,
+        checkpoint: &SubagentCheckpointV1,
+    ) -> Result<(), SubagentRecordError> {
         let identity = self
             .requests
             .get(&value.call_id)
@@ -318,7 +323,29 @@ impl<'a> TaskMaterial<'a> {
                 usage.input_tokens.checked_add(usage.output_tokens)
             })
             .ok_or(SubagentRecordError)?;
-        if tokens > request.amount.tokens || !self.replies.insert(value.call_id.clone()) {
+        if tokens > request.amount.tokens {
+            let settlement = self
+                .plan
+                .model_settlement(*identity)?
+                .ok_or(SubagentRecordError)?;
+            let accounted = self
+                .journal
+                .accounting
+                .get(
+                    &settlement
+                        .accounting_audit_sha256
+                        .ok_or(SubagentRecordError)?,
+                )
+                .ok_or(SubagentRecordError)?;
+            if settlement.cause_sha256 != checkpoint.identity()?
+                || settlement.amount.tokens != tokens
+                || accounted.model_usage != value.usage
+                || value.usage.is_none()
+            {
+                return Err(SubagentRecordError);
+            }
+        }
+        if !self.replies.insert(value.call_id.clone()) {
             return Err(SubagentRecordError);
         }
         self.usage.tokens = self
@@ -326,7 +353,7 @@ impl<'a> TaskMaterial<'a> {
             .tokens
             .checked_add(tokens)
             .ok_or(SubagentRecordError)?;
-        if !self.usage.within(self.task.budget) {
+        if !self.usage.within_non_tokens(self.task.budget) {
             return Err(SubagentRecordError);
         }
         self.partial |= value.truncated;
@@ -405,7 +432,7 @@ impl<'a> TaskMaterial<'a> {
             .cloud_bytes
             .checked_add(accounted.amount.cloud_bytes)
             .ok_or(SubagentRecordError)?;
-        if !self.usage.within(self.task.budget) {
+        if !self.usage.within_non_tokens(self.task.budget) {
             return Err(SubagentRecordError);
         }
         Ok(())
@@ -608,7 +635,9 @@ impl<'a> TaskMaterial<'a> {
             || (value.status == crate::subagents::SubagentStatus::Completed
                 && (self.requests.len() != self.replies.len() || self.partial))
             || !self.usage.within(value.usage)
-            || !value.usage.within(self.task.budget)
+            || !value.usage.within_non_tokens(self.task.budget)
+            || (value.usage.tokens > self.task.budget.tokens
+                && value.usage.tokens != self.plan.task_usage(self.task.task_id).tokens)
             || value
                 .sources
                 .iter()

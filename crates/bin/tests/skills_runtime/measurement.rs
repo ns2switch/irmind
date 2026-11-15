@@ -75,5 +75,7 @@ fn request_bytes(request: &CompletionRequest) -> usize {
         serde_json::json!({"role":format!("{:?}",m.role),"content":m.content,"tool_calls":calls,"tool_call_id":m.tool_call_id})
     }).collect();
     let tools: Vec<_> = request.tools.iter().map(|t| serde_json::json!({"name":t.name,"description":t.description,"parameters":t.parameters})).collect();
-    serde_json::to_vec(&serde_json::json!({"messages":messages,"tools":tools,"max_output_tokens":request.max_output_tokens})).unwrap().len()
+    serde_json::to_vec(&serde_json::json!({"messages":messages,"tools":tools}))
+        .unwrap()
+        .len()
 }

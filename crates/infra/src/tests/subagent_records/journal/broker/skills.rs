@@ -72,6 +72,9 @@ fn child_pinned_method_is_guarded_committed_before_model_context_and_verifiable_
 struct RepeatMethod(std::sync::atomic::AtomicUsize);
 #[async_trait]
 impl LlmPort for RepeatMethod {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        irmind_app::ModelOutputProfile::known(2048, false).unwrap()
+    }
     async fn complete(
         &self,
         request: CompletionRequest,

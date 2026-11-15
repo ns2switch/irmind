@@ -1,0 +1,11 @@
+---
+source: crates/tui/src/home/model.rs
+expression: screen(&state)
+---
+Native model output maximum (tokens; empty means unknown):
+┌──────────────────────────────┐
+│ 128000
+└──────────────────────────────┘
+Enter the provider's supported maximum, not a smaller response allowance.
+Unknown optional values are omitted; subagents need a known maximum.
+Status: Enter the model's native maximum as a positive integer, or clear it for unknown

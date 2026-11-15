@@ -301,7 +301,7 @@ pub fn run_llm_contract(port: &dyn LlmPort) -> Result<(), String> {
     if port.descriptor().is_empty() {
         return Err("LLM descriptor is empty".into());
     }
-    let request = |limit| CompletionRequest {
+    let request = || CompletionRequest {
         messages: vec![CompletionMessage {
             role: MessageRole::User,
             content: "synthetic incident".into(),
@@ -309,20 +309,11 @@ pub fn run_llm_contract(port: &dyn LlmPort) -> Result<(), String> {
             tool_call_id: None,
         }],
         tools: Vec::new(),
-        max_output_tokens: limit,
-        remaining_case_tokens: 100,
     };
     contract_runtime()?.block_on(async {
-        if port
-            .complete(request(0), &CancellationToken::new())
-            .await
-            .is_ok()
-        {
-            return Err("LLM accepted an empty output budget".into());
-        }
         let cancelled = CancellationToken::new();
         cancelled.cancel();
-        match port.complete(request(10), &cancelled).await {
+        match port.complete(request(), &cancelled).await {
             Err(AppError::Cancelled) => Ok(()),
             Ok(stream) => match collect_model_stream(stream, &cancelled).await {
                 Err(AppError::Cancelled) => Ok(()),
