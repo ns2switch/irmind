@@ -65,11 +65,6 @@ impl Engine<'_> {
             }
             let screened = self.guard.screen(&answer.text)?;
             let mut text = screened.text;
-            if !answer.calls.is_empty() {
-                text = bounded_text(text);
-                text.truncate(text.floor_char_boundary(text.len().min(15 * 1024)));
-                text.push_str("\nTools were not enabled; the proposed calls were not executed.");
-            }
             let truncated = answer.truncated || text.len() > 16 * 1024;
             text = bounded_text(text);
             outcome.terminal.guarded_summary.clone_from(&text);
@@ -79,7 +74,7 @@ impl Engine<'_> {
                 SubagentStatus::Partial
             };
             outcome.reply = Some(BranchModelReply {
-                call_id: "model_1".into(),
+                call_id: format!("model_{}", step.reservation.request_ordinal),
                 guarded_text: text,
                 truncated,
                 tool_calls: answer

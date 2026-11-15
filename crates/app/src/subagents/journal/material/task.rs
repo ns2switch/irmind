@@ -265,8 +265,7 @@ impl<'a> TaskMaterial<'a> {
             .get(&self.task.type_snapshot_sha256)
             .ok_or(SubagentRecordError)?;
         let rules = self.plan.plan.policy.rules()?;
-        if proposal.tainted
-            || tool.risk() != irmind_domain::RiskLevel::Read
+        if tool.risk() != irmind_domain::RiskLevel::Read
             || !kind.definition().permits_tool(&tool)
             || self
                 .parent_tools
