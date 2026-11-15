@@ -122,7 +122,7 @@ impl SubagentJournal {
             ReservationAction::ReleasePlan,
             ReservationPurpose::Plan,
             ReservationTransition {
-                amount: started.plan.reservation.checked_sub(state.total_usage()?)?,
+                amount: state.releasable()?,
                 parent_operation: Some(started.allocation.operation_id),
                 cause_sha256: checkpoint.identity()?,
                 accounting_audit_sha256: None,

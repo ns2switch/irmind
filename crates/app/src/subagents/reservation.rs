@@ -128,7 +128,14 @@ impl SubagentReservationV1 {
         } else {
             plan.reservation
         };
-        if !self.amount.within(limit) {
+        let reported_model = self.action == ReservationAction::SettleRequest
+            && self.purpose == ReservationPurpose::Model
+            && self.accounting_audit_sha256.is_some();
+        if !(if reported_model {
+            self.amount.within_non_tokens(limit)
+        } else {
+            self.amount.within(limit)
+        }) {
             return Err(SubagentRecordError);
         }
         Ok(())
@@ -146,7 +153,14 @@ impl SubagentRecord for SubagentReservationV1 {
     const KIND: AuditEventKind = AuditEventKind::SubagentReservationV1;
     const DOMAIN: &'static [u8] = b"irmind-subagent-reservation-v1\0";
     fn validate(&self) -> Result<(), SubagentRecordError> {
-        self.amount.validate()?;
+        if self.action == ReservationAction::SettleRequest
+            && self.purpose == ReservationPurpose::Model
+            && self.accounting_audit_sha256.is_some()
+        {
+            self.amount.validate_usage()?;
+        } else {
+            self.amount.validate()?;
+        }
         let plan_transition = matches!(
             self.action,
             ReservationAction::HoldPreview

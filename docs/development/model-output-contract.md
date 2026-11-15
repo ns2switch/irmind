@@ -139,6 +139,17 @@ The bounded 16 KiB child summary returned to the parent remains unchanged. The
 complete child answer is retained in its branch within the same frame limit.
 Resource failure, explicit cancellation and deadlines remain visible interruptions.
 
+### Branch payload capacity
+
+The existing branch payload validator also has a 256 KiB per-payload ceiling,
+independent of the 1 MiB signed entry/chunk limit. A representative 640,000-byte
+answer therefore fits the frame and guard, but is currently rejected as a branch
+reply. Proposed adjustment: for `ModelReply` only, replace that payload ceiling
+with the available capacity of its enclosing 1 MiB frame. All other branch
+payloads retain 256 KiB. Entry, chunk, branch-total, transport and guard bounds
+remain unchanged; the retained reply and its terminal metadata must fit together.
+The large-child regression test exposes this additional constraint.
+
 ## 4. One automatic provider continuation
 
 A native output/context stop (`length` / `max_tokens`, not a transport error)

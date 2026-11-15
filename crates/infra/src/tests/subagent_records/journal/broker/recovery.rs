@@ -4,6 +4,9 @@ use irmind_app::subagents::SubagentStatus;
 struct InterruptedModel;
 #[async_trait]
 impl LlmPort for InterruptedModel {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        irmind_app::ModelOutputProfile::known(2048, false).unwrap()
+    }
     async fn complete(
         &self,
         _: CompletionRequest,

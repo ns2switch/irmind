@@ -89,8 +89,6 @@ impl Engine<'_> {
         let request = CompletionRequest {
             messages,
             tools: Vec::new(),
-            max_output_tokens: remaining.min(512) as u32,
-            remaining_case_tokens: remaining,
         };
         on_text(ModelProgress::RoundStarted {
             round: self.policy.max_model_rounds_per_turn,
@@ -106,14 +104,8 @@ impl Engine<'_> {
                 "provider returned tools when none were offered".into(),
             ));
         }
-        self.audit_local(
-            id,
-            crate::AuditOrigin::Model,
-            AuditEventKind::ModelReply,
-            &answer.raw,
-            None,
-        )
-        .await?;
+        self.record_model_reply(id, &answer.raw).await?;
+        let used = self.used_model_tokens(id).await?;
         self.record_model_usage(id, usage, used, turn.budget.model_tokens)
             .await?;
         let mut summary = if answer.text.trim().is_empty() {

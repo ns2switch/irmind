@@ -1,6 +1,6 @@
 mod audit;
 mod local;
-mod model;
+pub(crate) mod model;
 mod object_source;
 mod remote;
 
@@ -16,10 +16,10 @@ pub use local::{
     SourceParallelism, StreamingEventParser, Verifier, startup_check,
 };
 pub use model::{
-    CompletionMessage, CompletionRequest, LlmPort, MessageRole, ModelEvent, ModelPricing,
-    ModelProgress, ModelResponse, ModelStream, ModelToolCall, ModelUsage, UsageEvent,
-    collect_model_stream, collect_model_stream_with_progress, single_completion_stream,
-    summarize_usage,
+    CompletionMessage, CompletionRequest, LlmPort, MessageRole, ModelEvent, ModelOutputProfile,
+    ModelPricing, ModelProgress, ModelResponse, ModelStream, ModelToolCall, ModelUsage,
+    OutputParameterRequirement, UsageEvent, collect_model_stream,
+    collect_model_stream_with_progress, single_completion_stream, summarize_usage,
 };
 pub use object_source::{ObjectEntry, ObjectSource, ObjectSourceOutput, ObjectStream};
 pub use remote::{CloudAuditPort, EdrPort, InternalIntelPort, SiemPort, ThreatIntelPort};

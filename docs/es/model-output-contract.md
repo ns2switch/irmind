@@ -123,6 +123,16 @@ El resumen de 16 KiB del hijo al principal se mantiene; la respuesta completa qu
 en la rama, dentro del mismo límite de frame. Cancelación, plazos y fallos de
 recursos siguen siendo interrupciones visibles.
 
+### Capacidad del payload de rama
+
+El validador actual añade un límite de 256 KiB por payload, independiente del
+frame de 1 MiB. La respuesta representativa de 640.000 bytes cabe en el frame y
+en el guard, pero se rechaza en la rama. Se propone usar, solo para `ModelReply`,
+la capacidad disponible en su frame de 1 MiB. Los demás payloads mantienen
+256 KiB. No cambian los límites del frame, chunk, total de rama, transporte ni
+guard; la respuesta y sus metadatos finales deben caber juntos. La prueba del
+hijo largo muestra esta restricción adicional.
+
 ## Una continuación automática
 
 Con `length`/`max_tokens` nativos, la TUI informa de que el modelo alcanzó su

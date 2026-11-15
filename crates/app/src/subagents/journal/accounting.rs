@@ -42,6 +42,7 @@ pub(super) struct Accounted {
     pub actor: crate::Actor,
     pub scope: crate::CaseScope,
     pub amount: SubagentResources,
+    pub model_usage: Option<crate::ModelUsage>,
     pub attribution: Option<TaskDispatchAttribution>,
 }
 impl SubagentJournal {
@@ -90,7 +91,11 @@ impl SubagentJournal {
             }
             _ => return Ok(()),
         };
-        amount.validate()?;
+        if entry.kind == AuditEventKind::ModelUsage {
+            amount.validate_usage()?;
+        } else {
+            amount.validate()?;
+        }
         // At most 256 tasks × 100 shared rounds, plus 10,000 case calls;
         // reserve headroom without retaining arbitrary unrelated zero reports.
         if self.accounting.len() >= 65_536 {
@@ -124,6 +129,7 @@ impl SubagentJournal {
                 actor: entry.actor.clone(),
                 scope: self.scope.clone(),
                 amount,
+                model_usage: model_usage(entry)?,
                 attribution,
             },
         );
@@ -192,4 +198,16 @@ impl SubagentJournal {
         self.accounted.insert((hash, value.purpose));
         Ok(())
     }
+}
+
+fn model_usage(entry: &SignedEntry) -> Result<Option<crate::ModelUsage>, SubagentRecordError> {
+    if entry.kind != AuditEventKind::ModelUsage {
+        return Ok(None);
+    }
+    let usage: UsageEvent =
+        serde_json::from_str(&entry.payload).map_err(|_| SubagentRecordError)?;
+    Ok(Some(crate::ModelUsage {
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+    }))
 }

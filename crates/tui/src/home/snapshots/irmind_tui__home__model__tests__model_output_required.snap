@@ -1,0 +1,7 @@
+---
+source: crates/tui/src/home/model.rs
+expression: screen(&state)
+---
+Does this API require the output-maximum parameter?
+  1. Optional
+> 2. Required

@@ -93,8 +93,6 @@ fn model_and_approval_debug_omit_sensitive_content() {
     let request = super::CompletionRequest {
         messages: vec![message],
         tools: Vec::new(),
-        max_output_tokens: 10,
-        remaining_case_tokens: 20,
     };
     let response = super::ModelResponse {
         truncated: false,

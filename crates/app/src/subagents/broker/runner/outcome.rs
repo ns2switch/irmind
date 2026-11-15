@@ -47,10 +47,6 @@ impl Engine<'_> {
                     .input_tokens
                     .checked_add(report.output_tokens)
                     .ok_or_else(invalid)?;
-                if tokens > step.reservation.amount.tokens {
-                    outcome.terminal.guarded_summary = "The provider usage report exceeded its reservation; no reply was accepted.".into();
-                    return Ok(outcome.committed());
-                }
                 outcome.terminal.usage.tokens = tokens;
                 outcome.report = Some(UsageEvent {
                     input_tokens: report.input_tokens,
@@ -63,11 +59,11 @@ impl Engine<'_> {
                 outcome.terminal.guarded_summary = "The subagent reached its deadline; reported usage is retained and unreported usage remains reserved.".into();
                 return Ok(outcome.committed());
             }
-            let screened = self.guard.screen(&answer.text)?;
-            let mut text = screened.text;
-            let truncated = answer.truncated || text.len() > 16 * 1024;
-            text = bounded_text(text);
-            outcome.terminal.guarded_summary.clone_from(&text);
+            let text =
+                crate::ports::model::output::screen_output(self.guard.as_ref(), &answer.text)?;
+            let truncated =
+                answer.truncated || text.ends_with(crate::ports::model::output::SECURITY_NOTICE);
+            outcome.terminal.guarded_summary = bounded_text(text.clone());
             outcome.terminal.status = if answer.calls.is_empty() && !truncated {
                 SubagentStatus::Completed
             } else {

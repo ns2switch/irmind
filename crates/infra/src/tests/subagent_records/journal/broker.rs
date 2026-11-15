@@ -2,6 +2,7 @@ mod admissions;
 mod events;
 mod findings;
 mod live_approvals;
+mod output;
 mod parallel;
 mod pending;
 mod recovery;
@@ -186,6 +187,9 @@ struct ChildModel {
 }
 #[async_trait]
 impl LlmPort for ChildModel {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        irmind_app::ModelOutputProfile::known(2048, false).unwrap()
+    }
     async fn complete(
         &self,
         request: CompletionRequest,

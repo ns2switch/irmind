@@ -91,6 +91,9 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                 break;
             };
             match progress {
+                irmind_app::ModelProgress::Notice(message) => {
+                    self.state.progress_status = Some(self.engine.guard.screen(&message)?.text);
+                }
                 irmind_app::ModelProgress::RoundStarted { round, limit } => {
                     if self.state.model_preview.is_empty() {
                         self.state.conversation.discard_preview();

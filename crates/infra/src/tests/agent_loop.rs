@@ -1,4 +1,6 @@
 use super::*;
+#[allow(clippy::unwrap_used)]
+mod output;
 
 #[derive(Default)]
 struct ProtocolModel {

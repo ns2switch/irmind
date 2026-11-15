@@ -56,6 +56,9 @@ fn proposal(tool: Tool) -> ProposedCall {
 struct CloudModel(Mutex<Vec<CompletionRequest>>);
 #[irmind_app::async_trait]
 impl LlmPort for CloudModel {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        irmind_app::ModelOutputProfile::known(2048, false).unwrap()
+    }
     async fn complete(
         &self,
         request: CompletionRequest,

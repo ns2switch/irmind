@@ -27,6 +27,26 @@ impl SubagentResources {
             && self.rounds <= limit.rounds
             && self.cloud_bytes <= limit.cloud_bytes
     }
+    pub(crate) fn within_non_tokens(self, limit: Self) -> bool {
+        Self { tokens: 0, ..self }.within(Self { tokens: 0, ..limit })
+    }
+    pub(crate) fn validate_usage(self) -> Result<(), SubagentRecordError> {
+        Self { tokens: 0, ..self }.validate()
+    }
+    pub(crate) fn remaining_after_usage(self, usage: Self) -> Result<Self, SubagentRecordError> {
+        let mut remaining = Self { tokens: 0, ..self }.checked_sub(Self { tokens: 0, ..usage })?;
+        remaining.tokens = self.tokens.saturating_sub(usage.tokens);
+        Ok(remaining)
+    }
+    pub(crate) fn checked_add_usage(self, other: Self) -> Result<Self, SubagentRecordError> {
+        let tokens = self
+            .tokens
+            .checked_add(other.tokens)
+            .ok_or(SubagentRecordError)?;
+        let mut value = Self { tokens: 0, ..self }.checked_add(Self { tokens: 0, ..other })?;
+        value.tokens = tokens;
+        Ok(value)
+    }
     pub fn checked_add(self, other: Self) -> Result<Self, SubagentRecordError> {
         let value = Self {
             tokens: self

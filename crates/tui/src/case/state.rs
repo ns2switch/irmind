@@ -177,7 +177,7 @@ pub(super) fn update(state: &mut CaseState, message: CaseMessage) -> CaseAction 
             CaseAction::None
         }
         CaseMessage::ModelDelta(text) => {
-            if state.model_preview.len().saturating_add(text.len()) <= 16_384 {
+            if state.model_preview.len().saturating_add(text.len()) <= 1_000_000 {
                 state.model_preview.push_str(&text);
             }
             CaseAction::None

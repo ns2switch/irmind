@@ -115,6 +115,9 @@ impl Episode {
 }
 #[irmind_app::async_trait]
 impl LlmPort for Episode {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        irmind_app::ModelOutputProfile::known(2048, false).unwrap()
+    }
     async fn complete(
         &self,
         request: CompletionRequest,

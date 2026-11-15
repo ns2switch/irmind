@@ -17,6 +17,16 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
     tools: &[],
     config: &[
         ConfigField {
+            name: "IRMIND_MODEL_MAX_OUTPUT_TOKENS",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_MODEL_OUTPUT_REQUIRED",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "IRMIND_DEEPSEEK_BASE_URL",
             required: false,
             secret: false,
@@ -43,12 +53,18 @@ impl DeepSeek {
             .required_secret("DEEPSEEK_API_KEY")?
             .expose_secret()
             .to_owned();
-        Ok(Self(ChatCompletionsClient::new_with_profile(
-            config.value("IRMIND_DEEPSEEK_BASE_URL").unwrap_or(BASE_URL),
-            model,
-            Some(key),
-            ChatProfile::DeepSeek,
-        )?))
+        Ok(Self(
+            ChatCompletionsClient::new_with_profile(
+                config.value("IRMIND_DEEPSEEK_BASE_URL").unwrap_or(BASE_URL),
+                model,
+                Some(key),
+                ChatProfile::DeepSeek,
+            )?
+            .with_output_configuration(
+                config.value("IRMIND_MODEL_MAX_OUTPUT_TOKENS"),
+                config.value("IRMIND_MODEL_OUTPUT_REQUIRED"),
+            )?,
+        ))
     }
 }
 
@@ -67,6 +83,9 @@ impl Module for DeepSeek {
 
 #[irmind_app::async_trait]
 impl LlmPort for DeepSeek {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        self.0.output_profile()
+    }
     fn descriptor(&self) -> String {
         self.0.descriptor_for(MODULE_ID)
     }

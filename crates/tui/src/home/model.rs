@@ -13,6 +13,8 @@ pub(super) enum ModelStep {
     ConfirmDiscovery,
     Review,
     ConfirmEgress,
+    OutputMaximum,
+    OutputRequirement,
 }
 
 #[derive(Clone)]
@@ -21,6 +23,8 @@ pub(crate) struct ModelDraft {
     pub url: String,
     pub name: String,
     pub key: Option<SecretString>,
+    pub output_maximum: String,
+    pub output_required: bool,
 }
 
 pub(crate) fn save_configuration(
@@ -68,6 +72,30 @@ pub(crate) fn save_configuration(
             true,
         )?;
     }
+    let output_values = [
+        (
+            "IRMIND_MODEL_MAX_OUTPUT_TOKENS",
+            draft.output_maximum.clone(),
+        ),
+        (
+            "IRMIND_MODEL_OUTPUT_REQUIRED",
+            draft.output_required.to_string(),
+        ),
+    ];
+    for (field, value) in output_values {
+        if field == "IRMIND_MODEL_OUTPUT_REQUIRED" && draft.provider == "llm-anthropic" {
+            continue;
+        }
+        io_ops.change_module_configuration(
+            engine,
+            ConfigChange::SetValue {
+                module: draft.provider.into(),
+                field: field.into(),
+                value,
+            },
+            true,
+        )?;
+    }
     io_ops.change_module_configuration(
         engine,
         ConfigChange::SelectLlm(Some(draft.provider.into())),
@@ -84,6 +112,8 @@ pub(super) struct ModelSetup {
     pub url: String,
     pub name: String,
     pub key: SecretString,
+    pub output_maximum: String,
+    pub output_required: bool,
     pub notice: String,
     pub selected_action: usize,
     pub url_edited: bool,
@@ -200,6 +230,8 @@ impl ModelSetup {
             url: String::new(),
             name: String::new(),
             key: SecretString::from(String::new()),
+            output_maximum: String::new(),
+            output_required: false,
             notice: String::new(),
             selected_action: 0,
             url_edited: false,
@@ -219,6 +251,8 @@ impl ModelSetup {
             url: self.url.clone(),
             name: self.name.clone(),
             key: (!self.key.expose_secret().is_empty()).then(|| self.key.clone()),
+            output_maximum: self.output_maximum.clone(),
+            output_required: self.output_required,
         }
     }
 
@@ -227,6 +261,8 @@ impl ModelSetup {
         self.selected_action = 0;
         self.url_edited = false;
         self.name.clear();
+        self.output_maximum.clear();
+        self.output_required = self.provider_id() == "llm-anthropic";
         self.models.clear();
         self.key = SecretString::from(String::new());
         let Some(preset) = PROVIDERS.get(self.provider) else {
@@ -258,7 +294,9 @@ pub(super) fn update_model(state: &mut HomeState, key: KeyCode) -> HomeAction {
                     RemoteProbe::List => ModelStep::Key,
                     RemoteProbe::Test => ModelStep::Review,
                 },
-                ModelStep::ConfirmEgress => ModelStep::Review,
+                ModelStep::ConfirmEgress
+                | ModelStep::OutputMaximum
+                | ModelStep::OutputRequirement => ModelStep::Review,
             };
         }
         KeyCode::Tab if setup.step == ModelStep::AvailableModels => {
@@ -275,6 +313,9 @@ pub(super) fn update_model(state: &mut HomeState, key: KeyCode) -> HomeAction {
             }
             ModelStep::Name => {
                 setup.name.pop();
+            }
+            ModelStep::OutputMaximum => {
+                setup.output_maximum.pop();
             }
             ModelStep::Key => {
                 let mut value = setup.key.expose_secret().to_string();
@@ -296,7 +337,11 @@ fn move_selection(setup: &mut ModelSetup, forward: bool) {
     let (selected, count) = match setup.step {
         ModelStep::Provider => (&mut setup.provider, PROVIDERS.len()),
         ModelStep::AvailableModels => (&mut setup.selected_model, setup.models.len()),
-        ModelStep::Review => (&mut setup.selected_action, 3),
+        ModelStep::Review => (&mut setup.selected_action, 4),
+        ModelStep::OutputRequirement => {
+            setup.output_required = forward;
+            return;
+        }
         ModelStep::ConfirmEgress | ModelStep::ConfirmDiscovery => (&mut setup.selected_action, 2),
         _ => return,
     };
@@ -318,12 +363,16 @@ fn enter_text(state: &mut HomeState, ch: char) {
             setup.url.push(ch);
         }
         ModelStep::Name if setup.name.len() < 200 => setup.name.push(ch),
+        ModelStep::OutputMaximum if ch.is_ascii_digit() && setup.output_maximum.len() < 10 => {
+            setup.output_maximum.push(ch);
+        }
         ModelStep::Key if setup.key.expose_secret().len() < 4096 => {
             let mut value = setup.key.expose_secret().to_string();
             value.push(ch);
             setup.key = SecretString::from(value);
         }
         ModelStep::Provider
+        | ModelStep::OutputRequirement
         | ModelStep::AvailableModels
         | ModelStep::Review
         | ModelStep::ConfirmDiscovery
@@ -372,13 +421,33 @@ fn advance(state: &mut HomeState) -> HomeAction {
         ModelStep::ConfirmEgress if setup.selected_action == 1 => {
             HomeAction::SaveModel(setup.draft())
         }
-        ModelStep::Name | ModelStep::ConfirmEgress => {
+        ModelStep::Name | ModelStep::ConfirmEgress | ModelStep::OutputRequirement => {
             setup.step = ModelStep::Review;
             HomeAction::None
         }
         ModelStep::Key => advance_key(setup),
         ModelStep::ConfirmDiscovery => advance_discovery(setup),
         ModelStep::Review => review_action(setup),
+        ModelStep::OutputMaximum => {
+            if !setup.output_maximum.is_empty()
+                && setup
+                    .output_maximum
+                    .parse::<u32>()
+                    .ok()
+                    .and_then(std::num::NonZeroU32::new)
+                    .is_none()
+            {
+                setup.notice = "Enter the model's native maximum as a positive integer, or clear it for unknown".into();
+            } else {
+                setup.notice.clear();
+                setup.step = if setup.provider_id() == "llm-anthropic" {
+                    ModelStep::Review
+                } else {
+                    ModelStep::OutputRequirement
+                };
+            }
+            HomeAction::None
+        }
     }
 }
 
@@ -480,7 +549,10 @@ fn apply_numeric_choice(setup: &mut ModelSetup, input: &str) {
             ModelStep::AvailableModels if choice > 0 && choice <= setup.models.len() => {
                 setup.selected_model = choice - 1;
             }
-            ModelStep::Review if (1..=3).contains(&choice) => setup.selected_action = choice - 1,
+            ModelStep::Review if (1..=4).contains(&choice) => setup.selected_action = choice - 1,
+            ModelStep::OutputRequirement if (1..=2).contains(&choice) => {
+                setup.output_required = choice == 2;
+            }
             ModelStep::ConfirmEgress | ModelStep::ConfirmDiscovery if (1..=2).contains(&choice) => {
                 setup.selected_action = choice - 1;
             }
@@ -502,6 +574,10 @@ fn review_action(setup: &mut ModelSetup) -> HomeAction {
         1 => {
             setup.selected_action = 0;
             setup.step = ModelStep::ConfirmEgress;
+            HomeAction::None
+        }
+        3 => {
+            setup.step = ModelStep::OutputMaximum;
             HomeAction::None
         }
         _ => {
@@ -573,6 +649,31 @@ mod tests {
             HomeAction::None
         ));
         assert!(matches!(state.model_setup.step, ModelStep::ConfirmEgress));
+    }
+
+    #[test]
+    fn output_profile_uses_bounded_form_input_and_an_explicit_requirement() {
+        let mut state = HomeState::new(Vec::new(), false);
+        state.mode = Mode::Model;
+        state.model_setup.provider = 4;
+        state.model_setup.step = ModelStep::OutputMaximum;
+        update_model(&mut state, KeyCode::Char('0'));
+        update_model(&mut state, KeyCode::Enter);
+        assert!(state.model_setup.step == ModelStep::OutputMaximum);
+        assert!(state.model_setup.notice.contains("positive integer"));
+        super::super::state::clear_active_field(&mut state);
+        for ch in "128000".chars() {
+            update_model(&mut state, KeyCode::Char(ch));
+        }
+        insta::assert_snapshot!("model_output_maximum", screen(&state));
+        update_model(&mut state, KeyCode::Enter);
+        assert!(state.model_setup.step == ModelStep::OutputRequirement);
+        update_model(&mut state, KeyCode::Down);
+        insta::assert_snapshot!("model_output_required", screen(&state));
+        update_model(&mut state, KeyCode::Enter);
+        assert_eq!(state.model_setup.draft().output_maximum, "128000");
+        assert!(state.model_setup.draft().output_required);
+        assert!(state.model_setup.step == ModelStep::Review);
     }
 
     fn screen(state: &HomeState) -> String {

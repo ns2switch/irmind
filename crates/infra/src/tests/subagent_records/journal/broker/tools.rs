@@ -31,6 +31,9 @@ pub(super) struct ToolModel {
 }
 #[async_trait]
 impl LlmPort for ToolModel {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        irmind_app::ModelOutputProfile::known(2048, false).unwrap()
+    }
     async fn complete(
         &self,
         request: CompletionRequest,
@@ -186,6 +189,9 @@ fn subagent_tool_round_limit_preserves_work_and_disallowed_tools_never_reach_que
 struct RepeatedProtocolId;
 #[async_trait]
 impl LlmPort for RepeatedProtocolId {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        irmind_app::ModelOutputProfile::known(2048, false).unwrap()
+    }
     async fn complete(
         &self,
         request: CompletionRequest,

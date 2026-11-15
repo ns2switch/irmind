@@ -51,8 +51,6 @@ pub(super) fn test_model_connection(
             tool_call_id: None,
         }],
         tools: Vec::new(),
-        max_output_tokens: 8,
-        remaining_case_tokens: 8,
     };
     let runtime = runtime()?;
     runtime.block_on(async {

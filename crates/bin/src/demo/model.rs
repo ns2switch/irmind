@@ -39,6 +39,12 @@ impl ScriptedModel {
 
 #[irmind_app::async_trait]
 impl LlmPort for ScriptedModel {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        irmind_app::ModelOutputProfile {
+            maximum_output_tokens: std::num::NonZeroU32::new(4096),
+            parameter_requirement: irmind_app::OutputParameterRequirement::Optional,
+        }
+    }
     fn descriptor(&self) -> String {
         "scripted demo model · no network".into()
     }

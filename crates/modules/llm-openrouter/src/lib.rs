@@ -17,6 +17,16 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
     tools: &[],
     config: &[
         ConfigField {
+            name: "IRMIND_MODEL_MAX_OUTPUT_TOKENS",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_MODEL_OUTPUT_REQUIRED",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "IRMIND_OPENROUTER_BASE_URL",
             required: false,
             secret: false,
@@ -43,14 +53,20 @@ impl OpenRouter {
             .required_secret("OPENROUTER_API_KEY")?
             .expose_secret()
             .to_owned();
-        Ok(Self(ChatCompletionsClient::new_with_profile(
-            config
-                .value("IRMIND_OPENROUTER_BASE_URL")
-                .unwrap_or(BASE_URL),
-            model,
-            Some(key),
-            ChatProfile::OpenRouter,
-        )?))
+        Ok(Self(
+            ChatCompletionsClient::new_with_profile(
+                config
+                    .value("IRMIND_OPENROUTER_BASE_URL")
+                    .unwrap_or(BASE_URL),
+                model,
+                Some(key),
+                ChatProfile::OpenRouter,
+            )?
+            .with_output_configuration(
+                config.value("IRMIND_MODEL_MAX_OUTPUT_TOKENS"),
+                config.value("IRMIND_MODEL_OUTPUT_REQUIRED"),
+            )?,
+        ))
     }
 }
 
@@ -69,6 +85,9 @@ impl Module for OpenRouter {
 
 #[irmind_app::async_trait]
 impl LlmPort for OpenRouter {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        self.0.output_profile()
+    }
     fn descriptor(&self) -> String {
         self.0.descriptor_for(MODULE_ID)
     }

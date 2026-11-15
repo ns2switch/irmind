@@ -29,6 +29,16 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
     tools: &[],
     config: &[
         ConfigField {
+            name: "IRMIND_MODEL_MAX_OUTPUT_TOKENS",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_MODEL_OUTPUT_REQUIRED",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "IRMIND_LLM_BASE_URL",
             required: false,
             secret: false,
@@ -258,7 +268,12 @@ impl OpenAiCompatible {
                 .secret("OPENAI_API_KEY")
                 .map(|key| key.expose_secret().to_owned()),
         );
-        Self::new(base_url, model, key)
+        let mut client = Self::new(base_url, model, key)?;
+        client.0 = client.0.with_output_configuration(
+            config.value("IRMIND_MODEL_MAX_OUTPUT_TOKENS"),
+            config.value("IRMIND_MODEL_OUTPUT_REQUIRED"),
+        )?;
+        Ok(client)
     }
 
     pub fn new(base_url: &str, model: &str, key: Option<String>) -> Result<Self, AppError> {
@@ -286,6 +301,9 @@ impl Module for OpenAiCompatible {
 
 #[irmind_app::async_trait]
 impl LlmPort for OpenAiCompatible {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        self.0.output_profile()
+    }
     fn descriptor(&self) -> String {
         self.0.descriptor_for(MODULE_ID)
     }

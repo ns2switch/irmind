@@ -23,6 +23,7 @@ pub struct ChatCompletionsClient {
     key: Option<SecretString>,
     model: String,
     profile: ChatProfile,
+    output: irmind_app::ModelOutputProfile,
 }
 
 impl ChatCompletionsClient {
@@ -95,11 +96,21 @@ impl ChatCompletionsClient {
         })?;
         Ok(Self {
             async_client,
-            endpoint,
+            endpoint: endpoint.clone(),
             key: key.map(SecretString::from),
             model: model.to_owned(),
             profile,
+            output: output_profile(profile, endpoint.host_str(), model),
         })
+    }
+
+    pub fn with_output_configuration(
+        mut self,
+        maximum: Option<&str>,
+        required: Option<&str>,
+    ) -> Result<Self, AppError> {
+        self.output = self.output.configured(maximum, required)?;
+        Ok(self)
     }
 
     #[must_use]
@@ -109,6 +120,41 @@ impl ChatCompletionsClient {
             self.model,
             irmind_app::hex(&irmind_app::sha256(self.endpoint.as_str().as_bytes()))
         )
+    }
+}
+
+fn output_profile(
+    profile: ChatProfile,
+    host: Option<&str>,
+    model: &str,
+) -> irmind_app::ModelOutputProfile {
+    // Exact identities only. Specifications: docs/configuration.md#model-output.
+    let maximum = match (profile, host, model) {
+        (
+            ChatProfile::OpenAi,
+            Some("api.openai.com"),
+            "gpt-4.1" | "gpt-4.1-2025-04-14" | "gpt-4.1-mini" | "gpt-4.1-mini-2025-04-14",
+        ) => Some(32_768),
+        (ChatProfile::OpenAi, Some("api.openai.com"), "gpt-4o") => Some(16_384),
+        (
+            ChatProfile::OpenAi,
+            Some("api.openai.com"),
+            "gpt-5" | "gpt-5-2025-08-07" | "gpt-5.2" | "gpt-5.4" | "gpt-5.5" | "gpt-6-astra"
+            | "gpt-6.1-sol" | "gpt-6.1-terra" | "gpt-6-luna",
+        ) => Some(128_000),
+        (
+            ChatProfile::DeepSeek,
+            Some("api.deepseek.com"),
+            "deepseek-flash"
+            | "deepseek-v4-pro"
+            | "deepseek-v4-flash"
+            | "deepseek-v4-flash-vision-exp",
+        ) => Some(393_216),
+        _ => None,
+    };
+    irmind_app::ModelOutputProfile {
+        maximum_output_tokens: maximum.and_then(std::num::NonZeroU32::new),
+        parameter_requirement: irmind_app::OutputParameterRequirement::Optional,
     }
 }
 
@@ -128,7 +174,10 @@ impl ChatCompletionsClient {
             .iter()
             .map(encode_message)
             .collect::<Vec<_>>();
-        let limit = u64::from(request.max_output_tokens).min(request.remaining_case_tokens);
+        let limit = self
+            .output
+            .maximum_output_tokens
+            .map(std::num::NonZeroU32::get);
         let mut body = json!({"model":self.model,"messages":messages,"stream":true,
             "stream_options":{"include_usage":true}});
         if !tools.is_empty() {
@@ -137,18 +186,29 @@ impl ChatCompletionsClient {
         }
         match self.profile {
             ChatProfile::OpenAi => {
-                body["max_completion_tokens"] = json!(limit);
+                if let Some(limit) = limit {
+                    let field = if self.endpoint.host_str() == Some("api.openai.com") {
+                        "max_completion_tokens"
+                    } else {
+                        "max_tokens"
+                    };
+                    body[field] = json!(limit);
+                }
                 body["parallel_tool_calls"] = json!(false);
                 body["store"] = json!(false);
             }
             ChatProfile::DeepSeek => {
-                body["max_tokens"] = json!(limit);
+                if let Some(limit) = limit {
+                    body["max_tokens"] = json!(limit);
+                }
                 if !request.tools.is_empty() {
                     body["thinking"] = json!({"type":"disabled"});
                 }
             }
             ChatProfile::OpenRouter => {
-                body["max_completion_tokens"] = json!(limit);
+                if let Some(limit) = limit {
+                    body["max_completion_tokens"] = json!(limit);
+                }
                 body["parallel_tool_calls"] = json!(false);
             }
         }
@@ -190,6 +250,9 @@ fn encode_message(message: &CompletionMessage) -> serde_json::Value {
 
 #[async_trait]
 impl LlmPort for ChatCompletionsClient {
+    fn output_profile(&self) -> irmind_app::ModelOutputProfile {
+        self.output
+    }
     fn descriptor(&self) -> String {
         self.descriptor_for("llm-chat-completions")
     }
@@ -199,11 +262,10 @@ impl LlmPort for ChatCompletionsClient {
         request: CompletionRequest,
         cancel: &CancellationToken,
     ) -> Result<ModelStream, AppError> {
-        if request.max_output_tokens == 0 || request.remaining_case_tokens == 0 {
-            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                irmind_app::AdapterModelError::ModelTokenBudgetIsEmpty,
-            )));
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
         }
+        self.output.parameter_value()?;
         request.validate()?;
         let body = self.request_body(&request);
         let mut http_request = self.async_client.post(self.endpoint.clone());
@@ -253,6 +315,42 @@ mod tests {
     use super::*;
     use std::io::{Read as _, Write as _};
     use std::net::TcpListener;
+
+    #[tokio::test]
+    async fn model_maxima_are_not_request_budgets_and_unknown_optional_is_omitted() {
+        let request = CompletionRequest {
+            messages: vec![CompletionMessage::text(
+                MessageRole::User,
+                "Synthetic".into(),
+            )],
+            tools: Vec::new(),
+        };
+        let local =
+            ChatCompletionsClient::new("http://127.0.0.1:11434/v1/", "gpt-4.1", None).unwrap();
+        assert!(
+            local
+                .request_body(&request)
+                .get("max_completion_tokens")
+                .is_none()
+        );
+        let known = ChatCompletionsClient::new(
+            "https://api.openai.com/v1/",
+            "gpt-4.1",
+            Some("synthetic".into()),
+        )
+        .unwrap();
+        assert_eq!(
+            known.request_body(&request)["max_completion_tokens"],
+            32_768
+        );
+        let required = local.with_output_configuration(None, Some("true")).unwrap();
+        let error = required
+            .complete(request, &CancellationToken::new())
+            .await
+            .err()
+            .unwrap();
+        assert!(error.to_string().contains("/settings model"));
+    }
 
     #[test]
     fn endpoint_is_explicit_and_local_http_requires_loopback() {
@@ -343,6 +441,8 @@ mod tests {
                 None,
                 profile,
             )
+            .unwrap()
+            .with_output_configuration(Some("128000"), None)
             .unwrap();
             let catalog = irmind_app::tool_catalog::catalog();
             let events = adapter
@@ -355,8 +455,6 @@ mod tests {
                             tool_call_id: None,
                         }],
                         tools: catalog[..1].to_vec(),
-                        max_output_tokens: 2048,
-                        remaining_case_tokens: 10_000,
                     },
                     &CancellationToken::new(),
                 )
@@ -374,15 +472,15 @@ mod tests {
             match profile {
                 ChatProfile::OpenAi => {
                     assert_eq!(body["store"], false);
-                    assert_eq!(body["max_completion_tokens"], 2048);
+                    assert_eq!(body["max_tokens"], 128_000);
                 }
                 ChatProfile::DeepSeek => {
-                    assert_eq!(body["max_tokens"], 2048);
+                    assert_eq!(body["max_tokens"], 128_000);
                     assert!(body.get("store").is_none());
                     assert!(body.get("parallel_tool_calls").is_none());
                 }
                 ChatProfile::OpenRouter => {
-                    assert_eq!(body["max_completion_tokens"], 2048);
+                    assert_eq!(body["max_completion_tokens"], 128_000);
                     assert!(body.get("store").is_none());
                 }
             }
@@ -419,8 +517,6 @@ mod tests {
             let request = CompletionRequest {
                 messages,
                 tools: irmind_app::tool_catalog::catalog()[..1].to_vec(),
-                max_output_tokens: 128,
-                remaining_case_tokens: 1_000,
             };
             request.validate().unwrap();
             let body = adapter.request_body(&request);
@@ -478,8 +574,6 @@ mod tests {
                     ),
                 ],
                 tools: irmind_app::tool_catalog::catalog()[..1].to_vec(),
-                max_output_tokens: 128,
-                remaining_case_tokens: 1_000,
             };
             request.validate().unwrap();
             let body = adapter.request_body(&request);

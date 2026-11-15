@@ -252,7 +252,7 @@ impl BranchModelReply {
             && usage
                 .input_tokens
                 .checked_add(usage.output_tokens)
-                .is_none_or(|n| n > 10_000_000)
+                .is_none()
         {
             return Err(SubagentRecordError);
         }
@@ -263,7 +263,7 @@ impl BranchModelReply {
 
 impl BranchTerminal {
     fn validate(&self) -> Result<(), SubagentRecordError> {
-        self.usage.validate()?;
+        self.usage.validate_usage()?;
         super::super::codec::sorted(&self.sources, 16_384)?;
         super::super::codec::sorted(&self.reservation_ids, 4096)?;
         super::super::codec::sorted(&self.pending_approvals, 4096)?;

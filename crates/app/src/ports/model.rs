@@ -1,4 +1,7 @@
 use crate::*;
+pub(crate) mod output;
+mod profile;
+pub use profile::*;
 pub struct ModelResponse {
     pub text: String,
     pub calls: Vec<ModelToolCall>,
@@ -105,7 +108,7 @@ impl std::fmt::Debug for ModelResponse {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModelUsage {
     pub input_tokens: u64,
@@ -171,6 +174,7 @@ pub enum ModelEvent {
 }
 
 pub enum ModelProgress {
+    Notice(String),
     RoundStarted { round: usize, limit: usize },
     TextDelta(String),
     ToolProposed(String),
@@ -250,8 +254,6 @@ impl std::fmt::Debug for CompletionMessage {
 pub struct CompletionRequest {
     pub messages: Vec<CompletionMessage>,
     pub tools: Vec<tool_catalog::ToolSpec>,
-    pub max_output_tokens: u32,
-    pub remaining_case_tokens: u64,
 }
 
 impl std::fmt::Debug for CompletionRequest {
@@ -259,8 +261,6 @@ impl std::fmt::Debug for CompletionRequest {
         f.debug_struct("CompletionRequest")
             .field("message_count", &self.messages.len())
             .field("tool_count", &self.tools.len())
-            .field("max_output_tokens", &self.max_output_tokens)
-            .field("remaining_case_tokens", &self.remaining_case_tokens)
             .finish()
     }
 }
@@ -317,6 +317,10 @@ pub trait LlmPort: Send + Sync {
         "unspecified".into()
     }
 
+    fn output_profile(&self) -> ModelOutputProfile {
+        ModelOutputProfile::default()
+    }
+
     async fn complete(
         &self,
         request: CompletionRequest,
@@ -345,10 +349,28 @@ pub async fn collect_model_stream_with_progress(
             event = events.next() => event,
         };
         let Some(event) = event else { break };
-        match event? {
+        let event = match event {
+            Ok(event) => event,
+            Err(AppError::Fixed(crate::FixedAppError::AdapterModel(
+                crate::AdapterModelError::ProviderStreamExceeds2MB,
+            ))) if completed.is_none() => {
+                return Ok((
+                    ModelResponse {
+                        text: format!("{preview}\n\n{}", output::SECURITY_NOTICE),
+                        calls: Vec::new(),
+                        raw: "Provider stream reached IRMind security limit; usage unavailable"
+                            .into(),
+                        truncated: false,
+                    },
+                    None,
+                ));
+            }
+            Err(error) => return Err(error),
+        };
+        match event {
             ModelEvent::Progress(_) if completed.is_none() => {}
             ModelEvent::TextDelta(text) if completed.is_none() => {
-                if preview.len().saturating_add(text.len()) > 200_000 {
+                if preview.len().saturating_add(text.len()) > 2_000_000 {
                     return Err(AppError::Fixed(
                         crate::FixedAppError::ModelStreamPreviewExceedsLimit,
                     ));

@@ -1,7 +1,7 @@
 use crate::{AppError, CaseId, Engine, ModelUsage, UsageEvent, summarize_usage};
 
 impl Engine<'_> {
-    pub(super) async fn used_model_tokens(&self, id: &CaseId) -> Result<u64, AppError> {
+    pub(in crate::engine) async fn used_model_tokens(&self, id: &CaseId) -> Result<u64, AppError> {
         let id_owned = id.clone();
         let spent = self
             .blocking_local(move |local| summarize_usage(&local.audit_log.entries(&id_owned)?))
@@ -20,7 +20,7 @@ impl Engine<'_> {
         Ok(used_tokens)
     }
 
-    pub(super) async fn record_model_usage(
+    pub(in crate::engine) async fn record_model_usage(
         &self,
         id: &CaseId,
         usage: Option<ModelUsage>,
