@@ -109,7 +109,12 @@ impl<'a> TaskMaterial<'a> {
             return Err(SubagentRecordError);
         }
         for entry in chunk.entries() {
-            if entry.body.at > self.task.deadline_at {
+            if entry.body.at > self.task.deadline_at
+                && !matches!(
+                    entry.body.payload,
+                    SubagentBranchPayload::Terminal(_) | SubagentBranchPayload::BudgetNotice(_)
+                )
+            {
                 return Err(SubagentRecordError);
             }
             match &entry.body.payload {
@@ -134,37 +139,7 @@ impl<'a> TaskMaterial<'a> {
                 }
                 SubagentBranchPayload::ToolResult(value) => self.tool_result(value, sequence)?,
                 SubagentBranchPayload::SkillLoad(value) => {
-                    let load =
-                        crate::SkillLoadV1::decode(value).map_err(|_| SubagentRecordError)?;
-                    if load.turn() != self.task.nonce {
-                        return Err(SubagentRecordError);
-                    }
-                    let identity = load.snapshot().map_err(|_| SubagentRecordError)?;
-                    let (name, tools) = skills
-                        .snapshot_method(identity, sequence, compiler)
-                        .map_err(|_| SubagentRecordError)?;
-                    if !self
-                        .journal
-                        .types
-                        .get(&self.task.type_snapshot_sha256)
-                        .ok_or(SubagentRecordError)?
-                        .definition()
-                        .skills()
-                        .contains(&name)
-                        || (self.child_tools.is_none()
-                            && self
-                                .task
-                                .skill_snapshot_sha256
-                                .is_some_and(|expected| expected.as_bytes() != identity.as_bytes()))
-                    {
-                        return Err(SubagentRecordError);
-                    }
-                    skills
-                        .accept_task_load(&load, &self.plan.plan.turn_id)
-                        .map_err(|_| SubagentRecordError)?;
-                    if load.result() == crate::SkillLoadResult::Loaded {
-                        self.child_tools = Some(tools);
-                    }
+                    self.skill_load(value, sequence, skills, compiler)?;
                 }
                 SubagentBranchPayload::Compaction(value) => {
                     if value.replaced_last >= entry.body.seq {
@@ -176,6 +151,45 @@ impl<'a> TaskMaterial<'a> {
             }
         }
         self.checkpoint = Some(checkpoint.clone());
+        Ok(())
+    }
+    fn skill_load(
+        &mut self,
+        value: &str,
+        sequence: u64,
+        skills: &mut SkillReceiptVerifier,
+        compiler: &dyn SkillCompiler,
+    ) -> Result<(), SubagentRecordError> {
+        let load = crate::SkillLoadV1::decode(value).map_err(|_| SubagentRecordError)?;
+        if load.turn() != self.task.nonce {
+            return Err(SubagentRecordError);
+        }
+        let identity = load.snapshot().map_err(|_| SubagentRecordError)?;
+        let (name, tools) = skills
+            .snapshot_method(identity, sequence, compiler)
+            .map_err(|_| SubagentRecordError)?;
+        if !self
+            .journal
+            .types
+            .get(&self.task.type_snapshot_sha256)
+            .ok_or(SubagentRecordError)?
+            .definition()
+            .skills()
+            .contains(&name)
+            || (self.child_tools.is_none()
+                && self
+                    .task
+                    .skill_snapshot_sha256
+                    .is_some_and(|expected| expected.as_bytes() != identity.as_bytes()))
+        {
+            return Err(SubagentRecordError);
+        }
+        skills
+            .accept_task_load(&load, &self.plan.plan.turn_id)
+            .map_err(|_| SubagentRecordError)?;
+        if load.result() == crate::SkillLoadResult::Loaded {
+            self.child_tools = Some(tools);
+        }
         Ok(())
     }
     fn model_request(
@@ -266,6 +280,7 @@ impl<'a> TaskMaterial<'a> {
             || rules.denied_tools.contains(&tool)
             || proposal_sequence >= &accounted.seq
             || accounted.seq >= sequence
+            || accounted.at > self.task.deadline_at
             || attribution.task_id != self.task.task_id
             || attribution.call_id != proposal.call_id
             || value.call_id != proposal.call_id
@@ -368,6 +383,8 @@ impl<'a> TaskMaterial<'a> {
     }
     fn terminal(&mut self, value: &BranchTerminal) -> Result<(), SubagentRecordError> {
         if self.terminal.is_some()
+            || (value.status == crate::subagents::SubagentStatus::Completed
+                && self.requests.len() != self.replies.len())
             || !self.usage.within(value.usage)
             || !value.usage.within(self.task.budget)
             || value

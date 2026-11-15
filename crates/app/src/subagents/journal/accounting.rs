@@ -38,6 +38,7 @@ impl TaskDispatchAttribution {
 
 pub(super) struct Accounted {
     pub seq: u64,
+    pub at: u64,
     pub actor: crate::Actor,
     pub amount: SubagentResources,
     pub attribution: Option<TaskDispatchAttribution>,
@@ -47,11 +48,9 @@ impl SubagentJournal {
         &mut self,
         entry: &SignedEntry,
     ) -> Result<(), SubagentRecordError> {
-        if self.agent.as_ref() == Some(&entry.actor)
-            && !self.plans.values().any(super::PlanLedger::is_open)
-        {
-            // Ordinary unattended root work remains ordinary work. A branch can
-            // only cite an accounting event recorded while its plan was open.
+        if !self.plans.values().any(super::PlanLedger::is_open) {
+            // Only requests inside an open plan can cite these receipts. Root
+            // accounting outside plans is already streamed by BudgetReplay.
             return Ok(());
         }
         if self.agent.as_ref() != Some(&entry.actor)
@@ -91,10 +90,16 @@ impl SubagentJournal {
             _ => return Ok(()),
         };
         amount.validate()?;
+        // At most 256 tasks × 100 shared rounds, plus 10,000 case calls;
+        // reserve headroom without retaining arbitrary unrelated zero reports.
+        if self.accounting.len() >= 65_536 {
+            return Err(SubagentRecordError);
+        }
         self.accounting.insert(
             SubagentDigest::from_bytes(entry.hash),
             Accounted {
                 seq: entry.seq,
+                at: entry.at,
                 actor: entry.actor.clone(),
                 amount,
                 attribution,

@@ -7,6 +7,7 @@ use super::{
 };
 use crate::{AppError, AuditOrigin, CancellationToken, CaseId, Engine, SignedEntry};
 use irmind_domain::{CaseScope, EvidenceHash, SkillName};
+mod runner;
 
 /// Untrusted proposal. The broker supplies all identities and checkpoints.
 pub struct SubagentTaskProposal {
@@ -92,6 +93,18 @@ impl<'a> AgentBatch<'a> {
         record: &T,
         analyst: bool,
     ) -> Result<SubagentDigest, AppError> {
+        self.push_payload(
+            T::KIND,
+            &record.audit_payload().map_err(|_| invalid())?,
+            analyst,
+        )
+    }
+    fn push_payload(
+        &mut self,
+        kind: crate::AuditEventKind,
+        payload: &str,
+        analyst: bool,
+    ) -> Result<SubagentDigest, AppError> {
         let entry = self.engine.signed_entry_after(
             self.case,
             self.entries.last().or(self.prior.as_ref()),
@@ -100,8 +113,8 @@ impl<'a> AgentBatch<'a> {
             } else {
                 AuditOrigin::Agent
             },
-            T::KIND,
-            &record.audit_payload().map_err(|_| invalid())?,
+            kind,
+            payload,
             None,
         )?;
         self.journal.accept(&entry, self.verifier)?;
@@ -140,6 +153,27 @@ impl<'a> AgentBatch<'a> {
 }
 
 impl Engine<'_> {
+    pub fn finish_subagent_plan(&self, started: &StartedSubagentPlan) -> Result<(), AppError> {
+        self.require_attended_analyst("finish subagent plan")?;
+        let case = CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
+        let _lock = self.repo.lock_case(&case)?;
+        self.finish_subagent_plan_unlocked(&case, started)
+    }
+    pub(crate) fn finish_subagent_plan_unlocked(
+        &self,
+        case: &CaseId,
+        started: &StartedSubagentPlan,
+    ) -> Result<(), AppError> {
+        self.verify_unlocked(case)?;
+        let mut batch = AgentBatch::new(self, case, self.verifier.as_ref())?;
+        let release = batch
+            .journal
+            .release_transition(started)
+            .map_err(|_| invalid())?;
+        batch.push(&release)?;
+        batch.publish(&CancellationToken::new())
+    }
+
     pub fn prepare_subagent_plan(
         &self,
         case: &CaseId,

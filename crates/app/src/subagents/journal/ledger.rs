@@ -92,7 +92,7 @@ impl PlanLedger {
                 total.checked_add(*used)
             })
     }
-    fn total_usage(&self) -> Result<SubagentResources, SubagentRecordError> {
+    pub(super) fn total_usage(&self) -> Result<SubagentResources, SubagentRecordError> {
         self.task_charged
             .values()
             .try_fold(SubagentResources::default(), |total, used| {
@@ -383,6 +383,25 @@ impl SubagentJournal {
                 let value: SubagentReservationV1 = decode_entry(entry)?;
                 if value.action == ReservationAction::StartPlan {
                     self.validate_admission(&value, entry.at)?;
+                }
+                if value.action == ReservationAction::ReserveRequest {
+                    let plan = &self
+                        .plans
+                        .get(&value.plan_sha256)
+                        .ok_or(SubagentRecordError)?
+                        .plan;
+                    let deadline = value
+                        .task_id
+                        .map_or(Some(plan.deadline_at), |task| {
+                            plan.tasks
+                                .iter()
+                                .find(|spec| spec.task_id == task)
+                                .map(|spec| spec.deadline_at)
+                        })
+                        .ok_or(SubagentRecordError)?;
+                    if entry.at > deadline {
+                        return Err(SubagentRecordError);
+                    }
                 }
                 self.validate_accounting(&value)?;
                 self.plans

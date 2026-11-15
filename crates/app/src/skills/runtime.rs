@@ -72,12 +72,21 @@ impl SkillServices {
     }
 }
 #[derive(Default)]
+pub(crate) struct SkillReadBudget {
+    pub(crate) packages: BTreeSet<SkillSnapshotId>,
+    pub(crate) reads: usize,
+    pub(crate) bytes: usize,
+}
+#[derive(Default)]
 pub(crate) struct SkillTurn {
-    packages: BTreeSet<SkillSnapshotId>,
-    reads: usize,
-    bytes: usize,
+    pub(crate) budget: Arc<std::sync::Mutex<SkillReadBudget>>,
     pub(crate) active: Option<ActiveSkill>,
     pub(crate) read_limit: usize,
+}
+pub(crate) struct PreparedSkillRead {
+    pub(crate) receipt: crate::SkillLoadV1,
+    pub(crate) output: String,
+    pub(crate) active: Option<ActiveSkill>,
 }
 #[derive(Clone)]
 pub(crate) struct ActiveSkill {
