@@ -1,3 +1,5 @@
+Traducción de docs/development/adding-a-mapping.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+
 # Añadir un mapeo de origen
 
 El decodificador conserva campos originales y procedencia. Un módulo identificado
