@@ -288,14 +288,14 @@ fn a_failed_budget_signature_does_not_publish_any_change() {
 }
 
 #[test]
-fn insufficient_compaction_budget_preserves_history_and_finishes_locally() {
+fn exhausted_compaction_budget_preserves_history_and_finishes_locally() {
     let root = tempfile::tempdir().unwrap();
     let (_, engine) = setup(root.path());
     let engine = engine.with_case_budget_defaults(limits(20_000, 5)).unwrap();
     let case = engine
         .create_case("Synthetic long history", "local")
         .unwrap();
-    let answer = Box::leak("synthetic observation ".repeat(450).into_boxed_str());
+    let answer: &'static str = Box::leak("synthetic observation ".repeat(450).into_boxed_str());
     let model = BudgetModel {
         requests: std::sync::Mutex::default(),
         output: Some(answer),
@@ -311,7 +311,7 @@ fn insufficient_compaction_budget_preserves_history_and_finishes_locally() {
     }
     let used = engine.case_budget(&case.id).unwrap().usage.model_tokens;
     engine
-        .change_case_budget(&case.id, limits(used + 100, 5), true)
+        .change_case_budget(&case.id, limits(used, 5), true)
         .unwrap();
     let requests = model.requests.lock().unwrap().len();
     let reply = engine
@@ -320,6 +320,51 @@ fn insufficient_compaction_budget_preserves_history_and_finishes_locally() {
     assert!(reply.contains("cannot cover history compaction"));
     assert!(reply.contains("Recorded work:"));
     assert_eq!(model.requests.lock().unwrap().len(), requests);
+    engine.verify(&case.id).unwrap();
+}
+
+#[test]
+fn a_positive_balance_admits_complete_compaction_without_a_smaller_output_allowance() {
+    let root = tempfile::tempdir().unwrap();
+    let (_, engine) = setup(root.path());
+    let engine = engine.with_case_budget_defaults(limits(20_000, 5)).unwrap();
+    let case = engine
+        .create_case("Synthetic positive compaction balance", "local")
+        .unwrap();
+    let answer: &'static str = Box::leak("synthetic observation ".repeat(450).into_boxed_str());
+    let model = BudgetModel {
+        requests: std::sync::Mutex::default(),
+        output: Some(answer),
+        usage: Some(irmind_app::ModelUsage {
+            input_tokens: 8,
+            output_tokens: 2,
+        }),
+    };
+    for _ in 0..5 {
+        engine
+            .investigate(&case.id, "Review the synthetic observation.", &model)
+            .unwrap();
+    }
+    let used = engine.case_budget(&case.id).unwrap().usage.model_tokens;
+    engine
+        .change_case_budget(&case.id, limits(used + 1, 5), true)
+        .unwrap();
+    let count = model.requests.lock().unwrap().len();
+    let reply = engine
+        .investigate(&case.id, "Continue the review.", &model)
+        .unwrap();
+    assert!(reply.contains("/budget"));
+    assert_eq!(model.requests.lock().unwrap().len(), count + 1);
+    assert_eq!(
+        engine.case_budget(&case.id).unwrap().usage.model_tokens,
+        used + 10
+    );
+    let entries = engine.audit_log.entries(&case.id).unwrap();
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.kind == AuditEventKind::ModelReply && entry.payload == answer)
+    );
     engine.verify(&case.id).unwrap();
 }
 

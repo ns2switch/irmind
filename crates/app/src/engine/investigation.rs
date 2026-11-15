@@ -248,8 +248,12 @@ impl Engine<'_> {
         on_text: &(dyn Fn(ModelProgress) + Send + Sync),
     ) -> Result<Option<String>, AppError> {
         let id = &case.id;
-        self.compact_history_if_needed(id, model, turn, cancel)
-            .await?;
+        if let Some(answer) = self
+            .compact_or_finish_budget(id, model, turn, cancel)
+            .await?
+        {
+            return Ok(Some(answer));
+        }
         let round = self.shared_round_number(id, turn, round).await?;
         if round.0 > round.1 {
             return self
@@ -265,6 +269,7 @@ impl Engine<'_> {
                 .await
                 .map(Some);
         }
+        model.output_profile().parameter_value()?;
         self.audit_local(
             id,
             crate::AuditOrigin::System,
@@ -278,9 +283,7 @@ impl Engine<'_> {
             limit: round.1,
         });
         let (answer, usage) = self
-            .complete_model_request(id, model, request, cancel, &|text| {
-                on_text(ModelProgress::TextDelta(text.to_owned()));
-            })
+            .complete_model_request(id, model, request, cancel, on_text)
             .await?;
         let used_tokens = self.used_model_tokens(id).await?;
         let (answer, quota_exhausted) = self
@@ -329,12 +332,28 @@ impl Engine<'_> {
         let id = &case.id;
         let (answer, quota_exhausted) = response;
         if quota_exhausted {
-            return self
-                .finish_token_exhaustion(id, &answer.text)
-                .await
-                .map(Some);
+            let text = if answer.truncated
+                && !answer
+                    .text
+                    .contains(crate::ports::model::output::SECURITY_NOTICE)
+            {
+                format!(
+                    "{}\n\n{}",
+                    answer.text,
+                    crate::ports::model::output::PROVIDER_NOTICE
+                )
+            } else {
+                answer.text
+            };
+            return self.finish_token_exhaustion(id, &text).await.map(Some);
         }
         if answer.truncated {
+            if answer
+                .text
+                .contains(crate::ports::model::output::SECURITY_NOTICE)
+            {
+                return self.finish_answer(id, &answer.text).await.map(Some);
+            }
             return self.finish_answer(id, &format!("{}\n\n{} Automatic continuation stopped at the available budget or round limit, or was already attempted once.", answer.text, crate::ports::model::output::PROVIDER_NOTICE)).await.map(Some);
         }
         if answer.calls.is_empty() {
@@ -471,7 +490,11 @@ impl Engine<'_> {
         self.refresh_skill_tools(turn)
     }
 
-    async fn finish_answer(&self, id: &CaseId, text: &str) -> Result<String, AppError> {
+    pub(in crate::engine) async fn finish_answer(
+        &self,
+        id: &CaseId,
+        text: &str,
+    ) -> Result<String, AppError> {
         let text = crate::ports::model::output::screen_output(self.guard.as_ref(), text)?;
         let screened = self
             .screen_and_audit_local(

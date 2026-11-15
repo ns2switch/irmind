@@ -323,7 +323,12 @@ impl<'a> TaskMaterial<'a> {
                 usage.input_tokens.checked_add(usage.output_tokens)
             })
             .ok_or(SubagentRecordError)?;
-        if tokens > request.amount.tokens {
+        if tokens > request.amount.tokens
+            || self
+                .plan
+                .model_settlement(*identity)?
+                .is_some_and(|settlement| settlement.amount.tokens > request.amount.tokens)
+        {
             let settlement = self
                 .plan
                 .model_settlement(*identity)?

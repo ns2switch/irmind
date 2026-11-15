@@ -89,18 +89,25 @@ impl Engine<'_> {
         let mut chunk = String::new();
         for message in &turn.messages[2..keep_from] {
             let line = format!("{:?}: {}\n", message.role, message.content);
-            if line.len() > 24_000 {
-                return Err(AppError::Model(
-                    "conversation turn exceeds summary limit".into(),
-                ));
+            let mut rest = line.as_str();
+            while !rest.is_empty() {
+                if chunk.len() == 24_000 {
+                    summary = self
+                        .summarize_chunk(id, model, &summary, &chunk, &turn.nonce, cancel)
+                        .await?;
+                    chunk.clear();
+                }
+                let part = crate::ports::model::output::utf8_prefix(rest, 24_000 - chunk.len());
+                if part.is_empty() {
+                    summary = self
+                        .summarize_chunk(id, model, &summary, &chunk, &turn.nonce, cancel)
+                        .await?;
+                    chunk.clear();
+                    continue;
+                }
+                chunk.push_str(part);
+                rest = &rest[part.len()..];
             }
-            if chunk.len() + line.len() > 24_000 {
-                summary = self
-                    .summarize_chunk(id, model, &summary, &chunk, &turn.nonce, cancel)
-                    .await?;
-                chunk.clear();
-            }
-            chunk.push_str(&line);
         }
         if !chunk.is_empty() {
             summary = self
@@ -180,15 +187,15 @@ impl Engine<'_> {
         let (answer, usage) = self
             .complete_model_request(id, model, request, cancel, &|_| {})
             .await?;
+        self.record_model_reply(id, &answer.text).await?;
+        let used = self.used_model_tokens(id).await?;
+        self.record_model_usage(id, usage, used, token_limit)
+            .await?;
         if !answer.calls.is_empty() || answer.truncated || answer.text.trim().is_empty() {
             return Err(AppError::Model(
                 "provider did not return a complete no-tool summary".into(),
             ));
         }
-        self.record_model_reply(id, &answer.raw).await?;
-        let used = self.used_model_tokens(id).await?;
-        self.record_model_usage(id, usage, used, token_limit)
-            .await?;
         let screened = self
             .screen_and_audit_local(
                 id,
@@ -199,8 +206,9 @@ impl Engine<'_> {
             .await?
             .text;
         if screened.len() > 8_000 {
-            return Err(AppError::Model(
-                "conversation summary exceeds safe limit".into(),
+            return Ok(format!(
+                "{}\n[Context excerpt; the complete summary is retained in the signed ModelReply.]",
+                crate::ports::model::output::utf8_prefix(&screened, 7_900)
             ));
         }
         Ok(screened)

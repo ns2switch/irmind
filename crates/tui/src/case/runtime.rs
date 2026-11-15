@@ -98,7 +98,11 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     if self.state.model_preview.is_empty() {
                         self.state.conversation.discard_preview();
                     } else {
-                        let safe = self.engine.guard.screen(&self.state.model_preview)?.text;
+                        let safe = irmind_app::screen_model_preview(
+                            self.engine.guard.as_ref(),
+                            &self.state.model_preview,
+                        )?
+                        .text;
                         self.state.conversation.set_preview(safe);
                         self.state.conversation.finish_preview();
                     }
@@ -127,7 +131,11 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             }
         }
         if preview_dirty {
-            let safe = self.engine.guard.screen(&self.state.model_preview)?.text;
+            let safe = irmind_app::screen_model_preview(
+                self.engine.guard.as_ref(),
+                &self.state.model_preview,
+            )?
+            .text;
             self.state.conversation.set_preview(safe);
         }
         Ok(())

@@ -191,7 +191,11 @@ impl SubagentBranchPayload {
         if serde_json::to_vec(self)
             .map_err(|_| SubagentRecordError)?
             .len()
-            > 256 * 1024
+            > if matches!(self, Self::ModelReply(_)) {
+                1024 * 1024
+            } else {
+                256 * 1024
+            }
         {
             return Err(SubagentRecordError);
         }
@@ -275,5 +279,35 @@ impl BranchTerminal {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod model_capacity_tests {
+    use super::*;
+    #[test]
+    fn only_model_replies_get_the_signed_frame_capacity() {
+        let text = "word ".repeat(128_000);
+        let reply = SubagentBranchPayload::ModelReply(BranchModelReply {
+            call_id: "model_1".into(),
+            guarded_text: text.clone(),
+            truncated: false,
+            tool_calls: vec![],
+            usage: None,
+        });
+        reply.validate().unwrap();
+        let compaction = SubagentBranchPayload::Compaction(BranchCompaction {
+            text_sha256: SubagentDigest::from_bytes(crate::sha256(text.as_bytes())),
+            guarded_text: text,
+            replaced_first: 1,
+            replaced_last: 1,
+        });
+        assert!(compaction.validate().is_err());
+        let mut reply = reply;
+        if let SubagentBranchPayload::ModelReply(value) = &mut reply {
+            value.guarded_text = "x".repeat(1024 * 1024);
+        }
+        assert!(reply.validate().is_err());
     }
 }

@@ -144,7 +144,7 @@ Resource failure, explicit cancellation and deadlines remain visible interruptio
 The existing branch payload validator also has a 256 KiB per-payload ceiling,
 independent of the 1 MiB signed entry/chunk limit. A representative 640,000-byte
 answer therefore fits the frame and guard, but is currently rejected as a branch
-reply. Proposed adjustment: for `ModelReply` only, replace that payload ceiling
+reply. Approved adjustment: for `ModelReply` only, replace that payload ceiling
 with the available capacity of its enclosing 1 MiB frame. All other branch
 payloads retain 256 KiB. Entry, chunk, branch-total, transport and guard bounds
 remain unchanged; the retained reply and its terminal metadata must fit together.

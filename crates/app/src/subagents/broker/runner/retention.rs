@@ -52,3 +52,69 @@ impl Engine<'_> {
         Ok(())
     }
 }
+
+impl Engine<'_> {
+    pub(super) fn prepare_child_continuation(
+        &self,
+        started: &StartedSubagentPlan,
+        task: &SubagentTaskSpec,
+        state: &mut TaskSession,
+        entries: &mut Vec<crate::subagents::SubagentBranchEntry>,
+    ) -> Result<(), AppError> {
+        self.compact_child_continuation(started, task, state, entries)?;
+        state.messages.push(crate::CompletionMessage::text(
+            crate::MessageRole::System,
+            crate::ports::model::output::CONTINUE_INSTRUCTION.into(),
+        ));
+        Ok(())
+    }
+    fn compact_child_continuation(
+        &self,
+        started: &StartedSubagentPlan,
+        task: &SubagentTaskSpec,
+        state: &mut TaskSession,
+        entries: &mut Vec<crate::subagents::SubagentBranchEntry>,
+    ) -> Result<(), AppError> {
+        if super::messages::canonical(&state.messages)?.len() <= 40_000 {
+            return Ok(());
+        }
+        let Some(message) = state
+            .messages
+            .iter_mut()
+            .rev()
+            .find(|m| m.role == crate::MessageRole::Assistant && m.tool_calls.is_empty())
+        else {
+            return Ok(());
+        };
+        let start = message
+            .content
+            .ceil_char_boundary(message.content.len().saturating_sub(8_000));
+        let text = format!(
+            "Previous answer is retained in the signed branch. Continue from this final excerpt:\n<UNTRUSTED_{}>\n{}\n</UNTRUSTED_{}>",
+            task.nonce,
+            crate::isolate_untrusted(
+                &message.content[start..],
+                &uuid::Uuid::parse_str(&task.nonce).map_err(|_| invalid())?
+            ),
+            task.nonce
+        );
+        message.content.clone_from(&text);
+        let previous = entries.last().ok_or_else(invalid)?;
+        let compacted = self.child_entry(
+            started,
+            task,
+            previous.body.seq + 1,
+            previous.hash,
+            SubagentBranchPayload::Compaction(crate::subagents::BranchCompaction {
+                text_sha256: crate::subagents::SubagentDigest::from_bytes(crate::sha256(
+                    text.as_bytes(),
+                )),
+                guarded_text: text,
+                replaced_first: previous.body.seq,
+                replaced_last: previous.body.seq,
+            }),
+        )?;
+        entries.push(compacted);
+        Ok(())
+    }
+}

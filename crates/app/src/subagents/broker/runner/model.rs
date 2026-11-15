@@ -112,7 +112,7 @@ impl Engine<'_> {
         let accounting = record_child_usage(&mut batch, outcome.report.as_ref())?;
         state.record_model_result(
             outcome.terminal.usage,
-            std::mem::take(&mut outcome.terminal.guarded_summary),
+            child_summary(state, &mut outcome),
             outcome.reply.as_ref().is_some_and(|reply| reply.truncated),
         )?;
         let continue_output = self.prepare_child_answer(started, task, state, &mut outcome)?;
@@ -140,10 +140,7 @@ impl Engine<'_> {
             )?);
         }
         if continue_output {
-            state.messages.push(crate::CompletionMessage::text(
-                crate::MessageRole::System,
-                crate::ports::model::output::CONTINUE_INSTRUCTION.into(),
-            ));
+            self.prepare_child_continuation(started, task, state, &mut entries)?;
         }
         let checkpoint = self.publish_child_prefix(
             case,
@@ -309,4 +306,13 @@ fn record_child_usage(
             )
         })
         .transpose()
+}
+
+fn child_summary(state: &TaskSession, outcome: &mut super::outcome::ModelOutcome) -> String {
+    let text = std::mem::take(&mut outcome.terminal.guarded_summary);
+    if state.continuing {
+        super::bounded_text(format!("{}{text}", state.summary))
+    } else {
+        text
+    }
 }

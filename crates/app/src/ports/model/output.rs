@@ -14,6 +14,23 @@ pub(crate) fn utf8_prefix(text: &str, limit: usize) -> &str {
     &text[..end]
 }
 
+/// Do not expose an unfinished PEM block at a streaming or retention boundary.
+pub(crate) fn complete_prefix(mut text: &str) -> &str {
+    for kind in [
+        "PRIVATE KEY",
+        "RSA PRIVATE KEY",
+        "EC PRIVATE KEY",
+        "OPENSSH PRIVATE KEY",
+    ] {
+        if let Some(start) = text.rfind(&format!("-----BEGIN {kind}-----"))
+            && !text[start..].contains(&format!("-----END {kind}-----"))
+        {
+            text = &text[..start];
+        }
+    }
+    text
+}
+
 /// Screen one bounded input, including when a finite transport/security limit
 /// interrupts a response. Unscreened suffixes are never displayed or persisted.
 pub(crate) fn screen_output(guard: &dyn ContentGuard, text: &str) -> Result<String, AppError> {
@@ -25,6 +42,11 @@ pub(crate) fn screen_output(guard: &dyn ContentGuard, text: &str) -> Result<Stri
             1_000_000
         },
     );
+    let input = if input.len() < text.len() {
+        complete_prefix(input)
+    } else {
+        input
+    };
     let mut screened = guard.screen(input)?.text;
     if input.len() != text.len() || screened.len() > 1_000_000 {
         screened = utf8_prefix(&screened, 1_000_000 - SECURITY_NOTICE.len() - 2).to_owned();
