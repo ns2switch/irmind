@@ -106,3 +106,12 @@ Use [configuration](configuration.md) for scopes, policy, backends, and credenti
 ## Forensic methods
 
 Open `/skills` to inspect the 15 included cloud, Windows, Linux and network methods, install a reviewed local folder or sign an activation change. In a case, type `/windows-triage`, `/linux-triage` or `/aws-credential-compromise` and append your question. The agent can also choose a method from its description. Loading is progressive and always untrusted; policy and approvals stay the same. The [skills guide](skills.md) explains limits and signed receipts in export V8.
+
+## Investigate with subagents
+
+A larger question can produce a reviewed plan of bounded parallel tasks.
+Check its sources and reserved budget before Start. `/subagents` shows activity
+and coverage; `/subagents cancel <task>` cancels one task and `/pause` cancels
+the investigation. Plans above 25% of remaining tokens or calls require your
+signature. [The subagent guide](subagents.md) explains confirmation preferences,
+shared limits and signed branch exports.

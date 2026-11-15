@@ -71,11 +71,11 @@ correlates nine synthetic exports; real collection/model validation remains open
 - Installation is signed, and the case log records the hash of the version used. A skill can declare needed tools but cannot extend permissions: policy and the organization ceiling decide. Signing admits exact package bytes; skill content stays untrusted even after admission and never enters system messages.
 - Use `/skills` to list, install, inspect, update and disable skills. User-invocable skills appear as slash commands. Maintain a separate community skills repository.
 
-## v0.5: Subagents and parallel work
+## v0.5: Subagents and parallel work (delivered)
 
 Run bounded parallel subagents with Agent-key signatures and deterministic case records.
 
-- Review the proposed [subagent design](subagents-design.md) before implementation: types, shared limits, Agent-key signing, approval routing, event branches, deterministic merging and engine events. Concrete ports and export V8 bytes need their own reviewed contract.
+- The approved [subagent design](subagents-design.md) and [format/port contract](subagents-format-contract.md) are implemented with case marker 4, authenticated branches and export V8. The [user guide](../subagents.md) covers review, cancellation, budgets and partial coverage.
 - The main agent delegates bounded tasks to parallel subagents with separate contexts. Version 0.5 includes only triage, cloud, endpoint, network, Kubernetes, and threat intelligence; community-defined types and monetary caps follow later. Plans are visible before work; reserving more than 25% of remaining case tokens or calls requires signed analyst confirmation.
 - Subagents inherit case scope and never extend it. They cannot approve calls; requests enter the analyst queue. They sign with the Agent key, and their output returns to the main agent as untrusted data.
 - Enforce concurrency, round, and token limits per subagent and a total budget per turn. Show each subagent in the TUI and allow cancellation.

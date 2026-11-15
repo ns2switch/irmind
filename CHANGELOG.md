@@ -4,6 +4,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.5.0 — Bounded parallel investigations
+
 **Format impact:** New cases use CaseCreated version 4 with an initial signed
 allocation. Export V8 replaces V7 and always includes catalog-proof and subagent
 branch counts, including zero counts. Older cases/exports require their creating
@@ -13,6 +15,7 @@ IRMind version or re-ingestion of verified originals; there is no automatic migr
   loaded skills, source-restricted queries and shared case budgets. The TUI shows
   plans before start, requires signed confirmation above 25% of remaining tokens
   or calls, and offers signed confirmation for every plan as a preference.
+- Keep a partial, verifiable task result when a provider repeats a tool-call identifier, without repeating its effect.
 - Follow activity and partial coverage with `/subagents`; cancel individual tasks
   without discarding completed work. Child approval requests return to the owning
   live task, and siblings continue while an Analyst decision is pending.
