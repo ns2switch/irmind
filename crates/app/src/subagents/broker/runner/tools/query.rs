@@ -1,4 +1,6 @@
-use super::{AppError, GraphQueryFilter, TaskEvidenceQuery, TaskEvidenceResult, Tool, invalid};
+use super::{
+    AppError, ChildAction, GraphQueryFilter, TaskEvidenceQuery, TaskEvidenceResult, Tool, invalid,
+};
 
 pub(super) fn supported(name: &str) -> bool {
     matches!(
@@ -16,14 +18,21 @@ pub(super) fn supported(name: &str) -> bool {
 }
 pub(super) fn checked(
     call: &crate::ProposedCall,
+    protocol: &crate::subagents::BranchToolCall,
+    task: crate::subagents::SubagentDigest,
     view: &crate::subagents::VerifiedTaskQueryView,
-) -> Result<Option<TaskEvidenceQuery>, AppError> {
+) -> Result<ChildAction, AppError> {
     if call.tool == Tool::SkillRead {
-        return Ok(None);
+        return Ok(ChildAction::Method);
+    }
+    if call.tool == Tool::CaseAddFinding {
+        return crate::subagents::finding::proposed_finding(task, protocol, view.sources())
+            .map(|finding| ChildAction::Finding(Box::new(finding)))
+            .map_err(|_| invalid());
     }
     let query = from_call(call)?;
     query.validate(view)?;
-    Ok(Some(query))
+    Ok(ChildAction::Query(Box::new(query)))
 }
 pub(super) fn from_call(call: &crate::ProposedCall) -> Result<TaskEvidenceQuery, AppError> {
     let field = |name: &str| call.args.get(name).cloned().ok_or_else(invalid);

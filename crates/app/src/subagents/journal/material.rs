@@ -44,6 +44,7 @@ pub struct BranchMaterialVerifier<'a> {
     next: usize,
     current: Option<TaskMaterial<'a>>,
     failed: bool,
+    remaining_findings: std::collections::BTreeSet<SubagentDigest>,
 }
 impl<'a> BranchMaterialVerifier<'a> {
     pub fn new(journal: &'a SubagentJournal) -> Result<Self, SubagentRecordError> {
@@ -76,6 +77,7 @@ impl<'a> BranchMaterialVerifier<'a> {
             next: 0,
             current: None,
             failed: false,
+            remaining_findings: journal.findings.keys().copied().collect(),
         })
     }
 
@@ -154,12 +156,20 @@ impl<'a> BranchMaterialVerifier<'a> {
         }
         let current = self.current.as_mut().ok_or(SubagentRecordError)?;
         current.accept(&chunk, expected.checkpoint, skills, compiler)?;
+        for entry in chunk.entries() {
+            if matches!(
+                entry.body.payload,
+                crate::subagents::SubagentBranchPayload::ToolProposal(_)
+            ) {
+                self.remaining_findings.remove(&entry.hash);
+            }
+        }
         self.next += 1;
         Ok(())
     }
 
     pub fn finish(self) -> Result<(), SubagentRecordError> {
-        if self.failed || self.next != self.expected.len() {
+        if self.failed || self.next != self.expected.len() || !self.remaining_findings.is_empty() {
             return Err(SubagentRecordError);
         }
         if let Some(current) = self.current {

@@ -29,8 +29,11 @@ impl TaskSession {
         objective: &str,
     ) -> Result<Self, AppError> {
         let nonce = uuid::Uuid::parse_str(&task.nonce).map_err(|_| invalid())?;
+        let mut initial = messages::initial(objective, &nonce, task.source_set_sha256);
+        initial[0].content.push(' ');
+        initial[0].content.push_str(messages::role(started, task)?);
         Ok(Self {
-            messages: messages::initial(objective, &nonce, task.source_set_sha256),
+            messages: initial,
             skills: crate::skills::runtime::SkillTurn {
                 budget: started.skill_budget.clone(),
                 active: None,
@@ -49,6 +52,21 @@ impl TaskSession {
             summary: String::new(),
             coverage: BTreeSet::new(),
         })
+    }
+    pub(super) fn record_model_result(
+        &mut self,
+        usage: SubagentResources,
+        summary: String,
+        truncated: bool,
+    ) -> Result<(), AppError> {
+        self.usage = self.usage.checked_add(usage).map_err(|_| invalid())?;
+        self.summary = summary;
+        if truncated {
+            self.partial = true;
+            self.coverage
+                .insert("The provider truncated a model reply.".into());
+        }
+        Ok(())
     }
     pub(super) fn checkpoint_id(&self) -> Result<Option<SubagentDigest>, AppError> {
         self.checkpoint

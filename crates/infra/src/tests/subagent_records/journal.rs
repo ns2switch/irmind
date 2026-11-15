@@ -909,7 +909,7 @@ fn stored_history_engine_with_queries(
         CaseMutation, SkillServices,
         subagents::{SubagentBranchStore, SubagentPorts},
     };
-    let store = Arc::new(LocalStore::open(root).unwrap());
+    let store = Arc::new(open_source_store(root).unwrap());
     store
         .transact(
             &history.entries[0],

@@ -95,6 +95,18 @@ impl SubagentJournal {
         if self.accounting.len() >= 65_536 {
             return Err(SubagentRecordError);
         }
+        if let Some(attr) = &attribution
+            && attr.tool == Tool::CaseAddFinding.as_str()
+        {
+            let id = crate::subagents::finding::finding_id(attr.task_id, &attr.call_id);
+            if self
+                .finding_dispatches
+                .insert(id, SubagentDigest::from_bytes(entry.hash))
+                .is_some()
+            {
+                return Err(SubagentRecordError);
+            }
+        }
         self.accounting.insert(
             SubagentDigest::from_bytes(entry.hash),
             Accounted {

@@ -7,6 +7,7 @@ use crate::{Actor, AppError, AuditEventKind, CaseId, CaseScope, SignedEntry, Ver
 use std::collections::{BTreeMap, BTreeSet};
 
 mod accounting;
+mod findings;
 mod ledger;
 mod material;
 mod preparation;
@@ -31,6 +32,8 @@ pub struct SubagentJournal {
     nonces: BTreeSet<String>,
     references: usize,
     accounting: BTreeMap<SubagentDigest, accounting::Accounted>,
+    finding_dispatches: BTreeMap<String, SubagentDigest>,
+    findings: BTreeMap<SubagentDigest, findings::FindingEffect>,
     accounted: BTreeSet<(SubagentDigest, super::ReservationPurpose)>,
     checkpoint_sequences: BTreeMap<SubagentDigest, u64>,
     parent_rounds: u64,
@@ -60,6 +63,8 @@ impl SubagentJournal {
             nonces: BTreeSet::new(),
             references: 0,
             accounting: BTreeMap::new(),
+            finding_dispatches: BTreeMap::new(),
+            findings: BTreeMap::new(),
             accounted: BTreeSet::new(),
             checkpoint_sequences: BTreeMap::new(),
             parent_rounds: 0,
@@ -143,6 +148,7 @@ impl SubagentJournal {
         }
         self.accept_metadata(entry)?;
         self.observe_accounting(entry)?;
+        self.observe_finding(entry)?;
         self.budget.accept(entry).map_err(|_| SubagentRecordError)?;
         if entry.kind == AuditEventKind::CaseBudgetChanged {
             let status = self

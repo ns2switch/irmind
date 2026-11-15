@@ -114,17 +114,28 @@ impl<'a> AgentBatch<'a> {
         payload: &str,
         analyst: bool,
     ) -> Result<SubagentDigest, AppError> {
+        self.push_evidenced_payload(kind, payload, analyst, None)
+    }
+    fn push_evidenced_payload(
+        &mut self,
+        kind: crate::AuditEventKind,
+        payload: &str,
+        analyst: bool,
+        evidence: Option<&str>,
+    ) -> Result<SubagentDigest, AppError> {
         let entry = self.engine.signed_entry_after(
             self.case,
             self.entries.last().or(self.prior.as_ref()),
             if analyst {
                 AuditOrigin::Analyst
+            } else if kind == crate::AuditEventKind::FindingProposed {
+                AuditOrigin::Model
             } else {
                 AuditOrigin::Agent
             },
             kind,
             payload,
-            None,
+            evidence,
         )?;
         self.journal.accept(&entry, self.verifier)?;
         let hash = SubagentDigest::from_bytes(entry.hash);

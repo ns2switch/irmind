@@ -8,8 +8,15 @@ use crate::subagents::{
 use crate::{AppError, CancellationToken, CaseId, Engine, GraphQueryFilter, Tool};
 
 mod completion;
+mod finding;
 mod query;
 mod worker;
+
+enum ChildAction {
+    Query(Box<TaskEvidenceQuery>),
+    Method,
+    Finding(Box<crate::Finding>),
+}
 
 enum ChildReadResponse {
     Evidence(TaskEvidenceResult),
@@ -25,7 +32,7 @@ struct ReadEffect {
 struct ReadTicket {
     effect: ReadEffect,
     view: crate::subagents::VerifiedTaskQueryView,
-    query: Option<TaskEvidenceQuery>,
+    action: ChildAction,
 }
 impl Engine<'_> {
     pub(super) fn child_read_catalog(
@@ -56,7 +63,8 @@ impl Engine<'_> {
             .into_iter()
             .filter(|spec| {
                 tools.contains(spec.name)
-                    && (query::supported(spec.name) || spec.name == "skill_read")
+                    && (query::supported(spec.name)
+                        || matches!(spec.name, "skill_read" | "case_add_finding"))
             })
             .collect())
     }
@@ -91,14 +99,18 @@ impl Engine<'_> {
             let ReadTicket {
                 effect,
                 view,
-                query,
+                action,
             } = ticket;
-            let response = match query {
-                Some(query) => self
-                    .run_child_query(view, query, task.deadline_at, cancel)
+            let response = match action {
+                ChildAction::Query(query) => self
+                    .run_child_query(view, *query, task.deadline_at, cancel)
                     .await
                     .map(ChildReadResponse::Evidence),
-                None => self
+                ChildAction::Finding(finding) => self
+                    .publish_child_finding(started, task, &effect, *finding, cancel)
+                    .await
+                    .map(ChildReadResponse::Evidence),
+                ChildAction::Method => self
                     .prepare_child_method(started, task, state, &effect.call, cancel)
                     .map(ChildReadResponse::Method),
             };
@@ -181,7 +193,7 @@ impl Engine<'_> {
         if !self.permit_child_read(case, started, task, state, &proposal)? {
             return Ok(None);
         }
-        let Ok(query) = query::checked(&proposal, &view) else {
+        let Ok(action) = query::checked(&proposal, call, task.task_id, &view) else {
             return Ok(None);
         };
         let body = child_read_proposal(started, call)?;
@@ -237,7 +249,7 @@ impl Engine<'_> {
         Ok(Some(ReadTicket {
             effect: ReadEffect { decision, ..effect },
             view,
-            query,
+            action,
         }))
     }
 }

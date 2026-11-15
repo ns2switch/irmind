@@ -9,6 +9,7 @@ mod codec;
 pub use branch::*;
 pub use chunk::{CheckedBranchChunk, SubagentBranchCursor};
 mod consent;
+mod finding;
 mod interaction;
 mod journal;
 mod queries;
