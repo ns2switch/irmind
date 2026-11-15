@@ -189,7 +189,7 @@ impl<'a> TaskMaterial<'a> {
         }
         let rules = self.plan.plan.policy.rules()?;
         self.require_method_allow(value, &rules)?;
-        self.require_policy_allow(value, &rules)?;
+        self.require_policy_allow(value, &rules, &accounted.scope)?;
         self.require_tool_reservation(attr.reservation_sha256, proposal_sequence, accounted.seq)?;
         let sources = self
             .sources
@@ -343,7 +343,7 @@ impl<'a> TaskMaterial<'a> {
         {
             return Err(SubagentRecordError);
         }
-        self.require_policy_allow(proposal, &rules)?;
+        self.require_policy_allow(proposal, &rules, &accounted.scope)?;
         if proposal.tool == Tool::CaseAddFinding.as_str()
             && !value.partial
             && !self.journal.findings.contains_key(&value.proposal_sha256)
@@ -418,18 +418,24 @@ impl<'a> TaskMaterial<'a> {
         &self,
         proposal: &BranchToolProposal,
         rules: &irmind_domain::PolicyRules,
+        effect_scope: &crate::CaseScope,
     ) -> Result<(), SubagentRecordError> {
         let case = irmind_domain::Case {
             id: self.journal.case.clone(),
             title: "Delegated task".into(),
             severity: irmind_domain::Severity::Low,
-            scope: self
-                .task
-                .remote_scope
-                .clone()
-                .unwrap_or_else(|| "local".into()),
+            scope: match &self.task.remote_scope {
+                Some(scope) => scope.clone(),
+                None => crate::subagents::queries::scope_text(&self.plan.case_scope)?,
+            },
             sealed: false,
         };
+        if !crate::CaseScope::parse(&case.scope)
+            .map_err(|_| SubagentRecordError)?
+            .is_within(effect_scope)
+        {
+            return Err(SubagentRecordError);
+        }
         let call = irmind_domain::ProposedCall {
             tool: Tool::parse(&proposal.tool).map_err(|_| SubagentRecordError)?,
             args: proposal.arguments.clone(),

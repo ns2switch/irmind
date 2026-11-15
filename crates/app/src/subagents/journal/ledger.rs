@@ -27,6 +27,7 @@ pub(super) struct PlanLedger {
     pub plan: SubagentPlanV1,
     pub seq: u64,
     pub parent_skill: Option<crate::SkillSnapshotId>,
+    pub case_scope: crate::CaseScope,
     entry_hash: SubagentDigest,
     phase: Phase,
     consent: Option<SubagentDigest>,
@@ -46,11 +47,13 @@ impl PlanLedger {
         entry_hash: SubagentDigest,
         seq: u64,
         parent_skill: Option<crate::SkillSnapshotId>,
+        case_scope: crate::CaseScope,
     ) -> Self {
         Self {
             plan,
             seq,
             parent_skill,
+            case_scope,
             entry_hash,
             phase: Phase::Prepared,
             consent: None,

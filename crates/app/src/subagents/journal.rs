@@ -362,6 +362,7 @@ impl SubagentJournal {
                 SubagentDigest::from_bytes(entry.hash),
                 entry.seq,
                 parent_skill,
+                self.scope.clone(),
             ),
         );
         Ok(())

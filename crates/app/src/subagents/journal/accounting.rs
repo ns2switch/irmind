@@ -40,6 +40,7 @@ pub(super) struct Accounted {
     pub seq: u64,
     pub at: u64,
     pub actor: crate::Actor,
+    pub scope: crate::CaseScope,
     pub amount: SubagentResources,
     pub attribution: Option<TaskDispatchAttribution>,
 }
@@ -113,6 +114,7 @@ impl SubagentJournal {
                 seq: entry.seq,
                 at: entry.at,
                 actor: entry.actor.clone(),
+                scope: self.scope.clone(),
                 amount,
                 attribution,
             },

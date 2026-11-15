@@ -99,3 +99,15 @@ fn automatic_plan_choice_never_substitutes_for_required_explicit_start() {
     preview.confirmation_required = false;
     assert!(!preview.automatic_start().unwrap().explicit());
 }
+
+#[test]
+fn task_case_scope_encoding_preserves_local_and_remote_meaning() {
+    assert_eq!(
+        CaseScope::parse(&scope_text(&CaseScope::LocalOnly).unwrap()).unwrap(),
+        CaseScope::LocalOnly
+    );
+    let scope = CaseScope::parse("v1;sources=siem-a;accounts=acct-a;hosts=;from=2026-11-01T00:00:00Z;to=2026-11-01T01:00:00Z").unwrap();
+    let restored = CaseScope::parse(&scope_text(&scope).unwrap()).unwrap();
+    assert!(scope.is_within(&restored));
+    assert!(restored.is_within(&scope));
+}
