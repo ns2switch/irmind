@@ -117,7 +117,7 @@ impl Engine<'_> {
             matches!(
                 e.kind,
                 crate::AuditEventKind::SkillSnapshotV2 | crate::AuditEventKind::SkillLoadV1
-            )
+            ) || crate::subagents::is_subagent_kind(e.kind)
         }) {
             return Ok(());
         }
@@ -168,6 +168,48 @@ impl Engine<'_> {
             self.verifier.as_ref(),
             &analyst,
             services.compiler.as_ref(),
+        )?;
+        self.verify_subagent_receipts(entries, &mut checked, services, cancel)
+    }
+    fn verify_subagent_receipts(
+        &self,
+        entries: &[crate::SignedEntry],
+        checked: &mut super::SkillReceiptVerifier,
+        services: &SkillServices,
+        cancel: &crate::CancellationToken,
+    ) -> Result<(), AppError> {
+        if !entries
+            .iter()
+            .any(|entry| crate::subagents::is_subagent_kind(entry.kind))
+        {
+            return Ok(());
+        }
+        let case = crate::CaseId::parse(
+            &entries
+                .first()
+                .ok_or_else(super::receipts::invalid)?
+                .case_id,
         )
+        .map_err(|_| super::receipts::invalid())?;
+        let mut journal = crate::subagents::SubagentJournal::new(case, services.agent.actor())
+            .map_err(|_| super::receipts::invalid())?;
+        for entry in entries {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            journal.accept(entry, self.verifier.as_ref())?;
+        }
+        let ports = self
+            .subagents
+            .as_ref()
+            .ok_or_else(super::receipts::invalid)?;
+        journal.verify_stored_branches(
+            ports.branches.as_ref(),
+            self.verifier.as_ref(),
+            checked,
+            services.compiler.as_ref(),
+            cancel,
+        )?;
+        Ok(())
     }
 }

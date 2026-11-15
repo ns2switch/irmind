@@ -22,6 +22,8 @@ pub(super) struct TaskMaterial<'a> {
     results: BTreeSet<SubagentDigest>,
     usage: SubagentResources,
     terminal: Option<BranchTerminal>,
+    parent_tools: Option<BTreeSet<String>>,
+    child_tools: Option<BTreeSet<String>>,
     checkpoint: Option<SubagentCheckpointV1>,
 }
 impl<'a> TaskMaterial<'a> {
@@ -29,11 +31,39 @@ impl<'a> TaskMaterial<'a> {
         journal: &'a SubagentJournal,
         plan: &'a PlanLedger,
         task: &'a SubagentTaskSpec,
+        skills: &SkillReceiptVerifier,
+        compiler: &dyn SkillCompiler,
     ) -> Result<Self, SubagentRecordError> {
         let sources = journal
             .sets
             .get(&task.source_set_sha256)
             .ok_or(SubagentRecordError)?;
+        let parent_tools = plan
+            .parent_skill
+            .map(|id| {
+                skills
+                    .snapshot_method(id, plan.seq, compiler)
+                    .map(|(_, tools)| tools)
+                    .map_err(|_| SubagentRecordError)
+            })
+            .transpose()?;
+        if let Some(snapshot) = task.skill_snapshot_sha256 {
+            let identity = crate::SkillSnapshotId::parse(&crate::hex(snapshot.as_bytes()))
+                .map_err(|_| SubagentRecordError)?;
+            let (name, _) = skills
+                .snapshot_method(identity, plan.seq, compiler)
+                .map_err(|_| SubagentRecordError)?;
+            if !journal
+                .types
+                .get(&task.type_snapshot_sha256)
+                .ok_or(SubagentRecordError)?
+                .definition()
+                .skills()
+                .contains(&name)
+            {
+                return Err(SubagentRecordError);
+            }
+        }
         Ok(Self {
             journal,
             plan,
@@ -51,6 +81,8 @@ impl<'a> TaskMaterial<'a> {
             results: BTreeSet::new(),
             usage: SubagentResources::default(),
             terminal: None,
+            parent_tools,
+            child_tools: None,
             checkpoint: None,
         })
     }
@@ -62,8 +94,8 @@ impl<'a> TaskMaterial<'a> {
         &mut self,
         chunk: &CheckedBranchChunk,
         checkpoint: &SubagentCheckpointV1,
-        _skills: &mut SkillReceiptVerifier,
-        _compiler: &dyn SkillCompiler,
+        skills: &mut SkillReceiptVerifier,
+        compiler: &dyn SkillCompiler,
     ) -> Result<(), SubagentRecordError> {
         self.cursor.accept(chunk, checkpoint)?;
         let sequence = *self
@@ -101,7 +133,39 @@ impl<'a> TaskMaterial<'a> {
                     self.proposals.insert(entry.hash, (sequence, value.clone()));
                 }
                 SubagentBranchPayload::ToolResult(value) => self.tool_result(value, sequence)?,
-                SubagentBranchPayload::SkillLoad(_) => return Err(SubagentRecordError),
+                SubagentBranchPayload::SkillLoad(value) => {
+                    let load =
+                        crate::SkillLoadV1::decode(value).map_err(|_| SubagentRecordError)?;
+                    if load.turn() != self.task.nonce {
+                        return Err(SubagentRecordError);
+                    }
+                    let identity = load.snapshot().map_err(|_| SubagentRecordError)?;
+                    let (name, tools) = skills
+                        .snapshot_method(identity, sequence, compiler)
+                        .map_err(|_| SubagentRecordError)?;
+                    if !self
+                        .journal
+                        .types
+                        .get(&self.task.type_snapshot_sha256)
+                        .ok_or(SubagentRecordError)?
+                        .definition()
+                        .skills()
+                        .contains(&name)
+                        || (self.child_tools.is_none()
+                            && self
+                                .task
+                                .skill_snapshot_sha256
+                                .is_some_and(|expected| expected.as_bytes() != identity.as_bytes()))
+                    {
+                        return Err(SubagentRecordError);
+                    }
+                    skills
+                        .accept_task_load(&load, &self.plan.plan.turn_id)
+                        .map_err(|_| SubagentRecordError)?;
+                    if load.result() == crate::SkillLoadResult::Loaded {
+                        self.child_tools = Some(tools);
+                    }
+                }
                 SubagentBranchPayload::Compaction(value) => {
                     if value.replaced_last >= entry.body.seq {
                         return Err(SubagentRecordError);
@@ -190,6 +254,15 @@ impl<'a> TaskMaterial<'a> {
         if proposal.tainted
             || tool.risk() != irmind_domain::RiskLevel::Read
             || !kind.definition().permits_tool(&tool)
+            || self
+                .parent_tools
+                .as_ref()
+                .is_some_and(|tools| !tools.contains(tool.as_str()))
+            || self
+                .child_tools
+                .as_ref()
+                .is_some_and(|tools| !tools.contains(tool.as_str()))
+            || (self.task.skill_snapshot_sha256.is_some() && self.child_tools.is_none())
             || rules.denied_tools.contains(&tool)
             || proposal_sequence >= &accounted.seq
             || accounted.seq >= sequence

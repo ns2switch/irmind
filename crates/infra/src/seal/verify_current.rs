@@ -91,21 +91,7 @@ fn verify_open_export_with_catalog(
     {
         super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
     }
-    let proofs = super::skill_proofs::read(
-        &mut input,
-        &chain.skills,
-        &chain.verifier,
-        &header.seal.public_key,
-    )?;
-    super::catalog_proofs::read(
-        &mut input,
-        &mut chain.skills,
-        &proofs,
-        &chain.verifier,
-        &header.seal.public_key,
-        catalog,
-    )?;
-    verify_empty_branches(&mut input)?;
+    verify_methodology_tail(&mut input, &mut chain, &header, catalog)?;
     let mut extra = [0u8; 1];
     if input.read(&mut extra).map_err(storage)? != 0 {
         return Err(storage_reason("export has trailing bytes"));
@@ -120,12 +106,32 @@ fn verify_open_export_with_catalog(
     Ok(result)
 }
 
-fn verify_empty_branches(input: &mut File) -> Result<(), AppError> {
-    if read_u64(input)? != 0 {
-        return Err(storage_reason(
-            "export contains subagent branch chunks not supported by this build",
-        ));
-    }
+fn verify_methodology_tail(
+    input: &mut File,
+    chain: &mut ChainState,
+    header: &HeaderV8,
+    catalog: &dyn irmind_app::catalog::CatalogIndexVerifier,
+) -> Result<(), AppError> {
+    let proofs = super::skill_proofs::read(
+        input,
+        &chain.skills,
+        &chain.verifier,
+        &header.seal.public_key,
+    )?;
+    super::catalog_proofs::read(
+        input,
+        &mut chain.skills,
+        &proofs,
+        &chain.verifier,
+        &header.seal.public_key,
+        catalog,
+    )?;
+    super::subagent_branches::read(
+        input,
+        chain.subagents.as_ref().ok_or(AppError::InvalidChain(0))?,
+        &chain.verifier,
+        &mut chain.skills,
+    )?;
     Ok(())
 }
 
@@ -244,6 +250,7 @@ fn verify_source_frames(input: &mut File, chain: &mut ChainState) -> Result<usiz
 
 struct ChainState {
     skills: irmind_app::SkillReceiptVerifier,
+    subagents: Option<irmind_app::subagents::SubagentJournal>,
     mapping_installations:
         BTreeMap<irmind_domain::EvidenceHash, irmind_app::source_mapping::MappingManifest>,
     catalog: irmind_app::ArtifactCatalogBuilder,
@@ -265,6 +272,7 @@ impl ChainState {
     fn new() -> Self {
         Self {
             skills: irmind_app::SkillReceiptVerifier::default(),
+            subagents: None,
             mapping_installations: BTreeMap::new(),
             catalog: irmind_app::ArtifactCatalogBuilder::default(),
             inventory: irmind_app::SealInventoryBuilder::default(),
@@ -316,6 +324,16 @@ impl ChainState {
             self.catalog.accept(&entry)?;
             self.inventory.accept(&entry)?;
         }
+        if self.subagents.is_none() {
+            self.subagents = Some(
+                irmind_app::subagents::SubagentJournal::for_verification(id.clone())
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?,
+            );
+        }
+        self.subagents
+            .as_mut()
+            .ok_or(AppError::InvalidChain(entry.seq))?
+            .accept(&entry, &self.verifier)?;
         super::mapping_proofs::collect(&entry, &mut self.mapping_installations)?;
         self.skills.accept(&entry, &crate::TomlSkillCompiler)?;
         self.accept_metadata(&entry)?;

@@ -301,3 +301,109 @@ fn bundled_snapshot_requires_exact_compiled_inventory_and_catalog_cannot_shadow_
             .is_err()
     );
 }
+
+#[test]
+fn subagent_skill_reads_share_parent_limits_without_main_branch_substitution() {
+    use crate::subagents::{SubagentPlanV1, SubagentRecord};
+    let plan = SubagentPlanV1::decode(include_bytes!(
+        "../../../../../docs/development/subagent-format-vectors/plan.json"
+    ))
+    .unwrap();
+    let snapshot = SkillSnapshotV2::decode(SNAPSHOT.trim_end()).unwrap();
+    let agent = irmind_domain::Actor::Agent(irmind_domain::AgentId::parse("core").unwrap());
+    let mut checked = SkillReceiptVerifier::default();
+    checked
+        .accept(
+            &entry(
+                AuditEventKind::SkillSnapshotV2,
+                irmind_domain::Actor::Analyst,
+                snapshot.encode().unwrap(),
+            ),
+            &Compiler,
+        )
+        .unwrap();
+    let base = SkillLoadV1::decode(LOAD.trim_end()).unwrap();
+    let read = |turn: &str| {
+        SkillLoadV1::new(SkillReadReceipt {
+            snapshot: snapshot.identity().unwrap(),
+            turn: uuid::Uuid::parse_str(turn).unwrap(),
+            call: "load",
+            resource: base.resource(),
+            range: base.range().unwrap(),
+            guard: base.guard(),
+            text: base.text().into(),
+            detections: 0,
+            result: SkillLoadResult::Loaded,
+        })
+        .unwrap()
+    };
+    let parent = read(&plan.turn_id);
+    for _ in 0..7 {
+        checked
+            .accept(
+                &entry(
+                    AuditEventKind::SkillLoadV1,
+                    agent.clone(),
+                    parent.encode().unwrap(),
+                ),
+                &Compiler,
+            )
+            .unwrap();
+    }
+    checked
+        .accept(
+            &entry(
+                AuditEventKind::SubagentPlanV1,
+                agent.clone(),
+                plan.audit_payload().unwrap(),
+            ),
+            &Compiler,
+        )
+        .unwrap();
+    let child = read(&plan.tasks[0].nonce);
+    // A task nonce is accepted only inside its authenticated branch, never in main.
+    assert!(
+        checked
+            .accept(
+                &entry(AuditEventKind::SkillLoadV1, agent, child.encode().unwrap()),
+                &Compiler
+            )
+            .is_err()
+    );
+    assert!(
+        checked
+            .accept_task_load(&child, &uuid::Uuid::nil().to_string())
+            .is_err()
+    );
+    checked.accept_task_load(&child, &plan.turn_id).unwrap();
+    assert!(checked.accept_task_load(&child, &plan.turn_id).is_err());
+}
+
+#[test]
+fn subagent_method_is_available_only_after_its_main_snapshot() {
+    let snapshot = SkillSnapshotV2::decode(SNAPSHOT.trim_end()).unwrap();
+    let mut checked = SkillReceiptVerifier::default();
+    checked
+        .accept(
+            &entry(
+                AuditEventKind::SkillSnapshotV2,
+                irmind_domain::Actor::Analyst,
+                snapshot.encode().unwrap(),
+            ),
+            &Compiler,
+        )
+        .unwrap();
+    assert!(
+        checked
+            .snapshot_method(snapshot.identity().unwrap(), 1, &Compiler)
+            .is_err()
+    );
+    let (name, tools) = checked
+        .snapshot_method(snapshot.identity().unwrap(), 2, &Compiler)
+        .unwrap();
+    assert_eq!(name, "synthetic-triage");
+    assert_eq!(
+        tools,
+        std::collections::BTreeSet::from(["text_search".into()])
+    );
+}

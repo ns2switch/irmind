@@ -47,7 +47,7 @@ impl SubagentJournal {
         &mut self,
         entry: &SignedEntry,
     ) -> Result<(), SubagentRecordError> {
-        if entry.actor != self.agent
+        if self.agent.as_ref() != Some(&entry.actor)
             && !(entry.actor == crate::Actor::Analyst && entry.kind == AuditEventKind::ModelUsage)
         {
             return Ok(());
@@ -132,7 +132,7 @@ impl SubagentJournal {
                 != if value.task_id.is_none() {
                     crate::Actor::Analyst
                 } else {
-                    self.agent.clone()
+                    self.agent.clone().ok_or(SubagentRecordError)?
                 }
         {
             return Err(SubagentRecordError);

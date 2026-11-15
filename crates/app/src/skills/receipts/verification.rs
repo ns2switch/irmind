@@ -11,6 +11,8 @@ pub struct SkillReceiptVerifier {
     snapshots: BTreeMap<SkillSnapshotId, SkillSnapshotV2>,
     turns: BTreeMap<String, TurnBudget>,
     bytes: usize,
+    snapshot_sequences: BTreeMap<SkillSnapshotId, u64>,
+    task_parents: BTreeMap<String, String>,
     catalog_verified: BTreeSet<SkillSnapshotId>,
 }
 impl SkillReceiptVerifier {
@@ -85,19 +87,83 @@ impl SkillReceiptVerifier {
                 if self.bytes > 16 * 1024 * 1024 {
                     return Err(invalid());
                 }
+                self.snapshot_sequences.insert(identity, entry.seq);
                 self.snapshots.insert(identity, snapshot);
+            }
+            AuditEventKind::SubagentPlanV1 => {
+                use crate::subagents::{SubagentPlanV1, SubagentRecord};
+                let (_, data) = entry.payload.split_once(':').ok_or_else(invalid)?;
+                if data.len() > 512 * 1024 {
+                    return Err(invalid());
+                }
+                let bytes = hex::decode(data).map_err(|_| invalid())?;
+                if hex(&bytes) != data {
+                    return Err(invalid());
+                }
+                let plan = SubagentPlanV1::decode(&bytes).map_err(|_| invalid())?;
+                for task in plan.tasks {
+                    if self.task_parents.len() >= 256
+                        || task.nonce == plan.turn_id
+                        || self.task_parents.contains_key(&plan.turn_id)
+                        || self
+                            .task_parents
+                            .insert(task.nonce, plan.turn_id.clone())
+                            .is_some()
+                    {
+                        return Err(invalid());
+                    }
+                }
             }
             AuditEventKind::SkillLoadV1 => {
                 if !matches!(entry.actor, Actor::Agent(_)) || entry.evidence.is_some() {
                     return Err(invalid());
                 }
-                self.load(&SkillLoadV1::decode(&entry.payload)?)?;
+                let load = SkillLoadV1::decode(&entry.payload)?;
+                if self.task_parents.contains_key(load.turn()) {
+                    return Err(invalid());
+                }
+                self.load(&load, load.turn())?;
             }
             _ => {}
         }
         Ok(())
     }
-    fn load(&mut self, load: &SkillLoadV1) -> Result<(), AppError> {
+    pub(crate) fn snapshot_method(
+        &self,
+        identity: SkillSnapshotId,
+        before: u64,
+        compiler: &dyn SkillCompiler,
+    ) -> Result<(String, BTreeSet<String>), AppError> {
+        if self
+            .snapshot_sequences
+            .get(&identity)
+            .is_none_or(|seq| *seq >= before)
+        {
+            return Err(invalid());
+        }
+        let skill = self
+            .snapshots
+            .get(&identity)
+            .ok_or_else(invalid)?
+            .compile(compiler)?;
+        Ok((
+            skill.metadata().name().as_str().into(),
+            skill.metadata().tools().clone(),
+        ))
+    }
+
+    pub(crate) fn accept_task_load(
+        &mut self,
+        load: &SkillLoadV1,
+        parent: &str,
+    ) -> Result<(), AppError> {
+        if self.task_parents.get(load.turn()).map(String::as_str) != Some(parent) {
+            return Err(invalid());
+        }
+        self.load(load, parent)
+    }
+
+    fn load(&mut self, load: &SkillLoadV1, budget_turn: &str) -> Result<(), AppError> {
         let identity = load.snapshot()?;
         let snapshot = self.snapshots.get(&identity).ok_or_else(invalid)?;
         let package = snapshot.package()?;
@@ -114,7 +180,7 @@ impl SkillReceiptVerifier {
             load.result(),
             SkillLoadResult::Loaded | SkillLoadResult::Blocked
         ) {
-            let (packages, reads, bytes) = self.turns.entry(load.turn().into()).or_default();
+            let (packages, reads, bytes) = self.turns.entry(budget_turn.into()).or_default();
             packages.insert(identity);
             *reads += 1;
             *bytes += load.bytes();

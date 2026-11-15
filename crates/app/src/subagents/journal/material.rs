@@ -133,7 +133,7 @@ impl<'a> BranchMaterialVerifier<'a> {
             return Err(SubagentRecordError);
         }
         let key = verifier
-            .trusted_public_key(&self.journal.agent)
+            .trusted_public_key(self.journal.agent.as_ref().ok_or(SubagentRecordError)?)
             .map_err(|_| SubagentRecordError)?;
         let chunk = CheckedBranchChunk::decode(bytes, &key, verifier)?;
         if self
@@ -148,6 +148,8 @@ impl<'a> BranchMaterialVerifier<'a> {
                 self.journal,
                 expected.plan,
                 expected.task,
+                skills,
+                compiler,
             )?);
         }
         let current = self.current.as_mut().ok_or(SubagentRecordError)?;

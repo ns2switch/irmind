@@ -15,7 +15,7 @@ pub use material::BranchMaterialVerifier;
 
 pub struct SubagentJournal {
     case: CaseId,
-    agent: Actor,
+    agent: Option<Actor>,
     seq: u64,
     previous: SubagentDigest,
     failed: bool,
@@ -33,6 +33,7 @@ pub struct SubagentJournal {
     accounted: BTreeSet<(SubagentDigest, super::ReservationPurpose)>,
     checkpoint_sequences: BTreeMap<SubagentDigest, u64>,
     parent_rounds: u64,
+    parent_skill: Option<(String, crate::SkillSnapshotId)>,
     turn: Option<String>,
     closed_turns: BTreeSet<String>,
 }
@@ -43,7 +44,7 @@ impl SubagentJournal {
         }
         Ok(Self {
             case,
-            agent,
+            agent: Some(agent),
             seq: 0,
             previous: SubagentDigest::from_bytes([0; 32]),
             failed: false,
@@ -61,9 +62,31 @@ impl SubagentJournal {
             accounted: BTreeSet::new(),
             checkpoint_sequences: BTreeMap::new(),
             parent_rounds: 0,
+            parent_skill: None,
             turn: None,
             closed_turns: BTreeSet::new(),
         })
+    }
+
+    /// Offline replay binds the Agent only from an authenticated subagent entry.
+    /// The enclosing sealed main chain authenticates that binding. This state
+    /// creates no signer, task lease or execution capability.
+    pub fn for_verification(case: CaseId) -> Result<Self, SubagentRecordError> {
+        let mut journal = Self::new(
+            case,
+            Actor::Agent(
+                irmind_domain::AgentId::parse("unbound").map_err(|_| SubagentRecordError)?,
+            ),
+        )?;
+        journal.agent = None;
+        Ok(journal)
+    }
+
+    pub fn has_open_plans(&self) -> Result<bool, SubagentRecordError> {
+        if self.failed {
+            return Err(SubagentRecordError);
+        }
+        Ok(self.plans.values().any(PlanLedger::is_open))
     }
 
     /// Every entry, including ordinary accounting, must arrive in main-chain order.
@@ -98,15 +121,23 @@ impl SubagentJournal {
         verifier
             .verify(&entry.public_key, &entry.hash, &entry.sig)
             .map_err(|_| SubagentRecordError)?;
-        if is_subagent_kind(entry.kind)
-            && (entry.evidence.is_some()
-                || entry.actor
-                    != if entry.kind == AuditEventKind::SubagentPlanApprovalV1 {
-                        Actor::Analyst
-                    } else {
-                        self.agent.clone()
-                    })
-        {
+        if is_subagent_kind(entry.kind) {
+            if self.agent.is_none() && entry.kind != AuditEventKind::SubagentPlanApprovalV1 {
+                if !matches!(entry.actor, Actor::Agent(_)) {
+                    return Err(SubagentRecordError);
+                }
+                self.agent = Some(entry.actor.clone());
+            }
+            let expected = if entry.kind == AuditEventKind::SubagentPlanApprovalV1 {
+                &Actor::Analyst
+            } else {
+                self.agent.as_ref().ok_or(SubagentRecordError)?
+            };
+            if entry.evidence.is_some() || &entry.actor != expected {
+                return Err(SubagentRecordError);
+            }
+        }
+        if entry.kind == AuditEventKind::CaseSealed && self.has_open_plans()? {
             return Err(SubagentRecordError);
         }
         self.accept_metadata(entry)?;
@@ -120,13 +151,14 @@ impl SubagentJournal {
     fn accept_metadata(&mut self, entry: &SignedEntry) -> Result<(), SubagentRecordError> {
         match entry.kind {
             AuditEventKind::Prompt => {
-                if entry.actor != Actor::Analyst || self.plans.values().any(PlanLedger::is_open) {
+                if self.plans.values().any(PlanLedger::is_open) {
                     return Err(SubagentRecordError);
                 }
                 if let Some(turn) = self.turn.take() {
                     self.closed_turns.insert(turn);
                 }
                 self.parent_rounds = 0;
+                self.parent_skill = None;
             }
             AuditEventKind::ModelRequest if entry.actor == Actor::Analyst => {
                 self.parent_rounds = self
@@ -134,9 +166,20 @@ impl SubagentJournal {
                     .checked_add(1)
                     .ok_or(SubagentRecordError)?;
             }
+            AuditEventKind::SkillLoadV1 => {
+                let load =
+                    crate::SkillLoadV1::decode(&entry.payload).map_err(|_| SubagentRecordError)?;
+                if load.result() == crate::SkillLoadResult::Loaded {
+                    self.parent_skill = Some((
+                        load.turn().into(),
+                        load.snapshot().map_err(|_| SubagentRecordError)?,
+                    ));
+                }
+            }
             AuditEventKind::CaseCreated | AuditEventKind::CaseScopeChanged => {
                 #[derive(serde::Deserialize)]
                 struct Scope {
+                    #[serde(alias = "new_scope")]
                     scope: String,
                 }
                 let scope: Scope =
@@ -274,9 +317,19 @@ impl SubagentJournal {
             }
         }
         self.turn = Some(plan.turn_id.clone());
+        let parent_skill = self
+            .parent_skill
+            .as_ref()
+            .filter(|(turn, _)| turn == &plan.turn_id)
+            .map(|(_, skill)| *skill);
         self.plans.insert(
             plan.identity()?,
-            PlanLedger::new(plan, SubagentDigest::from_bytes(entry.hash)),
+            PlanLedger::new(
+                plan,
+                SubagentDigest::from_bytes(entry.hash),
+                entry.seq,
+                parent_skill,
+            ),
         );
         Ok(())
     }
