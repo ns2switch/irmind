@@ -47,6 +47,13 @@ impl SubagentJournal {
         &mut self,
         entry: &SignedEntry,
     ) -> Result<(), SubagentRecordError> {
+        if self.agent.as_ref() == Some(&entry.actor)
+            && !self.plans.values().any(super::PlanLedger::is_open)
+        {
+            // Ordinary unattended root work remains ordinary work. A branch can
+            // only cite an accounting event recorded while its plan was open.
+            return Ok(());
+        }
         if self.agent.as_ref() != Some(&entry.actor)
             && !(entry.actor == crate::Actor::Analyst && entry.kind == AuditEventKind::ModelUsage)
         {

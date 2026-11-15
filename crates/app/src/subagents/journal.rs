@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 mod accounting;
 mod ledger;
 mod material;
+mod preparation;
 pub use accounting::TaskDispatchAttribution;
 use ledger::PlanLedger;
 pub use material::BranchMaterialVerifier;
@@ -143,6 +144,32 @@ impl SubagentJournal {
         self.accept_metadata(entry)?;
         self.observe_accounting(entry)?;
         self.budget.accept(entry).map_err(|_| SubagentRecordError)?;
+        if entry.kind == AuditEventKind::CaseBudgetChanged {
+            let status = self
+                .budget
+                .status(&irmind_domain::PolicyRules::default())
+                .map_err(|_| SubagentRecordError)?;
+            let limits = status.allocated.ok_or(SubagentRecordError)?;
+            let held = self.outstanding()?;
+            if status
+                .usage
+                .model_tokens
+                .checked_add(held.tokens)
+                .is_none_or(|used| used > limits.model_tokens)
+                || status
+                    .usage
+                    .tool_calls
+                    .checked_add(held.calls)
+                    .is_none_or(|used| used > limits.tool_calls)
+                || status
+                    .usage
+                    .cloud_bytes
+                    .checked_add(held.cloud_bytes)
+                    .is_none_or(|used| used > limits.cloud_bytes)
+            {
+                return Err(SubagentRecordError);
+            }
+        }
         self.seq = entry.seq;
         self.previous = SubagentDigest::from_bytes(entry.hash);
         Ok(())

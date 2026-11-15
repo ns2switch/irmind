@@ -50,7 +50,19 @@ impl Engine<'_> {
         if !limits.within(status.organization) {
             return Err(AppError::Policy("case limits exceed the organization ceiling; change policy.toml through the organization administrator".into()));
         }
-        if !status.usage.fits(limits) {
+        let held = self.subagent_holds_unlocked(id)?;
+        let committed = crate::subagents::SubagentResources {
+            tokens: status.usage.model_tokens,
+            calls: status.usage.tool_calls,
+            cloud_bytes: status.usage.cloud_bytes,
+            rounds: 0,
+        }
+        .checked_add(held)
+        .map_err(|_| AppError::InvalidChain(0))?;
+        if committed.tokens > limits.model_tokens
+            || committed.calls > limits.tool_calls
+            || committed.cloud_bytes > limits.cloud_bytes
+        {
             return Err(AppError::Policy(
                 "case limits cannot be reduced below recorded consumption".into(),
             ));

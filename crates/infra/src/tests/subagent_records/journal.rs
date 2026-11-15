@@ -1,3 +1,4 @@
+mod broker;
 use super::*;
 use irmind_app::subagents::{
     ReservationAction, ReservationPurpose, ReservationTransition, SubagentDigest, SubagentJournal,
@@ -913,7 +914,9 @@ fn stored_history_engine(
             }),
         )
         .unwrap();
-    store.append_batch(&history.entries[1..]).unwrap();
+    if history.entries.len() > 1 {
+        store.append_batch(&history.entries[1..]).unwrap();
+    }
     for chunk in chunks {
         store
             .parquet
@@ -955,7 +958,7 @@ fn stored_history_engine(
             analyst: Arc::new(NoPlanInteraction),
         }),
         ExecutionMode::Attended,
-        Arc::new(SystemClock),
+        Arc::new(irmind_testkit::FixedClock::new(10)),
     )
     .unwrap()
     .with_skills(services)
@@ -981,6 +984,10 @@ fn subagent_case_verification_seal_and_offline_v8_keep_every_committed_chunk() {
     let fingerprint = hex(&sha256(&history.analyst.public_key()));
     verify_export_expected(&output, Some(&fingerprint)).unwrap();
     let bytes = fs::read(&output).unwrap();
+    assert_eq!(
+        bytes,
+        include_bytes!("../../../../../fuzz/seeds/export/valid-v8-subagents.irmind")
+    );
     let chunk = chunks[1].bytes();
     let position = bytes
         .windows(chunk.len())

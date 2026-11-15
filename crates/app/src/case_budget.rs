@@ -145,6 +145,24 @@ impl UsageAccumulator {
     pub(crate) fn push(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
         let invalid = || AppError::InvalidChain(entry.seq);
         match entry.kind {
+            crate::AuditEventKind::SubagentReservationV1 => {
+                use crate::subagents::{
+                    ReservationAction, ReservationPurpose, SubagentRecord, SubagentReservationV1,
+                };
+                let (_, encoded) = entry.payload.split_once(':').ok_or_else(invalid)?;
+                if encoded.len() > 512 * 1024 {
+                    return Err(invalid());
+                }
+                let bytes = hex::decode(encoded).map_err(|_| invalid())?;
+                let reservation = SubagentReservationV1::decode(&bytes).map_err(|_| invalid())?;
+                if reservation.action == ReservationAction::ReserveRequest
+                    && reservation.purpose == ReservationPurpose::Model
+                    && reservation.task_id.is_some()
+                {
+                    let model = self.models.entry(entry.actor.as_storage()).or_default();
+                    model.requests = model.requests.checked_add(1).ok_or_else(invalid)?;
+                }
+            }
             crate::AuditEventKind::ModelRequest => {
                 let model = self.models.entry(entry.actor.as_storage()).or_default();
                 model.requests = model.requests.checked_add(1).ok_or_else(invalid)?;
@@ -309,13 +327,52 @@ mod tests {
 
     #[test]
     fn child_token_charges_never_mask_missing_parent_provider_usage() {
+        use crate::subagents::{
+            ReservationAction, ReservationPurpose, ReservationTransition, SubagentDigest,
+            SubagentPlanV1, SubagentRecord, SubagentReservationV1, SubagentResources,
+        };
         let mut child = entry(
             AuditEventKind::ModelUsage,
             r#"{"input_tokens":12,"output_tokens":8,"estimated_cost_microusd":30}"#,
         );
         child.actor =
             irmind_domain::Actor::Agent(irmind_domain::AgentId::parse("skills-agent").unwrap());
-        let mut entries = vec![entry(AuditEventKind::ModelRequest, "parent"), child];
+        let plan = SubagentPlanV1::decode(include_bytes!(
+            "../../../docs/development/subagent-format-vectors/plan.json"
+        ))
+        .unwrap();
+        let request = SubagentReservationV1::prepare(
+            &plan,
+            Some(plan.tasks[0].task_id),
+            1,
+            ReservationAction::ReserveRequest,
+            ReservationPurpose::Model,
+            ReservationTransition {
+                amount: SubagentResources {
+                    tokens: 100,
+                    rounds: 1,
+                    calls: 0,
+                    cloud_bytes: 0,
+                },
+                parent_operation: Some(SubagentDigest::from_bytes([1; 32])),
+                cause_sha256: SubagentDigest::from_bytes([2; 32]),
+                accounting_audit_sha256: None,
+            },
+        )
+        .unwrap();
+        let mut reserved = entry(
+            AuditEventKind::SubagentReservationV1,
+            &request.audit_payload().unwrap(),
+        );
+        reserved.actor = child.actor.clone();
+        let no_report = case_budget_usage(std::slice::from_ref(&reserved)).unwrap();
+        assert!(!no_report.provider_usage_available);
+        assert_eq!(no_report.cost_microusd, None);
+        let mut entries = vec![
+            entry(AuditEventKind::ModelRequest, "parent"),
+            reserved,
+            child,
+        ];
         let unknown = case_budget_usage(&entries).unwrap();
         assert_eq!(unknown.model_tokens, 20);
         assert!(!unknown.provider_usage_available);

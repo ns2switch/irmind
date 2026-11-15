@@ -2,6 +2,8 @@
 pub type PortFuture<'a, T> =
     std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, crate::AppError>> + Send + 'a>>;
 mod branch;
+mod broker;
+pub use broker::{PreparedSubagentPlan, StartedSubagentPlan, SubagentTaskProposal};
 mod chunk;
 mod codec;
 pub use branch::*;
@@ -53,6 +55,24 @@ pub struct SubagentPorts {
 mod tests;
 
 impl crate::Engine<'_> {
+    pub(crate) fn subagent_holds_unlocked(
+        &self,
+        case: &crate::CaseId,
+    ) -> Result<SubagentResources, crate::AppError> {
+        let entries = self.audit_log.entries(case)?;
+        if !entries.iter().any(|entry| is_subagent_kind(entry.kind)) {
+            return Ok(SubagentResources::default());
+        }
+        let mut journal = SubagentJournal::for_verification(case.clone())
+            .map_err(|_| crate::AppError::InvalidChain(0))?;
+        for entry in &entries {
+            journal.accept(entry, self.verifier.as_ref())?;
+        }
+        journal
+            .outstanding()
+            .map_err(|_| crate::AppError::InvalidChain(0))
+    }
+
     pub(crate) fn require_no_active_subagents(
         &self,
         case: &crate::CaseId,
