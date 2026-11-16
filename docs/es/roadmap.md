@@ -10,82 +10,75 @@ Política anterior a 1.0: las versiones menores pueden cambiar formatos sin migr
 
 Preparación del lanzamiento: [validación real](real-validation.md), [evaluación de modelos](hunteval-model-benchmark.md) y [firma nativa](native-signing.md). Son procedimientos, no validaciones reales ya completadas.
 
-## Entregado en 0.1.0 y 0.1.1
+## Entregado hasta v0.5.x
 
-Las versiones preliminares incluyen la TUI para casos, conectores sujetos a política, custodia firmada, conversaciones protegidas, consultas acotadas sobre Parquet, demo sintética, registro de detección de parsers, instaladores verificados y binarios firmados y atestados con Sigstore. El [registro de cambios](../../CHANGELOG.md) detalla lo entregado. H5 está hecha por decisión del analista; siguen pendientes de registro los pasos no descritos y la validación de un conector real.
+El [registro de cambios](../../CHANGELOG.md) detalla versiones y formatos. Estas
+son capacidades entregadas, no afirmaciones de validación con incidentes reales.
 
-## v0.1.x: estabilizar la versión preliminar
+- Casos en terminal, conversaciones protegidas, herramientas sujetas a política,
+  custodia firmada, consultas Parquet acotadas, instaladores verificados y demo
+  sintética sin red.
+- Parsers experimentales modulares con detección, confirmación ante ambigüedad y
+  EVTX aislado. Los binarios de Windows se cubren mediante salidas de EZTools,
+  Velociraptor y plaso; futuros parsers nativos de registro y `$MFT` requieren
+  auxiliares aislados. Consulta la [cobertura](parsers.md).
+- Esquema común con decodificadores y mapeos identificados separados. Artefactos
+  V3, conjuntos de fuentes, perfiles y recibos firmados; consultas por categoría,
+  resultado y rol con los mismos límites. Ingesta multinúcleo con orden y bytes
+  deterministas.
+- Elastic y Google SecOps experimentales: consultas estructuradas de solo lectura,
+  credenciales explícitas en el llavero, TLS completo y resultados firmados.
+  La validación real sigue correspondiendo al analista. El modo de instancia de
+  Chronicle exige confirmación, techo de organización y aviso permanente.
+- Quince skills progresivas para Windows, Linux, AWS, Azure, GCP, red y Kubernetes.
+  El núcleo se mantiene en [irmind-skills](https://github.com/ns2switch/irmind-skills),
+  separado del catálogo instalable. La clave de producción y la primera release
+  firmada del catálogo siguen pendientes de la persona mantenedora.
+- Seis tipos de subagente acotados, con contexto propio, ramas, checkpoints,
+  fusión determinista, export V8 y planes visibles/cancelables. Reservar más del
+  25% de tokens o llamadas restantes exige firma; una preferencia permite pedir
+  confirmación para todos los planes.
+- Presupuestos de caso bajo el techo organizativo. Se usa el máximo nativo de
+  salida del modelo y se comprueba saldo entre peticiones, conservando uso real
+  y deuda. La configuración del modelo se guarda conjunta y la prueba usa el
+  borrador sin guardarlo.
+- Borrado lógico firmado de casos sin sellar y barra de estado declarativa con
+  prioridades integrados para v0.5.2. El borrado conserva lápidas, respeta bloqueos
+  y recupera interrupciones; no garantiza eliminación física segura.
 
-- H5 está hecha por decisión del analista tras probar un saludo con DeepSeek real. Registrar los pasos restantes y probar un conector en un entorno real. Consulta el [registro de validación](manual-validation.md#registro-de-resultados).
-- Mantener la firma Sigstore sin claves, las atestaciones de GitHub y el SBOM entregados en v0.1.1.
-- Firmar los binarios de macOS con Developer ID, hardened runtime y notarización mediante `notarytool`, desde un entorno de release protegido que solo se ejecuta para tags. La persona mantenedora debe proporcionar el certificado y la clave de App Store Connect antes de implementarlo.
-- Solicitar acceso al programa SignPath Foundation para firmar Windows con Authenticode. Publicar `CODE_SIGNING.md` con la política de firma, aprobación de releases y procedencia de builds. La solicitud corresponde a la persona mantenedora.
-- Mantener instaladores que verifican checksums y el binario Linux aarch64. Homebrew, AUR, Nix, winget y Scoop quedan abiertos a empaquetadores de la comunidad.
-- Reducir el espacio del artefacto de co-observación, mejorar `entity_lookup` y acotar el peor caso de `path` de tres saltos ([issue #37](https://github.com/ns2switch/irmind/issues/37)).
+Skills e hijos no amplían permisos ni alcance, los hijos no aprueban, y datos
+externos o del modelo nunca pasan a system confiable. Ningún modelo ni conector
+se activa por defecto. Los diseños históricos no prometen compatibilidad del
+binario actual.
 
-## v0.2: parsers y artefactos precisos
+## v0.5.x: estabilización y preparación para evaluación
 
-Syslog y las exportaciones de Linux están disponibles como módulos experimentales. Linux cubre autenticación, correlación acotada de auditd, journald JSON y logs HTTP common/combined. [La cobertura y selección de parsers](parsers.md) describe sus límites actuales.
-
-- Ampliar el registro de detección: cada parser es un módulo Cargo que se activa cuando reconoce el log. Una coincidencia ambigua requiere que el analista elija; una elección forzada queda auditada.
-- Añadir parsers experimentales de EVTX; syslog; autenticación, auditd, journald, nginx y Apache en Linux; ECS; OCSF; Velociraptor; Hayabusa; Chainsaw; plaso; EZTools; Zeek; Suricata EVE; y un formato declarativo definido por el usuario.
-- Mantener los formatos restantes como [issues de entrada](https://github.com/ns2switch/irmind/issues?q=is%3Aissue+label%3A%22good+first+issue%22).
-
-Los artefactos binarios de Windows (registro, `$MFT`, Prefetch, LNK, SRUM y Amcache) se cubren mediante las exportaciones procesadas de EZTools, Velociraptor y plaso. Consulta [la cobertura actual de Windows](parsers.md#cobertura-de-windows) para los formatos admitidos. Los [futuros parsers nativos de registro y `$MFT`](https://github.com/ns2switch/irmind/issues/159) dependerán de la demanda y deberán seguir el mismo modelo de proceso auxiliar aislado aprobado para EVTX, sin incorporar decodificadores binarios al proceso principal.
-
-Zeek y Suricata no se distribuyeron en v0.1.x. Los módulos recuperados conservan microsegundos y usan particiones por host en V2. La migración de precisión V1 → V2 pertenecía a v0.2. La versión actual no conserva esos lectores ni comandos; abrir un caso nunca lo migra.
-
-## v0.3: eventos comunes, una sola cadena y conectores SIEM
-
-La cadena actual separa la decodificación acotada del formato del mapeo
-identificado y validado. CLI, TUI y demo usan artefactos V3 y exportación V6.
-La versión 0.3 no lee casos de 0.2: conserva el ejecutable creador o
-[reingiere los originales verificados en un caso nuevo](../development/case-migration.md).
-
-- Los tipos validados y códigos fijos permiten filtrar por categoría, tipo, resultado y rol mediante las herramientas acotadas existentes.
-- Hay mapeos semánticos de EVTX, autenticación/auditd/HTTP de Linux, CloudTrail, ECS y OCSF. Las exportaciones DFIR, syslog, journald, Zeek, Suricata y los formatos declarativos conservan campos originales y extracción consultable sin inventar clasificaciones. Los mapeos semánticos comunitarios siguen abiertos.
-- Cada parser compilado tiene un decodificador de campos originales. Los conjuntos de origen, perfiles y recibos vinculan la interpretación con los artefactos firmados; la reconstrucción usa esas identidades exactas.
-- El auxiliar EVTX aislado decodifica bloques independientes en paralelo con salida idéntica entre números de trabajadores. Se mantiene el aislamiento nativo; Windows usa un único testigo de red verificado por sesión.
-- La ingesta multinúcleo usa las CPU disponibles y un presupuesto de memoria. Se paralelizan el framing independiente, la preparación pura de registros y la finalización de particiones; la cadena firmada y el orden siguen siendo deterministas. Las fuentes ordenadas usan colas acotadas y las desordenadas conservan la ordenación dentro del caso.
-- Los conectores experimentales Elastic y Google SecOps usan consultas estructuradas, credenciales explícitas del llavero, TLS completo, contratos sintéticos y evidencia firmada. Ningún conector ni modelo se activa por defecto; sigue pendiente la validación con servicios reales. Chronicle filtra por cuenta de evento por defecto; el alcance explícito de instancia exige confirmación, techo de organización y contexto firmado del caso, con un aviso persistente en la TUI.
-- Se mantienen las mediciones release de los nueve escenarios de 15 GB y los plazos de consultas ordinarias. Las mejoras de entidades densas, ordenación de estrés y co-observación se siguen por separado de los controles de seguridad.
-
-## v0.4: skills forenses
-
-La versión preliminar 0.4.2 incluye 15 skills firmadas y de carga progresiva,
-presupuestos de caso firmados, ingesta nativa de Kubernetes audit/Falco y
-cobertura semántica de Entra, GCP y red. Cada skill pasa un caso sintético con
-modelo guionizado, hallazgos confirmados y exportación verificada de forma
-independiente. Siguen pendientes la validación de un conector real y la
-publicación del catálogo comunitario. Una [evaluación Windows posterior](https://github.com/ns2switch/irmind/pull/284)
-correlaciona nueve exportaciones sintéticas; no valida una colección ni un modelo
-reales.
-
-- El [diseño aprobado](../development/skills-design.md), el [contrato de instalación](../development/skills-installation-contract.md) y el [contrato de recibos y exportación V7](../development/skills-case-format-contract.md) definen la implementación 0.4. Consulta la [guía de uso](skills.md).
-- Una skill es una carpeta con `SKILL.md` que describe una metodología, más plantillas de consulta, reglas Sigma o mapeos opcionales. El núcleo cubre AWS, Azure, GCP, Windows, Linux, red y Kubernetes. Windows triage, Linux triage y AWS credential compromise son los tres métodos iniciales; ransomware de Windows y otros nueve llegaron en 0.4.1, y dos métodos de Kubernetes en 0.4.2. BEC de M365 sigue como posible ampliación comunitaria.
-- Incluir [**Windows triage**](https://github.com/ns2switch/irmind/issues/157): guiar una colección sintética y acotada con KAPE o Velociraptor de logs de eventos, registro y sus logs de transacciones, `$MFT`, Prefetch, LNK, SRUM y Amcache. Ingerir primero timelines de Hayabusa derivados de EVTX o CSV de EvtxECmd (EVTX directo si el auxiliar aislado está disponible), y después las exportaciones de PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch y SrumECmd. Investigar en orden: inicio de sesión → ejecución → persistencia → movimiento lateral → exfiltración. Correlacionar fuentes independientes y confirmar hallazgos con evidencia. El analista ejecuta las herramientas externas; una skill no concede permisos de ejecución.
-- Incluir **Linux triage** para autenticación, ejecución y persistencia, y **AWS credential compromise** para CloudTrail, actividad de roles y sesiones, y cambios en IAM.
-- `/budget` muestra consumo y asignaciones firmadas; `/settings limits` fija los valores para casos nuevos por debajo del techo de la organización. La identidad del clúster se confirma explícitamente; el lector de origen permite consultar hechos originales verificados sin proyectar cuerpos completos de peticiones.
-- El modelo recibe primero nombre y descripción y carga el contenido completo solo cuando lo necesita. Las skills pueden venir incluidas, de una organización o instaladas por un analista.
-- La instalación se firma y el caso registra el hash de la versión usada. Una skill declara herramientas necesarias, pero no amplía permisos. La firma admite los bytes exactos del paquete; su contenido sigue siendo no confiable tras la admisión y nunca llega al rol system.
-- `/skills` permite listar, instalar, inspeccionar y deshabilitar. Las skills invocables aparecen como comandos. El catálogo comunitario vive en otro repositorio.
-
-## v0.5: subagentes y trabajo paralelo (entregada)
-
-El [diseño aprobado](subagents-design.md) y el
-[contrato de formatos y puertos](subagents-format-contract.md) están implementados
-con marcador de caso 4, ramas autenticadas y export V8. La
-[guía de uso](subagents.md) explica revisión, cancelación, presupuestos y cobertura parcial.
-
-- El principal delega tareas acotadas con contextos propios. Hay seis tipos incluidos: triaje, nube, endpoint, red, Kubernetes e inteligencia. Los tipos comunitarios y límites en dinero se aplazan.
-- El plan se muestra antes de empezar. Más del 25 % de los tokens o llamadas restantes exige confirmación firmada; una preferencia firmada puede exigir Start siempre.
-- Los hijos heredan el alcance sin ampliarlo, no aprueban y envían sus solicitudes al analista. Firman con Agent y sus resultados vuelven al principal como contenido no confiable.
-- Tokens, llamadas, rondas y bytes tienen límites propios y compartidos con el caso. La TUI permite seguir y cancelar tareas y muestra el coste estimado o no disponible.
-- Las ramas y checkpoints se fusionan de forma determinista. La TUI consume eventos de solo lectura del motor como preparación para su API futura.
+- Completar la primera caché tras revisar el contrato concreto de contabilidad:
+  prefijo confiable estable, uso de caché reportado y visible en presupuesto.
+  Mantener nonce por turno y cobrar todos los tokens; sin precalentamiento,
+  cambios automáticos de ruta ni caché presentada como gratuita.
+- Ensayar la [validación real](real-validation.md) con Elasticsearch local, TLS,
+  CA y modelo local. Registrar resultados, fallos y tiempos observados; no
+  sustituye la validación del analista con su modelo y conector.
+- Repetir PTY bajo carga con sincronización por eventos: arranque, presentación,
+  expansión y borrado.
+- Añadir macOS Intel nativo y Homebrew verificado. Mantener Linux aarch64,
+  instaladores, Sigstore con identidad de tag, provenance y SBOM. AUR, Nix,
+  winget y Scoop quedan abiertos a empaquetadores comunitarios.
+- Activar Developer ID, hardened runtime y notarización preparados solo tras
+  aportar el entorno protegido y aprobar la activación. SignPath y los
+  aprobadores de release corresponden a la persona mantenedora; Sigstore no
+  sustituye la firma nativa ni la reputación del sistema operativo.
+- Registrar los pasos pendientes de H5, un conector en un entorno real y EVTX
+  experimental en Windows 11. No deducirlos de pruebas sintéticas scripted.
+- Medir y mejorar estrés, consultas de entidades densas y disco de co-observación
+  sin alterar límites de consulta ni controles para mejorar una cifra.
 
 ## Lanzamiento público
 
-Publicar un artículo, un vídeo de demostración con datos sintéticos, publicaciones comunitarias, un benchmark público de modelos con HuntEval y un catálogo inicial de skills. El lanzamiento sigue a v0.5 e incluye el repositorio comunitario de skills.
+Publicar un artículo, un vídeo de demostración con datos sintéticos, publicaciones comunitarias, un benchmark público de modelos con HuntEval y un catálogo inicial de skills. El lanzamiento público es el siguiente hito tras estabilizar v0.5.x. Publicar
+solo afirmaciones medidas: firma nativa, validaciones del analista y catálogo
+son elementos explícitos de la lista, no garantías implícitas.
 
 ## v0.6: consultas en origen
 
@@ -96,7 +89,9 @@ Consultas estructuradas y con presupuesto en Athena, CloudTrail Lake, Security L
 - Ejecutar reglas Sigma sobre Parquet local sin LLM.
 - Exportar informes Markdown y PDF que citan solo evidencia confirmada.
 - Evaluar IRMind como deployment completo con el protocolo HuntEval.
-- Permitir hooks locales firmados antes o después de llamadas a herramientas.
+- Permitir hooks locales firmados antes o después de llamadas, incluida una
+  barra de estado con script admitido explícitamente. La barra actual es
+  declarativa y no ejecuta comandos externos.
 - Ofrecer un cliente MCP opcional y desactivado por defecto, con modelo de amenazas. Cada herramienta declara riesgo, pasa por política y devuelve contenido no confiable.
 - Aprobar el diseño de una API del motor antes de añadir el futuro subcomando `serve` de `irmind`. El protocolo versionado transmite eventos por stdio, socket Unix o named pipe de Windows, sin TCP abierto por defecto. Las claves permanecen en IRMind: el cliente solicita aprobación, el analista confirma e IRMind firma.
 

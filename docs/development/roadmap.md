@@ -10,84 +10,78 @@ This page is for contributors and evaluators. It describes intentions, not relea
 
 Current pre-1.0 policy: minor versions may break formats without migration. V3 is the sole artifact layout in v0.3; compatibility statements in delivered-release sections describe those historical releases only.
 
-## Delivered in 0.1.0 and 0.1.1
+## Delivered through v0.5.x
 
-The pre-releases provide the terminal case workflow, policy-gated connectors, signed custody, guarded model conversations, bounded Parquet queries, a synthetic demo, a parser detection registry, verified installers, and Sigstore-signed and attested assets. See the [changelog](../../CHANGELOG.md) for what shipped and its limitations. H5 is complete by analyst decision; unreported procedure details and validation of a real connector remain pending.
+See the [changelog](../../CHANGELOG.md) for exact releases and format changes.
+The following describes delivered capabilities, not field-validation claims.
 
-## v0.1.x: Stabilize the pre-release
+- Terminal cases, guarded conversations, policy-gated tools, signed custody,
+  bounded Parquet queries, verified installers and an offline synthetic demo.
+- Experimental parser modules with format detection, explicit ambiguity handling
+  and isolated EVTX decoding. Windows binary artifacts are ingested through
+  processed EZTools, Velociraptor and plaso exports; future native registry and
+  `$MFT` decoders require isolated helpers. See [parser coverage](../parsers.md).
+- The common-event pipeline separates bounded source decoding from identified
+  mappings. Mapped V3 artifacts retain signed source sets, profiles and receipts;
+  semantic category/outcome/role queries keep their existing limits. Multicore
+  ingestion preserves deterministic ordering and signed artifacts.
+- Experimental Elastic and Google SecOps connectors use structured read-only
+  queries, explicit keystore credentials, full TLS verification and signed
+  results. Live-service validation is still an analyst task. Chronicle instance
+  scope remains explicit, confirmed, organization-bounded and visible in the TUI.
+- Fifteen progressively loaded forensic skills cover Windows, Linux, AWS, Azure,
+  GCP, network and Kubernetes investigations. Core methods live in
+  [irmind-skills](https://github.com/ns2switch/irmind-skills); its catalog is
+  distinct from release-bundled core packages. Production catalog-key provisioning
+  and the first signed catalog release remain maintainer tasks.
+- Six bounded subagent types have separate contexts, signed branches, checkpoints,
+  deterministic fusion, export V8 and visible/cancelable plans. Reservations above
+  25% of remaining case tokens or calls require signed analyst confirmation;
+  Preferences can require confirmation for every plan.
+- Case budgets remain below the organization policy ceiling. Native model output
+  maxima replace application token caps; admission happens between requests,
+  actual usage and debt remain recorded. Model settings are saved together and
+  connection testing uses the unsaved draft.
+- Signed logical deletion of unsealed cases and a declarative, prioritized status
+  bar are integrated for v0.5.2. Deletion retains signed tombstones, honors process
+  locks and recovers interrupted cleanup; it is not secure physical erasure.
 
-Stabilize the pre-release with manual validation, verifiable installation, and signed assets.
+Skills never grant tools or scope, children never approve, and external/model
+content never enters trusted system instructions. No model or connector is
+enabled by default. Historical release designs explain old decisions; they are
+not compatibility promises for the current executable.
 
-- H5 is complete by analyst decision after a real DeepSeek greeting test. Record the remaining procedure details and test one connector against a real test environment. See the [validation record](manual-validation.md#result-record).
-- Maintain Sigstore keyless signatures, GitHub artifact attestations, and an SBOM for release assets, delivered in v0.1.1.
-- Sign macOS binaries with Developer ID, hardened runtime, and `notarytool` notarization in a protected release environment that runs only on tags. The maintainer must provision the certificate and App Store Connect API key before activation; secrets are never configured through a roadmap issue.
-- Apply to the SignPath Foundation open-source program for Windows Authenticode signing. Publish `CODE_SIGNING.md` to describe signed assets, release approval, and build provenance. The application is a maintainer task.
-- Maintain checksum-verified install scripts and the Linux aarch64 binary, delivered in v0.1.1. Homebrew, AUR, Nix, winget, and Scoop packaging is open to community maintainers.
-- Reduce co-observation disk use, improve `entity_lookup`, and bound worst-case three-hop `path` queries ([issue #37](https://github.com/ns2switch/irmind/issues/37)).
+## v0.5.x: Evaluation readiness and stabilization
 
-## v0.2: Parsers and precise evidence artifacts
-
-Syslog and Linux exports are available as experimental modules. Linux covers authentication, bounded auditd correlation, journald JSON and common/combined HTTP logs. [Parser coverage and selection](../parsers.md) describes current limits.
-
-Version 0.2 delivered detected log parsers, precise artifact V2, explicit precision migration and mixed-generation export V5. Those historical readers and migration commands belong to that release, not the current executable.
-
-- Extend the detection registry delivered in v0.1.1. Each parser is a Cargo module activated only when its detector recognizes the log; ambiguous matches ask the analyst. A forced choice is audited.
-- Add experimental parsers for Windows EVTX; syslog; Linux authentication, auditd, journald, nginx, and Apache logs; ECS; OCSF; Velociraptor; Hayabusa; Chainsaw; plaso; EZTools; Zeek; Suricata EVE; and a user-defined declarative format.
-- Zeek and Suricata were not shipped in v0.1.x. Their restored modules preserve microseconds, use host-aware V2 partitions and retain bounded parser detection and provenance.
-- Existing V1 cases stay readable without automatic migration. Explicit V1 → V2 precision migration is optional; retain verified originals and historical generations.
-- Track remaining log formats as [good first issues](https://github.com/ns2switch/irmind/issues?q=is%3Aissue+label%3A%22good+first+issue%22).
-
-Windows binary artifacts (registry hives, `$MFT`, Prefetch, LNK, SRUM and Amcache) are covered through processed EZTools, Velociraptor and plaso exports. See [current Windows coverage](../parsers.md#windows-coverage) for the supported input shapes. Demand will guide [future native registry and `$MFT` parsers](https://github.com/ns2switch/irmind/issues/159); both require the same isolated-helper model approved for EVTX, rather than binary decoders inside the main process.
-
-## v0.3: Common events, one pipeline and SIEM connectors
-
-The current source pipeline separates bounded format decoding from identified,
-validated mapping. CLI, TUI and demo use mapped V3 artifacts and export V6.
-Version 0.2 cases are not readable in 0.3: keep the creating executable or
-[re-ingest verified originals into a new case](case-migration.md).
-
-- Checked common-event types and fixed codes expose category, type, outcome and entity-role filters through the existing bounded evidence tools.
-- Semantic mappings cover EVTX, Linux authentication/auditd/HTTP, CloudTrail, ECS and OCSF. DFIR exports, syslog, journald, Zeek, Suricata and declarative formats retain original fields and searchable extraction without inventing classifications. Community semantic mappings remain welcome.
-- Every compiled parser has an original-field source decoder. Source sets, mapping profiles and run receipts bind its interpretation to signed artifacts; reconstruction uses those exact identities.
-- The isolated EVTX helper decodes independent chunks concurrently with identical output across worker counts. Native containment remains required; Windows uses one verified network witness per session.
-- Multicore ingestion follows available CPUs and a memory budget. Independent framing, pure record preparation and partition completion run in parallel; signed commits and record ordering remain deterministic. Ordered sources use bounded queues and disorder retains case-local sorting.
-- Experimental Elastic and Google SecOps connectors use structured queries, explicit keystore credentials, full TLS verification, synthetic contracts and signed source evidence. No connector or model is enabled by default; real-service validation remains pending. Chronicle defaults to event-account filtering; explicit instance scope requires analyst confirmation, an organization ceiling and signed case context, with a persistent TUI warning.
-- Keep release measurements for the nine 15 GB cloud/endpoint scenarios and all ordinary query deadlines. Track dense-entity, stress-sort and co-observation improvements separately from changes to security limits.
-
-## v0.4: Forensic skills
-
-The 0.4.2 pre-release includes 15 signed, progressively loaded forensic skills,
-signed case budgets, native Kubernetes audit/Falco ingestion and semantic Entra,
-GCP and network coverage. Each skill passes a scripted synthetic case with
-confirmed findings and an independently verified export. Real-connector
-validation and publication of the separate community catalog remain follow-up
-work. A subsequent [multi-artifact Windows evaluation](https://github.com/ns2switch/irmind/pull/284)
-correlates nine synthetic exports; real collection/model validation remains open.
-
-- The approved [skills design](skills-design.md), [installation contract](skills-installation-contract.md) and [case receipt contract](skills-case-format-contract.md) define the 0.4 implementation. See the [usage guide](../skills.md).
-- A skill is a folder with `SKILL.md` for methodology and instructions, plus optional query templates, Sigma rules, or mappings. The core catalog covers AWS, Azure, GCP, Windows, Linux, network and Kubernetes. Windows triage, Linux triage and AWS credential compromise remain the initial methods; Windows ransomware and nine other methods arrived in 0.4.1, and two Kubernetes methods in 0.4.2. M365 business email compromise remains a possible community extension.
-- Bundle [**Windows triage**](https://github.com/ns2switch/irmind/issues/157): guide a scoped, synthetic KAPE or Velociraptor collection of event logs, registry hives and related transaction logs, `$MFT`, Prefetch, LNK, SRUM and Amcache. Ingest direct EVTX with its verified isolated helper, Hayabusa timelines or EvtxECmd CSV first, then EZTools exports from PECmd, AmcacheParser, AppCompatCacheParser, MFTECmd, LECmd, RECmd batch and SrumECmd. Investigate logons → execution → persistence → lateral movement → exfiltration, correlate independent sources and confirm findings with evidence. Collection and external tools remain analyst-run; a skill grants no execution rights.
-- Bundle **Linux triage** for authentication, execution and persistence, and **AWS credential compromise** for CloudTrail, role/session activity and IAM changes.
-- `/budget` shows signed case consumption and allocations; `/settings limits` sets defaults for new cases below the organization ceiling. Kubernetes cluster identity is confirmed explicitly, and the source-reader contract permits verified original facts without projecting entire request bodies.
-- The model initially sees only a skill's name and description; it loads full content when needed. Skills may be bundled, supplied by an organization, or installed by an analyst.
-- Installation is signed, and the case log records the hash of the version used. A skill can declare needed tools but cannot extend permissions: policy and the organization ceiling decide. Signing admits exact package bytes; skill content stays untrusted even after admission and never enters system messages.
-- Use `/skills` to list, install, inspect, update and disable skills. User-invocable skills appear as slash commands. Maintain a separate community skills repository.
-
-## v0.5: Subagents and parallel work (delivered)
-
-Run bounded parallel subagents with Agent-key signatures and deterministic case records.
-
-- The approved [subagent design](subagents-design.md) and [format/port contract](subagents-format-contract.md) are implemented with case marker 4, authenticated branches and export V8. The [user guide](../subagents.md) covers review, cancellation, budgets and partial coverage.
-- The main agent delegates bounded tasks to parallel subagents with separate contexts. Version 0.5 includes only triage, cloud, endpoint, network, Kubernetes, and threat intelligence; community-defined types and monetary caps follow later. Plans are visible before work; reserving more than 25% of remaining case tokens or calls requires signed analyst confirmation.
-- Subagents inherit case scope and never extend it. They cannot approve calls; requests enter the analyst queue. They sign with the Agent key, and their output returns to the main agent as untrusted data.
-- Enforce concurrency, round, and token limits per subagent and a total budget per turn. Show each subagent in the TUI and allow cancellation.
-- Give each subagent an event branch and merge branches deterministically into the signed case chain so reports remain reproducible. Make the TUI a client of the engine's streamed events as preparation for the engine API.
+- Complete first-increment prompt-cache support after review of the concrete
+  accounting contract: stable trusted prefix, provider-reported cache usage and
+  visible budget accounting. Retain fresh per-turn nonces and charge every logical
+  token; no speculative warm-up, automatic routing change or claimed free input.
+- Rehearse the [real-service procedure](real-validation.md) with local Elasticsearch,
+  TLS/CA verification and a local model. Record actual outcomes, errors and timings;
+  this does not replace the analyst's real-model/connector validation.
+- Exercise PTY interactions repeatedly under load with event-based synchronization,
+  including first run, demo presentation, expansion and deletion.
+- Add native macOS Intel assets and verified Homebrew packaging. Maintain Linux
+  aarch64, signed installers, exact-tag Sigstore verification, provenance and SBOM.
+  AUR, Nix, winget and Scoop remain open to community maintainers.
+- Activate prepared Developer ID/hardened-runtime signing and notarization only
+  after the maintainer provisions the protected release environment and approves
+  activation. Windows SignPath application and release approvers are maintainer
+  tasks; Sigstore does not replace native OS signing or reputation.
+- Record the remaining H5 procedure details and a connector against a real test
+  environment, and confirm experimental EVTX behavior on Windows 11. Do not infer
+  these observations from scripted synthetic tests.
+- Track stress ingestion, dense-entity queries and co-observation disk use as
+  measured performance work; never change query/security limits to improve a score.
 
 ## Public launch
 
 Publish an article, a synthetic-data demo video, community posts, a public HuntEval model benchmark, and an initial community skills catalog.
 
-The launch follows v0.5 and includes the separate community skills repository.
+The public launch is the next milestone after v0.5.x stabilization. Publish only
+measured validation claims; native signing, analyst validations and the catalog
+remain explicit checklist items, not implied guarantees.
 
 ## v0.6: Source-side queries
 
@@ -102,7 +96,9 @@ Add local detections, evidence-linked reports, controlled extensions, and a head
 - Execute Sigma rules over local Parquet without an LLM.
 - Export Markdown and PDF reports that cite only confirmed evidence.
 - Evaluate IRMind as a complete deployment through the HuntEval protocol.
-- Add signed local hooks before or after tool calls.
+- Add signed local hooks before or after tool calls, including an explicitly
+  admitted status-bar script. The current status bar remains declarative and
+  executes no external command.
 - Offer an optional MCP client, disabled by default. Each MCP tool declares risk, passes through policy, and returns untrusted content; its design includes a threat model.
 - Approve an engine API design before implementing the planned headless `serve` subcommand for `irmind`. The versioned protocol streams events over stdio, a Unix socket, or a Windows named pipe, with no open TCP listener by default. Keys stay inside IRMind: a client requests approval, the analyst confirms, and IRMind signs.
 
