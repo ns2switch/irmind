@@ -1,7 +1,7 @@
 #![cfg(unix)]
 #![allow(clippy::unwrap_used)]
 
-use std::{path::Path, process::Command, thread, time::Duration};
+use std::{path::Path, process::Command, time::Duration};
 
 #[path = "support/terminal_screen.rs"]
 mod terminal_screen;
@@ -10,27 +10,9 @@ mod terminal_screen;
 mod demo_session;
 use demo_session::DemoSession;
 
-fn drain_output(session: &mut DemoSession) {
-    while session.poll().unwrap() {}
-}
-
-fn send_and_drain(session: &mut DemoSession, input: &str) {
+fn send_until(session: &mut DemoSession, input: &str, next_screen: &str) {
     session.send(input).unwrap();
-    for _ in 0..10 {
-        drain_output(session);
-        thread::sleep(Duration::from_millis(50));
-    }
-}
-
-fn wait_for_file(session: &mut DemoSession, path: &Path) -> bool {
-    for _ in 0..900 {
-        drain_output(session);
-        if path.is_file() {
-            return true;
-        }
-        thread::sleep(Duration::from_millis(50));
-    }
-    false
+    session.expect(next_screen).unwrap();
 }
 
 fn terminal_command(binary: &str, home: &Path) -> Command {
@@ -53,22 +35,29 @@ fn first_run_creates_file_keystore_without_leaving_the_tui() {
         DemoSession::spawn_sized(&terminal_command(binary, home.path()), 100, 32).unwrap();
     session.timeout = Duration::from_secs(45);
     session.expect("Welcome").unwrap();
-    send_and_drain(&mut session, "\r");
-    send_and_drain(&mut session, "\x1b[B");
-    send_and_drain(&mut session, "\r");
-    send_and_drain(&mut session, "\x1b[B");
-    send_and_drain(&mut session, "\r");
-    send_and_drain(&mut session, "synthetic passphrase for PTY test\r");
-    send_and_drain(&mut session, "synthetic passphrase for PTY test\r");
-    assert!(wait_for_file(
+    send_until(&mut session, "\r", "Choose a backend for the signing key:");
+    send_until(
         &mut session,
-        &home.path().join("keystore.toml")
-    ));
+        "2\r",
+        "Choose a backend for the module secrets:",
+    );
+    send_until(&mut session, "2\r", "Create a passphrase");
+    send_until(
+        &mut session,
+        "synthetic passphrase for PTY test\r",
+        "Repeat the passphrase",
+    );
+    send_until(
+        &mut session,
+        "synthetic passphrase for PTY test\r",
+        "Analyst public-key fingerprint:",
+    );
     session.send("\r").unwrap();
     session.expect("First-run").unwrap();
     assert!(home.path().join("keystore.enc").exists());
     assert!(home.path().join("keystore.toml").exists());
     session.send("\x1b").unwrap();
+    session.expect("No cases yet").unwrap();
     session.send("/quit\r\r").unwrap();
     drop(session);
 
@@ -79,7 +68,7 @@ fn first_run_creates_file_keystore_without_leaving_the_tui() {
     unlock.send("incorrect synthetic phrase\r").unwrap();
     unlock.expect("incorrect").unwrap();
     unlock.send("synthetic passphrase for PTY test\r").unwrap();
-    thread::sleep(Duration::from_secs(2));
+    unlock.expect("Analyst public-key fingerprint:").unwrap();
     unlock.send("\r").unwrap();
     unlock.expect("First-run").unwrap();
 }
