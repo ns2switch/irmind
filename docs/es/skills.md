@@ -6,7 +6,7 @@ Esta página ayuda a los analistas a aplicar un método de investigación repeti
 
 ## Proponer una mejora
 
-La fuente de las skills incluidas es [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills). Su directorio `core/` contiene los 15 paquetes incluidos, sus recursos y episodios sintéticos de evaluación separados. Propón las mejoras allí; llegan a IRMind mediante una PR de sincronización revisada y una release de IRMind.
+La fuente de las skills incluidas es [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills). Su directorio `core/` contiene los 15 paquetes incluidos, sus recursos y episodios sintéticos de evaluación separados. Propón las mejoras allí; llegan a IRMind mediante una PR de sincronización revisada y una release de IRMind. No hace falta Rust: puedes aportar metodología, fuentes necesarias, falsos positivos y episodios sintéticos de evaluación.
 
 Los paquetes comunitarios viven en `catalog/`. Se instalan explícitamente con `/skills install catalog:<name>` cuando exista un catálogo de producción confiable; no pueden sustituir un nombre del núcleo. El catálogo actual no tiene release ni clave de firma de producción. Ambas vías usan el mismo compilador acotado de skills y pruebas locales con modelo scripted.
 

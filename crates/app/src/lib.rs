@@ -93,7 +93,7 @@ pub use approvals::{ApprovalRequest, ApprovalSource};
 use audit_origin::AuditOrigin;
 pub use configuration::{
     ConfigChange, ConfigDifference, ConfigurationInspection, ConfigurationReview,
-    ConfigurationStore, PersistentConfig, ProductSettings,
+    ConfigurationStore, ModelConfiguration, PersistentConfig, ProductSettings,
 };
 pub use custody::{
     SealPreview, export_case, export_case_with_originals, verify_export, verify_export_details,

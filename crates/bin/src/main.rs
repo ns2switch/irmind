@@ -163,6 +163,43 @@ fn compiled_credential_fields() -> Vec<&'static str> {
     fields
 }
 
+impl RootWorkspaceIo {
+    fn configuration_is_overridden(&self, change: &ConfigChange) -> bool {
+        match change {
+            ConfigChange::SetResumeLastCase(_)
+            | ConfigChange::SetShowHints(_)
+            | ConfigChange::SetMouseCapture(_)
+            | ConfigChange::SetTheme(_)
+            | ConfigChange::SetMaxParallelWorkers(_)
+            | ConfigChange::SetCaseBudgetDefaults(_)
+            | ConfigChange::SetConfirmAllSubagentPlans(_) => false,
+            ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
+            ConfigChange::ConfigureModel(model) => {
+                self.module_overrides.contains("llm")
+                    || self.module_overrides.contains(&model.module)
+                    || model.parameter_fields().map_or(true, |fields| {
+                        fields.iter().any(|field| std::env::var_os(field).is_some())
+                    })
+            }
+            ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
+            ConfigChange::SetValue { module, field, .. } => {
+                std::env::var_os(field).is_some()
+                    || self.module_overrides.contains(module)
+                    || (self.module_overrides.contains("llm")
+                        && self.manifests.iter().any(|manifest| {
+                            manifest.id == module
+                                && manifest
+                                    .ports
+                                    .contains(&irmind_app::modules::ModulePort::Llm)
+                        }))
+            }
+            ConfigChange::SetCertificateAuthority {
+                module, path_field, ..
+            } => std::env::var_os(path_field).is_some() || self.module_overrides.contains(module),
+        }
+    }
+}
+
 impl WorkspaceIo for RootWorkspaceIo {
     fn definition_store(&self) -> Option<&dyn irmind_app::ParserDefinitionStore> {
         Some(&self.definition_store)
@@ -370,31 +407,7 @@ impl WorkspaceIo for RootWorkspaceIo {
                 "the CA file changed after its fingerprint was shown"
             ));
         }
-        let overridden = match &change {
-            ConfigChange::SetResumeLastCase(_)
-            | ConfigChange::SetShowHints(_)
-            | ConfigChange::SetMouseCapture(_)
-            | ConfigChange::SetTheme(_)
-            | ConfigChange::SetMaxParallelWorkers(_)
-            | ConfigChange::SetCaseBudgetDefaults(_)
-            | ConfigChange::SetConfirmAllSubagentPlans(_) => false,
-            ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
-            ConfigChange::SetEnabled { module, .. } => self.module_overrides.contains(module),
-            ConfigChange::SetValue { module, field, .. } => {
-                std::env::var_os(field).is_some()
-                    || self.module_overrides.contains(module)
-                    || (self.module_overrides.contains("llm")
-                        && self.manifests.iter().any(|manifest| {
-                            manifest.id == module
-                                && manifest
-                                    .ports
-                                    .contains(&irmind_app::modules::ModulePort::Llm)
-                        }))
-            }
-            ConfigChange::SetCertificateAuthority {
-                module, path_field, ..
-            } => std::env::var_os(path_field).is_some() || self.module_overrides.contains(module),
-        };
+        let overridden = self.configuration_is_overridden(&change);
         if overridden {
             return Err(anyhow!(
                 "this setting is overridden by a flag or environment variable"
@@ -402,8 +415,12 @@ impl WorkspaceIo for RootWorkspaceIo {
         }
         let current = self.config_store.load()?;
         let next = current.changed(change.clone(), &self.manifests)?;
+        if let ConfigChange::ConfigureModel(model) = &change {
+            model_probe::validate_configuration(model, self.secret_backend.as_ref())?;
+        }
         let active_module = match &change {
             ConfigChange::SelectLlm(Some(id)) => Some(id.as_str()),
+            ConfigChange::ConfigureModel(model) => Some(model.module.as_str()),
             ConfigChange::SetEnabled {
                 module,
                 enabled: true,

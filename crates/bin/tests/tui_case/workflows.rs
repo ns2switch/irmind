@@ -59,9 +59,20 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
     keys.extend([KeyCode::Enter, KeyCode::Enter]); // Skip model listing after confirmation
     keys.extend("synthetic-model".chars().map(KeyCode::Char));
     keys.extend([
-        KeyCode::Enter,
+        KeyCode::Enter, // Model name
         KeyCode::Down,
-        KeyCode::Enter, // Save from review
+        KeyCode::Down,
+        KeyCode::Down,
+        KeyCode::Enter, // Native output maximum
+    ]);
+    keys.extend("128000".chars().map(KeyCode::Char));
+    keys.extend([
+        KeyCode::Enter,
+        KeyCode::Down, // Parameter required
+        KeyCode::Enter,
+        KeyCode::Up,
+        KeyCode::Up, // Save from review
+        KeyCode::Enter,
         KeyCode::Down,
         KeyCode::Enter, // Explicitly approve remote egress
     ]);
@@ -71,13 +82,26 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
     engine
         .verify_configuration(&io_ops.1, &[&irmind_mod_llm_openai_compatible::MANIFEST])
         .unwrap();
-    assert!(
-        store
-            .global_operations()
-            .unwrap()
-            .iter()
-            .any(|entry| entry.operation.starts_with("configuration-approved-v2:"))
+    let operations = store.global_operations().unwrap();
+    assert_eq!(
+        operations.len(),
+        1,
+        "the complete draft must be signed once"
     );
+    assert_eq!(operations[0].actor, Actor::Analyst);
+    assert!(
+        operations[0]
+            .operation
+            .starts_with("configuration-approved-v2:")
+    );
+    let settings = &saved.modules["llm-openai-compatible"].values;
+    assert_eq!(
+        settings["IRMIND_LLM_BASE_URL"],
+        "https://api.openai.com/v1/"
+    );
+    assert_eq!(settings["IRMIND_MODEL"], "synthetic-model");
+    assert_eq!(settings["IRMIND_MODEL_MAX_OUTPUT_TOKENS"], "128000");
+    assert_eq!(settings["IRMIND_MODEL_OUTPUT_REQUIRED"], "true");
     assert!(screen(tui.terminal()).contains("Model setup"));
 
     tui.select_model(&model);

@@ -29,6 +29,7 @@ Sin configurar modelos, claves de API, cuentas ni coste. La interfaz real invest
 - Abrir un caso, definir su alcance e investigar una alerta desde la terminal.
 - Ingerir evidencia local y consultar la cronología y el grafo de entidades.
 - Pedir a un modelo seleccionado que proponga consultas y cargue una [skill](docs/es/skills.md) forense firmada.
+  Las skills incluidas se mantienen en [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills), donde cualquiera puede proponer mejoras o skills nuevas sin escribir Rust. Las del núcleo llegan con cada release de IRMind; las del catálogo se instalarán con `/skills install catalog:<nombre>`.
 - Revisar planes acotados, seguir tareas paralelas con `/subagents` y cancelarlas sin descartar lo ya terminado.
 - Revisar y firmar aprobaciones antes de un enriquecimiento externo.
 - Consultar registros indexados y originales disponibles mientras el modelo recibe datos limitados y redactados.
@@ -160,10 +161,16 @@ Lee [security-model.md](docs/es/security-model.md) antes de conectar un proveedo
 
 La [hoja de ruta pública](docs/es/roadmap.md) describe intenciones, sin compromisos de publicación.
 
+## Contribuir
+
+Una de las formas más sencillas de colaborar es hacerlo en [el repositorio de skills](https://github.com/ns2switch/irmind-skills): mejorar metodologías, describir las fuentes necesarias y los falsos positivos, o aportar episodios sintéticos de evaluación. No hace falta escribir Rust.
+
+Consulta [CONTRIBUTING.es.md](CONTRIBUTING.es.md) para las reglas de DCO y datos sintéticos.
+
 ## Más información
 
 - [Inicio](docs/es/getting-started.md) · [Configuración](docs/es/configuration.md) · [Módulos](docs/es/modules.md)
-- [Investigaciones en paralelo](docs/es/subagents.md) · [Skills forenses](docs/es/skills.md)
+- [Investigaciones en paralelo](docs/es/subagents.md) · [Skills forenses](docs/es/skills.md) · [Repositorio de skills](https://github.com/ns2switch/irmind-skills)
 - [Plataformas](docs/es/platforms.md) · [Seguridad](docs/es/security-model.md)
 - [Arquitectura](docs/development/architecture.md) y [CLI](docs/development/cli.md), solo en inglés
 - [Hoja de ruta](docs/es/roadmap.md)
