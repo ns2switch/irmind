@@ -322,9 +322,13 @@ fn release_exploration_lists_skills_subagents_and_specific_help() {
     session.send("\x1b").unwrap();
     session.expect_screen("No delegated tasks", false).unwrap();
     session.send("/help subagents\r").unwrap();
-    session.expect("/subagents [cancel <task>]").unwrap();
+    session
+        .expect("/subagents [cancel <task>|recover]")
+        .unwrap();
     session.send("\x0f").unwrap();
-    session.expect("Inspect delegated tasks").unwrap();
+    session
+        .expect("Inspect, cancel tasks or recover an interrupted plan")
+        .unwrap();
     session.send("/demo exit\r\r").unwrap();
     session.expect("Demo data deleted").unwrap();
     assert_deleted(real_home.path(), demo_parent.path());

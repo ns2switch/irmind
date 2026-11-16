@@ -5,6 +5,23 @@ pub(super) enum Confirmation {
     Seal(Box<SealPreview>, String),
     Export(String, String),
     ObjectRead(String, String),
+    RecoverSubagents(String),
+}
+
+impl Confirmation {
+    pub(super) fn detail(&self) -> &str {
+        match self {
+            Self::Seal(_, detail)
+            | Self::Export(_, detail)
+            | Self::ObjectRead(_, detail)
+            | Self::RecoverSubagents(detail) => detail,
+        }
+    }
+}
+
+pub(super) fn subagent_recovery_confirmation() -> String {
+    "Close interrupted subagent plans?\nClose other IRMind sessions for this case first.\nStop live work with /pause and wait before recovering.\nCompleted work and uncertain provider usage are retained.\nNo provider request or tool call will be replayed."
+        .into()
 }
 
 pub(super) fn seal_confirmation(preview: &SealPreview) -> String {

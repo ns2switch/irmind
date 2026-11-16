@@ -4,6 +4,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Expose explicit, confirmed recovery of interrupted subagent plans in the TUI, retaining completed branches and uncertain usage without replaying effects.
+
 ## 0.5.2 — Signed case deletion and a configurable status bar
 
 **Format impact:** Case, artifact, seal and export versions are unchanged. Adds
