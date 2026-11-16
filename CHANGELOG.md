@@ -18,6 +18,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 - Confirmed Ctrl+C exits the application from an open case; canceling its modal
   leaves the conversation unchanged. Evidence-picker help matches the actual keys.
 
+- Expose explicit, confirmed recovery of interrupted subagent plans in the TUI, retaining completed branches and uncertain usage without replaying effects.
+
 ## 0.5.2 — Signed case deletion and a configurable status bar
 
 **Format impact:** Case, artifact, seal and export versions are unchanged. Adds

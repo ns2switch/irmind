@@ -25,6 +25,22 @@ Hay seis tipos incluidos: triaje, nube, endpoint, red, Kubernetes e inteligencia
 de amenazas. Cada uno tiene un catálogo fijo de herramientas y skills. Esta
 versión no incluye tipos comunitarios ni límites de presupuesto en dinero.
 
+## Recuperación tras una interrupción
+
+Un cierre brusco puede dejar un plan pendiente de revisión o una rama sin acabar.
+Cierra primero las otras sesiones de IRMind de ese caso. Al reabrirlo, detén
+cualquier turno con `/pause` y espera a que termine; después usa
+`/subagents recover`. Revisa la explicación y confirma: Cancelar está
+preseleccionado y Esc no cambia nada. Los casos sellados siguen siendo de solo
+lectura.
+
+Se usa la reconciliación firmada existente: conserva el trabajo terminado y las
+reservas de uso incierto, sin repetir peticiones al modelo ni efectos de
+herramientas. No reanuda hijos ni aprueba sus solicitudes. Ejecuta `/verify`.
+Una segunda recuperación informa de cero planes si no queda ninguno. El
+presupuesto retenido y las aprobaciones habituales siguen aplicándose a nuevos
+turnos y al sello.
+
 ## Seguir y cancelar tareas
 
 `/subagents` muestra el estado, actividad, consumo y cobertura de las tareas.
