@@ -13,7 +13,7 @@ from urllib.parse import unquote
 ROOT = Path(__file__).resolve().parents[2]
 LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 FLAG = re.compile(r"(?<![\w-])--[a-z][a-z0-9-]*")
-COMMAND = re.compile(r"\birmind(?:\.exe)?\s+([a-z][a-z0-9-]*)(?:\s+([a-z][a-z0-9-]*))?")
+COMMAND = re.compile(r"\birmind(?:\.exe)?[ \t]+([a-z][a-z0-9-]*)(?:[ \t]+([a-z][a-z0-9-]*))?")
 NON_IRMIND_FLAGS = {
     "--all",
     "--all-features",
@@ -183,11 +183,15 @@ def irmind_flag_citations(text: str) -> set[str]:
         # still receive strict validation; a repository named irmind-skills
         # is not an invocation of the irmind executable.
         external = re.match(
-            r"^\s*(?:\$ )?(?:gcloud\s|gh\s+secret\s+set\s|docker\s+compose\s|curl\s|"
+            r"^\s*(?:\$ )?(?:gcloud\s|gh\s+secret\s+set\s|docker\s+compose\s|curl\s|codesign\s|spctl\s|xcrun\s+stapler\s|"
             r"python3\s+(?:scripts/hunteval_benchmark\.py|tools/real-validation/lab\.py)\s)",
             line,
         )
         ownership_line = re.sub(r"--repo\s+[A-Za-z0-9_.-]+/irmind(?=\s|$)", "--repo REPOSITORY", line)
+        if re.match(r"^\s*(?:\$ )?(?:codesign|spctl)\s", line):
+            # Here the executable is the file being inspected, not a command.
+            # Shell composition is still rejected by the mixed-line check.
+            ownership_line = re.sub(r"(?<![\w.-])(?:\./)?irmind(?:-evtx)?(?:\.exe)?(?=\s|$)", "BINARY", ownership_line)
         mixed = re.search(r"(?<![\w.-])irmind(?:\.exe)?(?=\s|$)|&&|\|\||;|\$\(|`", ownership_line)
         if not (external and not mixed):
             lines.append(line)

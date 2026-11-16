@@ -25,3 +25,21 @@ La firma acredita origen y proceso de construcción, no corrección forense ni
 aptitud para incidentes reales. IRMind es pre-1.0 y se evalúa principalmente con
 datos sintéticos. Véanse [SECURITY.md](SECURITY.md) y la
 [guía del mantenedor](docs/es/native-signing.md).
+
+## Responsabilidades y privacidad
+
+Las contribuciones llevan DCO y los mantenedores las revisan. El propietario del
+repositorio, [ns2switch](https://github.com/ns2switch), aprueba tags y futuras
+solicitudes de firma nativa. Otros aprobadores deben identificarse explícitamente
+antes de activar la integración. SignPath debe conservar la aprobación manual
+de cada solicitud y confirmar MFA para el equipo participante.
+
+IRMind contacta con modelos, conectores o catálogos remotos mediante la
+configuración y las acciones explícitas del analista. Antes de enviar datos,
+el analista debe revisar la privacidad del proveedor elegido. Skills y subagentes
+no amplían política, alcance ni aprobaciones.
+
+La aceptación por SignPath, la atribución a la Fundación, los metadatos Windows
+de producto y versión y las restricciones de artefactos siguen pendientes de
+integración. Esta política no afirma que la solicitud esté aceptada ni que los
+binarios Windows actuales lleven Authenticode.

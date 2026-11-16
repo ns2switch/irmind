@@ -24,3 +24,21 @@ A signing approval attests origin and build process, not forensic correctness or
 fitness for real incidents. The project remains pre-1.0 and evaluated principally
 with synthetic data. See [SECURITY.md](SECURITY.md) and the
 [maintainer setup guide](docs/development/native-signing.md).
+
+## Responsibilities and privacy
+
+Contributors submit DCO-signed changes; repository maintainers review them.
+The repository owner, [ns2switch](https://github.com/ns2switch), approves release
+tags and future native signing requests. Additional signing approvers must be
+identified explicitly before activation. SignPath integration must retain manual
+approval for every signing request and confirm MFA for the participating team.
+
+IRMind contacts a remote model, connector or catalog only through the analyst's
+explicit configuration and actions. The analyst must review the selected
+provider's privacy terms before sending case data. Skills and subagents do not
+expand policy, case scope or approvals.
+
+SignPath acceptance, Foundation attribution, Windows product/version metadata
+checks and service-specific artifact restrictions remain integration prerequisites.
+This policy does not claim that a SignPath application has been accepted or that
+current Windows files carry Authenticode signatures.
