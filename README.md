@@ -22,9 +22,6 @@ No model setup, API key, account or cost. The real interface runs a synthetic in
 *Captured with IRMind v0.5.0. The complete presentation runs the real product with synthetic evidence, ephemeral keys and an offline scripted model. Enter advances; Space pauses; Esc exits.*
 
 > [!WARNING]
-> IRMind 0.5.1 is a preliminary release for evaluation with synthetic data. The analyst accepted H5 after a real DeepSeek greeting test; the remaining procedure details and real-connector validation are pending. Do not use it for real incidents or sensitive data.
-
-> [!WARNING]
 > Pre-1.0: each minor version may change case, export and definition formats without migration. Keep the IRMind version that created a case to open, verify or export it, or re-ingest the verified originals into a new case.
 
 ## What you can do
