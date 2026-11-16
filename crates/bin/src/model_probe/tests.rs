@@ -106,6 +106,7 @@ fn serve(
                 Err(error) => return Err(error),
             }
         };
+        stream.set_nonblocking(false)?;
         stream.set_read_timeout(Some(Duration::from_secs(5)))?;
         let mut reader = std::io::BufReader::new(&mut stream);
         let mut headers = String::new();
