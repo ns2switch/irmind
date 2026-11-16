@@ -1,10 +1,9 @@
 ---
 source: crates/tui/src/case/view/tests.rs
-assertion_line: 104
 expression: shown
 ---
 ┌ Live investigation ──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│IRMind v0.5.1                                                                                                         │
+│IRMind v0.5.2                                                                                                         │
 │Evidence ready: 1 synthetic file · parser-json · 90% confidence                                                       │
 │                                                                                                                      │
 │                                                                                                                      │

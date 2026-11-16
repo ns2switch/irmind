@@ -56,7 +56,7 @@ where
     terminal.draw(|frame| {
         let theme = Theme::detect();
         let areas = Layout::vertical([Constraint::Length(1),Constraint::Min(5),Constraint::Length(3),Constraint::Length(3),Constraint::Length(1),Constraint::Length(2),Constraint::Length(1)]).split(frame.area());
-        frame.render_widget(Paragraph::new("Delete unsealed case · Analyst signature required").style(theme.warning()),areas[0]);
+        frame.render_widget(Paragraph::new(format!("IRMind v{} · Delete unsealed case · Analyst signature required",env!("CARGO_PKG_VERSION"))).style(theme.warning()),areas[0]);
         frame.render_widget(Paragraph::new(format!("{title}\n{} · created {}\n{} entries · {} sources · {} owned bytes\n{} shared blob bytes · {} logical metadata bytes\nDeletes chain, Parquet, spools, proofs, skill snapshots and branches.\nExternal originals stay. Shared blobs stay while another case uses them.\nLogical deletion only; use disk encryption for sensitive evidence.",inventory.case_id.as_str(),created,inventory.entry_count,inventory.source_count,inventory.owned_file_bytes,inventory.shared_blob_bytes,inventory.logical_metadata_bytes)).wrap(Wrap{trim:false}).style(Style::default().fg(theme.text)),areas[1]);
         for (index, (name,value)) in [("Exact title or case ID",confirmation.as_str()),("Reason (optional)",reason.as_str())].into_iter().enumerate() {
             let border = if form.focus == index { theme.accent() } else { theme.muted() };

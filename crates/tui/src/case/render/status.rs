@@ -69,19 +69,10 @@ impl CaseRuntime<'_, '_, '_> {
                 data.insert(StatusSegment::TokenPercent, format!("{percent}% tokens"));
             }
         }
-        let sources = self
-            .state
-            .entries
-            .iter()
-            .filter(|entry| {
-                matches!(
-                    entry.kind,
-                    AuditEventKind::SourceManifestV2 | AuditEventKind::EvidenceIngested
-                )
-            })
-            .filter_map(|entry| entry.evidence.as_deref())
-            .collect::<BTreeSet<_>>();
-        data.insert(StatusSegment::Sources, format!("{} sources", sources.len()));
+        data.insert(
+            StatusSegment::Sources,
+            format!("{} sources", source_count(&self.state.entries)?),
+        );
         data.insert(
             StatusSegment::Subagents,
             format!("{} active children", active_children(&self.state.entries)?),
@@ -90,6 +81,23 @@ impl CaseRuntime<'_, '_, '_> {
         Ok(())
     }
 }
+fn source_count(entries: &[irmind_app::SignedEntry]) -> Result<usize, irmind_app::AppError> {
+    let mut sources = BTreeSet::new();
+    for entry in entries {
+        if let Some(source) =
+            irmind_app::SourceManifestV1::decode_signed(entry.kind, &entry.payload)
+                .map_err(|_| irmind_app::AppError::InvalidChain(entry.seq))?
+        {
+            sources.insert(source.sha256.as_str().to_owned());
+        } else if entry.kind == AuditEventKind::EvidenceIngested
+            && let Some(hash) = &entry.evidence
+        {
+            sources.insert(hash.clone());
+        }
+    }
+    Ok(sources.len())
+}
+
 fn active_children(entries: &[irmind_app::SignedEntry]) -> super::Result<usize> {
     let mut plans = BTreeMap::new();
     let mut active = BTreeSet::new();
@@ -160,5 +168,25 @@ mod tests {
         assert_eq!(active_children(&entries).unwrap(), 0);
         entries[0].payload = serde_json::to_string(&plan).unwrap();
         assert!(active_children(&entries).is_err());
+    }
+    #[test]
+    fn source_counter_uses_signed_manifests_when_originals_are_not_copied() {
+        let payload = include_str!("status-fixtures/source-not-copied.manifest.hex").trim();
+        let source = irmind_app::SourceManifestV2::decode(payload).unwrap();
+        assert!(!source.source.copied);
+        let mut item: irmind_app::SignedEntry = serde_json::from_value(serde_json::json!({
+            "seq":1,"case_id":"11111111-1111-4111-8111-111111111111","at":0,
+            "actor":"analyst","origin":"synthetic","kind":"SourceManifestV2","payload":payload,
+            "evidence":null,"prev":vec![0u8;32],"hash":vec![0u8;32],"sig":[],"public_key":[]
+        }))
+        .unwrap();
+        assert_eq!(source_count(&[item.clone()]).unwrap(), 1);
+        let mut copy = item.clone();
+        copy.kind = AuditEventKind::EvidenceIngested;
+        copy.payload = "synthetic reference".into();
+        copy.evidence = Some(source.source.sha256.as_str().to_owned());
+        assert_eq!(source_count(&[item.clone(), copy]).unwrap(), 1);
+        item.payload = "malformed".into();
+        assert!(source_count(&[item]).is_err());
     }
 }
