@@ -21,7 +21,8 @@ the creating IRMind version or re-ingest verified originals into a new case.
 - Customize the status bar in Settings → Preferences with a bounded list of
   segments, priorities, theme colors and separators. Includes live preview,
   reset and minimal/investigation/cost presets, including 80-column terminals and
-  NO_COLOR. Mandatory scope and budget warnings remain visible.
+  NO_COLOR. Mandatory scope and budget warnings remain visible. Source counts
+  come from signed manifests even when originals are not copied.
 - Save provider, URL, model, native output maximum and parameter requirement as
   one validated, Analyst-signed model configuration. Connection testing uses the
   complete unsaved draft; known cross-provider combinations are rejected.
