@@ -40,12 +40,7 @@ impl CaseRuntime<'_, '_, '_> {
         if let Some(directory) = &self.data_directory {
             data.insert(StatusSegment::DataDirectory, directory.to_string_lossy());
         }
-        if let Ok(keystore) = self.io_ops.keystore_status() {
-            data.insert(
-                StatusSegment::Keystore,
-                format!("{}/{}", keystore.signer_backend, keystore.secrets_backend),
-            );
-        }
+        data.insert(StatusSegment::Keystore, &self.state.keystore_profile);
         let status = budget_status(&self.state.entries, &self.engine.policy)?;
         data.insert(
             StatusSegment::ToolCalls,
