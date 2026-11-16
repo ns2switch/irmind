@@ -4,6 +4,10 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.5.1 — Complete model responses and evaluation readiness
+
 **Format impact:** Case, artifact, skill and export versions are unchanged. Model
 replies in subagent branches may now use the available 1 MiB frame capacity;
 other branch payload limits are unchanged. Model-token settlement accepts signed,
@@ -11,6 +15,7 @@ verified usage above an already admitted reservation without creating capacity.
 
 - Use native model output maxima instead of application token caps, with signed model capability settings for custom/local endpoints. Enforce case budgets between requests and retain completed responses and actual usage when they overdraw the balance.
 - Continue a provider-limited answer once without tools when budget permits, keeping one continuous answer. Retain full in-frame child replies separately from their 16 KiB parent summaries; label security-boundary prefixes explicitly.
+- Test model connections with the current unsaved provider, URL, model, key and output profile; probing does not save configuration or credentials.
 - Show case help in a scrollable view and resume the conversation at its end after the demo presentation.
 - Refresh the verified-install quick start and synthetic v0.5.0 images, and add clean-release PTY checks for Linux, macOS and Windows.
 - Add opt-in real-service validation and multi-model HuntEval development helpers. Prepare disabled tag-only Developer ID signing and notarization; native signing remains unavailable until provisioned and validated.

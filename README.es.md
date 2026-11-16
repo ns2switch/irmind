@@ -19,10 +19,10 @@ Sin configurar modelos, claves de API, cuentas ni coste. La interfaz real invest
 
 ![Presentación automática de IRMind con narración a todo el ancho, evidencia sintética, respuesta en streaming, aprobación firmada y verificación de custodia](docs/assets/demo.gif)
 
-*La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
+*Grabada con IRMind v0.5.0. La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
 
 > [!WARNING]
-> IRMind 0.5.0 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
+> IRMind 0.5.1 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
 
 > [!WARNING]
 > Antes de 1.0, cada versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración. Conserva la versión de IRMind que creó un caso para abrirlo, verificarlo o exportarlo, o reingiere los originales verificados en un caso nuevo.
@@ -55,13 +55,13 @@ Empieza por [la instalación verificada](docs/es/platforms.md#verificar-una-vers
 
 
 
-La [versión preliminar v0.5.0](https://github.com/ns2switch/irmind/releases/tag/v0.5.0) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.5.1](https://github.com/ns2switch/irmind/releases/tag/v0.5.1) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
-Conserva la versión exacta de IRMind que creó el caso. La versión 0.5.0 usa el marcador de caso 4 y export V8; consulta la [nota de formatos](CHANGELOG.md). La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable creador o reingerir los originales verificados.
+Conserva la versión exacta de IRMind que creó el caso. La versión 0.5.1 usa el marcador de caso 4 y export V8; consulta la [nota de formatos](CHANGELOG.md). La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable creador o reingerir los originales verificados.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.5.0; binary=irmind-linux-x86_64
+tag=v0.5.1; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
