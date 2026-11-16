@@ -105,12 +105,24 @@ En `/settings connectors`, configura Elastic:
 | API key | Solo en Llavero y credenciales de `/settings` |
 
 Compara la huella de la CA con SHA-256 calculado localmente y guarda la operación
-firmada. Una CA incorrecta debe fallar. `lab-evaluation` es una etiqueta explícita
-de selección del laboratorio, no una cuenta AWS. Crea un caso con fuente
+firmada. Guarda cada cambio y desbloquea de nuevo si la configuración pide
+reiniciar. Guarda la API key en el campo oculto de Elastic en Llavero y
+credenciales; después activa el conector revisando la confirmación numerada.
+PgUp/PgDn permite leer la propuesta completa, incluso con 80 columnas. Guardar
+la CA pública con el conector desactivado no exige una confirmación de salida;
+activarlo sí conserva la revisión habitual. Una CA incorrecta debe fallar. `lab-evaluation` es una etiqueta explícita
+de selección del laboratorio, no una cuenta AWS. Copia `policy.toml`
+al directorio desechable y conserva sus límites y permisos; en `[scope]` permite
+solo la fuente `elastic-lab`, la cuenta `lab-evaluation` y el intervalo observado
+de las muestras. Inicia con `--policy` apuntando a ese fichero: no añadas
+comodines ni cambies niveles de riesgo denegados. Crea un caso con fuente
 elastic-lab, cuenta lab-evaluation y una ventana de **un día del dataset cada vez**:
 el conector limita cada consulta a 24 horas. Revisa `/scope` y el techo de la
 organización; no lo amplíes para evitar un rechazo. Ingiere el EVTX original local
-con `/ingest`; si el autotest de aislamiento falla, no lo omitas. Conserva originales.
+con `/ingest`; si el autotest de aislamiento falla, no lo omitas. Conserva originales. El EVTX fijado contiene un FILETIME cero, que se muestra
+como 1601-01-01 junto a eventos de 2020: es una salvedad de calidad de la fuente,
+no un motivo para ampliar a 1601 las consultas remotas. Las muestras AWS cubren
+varios días de 2022 y el export de texto Windows es de 2021.
 
 En `/settings model`, selecciona proveedor y modelo, guarda su clave solo en el
 SecretBackend, revisa la confirmación de salida de datos y prueba la conexión sin

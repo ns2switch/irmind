@@ -108,8 +108,20 @@ In `/settings connectors`, select Elastic:
 | API key | Enter only in `/settings` → Keystore and credentials. |
 
 Check the displayed CA SHA-256 against `sha256sum` / `shasum -a 256` (PowerShell:
-`Get-FileHash`). Save the signed configuration. An incorrect CA must fail.
+`Get-FileHash`). Save each signed change and unlock again if the configuration requests a restart.
+Store the API key in the masked Elastic field of Keystore and credentials, then
+enable the connector and review its numbered confirmation. Public CA paths and
+activation controls remain scrollable with PgUp/PgDn, even in an 80-column
+terminal. If the connector is disabled, storing its public CA need not ask for
+an external-data confirmation; enabling it still requires the usual review.
+An incorrect CA must fail.
 The account selector `lab-evaluation` is an explicit lab label, not an AWS account.
+Start with a narrow organization policy as well as a case scope: copy
+`policy.toml` into the disposable laboratory directory, retain all limits
+and permissions, and set its `[scope]` allowlists to source `elastic-lab`, account
+`lab-evaluation` and the observed sample interval. Start with `--policy` pointing
+to that explicit policy. Do not add a wildcard or change a denied risk level.
+
 Create a case with `/new`: remote source `elastic-lab`, account `lab-evaluation`,
 and a case window covering the dates actually present in the samples. Each
 structured connector query must cover **one dataset day at a time**, at most
@@ -119,7 +131,11 @@ this source, account and the intended dates; do not widen it to bypass an error.
 
 Ingest `target/real-validation/windows-logons.evtx` locally with `/ingest`.
 EVTX must show its verified isolation availability; do not bypass a failed self-test.
-Preserve originals until verification/export is complete.
+Preserve originals until verification/export is complete. The pinned EVTX contains
+a zero Windows FILETIME that displays as 1601-01-01, alongside dated 2020 logons.
+Retain that raw value as a source-quality caveat; it does not justify extending
+the remote search interval to 1601. The AWS exports cover several days in 2022
+and the separate Windows text export covers 2021.
 
 ## 60–100 min: model, skill, signed plan and approval
 
