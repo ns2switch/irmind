@@ -14,7 +14,9 @@ the model's documented native output maximum and whether the compatible/local AP
 requires that parameter. Empty means unknown. These are signed non-secret module
 settings, `IRMIND_MODEL_MAX_OUTPUT_TOKENS` and, for compatible APIs,
 `IRMIND_MODEL_OUTPUT_REQUIRED`. They describe capabilities, not a smaller response
-budget. Exact built-in profiles apply only to their documented provider endpoint;
+budget. **Test connection** uses the current, unsaved draft, including its output
+maximum; probing does not persist settings or credentials or sign a configuration
+operation. Exact built-in profiles apply only to their documented provider endpoint;
 a local model with the same name does not inherit them.
 
 A positive case balance admits a request. Its complete response and actual reported
