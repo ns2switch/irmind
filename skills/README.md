@@ -1,26 +1,45 @@
-# Bundled forensic methods
+# Bundled forensic methods: pinned upstream copy
 
-These data-only packages are for contributors reviewing the included catalog.
-Each contains a bounded SKILL.md and reference data. See the [analyst catalog](../docs/skills.md)
-for purpose, required sources and honest coverage limits, and the [skills design](../docs/development/skills-design.md)
-for the existing admission and case-use contracts.
+The source of these 15 data-only packages is
+[ns2switch/irmind-skills/core](https://github.com/ns2switch/irmind-skills/tree/main/core).
+Propose methodology, reference-data and synthetic-episode improvements there.
+The upstream `catalog/` is separate: it contains optional community packages and
+cannot replace a bundled name. Core packages arrive with an IRMind release.
 
-All 13 methods declare local reads and finding-proposal tools only. They do not
-run collectors or scripts, enable providers, grant permissions or confirm
-findings. Missing mappings remain coverage gaps. Methodology is untrusted after
-compilation and signing; its hash is not an evidence citation.
+[upstream.json](upstream.json) records the immutable upstream commit, every
+canonical package commitment and the SHA-256 of each mirrored resource or
+fixture. [package-identities.json](package-identities.json) and
+[SHA256SUMS](SHA256SUMS) are local inventories checked against that pin. The
+initial mirror preserves the exact package bytes embedded in v0.5.0.
 
-[Package commitments](package-identities.json) pin the inventories;
-[SHA256SUMS](SHA256SUMS) covers individual resources. Run
-`python3 scripts/skills_inventory.py` from the repository root to check both,
-or add `--write` after deliberately editing a package. The shared Rust compiler
-contract independently checks canonical package hashes, bounded metadata and guard
-screening. Existing published package hashes remain unchanged when adding methods.
+## Review an upstream update
 
-The scripted integration suite runs each included method through ingestion,
-progressive loading, local queries, analyst-confirmed findings, verification,
-sealing and independent V7 export verification. Separate hostile-evidence tests
-use an obedient fake model to attempt undeclared tools and out-of-scope reads.
-These checks validate integration and controls, not the accuracy of a real model.
-Expected answers live in evaluator-only fixtures, outside evidence and model context.
-The methods contain original project-licensed prose and link to public primary sources.
+Check out the desired public commit of `ns2switch/irmind-skills` separately.
+From the IRMind root, run:
+
+```sh
+python3 scripts/sync_core_skills.py <upstream-checkout> <full-40-character-commit>
+python3 scripts/sync_core_skills.py
+python3 scripts/test_sync_core_skills.py
+```
+
+The synchronizer reads only committed data blobs from that local checkout. It
+performs no fetch or other network access. Review the package, fixture and pin
+diff, run the shared compiler and scripted integration suite, and submit a normal
+PR. Never edit the vendored packages alone or refresh hashes to bypass a mismatch.
+The normal build uses only checked-in files; CI checks the pin without downloading
+skills. Historical design documents explain earlier admission and format decisions.
+
+Each package contains bounded methodology and reference data, without executable
+code. All methods declare local reads and finding-proposal tools only. Policy,
+case scope, approvals, taint and budgets still apply. Methodology is never evidence
+or trusted system instructions. See the [analyst guide](../docs/skills.md) for
+sources and coverage limits.
+
+The scripted integration suite exercises ingestion, progressive loading, local
+queries, analyst-confirmed findings, chain verification, sealing and independent
+export verification. Hostile-evidence tests retain the obedient fake model.
+Expected answers stay in evaluator-only fixtures outside packages, evidence and
+model context. These tests validate integration and controls, not real-model
+accuracy. All methodology is original project-licensed prose with primary-source
+references.

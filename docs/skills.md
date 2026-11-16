@@ -2,6 +2,14 @@
 
 This page is for analysts who want a repeatable investigation method without granting the agent more permissions. A skill is a small, versioned folder of methodology and reference data. It contains no executable code.
 
+## Propose an improvement
+
+The source of the bundled methods is [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills). Its `core/` directory contains the 15 included packages, reference resources and separate synthetic evaluation episodes. Propose improvements there; they reach IRMind through a reviewed synchronization PR and an IRMind release.
+
+Community packages live in `catalog/`. They are installed explicitly with `/skills install catalog:<name>` when a trusted production catalog is available; they cannot replace a bundled name. The current catalog has no production release or signing key. Both contribution paths use the same bounded skill compiler and local scripted tests.
+
+This repository keeps a [pinned offline copy](../skills/upstream.json). Builds never fetch skill content. See the [mirror maintenance instructions](../skills/README.md) for updating the upstream commit and checking every package and resource hash.
+
 ## Use an included method
 
 Open a case, configure a model in `/settings model`, and type `/` to see the active methods. The binary includes 15 methods. All are experimental and tested with synthetic episodes, not validated forensic conclusions.

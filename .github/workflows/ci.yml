@@ -88,6 +88,11 @@ jobs:
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_sign_macos.py
       - run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_hunteval_benchmark.py
       - run: PYTHONDONTWRITEBYTECODE=1 python3 tools/real-validation/test_lab.py
+      - name: Verify the pinned offline core-skill mirror
+        run: |
+          python3 -B scripts/skills_inventory.py
+          python3 -B scripts/sync_core_skills.py
+          python3 -B scripts/test_sync_core_skills.py
       - name: Test documented command ownership
         run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_docs.py
       - name: Test allocation profile attribution
