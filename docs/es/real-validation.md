@@ -2,7 +2,7 @@ Traducción de docs/development/real-validation.md en el commit 050c01156cc3c45f
 
 # Validación con servicios reales en unas dos horas
 
-Recorrido para el analista con IRMind v0.5.0 verificado, Elasticsearch local y un
+Recorrido para el analista con la versión preliminar verificada bajo prueba, Elasticsearch local y un
 modelo elegido explícitamente. Usa solo las muestras públicas de laboratorio
 fijadas; no se incorporan datasets al repositorio. Este recorrido puede aportar
 el resultado que falta para [#63](https://github.com/ns2switch/irmind/issues/63) y los
@@ -13,7 +13,10 @@ ningún paso como observado antes de ejecutarlo y registrar su resultado.
 
 Verifica binario, auxiliar, checksums firmados y attestations con la
 [guía de plataformas](platforms.md). Anota versión, commit, sistema y terminal.
-Necesitas Docker Compose v2, Python 3.11+, unos 4 GB de RAM y 5 GB libres.
+Necesitas Docker Compose v2, Python 3.11+, unos 4 GB de RAM y al menos 5 GB
+libres. El laboratorio acotado usa umbrales absolutos de espacio libre: 2 GB
+para el umbral bajo, 1 GB para el alto y 512 MB para el de inundación. La
+protección de disco sigue activada.
 Desde el checkout revisado:
 
 ```sh
@@ -36,6 +39,24 @@ curl --cacert target/real-validation/ca.crt -u elastic https://localhost:9200
 curl pide la contraseña. Espera si el servicio aún está arrancando. Sin la CA la
 verificación debe fallar; no uses la opción que desactiva TLS. Registra ambos
 resultados y nunca desactives la comprobación de nombre de host.
+
+Algunas versiones de Docker no publican puertos de una red `internal: true`.
+Si `docker compose ... port es 9200` no muestra una asignación válida y la
+conexión a localhost se rechaza, conserva la red interna e inicia este
+reenviador opcional de desarrollo en otro terminal:
+
+```sh
+python3 tools/real-validation/port_forward.py
+```
+
+Solo escucha en `127.0.0.1:9200` y transmite bytes sin interpretarlos mediante
+el servicio Compose a su puerto de loopback. TLS, la comprobación de nombre,
+las credenciales y la CA se siguen verificando entre el cliente y Elasticsearch.
+El contenedor no obtiene salida a la red. El auxiliar rechaza un puerto ocupado,
+limita a ocho las conexiones concurrentes y a 60 segundos cada conexión.
+Detenlo con Ctrl+C al limpiar el laboratorio. Es una herramienta de desarrollo,
+no una parte de IRMind.
+
 
 ## 20–40 minutos: muestras fijadas y carga
 

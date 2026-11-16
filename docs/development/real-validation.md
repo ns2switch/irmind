@@ -1,7 +1,6 @@
 # Two-hour real-service validation
 
-For the analyst, not an automated quality claim. Exercise the published v0.5.0
-binary against a **local Elasticsearch service** and a model you explicitly choose.
+For the analyst, not an automated quality claim. Exercise the verified pre-release binary under test against a **local Elasticsearch service** and a model you explicitly choose.
 Use only the pinned public lab exports below. No dataset is committed to IRMind.
 A successful run can supply the missing record for [#63](https://github.com/ns2switch/irmind/issues/63)
 and the unobserved H5 steps in [manual validation](manual-validation.md).
@@ -12,7 +11,8 @@ Do not mark those checks done before recording their actual results.
 Verify the release, helper, signed checksums and provenance using [platforms](../platforms.md).
 Record `irmind --version`, commit, OS and terminal size. Keep this version for the
 case. Have Docker Compose v2 and Python 3.11+ available; allocate about 4 GB RAM
-and 5 GB free disk. The lab listens only on `127.0.0.1:9200`, with TLS and no
+and at least 5 GB free disk. The bounded lab uses explicit free-space watermarks
+(2 GB low, 1 GB high, 512 MB flood stage); disk protection remains enabled. The lab listens only on `127.0.0.1:9200`, with TLS and no
 outbound container network. Never expose this developer service to the internet.
 
 From a checkout matching the release or reviewed launch-preparation commit:
@@ -37,6 +37,23 @@ curl --cacert target/real-validation/ca.crt -u elastic https://localhost:9200
 curl prompts for the password. Wait for startup if necessary. A request without
 the CA must fail trust verification; do not use `-k`. Record both results. A
 certificate error is not a reason to disable hostname checks.
+
+Some Docker engines do not publish ports for an `internal: true` bridge. If
+`docker compose ... port es 9200` reports no usable mapping and localhost
+refuses the connection, keep the internal network and start this optional
+development relay in another terminal:
+
+```sh
+python3 tools/real-validation/port_forward.py
+```
+
+It binds only `127.0.0.1:9200` and forwards opaque bytes through the existing
+Compose service to its loopback port. TLS, hostname checks, credentials and
+CA verification remain end-to-end. It does not give Elasticsearch outbound
+network access. The helper refuses an occupied host port, limits concurrent
+connections to eight and each connection to 60 seconds. Stop it with Ctrl+C
+when cleaning up the lab. It is a development helper, not part of IRMind.
+
 
 ## 20–40 min: download and load a small, hash-pinned subset
 

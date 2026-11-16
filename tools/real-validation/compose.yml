@@ -36,6 +36,10 @@ services:
       xpack.security.http.ssl.certificate_authorities: certs/ca/ca.crt
       ELASTIC_PASSWORD_FILE: /run/secrets/elastic_password
       ES_JAVA_OPTS: -Xms1g -Xmx1g
+      # Absolute free-space guards suit this bounded <=500-document lab.
+      cluster.routing.allocation.disk.watermark.low: 2gb
+      cluster.routing.allocation.disk.watermark.high: 1gb
+      cluster.routing.allocation.disk.watermark.flood_stage: 512mb
     secrets: [elastic_password]
     volumes: [certificates:/usr/share/elasticsearch/config/certs:ro, data:/usr/share/elasticsearch/data]
     mem_limit: 2g

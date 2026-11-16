@@ -88,6 +88,7 @@ jobs:
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_sign_macos.py
       - run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_hunteval_benchmark.py
       - run: PYTHONDONTWRITEBYTECODE=1 python3 tools/real-validation/test_lab.py
+      - run: PYTHONDONTWRITEBYTECODE=1 python3 tools/real-validation/test_port_forward.py
       - name: Verify the pinned offline core-skill mirror
         run: |
           python3 -B scripts/skills_inventory.py
