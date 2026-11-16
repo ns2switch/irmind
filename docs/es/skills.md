@@ -4,6 +4,14 @@ Traducción de docs/skills.md en el commit 050c01156cc3c45f5229306b88051eb22ed68
 
 Esta página ayuda a los analistas a aplicar un método de investigación repetible sin ampliar los permisos del agente. Una skill es una carpeta pequeña y versionada de metodología y referencias. No contiene código ejecutable.
 
+## Proponer una mejora
+
+La fuente de las skills incluidas es [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills). Su directorio `core/` contiene los 15 paquetes incluidos, sus recursos y episodios sintéticos de evaluación separados. Propón las mejoras allí; llegan a IRMind mediante una PR de sincronización revisada y una release de IRMind.
+
+Los paquetes comunitarios viven en `catalog/`. Se instalan explícitamente con `/skills install catalog:<name>` cuando exista un catálogo de producción confiable; no pueden sustituir un nombre del núcleo. El catálogo actual no tiene release ni clave de firma de producción. Ambas vías usan el mismo compilador acotado de skills y pruebas locales con modelo scripted.
+
+Este repositorio mantiene una [copia local fijada](../../skills/upstream.json). El build nunca descarga contenido de skills. Las [instrucciones de mantenimiento](../../skills/README.md) explican cómo actualizar el commit de origen y comprobar los hashes de cada paquete y recurso.
+
 ## Usar un método incluido
 
 Abre un caso, configura un modelo en `/settings model` y escribe `/` para ver los métodos activos. El binario incluye 15 métodos. Todos son experimentales y se prueban con episodios sintéticos; no validan por sí solos una conclusión forense.

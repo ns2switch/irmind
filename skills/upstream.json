@@ -1,0 +1,304 @@
+{
+  "format_version": 1,
+  "repository": "https://github.com/ns2switch/irmind-skills",
+  "commit": "75f9fce835d935d3c4ca29e9c68e6899bf572259",
+  "packages": {
+    "aws-credential-compromise": "bef2b28e3722ee1c2eda76c835f4e83b99e6395ea00583ed85f90b78553a35ef",
+    "aws-s3-data-exfiltration": "ec8c14a8ed5ecf5e2746821151395f7841ba530a0794d142d4a707e259b855a2",
+    "azure-entra-identity-compromise": "fd4e3aa66b15f257cec1564d4065e77b76af9dd617cc16280ff3dcb5863cdc41",
+    "gcp-service-account-abuse": "c74d04a881e956d8dd9c820c31d45f1867af4b4384288e45e7ff4f7185dfa4f4",
+    "k8s-cluster-compromise": "8e712497066efbb67ed5e78c9833d75ec74a43bb6716be1aba08216f274e952f",
+    "k8s-workload-compromise": "7f9ff9b98e0dd1f8f835fc5ad8436add069fffbac76dadd06390e7e8bd649dc2",
+    "linux-persistence": "ccf593350d5a35921e96818aa876b9bfe78c73595bbf3146cd3f28736dfcf746",
+    "linux-triage": "be4a83e88922a5b0fec026cd96d7b3d8eaf6e9f81487e5a60fca411d4d9f42e5",
+    "linux-webshell": "0579f0f44188fc36cae19e145b61a8a1cf7993683ef5f82861233c8dba1ae8bb",
+    "malware-execution-triage": "0d4be3f7aa12fc0c9d49686b1e568fc40c8064c41c9000ae392fe93a8c7f787d",
+    "network-c2-beaconing": "366b111a5c2a6db608512705bc42beee3af21d2ceabc1cdb1cde966053e0963f",
+    "windows-lateral-movement": "db5444367669a43bf281ab5d1793ab61b84324984fa9b450177023db0cc40919",
+    "windows-persistence": "bf42605151b9123b6702c7441664dc822875ec2bb180f5d9681c6d6369ecf7b0",
+    "windows-ransomware": "97fac9ded016ccaf74c4ec28c8d9e3399d944999ce275c29c9a18ff30c26a79b",
+    "windows-triage": "50ca091e3379c589017459d1d210dec8d571b0c16f9e8e1e45312bc587bce57d"
+  },
+  "files": [
+    {
+      "source": "core/aws-credential-compromise/SKILL.md",
+      "path": "skills/aws-credential-compromise/SKILL.md",
+      "sha256": "61fb1f10e232c0d16d098dd2cf2b3c0d59732085b80cbad41168716c8fda9c77"
+    },
+    {
+      "source": "core/aws-credential-compromise/references/operations.csv",
+      "path": "skills/aws-credential-compromise/references/operations.csv",
+      "sha256": "337cd0c8c9df8b2d023b5a36ebd3de2270a805d90cf4bd44fb400139da85a04e"
+    },
+    {
+      "source": "core/aws-s3-data-exfiltration/SKILL.md",
+      "path": "skills/aws-s3-data-exfiltration/SKILL.md",
+      "sha256": "47e9d55933e25652a75facd743ffd86d02a7da0be4a8f4cde4f4c7def59fd417"
+    },
+    {
+      "source": "core/aws-s3-data-exfiltration/references/coverage.csv",
+      "path": "skills/aws-s3-data-exfiltration/references/coverage.csv",
+      "sha256": "19568f5080cdbff6ffb8dfd3f65feef2be3a3cdeeb5297e7a49232ccaf4a9a4b"
+    },
+    {
+      "source": "core/azure-entra-identity-compromise/SKILL.md",
+      "path": "skills/azure-entra-identity-compromise/SKILL.md",
+      "sha256": "096a44cd0737ae97ba081aa226c918d25ed0027e452cb96a6e0a492223905347"
+    },
+    {
+      "source": "core/azure-entra-identity-compromise/references/coverage.csv",
+      "path": "skills/azure-entra-identity-compromise/references/coverage.csv",
+      "sha256": "9376bdec2b896fb0982cbbd0bbd177ff5764ee086b4b67e5bc554c42a54a3803"
+    },
+    {
+      "source": "core/gcp-service-account-abuse/SKILL.md",
+      "path": "skills/gcp-service-account-abuse/SKILL.md",
+      "sha256": "31c8d036f7f6025b9474ce84a882fff7bf1027e699a4bb083ba3030db7548c74"
+    },
+    {
+      "source": "core/gcp-service-account-abuse/references/coverage.csv",
+      "path": "skills/gcp-service-account-abuse/references/coverage.csv",
+      "sha256": "57d85ff61449ddb6fcbe4a7c61b8cb828731e31552bbd843d96e91afdc7bbef8"
+    },
+    {
+      "source": "core/k8s-cluster-compromise/SKILL.md",
+      "path": "skills/k8s-cluster-compromise/SKILL.md",
+      "sha256": "3a4d03e12aae65fc401b1e72197e6446cc979be97e8012769f8c4a1b1b640354"
+    },
+    {
+      "source": "core/k8s-cluster-compromise/references/coverage.csv",
+      "path": "skills/k8s-cluster-compromise/references/coverage.csv",
+      "sha256": "17cbc06431a38610c2dc8d427245687c587c0de0121ccfb44ad70a42d7e019b6"
+    },
+    {
+      "source": "core/k8s-workload-compromise/SKILL.md",
+      "path": "skills/k8s-workload-compromise/SKILL.md",
+      "sha256": "56ea31a6fe631eecc14c3033ea9eb09479c7160db793f135db7c8dc3f144c8cb"
+    },
+    {
+      "source": "core/k8s-workload-compromise/references/coverage.csv",
+      "path": "skills/k8s-workload-compromise/references/coverage.csv",
+      "sha256": "5ff272504d2b3f838d31279251ecf727bcf1d85756e739ffc72f4273701133ac"
+    },
+    {
+      "source": "core/linux-persistence/SKILL.md",
+      "path": "skills/linux-persistence/SKILL.md",
+      "sha256": "6e5477e2dec66e17cc33d21481263b3a6baccb104d2bd05bd9cf1387124a1400"
+    },
+    {
+      "source": "core/linux-persistence/references/coverage.csv",
+      "path": "skills/linux-persistence/references/coverage.csv",
+      "sha256": "154fa81734fc61d9e3d0928858f78df2cacc1b6d6cd16ac9ed7f3c0a42832a02"
+    },
+    {
+      "source": "core/linux-triage/SKILL.md",
+      "path": "skills/linux-triage/SKILL.md",
+      "sha256": "a958f2c7274027166fd54281ff51e6d28b319e42d26e163c0ef9e7a41244909b"
+    },
+    {
+      "source": "core/linux-triage/references/coverage.csv",
+      "path": "skills/linux-triage/references/coverage.csv",
+      "sha256": "5c66b3fb2cfd6e169cd4ca79c7de0f060800e08c7f83756e627c09432c087520"
+    },
+    {
+      "source": "core/linux-webshell/SKILL.md",
+      "path": "skills/linux-webshell/SKILL.md",
+      "sha256": "dd17c737c88214d0b63a6715415350d26b48bd93c04dd96ee1119b07016f5ea1"
+    },
+    {
+      "source": "core/linux-webshell/references/coverage.csv",
+      "path": "skills/linux-webshell/references/coverage.csv",
+      "sha256": "88b1e60e60389dd6cb1315b8e727d990a735358ec0a989934b30c9fed0241b70"
+    },
+    {
+      "source": "core/malware-execution-triage/SKILL.md",
+      "path": "skills/malware-execution-triage/SKILL.md",
+      "sha256": "cce964e6358ea57d90ff71f5ef830bcbaf18acd750ad7b563dafa47fdaab0fcb"
+    },
+    {
+      "source": "core/malware-execution-triage/references/coverage.csv",
+      "path": "skills/malware-execution-triage/references/coverage.csv",
+      "sha256": "6bebc258c12af29ef55cb842013537de7b37e3f06c96572fee88b8211ca22d02"
+    },
+    {
+      "source": "core/network-c2-beaconing/SKILL.md",
+      "path": "skills/network-c2-beaconing/SKILL.md",
+      "sha256": "29ae5da5f604e8d5b5d6888d1395cb1b94440f55a10608636ec7a84cb0178d60"
+    },
+    {
+      "source": "core/network-c2-beaconing/references/coverage.csv",
+      "path": "skills/network-c2-beaconing/references/coverage.csv",
+      "sha256": "40a1e98474a9ec4cffd3b84861d9a8516c87e85e2a9d2703f9d3911370993da1"
+    },
+    {
+      "source": "core/windows-lateral-movement/SKILL.md",
+      "path": "skills/windows-lateral-movement/SKILL.md",
+      "sha256": "4a0f5c2cfc43e23b8d0d6db8c45f69f7bbcddc23ee9b0d137baf12d92bc01d6b"
+    },
+    {
+      "source": "core/windows-lateral-movement/references/coverage.csv",
+      "path": "skills/windows-lateral-movement/references/coverage.csv",
+      "sha256": "a03f2805182fe5f1cf59b4852256db67c2ae3d3c012ba524d56646555d042fb9"
+    },
+    {
+      "source": "core/windows-persistence/SKILL.md",
+      "path": "skills/windows-persistence/SKILL.md",
+      "sha256": "88bd5d2e55747ee884eb36f052af4a733698e8aef8dc5cabe29ade33028cb387"
+    },
+    {
+      "source": "core/windows-persistence/references/coverage.csv",
+      "path": "skills/windows-persistence/references/coverage.csv",
+      "sha256": "6bebc258c12af29ef55cb842013537de7b37e3f06c96572fee88b8211ca22d02"
+    },
+    {
+      "source": "core/windows-ransomware/SKILL.md",
+      "path": "skills/windows-ransomware/SKILL.md",
+      "sha256": "57c07a7045be0a20156f0d055e2d429b724b25aa5bf40d418b4112736a30aafb"
+    },
+    {
+      "source": "core/windows-ransomware/references/coverage.csv",
+      "path": "skills/windows-ransomware/references/coverage.csv",
+      "sha256": "6bebc258c12af29ef55cb842013537de7b37e3f06c96572fee88b8211ca22d02"
+    },
+    {
+      "source": "core/windows-triage/SKILL.md",
+      "path": "skills/windows-triage/SKILL.md",
+      "sha256": "b2e2914e39344c0649073d17bf3c7210308688afa52c0c2565a4fcdb2b7f2e75"
+    },
+    {
+      "source": "core/windows-triage/references/event-ids.csv",
+      "path": "skills/windows-triage/references/event-ids.csv",
+      "sha256": "9f72451d839e420826a51dd47e29b4aab043da7e20c57dad50d753ac8b2fcaed"
+    },
+    {
+      "source": "episodes/core/aws-credential-compromise/source/hunteval-aws-iam-001.json",
+      "path": "crates/modules/parser-json/tests/fixtures/hunteval-aws-iam-001.json",
+      "sha256": "f3bb0e0b52d86b5760dd69163479d3eeb4e97b1e6e81ab922127aa8d2646831d"
+    },
+    {
+      "source": "episodes/core/aws-s3-data-exfiltration/source/cloudtrail.json",
+      "path": "crates/testkit/fixtures/skills-expanded/aws-s3-data-exfiltration/source/cloudtrail.json",
+      "sha256": "481076df50c0ef3e757c4b2337b63d4b82205a4b3af094a12b01ab4916e0571f"
+    },
+    {
+      "source": "episodes/core/azure-entra-identity-compromise/source/entra-native.ndjson",
+      "path": "crates/testkit/fixtures/parser-entra/source/audit-resource.ndjson",
+      "sha256": "203bb56e69680d28581abe49f1c6a468d04f9f299518d201ac2f2a753e1f91ee"
+    },
+    {
+      "source": "episodes/core/azure-entra-identity-compromise/source/entra-signin.ndjson",
+      "path": "crates/testkit/fixtures/parser-entra/source/signin-resource.ndjson",
+      "sha256": "c9c49905591de0b44c2c961796fa7db2d850689adc9b570a57133279d3b97d65"
+    },
+    {
+      "source": "episodes/core/azure-entra-identity-compromise/source/hunteval.json",
+      "path": "crates/testkit/fixtures/skills-expanded/azure-entra-identity-compromise/source/hunteval.json",
+      "sha256": "6eae0dadfb042e9beeed048d5ee8e84daa727d0e0d204ccf46def638c2dea6ad"
+    },
+    {
+      "source": "episodes/core/gcp-service-account-abuse/source/cloud-audit.json",
+      "path": "crates/testkit/fixtures/skills-expanded/gcp-service-account-abuse/source/cloud-audit.json",
+      "sha256": "760511b561b46ab90cbf93382dabf95f7620cff3acf2285d0a820e32403a584b"
+    },
+    {
+      "source": "episodes/core/gcp-service-account-abuse/source/hunteval.json",
+      "path": "crates/testkit/fixtures/skills-expanded/gcp-service-account-abuse/source/hunteval.json",
+      "sha256": "9f5dc4a91c5b7347062107c2021224e1fd48bde5145304f4e0e9558269333452"
+    },
+    {
+      "source": "episodes/core/k8s-cluster-compromise/source/audit.ndjson",
+      "path": "crates/testkit/fixtures/skills-expanded/k8s-cluster-compromise/source/audit.ndjson",
+      "sha256": "4e1b22f374707d0e10371f679431645fd45787db0d1efb21a9c9f8d9a550db5d"
+    },
+    {
+      "source": "episodes/core/k8s-workload-compromise/source/audit.ndjson",
+      "path": "crates/testkit/fixtures/skills-expanded/k8s-workload-compromise/source/audit.ndjson",
+      "sha256": "82b84b976a4b9979be45abcc321b188dfe8325c9214d15f2234d068d6d8afa93"
+    },
+    {
+      "source": "episodes/core/k8s-workload-compromise/source/falco.ndjson",
+      "path": "crates/testkit/fixtures/skills-expanded/k8s-workload-compromise/source/falco.ndjson",
+      "sha256": "ca98b094109e35e7febaa12e59cb29e345c203b1d39476a796a4d9b1eebf5b5e"
+    },
+    {
+      "source": "episodes/core/linux-persistence/source/audit.log",
+      "path": "crates/testkit/fixtures/skills-expanded/linux-persistence/source/audit.log",
+      "sha256": "6641ace7d688448e033e5bbb4aed0fa9676460a85ed6c682543566ade01bd8e4"
+    },
+    {
+      "source": "episodes/core/linux-persistence/source/collected-cron.json",
+      "path": "crates/testkit/fixtures/skills-expanded/linux-persistence/source/collected-cron.json",
+      "sha256": "a7dd4e526135c8e35e7855ee4a097901223d3b83d45c4474e99282d14d013633"
+    },
+    {
+      "source": "episodes/core/linux-triage/source/sshd.log",
+      "path": "crates/testkit/fixtures/common/linux/sshd.log",
+      "sha256": "2eb492c02aabed0d3707ca07eaa1ff27d9f0949251d6b7e7a837f7e35521785c"
+    },
+    {
+      "source": "episodes/core/linux-webshell/source/access.log",
+      "path": "crates/testkit/fixtures/skills-expanded/linux-webshell/source/access.log",
+      "sha256": "6df4e41342abcb969dbe7094ac4e939abf2c49e5e74f3e711608e0ccbb840cc8"
+    },
+    {
+      "source": "episodes/core/linux-webshell/source/audit.log",
+      "path": "crates/testkit/fixtures/skills-expanded/linux-webshell/source/audit.log",
+      "sha256": "9c46a928eb16f7024509215502e0991063be3f649b6a0b2711acc530a8a1a1ca"
+    },
+    {
+      "source": "episodes/core/malware-execution-triage/source/normalized-ecs.jsonl",
+      "path": "crates/testkit/fixtures/skills-expanded/malware-execution-triage/source/normalized-ecs.jsonl",
+      "sha256": "d1ab4fa448ac9c3debe9aa0bd831aaf16b6ee32e0c06d06ed1470aeed55f07bf"
+    },
+    {
+      "source": "episodes/core/network-c2-beaconing/source/conn.jsonl",
+      "path": "crates/testkit/fixtures/skills-expanded/network-c2-beaconing/source/conn.jsonl",
+      "sha256": "ac3d662e61c7c2fc5f68cc3b1ed50c8381d8964a44fe6d1866eebba5b0a23bfc"
+    },
+    {
+      "source": "episodes/core/network-c2-beaconing/source/eve.jsonl",
+      "path": "crates/testkit/fixtures/skills-expanded/network-c2-beaconing/source/eve.jsonl",
+      "sha256": "63959b1f2241e0dbdd1208c30ebedc3e6b45ad0b8eb00881a2b29f9a24ac7d0a"
+    },
+    {
+      "source": "episodes/core/windows-lateral-movement/source/normalized-ecs.jsonl",
+      "path": "crates/testkit/fixtures/skills-expanded/windows-lateral-movement/source/normalized-ecs.jsonl",
+      "sha256": "5c4b7ca625b5a7101782f99db29a7f7aac1679fab8a58790e037e1fd806aad61"
+    },
+    {
+      "source": "episodes/core/windows-persistence/source/normalized-ecs.jsonl",
+      "path": "crates/testkit/fixtures/skills-expanded/windows-persistence/source/normalized-ecs.jsonl",
+      "sha256": "3ad138181f2b3e566d091c159ace4ec3b11503807183ba87aebceb04bf1abf76"
+    },
+    {
+      "source": "episodes/core/windows-ransomware/source/normalized-ecs.jsonl",
+      "path": "crates/testkit/fixtures/skills-expanded/windows-ransomware/source/normalized-ecs.jsonl",
+      "sha256": "e11bb4f85974893d10dbef76a9206b74b0bc00bf251ad87c2b6e55212d8958ed"
+    },
+    {
+      "source": "episodes/core/windows-triage/source/events.jsonl",
+      "path": "crates/testkit/fixtures/parser-hayabusa/source/events.jsonl",
+      "sha256": "7b88fa2f0d5e06d4df2509d1890179c02a0950aef7a32dd86c21fc9290bba783"
+    },
+    {
+      "source": "episodes/private/expanded.json",
+      "path": "crates/testkit/fixtures/skills-expanded/private/ground-truth.json",
+      "sha256": "55435ebf39060dcf20354665ce422166e45848c80eb957ca095572c231229ba0"
+    },
+    {
+      "source": "episodes/private/hunteval-azure.json",
+      "path": "crates/testkit/fixtures/skills-expanded/private/hunteval-azure-ground-truth.json",
+      "sha256": "316fa58dfbd4cc5555c8a9b9d03b5f260219e5efb67d8da38364aecb6cf335d3"
+    },
+    {
+      "source": "episodes/private/hunteval-gcp.json",
+      "path": "crates/testkit/fixtures/skills-expanded/private/hunteval-gcp-ground-truth.json",
+      "sha256": "9b7246483efb1734b54558b0aa8df4d52c58785c1167232c4937a6f1137ec81d"
+    },
+    {
+      "source": "episodes/private/initial.json",
+      "path": "crates/testkit/fixtures/skills/private/ground-truth.json",
+      "sha256": "88f7f422a4d3022afa21157f2b6df88b171abdc2608f3f64ccca8ff9c11fccfa"
+    }
+  ]
+}
