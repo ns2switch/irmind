@@ -5,6 +5,7 @@ mod skills;
 
 mod budgets;
 mod case;
+mod case_deletion;
 mod demo_choice;
 mod home;
 mod menu_layout;

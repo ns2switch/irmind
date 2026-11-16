@@ -1,6 +1,8 @@
 use crate::*;
 #[derive(Debug, Error)]
 pub enum AppError {
+    #[error(transparent)]
+    CaseLifecycle(#[from] crate::CaseLifecycleError),
     #[error("skill package: {0}")]
     SkillPackage(#[from] irmind_domain::SkillError),
     #[error("skills: {0}")]

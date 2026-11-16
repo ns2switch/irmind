@@ -301,3 +301,10 @@ Turning this preference on requires Start for every plan. The preference change
 is a signed global operation; model tools cannot change it. See
 [parallel investigations](subagents.md) for task cancellation, shared budgets
 and partial-result coverage.
+
+## Case deletion audit
+
+Use `/case delete` for a typed, Analyst-signed confirmation of an unsealed case.
+`/cases deleted` shows the retained global tombstones and pending cleanup. Sealed
+cases and cases open in another process cannot be deleted. See [cases](cases.md)
+for ownership, interrupted cleanup, shared evidence and logical-erasure limits.

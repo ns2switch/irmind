@@ -2,6 +2,12 @@ use super::Command;
 
 pub(super) const COMMANDS: &[Command] = &[
     Command {
+        name: "case",
+        description: "Delete an unsealed case with typed, signed confirmation",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
         name: "subagents",
         description: "Inspect delegated tasks or cancel a task by identifier",
         shortcut: "",
@@ -273,7 +279,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "cases",
-        description: "List cases; optional all|open|sealed|inconsistent",
+        description: "List cases or signed tombstones with /cases deleted",
         shortcut: "",
         slash: true,
     },

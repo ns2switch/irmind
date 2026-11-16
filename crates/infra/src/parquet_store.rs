@@ -93,6 +93,10 @@ impl ParquetStore {
         self.profile = Some(profile);
     }
 
+    pub(crate) fn owned_case_path(&self, id: &CaseId) -> PathBuf {
+        self.root.join(id.as_str())
+    }
+
     pub(crate) fn case_dir(&self, id: &CaseId) -> Result<PathBuf, AppError> {
         let dir = self.root.join(id.as_str());
         fs::create_dir_all(&dir).map_err(storage)?;

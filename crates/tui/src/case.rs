@@ -48,6 +48,7 @@ pub(crate) enum CaseExit {
     Settings(Option<String>, bool),
     Quit,
     Open(String),
+    CaseCommand(String),
 }
 
 struct MouseCapture(bool);
@@ -359,6 +360,7 @@ pub(crate) fn run_case(
     shutdown: &CancellationToken,
     presentation: CasePresentation<'_>,
 ) -> Result<CaseExit> {
+    let _session = engine.open_case_session(id)?;
     if let Some(reason) = verify_case_before_open(terminal, engine, id, shutdown)? {
         return run_signed_history_only(terminal, engine, id, shutdown, &reason);
     }

@@ -25,4 +25,4 @@ No model? Use /settings model when you are ready to investigate.
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │Find cases or type / for commands · /help for help                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-↑/↓ choose · Enter open · /new create · /settings configure
+↑/↓ choose · Enter open · /case delete selected · /new create

@@ -36,6 +36,7 @@ impl<'a> Engine<'a> {
             ));
         }
         let engine = Engine {
+            case_lifecycle: None,
             repo: ports.repo,
             evidence_store: ports.evidence_store,
             graph: ports.graph,

@@ -2,7 +2,7 @@ use super::{HomeState, Mode};
 
 pub(super) fn help_line(state: &HomeState) -> &'static str {
     match state.mode {
-        Mode::List => "↑/↓ choose · Enter open · /new create · /settings configure",
+        Mode::List => "↑/↓ choose · Enter open · /case delete selected · /new create",
         Mode::Settings => "↑/↓ choose · Enter open · Esc back",
         Mode::New if state.remote_scope_step.is_remote() => {
             "Tab/Shift+Tab field · Enter create · Esc local step"

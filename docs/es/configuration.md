@@ -305,3 +305,11 @@ exige Start para todos los planes. El cambio es una operación global firmada;
 ninguna herramienta del modelo puede aplicarlo. Consulta
 [investigaciones en paralelo](subagents.md) para cancelar tareas, compartir
 presupuestos y entender las carencias de los resultados parciales.
+
+## Auditoría del borrado de casos
+
+`/case delete` abre la confirmación escrita y firmada por el analista de un caso
+no sellado. `/cases deleted` muestra las lápidas globales y la limpieza pendiente.
+No se pueden borrar casos sellados o abiertos en otro proceso. Consulta
+[casos](cases.md) para propiedad, interrupciones, evidencia compartida y límites
+del borrado lógico.
