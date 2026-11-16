@@ -420,3 +420,34 @@ fn complete_model_draft_is_one_confirmed_snapshot_and_invalid_pairs_leave_it_unc
     assert_eq!(audit.global_operations().unwrap().len(), 1);
     engine.verify_configuration(&file, &manifests).unwrap();
 }
+
+#[test]
+fn status_bar_is_one_signed_snapshot_and_invalid_templates_leave_it_unchanged() {
+    let (_root, audit, engine, file) = setup();
+    let template = irmind_app::StatusBarTemplate::costs();
+    engine
+        .apply_configuration_change(
+            &file,
+            &[],
+            ConfigChange::SetStatusBar(Some(template.clone())),
+            true,
+        )
+        .unwrap();
+    assert!(file.load().unwrap().status_bar.as_ref() == Some(&template));
+    assert_eq!(audit.global_operations().unwrap().len(), 1);
+    let mut invalid = template;
+    invalid.separator = "\x1b[2J".into();
+    assert!(
+        engine
+            .apply_configuration_change(&file, &[], ConfigChange::SetStatusBar(Some(invalid)), true)
+            .is_err()
+    );
+    assert_eq!(audit.global_operations().unwrap().len(), 1);
+    engine.verify_configuration(&file, &[]).unwrap();
+    engine
+        .apply_configuration_change(&file, &[], ConfigChange::SetStatusBar(None), true)
+        .unwrap();
+    assert!(file.load().unwrap().status_bar.is_none());
+    assert_eq!(audit.global_operations().unwrap().len(), 2);
+    engine.verify_global_operations().unwrap();
+}

@@ -23,6 +23,7 @@ fn frame(guide: &str) -> CaseFrame<'_> {
         cost: "",
         pending: 1,
         detections: 0,
+        footer: None,
         status: "idle",
     }
 }

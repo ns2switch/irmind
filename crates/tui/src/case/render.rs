@@ -1,6 +1,7 @@
 mod cards;
 mod menu;
 mod panels;
+mod status;
 use super::conversation::{Card, CardKind};
 use super::runtime::CaseRuntime;
 use super::{CaseFrame, Result, case_budget_usage, draw_case, escape_display};
@@ -48,6 +49,7 @@ impl CaseRuntime<'_, '_, '_> {
             )
         });
         self.refresh_budget_warning();
+        self.refresh_status_data()?;
         self.state.usage_cache_seq = last_seq;
         self.state.turn_detection_count = self
             .state
@@ -261,40 +263,44 @@ impl CaseRuntime<'_, '_, '_> {
                     .map_or_else(|| "no model".into(), irmind_app::LlmPort::descriptor),
             )?
             .text;
-        draw_case(
-            self.terminal,
-            &CaseFrame {
-                title: &title,
-                guide: guide.as_deref(),
-                guide_scroll: self
-                    .state
-                    .demo_guide
-                    .as_ref()
-                    .map_or(0, super::demo_guide::DemoGuide::scroll),
-                messages: "",
-                visible_lines: Some(&visible_lines),
-                input: &shown_input,
-                input_focused: self.state.focus == super::state::Focus::Composer,
-                panel: &shown_panel,
-                overlay: overlay.as_deref(),
-                menu: menu.as_deref(),
-                tab: self.state.tab,
-                sidebar_visible: self.state.sidebar_visible,
-                sidebar_scroll: u16::try_from(self.state.sidebar_scroll).unwrap_or(u16::MAX),
-                overlay_scroll: u16::try_from(self.state.overlay_scroll).unwrap_or(u16::MAX),
-                new_content: self.state.conversation.has_new_content(),
-                model: &model_name,
-                tokens: self
-                    .state
-                    .budget
-                    .usage_known
-                    .then_some(self.state.usage_cache_tokens),
-                cost: &self.state.budget.cost,
-                pending: self.state.approvals.len(),
-                detections: self.state.turn_detection_count,
-                status: &status,
-            },
-        )?;
+        let mut view = CaseFrame {
+            title: &title,
+            guide: guide.as_deref(),
+            guide_scroll: self
+                .state
+                .demo_guide
+                .as_ref()
+                .map_or(0, super::demo_guide::DemoGuide::scroll),
+            messages: "",
+            visible_lines: Some(&visible_lines),
+            input: &shown_input,
+            input_focused: self.state.focus == super::state::Focus::Composer,
+            panel: &shown_panel,
+            overlay: overlay.as_deref(),
+            menu: menu.as_deref(),
+            tab: self.state.tab,
+            sidebar_visible: self.state.sidebar_visible,
+            sidebar_scroll: u16::try_from(self.state.sidebar_scroll).unwrap_or(u16::MAX),
+            overlay_scroll: u16::try_from(self.state.overlay_scroll).unwrap_or(u16::MAX),
+            new_content: self.state.conversation.has_new_content(),
+            model: &model_name,
+            tokens: self
+                .state
+                .budget
+                .usage_known
+                .then_some(self.state.usage_cache_tokens),
+            cost: &self.state.budget.cost,
+            pending: self.state.approvals.len(),
+            detections: self.state.turn_detection_count,
+            status: &status,
+            footer: None,
+        };
+        let footer = self.footer_data(&view);
+        view.footer = Some(crate::status_bar::FooterView {
+            template: &self.status_bar,
+            data: &footer,
+        });
+        draw_case(self.terminal, &view)?;
         Ok(())
     }
 }

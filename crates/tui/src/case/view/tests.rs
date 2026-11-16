@@ -43,6 +43,7 @@ fn narrow_terminal_keeps_prompt_and_new_content_indicator() {
         cost: "$0",
         pending: 1,
         detections: 1,
+        footer: None,
         status: "idle",
     };
     draw_case(&mut terminal, &view).unwrap();
@@ -92,6 +93,7 @@ fn presentation_panel_is_large_below_the_thread_and_small_terminals_are_explicit
         cost: "",
         pending: 0,
         detections: 0,
+        footer: None,
         status: "idle",
     };
     draw_case(&mut terminal, &view).unwrap();
@@ -142,6 +144,7 @@ fn expanded_card_and_scrolled_sidebar_are_visible_in_test_backend() {
         cost: "n/a",
         pending: 0,
         detections: 0,
+        footer: None,
         status: "idle",
     };
     draw_case(&mut terminal, &view).unwrap();
@@ -193,6 +196,7 @@ fn cloud_listing_and_transfer_confirmation_fit_in_a_narrow_terminal() {
         cost: "",
         pending: 0,
         detections: 0,
+        footer: None,
         status: "◐ Cloud object… 2s · 256/512 bytes · esc to interrupt",
     };
     draw_case(&mut terminal, &view).unwrap();
@@ -224,6 +228,7 @@ fn visual_frame<'a>(lines: &'a [Line<'static>]) -> CaseFrame<'a> {
         cost: "$0",
         pending: 0,
         detections: 0,
+        footer: None,
         status: "idle",
     }
 }
@@ -337,6 +342,7 @@ fn consecutive_model_rounds_have_separate_messages() {
             cost: "",
             pending: 0,
             detections: 0,
+            footer: None,
             status: "Thinking…",
         },
     )
@@ -372,6 +378,7 @@ fn full_instance_scope_stays_visible_with_long_model_and_overlay_at_eighty_colum
         cost: "n/a",
         pending: 2,
         detections: 3,
+        footer: None,
         status: "FULL INSTANCE SCOPE · SCOPE LIMITED OVR idle",
     };
     draw_case(&mut terminal, &view).unwrap();

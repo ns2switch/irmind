@@ -150,6 +150,40 @@ Para Splunk, MISP, CrowdStrike, SentinelOne y un servicio S3 compatible, `/setti
 
 Usa **Maximum parallel workers** en `/settings preferences` para limitar la decodificación de fuentes locales y las lecturas paralelas de Parquet. Deja el campo vacío para usar un trabajador menos que las CPU lógicas disponibles, con un mínimo de uno. Un valor explícito de `max_parallel_workers` (1–256) puede usar todas las CPU disponibles. El presupuesto local de memoria puede reducir el número efectivo. La preferencia se firma y se aplica al recargar la sesión. El orden de las fuentes y los límites de cada artefacto se mantienen.
 
+### Barra de estado declarativa
+
+Abre **Status bar** en `/settings preferences`. Elige **Minimal**,
+**Investigation** (por defecto) o **Costs**; después activa segmentos, cambia su
+orden, asigna una prioridad de 0 a 100 y un color del tema, y edita el separador.
+La vista previa usa valores de ejemplo identificados como tales. Solo **Save
+and sign** guarda la plantilla como operación global firmada. **Restore
+default** también es una vista previa hasta que guardes. Esc vuelve sin guardar.
+
+La lista cerrada de segmentos incluye: título, severidad y estado de sello del
+caso; modelo y proveedor; tokens usados, presupuesto y porcentaje; tokens leídos
+y escritos en caché; llamadas y su presupuesto; bytes de nube y su presupuesto;
+coste estimado; subagentes activos; aprobaciones pendientes; detecciones; fuentes
+ingeridas; perfil de los llaveros de firma y secretos; directorio de datos;
+versión de IRMind; reloj UTC; y actividad. Se omiten los contadores de caché no
+disponibles y el coste sin precios; nunca se presentan como cero. Los contadores
+de caché solo aparecen cuando la contabilidad del proveedor los admite. Las
+reglas de consumo y presupuesto se mantienen.
+
+El orden de la plantilla es el de presentación. En anchos reducidos, incluidas
+80 columnas, se ocultan primero los segmentos con menor prioridad; en un empate
+se conserva el anterior. El último segmento se abrevia con puntos suspensivos
+si hace falta. Los títulos y otros textos externos se escapan para el terminal,
+los colores respetan `NO_COLOR` y los avisos de alcance y presupuesto siguen
+visibles independientemente de la plantilla.
+
+La configuración opcional `status_bar` usa `version = 1`, un separador de hasta
+cuatro caracteres imprimibles y como máximo una entrada por segmento. Los colores
+pertenecen al conjunto cerrado del tema: `text`, `muted`, `accent`, `warning`,
+`error`, `success`. Se rechazan segmentos desconocidos, duplicados y caracteres
+de control. La plantilla no ejecuta scripts, comandos de shell ni programas
+externos.
+
+
 Para automatización, el orden es **flag de CLI > variable de entorno > config.toml > valor por defecto**. Un override solo dura esa ejecución; la TUI no lo sustituye en silencio. El archivo contiene IDs de módulos, modelos, URLs, fuentes, índices, regiones y precios opcionales, pero nunca credenciales ni passphrases. Se rechazan los campos desconocidos o secretos. Ejemplo:
 
 ```toml

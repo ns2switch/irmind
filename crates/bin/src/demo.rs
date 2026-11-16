@@ -317,6 +317,8 @@ fn run_in_directory(
             mouse_capture: false,
             theme: None,
             max_parallel_workers: None,
+            status_bar: None,
+            data_directory: None,
         },
         presentation_speed,
     )?;

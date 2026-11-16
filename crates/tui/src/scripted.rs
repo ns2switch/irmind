@@ -206,6 +206,7 @@ where
                 cost: "",
                 pending: self.workflow.engine.pending_approvals(id)?.len(),
                 detections: 0,
+                footer: None,
                 status: "idle",
             },
         )
@@ -273,6 +274,7 @@ where
                 cost: "",
                 pending: self.workflow.engine.pending_approvals(id)?.len(),
                 detections: 0,
+                footer: None,
                 status: "idle",
             },
         )

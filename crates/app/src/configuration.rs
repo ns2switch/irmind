@@ -38,6 +38,8 @@ pub struct PersistentConfig {
     pub case_budget_defaults: Option<crate::CaseBudgetLimits>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confirm_all_subagent_plans: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_bar: Option<StatusBarTemplate>,
     #[serde(default)]
     pub modules: BTreeMap<String, ProductSettings>,
 }
@@ -77,6 +79,7 @@ pub enum ConfigChange {
     SetMaxParallelWorkers(Option<u16>),
     SetCaseBudgetDefaults(crate::CaseBudgetLimits),
     SetConfirmAllSubagentPlans(bool),
+    SetStatusBar(Option<StatusBarTemplate>),
 }
 
 pub trait ConfigurationStore: Send + Sync {
@@ -103,6 +106,7 @@ impl Default for PersistentConfig {
             max_parallel_workers: None,
             case_budget_defaults: None,
             confirm_all_subagent_plans: None,
+            status_bar: None,
             modules: BTreeMap::new(),
         }
     }
@@ -130,6 +134,9 @@ fn manifest<'a>(
 impl PersistentConfig {
     pub fn validate(&self, manifests: &[&ModuleManifest]) -> Result<(), AppError> {
         self.validate_local_preferences()?;
+        if let Some(template) = &self.status_bar {
+            template.validate()?;
+        }
         if self.version != 1
             || self.modules.len() > 256
             || self.policy_path.as_ref().is_some_and(|path| {
@@ -279,6 +286,7 @@ impl PersistentConfig {
             ConfigChange::SetTheme(theme) => next.theme = Some(theme),
             ConfigChange::SetMaxParallelWorkers(limit) => next.max_parallel_workers = limit,
             ConfigChange::SetCaseBudgetDefaults(limits) => next.case_budget_defaults = Some(limits),
+            ConfigChange::SetStatusBar(template) => next.status_bar = template,
             ConfigChange::SetConfirmAllSubagentPlans(enabled) => {
                 next.confirm_all_subagent_plans = Some(enabled);
             }
@@ -399,3 +407,6 @@ pub use model::ModelConfiguration;
 
 #[cfg(test)]
 mod tests;
+
+mod status_bar;
+pub use status_bar::{StatusBarTemplate, StatusColor, StatusItem, StatusSegment};

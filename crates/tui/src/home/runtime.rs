@@ -252,7 +252,11 @@ impl HomeRuntime<'_, '_, '_> {
             HomeAction::DeleteCredential => self.delete_credential()?,
             HomeAction::ChangePassphrase => self.change_passphrase(),
             HomeAction::ChangeModule(change, confirmed) => {
-                return Ok(self.change_module(change, confirmed));
+                let restart = self.change_module(change, confirmed);
+                if !restart && let Some(editor) = &mut self.state.status_bar_editor {
+                    editor.report(&self.state.notice);
+                }
+                return Ok(restart);
             }
             HomeAction::DiscoverModels => {
                 if self.model_models_task.is_none() {
@@ -449,6 +453,8 @@ impl HomeRuntime<'_, '_, '_> {
             self.shutdown,
             case::CasePresentation {
                 subagent_review: self.subagent_review,
+                status_bar: self.state.status_bar.as_ref(),
+                data_directory: self.state.data_directory.as_deref(),
                 demo_speed: self.demo_speed,
                 overrides_active: self.state.overrides_active,
                 modules: self.modules,
@@ -524,6 +530,8 @@ impl HomeRuntime<'_, '_, '_> {
                     self.shutdown,
                     case::CasePresentation {
                         subagent_review: self.subagent_review,
+                        status_bar: self.state.status_bar.as_ref(),
+                        data_directory: self.state.data_directory.as_deref(),
                         demo_speed: self.demo_speed,
                         overrides_active: self.state.overrides_active,
                         modules: self.modules,

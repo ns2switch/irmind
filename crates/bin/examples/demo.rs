@@ -310,23 +310,13 @@ fn main() -> Result<()> {
         recent,
         parsers,
     };
-    let modules = demo_modules();
     irmind_tui::run_workspace(
         &engine,
         Some(&model),
         &io,
-        &modules,
+        &demo_modules(),
         &CancellationToken::new(),
-        WorkspaceLaunch {
-            subagent_review: None,
-            initial_case: None,
-            resume_last_case: irmind_tui::ResumeMode::Enabled,
-            new_analyst_key: false,
-            overrides_active: false,
-            mouse_capture: false,
-            theme: None,
-            max_parallel_workers: None,
-        },
+        demo_launch(),
     )?;
     Ok(())
 }
@@ -422,5 +412,20 @@ mod tests {
         let directory = tempfile::tempdir()?;
         let (_store, _parsers) = super::demo_storage(directory.path())?;
         Ok(())
+    }
+}
+
+fn demo_launch() -> WorkspaceLaunch<'static> {
+    WorkspaceLaunch {
+        subagent_review: None,
+        initial_case: None,
+        resume_last_case: irmind_tui::ResumeMode::Enabled,
+        new_analyst_key: false,
+        overrides_active: false,
+        mouse_capture: false,
+        theme: None,
+        max_parallel_workers: None,
+        status_bar: None,
+        data_directory: None,
     }
 }

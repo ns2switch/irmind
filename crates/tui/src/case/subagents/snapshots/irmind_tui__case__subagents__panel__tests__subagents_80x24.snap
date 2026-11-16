@@ -1,6 +1,5 @@
 ---
 source: crates/tui/src/case/subagents/panel.rs
-assertion_line: 259
 expression: screen
 ---
 
@@ -26,4 +25,4 @@ expression: screen
   │                                                                          │
   └──────────────────────────────────────────────────────────────────────────┘
 
-Synthetic investi… · scripted · 1200 tok · delegated investigation
+Synthetic investigation · scripted · 1200 tok · delegated investigation

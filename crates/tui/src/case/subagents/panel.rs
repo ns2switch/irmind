@@ -236,6 +236,7 @@ mod tests {
                 cost: "",
                 pending: 0,
                 detections: 0,
+                footer: None,
                 status: "delegated investigation",
             },
         )

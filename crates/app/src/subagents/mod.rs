@@ -22,7 +22,8 @@ pub use interaction::{
     AnalystPlanChoice, AnalystPlanInteraction, AnalystPlanMailbox, PlanReview, SafePlanPreview,
 };
 pub use journal::{
-    BranchMaterialVerifier, SubagentJournal, TaskDispatchAttribution, is_subagent_kind,
+    BranchMaterialVerifier, SubagentJournal, TaskDispatchAttribution,
+    decode_entry as decode_subagent_record, is_subagent_kind,
 };
 pub use queries::{
     TaskEvidenceQueries, TaskEvidenceQuery, TaskEvidenceResult, TaskQueryPartialReason,

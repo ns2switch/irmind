@@ -76,6 +76,12 @@ where
     };
     let mut list_state = home_list_state(state);
     terminal.draw(|frame| {
+        if state.mode == Mode::StatusBar
+            && let Some(editor) = &state.status_bar_editor
+        {
+            editor.draw(frame, frame.area());
+            return;
+        }
         let theme = Theme::detect();
         let areas =
             Layout::vertical([Constraint::Min(4), Constraint::Length(1)]).split(frame.area());
@@ -460,6 +466,7 @@ fn home_header(mode: Mode) -> &'static str {
         Mode::Modules => " Connectors ",
         Mode::Config => " Preferences ",
         Mode::Limits => " Limits ",
+        Mode::StatusBar => " Status bar ",
         Mode::Keystore => " Keystore ",
         Mode::Setup => " First-run guide ",
         Mode::Help => " Commands and keys ",
