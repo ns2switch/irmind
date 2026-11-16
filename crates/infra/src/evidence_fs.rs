@@ -70,6 +70,8 @@ impl LocalStore {
 }
 impl EvidenceStore for LocalStore {
     fn put_evidence(&self, id: &CaseId, hash: &str, bytes: &[u8]) -> Result<(), AppError> {
+        let _session = self.session_file(id, true)?;
+        let _maintenance = self.evidence_maintenance()?;
         if self.get_case(id)?.sealed || self.seal_dir.join(format!("{}.json", id.as_str())).exists()
         {
             return Err(AppError::Sealed);

@@ -78,5 +78,28 @@ pub(super) fn validate_existing(db: &Connection) -> Result<(), AppError> {
             irmind_app::FixedAppError::RetiredCaseFormat,
         ));
     }
+    validate_deletion_table(db)
+}
+
+fn validate_deletion_table(db: &Connection) -> Result<(), AppError> {
+    let mut statement = db
+        .prepare("PRAGMA table_info(case_deletion)")
+        .map_err(storage)?;
+    let fields = statement
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(storage)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(storage)?;
+    let expected = ["case_id", "operation_seq", "operation", "complete"];
+    if !fields.is_empty()
+        && (fields.len() != expected.len()
+            || expected
+                .iter()
+                .any(|name| !fields.iter().any(|f| f == name)))
+    {
+        return Err(AppError::Fixed(
+            irmind_app::FixedAppError::RetiredCaseFormat,
+        ));
+    }
     Ok(())
 }

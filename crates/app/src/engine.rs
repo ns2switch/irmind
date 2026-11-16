@@ -89,6 +89,7 @@ type ObjectProgressMap = Arc<
 >;
 
 pub struct Engine<'a> {
+    pub(crate) case_lifecycle: Option<Arc<dyn crate::CaseLifecycleStore>>,
     pub repo: Arc<dyn Repository>,
     pub evidence_store: Arc<dyn EvidenceStore>,
     pub graph: Arc<dyn EvidenceGraph>,
@@ -190,6 +191,7 @@ impl EnginePorts {
 impl<'a> Engine<'a> {
     pub(crate) fn local_handle(&self) -> Engine<'static> {
         Engine {
+            case_lifecycle: self.case_lifecycle.clone(),
             repo: Arc::clone(&self.repo),
             evidence_store: Arc::clone(&self.evidence_store),
             graph: Arc::clone(&self.graph),

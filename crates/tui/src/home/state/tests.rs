@@ -325,3 +325,35 @@ fn status_bar_preferences_use_forms_and_only_save_emits_a_configuration_change()
         matches!(update(&mut state, KeyCode::Enter), HomeAction::ChangeModule(ConfigChange::SetStatusBar(Some(template)), true) if template.separator == "|")
     );
 }
+
+#[test]
+#[allow(clippy::expect_used)]
+fn case_deletion_routes_only_after_enter_and_supports_selected_and_named_case() {
+    let id = CaseId::parse("00000000-0000-4000-8000-000000000001").expect("synthetic case ID");
+    let mut state = HomeState::new(
+        vec![super::super::CaseRow {
+            id: id.clone(),
+            title: "Synthetic case".into(),
+            severity: "medium".into(),
+            status: super::super::CaseStatus::Open,
+            last_activity: 1,
+        }],
+        false,
+    );
+    for ch in "/case delete".chars() {
+        assert!(matches!(
+            update(&mut state, KeyCode::Char(ch)),
+            HomeAction::None
+        ));
+    }
+    assert!(
+        matches!(update(&mut state,KeyCode::Enter),HomeAction::DeleteCase(value) if value == id)
+    );
+    state.input = "/case delete Synthetic case".into();
+    assert!(matches!(execute_command(&mut state),HomeAction::DeleteCase(value) if value == id));
+    state.input = "/cases deleted".into();
+    assert!(matches!(
+        execute_command(&mut state),
+        HomeAction::DeletedCases
+    ));
+}

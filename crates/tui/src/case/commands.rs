@@ -25,6 +25,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             self.exit_to = super::CaseExit::Quit;
             return Ok(true);
         }
+        if let Some(result) = self.deletion_destination(&prompt) {
+            return Ok(result);
+        }
         if prompt == "/home" || prompt == "/cases" {
             return Ok(true);
         }
@@ -88,6 +91,25 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             self.investigate_prompt(prompt);
         }
         Ok(false)
+    }
+
+    fn deletion_destination(&mut self, prompt: &str) -> Option<bool> {
+        if prompt == "/case delete" || prompt == "/case" || prompt == "/cases deleted" {
+            if prompt != "/cases deleted" && self.state.case.sealed {
+                self.state.messages.push(
+                    "Sealed cases cannot be deleted. Their signed custody must be preserved."
+                        .into(),
+                );
+                return Some(false);
+            }
+            self.exit_to = super::CaseExit::CaseCommand(if prompt == "/cases deleted" {
+                prompt.to_owned()
+            } else {
+                format!("/case delete {}", self.id.as_str())
+            });
+            return Some(true);
+        }
+        None
     }
 
     fn budget_command(&mut self, prompt: &str) -> bool {

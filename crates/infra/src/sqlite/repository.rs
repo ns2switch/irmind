@@ -1,23 +1,21 @@
-use super::*;
+use super::{
+    AppError, Case, CaseId, CaseLock, CaseSeal, LocalStore, Repository, Severity, params, storage,
+    storage_reason,
+};
 
 impl Repository for LocalStore {
     fn lock_case(&self, id: &CaseId) -> Result<Box<dyn CaseLock>, AppError> {
-        let mut options = OpenOptions::new();
-        options.read(true).write(true).create(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt as _;
-            options.mode(0o600);
-        }
-        let file = options
-            .open(self.lock_dir.join(id.as_str()))
-            .map_err(storage)?;
-        private_file(&self.lock_dir.join(id.as_str())).map_err(storage)?;
-        file.lock_exclusive().map_err(storage)?;
-        Ok(Box::new(HeldCaseFile { _file: file }))
+        let session = self.session_file(id, true)?;
+        let operation = self.lease_file(id.as_str(), false, true)?;
+        self.reject_deleted(id)?;
+        Ok(Box::new(super::lifecycle::OperationLease {
+            _session: session,
+            _operation: operation,
+        }))
     }
 
     fn get_case(&self, id: &CaseId) -> Result<Case, AppError> {
+        self.reject_deleted(id)?;
         self.conn()?
             .query_row(
                 "SELECT title,scope,severity,sealed FROM cases WHERE id=?1",
@@ -39,7 +37,7 @@ impl Repository for LocalStore {
     fn list_cases(&self) -> Result<Vec<Case>, AppError> {
         let conn = self.conn()?;
         let mut stmt = conn
-            .prepare("SELECT id,title,scope,severity,sealed FROM cases ORDER BY rowid DESC")
+            .prepare("SELECT id,title,scope,severity,sealed FROM cases WHERE NOT EXISTS(SELECT 1 FROM case_deletion d WHERE d.case_id=cases.id) ORDER BY rowid DESC")
             .map_err(storage)?;
         let rows = stmt
             .query_map([], |row| {

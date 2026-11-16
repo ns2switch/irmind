@@ -11,8 +11,8 @@ impl Command {
     pub(crate) fn category(&self) -> &'static str {
         match self.name {
             "skills" => "Skills",
-            "subagents" | "budget" | "ingest" | "verify" | "seal" | "export" | "report"
-            | "scope" | "home" | "rebuild" => "Case",
+            "case" | "subagents" | "budget" | "ingest" | "verify" | "seal" | "export"
+            | "report" | "scope" | "home" | "rebuild" => "Case",
             "evidence" | "evidence-save" | "raw" | "graph" | "timeline" | "entity"
             | "neighbors" | "path" | "search" | "entity-timeline" | "siem-alert"
             | "verify-graph" | "objects" | "object-read" => "Evidence",
@@ -32,6 +32,8 @@ impl Command {
             "settings" => " [model|connectors|keystore|preferences|limits]",
             "subagents" => " [cancel <task>]",
             "open" => " <case title or ID>",
+            "case" => " delete [case title or ID]",
+            "cases" => " [all|open|sealed|inconsistent|deleted]",
             "demo" => " [check|exit]",
             "evidence" | "raw" => " <hash>",
             "ingest" => " [--parser <name>] [--year YYYY --utc-offset ±HH:MM] <path>",

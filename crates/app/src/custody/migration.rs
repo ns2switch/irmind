@@ -135,6 +135,22 @@ impl Engine<'_> {
         &self,
         operation: String,
     ) -> Result<(), AppError> {
+        let entry = self.sign_global_operation_unlocked(operation)?;
+        self.audit_log.append_global_operation(&entry)
+    }
+
+    pub(crate) fn sign_global_operation_unlocked(
+        &self,
+        operation: String,
+    ) -> Result<SignedOperation, AppError> {
+        self.sign_global_operation_at_unlocked(operation, self.clock.now()?)
+    }
+
+    pub(crate) fn sign_global_operation_at_unlocked(
+        &self,
+        operation: String,
+        at: u64,
+    ) -> Result<SignedOperation, AppError> {
         self.verify_global_operations()?;
         let last = self.audit_log.global_operations()?.pop();
         let mut entry = SignedOperation {
@@ -146,7 +162,7 @@ impl Engine<'_> {
                     )
                 })
             })?,
-            at: self.clock.now()?,
+            at,
             actor: Actor::Analyst,
             operation,
             prev: last.map_or([0u8; 32], |previous| previous.hash),
@@ -156,7 +172,7 @@ impl Engine<'_> {
         };
         entry.hash = sha256(&entry.canonical());
         entry.sig = self.signer.sign(&entry.hash)?;
-        self.audit_log.append_global_operation(&entry)
+        Ok(entry)
     }
 
     pub fn verify_global_operations(&self) -> Result<(), AppError> {

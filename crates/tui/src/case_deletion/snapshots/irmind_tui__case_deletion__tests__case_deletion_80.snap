@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/case_deletion/tests.rs
+expression: screen
+---
+Delete unsealed case · Analyst signature required
+Synthetic\u{1b}[2J\u{202e} case
+00000000-0000-4000-8000-000000000001 · created 1970-01-01 00:01:40 UTC
+1 entries · 0 sources · 0 owned bytes
+0 shared blob bytes · 0 logical metadata bytes
+Deletes chain, Parquet, spools, proofs, skill snapshots and branches.
+External originals stay. Shared blobs stay while another case uses them.
+Logical deletion only; use disk encryption for sensitive evidence.
+
+
+
+
+
+
+╭Exact title or case ID────────────────────────────────────────────────────────╮
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭Reason (optional)─────────────────────────────────────────────────────────────╮
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+1. Cancel     2. Sign and delete
+
+
+Tab fields · ←/→ choose · Enter confirm · Esc cancel

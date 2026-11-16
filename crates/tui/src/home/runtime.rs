@@ -42,6 +42,13 @@ impl HomeRuntime<'_, '_, '_> {
             if let Some(outcome) = self.state.parser_outcome {
                 return Ok(outcome);
             }
+            if let Some(command) = self.state.pending_case_command.take() {
+                self.state.input = command;
+                let action = super::state::execute_command(&mut self.state);
+                if self.apply_action(action)? {
+                    break;
+                }
+            }
             self.poll_tasks()?;
             while let Ok((id, status)) = self.statuses.try_recv() {
                 if let Some(row) = self.state.rows.iter_mut().find(|row| row.id == id) {
@@ -224,6 +231,8 @@ impl HomeRuntime<'_, '_, '_> {
                 return Ok(true);
             }
             HomeAction::OpenCase(id) => self.open_case(&id)?,
+            HomeAction::DeleteCase(id) => return self.delete_case(&id),
+            HomeAction::DeletedCases => return Ok(self.deleted_cases()),
             HomeAction::CreateCase => self.create_case()?,
             HomeAction::LoadKeystore => {
                 self.state.keystore = Some(self.io_ops.keystore_status()?);
@@ -272,6 +281,33 @@ impl HomeRuntime<'_, '_, '_> {
             HomeAction::SaveModel(draft) => return Ok(self.save_model(&draft)),
         }
         Ok(false)
+    }
+
+    fn delete_case(&mut self, id: &CaseId) -> Result<bool> {
+        let result = crate::case_deletion::run(self.terminal, self.engine, id, self.shutdown);
+        let quit = self.finish_deletion_screen(result);
+        self.state.rows = load_rows(self.engine)?;
+        self.state.selected = self
+            .state
+            .selected
+            .min(self.state.rows.len().saturating_sub(1));
+        Ok(quit)
+    }
+    fn deleted_cases(&mut self) -> bool {
+        let result = crate::case_deletion::deleted(self.terminal, self.engine, self.shutdown);
+        self.finish_deletion_screen(result)
+    }
+    fn finish_deletion_screen(&mut self, result: Result<crate::case_deletion::Exit>) -> bool {
+        match result {
+            Ok(crate::case_deletion::Exit::Quit) => return true,
+            Ok(crate::case_deletion::Exit::Back(message)) => self.state.notice = message,
+            Err(error) => {
+                self.state.notice = format!(
+                    "Case deletion: {error}. Use /cases deleted to inspect or retry signed cleanup."
+                );
+            }
+        }
+        false
     }
 
     fn manage_skills(&mut self, command: &str) -> bool {

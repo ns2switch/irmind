@@ -216,6 +216,7 @@ impl PreparedStartup {
         let Some(engine) = self.compose_with_retry(&registry, &catalog)? else {
             return Ok(false);
         };
+        resume_signed_deletions(&engine, cancel)?;
         let Self {
             subagent_review,
             cli,
@@ -335,6 +336,7 @@ impl PreparedStartup {
         }
         let engine = registry.bind(
             Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
+                .with_case_lifecycle(self.store.clone())
                 .with_skills(services)?
                 .with_large_case_pipeline(self.store.clone(), Arc::new(JsonParser))
                 .with_parser_catalog(catalog),
@@ -566,4 +568,13 @@ fn trusted_verifier(
         }
     }
     Ok(verifier)
+}
+
+fn resume_signed_deletions(engine: &Engine<'_>, cancel: &CancellationToken) -> Result<()> {
+    for result in engine.resume_case_deletions(cancel)? {
+        if !result.complete {
+            tracing::warn!(case_id=%result.case_id.as_str(), message=%engine.guard.screen(&result.message)?.text, "Pending signed case deletion");
+        }
+    }
+    Ok(())
 }

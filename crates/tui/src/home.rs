@@ -142,6 +142,7 @@ impl From<bool> for HintMode {
 
 pub(crate) struct HomeState {
     rows: Vec<CaseRow>,
+    pending_case_command: Option<String>,
     pub(crate) mode: Mode,
     status_filter: Option<CaseStatus>,
     selected: usize,
@@ -208,6 +209,7 @@ impl HomeState {
     pub(crate) fn new(rows: Vec<CaseRow>, show_setup: bool) -> Self {
         Self {
             rows,
+            pending_case_command: None,
             mode: if show_setup { Mode::Setup } else { Mode::List },
             status_filter: None,
             selected: 0,
@@ -476,6 +478,18 @@ fn prepare_home_state(
         load_rows(engine)?,
         launch.new_analyst_key || engine.repo.list_cases()?.is_empty(),
     );
+    let pending = engine
+        .resume_case_deletions(&CancellationToken::new())?
+        .into_iter()
+        .filter(|value| !value.complete)
+        .collect::<Vec<_>>();
+    if let Some(first) = pending.first() {
+        state.notice = format!(
+            "{} signed deletion(s) need cleanup: {}",
+            pending.len(),
+            first.message
+        );
+    }
     state.set_modules(modules);
     state.budget_editor = crate::budgets::BudgetEditor::new(
         engine.new_case_budget_limits(),
@@ -581,7 +595,8 @@ pub(super) fn apply_case_exit(state: &mut HomeState, exit: &case::CaseExit) {
         case::CaseExit::Home
         | case::CaseExit::Open(_)
         | case::CaseExit::Quit
-        | case::CaseExit::Restart => Mode::List,
+        | case::CaseExit::Restart
+        | case::CaseExit::CaseCommand(_) => Mode::List,
         case::CaseExit::New => Mode::New,
         case::CaseExit::Settings(section, legacy) => {
             if *legacy {
@@ -598,6 +613,9 @@ pub(super) fn apply_case_exit(state: &mut HomeState, exit: &case::CaseExit) {
         matches!(exit, case::CaseExit::Restart).then_some(crate::WorkspaceOutcome::Restart);
     if state.mode == Mode::Model {
         state.model_setup = model::ModelSetup::new();
+    }
+    if let case::CaseExit::CaseCommand(command) = exit {
+        state.pending_case_command = Some(command.clone());
     }
     if let case::CaseExit::Open(name) = exit {
         state.input = format!("/open {name}");

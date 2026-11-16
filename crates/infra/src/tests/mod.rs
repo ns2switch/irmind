@@ -126,3 +126,5 @@ mod benchmark_custody;
 
 mod skill_installation;
 mod subagent_records;
+
+mod case_deletion;

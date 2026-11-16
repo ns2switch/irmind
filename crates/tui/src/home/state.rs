@@ -10,6 +10,8 @@ pub(crate) enum HomeAction {
     Parsers(String),
     Skills(String),
     OpenCase(CaseId),
+    DeleteCase(CaseId),
+    DeletedCases,
     CreateCase,
     LoadKeystore,
     VerifyExport(std::path::PathBuf, String),
@@ -222,8 +224,23 @@ fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
             .map(|row| format!("/open {}", row.title))
             .collect();
     }
+    if source == "/case " || source == "/case d" {
+        return vec!["/case delete".into()];
+    }
+    if let Some(query) = source.strip_prefix("/case delete ") {
+        return state
+            .rows
+            .iter()
+            .filter(|r| {
+                r.title.to_lowercase().contains(&query.to_lowercase())
+                    || r.id.as_str().starts_with(query)
+            })
+            .take(20)
+            .map(|r| format!("/case delete {}", r.title))
+            .collect();
+    }
     if let Some(query) = source.strip_prefix("/cases ") {
-        return ["all", "open", "sealed", "inconsistent"]
+        return ["all", "open", "sealed", "inconsistent", "deleted"]
             .into_iter()
             .filter(|value| value.starts_with(&query.to_lowercase()))
             .map(|value| format!("/cases {value}"))
@@ -253,6 +270,7 @@ fn command_options_for(state: &HomeState, source: &str) -> Vec<String> {
                 "new"
                     | "open"
                     | "cases"
+                    | "case"
                     | "home"
                     | "settings"
                     | "help"
@@ -285,6 +303,9 @@ fn complete_command(state: &mut HomeState, forward: bool) {
 pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
     let input = std::mem::take(&mut state.input);
     state.palette_return = None;
+    if let Some(action) = deletion_command(state, input.trim()) {
+        return action;
+    }
     match input.trim() {
         "/new" => {
             state.form = HomeState::new(Vec::new(), false).form;
@@ -359,6 +380,26 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
         _ => state.notice = "Unknown command; use /help".into(),
     }
     HomeAction::None
+}
+
+fn deletion_command(state: &mut HomeState, input: &str) -> Option<HomeAction> {
+    match input {
+        "/cases deleted" => Some(HomeAction::DeletedCases),
+        "/case" | "/case delete" => {
+            if let Some(row) = state.visible().get(state.selected) {
+                return Some(HomeAction::DeleteCase(row.id.clone()));
+            }
+            state.notice = "Select a case first, or use /case delete <title or ID>.".into();
+            Some(HomeAction::None)
+        }
+        value if value.starts_with("/case delete ") => {
+            Some(match open_named_case(state, value[13..].trim()) {
+                HomeAction::OpenCase(id) => HomeAction::DeleteCase(id),
+                other => other,
+            })
+        }
+        _ => None,
+    }
 }
 
 fn open_settings_section(state: &mut HomeState, section: SettingsSection) -> HomeAction {

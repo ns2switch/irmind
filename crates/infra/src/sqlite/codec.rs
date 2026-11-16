@@ -1,6 +1,6 @@
 use super::{
-    Actor, AppError, OptionalExtension, SignedEntry, SignedOperation, Transaction, params, sha256,
-    storage, storage_reason,
+    Actor, AppError, GLOBAL_OPERATION_SCOPE, OptionalExtension, SignedEntry, SignedOperation,
+    Transaction, params, sha256, storage, storage_reason, verify_signature,
 };
 
 fn decode_fixed<const N: usize>(value: Vec<u8>) -> Result<[u8; N], rusqlite::Error> {
@@ -91,5 +91,36 @@ pub(super) fn append_entry_tx(tx: &Transaction<'_>, entry: &SignedEntry) -> Resu
         ],
     )
     .map_err(storage)?;
+    Ok(())
+}
+
+pub(super) fn append_global_operation_tx(
+    tx: &Transaction<'_>,
+    entry: &SignedOperation,
+) -> Result<(), AppError> {
+    if entry.case_id != GLOBAL_OPERATION_SCOPE || entry.actor != Actor::Analyst {
+        return Err(storage_reason("invalid global operational actor or scope"));
+    }
+    let last: Option<(u64, Vec<u8>)> = tx
+        .query_row(
+            "SELECT seq,hash FROM global_operational_audit ORDER BY seq DESC LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(storage)?;
+    let (next, prev) = last.map_or((1, vec![0u8; 32]), |(seq, hash)| (seq + 1, hash));
+    if entry.seq != next
+        || entry.prev.as_slice() != prev
+        || sha256(&entry.canonical()) != entry.hash
+    {
+        return Err(storage_reason(
+            "global operational audit sequence or hash mismatch",
+        ));
+    }
+    verify_signature(&entry.public_key, &entry.hash, &entry.sig)?;
+    tx.execute("INSERT INTO global_operational_audit (seq,at,actor,operation,prev,hash,sig,public_key) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+            params![entry.seq, entry.at, entry.actor.as_storage(), entry.operation,
+                entry.prev.as_slice(), entry.hash.as_slice(), entry.sig, entry.public_key]).map_err(storage)?;
     Ok(())
 }

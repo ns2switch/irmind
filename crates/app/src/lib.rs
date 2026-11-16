@@ -27,6 +27,11 @@ mod adapter_storage_errors;
 mod approvals;
 mod audit_origin;
 mod case_budget;
+mod case_lifecycle;
+pub use case_lifecycle::{
+    CaseDeletedV1, CaseDeletionInventory, CaseLifecycleError, CaseLifecycleStore, DeletionProgress,
+    PreparedCaseDeletion, VerifiedCaseDeletion,
+};
 pub mod catalog;
 mod configuration;
 pub use case_budget::{CaseBudgetLimits, CaseBudgetStatus, CaseBudgetUsage, case_budget_usage};

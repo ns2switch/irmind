@@ -95,6 +95,7 @@ impl LocalStore {
             CREATE TRIGGER IF NOT EXISTS global_operational_audit_no_update BEFORE UPDATE ON global_operational_audit BEGIN SELECT RAISE(ABORT,'global operational audit is append only'); END;
             CREATE TRIGGER IF NOT EXISTS global_operational_audit_no_delete BEFORE DELETE ON global_operational_audit BEGIN SELECT RAISE(ABORT,'global operational audit is append only'); END;
         ").map_err(storage)?;
+        super::lifecycle::install(&db)?;
         Ok(db)
     }
 

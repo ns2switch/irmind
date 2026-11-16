@@ -6,4 +6,5 @@ mod codec;
 mod open_and_migrate;
 mod repository;
 
+mod lifecycle;
 mod schema;
