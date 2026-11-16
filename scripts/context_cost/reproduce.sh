@@ -12,4 +12,4 @@ IRMIND_CONTEXT_COST_TRACE="$context_run_dir/raw" cargo nextest run -p irmind \
     --test skills_runtime --all-features --cargo-profile release --locked \
     --run-ignored all -E 'test(record_context_cost) | test(subagents_mixed)'
 python3 scripts/context_cost/analyze.py --traces "$context_run_dir/raw" \
-    --output "$context_run_dir/measured.json"
+    --output "$context_run_dir/measured.json" --engine-commit "$(git rev-parse HEAD)"

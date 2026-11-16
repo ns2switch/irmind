@@ -7,7 +7,7 @@ native model maximum and request-boundary accounting. No provider was called.
 
 ## 1. Baseline and reproducibility
 
-Baseline engine: `41c174bdbcfcf770f23218e0cbcdcec7c1509c8e`. The scripted
+Baseline engine: `55331ce7dd68acbe1299e50f9548876223e00d19`. The scripted
 `LlmPort` receives real `CompletionRequest` values from ingestion, skills,
 investigation, compaction and the three-child broker. It reports simulated usage:
 `ceil(provider-neutral UTF-8 JSON bytes / 4)` for input and response bytes / 4
@@ -34,7 +34,8 @@ The per-turn conversation inputs are **5,061; 5,568; 6,076; 6,583; 7,091; 7,598;
 corresponding table total. Every request, actor, turn, component byte count and
 simulated usage is in [baseline.json](context-cost-data/baseline.json).
 [repeats.json](context-cost-data/repeats.json) records three repetitions; aggregate
-input totals and prefix estimates were identical. Counts are obtained in release
+input totals and prefix estimates were identical. A fresh repetition against this
+main baseline retained the original counts; the observer adds no product behavior. Counts are obtained in release
 builds; they are not ingestion-throughput or wall-clock benchmarks.
 
 ```sh

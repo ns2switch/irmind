@@ -1,5 +1,3 @@
-Traducción de docs/development/context-cost-design.md en el commit 3f7899242bcb2afc62f747b0f8e39ff4a3f3928a; si hay diferencias, prevalece la versión en inglés.
-
 # Coste de contexto, caché de prompts y compactación acotada
 
 Solo diseño. El observador mide peticiones del motor actual; las transformaciones
@@ -11,7 +9,7 @@ contiene también los enlaces oficiales y las referencias de código.
 
 ## 1. Base medida y reproducción
 
-Motor base: `41c174bdbcfcf770f23218e0cbcdcec7c1509c8e`. Un `LlmPort` scripted
+Motor base: `55331ce7dd68acbe1299e50f9548876223e00d19`. Un `LlmPort` scripted
 recibe las peticiones reales de ingesta, skills, investigación, compactación y
 broker. Informa uso simulado: `ceil(bytes UTF-8 del JSON neutral / 4)` para entrada
 y bytes de respuesta / 4 para salida. **No es el tokenizer de ningún proveedor,
@@ -36,8 +34,8 @@ Entradas por turno de conversación: **5.061; 5.568; 6.076; 6.583; 7.091; 7.598;
 tabla. [baseline.json](../development/context-cost-data/baseline.json) contiene
 cada petición, actor, turno, componente y contador.
 [repeats.json](../development/context-cost-data/repeats.json) registra tres
-repeticiones: coinciden los agregados y las estimaciones de prefijo. Las medidas
-son de build release, no benchmarks de tiempo ni throughput de ingesta.
+repeticiones: coinciden los agregados y las estimaciones de prefijo. La repetición sobre esta base de main conserva las cifras de la primera
+medición. Las medidas son de build release, no benchmarks de tiempo ni throughput de ingesta.
 
 ```sh
 sh scripts/context_cost/reproduce.sh target/context-cost/run-1

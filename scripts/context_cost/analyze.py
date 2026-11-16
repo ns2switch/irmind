@@ -198,8 +198,11 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--traces',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--engine-commit',required=True)
     args=parser.parse_args()
-    result={'method':'context-cost-simulation-v1','engine_commit':'41c174bdbcfcf770f23218e0cbcdcec7c1509c8e',
+    if not re.fullmatch('[0-9a-f]{40}', args.engine_commit):
+        parser.error('--engine-commit requires a full commit hash')
+    result={'method':'context-cost-simulation-v1','engine_commit':args.engine_commit,
         'provider_calls':0,'provider_cost_usd':0,'tokenizer':'ceil(neutral UTF-8 JSON bytes / 4); NOT provider tokens',
         'prefix_model':'tools-first neutral JSON; perfect retention; 1024-token minimum and 128-token alignment are illustrative, not universal',
         'simulation_only':['one_kib_summary','entropy-free frozen archive','cache cost multipliers','auxiliary model price ratios'],

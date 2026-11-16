@@ -1,6 +1,6 @@
 {
   "build_profile": "release",
-  "engine_commit": "41c174bdbcfcf770f23218e0cbcdcec7c1509c8e",
+  "engine_commit": "55331ce7dd68acbe1299e50f9548876223e00d19",
   "method": "context-cost-simulation-v1",
   "prefix_model": "tools-first neutral JSON; perfect retention; 1024-token minimum and 128-token alignment are illustrative, not universal",
   "provider_calls": 0,
