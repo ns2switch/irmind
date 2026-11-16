@@ -190,6 +190,10 @@ signed usage readers use closed fields; extra JSON keys cannot simply be slipped
 records. Unknown usage must not free an unsettled reservation. This design is not
 that format approval.
 
+The proposed first-increment [concrete accounting amendment](context-cache-accounting-contract.md)
+provides the public value types, signed payload encoding and synthetic vectors
+for that separate review.
+
 ## 6. Profile-aware compaction
 
 Add a context profile distinct from `ModelOutputProfile`: documented/declared
