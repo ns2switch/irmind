@@ -304,7 +304,9 @@ impl Editor {
         let mut selected = ListState::default();
         selected.select(Some(self.selected));
         frame.render_stateful_widget(
-            List::new(self.rows()).highlight_style(theme.accent()),
+            List::new(self.rows())
+                .highlight_symbol("› ")
+                .highlight_style(theme.accent()),
             parts[2],
             &mut selected,
         );

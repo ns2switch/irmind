@@ -136,3 +136,14 @@ fn editor_cancel_and_separator_validation_preserve_the_signed_template() {
         editor::Action::Cancel
     ));
 }
+
+#[test]
+fn editor_selection_is_visible_without_relying_on_color() {
+    use crossterm::event::KeyCode;
+    let mut editor = editor::Editor::new(None);
+    assert!(screen(&editor, 80).contains("› 1. Choose preset"));
+    editor.update(KeyCode::Down);
+    let shown = screen(&editor, 80);
+    assert!(shown.contains("› 2. Segments and order"));
+    assert!(!shown.contains("› 1. Choose preset"));
+}

@@ -136,7 +136,8 @@ fn initial_state(
     resumed: bool,
 ) -> Result<CaseState> {
     let case = engine.repo.get_case(id)?;
-    let mut conversation = welcome_conversation(engine, &case, model, io_ops, resumed)?;
+    let (mut conversation, keystore_profile) =
+        welcome_conversation(engine, &case, model, io_ops, resumed)?;
     let approvals = engine.pending_approvals(id)?;
     let approval_sources = load_approval_sources(engine, id, &approvals)?;
     let findings = engine.findings(id)?;
@@ -169,6 +170,7 @@ fn initial_state(
         object_listing_window: None,
         object_listing_after_seq: 0,
         conversation,
+        keystore_profile,
         demo_guide: initial_demo_guide(io_ops)?,
         demo_pending_event: None,
         audit_cursor: 0,
@@ -221,8 +223,10 @@ fn welcome_conversation(
     model: Option<&dyn LlmPort>,
     io_ops: &dyn WorkspaceIo,
     resumed: bool,
-) -> Result<Conversation> {
-    let backend = io_ops.keystore_status()?.signer_backend;
+) -> Result<(Conversation, String)> {
+    let status = io_ops.keystore_status()?;
+    let profile = format!("{}/{}", status.signer_backend, status.secrets_backend);
+    let backend = status.signer_backend;
     let mut case_summary = welcome_summary(case, model, &backend, resumed, !io_ops.demo_mode());
     if io_ops.demo_mode() {
         case_summary.insert_str(0, "Demo · synthetic data · deleted on exit\n");
@@ -234,7 +238,7 @@ fn welcome_conversation(
         engine.guard.screen(&case_summary)?.text,
         false,
     ));
-    Ok(conversation)
+    Ok((conversation, profile))
 }
 
 #[derive(Clone, Copy)]
