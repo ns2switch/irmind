@@ -1,0 +1,28 @@
+---
+source: crates/tui/src/status_bar/tests.rs
+expression: "screen(&editor, 80)"
+---
+Status bar · signed declarative preferences
+
+╭ Live preview · example values ───────────────────────────────────────────────╮
+│Example local model · 120000 tok · 6% tokens · cost $0.10 (example)           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+1. Choose preset
+2. Segments and order
+3. Separator:  ·
+4. Restore default
+5. Save and sign
+6. Cancel
+
+
+
+
+
+
+
+
+┌Option number (optional)──────────────────────────────────────────────────────┐
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+↑/↓ choose · Enter confirm · Esc back

@@ -301,3 +301,27 @@ fn worker_limit_is_edited_and_confirmed_as_a_preference() {
         HomeAction::ChangeModule(ConfigChange::SetMaxParallelWorkers(None), true)
     ));
 }
+
+#[test]
+fn status_bar_preferences_use_forms_and_only_save_emits_a_configuration_change() {
+    let mut state = HomeState::new(Vec::new(), false);
+    state.mode = Mode::Config;
+    state.preference_selected = 6;
+    assert!(matches!(
+        update(&mut state, KeyCode::Enter),
+        HomeAction::None
+    ));
+    assert_eq!(state.mode, Mode::StatusBar);
+    assert!(matches!(
+        update(&mut state, KeyCode::Char('3')),
+        HomeAction::None
+    ));
+    update(&mut state, KeyCode::Enter);
+    paste(&mut state, "|\n");
+    assert!(state.input.is_empty());
+    update(&mut state, KeyCode::Enter);
+    update(&mut state, KeyCode::Char('5'));
+    assert!(
+        matches!(update(&mut state, KeyCode::Enter), HomeAction::ChangeModule(ConfigChange::SetStatusBar(Some(template)), true) if template.separator == "|")
+    );
+}

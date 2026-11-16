@@ -77,6 +77,8 @@ pub(crate) struct CasePresentation<'a> {
     pub mouse_capture: bool,
     pub resumed: bool,
     pub demo_speed: u8,
+    pub status_bar: Option<&'a irmind_app::StatusBarTemplate>,
+    pub data_directory: Option<&'a std::path::Path>,
 }
 
 fn initial_demo_guide(io_ops: &dyn WorkspaceIo) -> Result<Option<demo_guide::DemoGuide>> {
@@ -398,6 +400,9 @@ pub(crate) fn run_case(
             overrides_active: presentation.overrides_active,
             modules: presentation.modules,
             exit_to: CaseExit::Home,
+            status_bar: presentation.status_bar.cloned().unwrap_or_default(),
+            status_data: crate::status_bar::StatusData::default(),
+            data_directory: presentation.data_directory.map(std::path::Path::to_owned),
         };
         let _mouse = MouseCapture::start(presentation.mouse_capture)?;
         runtime.run()

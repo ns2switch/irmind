@@ -9,6 +9,7 @@ pub(super) fn help_line(state: &HomeState) -> &'static str {
         }
         Mode::New => "Tab/Shift+Tab field · ↑/↓ severity · Enter create or expand · Esc back",
         Mode::Limits => "Tab/Shift+Tab field · Enter review and sign · Esc back",
+        Mode::StatusBar => "↑/↓ choose · Enter confirm · Esc back",
         Mode::Config => "↑/↓ choose · Enter change · Esc back",
         Mode::Modules => {
             if state.pending_module_change.is_some() {

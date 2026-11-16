@@ -11,6 +11,7 @@ mod menu_layout;
 pub mod scripted;
 mod setup;
 mod startup_review;
+mod status_bar;
 mod theme;
 mod workflow;
 
@@ -110,6 +111,8 @@ pub struct WorkspaceLaunch<'a> {
     pub mouse_capture: bool,
     pub theme: Option<&'a str>,
     pub max_parallel_workers: Option<u16>,
+    pub status_bar: Option<&'a irmind_app::StatusBarTemplate>,
+    pub data_directory: Option<&'a Path>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]

@@ -4,7 +4,7 @@ use super::{
     parse_id, write_private_output,
 };
 use irmind_app::modules::ModuleRegistry;
-use irmind_app::{LargeCaseUseCases, SourceCheckMode};
+use irmind_app::{ConfigurationStore, LargeCaseUseCases, SourceCheckMode};
 use irmind_infra::LocalStore;
 use std::path::Path;
 
@@ -320,6 +320,7 @@ impl AutomationContext<'_, '_> {
                 ));
             }
             Command::Tui { case_id } => {
+                let saved = workspace_io.config_store.load()?;
                 return irmind_tui::run_workspace(
                     engine,
                     selected_model,
@@ -334,7 +335,9 @@ impl AutomationContext<'_, '_> {
                         overrides_active,
                         mouse_capture,
                         theme: None,
-                        max_parallel_workers: None,
+                        max_parallel_workers: saved.max_parallel_workers,
+                        status_bar: saved.status_bar.as_ref(),
+                        data_directory: Some(&workspace_io.home),
                     },
                 )
                 .map(|outcome| outcome == irmind_tui::WorkspaceOutcome::Restart);

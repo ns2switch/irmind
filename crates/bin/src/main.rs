@@ -172,7 +172,8 @@ impl RootWorkspaceIo {
             | ConfigChange::SetTheme(_)
             | ConfigChange::SetMaxParallelWorkers(_)
             | ConfigChange::SetCaseBudgetDefaults(_)
-            | ConfigChange::SetConfirmAllSubagentPlans(_) => false,
+            | ConfigChange::SetConfirmAllSubagentPlans(_)
+            | ConfigChange::SetStatusBar(_) => false,
             ConfigChange::SelectLlm(_) => self.module_overrides.contains("llm"),
             ConfigChange::ConfigureModel(model) => {
                 self.module_overrides.contains("llm")

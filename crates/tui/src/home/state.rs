@@ -80,6 +80,7 @@ pub(crate) fn update(state: &mut HomeState, key: KeyCode) -> HomeAction {
     match state.mode {
         Mode::List => update_list(state, key),
         Mode::Settings => update_settings(state, key),
+        Mode::StatusBar => update_status_bar(state, key),
         Mode::New => update_new_case(state, key),
         Mode::Model => update_model(state, key),
         Mode::VerifyExport => update_verify_export(state, key),
@@ -135,6 +136,11 @@ pub(crate) fn clear_active_field(state: &mut HomeState) {
             }
         }
         Mode::Limits => state.budget_editor.clear(),
+        Mode::StatusBar => {
+            if let Some(editor) = &mut state.status_bar_editor {
+                editor.clear();
+            }
+        }
         Mode::List => state.input.clear(),
         _ => {}
     }
@@ -426,7 +432,7 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
             HomeAction::None
         }
         KeyCode::Down => {
-            state.preference_selected = (state.preference_selected + 1).min(5);
+            state.preference_selected = (state.preference_selected + 1).min(6);
             HomeAction::None
         }
         KeyCode::Enter => {
@@ -444,6 +450,13 @@ fn update_config(state: &mut HomeState, key: KeyCode) -> HomeAction {
                 ),
                 4 => {
                     state.worker_limit_input = Some(String::new());
+                    return HomeAction::None;
+                }
+                6 => {
+                    state.status_bar_editor = Some(crate::status_bar::editor::Editor::new(
+                        state.status_bar.as_ref(),
+                    ));
+                    state.mode = Mode::StatusBar;
                     return HomeAction::None;
                 }
                 5 => ConfigChange::SetConfirmAllSubagentPlans(
@@ -636,3 +649,21 @@ fn update_keystore_confirmation(state: &mut HomeState, key: KeyCode) -> Option<H
 
 #[cfg(test)]
 mod tests;
+
+fn update_status_bar(state: &mut HomeState, key: KeyCode) -> HomeAction {
+    let Some(editor) = &mut state.status_bar_editor else {
+        state.mode = Mode::Config;
+        return HomeAction::None;
+    };
+    match editor.update(key) {
+        crate::status_bar::editor::Action::Keep => HomeAction::None,
+        crate::status_bar::editor::Action::Cancel => {
+            state.status_bar_editor = None;
+            state.mode = Mode::Config;
+            HomeAction::None
+        }
+        crate::status_bar::editor::Action::Save(template) => {
+            HomeAction::ChangeModule(ConfigChange::SetStatusBar(template), true)
+        }
+    }
+}

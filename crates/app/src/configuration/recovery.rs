@@ -161,6 +161,12 @@ fn fields(config: &PersistentConfig) -> BTreeMap<String, String> {
     if let Some(value) = config.confirm_all_subagent_plans {
         out.insert("confirm_all_subagent_plans".into(), value.to_string());
     }
+    if let Some(template) = &config.status_bar {
+        out.insert(
+            "status_bar".into(),
+            serde_json::to_string(template).unwrap_or_else(|_| "invalid status bar".into()),
+        );
+    }
     let limits = config.case_budget_defaults.unwrap_or_default();
     for (field, value) in [
         ("model_tokens", limits.model_tokens),

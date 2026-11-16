@@ -148,6 +148,39 @@ For Splunk, MISP, CrowdStrike, SentinelOne, and an S3-compatible storage endpoin
 
 Use **Maximum parallel workers** in `/settings preferences` to cap local source decoding and parallel Parquet scans. Leave it blank to use one fewer worker than the available logical CPUs, with at least one worker. An explicit `max_parallel_workers` value (1–256) can use all available CPUs. The local memory budget may reduce the effective count further. This signed preference applies when the session reloads. It does not change source order or artifact boundaries.
 
+### Declarative status bar
+
+Open **Status bar** in `/settings preferences`. Choose the **Minimal**,
+**Investigation** (default), or **Costs** preset, then enable segments, move them
+earlier or later, choose a priority from 0 to 100 and a theme color, and edit the
+separator. The live preview uses clearly labeled example values; only **Save and
+sign** commits the template as a global signed configuration operation. **Restore
+default** also remains a preview until saved. Esc leaves without saving.
+
+The closed segment list is: case title, severity, seal state, model, provider,
+tokens used, token budget, token percentage, cache tokens read and written, tool
+calls and their budget, cloud bytes and their budget, estimated cost, active
+subagents, pending approvals, detections, ingested sources, signing/secrets
+keystore profile, data directory, IRMind version, UTC clock, and activity.
+Unavailable cache counters and unpriced cost are omitted, never estimated as
+zero. Cache counters become available only when the provider accounting supports
+them. Model usage and budgets retain their existing accounting rules.
+
+The order in the template is the display order. At narrow widths, including 80
+columns, segments with the lowest priority disappear first; equal priorities
+keep the earlier segment. The last remaining segment is shortened with an
+ellipsis if necessary. Case titles and other external text are escaped for the
+terminal, theme colors respect `NO_COLOR`, and scope/budget warnings remain
+visible independently of the chosen template.
+
+The optional `status_bar` configuration has `version = 1`, a separator of at
+most four printable characters, and at most one entry for each segment. Colors
+come from the closed theme set: `text`, `muted`, `accent`, `warning`, `error`,
+`success`. Unknown segment names, duplicate entries and control characters are
+rejected. The template does not execute scripts, shell commands or external
+programs.
+
+
 For automation, resolution order is **CLI flag > environment variable > config.toml > default**. An override lasts only for that run; the TUI does not silently replace it. The file contains module IDs, models, URLs, source IDs, indexes, regions, and optional pricing, but never credentials or passphrases. Unknown or secret manifest fields fail validation. Example:
 
 ```toml

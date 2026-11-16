@@ -30,6 +30,9 @@ pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub overrides_active: bool,
     pub modules: &'env [crate::ModuleStatus],
     pub exit_to: CaseExit,
+    pub status_bar: irmind_app::StatusBarTemplate,
+    pub status_data: crate::status_bar::StatusData,
+    pub data_directory: Option<std::path::PathBuf>,
 }
 
 impl<'scope> CaseRuntime<'scope, '_, '_> {

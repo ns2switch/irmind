@@ -464,6 +464,8 @@ fn present(command: Option<Command>, context: cli::AutomationContext<'_, '_>) ->
                     mouse_capture: context.mouse_capture,
                     theme: saved.theme.as_deref(),
                     max_parallel_workers: saved.max_parallel_workers,
+                    status_bar: saved.status_bar.as_ref(),
+                    data_directory: Some(&context.workspace_io.home),
                 },
             )?;
             match outcome {

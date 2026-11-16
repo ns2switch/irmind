@@ -8,7 +8,7 @@ use ratatui::{
     Terminal,
     layout::{Constraint, Layout, Rect},
     style::Style,
-    text::{Line, Span},
+    text::Line,
     widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
@@ -35,6 +35,7 @@ pub(crate) struct CaseFrame<'a> {
     pub pending: usize,
     pub detections: usize,
     pub status: &'a str,
+    pub footer: Option<crate::status_bar::FooterView<'a>>,
 }
 
 pub(crate) fn composer_height(input: &str, width: u16) -> u16 {
@@ -258,93 +259,26 @@ fn draw_prompt(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Re
 }
 
 fn draw_footer(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, section: Rect, theme: Theme) {
-    let title = if view.title.chars().count() > 18 {
-        format!("{}…", view.title.chars().take(17).collect::<String>())
-    } else {
-        view.title.to_owned()
-    };
-    let tokens = view
-        .tokens
-        .map_or_else(|| "tokens unavailable".to_owned(), |n| format!("{n} tok"));
-    let mut label = format!("{title} · {} · {tokens}", view.model);
-    if !view.cost.is_empty() && !matches!(view.cost, "n/a" | "cost n/a") {
-        label.push_str(" · ");
-        label.push_str(view.cost);
-    }
-    let instance = view.status.starts_with("FULL INSTANCE SCOPE · ");
-    let (status, mut spans) = instance_footer(view.status, view.pending, view.detections, theme)
-        .unwrap_or((view.status, Vec::new()));
-    spans.push(Span::styled(label, theme.muted()));
-    if !instance && view.pending > 0 {
-        spans.push(Span::styled(
-            format!(
-                " · {} approval{} pending",
-                view.pending,
-                if view.pending == 1 { "" } else { "s" }
-            ),
-            theme.warning(),
-        ));
-    }
-    if !instance && view.detections > 0 {
-        spans.push(Span::styled(
-            format!(" · {} detections", view.detections),
-            theme.warning(),
-        ));
-    }
-    if status != "idle" {
-        spans.push(Span::styled(
-            format!(" · {status}"),
-            if status.contains("OVR") || status.contains("SCOPE LIMITED") {
-                theme.warning()
-            } else {
-                theme.muted()
-            },
-        ));
-    }
-    if view.new_content {
-        spans.push(Span::styled(" · End ↓", theme.warning()));
-    }
+    let fallback = crate::status_bar::frame_data(view);
+    let default = irmind_app::StatusBarTemplate::default();
+    let (template, data) = view
+        .footer
+        .as_ref()
+        .map_or((&default, &fallback), |footer| {
+            (footer.template, footer.data)
+        });
     frame.render_widget(
-        Paragraph::new(Line::from(spans)),
+        Paragraph::new(crate::status_bar::render(
+            template,
+            data,
+            usize::from(section.width),
+            theme,
+        )),
         Rect {
             height: 1,
             ..section
         },
     );
-}
-
-fn instance_footer(
-    status: &str,
-    pending: usize,
-    detections: usize,
-    theme: Theme,
-) -> Option<(&str, Vec<Span<'static>>)> {
-    use std::fmt::Write as _;
-    let mut rest = status.strip_prefix("FULL INSTANCE SCOPE · ")?;
-    let mut warnings = String::from("FULL INSTANCE SCOPE");
-    for marker in ["SCOPE LIMITED", "OVR"] {
-        if let Some(tail) = rest.strip_prefix(marker).and_then(|v| v.strip_prefix(' ')) {
-            warnings.push_str(" · ");
-            warnings.push_str(marker);
-            rest = tail;
-        }
-    }
-    if pending > 0 {
-        let _ = write!(
-            warnings,
-            " · {pending} approval{}",
-            if pending == 1 { "" } else { "s" }
-        );
-    }
-    if detections > 0 {
-        let _ = write!(
-            warnings,
-            " · {detections} detection{}",
-            if detections == 1 { "" } else { "s" }
-        );
-    }
-    warnings.push_str(" · ");
-    Some((rest, vec![Span::styled(warnings, theme.warning())]))
 }
 
 fn draw_menu(

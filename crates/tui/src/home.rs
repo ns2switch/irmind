@@ -49,6 +49,7 @@ pub(crate) enum Mode {
     Modules,
     Config,
     Limits,
+    StatusBar,
     Keystore,
     Setup,
     Help,
@@ -148,6 +149,9 @@ pub(crate) struct HomeState {
     settings_return: Mode,
     preference_selected: usize,
     max_parallel_workers: Option<u16>,
+    status_bar: Option<irmind_app::StatusBarTemplate>,
+    status_bar_editor: Option<crate::status_bar::editor::Editor>,
+    data_directory: Option<std::path::PathBuf>,
     worker_limit_input: Option<String>,
     budget_editor: crate::budgets::BudgetEditor,
     ui_selection: UiSelection,
@@ -211,6 +215,9 @@ impl HomeState {
             settings_return: Mode::List,
             preference_selected: 0,
             max_parallel_workers: None,
+            status_bar: None,
+            status_bar_editor: None,
+            data_directory: None,
             confirm_all_subagent_plans: PlanConfirmation::ThresholdOnly,
             worker_limit_input: None,
             budget_editor: crate::budgets::BudgetEditor::new(
@@ -482,6 +489,8 @@ fn prepare_home_state(
     state.max_parallel_workers = launch.max_parallel_workers;
     state.confirm_all_subagent_plans = engine.confirm_all_subagent_plans()?.into();
     state.show_hints = io_ops.show_hints().into();
+    state.status_bar = launch.status_bar.cloned();
+    state.data_directory = launch.data_directory.map(std::path::Path::to_owned);
     state.ui_selection.mouse_capture = launch.mouse_capture;
     state.theme_choice = launch.theme.unwrap_or("auto").into();
     state.overrides_active = launch.overrides_active;
@@ -555,6 +564,8 @@ impl StartupCaseView<'_, '_> {
             self.shutdown,
             case::CasePresentation {
                 subagent_review: launch.subagent_review,
+                status_bar: launch.status_bar,
+                data_directory: launch.data_directory,
                 demo_speed: self.demo_speed,
                 overrides_active: launch.overrides_active,
                 modules: self.modules,

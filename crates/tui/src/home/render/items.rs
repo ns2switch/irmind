@@ -22,7 +22,7 @@ pub(super) fn home_items(
     let content = match state.mode {
         Mode::List => case_items(state, engine)?,
         Mode::Settings => settings_items(state, modules, model_descriptor.as_deref(), &safe)?,
-        Mode::New => Vec::new(),
+        Mode::New | Mode::StatusBar => Vec::new(),
         Mode::Model => model_items(state, &escaped)?,
         Mode::Modules => module_items(state, modules, &escaped)?,
         Mode::Config => preference_items(state, modules),
@@ -333,6 +333,7 @@ fn change_summary(change: &irmind_app::ConfigChange) -> String {
         irmind_app::ConfigChange::SetResumeLastCase(enabled) => {
             format!("resume recent case={enabled}")
         }
+        irmind_app::ConfigChange::SetStatusBar(_) => "change status bar template".into(),
         irmind_app::ConfigChange::SetShowHints(enabled) => format!("context hints={enabled}"),
         irmind_app::ConfigChange::SetConfirmAllSubagentPlans(enabled) => {
             format!("confirm all subagent plans={enabled}")
@@ -681,6 +682,7 @@ pub(super) fn preference_items(
             "off"
         }
     )));
+    items.push(ListItem::new("Status bar"));
     if let Some(input) = &state.worker_limit_input {
         items.push(ListItem::new(format!(
             "New limit (1–256, blank for automatic): [{input}]"

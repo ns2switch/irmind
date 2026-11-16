@@ -442,9 +442,8 @@ pub fn is_subagent_kind(kind: AuditEventKind) -> bool {
             | AuditEventKind::SubagentResultV1
     )
 }
-pub(super) fn decode_entry<T: SubagentRecord>(
-    entry: &SignedEntry,
-) -> Result<T, SubagentRecordError> {
+/// Decode a bounded, canonically encoded subagent audit record.
+pub fn decode_entry<T: SubagentRecord>(entry: &SignedEntry) -> Result<T, SubagentRecordError> {
     let (label, encoded) = entry.payload.split_once(':').ok_or(SubagentRecordError)?;
     if entry.kind != T::KIND || label != T::KIND.as_str() || encoded.len() > 512 * 1024 {
         return Err(SubagentRecordError);
