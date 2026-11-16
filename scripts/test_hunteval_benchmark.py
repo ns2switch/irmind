@@ -10,6 +10,15 @@ HASH = 'a' * 64
 
 
 class MetricsTests(unittest.TestCase):
+    def test_pilot_is_explicit_unique_and_uses_pinned_corpus_order(self):
+        self.assertEqual(b.selected_episodes(None), b.EPISODES)
+        self.assertEqual(b.selected_episodes(['gcp-iam-001', 'aws-iam-001']),
+                         ['aws-iam-001', 'gcp-iam-001'])
+        for invalid in ([], ['aws-iam-001'] * 2, ['../private/ground-truth.json'], ['aws-iam-999']):
+            with self.assertRaises(ValueError):
+                b.selected_episodes(invalid)
+
+
     def test_exact_scores_keep_false_positives_and_do_not_count_query_echo(self):
         final = {'events': ['evt-0001', 'evt-9999'], 'entities': ['alice', 'invented'],
                  'techniques': ['T1078'], 'findings': [{'claim': 'Check this event',
@@ -53,6 +62,12 @@ class MetricsTests(unittest.TestCase):
         self.assertEqual(call.call_args.kwargs['input'], 'unlock-phrase\n')
 
     def test_every_model_run_finishes_before_private_answers_are_read(self):
+        for episodes in (None, ['gcp-iam-001', 'aws-iam-001', 'azure-iam-001']):
+            with self.subTest(episodes=episodes):
+                self.check_private_answer_isolation(episodes)
+
+    def check_private_answer_isolation(self, episodes):
+        count_expected = len(b.selected_episodes(episodes))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); binary = root / 'irmind'; binary.write_bytes(b'synthetic')
             source = root / 'events.json'; source.write_text('[{"event_id":"evt-0001"}]')
@@ -69,7 +84,7 @@ class MetricsTests(unittest.TestCase):
                     count += 1
                 return ''
             def verify_private(_root, _relative):
-                self.assertEqual(count, 18)
+                self.assertEqual(count, count_expected)
             observed = dict(final=json.dumps(dict(events=[], entities=[], techniques=[], findings=[])),
                             tool_text='', known_hashes=set(), tool_calls=0, input_tokens=None,
                             output_tokens=None, estimated_cost_microusd=None, usage_complete=False,
@@ -77,6 +92,8 @@ class MetricsTests(unittest.TestCase):
             models = [dict(label='fake', module='llm-deepseek', model='synthetic', home=root)]
             argv = ['benchmark', '--hunteval-root', str(root), '--models', 'unused', '--binary',
                     str(binary), '--output', str(root / 'report'), '--execute']
+            for episode in episodes or []:
+                argv.extend(['--episode', episode])
             with patch('sys.argv', argv), patch.object(b, 'models_from', return_value=models), \
                  patch.object(b, 'checked_files', return_value=(source, hidden)), \
                  patch.object(b, 'verify_checksum', side_effect=verify_private), \
@@ -86,8 +103,9 @@ class MetricsTests(unittest.TestCase):
                  patch.object(b.subprocess, 'check_output', return_value='irmind synthetic'):
                 b.main()
             report = json.loads((root / 'report/report.json').read_text())
-            self.assertEqual(len(report['runs']), 18)
-            self.assertEqual(report['status_counts'], {'scored_pending_human_review': 18})
+            self.assertEqual(len(report['runs']), count_expected)
+            self.assertEqual(report['selected_episodes'], b.selected_episodes(episodes))
+            self.assertEqual(report['status_counts'], {'scored_pending_human_review': count_expected})
 
 
 if __name__ == '__main__':

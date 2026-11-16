@@ -47,6 +47,34 @@ same prompt. It measures that workflow, not interactive subagent orchestration.
 python3 scripts/hunteval_benchmark.py --hunteval-root <checkout> --models <private-models.json> --binary <verified-irmind> --output <new-results-directory> --execute
 ```
 
+## Pilot, duration and cost planning
+
+Start with one episode per cloud before authorizing all eighteen. Repeat
+the episode-selection option to select a unique subset; selection stays in pinned corpus order.
+Review the dry plan first, then add the execution option only for the explicitly selected
+pilot. Defaults still run all eighteen; a pilot report states its coverage as
+3/18 and never represents a complete benchmark.
+
+```sh
+python3 scripts/hunteval_benchmark.py --hunteval-root <checkout> --models <private-models.json> --binary <verified-irmind> --output <new-pilot-directory> --episode aws-iam-001 --episode azure-iam-001 --episode gcp-iam-001
+```
+
+For each model, use its pilot rows to estimate a full run:
+
+| Quantity | Illustrative extrapolation from three completed pilot episodes |
+| --- | --- |
+| Runtime | Six times the sum of their `elapsed_seconds`; also inspect 18 times the minimum/maximum episode time. |
+| Provider cost | Six times the sum of `estimated_cost_microusd`, divided by 1,000,000 for USD, only if every row has complete usage and configured prices. |
+| Known limitations | Tool rounds, failures, reasoning, prefix caches, input sizes, prices and provider aliases can change between episodes. The extrapolation is neither a cap nor a guarantee. |
+
+If a request failed or usage/prices are unknown, record the cost as unavailable.
+Do not infer zero from a local endpoint or missing invoice fields. No commercial
+calls were made to prepare this guide, so it contains no invented model-specific
+price or duration. Retain actual model/revision/date and pilot rows when recording
+an estimate. Each episode creates its own case; review case allocations and the
+organization ceiling before any full run. Paid answers may overdraw their case
+allocation at request completion; the next request stays blocked, as documented.
+
 ## Output and interpretation
 
 `report.json`, `report.md` and `SHA256SUMS` contain the corpus commit, actual binary
