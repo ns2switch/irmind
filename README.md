@@ -19,7 +19,7 @@ No model setup, API key, account or cost. The real interface runs a synthetic in
 
 ![Automatic IRMind presentation with a full-width narration panel, synthetic evidence, streaming responses, signed approval, and custody verification](docs/assets/demo.gif)
 
-*Captured with IRMind v0.5.0. The complete presentation runs the real product with synthetic evidence, ephemeral keys and an offline scripted model. Enter advances; Space pauses; Esc exits.*
+*Captured with IRMind v0.5.2. The complete presentation runs the real product with synthetic evidence, ephemeral keys and an offline scripted model. Enter advances; Space pauses; Esc exits.*
 
 > [!WARNING]
 > Pre-1.0: each minor version may change case, export and definition formats without migration. Keep the IRMind version that created a case to open, verify or export it, or re-ingest the verified originals into a new case.
@@ -53,13 +53,13 @@ Start with the [verified release instructions](docs/platforms.md#verify-a-releas
 
 
 
-The [v0.5.1 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.5.1) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
+The [v0.5.2 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.5.2) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
 
 Keep the exact IRMind version that created an existing case. Version 0.5.1 uses case marker 4 and export V8; see the [format-impact note](CHANGELOG.md). The [version policy](docs/development/decisions.md#pre-10-format-policy) explains how to retain the creating executable or re-ingest verified originals.
 
 ```sh
 # After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:
-tag=v0.5.1; binary=irmind-linux-x86_64
+tag=v0.5.2; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done

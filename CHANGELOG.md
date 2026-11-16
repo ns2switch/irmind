@@ -4,12 +4,36 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
-**Format impact:** Signed configuration snapshot encoding, case formats and
-exports are unchanged. Grouped model changes use the existing signed global
-configuration snapshot and public module settings.
+## 0.5.2 — Signed case deletion and a configurable status bar
 
-- Save the provider, URL, model, declared native output maximum and output-parameter requirement together as one validated, Analyst-signed configuration operation. Connection testing uses the complete unsaved draft without saving it; known cross-provider endpoint/model combinations are rejected.
-- Link the bundled skills and contribution guidance to the separate skills repository, distinguishing release-bundled core methods from the optional catalog.
+**Format impact:** Case, artifact, seal and export versions are unchanged. Adds
+an optional signed status-bar configuration and the bounded `case-deleted-v1`
+global operation; existing configuration and global-envelope golden bytes are
+unchanged. Pre-1.0 minor versions may change formats without migration: retain
+the creating IRMind version or re-ingest verified originals into a new case.
+
+- Delete an unsealed case with `/case delete`, after reviewing its inventory and
+  typing the exact title or identifier. An Analyst-signed global tombstone and
+  durable intent commit together before cleanup. Interrupted cleanup resumes from
+  authenticated receipts; `/cases deleted` retains the audit. Sealed cases and
+  cases open in another process cannot be deleted. External originals and evidence
+  shared with another case are preserved. Deletion is logical, not secure erasure.
+- Customize the status bar in Settings → Preferences with a bounded list of
+  segments, priorities, theme colors and separators. Includes live preview,
+  reset and minimal/investigation/cost presets, including 80-column terminals and
+  NO_COLOR. Mandatory scope and budget warnings remain visible.
+- Save provider, URL, model, native output maximum and parameter requirement as
+  one validated, Analyst-signed model configuration. Connection testing uses the
+  complete unsaved draft; known cross-provider combinations are rejected.
+- Link bundled skills and contribution guidance to the separate skills repository,
+  distinguishing release-bundled core methods from the optional catalog.
+- Avoid repeated keystore credential enumeration when refreshing the case footer,
+  and ignore key-release events when returning from the keystore wizard to home.
+
+Native Developer ID/notarization and Authenticode are not active. The binaries
+carry Sigstore signatures, provenance attestations and an SBOM; operating systems
+may still display native-signing warnings. Real-service coverage remains limited;
+use the documented controlled-lab validation before relying on a new environment.
 
 ## 0.5.1 — Complete model responses and evaluation readiness
 
