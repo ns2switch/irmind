@@ -29,6 +29,7 @@ No model setup, API key, account or cost. The real interface runs a synthetic in
 - Open a case, set its scope, and investigate an alert from one terminal workspace.
 - Ingest local evidence and search a case timeline and entity graph.
 - Ask a selected AI model to suggest queries and load a signed forensic [skill](docs/skills.md) when needed.
+  Included skills are maintained in [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills), where anyone can propose improvements or new skills without writing Rust. Core skills arrive with IRMind releases; catalog skills will be installed with `/skills install catalog:<name>`.
 - Review bounded plans, follow parallel tasks with `/subagents`, and cancel them without discarding completed work.
 - Review and sign approvals before any external enrichment call.
 - Inspect indexed records and available originals while the model receives bounded, redacted data.
@@ -160,11 +161,13 @@ See the [public roadmap](docs/development/roadmap.md) for scope and limits; thes
 ## Documentation
 
 - [Getting started](docs/getting-started.md) · [Configuration](docs/configuration.md) · [Modules](docs/modules.md)
-- [Parallel investigations](docs/subagents.md) · [Forensic skills](docs/skills.md)
+- [Parallel investigations](docs/subagents.md) · [Forensic skills](docs/skills.md) · [Skills repository](https://github.com/ns2switch/irmind-skills)
 - [Platforms](docs/platforms.md) · [Security model](docs/security-model.md)
 - [Architecture and development](docs/development/architecture.md) · [CLI automation](docs/development/cli.md) · [Roadmap](docs/development/roadmap.md)
 
 ## Contributing and security
+
+One of the easiest ways to contribute is through [the skills repository](https://github.com/ns2switch/irmind-skills): improve investigation methods, describe required sources and false positives, or add synthetic evaluation episodes. No Rust is required.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the DCO and synthetic-data rules, and follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately through [SECURITY.md](SECURITY.md). Do not include real incident data in issues or pull requests.
 

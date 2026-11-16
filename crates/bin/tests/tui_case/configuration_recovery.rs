@@ -362,3 +362,61 @@ fn retired_writer_setting_requires_explicit_signed_configuration_restore() {
             .contains("experimental_common_writer")
     );
 }
+
+#[test]
+fn complete_model_draft_is_one_confirmed_snapshot_and_invalid_pairs_leave_it_unchanged() {
+    let (_root, audit, engine, file) = setup();
+    let manifests = [&irmind_mod_llm_openai_compatible::MANIFEST];
+    let draft = irmind_app::ModelConfiguration {
+        module: "llm-openai-compatible".into(),
+        base_url: "http://127.0.0.1:11434/v1/".into(),
+        model: "synthetic-local-model".into(),
+        maximum_output_tokens: Some(128_000),
+        output_required: true,
+    };
+    let change = ConfigChange::ConfigureModel(draft.clone());
+    assert!(
+        engine
+            .apply_configuration_change(&file, &manifests, change.clone(), false)
+            .is_err()
+    );
+    assert!(audit.global_operations().unwrap().is_empty());
+    assert_eq!(file.load().unwrap().llm_module, None);
+    engine
+        .apply_configuration_change(&file, &manifests, change.clone(), true)
+        .unwrap();
+    let configured = file.load().unwrap();
+    assert_eq!(
+        configured.llm_module.as_deref(),
+        Some(draft.module.as_str())
+    );
+    let values = &configured.modules[&draft.module].values;
+    assert_eq!(values["IRMIND_LLM_BASE_URL"], draft.base_url);
+    assert_eq!(values["IRMIND_MODEL"], draft.model);
+    assert_eq!(values["IRMIND_MODEL_MAX_OUTPUT_TOKENS"], "128000");
+    assert_eq!(values["IRMIND_MODEL_OUTPUT_REQUIRED"], "true");
+    assert_eq!(audit.global_operations().unwrap().len(), 1);
+    assert!(
+        !engine
+            .apply_configuration_change(&file, &manifests, change, true)
+            .unwrap()
+    );
+    let invalid = irmind_app::ModelConfiguration {
+        base_url: "https://api.deepseek.com/".into(),
+        model: "claude-sonnet-4-6".into(),
+        ..draft
+    };
+    assert!(
+        engine
+            .apply_configuration_change(
+                &file,
+                &manifests,
+                ConfigChange::ConfigureModel(invalid),
+                true
+            )
+            .is_err()
+    );
+    assert!(file.load().unwrap() == configured);
+    assert_eq!(audit.global_operations().unwrap().len(), 1);
+    engine.verify_configuration(&file, &manifests).unwrap();
+}

@@ -39,69 +39,44 @@ pub(crate) fn save_configuration(
     {
         anyhow::bail!("provider is not compiled into this binary");
     }
-    let (model_field, key_field, base_field) = match draft.provider {
-        "llm-openai-compatible" => ("IRMIND_MODEL", "IRMIND_LLM_API_KEY", "IRMIND_LLM_BASE_URL"),
-        "llm-anthropic" => (
-            "IRMIND_ANTHROPIC_MODEL",
-            "ANTHROPIC_API_KEY",
-            "IRMIND_ANTHROPIC_BASE_URL",
-        ),
-        "llm-deepseek" => (
-            "IRMIND_DEEPSEEK_MODEL",
-            "DEEPSEEK_API_KEY",
-            "IRMIND_DEEPSEEK_BASE_URL",
-        ),
-        "llm-openrouter" => (
-            "IRMIND_OPENROUTER_MODEL",
-            "OPENROUTER_API_KEY",
-            "IRMIND_OPENROUTER_BASE_URL",
-        ),
+    let configuration = draft.configuration()?;
+    let key_field = match draft.provider {
+        "llm-openai-compatible" => "IRMIND_LLM_API_KEY",
+        "llm-anthropic" => "ANTHROPIC_API_KEY",
+        "llm-deepseek" => "DEEPSEEK_API_KEY",
+        "llm-openrouter" => "OPENROUTER_API_KEY",
         _ => anyhow::bail!("unknown model provider"),
     };
     if let Some(key) = &draft.key {
         io_ops.put_credential(key_field, key)?;
     }
-    for (field, value) in [(base_field, &draft.url), (model_field, &draft.name)] {
-        io_ops.change_module_configuration(
-            engine,
-            ConfigChange::SetValue {
-                module: draft.provider.into(),
-                field: field.into(),
-                value: value.clone(),
-            },
-            true,
-        )?;
-    }
-    let output_values = [
-        (
-            "IRMIND_MODEL_MAX_OUTPUT_TOKENS",
-            draft.output_maximum.clone(),
-        ),
-        (
-            "IRMIND_MODEL_OUTPUT_REQUIRED",
-            draft.output_required.to_string(),
-        ),
-    ];
-    for (field, value) in output_values {
-        if field == "IRMIND_MODEL_OUTPUT_REQUIRED" && draft.provider == "llm-anthropic" {
-            continue;
-        }
-        io_ops.change_module_configuration(
-            engine,
-            ConfigChange::SetValue {
-                module: draft.provider.into(),
-                field: field.into(),
-                value,
-            },
-            true,
-        )?;
-    }
     io_ops.change_module_configuration(
         engine,
-        ConfigChange::SelectLlm(Some(draft.provider.into())),
+        ConfigChange::ConfigureModel(configuration),
         true,
     )?;
     Ok(())
+}
+
+impl ModelDraft {
+    pub(crate) fn configuration(&self) -> anyhow::Result<irmind_app::ModelConfiguration> {
+        let maximum_output_tokens = if self.output_maximum.is_empty() {
+            None
+        } else {
+            Some(self.output_maximum.parse::<u32>().map_err(|_| {
+                anyhow::anyhow!("Set a positive integer model output maximum in /settings model")
+            })?)
+        };
+        let configuration = irmind_app::ModelConfiguration {
+            module: self.provider.into(),
+            base_url: self.url.clone(),
+            model: self.name.clone(),
+            maximum_output_tokens,
+            output_required: self.output_required,
+        };
+        configuration.validate()?;
+        Ok(configuration)
+    }
 }
 
 pub(super) struct ModelSetup {
@@ -603,6 +578,38 @@ mod tests {
     use super::*;
     use crate::home::Mode;
     use ratatui::{Terminal, backend::TestBackend, widgets::List};
+
+    #[test]
+    fn connection_confirmation_carries_the_complete_unsaved_model_draft() {
+        let mut state = HomeState::new(Vec::new(), false);
+        state.mode = Mode::Model;
+        state.model_setup.provider = 4;
+        state.model_setup.step = ModelStep::Review;
+        state.model_setup.url = "https://draft.example.invalid/v1/".into();
+        state.model_setup.name = "unsaved-draft".into();
+        state.model_setup.key = SecretString::from("synthetic/key");
+        state.model_setup.output_maximum = "128000".into();
+        state.model_setup.output_required = true;
+        update_model(&mut state, KeyCode::Enter);
+        assert!(state.model_setup.step == ModelStep::ConfirmDiscovery);
+        update_model(&mut state, KeyCode::Down);
+        let action = update_model(&mut state, KeyCode::Enter);
+        assert!(matches!(action, HomeAction::ProbeModel(_)));
+        let draft = match action {
+            HomeAction::ProbeModel(draft) => Some(draft),
+            _ => None,
+        }
+        .unwrap();
+        let configured = draft.configuration().unwrap();
+        assert_eq!(configured.module, "llm-openai-compatible");
+        assert_eq!(configured.base_url, "https://draft.example.invalid/v1/");
+        assert_eq!(configured.model, "unsaved-draft");
+        assert_eq!(configured.maximum_output_tokens, Some(128_000));
+        assert!(configured.output_required);
+        assert_eq!(draft.key.as_ref().unwrap().expose_secret(), "synthetic/key");
+        assert_eq!(state.model_setup.name, configured.model);
+        assert_eq!(state.model_setup.key.expose_secret(), "synthetic/key");
+    }
 
     #[test]
     fn url_normalization_collapses_path_slashes_and_rejects_unsafe_destinations() {

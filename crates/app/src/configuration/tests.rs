@@ -20,6 +20,16 @@ static LLM: ModuleManifest = ModuleManifest {
             secret: false,
         },
         ConfigField {
+            name: "IRMIND_MODEL_MAX_OUTPUT_TOKENS",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
+            name: "IRMIND_MODEL_OUTPUT_REQUIRED",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "IRMIND_LLM_API_KEY",
             required: false,
             secret: true,
@@ -364,4 +374,167 @@ fn chronicle_scope_change_always_requires_egress_confirmation_even_when_disabled
         .values
         .insert("IRMIND_CHRONICLE_SCOPE_MODE".into(), "event-account".into());
     assert!(!current.active_egress_changed(&next));
+}
+
+#[test]
+fn joint_model_update_replaces_all_parameters_and_clears_a_previous_capability() {
+    let draft = ModelConfiguration {
+        module: LLM.id.into(),
+        base_url: "http://127.0.0.1:11434/v1/".into(),
+        model: "synthetic-local".into(),
+        maximum_output_tokens: Some(128_000),
+        output_required: true,
+    };
+    let base = PersistentConfig::default();
+    let configured = base
+        .changed(ConfigChange::ConfigureModel(draft.clone()), &[&LLM])
+        .unwrap();
+    assert!(base.modules.is_empty());
+    assert_eq!(configured.llm_module.as_deref(), Some(LLM.id));
+    let values = &configured.modules[LLM.id].values;
+    assert_eq!(values["IRMIND_MODEL"], draft.model);
+    assert_eq!(values["IRMIND_LLM_BASE_URL"], draft.base_url);
+    assert_eq!(values["IRMIND_MODEL_MAX_OUTPUT_TOKENS"], "128000");
+    assert_eq!(values["IRMIND_MODEL_OUTPUT_REQUIRED"], "true");
+    let replacement = ModelConfiguration {
+        model: "another-local-model".into(),
+        maximum_output_tokens: None,
+        output_required: false,
+        ..draft
+    };
+    let next = configured
+        .changed(ConfigChange::ConfigureModel(replacement), &[&LLM])
+        .unwrap();
+    assert!(
+        !next.modules[LLM.id]
+            .values
+            .contains_key("IRMIND_MODEL_MAX_OUTPUT_TOKENS")
+    );
+    assert_eq!(
+        next.modules[LLM.id].values["IRMIND_MODEL_OUTPUT_REQUIRED"],
+        "false"
+    );
+    assert!(configured.active_egress_changed(&next));
+}
+
+#[test]
+fn joint_model_validation_accepts_matching_providers_gateways_and_custom_endpoints() {
+    for (module, base_url, model) in [
+        (
+            "llm-openai-compatible",
+            "https://api.openai.com/v1/",
+            "gpt-4.1",
+        ),
+        (
+            "llm-anthropic",
+            "https://api.anthropic.com/",
+            "claude-sonnet-4-6",
+        ),
+        (
+            "llm-deepseek",
+            "https://api.deepseek.com/v1/",
+            "deepseek-v4-flash",
+        ),
+        (
+            "llm-openrouter",
+            "https://openrouter.ai/api/v1/",
+            "anthropic/claude-sonnet-4-6",
+        ),
+        (
+            "llm-openai-compatible",
+            "http://127.0.0.1:11434/v1/",
+            "local-model:latest",
+        ),
+        (
+            "llm-anthropic",
+            "https://proxy.example.invalid/",
+            "custom-model",
+        ),
+    ] {
+        ModelConfiguration {
+            module: module.into(),
+            base_url: base_url.into(),
+            model: model.into(),
+            maximum_output_tokens: None,
+            output_required: module == "llm-anthropic",
+        }
+        .validate()
+        .unwrap();
+    }
+}
+
+#[test]
+fn joint_model_validation_rejects_cross_provider_drafts_without_changing_configuration() {
+    for (module, base_url, model) in [
+        (
+            "llm-deepseek",
+            "https://api.anthropic.com/",
+            "deepseek-v4-flash",
+        ),
+        (
+            "llm-anthropic",
+            "https://api.deepseek.com/",
+            "claude-sonnet-4-6",
+        ),
+        (
+            "llm-openai-compatible",
+            "https://api.deepseek.com/",
+            "deepseek-v4-flash",
+        ),
+        (
+            "llm-openai-compatible",
+            "https://api.openai.com/",
+            "claude-sonnet-4-6",
+        ),
+        ("llm-deepseek", "https://api.deepseek.com/", "gpt-4.1"),
+        (
+            "llm-anthropic",
+            "https://api.anthropic.com/",
+            "deepseek-v4-flash",
+        ),
+        ("siem-splunk", "https://example.invalid/", "synthetic"),
+        (
+            "llm-openai-compatible",
+            "http://remote.example.invalid/",
+            "synthetic",
+        ),
+        (
+            "llm-openai-compatible",
+            "https://secret@example.invalid/",
+            "synthetic",
+        ),
+        (
+            "llm-openai-compatible",
+            "https://example.invalid/?key=synthetic",
+            "synthetic",
+        ),
+    ] {
+        let base = PersistentConfig::default();
+        let draft = ModelConfiguration {
+            module: module.into(),
+            base_url: base_url.into(),
+            model: model.into(),
+            maximum_output_tokens: Some(128_000),
+            output_required: module == "llm-anthropic",
+        };
+        assert!(
+            base.changed(ConfigChange::ConfigureModel(draft), &[&LLM, &SIEM])
+                .is_err()
+        );
+        assert!(base.modules.is_empty() && base.llm_module.is_none());
+    }
+    let mut draft = ModelConfiguration {
+        module: LLM.id.into(),
+        base_url: "https://model.example.invalid/".into(),
+        model: "synthetic".into(),
+        maximum_output_tokens: Some(0),
+        output_required: false,
+    };
+    assert!(draft.validate().is_err());
+    draft.maximum_output_tokens = Some(128_000);
+    assert!(
+        PersistentConfig::default()
+            .changed(ConfigChange::ConfigureModel(draft), &[&SIEM])
+            .is_err()
+    );
 }

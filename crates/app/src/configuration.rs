@@ -54,6 +54,7 @@ pub struct ProductSettings {
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ConfigChange {
     SelectLlm(Option<String>),
+    ConfigureModel(ModelConfiguration),
     SetEnabled {
         module: String,
         enabled: bool,
@@ -233,6 +234,7 @@ impl PersistentConfig {
                 }
                 next.llm_module = id;
             }
+            ConfigChange::ConfigureModel(model) => model.apply(&mut next, manifests)?,
             ConfigChange::SetEnabled { module, enabled } => {
                 if manifest(&module, manifests)?
                     .ports
@@ -391,7 +393,9 @@ fn disallowed_char(ch: char) -> bool {
 
 mod recovery;
 pub use recovery::{ConfigDifference, ConfigurationInspection, ConfigurationReview};
+mod model;
 mod session;
+pub use model::ModelConfiguration;
 
 #[cfg(test)]
 mod tests;

@@ -4,7 +4,12 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
-No unreleased changes.
+**Format impact:** Signed configuration snapshot encoding, case formats and
+exports are unchanged. Grouped model changes use the existing signed global
+configuration snapshot and public module settings.
+
+- Save the provider, URL, model, declared native output maximum and output-parameter requirement together as one validated, Analyst-signed configuration operation. Connection testing uses the complete unsaved draft without saving it; known cross-provider endpoint/model combinations are rejected.
+- Link the bundled skills and contribution guidance to the separate skills repository, distinguishing release-bundled core methods from the optional catalog.
 
 ## 0.5.1 — Complete model responses and evaluation readiness
 

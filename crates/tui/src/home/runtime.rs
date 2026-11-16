@@ -264,29 +264,7 @@ impl HomeRuntime<'_, '_, '_> {
                     }));
                 }
             }
-            HomeAction::ProbeModel(draft) => {
-                if self.model_probe_task.is_none() {
-                    let io_ops = self.io_ops;
-                    self.state.model_setup.notice = "Testing with synthetic text…".into();
-                    self.model_probe_task = Some(self.scope.spawn(move || {
-                        let output = irmind_app::ModelOutputProfile::default().configured(
-                            Some(&draft.output_maximum),
-                            Some(if draft.output_required {
-                                "true"
-                            } else {
-                                "false"
-                            }),
-                        )?;
-                        io_ops.test_model_connection(
-                            draft.provider,
-                            &draft.url,
-                            &draft.name,
-                            draft.key.as_ref(),
-                            output,
-                        )
-                    }));
-                }
-            }
+            HomeAction::ProbeModel(draft) => self.start_model_probe(draft),
             HomeAction::SaveModel(draft) => return Ok(self.save_model(&draft)),
         }
         Ok(false)
@@ -333,6 +311,34 @@ impl HomeRuntime<'_, '_, '_> {
             }
         }
         false
+    }
+
+    fn start_model_probe(&mut self, draft: super::model::ModelDraft) {
+        if let Err(error) = draft.configuration() {
+            self.state.model_setup.notice = format!("Cannot test model: {error}");
+            return;
+        }
+        if self.model_probe_task.is_none() {
+            let io_ops = self.io_ops;
+            self.state.model_setup.notice = "Testing with synthetic text…".into();
+            self.model_probe_task = Some(self.scope.spawn(move || {
+                let output = irmind_app::ModelOutputProfile::default().configured(
+                    Some(&draft.output_maximum),
+                    Some(if draft.output_required {
+                        "true"
+                    } else {
+                        "false"
+                    }),
+                )?;
+                io_ops.test_model_connection(
+                    draft.provider,
+                    &draft.url,
+                    &draft.name,
+                    draft.key.as_ref(),
+                    output,
+                )
+            }));
+        }
     }
 
     fn save_model(&mut self, draft: &super::model::ModelDraft) -> bool {

@@ -40,6 +40,7 @@ pub(super) fn test_model_connection(
     secrets: &dyn SecretBackend,
     output: irmind_app::ModelOutputProfile,
 ) -> Result<String> {
+    let _draft = draft_configuration(provider, base_url, model, output)?;
     let port = construct_port(provider, base_url, model, supplied_key, secrets, output)?;
     let cancel = CancellationToken::new();
     let request = CompletionRequest {
@@ -60,6 +61,51 @@ pub(super) fn test_model_connection(
         Ok::<(), irmind_app::AppError>(())
     })?;
     Ok("Connection succeeded with synthetic text; no case data was sent".into())
+}
+
+fn draft_configuration(
+    provider: &str,
+    base_url: &str,
+    model: &str,
+    output: irmind_app::ModelOutputProfile,
+) -> Result<irmind_app::ModelConfiguration> {
+    let draft = irmind_app::ModelConfiguration {
+        module: provider.into(),
+        base_url: base_url.into(),
+        model: model.into(),
+        maximum_output_tokens: output.maximum_output_tokens.map(std::num::NonZeroU32::get),
+        output_required: provider == "llm-anthropic"
+            || output.parameter_requirement == irmind_app::OutputParameterRequirement::Required,
+    };
+    draft.validate()?;
+    Ok(draft)
+}
+
+/// Construct and validate the real adapter without sending a request or signing.
+pub(super) fn validate_configuration(
+    draft: &irmind_app::ModelConfiguration,
+    secrets: &dyn SecretBackend,
+) -> Result<()> {
+    draft.validate()?;
+    let maximum = draft.maximum_output_tokens.map(|value| value.to_string());
+    let output = irmind_app::ModelOutputProfile::default().configured(
+        maximum.as_deref(),
+        Some(if draft.output_required {
+            "true"
+        } else {
+            "false"
+        }),
+    )?;
+    let port = construct_port(
+        &draft.module,
+        &draft.base_url,
+        &draft.model,
+        None,
+        secrets,
+        output,
+    )?;
+    port.output_profile().parameter_value()?;
+    Ok(())
 }
 
 fn construct_port(

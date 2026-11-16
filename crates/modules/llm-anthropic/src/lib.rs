@@ -25,6 +25,11 @@ pub static MANIFEST: ModuleManifest = ModuleManifest {
             secret: false,
         },
         ConfigField {
+            name: "IRMIND_MODEL_OUTPUT_REQUIRED",
+            required: false,
+            secret: false,
+        },
+        ConfigField {
             name: "IRMIND_ANTHROPIC_BASE_URL",
             required: false,
             secret: false,
@@ -80,9 +85,10 @@ impl Anthropic {
             model,
             key,
         )?;
-        client.output = client
-            .output
-            .configured(config.value("IRMIND_MODEL_MAX_OUTPUT_TOKENS"), None)?;
+        client.output = client.output.configured(
+            config.value("IRMIND_MODEL_MAX_OUTPUT_TOKENS"),
+            config.value("IRMIND_MODEL_OUTPUT_REQUIRED"),
+        )?;
         Ok(client)
     }
 
