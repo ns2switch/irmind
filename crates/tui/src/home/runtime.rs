@@ -74,6 +74,9 @@ impl HomeRuntime<'_, '_, '_> {
             let Event::Key(key) = input else {
                 continue;
             };
+            if key.kind == crossterm::event::KeyEventKind::Release {
+                continue;
+            }
             if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('u') {
                 super::state::clear_active_field(&mut self.state);
                 continue;
