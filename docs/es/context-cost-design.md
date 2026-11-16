@@ -1,4 +1,4 @@
-Traducción de docs/development/context-cost-design.md en el commit fab62e9e37dfc77abd24483169b3ef3900d3cfc9; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/context-cost-design.md en el commit 3f7899242bcb2afc62f747b0f8e39ff4a3f3928a; si hay diferencias, prevalece la versión en inglés.
 
 # Coste de contexto, caché de prompts y compactación acotada
 
@@ -188,14 +188,20 @@ disponible; nunca cero inventado. /budget muestra categorías, total cobrado y
 estimación conocida; la barra de estado sigue compacta.
 
 Ampliar `ModelUsage`/`UsageEvent`, informes de ramas y vínculos firmados requiere
-contrato concreto y nuevos vectores. Los lectores actuales rechazan campos
+contrato concreto y nuevos vectores. Los lectores actuales de uso firmado rechazan campos
 extra: no añadir claves de JSON sin revisar el esquema. El uso desconocido no
 libera una reserva pendiente. Este documento no aprueba ese formato.
 
 ## 6. Compactación por perfil
 
 Perfil de contexto separado del de salida: ventana documentada/declarada,
-capacidad de conteo/tokenizer, procedencia y umbral del analista. Techos prudentes
+capacidad de conteo/tokenizer, procedencia y umbral del analista. En
+`/settings model`: **Ventana de contexto**, **Compactar al** y **Objetivo después
+de compactar**, separados del máximo de salida. Cambios como configuración firmada;
+ninguna herramienta del modelo puede aplicarlos. El método aditivo propuesto
+`LlmPort::context_profile()` devuelve desconocido por defecto. Antes de implementarlo,
+el contrato concretará rangos enteros, validación de ambos umbrales, framing y
+techos; no inferir ventana a partir del máximo de salida. Techos prudentes
 propuestos: **cota superior de 128.000 tokens de entrada y 512.000 bytes del JSON
 completo**, con herramientas y envoltorios; gana la ventana inferior del proveedor.
 Mantener margen y máximo nativo de salida. Un perfil incompatible produce error
@@ -254,7 +260,8 @@ defecto. Una referencia no permite afirmar que el modelo leyó la evidencia.
 
 ## 8. Modelo auxiliar opcional
 
-Perfil firmado para resumir/compactar, desactivado por defecto; sin él se usa el
+Sección **Modelo auxiliar** en `/settings model`, con el flujo de proveedor, URL,
+modelo y credencial enmascarada. Perfil firmado para resumir/compactar, desactivado por defecto; sin él se usa el
 principal. Proveedor, URL, modelo, capacidades, referencia del SecretBackend y rol
 son explícitos. Otro endpoint remoto exige confirmación de salida de datos propia;
 sin claves ambientales ni fallback silencioso. Resumir sigue sin herramientas,
