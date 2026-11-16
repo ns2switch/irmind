@@ -16,7 +16,7 @@ CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --re
 
 La segunda compilación genera el auxiliar EVTX junto al ejecutable principal. En PowerShell, define `$env:CARGO_TARGET_DIR = "target"` antes de ejecutar ese comando. EVTX permanece no disponible si falta el auxiliar o el aislamiento nativo.
 
-Las compilaciones Linux x86-64 usan Ubuntu 22.04 como base ABI. Los jobs nativos de Ubuntu 22.04 y 24.04 prueban el mismo auxiliar EVTX; los contenedores también comprueban los espacios de usuario Debian/Fedora sobre esos kernels. ARM64 usa un runner Ubuntu 24.04 independiente y tiene límites de compatibilidad propios. CI también prueba macOS arm64 y Windows x64 con el toolchain MSVC. SQLite se compila desde fuentes incluidas. Arrow y Parquet usan crates de Rust. TLS usa rustls con las raíces de certificados nativas, incluidas las CA corporativas instaladas; IRMind no enlaza OpenSSL del sistema. Esta opción de raíces nativas puede diferir de las comprobaciones de política de un verificador específico de cada plataforma.
+Las compilaciones Linux x86-64 usan Ubuntu 22.04 como base ABI. Los jobs nativos de Ubuntu 22.04 y 24.04 prueban el mismo auxiliar EVTX; los contenedores también comprueban los espacios de usuario Debian/Fedora sobre esos kernels. ARM64 usa un runner Ubuntu 24.04 independiente y tiene límites de compatibilidad propios. CI también prueba macOS arm64 y x86-64 nativos y Windows x64 con el toolchain MSVC. SQLite se compila desde fuentes incluidas. Arrow y Parquet usan crates de Rust. TLS usa rustls con las raíces de certificados nativas, incluidas las CA corporativas instaladas; IRMind no enlaza OpenSSL del sistema. Esta opción de raíces nativas puede diferir de las comprobaciones de política de un verificador específico de cada plataforma.
 
 Instala un compilador de C/C++ antes de compilar: GCC o Clang y `pkg-config` en Linux, Xcode Command Line Tools en macOS, o Visual Studio Build Tools con MSVC C++ en Windows. Una compilación release sin caché sigue compilando muchos crates de Rust y SQLite incluido. Reserva tiempo y disco adicionales; depende de la CPU, el compilador y la caché. Consulta las [mediciones](../development/benchmarks.md).
 
@@ -77,7 +77,9 @@ Usa un terminal compatible con xterm, como GNOME Terminal o Konsole. El backend 
 
 ## macOS
 
-Usa Terminal.app o iTerm2. `os` utiliza Keychain; `file` se puede elegir explícitamente por SSH. CI compila para Apple Silicon. Después de verificar la versión, Gatekeeper puede bloquear un binario descargado sin firma de código de Apple. Sigue la política de tu organización y la revisión de Privacidad y seguridad de macOS solo para ese binario verificado. No desactives Gatekeeper ni elimines la cuarentena para eludir un bloqueo sin resolver. El auxiliar necesita la misma verificación independiente. La preparación de firma nativa se explica más abajo.
+Usa Terminal.app o iTerm2. `os` utiliza Keychain; `file` se puede elegir explícitamente por SSH. La matriz de release compila para Apple Silicon e Intel en runners nativos.
+Las versiones anteriores pueden incluir solo Apple Silicon: comprueba los assets
+del tag exacto antes de instalar en Intel. Después de verificar la versión, Gatekeeper puede bloquear un binario descargado sin firma de código de Apple. Sigue la política de tu organización y la revisión de Privacidad y seguridad de macOS solo para ese binario verificado. No desactives Gatekeeper ni elimines la cuarentena para eludir un bloqueo sin resolver. El auxiliar necesita la misma verificación independiente. La preparación de firma nativa se explica más abajo.
 
 ## Windows
 
