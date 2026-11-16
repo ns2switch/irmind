@@ -38,8 +38,9 @@ pub(super) fn test_model_connection(
     model: &str,
     supplied_key: Option<&SecretString>,
     secrets: &dyn SecretBackend,
+    output: irmind_app::ModelOutputProfile,
 ) -> Result<String> {
-    let port = construct_port(provider, base_url, model, supplied_key, secrets)?;
+    let port = construct_port(provider, base_url, model, supplied_key, secrets, output)?;
     let cancel = CancellationToken::new();
     let request = CompletionRequest {
         messages: vec![CompletionMessage {
@@ -67,7 +68,9 @@ fn construct_port(
     model: &str,
     supplied_key: Option<&SecretString>,
     secrets: &dyn SecretBackend,
+    output: irmind_app::ModelOutputProfile,
 ) -> Result<Box<dyn LlmPort>> {
+    let mut config = output_config(output);
     if provider == "llm-openai-compatible" {
         let key = if let Some(value) = supplied_key {
             Some(value.expose_secret().to_owned())
@@ -94,11 +97,15 @@ fn construct_port(
                 "remote model requires an API key in the configured SecretBackend"
             ));
         }
+        config.insert_value("IRMIND_LLM_BASE_URL", base_url.into());
+        config.insert_value("IRMIND_MODEL", model.into());
+        if let Some(key) = key {
+            config.insert_secret("IRMIND_LLM_API_KEY", SecretString::from(key));
+        }
         return Ok(Box::new(
-            irmind_mod_llm_openai_compatible::OpenAiCompatible::new(base_url, model, key)?,
+            irmind_mod_llm_openai_compatible::OpenAiCompatible::from_config(&config)?,
         ));
     }
-    let mut config = ModuleConfig::new();
     let (model_field, base_field, key_field) = match provider {
         "llm-anthropic" => (
             "IRMIND_ANTHROPIC_MODEL",
@@ -140,8 +147,25 @@ fn construct_port(
     }
 }
 
+fn output_config(output: irmind_app::ModelOutputProfile) -> ModuleConfig {
+    let mut config = ModuleConfig::new();
+    if let Some(maximum) = output.maximum_output_tokens {
+        config.insert_value("IRMIND_MODEL_MAX_OUTPUT_TOKENS", maximum.to_string());
+    }
+    config.insert_value(
+        "IRMIND_MODEL_OUTPUT_REQUIRED",
+        (output.parameter_requirement == irmind_app::OutputParameterRequirement::Required)
+            .to_string(),
+    );
+    config
+}
+
 fn runtime() -> Result<tokio::runtime::Runtime> {
     Ok(tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?)
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests;

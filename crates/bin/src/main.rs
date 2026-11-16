@@ -461,6 +461,7 @@ impl WorkspaceIo for RootWorkspaceIo {
         base_url: &str,
         model: &str,
         key: Option<&SecretString>,
+        output: irmind_app::ModelOutputProfile,
     ) -> Result<String> {
         model_probe::test_model_connection(
             provider,
@@ -468,6 +469,7 @@ impl WorkspaceIo for RootWorkspaceIo {
             model,
             key,
             self.secret_backend.as_ref(),
+            output,
         )
     }
 }

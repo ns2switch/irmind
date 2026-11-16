@@ -235,6 +235,7 @@ pub trait WorkspaceIo: Send + Sync {
         _base_url: &str,
         _model: &str,
         _key: Option<&SecretString>,
+        _output: irmind_app::ModelOutputProfile,
     ) -> Result<String> {
         anyhow::bail!("Model connection testing is unavailable in this workspace")
     }

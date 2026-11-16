@@ -269,11 +269,20 @@ impl HomeRuntime<'_, '_, '_> {
                     let io_ops = self.io_ops;
                     self.state.model_setup.notice = "Testing with synthetic text…".into();
                     self.model_probe_task = Some(self.scope.spawn(move || {
+                        let output = irmind_app::ModelOutputProfile::default().configured(
+                            Some(&draft.output_maximum),
+                            Some(if draft.output_required {
+                                "true"
+                            } else {
+                                "false"
+                            }),
+                        )?;
                         io_ops.test_model_connection(
                             draft.provider,
                             &draft.url,
                             &draft.name,
                             draft.key.as_ref(),
+                            output,
                         )
                     }));
                 }
