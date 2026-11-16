@@ -185,7 +185,7 @@ the combined charged total and any known cost; status-line display stays compact
 
 Extending `ModelUsage`/`UsageEvent`, branch reports and signed accounting bindings
 requires a concrete receipt/schema amendment and new canonical vectors. Current
-parsers use closed fields; extra JSON keys cannot simply be slipped into signed
+signed usage readers use closed fields; extra JSON keys cannot simply be slipped into signed
 records. Unknown usage must not free an unsettled reservation. This design is not
 that format approval.
 
@@ -193,6 +193,12 @@ that format approval.
 
 Add a context profile distinct from `ModelOutputProfile`: documented/declared
 window, tokenizer/counting capability, provenance and analyst input threshold.
+Expose **Context window**, **Compact at** and **Target after compaction** in
+`/settings model`, alongside the separate output capability. Persist analyst edits
+through signed configuration; no model tool can change them. A proposed additive
+`LlmPort::context_profile()` defaults to unknown. Its concrete contract must define
+integer ranges, high/low-water validation, provider framing and policy ceilings
+before implementation; do not infer context length from the output maximum.
 Proposed initial prudent ceilings: **128,000 input-token upper bound and 512,000
 serialized request bytes**, including tools/envelopes; lower provider windows win.
 Use a safety margin and the unchanged native output maximum. An incompatible
@@ -258,7 +264,8 @@ was inspected merely because its result ID was returned.
 
 ## 8. Optional auxiliary model
 
-A signed auxiliary profile for compaction/summaries is off by default; absence
+In `/settings model`, an **Auxiliary model** section reuses the provider/URL/model
+and masked-credential flow. A signed profile for compaction/summaries is off by default; absence
 uses the primary model. Provider, endpoint, model, native output/context capability,
 SecretBackend key reference and role are explicit. A different remote endpoint
 requires its own data-disclosure confirmation; no ambient key or silent fallback.
