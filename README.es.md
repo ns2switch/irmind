@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 68baeea523d6ac20f8968ee4a40b051ed8b8fc5e; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 5d5cb6348fa4fdb505c17a7ab06b994501e9cc8d; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — investigaciones en terminal con registro firmado
 
@@ -20,9 +20,6 @@ Sin configurar modelos, claves de API, cuentas ni coste. La interfaz real invest
 ![Presentación automática de IRMind con narración a todo el ancho, evidencia sintética, respuesta en streaming, aprobación firmada y verificación de custodia](docs/assets/demo.gif)
 
 *Grabada con IRMind v0.5.0. La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
-
-> [!WARNING]
-> IRMind 0.5.1 es una versión preliminar para evaluar con datos sintéticos. El analista aceptó H5 tras probar un saludo con DeepSeek real; siguen pendientes de registro los demás pasos y la validación de un conector real. No la uses para incidentes reales ni datos sensibles.
 
 > [!WARNING]
 > Antes de 1.0, cada versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración. Conserva la versión de IRMind que creó un caso para abrirlo, verificarlo o exportarlo, o reingiere los originales verificados en un caso nuevo.
