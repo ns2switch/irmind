@@ -13,7 +13,7 @@ pub(super) fn help_line(state: &HomeState) -> &'static str {
         Mode::Config => "↑/↓ choose · Enter change · Esc back",
         Mode::Modules => {
             if state.pending_module_change.is_some() {
-                "↑/↓ choose · Enter confirm · Esc back"
+                "PgUp/PgDn review · ↑/↓ choose · Enter confirm · Esc back"
             } else if state.module_edit.is_some() {
                 "Type parameter · Enter save · Esc back"
             } else {

@@ -400,38 +400,8 @@ impl HomeRuntime<'_, '_, '_> {
     }
 
     fn change_module(&mut self, change: ConfigChange, confirmed: bool) -> bool {
-        let change = if let ConfigChange::SetValue {
-            module,
-            field,
-            value,
-        } = &change
-            && field.ends_with("_CA_PEM")
-        {
-            let sha256 = if value.is_empty() {
-                String::new()
-            } else {
-                match self.io_ops.ca_fingerprint(std::path::Path::new(value)) {
-                    Ok(fingerprint) => fingerprint,
-                    Err(error) => {
-                        self.state.notice = format!("Cannot approve CA file: {error}");
-                        self.state.module_edit = Some(super::ModuleEdit {
-                            module: module.clone(),
-                            field: field.clone(),
-                            value: value.clone(),
-                            replace_on_type: false,
-                        });
-                        return false;
-                    }
-                }
-            };
-            ConfigChange::SetCertificateAuthority {
-                module: module.clone(),
-                path_field: field.clone(),
-                path: value.clone(),
-                sha256,
-            }
-        } else {
-            change
+        let Some(change) = self.with_ca_fingerprint(change) else {
+            return false;
         };
         match self
             .io_ops
@@ -457,6 +427,7 @@ impl HomeRuntime<'_, '_, '_> {
                         )
                     }) =>
             {
+                self.state.module_review_scroll = 0;
                 self.state.pending_module_change = Some(change);
                 self.state.notice =
                     "Confirm that this setting may send case data off this device".into();
@@ -480,6 +451,43 @@ impl HomeRuntime<'_, '_, '_> {
                 false
             }
         }
+    }
+
+    fn with_ca_fingerprint(&mut self, change: ConfigChange) -> Option<ConfigChange> {
+        let change = if let ConfigChange::SetValue {
+            module,
+            field,
+            value,
+        } = &change
+            && field.ends_with("_CA_PEM")
+        {
+            let sha256 = if value.is_empty() {
+                String::new()
+            } else {
+                match self.io_ops.ca_fingerprint(std::path::Path::new(value)) {
+                    Ok(fingerprint) => fingerprint,
+                    Err(error) => {
+                        self.state.notice = format!("Cannot approve CA file: {error}");
+                        self.state.module_edit = Some(super::ModuleEdit {
+                            module: module.clone(),
+                            field: field.clone(),
+                            value: value.clone(),
+                            replace_on_type: false,
+                        });
+                        return None;
+                    }
+                }
+            };
+            ConfigChange::SetCertificateAuthority {
+                module: module.clone(),
+                path_field: field.clone(),
+                path: value.clone(),
+                sha256,
+            }
+        } else {
+            change
+        };
+        Some(change)
     }
 
     fn open_case(&mut self, id: &CaseId) -> Result<()> {
@@ -662,7 +670,9 @@ impl HomeRuntime<'_, '_, '_> {
                     "Replaced {name}. Active connectors still use the previous credential; use /restart for a new session"
                 ),
                 Ok(()) => {
-                    format!("Saved {name}. Restart the session with r to activate the credential")
+                    format!(
+                        "Saved {name}. Use /restart to activate the credential in a new session"
+                    )
                 }
                 Err(error) => format!("Credential update failed: {error}"),
             };
