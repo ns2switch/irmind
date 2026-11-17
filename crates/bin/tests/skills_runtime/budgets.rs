@@ -138,6 +138,7 @@ fn exhausted_tool_allocation_finishes_with_a_tool_free_summary() {
         requests: std::sync::Mutex::default(),
         output: None,
         usage: Some(irmind_app::ModelUsage {
+            cache: None,
             input_tokens: 8,
             output_tokens: 2,
         }),
@@ -175,6 +176,7 @@ fn exhausted_tokens_preserve_local_work_without_an_additional_model_request() {
         requests: std::sync::Mutex::default(),
         output: None,
         usage: Some(irmind_app::ModelUsage {
+            cache: None,
             input_tokens: 8,
             output_tokens: 2,
         }),
@@ -199,6 +201,7 @@ fn model_text_cannot_apply_a_budget_command_and_restart_preserves_the_allocation
         requests: std::sync::Mutex::default(),
         output: Some("/budget 10000000"),
         usage: Some(irmind_app::ModelUsage {
+            cache: None,
             input_tokens: 8,
             output_tokens: 2,
         }),
@@ -300,6 +303,7 @@ fn exhausted_compaction_budget_preserves_history_and_finishes_locally() {
         requests: std::sync::Mutex::default(),
         output: Some(answer),
         usage: Some(irmind_app::ModelUsage {
+            cache: None,
             input_tokens: 8,
             output_tokens: 2,
         }),
@@ -336,6 +340,7 @@ fn a_positive_balance_admits_complete_compaction_without_a_smaller_output_allowa
         requests: std::sync::Mutex::default(),
         output: Some(answer),
         usage: Some(irmind_app::ModelUsage {
+            cache: None,
             input_tokens: 8,
             output_tokens: 2,
         }),

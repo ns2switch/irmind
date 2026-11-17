@@ -38,6 +38,7 @@ pub(super) fn capture(
     let body = serde_json::json!({"messages":messages,"tools":tools});
     let input_bytes = serde_json::to_vec(&body).unwrap().len();
     let usage = ModelUsage {
+        cache: None,
         input_tokens: input_bytes.div_ceil(4) as u64,
         output_tokens: output_bytes.div_ceil(4) as u64,
     };

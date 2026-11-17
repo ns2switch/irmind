@@ -137,6 +137,7 @@ impl LlmPort for DelegatingModel {
                 truncated: false,
             },
             Some(ModelUsage {
+                cache: None,
                 input_tokens: 5,
                 output_tokens: 2,
             }),

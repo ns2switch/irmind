@@ -207,6 +207,7 @@ fn model_usage(entry: &SignedEntry) -> Result<Option<crate::ModelUsage>, Subagen
     let usage: UsageEvent =
         serde_json::from_str(&entry.payload).map_err(|_| SubagentRecordError)?;
     Ok(Some(crate::ModelUsage {
+        cache: usage.cache,
         input_tokens: usage.input_tokens,
         output_tokens: usage.output_tokens,
     }))

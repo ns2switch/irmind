@@ -162,9 +162,9 @@ tokens used, token budget, token percentage, cache tokens read and written, tool
 calls and their budget, cloud bytes and their budget, estimated cost, active
 subagents, pending approvals, detections, ingested sources, signing/secrets
 keystore profile, data directory, IRMind version, UTC clock, and activity.
-Unavailable cache counters and unpriced cost are omitted, never estimated as
-zero. Cache counters become available only when the provider accounting supports
-them. Model usage and budgets retain their existing accounting rules.
+Unavailable cache counters are labeled unavailable; unpriced cost is omitted,
+never estimated as zero. Cache counters become available only when provider accounting
+supports them. Model usage and budgets retain their existing accounting rules.
 
 The order in the template is the display order. At narrow widths, including 80
 columns, segments with the lowest priority disappear first; equal priorities
@@ -308,3 +308,20 @@ Use `/case delete` for a typed, Analyst-signed confirmation of an unsealed case.
 `/cases deleted` shows the retained global tombstones and pending cleanup. Sealed
 cases and cases open in another process cannot be deleted. See [cases](cases.md)
 for ownership, interrupted cleanup, shared evidence and logical-erasure limits.
+
+### Prompt-cache accounting
+
+`/budget` separates ordinary input, cache reads, cache writes and output. Input
+includes all these input components exactly once: a cache hit never increases a
+case or child budget. Missing metadata is unavailable; partial reporting is labeled.
+OpenAI and DeepSeek cache automatically. Native Anthropic requests mark only the
+trusted system block and the last currently allowed tool with five-minute cache
+breakpoints. Compatible and local endpoints receive no cache controls. Each turn
+still has a fresh untrusted-content nonce.
+
+Optional `cache_read_microusd_per_million` and `cache_write_microusd_per_million`
+prices supplement the ordinary input/output prices in signed configuration. Write
+pricing applies only to five-minute writes. Every nonzero component needs its
+configured rate; unknown breakdown/lifetime or any unpriced request makes the
+total estimate unavailable. Counters are provider reports, not an invoice. The
+cache status segments show reported counts (with partial coverage) or unavailable.

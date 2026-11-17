@@ -244,6 +244,7 @@ impl LegacyModel for RepeatingReadModel {
         Ok((
             LegacyModel::complete(self, context)?,
             Some(ModelUsage {
+                cache: None,
                 input_tokens: 60,
                 output_tokens: 50,
             }),

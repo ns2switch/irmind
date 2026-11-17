@@ -49,6 +49,7 @@ impl Engine<'_> {
                     .ok_or_else(invalid)?;
                 outcome.terminal.usage.tokens = tokens;
                 outcome.report = Some(UsageEvent {
+                    cache: report.cache,
                     input_tokens: report.input_tokens,
                     output_tokens: report.output_tokens,
                     estimated_cost_microusd: self.usage_cost(report)?,

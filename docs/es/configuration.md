@@ -313,3 +313,21 @@ no sellado. `/cases deleted` muestra las lápidas globales y la limpieza pendien
 No se pueden borrar casos sellados o abiertos en otro proceso. Consulta
 [casos](cases.md) para propiedad, interrupciones, evidencia compartida y límites
 del borrado lógico.
+
+### Contabilidad de caché de prompts
+
+`/budget` separa entrada ordinaria, lecturas de caché, escrituras de caché y salida.
+La entrada incluye todos esos componentes una sola vez: un acierto de caché nunca
+amplía el presupuesto del caso ni del hijo. Los datos ausentes figuran como no
+disponibles y la cobertura parcial se indica. OpenAI y DeepSeek usan caché automática.
+En Anthropic nativo solo se marcan el bloque de sistema confiable y la última
+herramienta permitida, con vigencia de cinco minutos. Los endpoints compatibles y
+locales no reciben controles de caché. Se mantiene un nonce nuevo por turno.
+
+Los precios opcionales `cache_read_microusd_per_million` y
+`cache_write_microusd_per_million` complementan los de entrada y salida en la
+configuración firmada. El precio de escritura solo se aplica a cinco minutos.
+Cada componente no nulo necesita su precio; si faltan datos, la vigencia es
+incierta o alguna petición no tiene precio, el coste total no está disponible.
+Los contadores son informes del proveedor, no una factura. Los segmentos de caché
+muestran los valores recibidos (indicando cobertura parcial) o no disponible.
