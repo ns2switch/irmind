@@ -307,6 +307,11 @@ fn graph_timeline_or_notice(
     }
 }
 
+fn welcome_model_label(descriptor: &str) -> String {
+    let (model, provider) = crate::status_bar::model_labels(descriptor);
+    provider.map_or_else(|| model.clone(), |provider| format!("{provider} · {model}"))
+}
+
 fn welcome_summary(
     case: &irmind_app::Case,
     model: Option<&dyn LlmPort>,
@@ -318,7 +323,14 @@ fn welcome_summary(
         "{} · {}\nModel: {} · Keystore: {}{}{}",
         case.title,
         case.severity.as_str(),
-        model.map_or_else(|| "no model".into(), LlmPort::descriptor),
+        model.map_or_else(
+            || if hints {
+                "no model · /settings model to configure".into()
+            } else {
+                "no model".into()
+            },
+            |model| welcome_model_label(&model.descriptor()),
+        ),
         backend,
         if hints {
             "\n/ingest adds evidence · /help opens help"
@@ -550,6 +562,35 @@ fn load_approval_sources(
 #[cfg(test)]
 mod hint_tests {
     use super::{AuditEventKind, no_case_evidence};
+
+    #[test]
+    fn welcome_uses_the_full_model_name_without_internal_descriptor_fields() {
+        let descriptor = "module=llm-deepseek;model=deepseek-flash;endpoint_sha256=abcdef";
+        assert_eq!(
+            super::welcome_model_label(descriptor),
+            "DeepSeek · deepseek-flash"
+        );
+        assert_eq!(
+            super::welcome_model_label("scripted demo model · no network"),
+            "scripted demo model · no network"
+        );
+    }
+
+    #[test]
+    fn an_unconfigured_model_has_an_actionable_settings_hint() -> anyhow::Result<()> {
+        let case = irmind_app::Case {
+            id: irmind_app::CaseId::parse("00000000-0000-0000-0000-000000000001")
+                .map_err(|_| anyhow::anyhow!("invalid synthetic fixture ID"))?,
+            title: "Synthetic".into(),
+            severity: irmind_app::Severity::Medium,
+            scope: "local".into(),
+            sealed: false,
+        };
+        let shown = super::welcome_summary(&case, None, "file", false, true);
+        assert!(shown.contains("/settings model to configure"));
+        assert!(!super::welcome_summary(&case, None, "file", false, false).contains("/settings"));
+        Ok(())
+    }
 
     #[test]
     fn signed_source_manifests_count_as_evidence_without_a_local_copy() {

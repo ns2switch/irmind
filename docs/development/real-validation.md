@@ -144,6 +144,38 @@ in the SecretBackend form. Review the existing confirmation before sending any
 synthetic case data to a remote provider. Test the connection with no case data.
 Record exact provider/model/version and, if used, reasoning mode and prices.
 
+For a CPU-only rehearsal, an existing local Ollama installation can use a small
+Qwen2.5-1.5B profile. Fetch models explicitly before disconnecting the runtime
+from external networking; record its version and model digest. The model's
+[documented native output maximum](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)
+is 8,192 tokens. An example runtime Modelfile is:
+
+```text
+FROM qwen2.5:1.5b
+PARAMETER num_thread 4
+PARAMETER num_ctx 16384
+PARAMETER num_predict 8192
+```
+
+Save it as `Modelfile.lab` and create the local profile explicitly:
+
+```sh
+ollama pull qwen2.5:1.5b
+ollama create lab-qwen --file Modelfile.lab
+ollama show lab-qwen --parameters
+```
+
+See [Ollama's Modelfile reference](https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx).
+Select that model in the TUI, declare native output 8192 and leave output-parameter
+requirement optional. Keep the server on loopback. Four inference threads are a
+reproducible laboratory choice, not a universal optimum: excessive CPU threads
+can make even the synthetic probe exceed IRMind's unchanged deadline. Size the
+runtime for the configured context and simultaneous children; a queued request
+may time out on a single-request server. Record such partial outcomes, and do
+not increase IRMind's safety deadlines to hide them. A successful probe does not
+establish investigation quality; small models can conflate Windows and AWS or
+invent conclusions. Check each cited original before confirming any finding.
+
 1. Say `hello`. Record whether it answers naturally without tools.
 2. Invoke `/windows-triage Review the local synthetic logons; cite source hashes.`
    Ask separately for a structured Elastic search over one lab day. Record the

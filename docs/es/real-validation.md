@@ -129,6 +129,34 @@ SecretBackend, revisa la confirmación de salida de datos y prueba la conexión 
 datos del caso. Registra identificador exacto, revisión conocida, razonamiento y
 precios si se usan. No publiques claves ni rutas personales.
 
+Para el ensayo sin GPU, una instalación local de Ollama puede usar Qwen2.5-1.5B.
+Descarga el modelo explícitamente antes de aislar la red y anota versión y digest.
+Su [máximo nativo documentado](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)
+es de 8192 tokens. Ejemplo de `Modelfile.lab`:
+
+```text
+FROM qwen2.5:1.5b
+PARAMETER num_thread 4
+PARAMETER num_ctx 16384
+PARAMETER num_predict 8192
+```
+
+```sh
+ollama pull qwen2.5:1.5b
+ollama create lab-qwen --file Modelfile.lab
+ollama show lab-qwen --parameters
+```
+
+[Referencia oficial de Modelfile](https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx).
+Selecciona el perfil en la TUI, declara máximo nativo 8192 y parámetro opcional.
+El servidor debe escuchar solo en loopback. Cuatro hilos son una configuración
+reproducible de laboratorio, no un óptimo universal: demasiados hilos pueden
+agotar el plazo de la prueba. Dimensiona memoria, contexto y peticiones de hijos;
+un servidor que las serializa puede devolver resultados parciales por tiempo.
+No amplíes los plazos de seguridad de IRMind para ocultarlo. Una conexión correcta
+no demuestra calidad de investigación: los modelos pequeños pueden confundir
+Windows y AWS o inventar conclusiones. Revisa cada original antes de confirmar.
+
 ## 60–100 minutos: investigación, skill, plan y aprobación
 
 1. Saluda y observa si responde naturalmente sin herramientas innecesarias.
