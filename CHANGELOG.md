@@ -8,8 +8,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 **Format impact:** Optional cache metadata extends signed usage receipts and
 optional cache prices extend signed configuration. Missing fields retain their
-existing canonical bytes. Case, artifact, seal and export versions are unchanged. Retain the creating
-executable for full reconstruction of its signed native decoder/mapping profiles.
+existing canonical bytes. Case, artifact, seal and export versions are unchanged.
+Retain the creating executable for full reconstruction of its signed native decoder/mapping profiles.
 
 - Publish native macOS Intel binaries alongside Apple Silicon, Linux x86_64,
   Linux aarch64 and Windows. Verify clean installers even when optional native
@@ -47,7 +47,6 @@ executable for full reconstruction of its signed native decoder/mapping profiles
 
 - Confirmed Ctrl+C exits the application from an open case; canceling its modal
   leaves the conversation unchanged. Evidence-picker help matches the actual keys.
-- Add native macOS Intel release binaries, their matching isolated EVTX helper and clean verified installation tests. Extend dormant Developer ID/notarization preparation to both architectures; native signing remains disabled.
 
 ## 0.5.2 — Signed case deletion and a configurable status bar
 
