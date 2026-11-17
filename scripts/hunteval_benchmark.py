@@ -168,7 +168,7 @@ def evaluate(observed, source, truth):
 
 def write_report(output, report):
     (output / 'report.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
-    lines = ['# HuntEval model evaluation', '', 'Exact-ID metrics, not a semantic forensic verdict. Human finding adjudication is pending.', '',
+    lines = ['# HuntEval model evaluation', '', f"Selected episodes: {len(report.get('selected_episodes', EPISODES))}/18. A subset is a pilot, not a full-corpus evaluation.", '', 'Exact-ID metrics, not a semantic forensic verdict. Human finding adjudication is pending.', '',
              '| Model | Episode | Status | Event P/R | Entity P/R | Tool calls | Input/output tokens | Cost (microUSD) |',
              '| --- | --- | --- | --- | --- | --- | --- | --- |']
     def metric(item, key):
@@ -181,28 +181,40 @@ def write_report(output, report):
     (output / 'SHA256SUMS').write_text(digests)
 
 
+def selected_episodes(requested):
+    if requested is None:
+        return list(EPISODES)
+    if not 1 <= len(requested) <= len(EPISODES) or len(set(requested)) != len(requested):
+        raise ValueError('Choose each selected episode once')
+    if any(episode not in EPISODES for episode in requested):
+        raise ValueError('Unknown pinned episode')
+    return [episode for episode in EPISODES if episode in requested]
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--hunteval-root', type=Path, required=True)
     p.add_argument('--models', type=Path, required=True)
     p.add_argument('--binary', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--episode', action='append', choices=EPISODES, help='Select a pinned episode; repeat for a pilot. Default: all 18.')
     p.add_argument('--execute', action='store_true', help='Explicitly authorize billable configured model calls')
     a = p.parse_args(); binary = a.binary.resolve(); models = models_from(a.models)
-    sources = {episode: checked_files(a.hunteval_root, episode) for episode in EPISODES}
+    episodes = selected_episodes(a.episode)
+    sources = {episode: checked_files(a.hunteval_root, episode) for episode in episodes}
     if not a.execute:
-        print(f'Plan: {len(models)} models × 18 episodes. No model called; no private answer opened. Cost unknown. Add --execute after reviewing saved provider/data-egress settings.')
+        print(f'Plan: {len(models)} models × {len(episodes)} / 18 selected episodes. No model called; no private answer opened. Cost unknown. Add --execute after reviewing saved provider/data-egress settings.')
         return
     a.output.mkdir(parents=True, exist_ok=False, mode=0o700)
     report = {'format': 'irmind-hunteval-model-eval-v1', 'date_utc': datetime.now(timezone.utc).isoformat(),
-              'corpus_commit': PINNED_COMMIT, 'irmind_version': subprocess.check_output([str(binary), '--version'], text=True).strip(),
+              'corpus_commit': PINNED_COMMIT, 'selected_episodes': episodes, 'irmind_version': subprocess.check_output([str(binary), '--version'], text=True).strip(),
               'binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'runs': [],
               'method': 'One root-agent CLI turn per episode; no automatic approvals or analyst confirmations. Retrieval counts signed raw tool-result coverage, before model-facing truncation/guard. Exact-ID scores and event-linked finding proxies require separate human adjudication.'}
     observations = []
     # Finish every model run before opening any private answer file.
     for model in models:
         password = getpass.getpass(f"File-keystore passphrase for {model['label']} (blank only for OS-only backends): ")
-        for episode in EPISODES:
+        for episode in episodes:
             row = {k: model.get(k, 'not reported') for k in ('label', 'module', 'model', 'revision')}
             row.update(episode=episode, provider=episode.split('-')[0], status='execution_failed')
             started = time.monotonic(); source, hidden = sources[episode]

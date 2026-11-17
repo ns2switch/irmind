@@ -54,3 +54,28 @@ human_false_positive_findings antes de publicar. Los hallazgos siguen propuestos
 Publica solo resultados saneados con modelo, revisión, fecha, fallos, límites y
 método; nunca claves, rutas personales ni diagnósticos crudos. Repite si comparas
 modelos no deterministas y no extrapoles estos episodios pequeños a incidentes reales.
+
+## Piloto para estimar duración y coste
+
+Antes de los dieciocho episodios, elige uno por nube. Repite la opción de selección de episodio para
+seleccionar un subconjunto sin duplicados; se conserva el orden del corpus
+fijado. Revisa primero el plan sin llamadas y añade la opción de ejecución solo después de
+aprobar ese gasto. Sin selección explícita siguen ejecutándose los dieciocho.
+El informe del piloto indica 3/18, nunca una evaluación completa.
+
+```sh
+python3 scripts/hunteval_benchmark.py --hunteval-root <checkout> --models <modelos-privados.json> --binary <irmind-verificado> --output <piloto-nuevo> --episode aws-iam-001 --episode azure-iam-001 --episode gcp-iam-001
+```
+
+Por modelo, multiplica por seis la suma de `elapsed_seconds` de sus tres episodios
+completados; revisa también 18 veces el mínimo y el máximo. Si todos tienen uso
+y precios completos, multiplica por seis la suma de `estimated_cost_microusd`
+y divide por un millón para obtener USD. Son extrapolaciones, no límites ni
+garantías: rondas, fallos, razonamiento, caché, tamaños y tarifas pueden variar.
+Con errores o datos incompletos, el coste permanece no disponible, nunca cero
+inventado. No se han hecho llamadas comerciales para preparar la guía; no hay
+cifras supuestas por modelo. Conserva versión/revisión, fecha y filas del piloto.
+
+Cada episodio crea su caso: revisa su presupuesto y el techo de la organización.
+Una respuesta admitida puede superar el saldo al completarse; la siguiente
+petición queda bloqueada hasta ampliar el presupuesto de forma autorizada.
