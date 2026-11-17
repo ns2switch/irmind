@@ -3,7 +3,7 @@
 This proposal is for maintainers and contributors building the v0.4 skills
 feature. It defines data packaging, bounded loading, signed authorization and
 tests. It does not implement skills, introduce ports or change signed formats.
-The [roadmap](roadmap.md#v04-forensic-skills) tracks the intended delivery.
+The [roadmap](roadmap.md#delivered-through-v05x) tracks the intended delivery.
 
 ## 1. Boundaries
 
