@@ -169,50 +169,7 @@ impl BudgetEditor {
         };
         let mut lines = vec![title.to_owned()];
         if let Some(used) = self.usage {
-            let tokens = if used.provider_usage_available {
-                used.model_tokens.to_string()
-            } else {
-                format!("unavailable; reported at least {}", used.model_tokens)
-            };
-            lines.push(format!("Consumed: tokens {tokens}"));
-            let coverage = if used.cache_reporting_complete {
-                ""
-            } else {
-                " (reported · partial)"
-            };
-            if let Some(cache) = used.reported_cache {
-                lines.push(format!(
-                    "Input ordinary {} · cache read {} · write {}{coverage}",
-                    used.ordinary_input_tokens,
-                    cache.read_input_tokens(),
-                    cache.write_input_tokens()
-                ));
-            } else {
-                lines.push("Input breakdown: unavailable".into());
-            }
-            lines.push(format!(
-                "Reported output {} · inclusive input {}{}",
-                used.output_tokens,
-                used.input_tokens,
-                if used.provider_usage_available {
-                    ""
-                } else {
-                    " (partial)"
-                }
-            ));
-            lines.push(format!(
-                "Calls {} · reserved cloud bytes {}",
-                used.tool_calls, used.cloud_bytes
-            ));
-            if used.provider_usage_available
-                && let Some(cost) = used.cost_microusd
-            {
-                lines.push(format!(
-                    "Estimated cost: ${}.{:06} USD",
-                    cost / 1_000_000,
-                    cost % 1_000_000
-                ));
-            }
+            append_usage(&mut lines, used);
         }
         for (i, (label, cap)) in [
             ("Model tokens", self.ceiling.model_tokens),
@@ -243,6 +200,53 @@ impl BudgetEditor {
             lines.push(self.error.clone());
         }
         crate::case::escape_display(&lines.join("\n"))
+    }
+}
+
+fn append_usage(lines: &mut Vec<String>, used: CaseBudgetUsage) {
+    let tokens = if used.provider_usage_available {
+        used.model_tokens.to_string()
+    } else {
+        format!("unavailable; reported at least {}", used.model_tokens)
+    };
+    lines.push(format!("Consumed: tokens {tokens}"));
+    let coverage = if used.cache_reporting_complete {
+        ""
+    } else {
+        " (reported · partial)"
+    };
+    if let Some(cache) = used.reported_cache {
+        lines.push(format!(
+            "Input ordinary {} · cache read {} · write {}{coverage}",
+            used.ordinary_input_tokens,
+            cache.read_input_tokens(),
+            cache.write_input_tokens()
+        ));
+    } else {
+        lines.push("Input breakdown: unavailable".into());
+    }
+    lines.push(format!(
+        "Reported output {} · inclusive input {}{}",
+        used.output_tokens,
+        used.input_tokens,
+        if used.provider_usage_available {
+            ""
+        } else {
+            " (partial)"
+        }
+    ));
+    lines.push(format!(
+        "Calls {} · reserved cloud bytes {}",
+        used.tool_calls, used.cloud_bytes
+    ));
+    if used.provider_usage_available
+        && let Some(cost) = used.cost_microusd
+    {
+        lines.push(format!(
+            "Estimated cost: ${}.{:06} USD",
+            cost / 1_000_000,
+            cost % 1_000_000
+        ));
     }
 }
 
