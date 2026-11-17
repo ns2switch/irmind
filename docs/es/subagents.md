@@ -1,4 +1,4 @@
-# Investigaciones en paralelo
+Traducción de docs/subagents.md en el commit 2b0159e078ba73acebb72331203016aa2026eec2; si hay diferencias, prevalece la versión en inglés.
 
 [English](../subagents.md)
 
