@@ -146,9 +146,10 @@ impl Anthropic {
     fn body(&self, request: &CompletionRequest) -> Result<serde_json::Value, AppError> {
         request.validate()?;
         let maximum = self.output.parameter_value()?;
-        let tools = request
-            .tools
-            .iter()
+        let mut allowed = request.tools.iter().collect::<Vec<_>>();
+        allowed.sort_by_key(|tool| tool.name);
+        let mut tools = allowed
+            .into_iter()
             .map(|tool| {
                 json!({
                     "name": tool.name,
@@ -158,6 +159,10 @@ impl Anthropic {
             })
             .collect::<Vec<_>>();
         let system = trusted_system(&request.messages)?;
+        let cache_enabled = self.endpoint.host_str() == Some("api.anthropic.com");
+        if cache_enabled && let Some(last) = tools.last_mut() {
+            last["cache_control"] = json!({"type":"ephemeral"});
+        }
         let mut messages = Vec::<serde_json::Value>::new();
         for message in request
             .messages
@@ -206,6 +211,10 @@ impl Anthropic {
             "messages": messages,
             "stream": true,
         });
+        if cache_enabled && !system.is_empty() {
+            body["system"] =
+                json!([{"type":"text","text":system,"cache_control":{"type":"ephemeral"}}]);
+        }
         if !tools.is_empty() {
             body["tools"] = json!(tools);
             body["tool_choice"] = json!({"type":"auto","disable_parallel_tool_use":true});
@@ -283,6 +292,7 @@ impl LlmPort for Anthropic {
             )));
         }
         let cancel = cancel.clone();
+        let five_minute_writes = self.endpoint.host_str() == Some("api.anthropic.com");
         Ok(Box::pin(async_stream::try_stream! {
             let mut response = response;
             let mut raw = Vec::new();
@@ -303,8 +313,8 @@ impl LlmPort for Anthropic {
                 }
                 yield ModelEvent::Progress(chunk.len());
             }
-            let (response, usage) = stream::parse(raw.as_slice())?;
-            yield ModelEvent::Completed { response, usage: Some(usage) };
+            let (response, usage) = stream::parse_profile(raw.as_slice(), five_minute_writes)?;
+            yield ModelEvent::Completed { response, usage };
         }))
     }
 }
@@ -392,6 +402,53 @@ mod tests {
     }
 
     #[test]
+    fn native_cache_markers_cover_only_trusted_system_and_last_current_tool() {
+        let native = Anthropic::new("claude-sonnet-4-6", "synthetic".into()).unwrap();
+        let mut compatible = Anthropic::new_with_base(
+            "http://127.0.0.1:7777/",
+            "claude-sonnet-4-6",
+            "synthetic".into(),
+        )
+        .unwrap();
+        compatible.output = native.output;
+        let mut request = CompletionRequest {
+            messages: vec![
+                CompletionMessage::text(MessageRole::System, "Trusted IRMind rules".into()),
+                CompletionMessage::text(
+                    MessageRole::User,
+                    "<UNTRUSTED_turn>case</UNTRUSTED_turn>".into(),
+                ),
+            ],
+            tools: irmind_app::tool_catalog::catalog()[..3].to_vec(),
+        };
+        request.tools.reverse();
+        let body = native.body(&request).unwrap();
+        assert_eq!(body["system"][0]["cache_control"]["type"], "ephemeral");
+        let tools = body["tools"].as_array().unwrap();
+        assert!(
+            tools
+                .windows(2)
+                .all(|v| v[0]["name"].as_str() < v[1]["name"].as_str())
+        );
+        assert!(
+            tools[..tools.len() - 1]
+                .iter()
+                .all(|tool| tool.get("cache_control").is_none())
+        );
+        assert_eq!(tools.last().unwrap()["cache_control"]["type"], "ephemeral");
+        assert!(!body["messages"].to_string().contains("cache_control"));
+        assert!(
+            !compatible
+                .body(&request)
+                .unwrap()
+                .to_string()
+                .contains("cache_control")
+        );
+        request.tools.clear();
+        assert!(native.body(&request).unwrap().get("tools").is_none());
+    }
+
+    #[test]
     fn untrusted_system_content_is_rejected_before_anthropic_request() {
         let adapter = Anthropic::new("claude-sonnet-4-6", "test-secret".into()).unwrap();
         let request = CompletionRequest {
@@ -419,7 +476,8 @@ mod tests {
             ..request
         };
         let body = adapter.body(&safe).unwrap();
-        assert_eq!(body["system"], "Trusted IRMind instruction");
+        assert_eq!(body["system"][0]["text"], "Trusted IRMind instruction");
+        assert_eq!(body["system"][0]["cache_control"]["type"], "ephemeral");
         assert!(
             body["messages"][0]["content"]
                 .as_str()

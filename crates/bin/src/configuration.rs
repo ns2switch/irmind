@@ -327,6 +327,8 @@ pub(super) fn load_pricing(saved: &PersistentConfig) -> Result<Option<ModelPrici
             Ok(Some(ModelPricing {
                 input_microusd_per_million,
                 output_microusd_per_million,
+                cache_read_microusd_per_million: saved.cache_read_microusd_per_million,
+                cache_write_microusd_per_million: saved.cache_write_microusd_per_million,
             }))
         }
         _ => Err(anyhow!("both input and output model prices must be set")),

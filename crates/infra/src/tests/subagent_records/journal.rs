@@ -320,10 +320,12 @@ fn model_terminal_prefix(
         request,
         first,
         ModelUsage {
+            cache: None,
             input_tokens: 10,
             output_tokens: 5,
         },
         Some(ModelUsage {
+            cache: None,
             input_tokens: 10,
             output_tokens: 5,
         }),
@@ -350,6 +352,7 @@ fn model_terminal_prefix_with_usage(
     let accounting = history.append(
         AuditEventKind::ModelUsage,
         serde_json::to_string(&irmind_app::UsageEvent {
+            cache: reported.cache,
             input_tokens: reported.input_tokens,
             output_tokens: reported.output_tokens,
             estimated_cost_microusd: None,
@@ -695,10 +698,12 @@ fn completed_model_history() -> (
 ) {
     completed_model_history_with_usage(
         ModelUsage {
+            cache: None,
             input_tokens: 10,
             output_tokens: 5,
         },
         Some(ModelUsage {
+            cache: None,
             input_tokens: 10,
             output_tokens: 5,
         }),

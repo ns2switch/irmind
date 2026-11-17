@@ -282,6 +282,7 @@ mod tests {
         };
         row.report(
             Some(irmind_app::ModelUsage {
+                cache: None,
                 input_tokens: 2,
                 output_tokens: 1,
             }),
@@ -292,6 +293,7 @@ mod tests {
         row.report(None, None);
         row.report(
             Some(irmind_app::ModelUsage {
+                cache: None,
                 input_tokens: 1,
                 output_tokens: 1,
             }),

@@ -175,6 +175,25 @@ impl BudgetEditor {
                 format!("unavailable; reported at least {}", used.model_tokens)
             };
             lines.push(format!("Consumed: tokens {tokens}"));
+            let coverage = if used.cache_reporting_complete {
+                ""
+            } else {
+                " (reported · partial)"
+            };
+            if let Some(cache) = used.reported_cache {
+                lines.push(format!(
+                    "Input ordinary {} · cache read {} · write {}{coverage}",
+                    used.ordinary_input_tokens,
+                    cache.read_input_tokens(),
+                    cache.write_input_tokens()
+                ));
+            } else {
+                lines.push("Input breakdown: unavailable".into());
+            }
+            lines.push(format!(
+                "Output {} · inclusive input {}",
+                used.output_tokens, used.input_tokens
+            ));
             lines.push(format!(
                 "Calls {} · reserved cloud bytes {}",
                 used.tool_calls, used.cloud_bytes
@@ -231,6 +250,35 @@ mod tests {
         BudgetEditor::new(limits, limits, None)
     }
     #[test]
+    fn cache_breakdown_is_visible_and_partial_reporting_is_explicit() {
+        let usage = CaseBudgetUsage {
+            input_tokens: 1000,
+            output_tokens: 50,
+            ordinary_input_tokens: 100,
+            model_tokens: 1050,
+            provider_usage_available: true,
+            reported_cache: Some(
+                irmind_app::CacheUsage::new(800, 100, irmind_app::CacheWriteLifetime::FiveMinutes)
+                    .unwrap(),
+            ),
+            cache_reporting_complete: true,
+            ..Default::default()
+        };
+        let mut form = editor();
+        form.usage = Some(usage);
+        assert!(
+            form.text()
+                .contains("Input ordinary 100 · cache read 800 · write 100")
+        );
+        assert!(form.text().contains("Output 50 · inclusive input 1000"));
+        form.usage = Some(CaseBudgetUsage {
+            cache_reporting_complete: false,
+            ..usage
+        });
+        assert!(form.text().contains("reported · partial"));
+        insta::assert_snapshot!("case_budget_cache", form.text());
+    }
+    #[test]
     fn an_increase_requires_review_and_explicit_number_then_enter() {
         let mut form = editor();
         form.clear();
@@ -269,6 +317,7 @@ mod tests {
                 cloud_bytes: 0,
                 cost_microusd: None,
                 provider_usage_available: true,
+                ..Default::default()
             },
         };
         assert!(status.warning());

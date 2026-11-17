@@ -70,6 +70,7 @@ impl LlmPort for ToolModel {
                 truncated: false,
             },
             Some(ModelUsage {
+                cache: None,
                 input_tokens: 5,
                 output_tokens: 2,
             }),
@@ -215,6 +216,7 @@ impl LlmPort for RepeatedProtocolId {
                 truncated: false,
             },
             Some(ModelUsage {
+                cache: None,
                 input_tokens: 5,
                 output_tokens: 2,
             }),

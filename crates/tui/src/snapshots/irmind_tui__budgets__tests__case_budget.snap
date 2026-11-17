@@ -4,6 +4,8 @@ expression: rendered
 ---
 Case allocation · changes are signed                                            
 Consumed: tokens 1600000                                                        
+Input breakdown: unavailable                                                    
+Output 0 · inclusive input 0                                                    
 Calls 800 · reserved cloud bytes 0                                              
 > Model tokens · organization ceiling 2000000                                   
 ┌──────────────────────────────────┐                                            

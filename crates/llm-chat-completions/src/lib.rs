@@ -160,9 +160,10 @@ fn output_profile(
 
 impl ChatCompletionsClient {
     fn request_body(&self, request: &CompletionRequest) -> serde_json::Value {
-        let tools = request
-            .tools
-            .iter()
+        let mut allowed = request.tools.iter().collect::<Vec<_>>();
+        allowed.sort_by_key(|tool| tool.name);
+        let tools = allowed
+            .into_iter()
             .map(|spec| {
                 json!({"type":"function","function":{
                     "name":spec.name,"description":spec.description,"parameters":spec.parameters
@@ -289,6 +290,11 @@ impl LlmPort for ChatCompletionsClient {
             )));
         }
         let cancel = cancel.clone();
+        let usage_profile = match (self.profile, self.endpoint.host_str()) {
+            (ChatProfile::OpenAi, Some("api.openai.com")) => stream::UsageProfile::OpenAi,
+            (ChatProfile::DeepSeek, Some("api.deepseek.com")) => stream::UsageProfile::DeepSeek,
+            _ => stream::UsageProfile::Compatible,
+        };
         Ok(Box::pin(async_stream::try_stream! {
             let mut raw = Vec::new();
             let mut preview = stream::TextPreview::default();
@@ -308,8 +314,8 @@ impl LlmPort for ChatCompletionsClient {
                 }
                 yield ModelEvent::Progress(chunk.len());
             }
-            let (response, usage) = stream::parse(raw.as_slice())?;
-            yield ModelEvent::Completed { response, usage: Some(usage) };
+            let (response, usage) = stream::parse_profile(raw.as_slice(), usage_profile)?;
+            yield ModelEvent::Completed { response, usage };
         }))
     }
 }

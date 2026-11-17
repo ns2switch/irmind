@@ -16,9 +16,9 @@ pub use local::{
     SourceParallelism, StreamingEventParser, Verifier, startup_check,
 };
 pub use model::{
-    CompletionMessage, CompletionRequest, LlmPort, MessageRole, ModelEvent, ModelOutputProfile,
-    ModelPricing, ModelProgress, ModelResponse, ModelStream, ModelToolCall, ModelUsage,
-    OutputParameterRequirement, UsageEvent, collect_model_stream,
+    CacheUsage, CacheWriteLifetime, CompletionMessage, CompletionRequest, LlmPort, MessageRole,
+    ModelEvent, ModelOutputProfile, ModelPricing, ModelProgress, ModelResponse, ModelStream,
+    ModelToolCall, ModelUsage, OutputParameterRequirement, UsageEvent, collect_model_stream,
     collect_model_stream_with_progress, screen_model_preview, single_completion_stream,
     summarize_usage,
 };

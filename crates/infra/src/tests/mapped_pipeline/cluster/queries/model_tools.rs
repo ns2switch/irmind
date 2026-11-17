@@ -26,6 +26,7 @@ impl LlmPort for QueryModel {
                 truncated: false,
             },
             Some(ModelUsage {
+                cache: None,
                 input_tokens: 3,
                 output_tokens: 2,
             }),

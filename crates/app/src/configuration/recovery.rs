@@ -152,6 +152,20 @@ fn fields(config: &PersistentConfig) -> BTreeMap<String, String> {
     if let Some(value) = config.output_microusd_per_million {
         out.insert("output_microusd_per_million".into(), value.to_string());
     }
+    for (name, value) in [
+        (
+            "cache_read_microusd_per_million",
+            config.cache_read_microusd_per_million,
+        ),
+        (
+            "cache_write_microusd_per_million",
+            config.cache_write_microusd_per_million,
+        ),
+    ] {
+        if let Some(value) = value {
+            out.insert(name.into(), value.to_string());
+        }
+    }
     if let Some(value) = config.resume_last_case {
         out.insert("resume_last_case".into(), value.to_string());
     }

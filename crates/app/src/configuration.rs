@@ -20,6 +20,10 @@ pub struct PersistentConfig {
     pub input_microusd_per_million: Option<u64>,
     #[serde(default)]
     pub output_microusd_per_million: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_microusd_per_million: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_write_microusd_per_million: Option<u64>,
     /// Presentation-only setting; omitted from the signed v1 representation when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mouse_capture: Option<bool>,
@@ -99,6 +103,8 @@ impl Default for PersistentConfig {
             policy_path: None,
             input_microusd_per_million: None,
             output_microusd_per_million: None,
+            cache_read_microusd_per_million: None,
+            cache_write_microusd_per_million: None,
             mouse_capture: None,
             theme: None,
             resume_last_case: None,
@@ -144,12 +150,15 @@ impl PersistentConfig {
             })
             || self.input_microusd_per_million.is_some()
                 != self.output_microusd_per_million.is_some()
-            || self
-                .input_microusd_per_million
-                .is_some_and(|price| price > 1_000_000_000_000)
-            || self
-                .output_microusd_per_million
-                .is_some_and(|price| price > 1_000_000_000_000)
+            || [
+                self.input_microusd_per_million,
+                self.output_microusd_per_million,
+                self.cache_read_microusd_per_million,
+                self.cache_write_microusd_per_million,
+            ]
+            .into_iter()
+            .flatten()
+            .any(|price| price > 1_000_000_000_000)
         {
             return Err(invalid());
         }

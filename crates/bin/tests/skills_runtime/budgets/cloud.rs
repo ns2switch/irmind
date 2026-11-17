@@ -94,6 +94,7 @@ impl LlmPort for CloudModel {
                     truncated: false,
                 },
                 usage: Some(irmind_app::ModelUsage {
+                    cache: None,
                     input_tokens: 8,
                     output_tokens: 2,
                 }),

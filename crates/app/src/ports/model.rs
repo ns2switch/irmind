@@ -1,6 +1,8 @@
 use crate::*;
+mod cache;
 pub(crate) mod output;
 mod profile;
+pub use cache::{CacheUsage, CacheWriteLifetime};
 pub use profile::*;
 pub struct ModelResponse {
     pub text: String,
@@ -109,24 +111,30 @@ impl std::fmt::Debug for ModelResponse {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "cache::ModelUsageWire")]
 pub struct ModelUsage {
     pub input_tokens: u64,
     pub output_tokens: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache: Option<CacheUsage>,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct ModelPricing {
     pub input_microusd_per_million: u64,
     pub output_microusd_per_million: u64,
+    pub cache_read_microusd_per_million: Option<u64>,
+    pub cache_write_microusd_per_million: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "cache::UsageEventWire")]
 pub struct UsageEvent {
     pub input_tokens: u64,
     pub output_tokens: u64,
     pub estimated_cost_microusd: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache: Option<CacheUsage>,
 }
 
 pub fn summarize_usage(entries: &[SignedEntry]) -> Result<UsageEvent, AppError> {
@@ -134,30 +142,44 @@ pub fn summarize_usage(entries: &[SignedEntry]) -> Result<UsageEvent, AppError> 
         input_tokens: 0,
         output_tokens: 0,
         estimated_cost_microusd: None,
+        cache: None,
     };
+    let mut first = true;
     for entry in entries
         .iter()
         .filter(|entry| entry.kind == irmind_domain::AuditEventKind::ModelUsage)
     {
         let usage: UsageEvent =
             serde_json::from_str(&entry.payload).map_err(|_| AppError::InvalidChain(entry.seq))?;
+        let invalid = || AppError::InvalidChain(entry.seq);
         total.input_tokens = total
             .input_tokens
             .checked_add(usage.input_tokens)
-            .ok_or(AppError::InvalidChain(entry.seq))?;
+            .ok_or_else(invalid)?;
         total.output_tokens = total
             .output_tokens
             .checked_add(usage.output_tokens)
-            .ok_or(AppError::InvalidChain(entry.seq))?;
-        if let Some(cost) = usage.estimated_cost_microusd {
-            total.estimated_cost_microusd = Some(
-                total
-                    .estimated_cost_microusd
-                    .unwrap_or(0)
-                    .checked_add(cost)
-                    .ok_or(AppError::InvalidChain(entry.seq))?,
-            );
-        }
+            .ok_or_else(invalid)?;
+        total.estimated_cost_microusd = if first {
+            usage.estimated_cost_microusd
+        } else {
+            total
+                .estimated_cost_microusd
+                .zip(usage.estimated_cost_microusd)
+                .map(|(a, b)| a.checked_add(b).ok_or_else(invalid))
+                .transpose()?
+        };
+        total.cache = if first {
+            usage.cache
+        } else {
+            total
+                .cache
+                .zip(usage.cache)
+                .map(|(a, b)| a.checked_add(b))
+                .transpose()
+                .map_err(|_| invalid())?
+        };
+        first = false;
     }
     Ok(total)
 }

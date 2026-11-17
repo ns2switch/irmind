@@ -12,6 +12,7 @@ fn malformed_usage_is_rejected_before_a_receipt_can_invalidate_the_case() {
         requests: std::sync::Mutex::default(),
         output: Some("Synthetic reply."),
         usage: Some(irmind_app::ModelUsage {
+            cache: None,
             input_tokens: u64::MAX,
             output_tokens: 1,
         }),
@@ -36,6 +37,8 @@ fn cumulative_cost_overflow_is_rejected_before_publishing_an_invalid_receipt() {
     let root = tempfile::tempdir().unwrap();
     let (store, engine) = setup(root.path());
     let engine = engine.with_pricing(irmind_app::ModelPricing {
+        cache_read_microusd_per_million: None,
+        cache_write_microusd_per_million: None,
         input_microusd_per_million: 1_000_000_000_000,
         output_microusd_per_million: 1_000_000_000_000,
     });
@@ -46,6 +49,10 @@ fn cumulative_cost_overflow_is_rejected_before_publishing_an_invalid_receipt() {
         requests: std::sync::Mutex::default(),
         output: Some("Synthetic reply."),
         usage: Some(irmind_app::ModelUsage {
+            cache: Some(
+                irmind_app::CacheUsage::new(0, 0, irmind_app::CacheWriteLifetime::NotApplicable)
+                    .unwrap(),
+            ),
             input_tokens: 8,
             output_tokens: 2,
         }),
@@ -57,6 +64,10 @@ fn cumulative_cost_overflow_is_rejected_before_publishing_an_invalid_receipt() {
         requests: std::sync::Mutex::default(),
         output: Some("Synthetic reply."),
         usage: Some(irmind_app::ModelUsage {
+            cache: Some(
+                irmind_app::CacheUsage::new(0, 0, irmind_app::CacheWriteLifetime::NotApplicable)
+                    .unwrap(),
+            ),
             input_tokens: 18_446_744_073_709,
             output_tokens: 0,
         }),

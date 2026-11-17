@@ -218,6 +218,7 @@ fn child_model(usage: bool) -> ChildModel {
     ChildModel {
         requests: std::sync::Mutex::new(vec![]),
         usage: usage.then_some(ModelUsage {
+            cache: None,
             input_tokens: 5,
             output_tokens: 2,
         }),
