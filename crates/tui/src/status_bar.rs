@@ -227,7 +227,7 @@ pub(crate) fn frame_data(view: &crate::case::CaseFrame<'_>) -> StatusData {
     data.insert(Activity, activity);
     data
 }
-fn model_labels(descriptor: &str) -> (String, Option<&'static str>) {
+pub(crate) fn model_labels(descriptor: &str) -> (String, Option<&'static str>) {
     if let Some((module, rest)) = descriptor
         .strip_prefix("module=")
         .and_then(|s| s.split_once(";model="))

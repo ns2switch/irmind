@@ -405,9 +405,6 @@ impl CaseRuntime<'_, '_, '_> {
         let shortcut = command_registry::shortcut_name(code, modifiers);
         if shortcut == Some("exit") {
             self.state.confirm_exit = crate::ExitConfirmation::Pending;
-            self.state
-                .messages
-                .push("Exit IRMind? Enter confirms; Esc cancels.".into());
             return Ok(Some(false));
         }
         if shortcut == Some("expand") {
@@ -429,9 +426,7 @@ impl CaseRuntime<'_, '_, '_> {
                 if let Some((cancel, _, _)) = &self.active {
                     cancel.cancel();
                 }
-                if self.io_ops.demo_mode() {
-                    self.shutdown.cancel();
-                }
+                self.shutdown.cancel();
                 true
             }
             KeyCode::Esc => {

@@ -211,7 +211,7 @@ impl CaseRuntime<'_, '_, '_> {
 
     fn active_overlay(&self) -> Result<Option<String>> {
         let overlay = if self.state.confirm_exit == crate::ExitConfirmation::Pending {
-            overlay_text(&self.state, self.engine)?
+            Some("Exit IRMind? Enter confirms; Esc cancels.".into())
         } else {
             self.subagents
                 .overlay()

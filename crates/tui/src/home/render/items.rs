@@ -289,18 +289,10 @@ pub(super) fn module_detail(
     } else {
         rows.push(format!("Feature: --features {}", module.id));
     }
-    if let Some(change) = &state.pending_module_change {
-        rows.push(format!("Confirm egress change: {}", change_summary(change)));
-        rows.push(format!(
-            "{} 1. Cancel   {} 2. Confirm and sign",
-            if state.selected_option == 0 { ">" } else { " " },
-            if state.selected_option == 1 { ">" } else { " " }
-        ));
-    }
     rows.iter().map(|row| safe(row)).collect()
 }
 
-fn change_summary(change: &irmind_app::ConfigChange) -> String {
+pub(super) fn change_summary(change: &irmind_app::ConfigChange) -> String {
     match change {
         irmind_app::ConfigChange::SelectLlm(id) => {
             format!("select LLM {}", id.as_deref().unwrap_or("none"))

@@ -27,6 +27,7 @@ fn tui_selects_fake_llm_and_completes_question_without_process_restart() {
     let io_ops = TestIo(
         store.clone(),
         irmind_infra::TomlConfigurationStore::new(root.path()),
+        None,
     );
     let terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     let mut tui = ScriptedWorkspace::new(terminal, &engine, None, &io_ops);
@@ -214,6 +215,7 @@ async fn tui_renders_while_a_local_port_is_slow() {
     let io_ops = TestIo(
         store,
         irmind_infra::TomlConfigurationStore::new(root.path()),
+        None,
     );
     let terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
     let mut tui = ScriptedWorkspace::new(terminal, &engine, Some(&model), &io_ops);
@@ -234,4 +236,55 @@ async fn tui_renders_while_a_local_port_is_slow() {
         tick < Duration::from_secs(1),
         "TUI render tick was blocked by local I/O"
     );
+}
+
+#[test]
+fn signed_mapped_rebuild_does_not_require_a_format_detector_for_its_decoder() {
+    let root = tempfile::tempdir().unwrap();
+    let store = Arc::new(current_sources::open(root.path()));
+    let signer = Arc::new(TestSigner(SigningKey::from_bytes(&[118u8; 32])));
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(
+                signer.clone(),
+                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            ),
+            Arc::new(MandatoryGuard::new().unwrap()),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )
+    .unwrap();
+    let mut io_ops = TestIo(
+        store,
+        irmind_infra::TomlConfigurationStore::new(root.path()),
+        None,
+    );
+    let terminal = Terminal::new(TestBackend::new(100, 32)).unwrap();
+    let tui = ScriptedWorkspace::new(terminal, &engine, None, &io_ops);
+    let id = tui
+        .create_case("Identified source", Severity::Medium, "local only")
+        .unwrap();
+    let source = root.path().join("synthetic.json");
+    std::fs::write(
+        &source,
+        br#"{"eventTime":"2026-10-23T10:10:00Z","eventName":"SyntheticLogin"}"#,
+    )
+    .unwrap();
+    assert_eq!(tui.ingest_path(&id, &source).unwrap(), 1);
+    drop(tui);
+    // Connector decoders belong to the signed mapping catalog, not automatic file detection.
+    io_ops.2 = Some(irmind_app::modules::ParserCatalog::default());
+    let terminal = Terminal::new(TestBackend::new(100, 32)).unwrap();
+    let tui = ScriptedWorkspace::new(terminal, &engine, None, &io_ops);
+    assert_eq!(
+        tui.verify_graph_with_source_root(&id, root.path()).unwrap(),
+        1
+    );
+    std::fs::write(&source, b"changed").unwrap();
+    assert!(tui.verify_graph_with_source_root(&id, root.path()).is_err());
 }

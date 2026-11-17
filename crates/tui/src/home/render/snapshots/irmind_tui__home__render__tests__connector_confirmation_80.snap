@@ -1,0 +1,27 @@
+---
+source: crates/tui/src/home/render/tests.rs
+expression: screen
+---
+╭Confirm remote connector change───────────────────────────────────────────────╮
+│Review the exact change and connector settings before signing.                │
+│                                                                              │
+│Exact change: set siem-elastic enabled=true                                   │
+│                                                                              │
+│Public field 0:                                                               │
+│xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx│
+│xxxxxxxxxxxxxxxxxxxxxx                                                        │
+│Public field 1:                                                               │
+│xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx│
+│xxxxxxxxxxxxxxxxxxxxxx                                                        │
+│Public field 2:                                                               │
+│xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx│
+│xxxxxxxxxxxxxxxxxxxxxx                                                        │
+│Public field 3:                                                               │
+│xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx│
+│xxxxxxxxxxxxxxxxxxxxxx                                                        │
+│Public field 4:                                                               │
+│xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx│
+│xxxxxxxxxxxxxxxxxxxxxx                                                        │
+│> 1. Cancel     2. Confirm and sign                                           │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯

@@ -4,6 +4,20 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Show an actionable notice when a provider completes without a visible answer,
+  while retaining its signed empty reply and reported usage.
+
+- Rebuild mapped evidence through its signed decoder/mapping profile in both CLI
+  and TUI; connector decoders do not need automatic file-format detectors.
+
+- Verify private originals retained by the case at their signed location instead
+  of requiring a second external duplicate of acquired connector responses. The
+  same signed source location is used when including originals in an export.
+  Missing, altered or unavailable retained originals still fail verification.
+
+- Confirmed Ctrl+C exits the application from an open case; canceling its modal
+  leaves the conversation unchanged. Evidence-picker help matches the actual keys.
+
 ## 0.5.2 — Signed case deletion and a configurable status bar
 
 **Format impact:** Case, artifact, seal and export versions are unchanged. Adds

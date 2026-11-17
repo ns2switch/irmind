@@ -396,3 +396,103 @@ fn parallel_batch_signs_sources_in_order_and_rejects_duplicate_source_bytes() {
     );
     assert_eq!(engine.verify(&case.id).unwrap(), 9);
 }
+
+#[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "One custody lifecycle covers retained copies, export, corruption, absence and cancellation."
+)]
+fn retained_original_is_verified_without_an_external_duplicate_and_has_no_fallback() {
+    let root = tempfile::tempdir().unwrap();
+    let source_root = root.path().join("inputs");
+    fs::create_dir(&source_root).unwrap();
+    let path = source_root.join("events.json");
+    let original = br#"{"eventTime":"2026-10-28T12:00:00Z","eventName":"SyntheticCapture"}"#;
+    fs::write(&path, original).unwrap();
+    let (store, engine) = source_fixture(root.path(), 72);
+    let case = engine
+        .create_case("Retained original", "local only")
+        .unwrap();
+    let parser = json_source_parser();
+    let use_cases = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &parser,
+    };
+    let hash = use_cases
+        .ingest_local(
+            &case.id,
+            &source_root,
+            "events.json",
+            true,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+    fs::remove_file(&path).unwrap();
+    let check = || {
+        use_cases
+            .verify_sources(
+                &case.id,
+                &source_root,
+                SourceCheckMode::Full,
+                &CancellationToken::new(),
+            )
+            .unwrap()
+    };
+    let report = check();
+    assert_eq!((report.checked, report.total, report.unchecked), (1, 1, 0));
+    assert!(report.missing_or_changed.is_empty());
+    engine.seal(&case.id).unwrap();
+    let export = root.path().join("retained-original.irmind");
+    irmind_app::export_case_with_originals(
+        &engine,
+        store.as_ref(),
+        &case.id,
+        &export,
+        Some(&source_root),
+        true,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    let exported = verify_export_details(&LocalExportVerifier, &export, None).unwrap();
+    assert_eq!(
+        (
+            exported.source_bytes_verified,
+            exported.source_bytes_unavailable
+        ),
+        (1, 0)
+    );
+    let retained = root
+        .path()
+        .join("parquet")
+        .join(case.id.as_str())
+        .join("originals")
+        .join(hash.as_str());
+    let mut altered = original.to_vec();
+    altered[10] ^= 1;
+    fs::write(&retained, altered).unwrap();
+    fs::write(&path, original).unwrap();
+    assert_eq!(check().missing_or_changed, vec![hash.as_str()]);
+    let failed_export = root.path().join("changed-retained-original.irmind");
+    assert!(
+        irmind_app::export_case_with_originals(
+            &engine,
+            store.as_ref(),
+            &case.id,
+            &failed_export,
+            Some(&source_root),
+            true,
+            &CancellationToken::new()
+        )
+        .is_err()
+    );
+    assert!(!failed_export.exists());
+    fs::remove_file(&retained).unwrap();
+    assert_eq!(check().missing_or_changed, vec![hash.as_str()]);
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    assert!(matches!(
+        use_cases.verify_sources(&case.id, &source_root, SourceCheckMode::Full, &cancel),
+        Err(AppError::Cancelled)
+    ));
+}

@@ -121,43 +121,12 @@ struct RootWorkspaceIo {
 }
 
 fn compiled_credential_fields() -> Vec<&'static str> {
-    let mut fields = Vec::new();
-    macro_rules! collect {
-        ($manifest:expr) => {
-            fields.extend(
-                $manifest
-                    .config
-                    .iter()
-                    .filter(|field| field.secret)
-                    .map(|field| field.name),
-            );
-        };
-    }
-    collect!(irmind_mod_llm_openai_compatible::MANIFEST);
-    #[cfg(feature = "llm-anthropic")]
-    collect!(irmind_mod_llm_anthropic::MANIFEST);
-    #[cfg(feature = "llm-deepseek")]
-    collect!(irmind_mod_llm_deepseek::MANIFEST);
-    #[cfg(feature = "llm-openrouter")]
-    collect!(irmind_mod_llm_openrouter::MANIFEST);
-    #[cfg(feature = "siem-splunk")]
-    collect!(irmind_mod_siem_splunk::MANIFEST);
-    #[cfg(feature = "cloud-aws")]
-    collect!(irmind_mod_cloud_aws::MANIFEST);
-    #[cfg(feature = "storage-s3")]
-    collect!(irmind_mod_storage_object::S3_MANIFEST);
-    #[cfg(feature = "storage-gcs")]
-    collect!(irmind_mod_storage_object::GCS_MANIFEST);
-    #[cfg(feature = "storage-azure")]
-    collect!(irmind_mod_storage_object::AZURE_MANIFEST);
-    #[cfg(feature = "edr-crowdstrike")]
-    collect!(irmind_mod_edr_crowdstrike::MANIFEST);
-    #[cfg(feature = "edr-sentinelone")]
-    collect!(irmind_mod_edr_sentinelone::MANIFEST);
-    #[cfg(feature = "ti-misp")]
-    collect!(irmind_mod_ti_misp::MANIFEST);
-    #[cfg(feature = "ti-virustotal")]
-    collect!(irmind_mod_ti_virustotal::MANIFEST);
+    let mut fields = configuration::compiled_manifests()
+        .into_iter()
+        .flat_map(|manifest| manifest.config.iter())
+        .filter(|field| field.secret)
+        .map(|field| field.name)
+        .collect::<Vec<_>>();
     fields.sort_unstable();
     fields.dedup();
     fields
@@ -511,4 +480,39 @@ fn main() -> Result<()> {
     });
     while !cancel.is_cancelled() && startup::run_once(&cancel)? {}
     Ok(())
+}
+
+#[cfg(test)]
+mod credential_fields_tests {
+    #[test]
+    fn every_compiled_secret_field_is_exposed_by_the_keystore_form() {
+        let expected = super::configuration::compiled_manifests()
+            .iter()
+            .flat_map(|manifest| manifest.config.iter())
+            .filter(|field| field.secret)
+            .map(|field| field.name)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            super::compiled_credential_fields()
+                .into_iter()
+                .collect::<std::collections::BTreeSet<_>>(),
+            expected
+        );
+    }
+    #[cfg(feature = "siem-elastic")]
+    #[test]
+    fn elastic_key_is_available_without_ambient_credentials() {
+        assert!(super::compiled_credential_fields().contains(&"IRMIND_ELASTIC_API_KEY"));
+    }
+    #[cfg(feature = "siem-chronicle")]
+    #[test]
+    fn chronicle_credentials_are_available_without_ambient_credentials() {
+        for field in irmind_mod_siem_chronicle::MANIFEST
+            .config
+            .iter()
+            .filter(|field| field.secret)
+        {
+            assert!(super::compiled_credential_fields().contains(&field.name));
+        }
+    }
 }

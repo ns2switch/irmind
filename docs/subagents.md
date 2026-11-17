@@ -72,8 +72,12 @@ Each child signs a separate branch with the Agent key. The case commits bounded
 checkpoints and merges results in deterministic task order. `/verify`, `/seal`
 and `/export` authenticate the branch material, approvals, reservations and
 terminal results. Export V8 includes the committed branches and catalog proofs
-needed for offline verification. Interrupted plans retain their signed work;
-reopening closes interrupted work without retrying remote effects.
+needed for offline verification. Normal cancellation finishes and joins active
+work. An abrupt process exit can leave a plan and reservations open. Reopening
+authenticates retained work; it does not automatically close the plan or replay
+remote effects. Preserve an interrupted case and its creating executable. If
+its plan still blocks work, re-ingest verified originals into a new case.
+Explicit recovery needs [interprocess coordination](https://github.com/ns2switch/irmind/pull/318).
 
 Version 0.5 uses case marker 4 and export V8. Keep the creating executable for
 older cases or re-ingest verified originals into a new case; opening a case does

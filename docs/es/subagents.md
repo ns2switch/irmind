@@ -73,7 +73,12 @@ Cada hijo firma una rama con la clave Agent. El caso registra checkpoints acotad
 y fusiona resultados en orden determinista de tareas. `/verify`, `/seal` y
 `/export` autentican ramas, aprobaciones, reservas y resultados terminales. Export
 V8 incluye las ramas y pruebas de catálogo necesarias para verificar sin conexión.
-Al reabrir, se conserva y cierra el trabajo interrumpido sin repetir efectos remotos.
+Una cancelación normal termina y une el trabajo activo. Un cierre brusco puede
+dejar un plan y sus reservas abiertos. Reabrir autentica el trabajo conservado;
+no cierra el plan automáticamente ni repite efectos remotos. Conserva el caso y
+su ejecutable creador. Si el plan impide continuar, reingiere los originales
+verificados en un caso nuevo. La recuperación explícita necesita
+[coordinación entre procesos](https://github.com/ns2switch/irmind/pull/318).
 
 La versión 0.5 usa marcador de caso 4 y export V8. Conserva el ejecutable creador
 para casos anteriores o reingiere originales verificados en un caso nuevo; abrir

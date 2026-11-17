@@ -368,6 +368,12 @@ where
         )?)
     }
 
+    pub fn verify_graph_with_source_root(&self, id: &CaseId, root: &Path) -> Result<usize> {
+        Ok(self
+            .workflow
+            .verify_parquet_rebuild(id, root, &CancellationToken::new())?)
+    }
+
     pub fn seal(&self, id: &CaseId) -> Result<()> {
         Ok(self.workflow.seal(id)?)
     }

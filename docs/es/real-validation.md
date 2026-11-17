@@ -2,18 +2,28 @@ Traducción de docs/development/real-validation.md en el commit 050c01156cc3c45f
 
 # Validación con servicios reales en unas dos horas
 
-Recorrido para el analista con IRMind v0.5.0 verificado, Elasticsearch local y un
+Recorrido para el analista con la versión preliminar verificada bajo prueba, Elasticsearch local y un
 modelo elegido explícitamente. Usa solo las muestras públicas de laboratorio
 fijadas; no se incorporan datasets al repositorio. Este recorrido puede aportar
 el resultado que falta para [#63](https://github.com/ns2switch/irmind/issues/63) y los
 pasos de H5 pendientes en [validación manual](manual-validation.md). No marques
 ningún paso como observado antes de ejecutarlo y registrar su resultado.
 
+Mantén el mismo ejecutable y auxiliar durante todo el recorrido. Recompilar un
+candidato de desarrollo o cambiar su lockfile puede cambiar las identidades de
+los mapeos nativos aunque el número de versión mostrado no cambie. Si cambias el
+build, empieza un caso nuevo; no omitas la comprobación de la identidad firmada.
+Conserva el ejecutable creador del caso. Usa `/expand` o Ctrl+O para leer la
+tarjeta completa de `/report`.
+
 ## 0–20 minutos: instalación y laboratorio desechable
 
 Verifica binario, auxiliar, checksums firmados y attestations con la
 [guía de plataformas](platforms.md). Anota versión, commit, sistema y terminal.
-Necesitas Docker Compose v2, Python 3.11+, unos 4 GB de RAM y 5 GB libres.
+Necesitas Docker Compose v2, Python 3.11+, unos 4 GB de RAM y al menos 5 GB
+libres. El laboratorio acotado usa umbrales absolutos de espacio libre: 2 GB
+para el umbral bajo, 1 GB para el alto y 512 MB para el de inundación. La
+protección de disco sigue activada.
 Desde el checkout revisado:
 
 ```sh
@@ -36,6 +46,24 @@ curl --cacert target/real-validation/ca.crt -u elastic https://localhost:9200
 curl pide la contraseña. Espera si el servicio aún está arrancando. Sin la CA la
 verificación debe fallar; no uses la opción que desactiva TLS. Registra ambos
 resultados y nunca desactives la comprobación de nombre de host.
+
+Algunas versiones de Docker no publican puertos de una red `internal: true`.
+Si `docker compose ... port es 9200` no muestra una asignación válida y la
+conexión a localhost se rechaza, conserva la red interna e inicia este
+reenviador opcional de desarrollo en otro terminal:
+
+```sh
+python3 tools/real-validation/port_forward.py
+```
+
+Solo escucha en `127.0.0.1:9200` y transmite bytes sin interpretarlos mediante
+el servicio Compose a su puerto de loopback. TLS, la comprobación de nombre,
+las credenciales y la CA se siguen verificando entre el cliente y Elasticsearch.
+El contenedor no obtiene salida a la red. El auxiliar rechaza un puerto ocupado,
+limita a ocho las conexiones concurrentes y a 60 segundos cada conexión.
+Detenlo con Ctrl+C al limpiar el laboratorio. Es una herramienta de desarrollo,
+no una parte de IRMind.
+
 
 ## 20–40 minutos: muestras fijadas y carga
 
@@ -84,17 +112,57 @@ En `/settings connectors`, configura Elastic:
 | API key | Solo en Llavero y credenciales de `/settings` |
 
 Compara la huella de la CA con SHA-256 calculado localmente y guarda la operación
-firmada. Una CA incorrecta debe fallar. `lab-evaluation` es una etiqueta explícita
-de selección del laboratorio, no una cuenta AWS. Crea un caso con fuente
+firmada. Guarda cada cambio y desbloquea de nuevo si la configuración pide
+reiniciar. Guarda la API key en el campo oculto de Elastic en Llavero y
+credenciales; después activa el conector revisando la confirmación numerada.
+PgUp/PgDn permite leer la propuesta completa, incluso con 80 columnas. Guardar
+la CA pública con el conector desactivado no exige una confirmación de salida;
+activarlo sí conserva la revisión habitual. Una CA incorrecta debe fallar. `lab-evaluation` es una etiqueta explícita
+de selección del laboratorio, no una cuenta AWS. Copia `policy.toml`
+al directorio desechable y conserva sus límites y permisos; en `[scope]` permite
+solo la fuente `elastic-lab`, la cuenta `lab-evaluation` y el intervalo observado
+de las muestras. Inicia con `--policy` apuntando a ese fichero: no añadas
+comodines ni cambies niveles de riesgo denegados. Crea un caso con fuente
 elastic-lab, cuenta lab-evaluation y una ventana de **un día del dataset cada vez**:
 el conector limita cada consulta a 24 horas. Revisa `/scope` y el techo de la
 organización; no lo amplíes para evitar un rechazo. Ingiere el EVTX original local
-con `/ingest`; si el autotest de aislamiento falla, no lo omitas. Conserva originales.
+con `/ingest`; si el autotest de aislamiento falla, no lo omitas. Conserva originales. El EVTX fijado contiene un FILETIME cero, que se muestra
+como 1601-01-01 junto a eventos de 2020: es una salvedad de calidad de la fuente,
+no un motivo para ampliar a 1601 las consultas remotas. Las muestras AWS cubren
+varios días de 2022 y el export de texto Windows es de 2021.
 
 En `/settings model`, selecciona proveedor y modelo, guarda su clave solo en el
 SecretBackend, revisa la confirmación de salida de datos y prueba la conexión sin
 datos del caso. Registra identificador exacto, revisión conocida, razonamiento y
 precios si se usan. No publiques claves ni rutas personales.
+
+Para el ensayo sin GPU, una instalación local de Ollama puede usar Qwen2.5-1.5B.
+Descarga el modelo explícitamente antes de aislar la red y anota versión y digest.
+Su [máximo nativo documentado](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)
+es de 8192 tokens. Ejemplo de `Modelfile.lab`:
+
+```text
+FROM qwen2.5:1.5b
+PARAMETER num_thread 4
+PARAMETER num_ctx 16384
+PARAMETER num_predict 8192
+```
+
+```sh
+ollama pull qwen2.5:1.5b
+ollama create lab-qwen --file Modelfile.lab
+ollama show lab-qwen --parameters
+```
+
+[Referencia oficial de Modelfile](https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx).
+Selecciona el perfil en la TUI, declara máximo nativo 8192 y parámetro opcional.
+El servidor debe escuchar solo en loopback. Cuatro hilos son una configuración
+reproducible de laboratorio, no un óptimo universal: demasiados hilos pueden
+agotar el plazo de la prueba. Dimensiona memoria, contexto y peticiones de hijos;
+un servidor que las serializa puede devolver resultados parciales por tiempo.
+No amplíes los plazos de seguridad de IRMind para ocultarlo. Una conexión correcta
+no demuestra calidad de investigación: los modelos pequeños pueden confundir
+Windows y AWS o inventar conclusiones. Revisa cada original antes de confirmar.
 
 ## 60–100 minutos: investigación, skill, plan y aprobación
 
@@ -122,6 +190,13 @@ para convertirlo en una prueba superada.
 
 ## 100–120 minutos: custodia y exportación
 
+Los originales locales no copiados se resuelven solo bajo el directorio elegido
+explícitamente. Las respuestas del conector retenidas en el caso se comprueban
+en su ubicación firmada, por tamaño y SHA-256: no necesitan otra copia externa
+ni repetir la consulta. Una copia retenida ausente o alterada falla sin recurrir
+a otro fichero.
+
+
 Ejecuta `/verify <directorio-origen>` y `/verify-graph <directorio-origen>`, revisa
 `/report`, hallazgos y tareas pendientes. Termina o cancela trabajo antes de
 `/seal`, confirma hash y huella exactos y usa `/export`, con originales si quieres.
@@ -137,6 +212,26 @@ publica solo un resumen saneado; actualiza H5 y #63 únicamente con lo observado
 Para limpiar, ejecuta docker compose con el mismo fichero y env-file, seguido de
 `down -v`. Borra contraseña, copia de API key, muestras y casos desechables cuando
 no sean necesarios; conserva el ejecutable creador de los casos que retengas.
+
+## Alcance del ensayo local
+
+El ensayo utilizó Elasticsearch con los datos fijados del laboratorio, su API key
+de solo lectura, verificación completa de la CA y Ollama con Qwen2.5-1.5B.
+Recorrió formularios reales de la TUI, ingesta local de EVTX, adquisición de un
+evento de Elastic, carga de una skill, verificación de originales, reconstrucción
+reproducible de Parquet, sello y verificación independiente del export. El paquete
+completo verificó los dos originales y rechazó otra clave esperada, sin abrir
+el directorio de datos ni el llavero. La corrección de export se registra en
+[97ac0b5b](https://github.com/ns2switch/irmind/commit/97ac0b5b).
+
+Las respuestas de investigación del modelo pequeño no fueron fiables; una petición
+posterior de plan terminó sin respuesta visible. Otro ensayo anterior produjo un
+plan firmado de dos hijos, con uno terminado y otro con error de petición.
+Son resultados parciales del modelo, no una investigación aprobada ni una
+validación del analista. No se confirmó ningún hallazgo sin respaldo. La tabla
+siguiente sigue reservada para tu modelo, entorno y observaciones: este ensayo
+no completa los pasos de H5 pendientes de registrar ni la validación del
+conector por el analista.
 
 ## Registro de resultados
 

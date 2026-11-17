@@ -23,22 +23,18 @@ impl LargeCaseUseCases<'_, '_> {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            let original = self.store.verify_local_source(source_root, &source, cancel);
-            if matches!(original, Err(AppError::Cancelled)) {
-                return Err(AppError::Cancelled);
-            }
-            if original.is_ok() && !source.source.contains("://") {
-                authorized.push(source.sha256.clone());
-            }
-            let copy = if source.copied {
+            let verified = if source.copied {
                 self.store.verify_copied_source(id, &source, cancel)
             } else {
-                Ok(())
+                self.store.verify_local_source(source_root, &source, cancel)
             };
-            if matches!(copy, Err(AppError::Cancelled)) {
+            if matches!(verified, Err(AppError::Cancelled)) {
                 return Err(AppError::Cancelled);
             }
-            if original.is_err() || copy.is_err() {
+            if verified.is_ok() && !source.copied && !source.source.contains("://") {
+                authorized.push(source.sha256.clone());
+            }
+            if verified.is_err() {
                 missing_or_changed.push(source.sha256.as_str().to_owned());
             }
         }

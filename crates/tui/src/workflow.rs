@@ -122,17 +122,10 @@ impl CaseWorkflow<'_, '_> {
             .large_case_store()
             .zip(self.io_ops.streaming_parser())
             .ok_or(AppError::Policy("large-case storage is unavailable".into()))?;
-        let router = self
-            .io_ops
-            .parser_catalog()
-            .map(|catalog| catalog.rebuild_router(&self.engine.audit_log.entries(id)?))
-            .transpose()?;
         LargeCaseUseCases {
             engine: self.engine,
             store,
-            parser: router.as_ref().map_or(parser, |router| {
-                router as &dyn irmind_app::StreamingEventParser
-            }),
+            parser,
         }
         .verify_parquet_rebuild(id, root, cancel)
     }

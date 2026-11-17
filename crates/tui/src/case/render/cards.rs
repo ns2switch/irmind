@@ -23,12 +23,9 @@ pub(super) fn audit_card(
         AuditEventKind::Proposal | AuditEventKind::ToolDispatch => {
             Some(call_card(entry, state, engine)?)
         }
-        AuditEventKind::FinalAnswer => Some(Card::new(
-            CardKind::Model,
-            "IRMind",
-            engine.guard.screen(&entry.payload)?.text,
-            true,
-        )),
+        AuditEventKind::FinalAnswer => {
+            Some(final_answer_card(engine.guard.screen(&entry.payload)?.text))
+        }
         AuditEventKind::NeedsApproval => return approval_card(entry, state, engine),
         AuditEventKind::ApprovalGranted | AuditEventKind::ApprovalDenied => {
             Some(decision_card(entry, state, engine)?)
@@ -66,6 +63,19 @@ pub(super) fn audit_card(
         _ => None,
     };
     Ok(card)
+}
+
+fn final_answer_card(text: String) -> Card {
+    if text.trim().is_empty() {
+        Card::new(
+            CardKind::Notice,
+            "",
+            "The model returned no visible answer. Retry or choose another model in /settings model.",
+            false,
+        )
+    } else {
+        Card::new(CardKind::Model, "IRMind", text, true)
+    }
 }
 
 fn skill_load_card(entry: &SignedEntry, engine: &Engine<'_>) -> Result<Card> {
@@ -362,8 +372,24 @@ fn highlight_match(excerpt: &str, args: &std::collections::BTreeMap<String, Stri
 
 #[cfg(test)]
 mod tests {
-    use super::{friendly_call, is_hidden_custody_payload};
+    use super::{final_answer_card, friendly_call, is_hidden_custody_payload};
     use irmind_app::AuditEventKind;
+
+    #[test]
+    fn empty_completed_response_has_an_actionable_eighty_column_notice() {
+        let mut conversation = crate::case::conversation::Conversation::new(false);
+        conversation.set_viewport(80, 24);
+        conversation.push(final_answer_card(" \n".into()));
+        let text = conversation
+            .visible_lines()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(text.contains("The model returned no visible answer"));
+        assert!(text.contains("/settings model"));
+        insta::assert_snapshot!("empty_provider_answer_80", text);
+    }
 
     #[test]
     fn proposal_title_names_the_tool_and_primary_argument() {

@@ -187,6 +187,12 @@ pub(super) fn confirm_pending_change(state: &mut HomeState, key: KeyCode) -> Hom
                 state.pending_module_change = None;
                 state.input.clear();
             }
+            KeyCode::PageUp => {
+                state.module_review_scroll = state.module_review_scroll.saturating_sub(5);
+            }
+            KeyCode::PageDown => {
+                state.module_review_scroll = state.module_review_scroll.saturating_add(5).min(1024);
+            }
             KeyCode::Up | KeyCode::Down => state.selected_option = 1 - state.selected_option,
             KeyCode::Char(ch) if !ch.is_control() && state.input.len() < 4 => state.input.push(ch),
             KeyCode::Backspace => {
