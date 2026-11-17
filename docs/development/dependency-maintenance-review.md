@@ -52,10 +52,9 @@ therefore stay pinned while their date dependencies are replaced explicitly.
    `arrow-array`, `arrow-schema`, `arrow-select` and `arrow-ord` **59.3.2** crates.
    Keep the same record batches, arrays, filtering, ordering and take kernels.
    This drops unrelated arithmetic/string kernels without removing a product tool.
-3. Vendor the published **`arrow-array 59.3.2`**, **`arrow-cast 59.3.2`** and
-   **`parquet 59.3.0`** sources and replace only their date implementation with
-   `time`. Their current Rust source totals **218 files / 6,796,051 bytes**,
-   before manifests/licenses. Package checksums are fixed in
+3. Vendor the published **`arrow-array 59.3.2`** and **`parquet 59.3.0`**
+   sources and replace their date implementation with `time`. The initially
+   considered `arrow-cast` patch is unnecessary after removing the umbrella. Package checksums are fixed in
    [date-dependency-sources.json](date-dependency-sources.json).
    Retain Apache notices, record every changed file, keep new code safe, and
    preserve existing upstream unsafe blocks unchanged. This is a maintained local

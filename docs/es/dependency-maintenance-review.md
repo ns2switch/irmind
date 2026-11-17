@@ -1,91 +1,62 @@
-Traducción de docs/development/dependency-maintenance-review.md en el commit a23a25e0d1ccd359f347cc057f8d8a143ddff2ff; si hay diferencias, prevalece la versión en inglés.
+<!-- Translation of docs/development/dependency-maintenance-review.md; source commit: 3a6bfca1 -->
+# Retirada de dependencias de fechas sin mantenimiento
 
-# Retirada de dependencias temporales sin mantenimiento
+La sustitución elimina `chrono` y `humantime` de los cuatro lockfiles: aplicación,
+fuzzing, auxiliar EVTX y fuzzing del auxiliar. La política de avisos no cambia:
+no hay excepciones nuevas en `deny.toml`. Las operaciones sencillas reutilizan los
+tipos UTC ya validados de IRMind; el resto usa primitivas mantenidas de `time`.
 
-La sustitución retira `chrono` y `humantime` de los cuatro grafos fijados de
-compilación, pruebas y fuzzing. La política de avisos no cambia y no hay ninguna
-excepción. Se usan los tipos UTC validados de IRMind cuando bastan y una biblioteca
-mantenida donde hacen falta calendarios o formatos generales.
+## Implementación
 
-## Primera parte implementada
+- TUI, AWS, Splunk, CrowdStrike y SentinelOne reutilizan los tipos UTC existentes.
+  Los filtros EDR comparan instantes exactos, con fracciones y offsets explícitos,
+  y rechazan offsets desconocidos y segundos intercalares.
+- `irmind-calendar` es una utilidad segura basada en `time =0.3.55`, con
+  `std`, `parsing`, `formatting`, `serde` y `large-dates`. Conserva los grupos
+  fraccionarios de 3/6/9 dígitos, los límites de fechas y los offsets fijos, sin
+  consultar la zona horaria del equipo ni una base de zonas IANA.
+- El paquete general `arrow` se sustituye por los componentes ya fijados
+  `arrow-array`, `arrow-schema`, `arrow-select` y `arrow-ord` 59.3.2. Al eliminarlo,
+  `arrow-cast` deja de ser necesario: no se distribuye un parche de ese crate.
+- Se incluyen las fuentes publicadas de `arrow-array` 59.3.2 y `parquet` 59.3.0,
+  con sustituciones de calendario. Cada directorio conserva las licencias Apache,
+  el hash del archivo publicado, los hashes originales y los del parche revisado.
+  Los 57 ficheros con código unsafe de upstream no cambian salvo los imports de
+  calendario y un espacio final en un comentario, comprobados en CI.
+- El parche existente de `object_store` 0.13.2 usa la utilidad de calendario y
+  Jiff 0.2.39 para las duraciones. Una tabla acotada mantiene los alias de unidades,
+  el significado fijo de meses y años y el rechazo de desbordamientos y pérdida
+  de precisión. El límite HTTP de metadatos de 8 MiB y el GET en streaming siguen
+  igual, con credenciales explícitas y verificación TLS completa. La alternativa
+  de credenciales ambientales de Azure CLI, no usada por IRMind, devuelve un error
+  claro sin ejecutar procesos ni interpretar fechas locales.
+- El auxiliar conserva `evtx` 0.15.1 oficial. El parche de `winstructs` 0.3.2 solo
+  retiene su código GUID, errores y licencia originales. No modifica la
+  decodificación EVTX, sus timestamps, protocolo ni aislamiento.
+- El test de respuestas grabadas de AWS usa un simulador HTTP en memoria que
+  comprueba las peticiones firmadas, sin la dependencia diagnóstica del SDK que
+  también arrastraba `chrono`. No añade dependencias de producción.
 
-- La TUI, la validación temporal del caso nuevo, AWS, Splunk, CrowdStrike y
-  SentinelOne reutilizan los tipos UTC del dominio. Se retiran cinco dependencias
-  directas de `chrono` sin añadir un crate sustituto. Los filtros EDR comparan
-  instantes exactos con nanosegundos y offsets explícitos; rechazan offsets
-  desconocidos y segundos intercalares.
-- El código oficial de `evtx 0.15.1` solo importa `winstructs::guid::Guid`.
-  Un parche de solo GUID conserva sin cambios el código de GUID, errores y
-  licencia; omite los módulos de timestamp, NTFS y seguridad que no se usan.
-  El SHA-256 del paquete verificado y sus ficheros están en
-  [el manifiesto de origen](../../helpers/evtx/vendor/winstructs/UPSTREAM.json).
-  No cambian el decodificador EVTX, sus instantes, protocolo ni aislamiento.
-- El lockfile de fuzzing del auxiliar ya no contiene ninguna de las dos
-  dependencias. Su grafo de desarrollo aún llega a `chrono` mediante Parquet y
-  Arrow; esa ruta se retira con el trabajo restante.
+## Por qué no basta con actualizar upstream
 
-Han pasado 159 tests de TUI y conectores, dos pruebas adicionales de límites
-exactos, 14 pruebas nativas Linux de protocolo, aislamiento y custodia EVTX y el
-contrato de lectura de GUID truncados. Clippy de TUI y conectores pasa con avisos
-como errores. No cambian los golden de formatos firmados ni de la TUI. Todavía
-no es la retirada completa ni una matriz de release en verde.
+Los avisos [RUSTSEC-2026-0543](https://github.com/RustSec/advisory-db/blob/main/crates/chrono/RUSTSEC-2026-0543.md)
+y [RUSTSEC-2026-0542](https://github.com/RustSec/advisory-db/blob/main/crates/humantime/RUSTSEC-2026-0542.md)
+indican falta de mantenimiento sin versión corregida. Arrow/Parquet 60.1.0 y
+`object_store` 0.14.2 todavía los requieren. Actualizarlos no resuelve la retirada.
+Los parches mantienen las versiones físicas actuales y son código local revisado,
+no versiones de upstream anunciadas como libres de esas dependencias.
 
-## Por qué no basta actualizar versiones upstream
+## Verificación
 
-| Dependencia | Aviso | Rutas de producción |
-| --- | --- | --- |
-| `chrono 0.4.45` | [RUSTSEC-2026-0543](https://github.com/RustSec/advisory-db/blob/main/crates/chrono/RUSTSEC-2026-0543.md) | Parsers, Arrow/Parquet, almacenamiento y los timestamps no usados de winstructs en el auxiliar original. |
-| `humantime 2.4.0` | [RUSTSEC-2026-0542](https://github.com/RustSec/advisory-db/blob/main/crates/humantime/RUSTSEC-2026-0542.md) | El almacenamiento object_store vendorizado. |
+El grafo principal pasa `cargo-deny` con su política intacta. Hay vectores
+sintéticos congelados para 756 combinaciones de fecha, fracción y offset, además
+de patrones de presentación. Los 21 tests de formatos actuales pasan sin cambiar
+los bytes esperados. La matriz nativa completa sigue siendo requisito de cierre.
 
-Ambos registros son `informational = "unmaintained"`, sin versión corregida.
-Arrow/Parquet 60.1.0 aún requieren `chrono`; object_store 0.14.2 requiere ambos.
-Actualizar esas versiones no cumple el objetivo. Se pueden mantener las versiones
-físicas actuales mientras se sustituye explícitamente su implementación temporal.
-
-## Propuesta concreta restante
-
-1. Usar **`time = 0.3.55`** directamente en los consumidores generales restantes.
-   Ya está en el lockfile principal mediante AWS y admite strftime. Features
-   propuestas: `std`, `parsing`, `formatting`, `serde` y `large-dates`, sin offset
-   local del equipo ni base de zonas. Mandan los límites de instantes de IRMind.
-2. Sustituir el crate paraguas de Arrow por los ya fijados `arrow-array`,
-   `arrow-schema`, `arrow-select` y `arrow-ord` **59.3.2**. Conservar arrays,
-   lotes, filtros, orden y kernels take. Se retiran kernels ajenos de aritmética
-   y cadenas; ninguna herramienta del producto desaparece.
-3. Vendorizar los paquetes publicados **arrow-array 59.3.2**, **arrow-cast 59.3.2**
-   y **parquet 59.3.0** y sustituir su implementación temporal por `time`. Su
-   código Rust actual ocupa **218 ficheros / 6.796.051 bytes**, sin manifiestos
-   ni licencias. Sus checksums están en
-   [date-dependency-sources.json](../development/date-dependency-sources.json).
-   Conservar avisos Apache, registrar los ficheros modificados, usar código nuevo
-   seguro y mantener intactos los bloques unsafe upstream existentes. Es un
-   parche local mantenido, no una release oficial de Arrow sin chrono.
-4. Ampliar el parche de **object_store 0.13.2** con `time` para fechas y
-   **`jiff = 0.2.39`** (solo `std`) para duraciones, retirando `humantime`. Jiff
-   y **jiff-core 0.1.2** ya se distribuyen en el grafo del auxiliar. Conservar
-   unidades admitidas y rechazo de overflow, sin inferir calendario ni zona local.
-   Mantener el límite HTTP de 8 MiB antes de parsear, streaming,
-   credenciales explícitas, TLS completo y firma canónica de peticiones.
-5. Aplicar las mismas fuentes a los cuatro workspaces. El parche GUID de
-   **winstructs 0.3.2** queda separado del decodificador oficial EVTX. No se
-   propone un fork de EVTX ni cambiar el aislamiento.
-
-Las nuevas dependencias directas y fuentes locales son otra elección de cadena
-de suministro. La parte de `time` y Arrow aún no está implementada. No concede
-permisos, no introduce credenciales ni cambia puertos de dominio o aplicación.
-
-## Condiciones para terminar
-
-- Ningún grafo o lockfile conserva ambos paquetes; cargo-deny pasa con la
-  política actual y sin supresión de avisos.
-- Fixtures diferenciales de offsets, bisiestos, fracciones hasta nanosegundos,
-  pre-epoch, límites de fecha, zonas inválidas y formatos declarados. Conservar
-  los instantes admitidos; rechazar límites explícitamente, sin recortar
-  precisión ni sustituir silenciosamente la zona por UTC.
-- Mantener bytes de frames, hashes Parquet, compromisos, procedencia, hashes,
-  rollback, alcance y vectores de exportación. Investigar diferencias, sin
-  regenerar un golden firmado para aceptarlas.
-- Repetir Linux, macOS, Windows, preserve_order, equivalencia de trabajadores y
-  aislamiento EVTX; comprobar hashes de fuentes retenidas.
-- Integrar después la caché, repetir sus tres mediciones scripted en release y
-  ejecutar la distribución firmada e instaladores limpios antes de v0.5.3.
+Los cuatro lockfiles deben seguir sin ambas dependencias. CI comprueba los
+hashes de 246 ficheros revisados y la conservación de los ficheros con unsafe.
+Se mantienen los golden físicos y canónicos, las firmas, procedencia, rollback,
+límites, alcance y exportación. Una diferencia de bytes se investiga; no se
+resuelve regenerando el golden firmado. Antes de publicar v0.5.3 se repiten las
+mediciones scripted de caché en release y las comprobaciones habituales de
+firmas, attestations, SBOM e instalación limpia.
