@@ -191,8 +191,14 @@ impl BudgetEditor {
                 lines.push("Input breakdown: unavailable".into());
             }
             lines.push(format!(
-                "Output {} · inclusive input {}",
-                used.output_tokens, used.input_tokens
+                "Reported output {} · inclusive input {}{}",
+                used.output_tokens,
+                used.input_tokens,
+                if used.provider_usage_available {
+                    ""
+                } else {
+                    " (partial)"
+                }
             ));
             lines.push(format!(
                 "Calls {} · reserved cloud bytes {}",
@@ -270,7 +276,10 @@ mod tests {
             form.text()
                 .contains("Input ordinary 100 · cache read 800 · write 100")
         );
-        assert!(form.text().contains("Output 50 · inclusive input 1000"));
+        assert!(
+            form.text()
+                .contains("Reported output 50 · inclusive input 1000")
+        );
         form.usage = Some(CaseBudgetUsage {
             cache_reporting_complete: false,
             ..usage

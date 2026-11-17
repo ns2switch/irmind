@@ -312,8 +312,9 @@ aislamiento del contenido no confiable.
 
 ## Mediciones release del primer incremento
 
-Tres repeticiones antes y después en el mismo runner reproducen los mismos
-valores. El observador usa el motor de producción y bytes JSON UTF-8 / 4,
+Tres repeticiones antes y después en el mismo runner conservan la cobertura de
+prefijo. Los totales de conversación y skill no cambian; el plan mixto varía
+en un token simulado. El observador usa el motor de producción y bytes JSON UTF-8 / 4,
 redondeando hacia arriba; no simula facturas ni llama a proveedores comerciales.
 Observa el puerto del motor antes de codificar para cada proveedor; no incluye
 el coste de sus marcadores ni su tokenización nativa.
@@ -322,7 +323,7 @@ el coste de sus marcadores ni su tokenización nativa.
 | --- | ---: | ---: | ---: |
 | Conversación de diez turnos | 10 | 73.445 / 73.445 | 33.408 (45,49 %) |
 | Investigación con skill, 15 rondas | 15 | 126.382 / 126.382 | 107.776 (85,28 %) |
-| Tres subagentes | 11 | 48.655 / 48.655 | 29.056 (59,72 %) |
+| Tres subagentes | 11 | 48.655 / 48.655–48.656 | 29.056 (59,72 %) |
 
 Este incremento añade marcadores nativos de Anthropic y contadores del proveedor;
 no reduce el contexto enviado. Los proveedores automáticos podrían estar
@@ -331,3 +332,8 @@ siguen sin medir hasta una evaluación explícita del analista.
 [Mediciones](../development/context-cost-data/cache-phase1-measurements.json) y
 [vector de liquidación del hijo](../development/context-cost-data/child-cache-settlement.json),
 cubiertos por el fichero de checksums.
+
+En la tercera repetición integrada del plan mixto, una sustitución del guard
+sobre un identificador sintético añade cuatro bytes a una petición de un hijo
+(un token simulado). Es variación observada, no ahorro de caché. Se mantienen
+el guard y los nonces por turno.

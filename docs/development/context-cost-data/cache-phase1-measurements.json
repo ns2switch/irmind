@@ -1,8 +1,8 @@
 {
   "after": [
     {
-      "engine_commit": "8a3d3de5accb217caf1f46ca4e349d0427323490",
-      "measurement_sha256": "577030fafe10eee6e5f2d81c682c00117fcde451c7e17c49393a194109977c68",
+      "engine_commit": "596f1690286c95868a849424ecf96705c3b6e2ea",
+      "measurement_sha256": "cf2feb25d8c0e474557e6b0dfe5aefb95fb3fd16447de92dbedc5741b8de199b",
       "scenarios": {
         "conversation_10_turns": {
           "cache_read_ceiling_sim": 33408,
@@ -25,8 +25,8 @@
       }
     },
     {
-      "engine_commit": "8a3d3de5accb217caf1f46ca4e349d0427323490",
-      "measurement_sha256": "577030fafe10eee6e5f2d81c682c00117fcde451c7e17c49393a194109977c68",
+      "engine_commit": "596f1690286c95868a849424ecf96705c3b6e2ea",
+      "measurement_sha256": "4c9e12478cd4227334a681d29b743c88089ec8fd62fda454de07ba3069701fca",
       "scenarios": {
         "conversation_10_turns": {
           "cache_read_ceiling_sim": 33408,
@@ -49,8 +49,8 @@
       }
     },
     {
-      "engine_commit": "8a3d3de5accb217caf1f46ca4e349d0427323490",
-      "measurement_sha256": "577030fafe10eee6e5f2d81c682c00117fcde451c7e17c49393a194109977c68",
+      "engine_commit": "596f1690286c95868a849424ecf96705c3b6e2ea",
+      "measurement_sha256": "fa66f7a29c559cde4bb73af383953f1d69b1a7ac2359ab5a4f2b2954b8ceaa0f",
       "scenarios": {
         "conversation_10_turns": {
           "cache_read_ceiling_sim": 33408,
@@ -66,7 +66,7 @@
         },
         "three_subagents": {
           "cache_read_ceiling_sim": 29056,
-          "input_tokens_sim": 48655,
+          "input_tokens_sim": 48656,
           "model_requests": 11,
           "output_tokens_sim": 163
         }
@@ -153,5 +153,6 @@
   "provider_calls": 0,
   "provider_cost_usd": 0,
   "repetitions": 3,
-  "simulation_only": true
+  "simulation_only": true,
+  "variation_note": "One existing guard redaction of a synthetic finding identifier adds four serialized bytes to one child request in the third integrated repeat (one simulated token); guard and nonce rules are unchanged."
 }
