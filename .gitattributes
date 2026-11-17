@@ -34,8 +34,5 @@ docs/development/skills-format-vectors/** text eol=lf
 # Retained upstream license bytes are covered by the GUID source manifest.
 helpers/evtx/vendor/winstructs/LICENSE text eol=lf
 
-# Published dependency licenses/notices are covered by source manifests.
-vendor/**/LICENSE.txt text eol=lf
-vendor/**/NOTICE.txt text eol=lf
-vendor/**/Cargo.toml.orig text eol=lf
-vendor/**/src/**/*.txt text eol=lf
+# Preserve the exact reviewed third-party bytes on every platform, including scripts.
+vendor/** -text

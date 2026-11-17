@@ -21,8 +21,9 @@ tipos UTC ya validados de IRMind; el resto usa primitivas mantenidas de `time`.
 - Se incluyen las fuentes publicadas de `arrow-array` 59.3.2 y `parquet` 59.3.0,
   con sustituciones de calendario. Cada directorio conserva las licencias Apache,
   el hash del archivo publicado, los hashes originales y los del parche revisado.
-  Los 57 ficheros con código unsafe de upstream no cambian salvo los imports de
-  calendario y un espacio final en un comentario, comprobados en CI.
+  CI verifica los 57 ficheros con código unsafe de upstream, revirtiendo
+  únicamente cambios exactos documentados: imports, mensajes seguros de límites
+  y un espacio de un comentario. Los bloques unsafe se conservan.
 - El parche existente de `object_store` 0.13.2 usa la utilidad de calendario y
   Jiff 0.2.39 para las duraciones. Una tabla acotada mantiene los alias de unidades,
   el significado fijo de meses y años y el rechazo de desbordamientos y pérdida
@@ -60,3 +61,19 @@ límites, alcance y exportación. Una diferencia de bytes se investiga; no se
 resuelve regenerando el golden firmado. Antes de publicar v0.5.3 se repiten las
 mediciones scripted de caché en release y las comprobaciones habituales de
 firmas, attestations, SBOM e instalación limpia.
+
+
+## Portabilidad y diagnósticos de límites
+
+Los ficheros vendorizados conservan sus bytes exactos al hacer checkout, incluidos
+los scripts Python originales, y se leen explícitamente como UTF-8. Una prueba
+con checkout CRLF y la CI nativa comprueban los mismos hashes. Las pruebas
+negativas siguen rechazando cambios de hashes revisados o de código unsafe.
+
+Siete accesores de arrays mantienen sus condiciones de límites y usan un mensaje
+constante para no incluir índices, longitudes ni prefijos de tipos en el error.
+Los tests ejercitan lecturas válidas y rechazadas en las siete familias. Se
+actualizan también las expectativas de los mensajes de los tests originales.
+Los cambios seguros exactos quedan registrados por separado para que CI pueda
+reconstruir el fichero original completo y rechace cualquier otro cambio. No se
+necesitan exclusiones de consultas o rutas ni excepciones de avisos.

@@ -33,8 +33,11 @@ def main():
             reviewed += 1
         for relative, expected in manifest['upstream_unsafe_source_sha256'].items():
             source = (base / relative).read_text(encoding="utf-8").replace('irmind_calendar::', 'chrono::')
-            for new, old in manifest.get('upstream_doc_whitespace_restoration', {}).get(relative, []):
-                source = source.replace(new, old)
+            for kind in ('upstream_doc_whitespace_restoration', 'upstream_safe_diagnostic_restorations'):
+                for new, old in manifest.get(kind, {}).get(relative, []):
+                    if source.count(new) != 1:
+                        raise SystemExit(f'{name}/{relative}: reviewed source restoration differs')
+                    source = source.replace(new, old)
             if digest(source.encode()) != expected:
                 raise SystemExit(f'{name}/{relative}: upstream unsafe-bearing source changed')
             unsafe_sources += 1

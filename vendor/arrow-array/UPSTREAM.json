@@ -1,7 +1,13 @@
 {
   "changed_files": [
     "Cargo.toml",
+    "src/array/boolean_array.rs",
+    "src/array/byte_array.rs",
+    "src/array/byte_view_array.rs",
+    "src/array/dictionary_array.rs",
+    "src/array/fixed_size_binary_array.rs",
     "src/array/primitive_array.rs",
+    "src/array/run_array.rs",
     "src/builder/generic_bytes_view_builder.rs",
     "src/delta.rs",
     "src/lib.rs",
@@ -18,19 +24,19 @@
     "NOTICE.txt": "e5b198d7f809311723889814d99a92f808c69e89a847efa7a7b65270f5fdeae6",
     "src/arithmetic.rs": "6428b04aa7760e8c0159eb240664d1c67f46b6812677e67eea7795c4fe73c096",
     "src/array/binary_array.rs": "1cd6a922eea536bb3d62123c9e775fcf20282330ea49d19b28baf131b7f36f3a",
-    "src/array/boolean_array.rs": "ab1e3f800175cae7f7017b526fb7745178911d024e2fd0dc55dcba26e0201300",
-    "src/array/byte_array.rs": "a249351e2567b290985a2e0191aba5ac81c7c6d4ac6bf3cbfe73f7444b812296",
-    "src/array/byte_view_array.rs": "96e300b7161d6236c4d57e0d01c85329b1aaeef4a9eb352999a5f513f61c8c07",
-    "src/array/dictionary_array.rs": "04affef07917aa8f536f637fe3e8f4df6c6c483fd7c1ce25e648377feb3a1a3a",
-    "src/array/fixed_size_binary_array.rs": "9087272fbceec223b87533e9ce9a0888964fa05662ea357464522f075ef09ca8",
+    "src/array/boolean_array.rs": "b9508542b682dbd249c514427e988f939e70405c0d29ad964e1e56355930f566",
+    "src/array/byte_array.rs": "32f3f2a964f51909b2c3b1325cb0a5a736d8fd92fb4d4222cfcbef7a174217b6",
+    "src/array/byte_view_array.rs": "9e6479abf505d98f96f2688128d5b5a758f7f3a84e4ef8440a14d84c5dd62ad4",
+    "src/array/dictionary_array.rs": "13b59959b60c854bb200e82a6adf2562fd488e8da33bc62be4524468005e2a96",
+    "src/array/fixed_size_binary_array.rs": "8372758937d848081056e552e9c86d8c34fdd095570c05cbfd04e1e8f796c8ca",
     "src/array/fixed_size_list_array.rs": "b382ca72d89c5a263c668702ba8966b8ff83519958927ff4cfa01a21e48cac6f",
     "src/array/list_array.rs": "227969f2691c562adba8940a75cc152b71a78458d0f9d70c2d72aa8706e5371e",
     "src/array/list_view_array.rs": "8f14c00e18089b1691446b0e8bc6fd4b96ae107cceb7de5fceb3a93972255dfd",
     "src/array/map_array.rs": "f922d17630237af71cdda2efccbd74c614fa438db97475b3b944daf7d076f109",
     "src/array/mod.rs": "64308d3f7ca0271d57cff5c407323a6315374bba8542b7dbf98392979539b83b",
     "src/array/null_array.rs": "43765935e2b5ef4239aae75f99386f7728eec8b3ea8d6d67848ad0c76cf1e3cf",
-    "src/array/primitive_array.rs": "7dde052b3d7f8cfef642adecde6a432dd640c85f4b31155185d4ea880f0bcbf7",
-    "src/array/run_array.rs": "ff91da6303147394cc2ed61c8c114563b42e8633ae26a865d22a6ad93531044a",
+    "src/array/primitive_array.rs": "13a5a97b3bb8e7146083b063233d67554acf90396a4a7e20729fb39eebcff55f",
+    "src/array/run_array.rs": "bd31a39d7268e8271ea77c2b245b0091ebf6633e316777c20e5cbea2a1f35ea9",
     "src/array/string_array.rs": "275aa7cbffa60089bb47c278691d89e405524210beee8bfb7de74c2805be1dcc",
     "src/array/struct_array.rs": "024ac1674ad6b948a9a5491c243fa0570664aede14d65607654b4fac7c7a9098",
     "src/array/union_array.rs": "31eea58f59009c2b9ecd4a012f87f17868cee9a76e4f4d28033bd139e3818c5e",
@@ -134,6 +140,66 @@
     "src/timezone.rs": "e1804a8bf351b48bf55018627076755fab1c836c364e951fa7fe0d349fcc2cf5",
     "src/trusted_len.rs": "38345d50859a7fadc406f12f521c7a20252454bef60a2682a731d04d0d698813",
     "src/types.rs": "0410e95297da4d0b02be3eb63499c851d5057e593b50c48af67f5f396b86155d"
+  },
+  "upstream_safe_diagnostic_restorations": {
+    "src/array/boolean_array.rs": [
+      [
+        "assert!(i < self.len(), \"Arrow array index out of bounds\");",
+        "assert!(\n            i < self.len(),\n            \"Trying to access an element at index {} from a BooleanArray of length {}\",\n            i,\n            self.len()\n        );"
+      ],
+      [
+        "#[should_panic(\n        expected = \"Arrow array index out of bounds\"\n    )]\n    fn test_fixed_size_binary_array_get_value_index_out_of_bound",
+        "#[should_panic(\n        expected = \"Trying to access an element at index 4 from a BooleanArray of length 3\"\n    )]\n    fn test_fixed_size_binary_array_get_value_index_out_of_bound"
+      ]
+    ],
+    "src/array/byte_array.rs": [
+      [
+        "assert!(i < self.len(), \"Arrow array index out of bounds\");",
+        "assert!(\n            i < self.len(),\n            \"Trying to access an element at index {} from a {}{}Array of length {}\",\n            i,\n            T::Offset::PREFIX,\n            T::PREFIX,\n            self.len()\n        );"
+      ]
+    ],
+    "src/array/byte_view_array.rs": [
+      [
+        "assert!(i < self.len(), \"Arrow array index out of bounds\");",
+        "assert!(\n            i < self.len(),\n            \"Trying to access an element at index {} from a {}ViewArray of length {}\",\n            i,\n            T::PREFIX,\n            self.len()\n        );"
+      ]
+    ],
+    "src/array/dictionary_array.rs": [
+      [
+        "assert!(index < self.len(), \"Arrow array index out of bounds\");",
+        "assert!(\n            index < self.len(),\n            \"Trying to access an element at index {} from a TypedDictionaryArray of length {}\",\n            index,\n            self.len()\n        );"
+      ]
+    ],
+    "src/array/fixed_size_binary_array.rs": [
+      [
+        "assert!(i < len, \"Arrow array index out of bounds\");",
+        "assert!(\n            i < len,\n            \"Trying to access an element at index {i} from a FixedSizeBinaryArray of length {len}\",\n        );"
+      ],
+      [
+        "#[should_panic(\n        expected = \"Arrow array index out of bounds\"\n    )]\n    fn test_fixed_size_binary_array_get_value_index_out_of_bound",
+        "#[should_panic(\n        expected = \"Trying to access an element at index 4 from a FixedSizeBinaryArray of length 3\"\n    )]\n    fn test_fixed_size_binary_array_get_value_index_out_of_bound"
+      ]
+    ],
+    "src/array/primitive_array.rs": [
+      [
+        "assert!(i < self.len(), \"Arrow array index out of bounds\");",
+        "assert!(\n            i < self.len(),\n            \"Trying to access an element at index {} from a PrimitiveArray of length {}\",\n            i,\n            self.len()\n        );"
+      ],
+      [
+        "#[should_panic(\n        expected = \"Arrow array index out of bounds\"\n    )]\n    fn test_fixed_size_binary_array_get_value_index_out_of_bound",
+        "#[should_panic(\n        expected = \"Trying to access an element at index 4 from a PrimitiveArray of length 3\"\n    )]\n    fn test_fixed_size_binary_array_get_value_index_out_of_bound"
+      ],
+      [
+        "#[should_panic(\n        expected = \"Arrow array index out of bounds\"\n    )]\n    fn test_string_array_get_value_index_out_of_bound",
+        "#[should_panic(\n        expected = \"Trying to access an element at index 4 from a PrimitiveArray of length 3\"\n    )]\n    fn test_string_array_get_value_index_out_of_bound"
+      ]
+    ],
+    "src/array/run_array.rs": [
+      [
+        "assert!(logical_index < self.len(), \"Arrow array index out of bounds\");",
+        "assert!(\n            logical_index < self.len(),\n            \"Trying to access an element at index {} from a TypedRunArray of length {}\",\n            logical_index,\n            self.len()\n        );"
+      ]
+    ]
   },
   "upstream_unsafe_source_sha256": {
     "src/arithmetic.rs": "6428b04aa7760e8c0159eb240664d1c67f46b6812677e67eea7795c4fe73c096",

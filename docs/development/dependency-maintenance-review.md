@@ -100,3 +100,19 @@ and distribution validation remain completion gates.
 - Reintegrate cache accounting only after dependency removal, repeat its three
   release-mode scripted measurements, then run the normal signed distribution and
   clean-install checks before publishing v0.5.3.
+
+
+## Portable source checks and bounds diagnostics
+
+Reviewed vendor files retain their exact bytes on every checkout, including
+upstream Python scripts; UTF-8 reads do not depend on the host locale. A CRLF
+checkout rehearsal and native CI check the same source hashes. Negative tests
+reject both changed reviewed hashes and changes inside upstream unsafe code.
+
+Seven array accessor bounds checks retain their original conditions and use a
+constant error message. This keeps indices, lengths and type prefixes out of
+panic diagnostics. Shared API tests cover valid and rejected reads for all seven
+array families; the corresponding upstream panic-message expectations are
+updated. Exact safe replacements are recorded separately, allowing CI to
+reconstruct and hash the original unsafe-bearing source files without permitting
+other edits. Query/path exclusions and advisory exceptions are not required.

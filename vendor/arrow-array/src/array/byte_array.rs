@@ -340,14 +340,7 @@ impl<T: ByteArrayType> GenericByteArray<T> {
     /// # Panics
     /// Panics if index `i` is out of bounds.
     pub fn value(&self, i: usize) -> &T::Native {
-        assert!(
-            i < self.len(),
-            "Trying to access an element at index {} from a {}{}Array of length {}",
-            i,
-            T::Offset::PREFIX,
-            T::PREFIX,
-            self.len()
-        );
+        assert!(i < self.len(), "Arrow array index out of bounds");
         // SAFETY:
         // Verified length above
         unsafe { self.value_unchecked(i) }

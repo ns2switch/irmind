@@ -947,12 +947,7 @@ where
     type Item = <&'a V as ArrayAccessor>::Item;
 
     fn value(&self, index: usize) -> Self::Item {
-        assert!(
-            index < self.len(),
-            "Trying to access an element at index {} from a TypedDictionaryArray of length {}",
-            index,
-            self.len()
-        );
+        assert!(index < self.len(), "Arrow array index out of bounds");
         unsafe { self.value_unchecked(index) }
     }
 

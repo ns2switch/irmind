@@ -242,12 +242,7 @@ impl BooleanArray {
     /// # Panics
     /// Panics if index `i` is out of bounds
     pub fn value(&self, i: usize) -> bool {
-        assert!(
-            i < self.len(),
-            "Trying to access an element at index {} from a BooleanArray of length {}",
-            i,
-            self.len()
-        );
+        assert!(i < self.len(), "Arrow array index out of bounds");
         // Safety:
         // `i < self.len()
         unsafe { self.value_unchecked(i) }
@@ -1117,7 +1112,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "Trying to access an element at index 4 from a BooleanArray of length 3"
+        expected = "Arrow array index out of bounds"
     )]
     fn test_fixed_size_binary_array_get_value_index_out_of_bound() {
         let v = vec![Some(true), None, Some(false)];

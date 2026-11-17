@@ -759,12 +759,7 @@ where
     type Item = <&'a V as ArrayAccessor>::Item;
 
     fn value(&self, logical_index: usize) -> Self::Item {
-        assert!(
-            logical_index < self.len(),
-            "Trying to access an element at index {} from a TypedRunArray of length {}",
-            logical_index,
-            self.len()
-        );
+        assert!(logical_index < self.len(), "Arrow array index out of bounds");
         unsafe { self.value_unchecked(logical_index) }
     }
 

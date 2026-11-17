@@ -30,6 +30,32 @@ class DateSourceChecks(unittest.TestCase):
                 with self.assertRaisesRegex(SystemExit, 'reviewed source hash differs'):
                     MODULE.main()
 
+    def test_unsafe_source_changes_are_still_rejected(self):
+        read_text = Path.read_text
+        target = MODULE.ROOT / 'vendor/arrow-array/src/array/boolean_array.rs'
+        def changed(path, *args, **kwargs):
+            source = read_text(path, *args, **kwargs)
+            if path == target:
+                source = source.replace('unsafe { self.values.value_unchecked(i) }',
+                                        'unsafe { self.values.value_unchecked(0) }', 1)
+            return source
+        with patch.object(Path, 'read_text', new=changed):
+            with self.assertRaisesRegex(SystemExit, 'upstream unsafe-bearing source changed'):
+                MODULE.main()
+
+    def test_reviewed_vendor_files_disable_checkout_conversion(self):
+        paths = []
+        for name in ('arrow-array', 'parquet'):
+            manifest = MODULE.json.loads((MODULE.ROOT / 'vendor' / name / 'UPSTREAM.json').read_text(encoding='utf-8'))
+            paths.extend(f'vendor/{name}/{p}' for p in manifest['reviewed_file_sha256'])
+        result = subprocess.run(['git', 'check-attr', '-z', '--stdin', 'text'],
+                                input=('\0'.join(paths) + '\0').encode(),
+                                cwd=MODULE.ROOT, capture_output=True, check=True)
+        fields = result.stdout.decode('utf-8').split('\0')
+        self.assertEqual(len(fields), len(paths) * 3 + 1)
+        for path, attribute, state in zip(fields[0:-1:3], fields[1:-1:3], fields[2:-1:3]):
+            self.assertEqual((attribute, state), ('text', 'unset'), path)
+
 
 if __name__ == '__main__':
     unittest.main()

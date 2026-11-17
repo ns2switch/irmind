@@ -788,12 +788,7 @@ impl<T: ArrowPrimitiveType> PrimitiveArray<T> {
     /// Panics if index `i` is out of bounds
     #[inline]
     pub fn value(&self, i: usize) -> T::Native {
-        assert!(
-            i < self.len(),
-            "Trying to access an element at index {} from a PrimitiveArray of length {}",
-            i,
-            self.len()
-        );
+        assert!(i < self.len(), "Arrow array index out of bounds");
         unsafe { self.value_unchecked(i) }
     }
 
@@ -2417,7 +2412,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "Trying to access an element at index 4 from a PrimitiveArray of length 3"
+        expected = "Arrow array index out of bounds"
     )]
     fn test_string_array_get_value_index_out_of_bound() {
         let array: Int8Array = [10_i8, 11, 12].into_iter().collect();
@@ -2822,7 +2817,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "Trying to access an element at index 4 from a PrimitiveArray of length 3"
+        expected = "Arrow array index out of bounds"
     )]
     fn test_fixed_size_binary_array_get_value_index_out_of_bound() {
         let array = Decimal128Array::from(vec![-100, 0, 101]);

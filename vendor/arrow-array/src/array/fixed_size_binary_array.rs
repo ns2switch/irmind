@@ -275,10 +275,7 @@ impl FixedSizeBinaryArray {
     /// Panics if index `i` is out of bounds.
     pub fn value(&self, i: usize) -> &[u8] {
         let len = self.len();
-        assert!(
-            i < len,
-            "Trying to access an element at index {i} from a FixedSizeBinaryArray of length {len}",
-        );
+        assert!(i < len, "Arrow array index out of bounds");
         let position = i * self.value_size;
         unsafe {
             std::slice::from_raw_parts(self.value_data.as_ptr().add(position), self.value_size)
@@ -1166,7 +1163,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "Trying to access an element at index 4 from a FixedSizeBinaryArray of length 3"
+        expected = "Arrow array index out of bounds"
     )]
     fn test_fixed_size_binary_array_get_value_index_out_of_bound() {
         let values = vec![Some("one".as_bytes()), Some(b"two"), None];
