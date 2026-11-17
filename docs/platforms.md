@@ -85,9 +85,9 @@ brew upgrade ns2switch/irmind/irmind
 brew uninstall ns2switch/irmind/irmind
 ```
 
-No source build is needed. The updater authenticates the release's `SHA256SUMS` with its exact Sigstore tag/workflow identity before fixing each asset hash in the formula. Homebrew verifies those hashes during installation. Inspect the formula before granting trust; recent Homebrew may ask for `brew trust --formula ns2switch/irmind/irmind`.
+No source build is needed. The updater authenticates the release's `SHA256SUMS` with its exact Sigstore tag/workflow identity before fixing each asset hash in the formula. Homebrew verifies those hashes during installation. Inspect the formula before granting trust; recent Homebrew may request explicit formula trust as described in the [tap instructions](https://github.com/ns2switch/homebrew-irmind#trust-and-verification).
 
-The tap checks `brew audit --strict`, `brew test`, real demo startup at 80×24, installed bytes and uninstall on clean macOS arm64, macOS Intel and Linux runners. Its macOS test checks quarantine **without removing it** and records command execution. This is not Apple signing or notarization and does not certify every local Gatekeeper policy. Keep the exact creating executable and helper outside Homebrew before upgrading a case; old kegs may be removed by Homebrew cleanup.
+The tap checks `brew audit` in strict mode, `brew test`, real demo startup at 80×24, installed bytes and uninstall on clean macOS arm64, macOS Intel and Linux runners. Its macOS test checks quarantine **without removing it** and records command execution. This is not Apple signing or notarization and does not certify every local Gatekeeper policy. Keep the exact creating executable and helper outside Homebrew before upgrading a case; old kegs may be removed by Homebrew cleanup.
 
 ## Linux
 

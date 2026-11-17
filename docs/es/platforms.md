@@ -88,9 +88,9 @@ brew upgrade ns2switch/irmind/irmind
 brew uninstall ns2switch/irmind/irmind
 ```
 
-No compila IRMind. El actualizador autentica `SHA256SUMS` con la identidad Sigstore exacta del workflow y tag antes de fijar los hashes de los assets. Homebrew comprueba esos hashes al instalar. Revisa la fórmula antes de confiar en ella; las versiones recientes pueden pedir `brew trust --formula ns2switch/irmind/irmind`.
+No compila IRMind. El actualizador autentica `SHA256SUMS` con la identidad Sigstore exacta del workflow y tag antes de fijar los hashes de los assets. Homebrew comprueba esos hashes al instalar. Revisa la fórmula antes de confiar en ella; las versiones recientes pueden pedir confianza explícita en la fórmula; sigue las [instrucciones del tap](https://github.com/ns2switch/homebrew-irmind/blob/main/README.es.md).
 
-El tap ejecuta `brew audit --strict`, `brew test`, inicio real de la demo en 80×24, comprobación de bytes y desinstalación en runners limpios macOS arm64, macOS Intel y Linux. En macOS comprueba cuarentena **sin retirarla** y registra la ejecución. No equivale a firma ni notarización de Apple ni certifica toda política local de Gatekeeper. Conserva fuera de Homebrew el ejecutable y auxiliar que crearon un caso antes de actualizar: la limpieza de Homebrew puede borrar versiones anteriores.
+El tap ejecuta `brew audit` en modo estricto, `brew test`, inicio real de la demo en 80×24, comprobación de bytes y desinstalación en runners limpios macOS arm64, macOS Intel y Linux. En macOS comprueba cuarentena **sin retirarla** y registra la ejecución. No equivale a firma ni notarización de Apple ni certifica toda política local de Gatekeeper. Conserva fuera de Homebrew el ejecutable y auxiliar que crearon un caso antes de actualizar: la limpieza de Homebrew puede borrar versiones anteriores.
 
 ## Linux
 
