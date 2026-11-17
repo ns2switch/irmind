@@ -39,21 +39,6 @@ live task. A request from an ended task can be denied, but cannot execute in the
 parent. Children cannot approve requests, change settings, increase budgets or
 create more subagents. Only the analyst confirms findings.
 
-## Recover after an interrupted session
-
-An abruptly closed process can leave a durable plan preview or an unfinished
-branch. Close other IRMind sessions for the case first. In the reopened case,
-stop any current turn with `/pause` and wait for it to finish, then run
-`/subagents recover`. Review the explanation and select Confirm; Cancel is the
-default and Esc makes no change. Sealed cases remain read-only.
-
-Recovery uses the existing signed reconciliation: completed work stays intact,
-uncertain provider use stays reserved, and no model request or tool effect is
-replayed. It does not resume children or approve their pending requests. Run
-`/verify` afterward. A second recovery is harmless and reports zero plans when
-nothing remains. New work and sealing can then proceed subject to the retained
-budget and normal approvals.
-
 ## Sources, budgets and partial results
 
 Tasks receive a frozen subset of signed sources and, when explicitly assigned,
@@ -88,7 +73,7 @@ checkpoints and merges results in deterministic task order. `/verify`, `/seal`
 and `/export` authenticate the branch material, approvals, reservations and
 terminal results. Export V8 includes the committed branches and catalog proofs
 needed for offline verification. Interrupted plans retain their signed work;
-after an interrupted session, recover it explicitly without retrying remote effects.
+reopening closes interrupted work without retrying remote effects.
 
 Version 0.5 uses case marker 4 and export V8. Keep the creating executable for
 older cases or re-ingest verified originals into a new case; opening a case does

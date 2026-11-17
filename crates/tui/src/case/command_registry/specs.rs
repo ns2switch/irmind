@@ -9,7 +9,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "subagents",
-        description: "Inspect, cancel tasks or recover an interrupted plan",
+        description: "Inspect delegated tasks or cancel a task by identifier",
         shortcut: "",
         slash: true,
     },

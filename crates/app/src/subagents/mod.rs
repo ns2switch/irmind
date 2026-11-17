@@ -117,7 +117,7 @@ impl crate::Engine<'_> {
             .map_err(|_| crate::AppError::InvalidChain(0))?
         {
             return Err(crate::AppError::Policy(
-                "Subagent plan is still active. Finish or cancel it; after an interrupted session, use /subagents recover in the TUI.".into(),
+                "Subagent plan is still active; cancel or finish it before sealing".into(),
             ));
         }
         Ok(())

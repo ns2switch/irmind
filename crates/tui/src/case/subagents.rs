@@ -270,7 +270,7 @@ impl<'scope, 'env> SubagentUi<'scope, 'env> {
             return false;
         };
         let Some(value) = value.strip_prefix("cancel ") else {
-            messages.push("Use /subagents, /subagents cancel <task> or /subagents recover.".into());
+            messages.push("Use /subagents or /subagents cancel <task>.".into());
             return true;
         };
         let Some(task) = self.panel.resolve_task(value.trim()) else {
