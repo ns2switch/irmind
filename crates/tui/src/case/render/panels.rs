@@ -127,9 +127,6 @@ fn audit_panel(state: &CaseState) -> String {
 }
 
 pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Option<String>> {
-    if state.confirm_exit == crate::ExitConfirmation::Pending {
-        return Ok(Some("Exit IRMind? Enter confirms; Esc cancels.".into()));
-    }
     if let Some(help) = &state.help {
         return Ok(Some(engine.guard.screen(help)?.text));
     }
