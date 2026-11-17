@@ -4,6 +4,9 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Rebuild mapped evidence through its signed decoder/mapping profile in both CLI
+  and TUI; connector decoders do not need automatic file-format detectors.
+
 - Verify private originals retained by the case at their signed location instead
   of requiring a second external duplicate of acquired connector responses.
   Missing, altered or unavailable retained originals still fail verification.

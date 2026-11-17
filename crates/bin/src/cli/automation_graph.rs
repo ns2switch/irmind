@@ -3,7 +3,6 @@ use super::{
     AuditLog, AutomationContext, Command, EvidenceGraph, EvidenceStore, Repository, Result, anyhow,
     parse_id, write_private_output,
 };
-use irmind_app::modules::ModuleRegistry;
 use irmind_app::{ConfigurationStore, LargeCaseUseCases, SourceCheckMode};
 use irmind_infra::LocalStore;
 use std::path::Path;
@@ -113,7 +112,6 @@ impl AutomationContext<'_, '_> {
             engine,
             store,
             guard,
-            registry,
             cancel,
             ..
         } = self;
@@ -134,7 +132,6 @@ impl AutomationContext<'_, '_> {
                 verify_graph_command(
                     engine,
                     store.as_ref(),
-                    registry,
                     cancel,
                     &case_id,
                     source_root.as_deref(),
@@ -351,7 +348,6 @@ impl AutomationContext<'_, '_> {
 fn verify_graph_command(
     engine: &irmind_app::Engine<'_>,
     store: &LocalStore,
-    registry: &ModuleRegistry,
     cancel: &irmind_app::CancellationToken,
     case_id: &str,
     source_root: Option<&Path>,
@@ -360,7 +356,7 @@ fn verify_graph_command(
     let (has_sources, has_artifacts) = parquet_status(store, &id)?;
     if !has_sources && !has_artifacts {
         return Err(anyhow!(
-            "no signed Parquet artifacts; migrate copied evidence first"
+            "no signed Parquet artifacts; ingest evidence in this case first"
         ));
     }
     let root = source_root
@@ -368,13 +364,12 @@ fn verify_graph_command(
         .ok_or_else(|| {
             anyhow!("source root required to rebuild and verify Parquet; use --source-root")
         })?;
-    let router = registry
-        .parser_catalog()
-        .rebuild_router(&store.entries(&id)?)?;
+    // The store resolves exact decoders and mappings from signed pipeline profiles.
+    let parser = JsonParser;
     let large = LargeCaseUseCases {
         engine,
         store,
-        parser: &router,
+        parser: &parser,
     };
     let count = large.verify_parquet_rebuild(&id, root, cancel)?;
     println!("rebuilt and compared {count} Parquet sources");

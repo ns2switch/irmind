@@ -100,6 +100,7 @@ impl ThreatIntelPort for FakeIntel {
 pub(super) struct TestIo(
     pub(super) Arc<LocalStore>,
     pub(super) irmind_infra::TomlConfigurationStore,
+    pub(super) Option<irmind_app::modules::ParserCatalog>,
 );
 
 #[cfg(feature = "keystore-file")]
@@ -157,6 +158,9 @@ impl SecretBackend for MigrationTarget {
 }
 
 impl WorkspaceIo for TestIo {
+    fn parser_catalog(&self) -> Option<&irmind_app::modules::ParserCatalog> {
+        self.2.as_ref()
+    }
     fn input_files(&self, root: &Path) -> anyhow::Result<Vec<PathBuf>> {
         Ok(vec![root.to_path_buf()])
     }

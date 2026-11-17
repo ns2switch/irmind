@@ -40,6 +40,7 @@ fn complete_case_without_os_keyring_from_tui_controller_with_fakes() {
     let io_ops = TestIo(
         store.clone(),
         irmind_infra::TomlConfigurationStore::new(root.path()),
+        None,
     );
     let terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
     let mut tui = ScriptedWorkspace::new(terminal, &engine, Some(&model), &io_ops);
