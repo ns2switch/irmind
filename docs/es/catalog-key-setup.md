@@ -9,7 +9,7 @@ No compartas la semilla ni la clave privada.
 
 ## Clave de producción activa
 
-Activada para IRMind v0.5.4 el 2026-11-17:
+Clave de producción registrada el 2026-11-17 para IRMind v0.5.4:
 
 ```text
 public_key=fb2015c83d13fe018e270a7fe73bf7bccfdb622565e30f7ade436637c3b2c25b

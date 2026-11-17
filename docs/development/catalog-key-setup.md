@@ -8,7 +8,7 @@ The publishing workflow uses the protected `release` environment in
 
 ## Active production key
 
-Activated for IRMind v0.5.4 on 2026-11-17:
+Production key registered on 2026-11-17 for IRMind v0.5.4:
 
 ```text
 public_key=fb2015c83d13fe018e270a7fe73bf7bccfdb622565e30f7ade436637c3b2c25b

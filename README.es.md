@@ -19,7 +19,7 @@ Sin configurar modelos, claves de API, cuentas ni coste. La interfaz real invest
 
 ![Presentación automática de IRMind con narración a todo el ancho, evidencia sintética, respuesta en streaming, aprobación firmada y verificación de custodia](docs/assets/demo.gif)
 
-*Grabada con IRMind v0.5.4. La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
+*Grabada con IRMind v0.5.3. La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
 
 > [!WARNING]
 > Antes de 1.0, cada versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración. Conserva la versión de IRMind que creó un caso para abrirlo, verificarlo o exportarlo, o reingiere los originales verificados en un caso nuevo.
