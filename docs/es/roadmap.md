@@ -58,16 +58,16 @@ binario actual.
 
 ## v0.5.x: estabilización y preparación para evaluación
 
-- Completar la primera caché tras revisar el contrato concreto de contabilidad:
-  prefijo confiable estable, uso de caché reportado y visible en presupuesto.
-  Mantener nonce por turno y cobrar todos los tokens; sin precalentamiento,
-  cambios automáticos de ruta ni caché presentada como gratuita.
+- Medir la reutilización real de caché con la primera contabilidad. Mantener el
+  nonce por turno y el cargo de todos los tokens; aplazar las demás propuestas
+  de contexto hasta después del lanzamiento. Sin precalentamiento ni cambios
+  automáticos de ruta.
 - Ensayar la [validación real](real-validation.md) con Elasticsearch local, TLS,
   CA y modelo local. Registrar resultados, fallos y tiempos observados; no
   sustituye la validación del analista con su modelo y conector.
 - Repetir PTY bajo carga con sincronización por eventos: arranque, presentación,
   expansión y borrado.
-- Añadir macOS Intel nativo y Homebrew verificado. Mantener Linux aarch64,
+- Publicar Homebrew verificado. Mantener macOS Intel nativo y Linux aarch64,
   instaladores, Sigstore con identidad de tag, provenance y SBOM. AUR, Nix,
   winget y Scoop quedan abiertos a empaquetadores comunitarios.
 - Activar Developer ID, hardened runtime y notarización preparados solo tras
