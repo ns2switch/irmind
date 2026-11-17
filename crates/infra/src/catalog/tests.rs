@@ -107,6 +107,12 @@ fn catalog_has_no_production_test_key_or_unverified_alternate_trust_path() {
     let public = VerifyingKey::from_bytes(&RELEASE_CATALOG_KEYS[0]).unwrap();
     assert!(!public.is_weak());
     assert!(!RELEASE_CATALOG_KEYS.contains(&keys()[0]));
+    for seed in [42, 43, 44, 73, 74, 88, 90] {
+        let synthetic = SigningKey::from_bytes(&[seed; 32])
+            .verifying_key()
+            .to_bytes();
+        assert!(!RELEASE_CATALOG_KEYS.contains(&synthetic));
+    }
     // Even a valid index signed by the documented fixture key is not trusted.
     let release = FrozenCatalogRelease::new("v0.1.0").unwrap();
     assert!(
