@@ -127,6 +127,9 @@ fn audit_panel(state: &CaseState) -> String {
 }
 
 pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Option<String>> {
+    if state.confirm_exit == crate::ExitConfirmation::Pending {
+        return Ok(Some("Exit IRMind? Enter confirms; Esc cancels.".into()));
+    }
     if let Some(help) = &state.help {
         return Ok(Some(engine.guard.screen(help)?.text));
     }
@@ -151,7 +154,7 @@ pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Opt
     if let Some(picker) = &state.picker {
         let mut lines = vec![
             format!("Select evidence · {}", picker.current.display()),
-            "Enter open directory · s select file/directory · Backspace parent · Esc close".into(),
+            "Enter opens directory or ingests file · Backspace parent · Esc close".into(),
         ];
         for (index, path) in picker
             .entries

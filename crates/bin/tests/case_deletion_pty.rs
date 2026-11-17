@@ -104,3 +104,27 @@ fn case_deletion_from_open_tui_releases_session_then_signs_and_lists_tombstone()
     session.expect("Exit IRMind?").unwrap();
     session.send("\r").unwrap();
 }
+
+#[test]
+fn confirmed_ctrl_c_exits_the_application_from_an_open_case() {
+    let root = tempfile::tempdir().unwrap();
+    seed(root.path());
+    let mut session = DemoSession::spawn_sized(&command(root.path()), 100, 32).unwrap();
+    session.timeout = std::time::Duration::from_secs(45);
+    session.expect("Unlock").unwrap();
+    session.send(format!("{PHRASE}\r")).unwrap();
+    session.expect("Fingerprint").unwrap();
+    session.send("\r").unwrap();
+    session.expect("Find cases or type").unwrap();
+    session.send(format!("/open {TITLE}\r")).unwrap();
+    session.expect("Ask about the case").unwrap();
+    session.send("\x03").unwrap();
+    session.expect("Exit IRMind?").unwrap();
+    session.send("\x1b").unwrap();
+    session.expect_screen("Exit IRMind?", false).unwrap();
+    session.expect("Ask about the case").unwrap();
+    session.send("\x03").unwrap();
+    session.expect("Exit IRMind?").unwrap();
+    session.send("\r").unwrap();
+    session.expect_exit().unwrap();
+}

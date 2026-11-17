@@ -64,6 +64,36 @@ impl DemoSession {
         self.sent = false;
         Ok(true)
     }
+    #[allow(
+        dead_code,
+        reason = "Shared support; only exit-lifecycle tests need the child status."
+    )]
+    pub(super) fn expect_exit(&mut self) -> Result<(), String> {
+        let started = Instant::now();
+        loop {
+            if let Some(status) = self
+                .driver
+                .child
+                .try_wait()
+                .map_err(|error| error.to_string())?
+            {
+                return if status.success() {
+                    Ok(())
+                } else {
+                    Err(format!("PTY process failed: {status}"))
+                };
+            }
+            if started.elapsed() > self.timeout {
+                return Err(format!(
+                    "PTY process remained running: {}",
+                    self.screen.text()
+                ));
+            }
+            let _ = self.poll();
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
     pub(super) fn send(&mut self, value: impl AsRef<str>) -> Result<(), String> {
         self.driver.send(value.as_ref().as_bytes())?;
         self.sent = true;
