@@ -1,4 +1,4 @@
-<!-- Translation of docs/development/dependency-maintenance-review.md; source commit: 3a6bfca1 -->
+<!-- Translation of docs/development/dependency-maintenance-review.md; source commit: c8ed6cd8332c5b025f378e772e54a05c1ad24e71 -->
 # Retirada de dependencias de fechas sin mantenimiento
 
 La sustitución elimina `chrono` y `humantime` de los cuatro lockfiles: aplicación,
