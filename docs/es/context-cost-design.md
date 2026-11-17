@@ -315,6 +315,8 @@ aislamiento del contenido no confiable.
 Tres repeticiones antes y después en el mismo runner reproducen los mismos
 valores. El observador usa el motor de producción y bytes JSON UTF-8 / 4,
 redondeando hacia arriba; no simula facturas ni llama a proveedores comerciales.
+Observa el puerto del motor antes de codificar para cada proveedor; no incluye
+el coste de sus marcadores ni su tokenización nativa.
 
 | Escenario | Peticiones | Entrada antes / después | Techo de prefijo reutilizable |
 | --- | ---: | ---: | ---: |
