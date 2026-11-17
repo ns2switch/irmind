@@ -311,3 +311,11 @@ normalization, cache expiry/routing changes, old-nonce injection, edited evidenc
 role separation, tool-pair validity, source-restricted children, page-boundary
 secrets, exhausted budgets and full-response export. Compare quality and paid
 usage on real models only through an explicit analyst-run evaluation.
+
+## Approved implementation scope
+
+The first increment implements provider cache accounting and stable trusted-prefix
+cache markers as specified in [the accounting contract](context-cache-accounting-contract.md).
+Immutable capsules and nonce changes, result summaries and pagination, per-model
+context/compaction profiles, and an auxiliary model remain deferred until after
+the public launch. Per-turn nonces and untrusted-content isolation remain unchanged.

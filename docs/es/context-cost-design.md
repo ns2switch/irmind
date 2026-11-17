@@ -300,3 +300,12 @@ expulsión/rutas, nonce antiguo malicioso, evidencia alterada, separación de ro
 parejas tool válidas, fuentes de hijos, secretos entre páginas, presupuesto agotado
 y export completo. Calidad y uso pagado reales solo en una evaluación explícita
 del analista.
+
+## Alcance de implementación aprobado
+
+El primer incremento implementa la contabilidad de caché del proveedor y los
+marcadores del prefijo confiable según [el contrato](context-cache-accounting-contract.md).
+Las cápsulas inmutables y cambios de nonce, resúmenes y paginación de resultados,
+perfiles de contexto/compactación por modelo y el modelo auxiliar quedan aplazados
+hasta después del lanzamiento público. Se mantienen los nonces por turno y el
+aislamiento del contenido no confiable.
