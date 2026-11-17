@@ -4,6 +4,22 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.5.3 — Prompt-cache accounting and interrupted-plan recovery
+
+**Format impact:** Optional cache metadata extends signed usage receipts and
+optional cache prices extend signed configuration. Missing fields retain their
+existing canonical bytes. Case, artifact, seal and export versions are unchanged;
+no migration is required for cases created by this minor version.
+
+- Publish native macOS Intel binaries alongside Apple Silicon, Linux x86_64,
+  Linux aarch64 and Windows. Verify clean installers even when optional native
+  signing is disabled. Sigstore, provenance and SBOM verification remain mandatory.
+- Refresh the complete offline presentation with the actual v0.5.3 executable.
+  Native Developer ID/notarization and Authenticode remain unavailable.
+- Expand the controlled Elasticsearch/TLS rehearsal guidance and the optional
+  HuntEval pilot runner. A local-model rehearsal does not replace analyst
+  validation of investigation quality or a connector in a real test environment.
+
 - Recover an interrupted subagent plan explicitly with `/subagents recover`,
   after confirmation. Nonblocking interprocess activity/recovery locks protect
   live previews and children, remain held through reconciliation and prevent

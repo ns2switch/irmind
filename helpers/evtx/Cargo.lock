@@ -935,7 +935,7 @@ dependencies = [
 
 [[package]]
 name = "irmind-evtx"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "ed25519-dalek",
  "evtx",

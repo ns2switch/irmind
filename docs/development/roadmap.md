@@ -46,6 +46,11 @@ The following describes delivered capabilities, not field-validation claims.
   bar are integrated for v0.5.2. Deletion retains signed tombstones, honors process
   locks and recovers interrupted cleanup; it is not secure physical erasure.
 
+- Version 0.5.3 adds provider-reported cache accounting, trusted Anthropic prefix
+  markers, explicit interprocess-safe plan recovery and macOS Intel packages.
+  Fresh per-turn nonces and full logical token charging are unchanged. Later
+  context-cost proposals remain deferred until after launch.
+
 Skills never grant tools or scope, children never approve, and external/model
 content never enters trusted system instructions. No model or connector is
 enabled by default. Historical release designs explain old decisions; they are

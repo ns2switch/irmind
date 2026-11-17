@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "irmind-evtx"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "evtx",
  "irmind-process-containment",

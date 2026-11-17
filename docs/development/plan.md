@@ -2,16 +2,18 @@
 
 This internal plan records historical acceptance criteria and decisions behind the first pre-releases. Future sequence and ownership follow the [public roadmap](roadmap.md); this document does not set future release dates or assign the unattended gateway to this repository. The English version is authoritative.
 
-## Stabilization sequence after 0.5.1
+## Stabilization through 0.5.3
 
-Version 0.5.1 is immutable. The next patch is 0.5.2: signed deletion of unsealed
-cases, customizable status bar, grouped model configuration and skills repository
-links. Case deletion uses the [signed lifecycle contract](case-deletion-contract.md).
-The following patch, 0.5.3, covers the reviewed context-cache increment, a complete
-local Elastic/Ollama validation rehearsal, Homebrew packaging, event-driven PTY
-checks under load and the updated public roadmap. Native-signing provisioning,
-production catalog keys and the analyst's real-environment result records remain
-maintainer actions; they are not replaced by a development rehearsal.
+Version 0.5.2 delivered signed deletion of unsealed cases, the customizable status
+bar and grouped model configuration. Version 0.5.3 adds the approved first
+prompt-cache accounting increment, explicit interrupted-plan recovery guarded
+across processes, macOS Intel distribution and mandatory clean-installer checks
+when optional native signing is skipped. The controlled Elastic/local-model
+rehearsal records its limitations; the scripted PTY and cache measurements do not
+establish real-model investigation quality. Homebrew publication/access,
+native-signing provisioning, production catalog keys and the analyst's remaining
+real-environment results are maintainer actions. Later context-cost proposals
+remain deferred until after launch.
 
 ## Skills in 0.4
 
