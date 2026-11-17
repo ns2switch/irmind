@@ -323,8 +323,8 @@ the public launch. Per-turn nonces and untrusted-content isolation remain unchan
 ## First-increment release measurements
 
 Three repeats before and after on the same runner retain the same exact-prefix
-coverage. The conversation and skill input totals are unchanged; the mixed plan
-varies by one simulated token. The scripted observer uses the production
+coverage after the date-dependency replacement. All three workloads retain
+identical logical input totals across these repeats. The scripted observer uses the production
 engine with UTF-8 JSON bytes / 4, rounded upward; it does not simulate provider
 cache invoices. No commercial model was called. The observer captures the engine
 port before provider-specific encoding; adapter marker overhead and native
@@ -334,7 +334,7 @@ tokenization are outside this neutral prefix model.
 | --- | ---: | ---: | ---: |
 | Ten-turn conversation | 10 | 73,445 / 73,445 | 33,408 (45.49%) |
 | Skill investigation, 15 rounds | 15 | 126,382 / 126,382 | 107,776 (85.28%) |
-| Three subagents | 11 | 48,655 / 48,655–48,656 | 29,056 (59.72%) |
+| Three subagents | 11 | 48,655 / 48,655 | 29,056 (59.72%) |
 
 The first increment adds native Anthropic breakpoints and provider-reported
 accounting, without reducing transmitted context. Automatic providers may
@@ -344,7 +344,6 @@ remain unmeasured until an explicit analyst-run evaluation.
 [child receipt/settlement vector](context-cost-data/child-cache-settlement.json)
 are covered by the data checksum file.
 
-In the third integrated mixed-plan repeat, an existing guard redaction of a
-synthetic finding identifier adds four serialized bytes to one child request
-(one simulated token). This is observed measurement variance, not a cache saving.
-The guard and per-turn nonce behavior remain unchanged.
+The measurements identify the exact source commits and use the same maintained
+date dependencies on both sides. Guard behavior and per-turn nonces remain
+unchanged; no input-size reduction or real billed cache saving is claimed.

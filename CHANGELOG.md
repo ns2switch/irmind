@@ -11,6 +11,11 @@ optional cache prices extend signed configuration. Missing fields retain their
 existing canonical bytes. Case, artifact, seal and export versions are unchanged.
 Retain the creating executable for full reconstruction of its signed native decoder/mapping profiles.
 
+- Replace unmaintained calendar/duration dependencies with maintained date
+  primitives and narrowly reviewed Arrow/Parquet/storage source patches. Current
+  canonical and physical-format golden bytes are unchanged; advisory enforcement,
+  explicit credentials, TLS, bounded reads and EVTX isolation remain enabled.
+
 - Publish native macOS Intel binaries alongside Apple Silicon, Linux x86_64,
   Linux aarch64 and Windows. Verify clean installers even when optional native
   signing is disabled. Sigstore, provenance and SBOM verification remain mandatory.
