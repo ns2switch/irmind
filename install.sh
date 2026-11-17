@@ -26,6 +26,7 @@ case "$(uname -s):$(uname -m)" in
   Linux:x86_64|Linux:amd64) asset='irmind-linux-x86_64' ;;
   Linux:aarch64|Linux:arm64) asset='irmind-linux-aarch64' ;;
   Darwin:arm64) asset='irmind-macos-aarch64' ;;
+  Darwin:x86_64) asset='irmind-macos-x86_64' ;;
   *) fail 'no release binary for this system and architecture; build from source' ;;
 esac
 

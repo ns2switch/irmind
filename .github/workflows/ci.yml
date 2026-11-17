@@ -14,7 +14,7 @@ on:
         type: boolean
         default: false
       release_dry_run:
-        description: Build and cross-verify unsigned release artifacts without creating a tag or release
+        description: Build and verify signed release artifacts without creating a tag or release
         type: boolean
         default: false
 permissions:
@@ -96,6 +96,8 @@ jobs:
           python3 -B scripts/test_sync_core_skills.py
       - name: Test documented command ownership
         run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_docs.py
+      - name: Test native release coverage
+        run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_release_platforms.py
       - name: Test allocation profile attribution
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_profile_pipeline_allocations.py
       - name: Test current absolute benchmark criteria
@@ -382,10 +384,16 @@ jobs:
   macos:
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true }}
     needs: [linux, dco]
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-latest, target: aarch64-apple-darwin, arch: arm64}
+          - {runner: macos-15-intel, target: x86_64-apple-darwin, arch: x86_64}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     env:
-      CARGO_BUILD_TARGET: aarch64-apple-darwin
+      CARGO_BUILD_TARGET: ${{ matrix.target }}
     defaults:
       run:
         shell: bash
@@ -393,7 +401,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
-        with: {targets: aarch64-apple-darwin}
+        with: {targets: "${{ matrix.target }}"}
       - name: Keep only the pinned Rust toolchain for a stable cache key
         run: |
           rustup toolchain list | awk '{print $1}' | while read -r toolchain; do
@@ -401,7 +409,7 @@ jobs:
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: macos-arm64-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
+          key: macos-${{ matrix.arch }}-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
           add-rust-environment-hash-key: false
           cache-targets: true
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -423,10 +431,10 @@ jobs:
         run: /usr/bin/log show --last 2m --style compact --predicate '(process == "kernel" OR process == "sandboxd") AND eventMessage CONTAINS "irmind-evtx"'
       - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked --test-threads 4
       - name: Stage CLI test executable for cross-platform verification
-        if: needs.dco.outputs.cross_verify == 'true'
-        run: mkdir -p verify-bin && cp target/aarch64-apple-darwin/ci/irmind verify-bin/irmind
+        if: needs.dco.outputs.cross_verify == 'true' && matrix.arch == 'arm64'
+        run: mkdir -p verify-bin && cp target/${{ matrix.target }}/ci/irmind verify-bin/irmind
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.dco.outputs.cross_verify == 'true'
+        if: needs.dco.outputs.cross_verify == 'true' && matrix.arch == 'arm64'
         with: {name: verify-test-macos, path: verify-bin/, if-no-files-found: error}
       - name: Check shipped JSON feature isolation
         if: needs.dco.outputs.release_build == 'true'
@@ -440,18 +448,18 @@ jobs:
         if: needs.dco.outputs.release_build == 'true'
         run: |
           mkdir -p dist
-          cp target/aarch64-apple-darwin/release/irmind target/aarch64-apple-darwin/release/irmind-evtx dist/
+          cp target/${{ matrix.target }}/release/irmind target/${{ matrix.target }}/release/irmind-evtx dist/
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
           (cd dist && shasum -a 256 irmind irmind-evtx LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
           (cd dist && shasum -a 256 -c SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.release_build == 'true'
-        with: {name: irmind-macos-arm64, path: dist/, if-no-files-found: error}
+        with: {name: "irmind-macos-${{ matrix.arch }}", path: dist/, if-no-files-found: error}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        if: needs.dco.outputs.cross_verify == 'true'
+        if: needs.dco.outputs.cross_verify == 'true' && matrix.arch == 'arm64'
         with: {name: portable-export-linux, path: foreign-export}
       - name: Verify Linux export on macOS
-        if: needs.dco.outputs.cross_verify == 'true'
+        if: needs.dco.outputs.cross_verify == 'true' && matrix.arch == 'arm64'
         run: verify-bin/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
       - name: Clean staging
         if: always()
@@ -476,6 +484,12 @@ jobs:
   native_macos:
     needs: [dco, macos]
     if: ${{ false && !cancelled() && needs.macos.result == 'success' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && vars.MACOS_NATIVE_SIGNING_ENABLED == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {artifact: arm64, architecture: aarch64}
+          - {artifact: x86_64, architecture: x86_64}
     runs-on: macos-latest
     timeout-minutes: 40
     environment: release
@@ -485,7 +499,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with: {name: irmind-macos-arm64, path: native-macos}
+        with: {name: "irmind-macos-${{ matrix.artifact }}", path: native-macos}
       - name: Sign Developer ID binaries and notarize their disk image
         env:
           MACOS_NATIVE_SIGNING_ENABLED: ${{ vars.MACOS_NATIVE_SIGNING_ENABLED }}
@@ -495,9 +509,9 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
           APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
-        run: python3 .github/scripts/sign_macos.py native-macos
+        run: python3 .github/scripts/sign_macos.py native-macos --architecture "${{ matrix.architecture }}"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with: {name: irmind-macos-native, path: native-macos/, if-no-files-found: error}
+        with: {name: "irmind-macos-native-${{ matrix.architecture }}", path: native-macos/, if-no-files-found: error}
       - name: Remove temporary package copies
         if: always()
         run: rm -rf native-macos
@@ -522,10 +536,15 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {name: irmind-macos-arm64, path: artifacts/macos-aarch64}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: irmind-macos-x86_64, path: artifacts/macos-x86_64}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {name: irmind-windows, path: artifacts/windows-x86_64}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: needs.native_macos.result == 'success'
-        with: {name: irmind-macos-native, path: artifacts/macos-aarch64}
+        with: {name: irmind-macos-native-aarch64, path: artifacts/macos-aarch64}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.native_macos.result == 'success'
+        with: {name: irmind-macos-native-x86_64, path: artifacts/macos-x86_64}
       - name: Stage binaries and install scripts
         run: |
           mkdir -p release
@@ -535,12 +554,16 @@ jobs:
           cp artifacts/linux-aarch64/irmind-evtx release/irmind-evtx-linux-aarch64
           cp artifacts/macos-aarch64/irmind release/irmind-macos-aarch64
           cp artifacts/macos-aarch64/irmind-evtx release/irmind-evtx-macos-aarch64
+          cp artifacts/macos-x86_64/irmind release/irmind-macos-x86_64
+          cp artifacts/macos-x86_64/irmind-evtx release/irmind-evtx-macos-x86_64
           cp artifacts/windows-x86_64/irmind.exe release/irmind-windows-x86_64.exe
           cp artifacts/windows-x86_64/irmind-evtx.exe release/irmind-evtx-windows-x86_64.exe
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 release/
-          if test -f artifacts/macos-aarch64/IRMind-macos-aarch64.dmg; then
-            cp artifacts/macos-aarch64/IRMind-macos-aarch64.dmg release/
-          fi
+          for architecture in aarch64 x86_64; do
+            if test -f "artifacts/macos-$architecture/IRMind-macos-$architecture.dmg"; then
+              cp "artifacts/macos-$architecture/IRMind-macos-$architecture.dmg" release/
+            fi
+          done
       - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           path: .
@@ -585,10 +608,12 @@ jobs:
           rm "$RUNNER_TEMP/evtx-geiger.json" "$RUNNER_TEMP/evtx-geiger.log"
       - name: Create and check the release checksum list
         run: |
-          (cd release && sha256sum irmind-linux-x86_64 irmind-linux-aarch64 irmind-macos-aarch64 irmind-windows-x86_64.exe irmind-evtx-linux-x86_64 irmind-evtx-linux-aarch64 irmind-evtx-macos-aarch64 irmind-evtx-windows-x86_64.exe install.sh install.ps1 IRMind-SBOM.spdx.json IRMind-EVTX-SBOM.spdx.json EVTX-UNSAFE-REPORT.json EVTX-GEIGER-REPORT.json LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
-          if test -f release/IRMind-macos-aarch64.dmg; then
-            (cd release && sha256sum IRMind-macos-aarch64.dmg >> SHA256SUMS)
-          fi
+          (cd release && sha256sum irmind-linux-x86_64 irmind-linux-aarch64 irmind-macos-aarch64 irmind-macos-x86_64 irmind-windows-x86_64.exe irmind-evtx-linux-x86_64 irmind-evtx-linux-aarch64 irmind-evtx-macos-aarch64 irmind-evtx-macos-x86_64 irmind-evtx-windows-x86_64.exe install.sh install.ps1 IRMind-SBOM.spdx.json IRMind-EVTX-SBOM.spdx.json EVTX-UNSAFE-REPORT.json EVTX-GEIGER-REPORT.json LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
+          for architecture in aarch64 x86_64; do
+            if test -f "release/IRMind-macos-$architecture.dmg"; then
+              (cd release && sha256sum "IRMind-macos-$architecture.dmg" >> SHA256SUMS)
+            fi
+          done
           (cd release && sha256sum --check SHA256SUMS)
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with: {subject-path: 'release/irmind-*'}
@@ -596,27 +621,31 @@ jobs:
         with: {subject-path: 'release/*SBOM.spdx.json'}
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         if: needs.native_macos.result == 'success'
-        with: {subject-path: 'release/IRMind-macos-aarch64.dmg'}
+        with: {subject-path: 'release/IRMind-macos-*.dmg'}
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with: {cosign-release: 'v3.1.4'} # fixes GHSA-fx35-mq7g-6g98 in the bundled default
       - name: Sign every binary and the checksum list with GitHub OIDC
         run: |
-          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-windows-x86_64.exe release/irmind-evtx-linux-x86_64 release/irmind-evtx-linux-aarch64 release/irmind-evtx-macos-aarch64 release/irmind-evtx-windows-x86_64.exe release/SHA256SUMS; do
+          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-macos-x86_64 release/irmind-windows-x86_64.exe release/irmind-evtx-linux-x86_64 release/irmind-evtx-linux-aarch64 release/irmind-evtx-macos-aarch64 release/irmind-evtx-macos-x86_64 release/irmind-evtx-windows-x86_64.exe release/SHA256SUMS; do
             cosign sign-blob --yes --bundle "$file.sigstore.json" "$file"
           done
-          if test -f release/IRMind-macos-aarch64.dmg; then
-            cosign sign-blob --yes --bundle release/IRMind-macos-aarch64.dmg.sigstore.json release/IRMind-macos-aarch64.dmg
-          fi
+          for dmg in release/IRMind-macos-*.dmg; do
+            if test -f "$dmg"; then
+              cosign sign-blob --yes --bundle "$dmg.sigstore.json" "$dmg"
+            fi
+          done
       - name: Verify every Sigstore bundle against this exact workflow ref
         env:
           EXPECTED_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/ci.yml@${{ github.ref }}
         run: |
-          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-windows-x86_64.exe release/irmind-evtx-linux-x86_64 release/irmind-evtx-linux-aarch64 release/irmind-evtx-macos-aarch64 release/irmind-evtx-windows-x86_64.exe release/SHA256SUMS; do
+          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-macos-x86_64 release/irmind-windows-x86_64.exe release/irmind-evtx-linux-x86_64 release/irmind-evtx-linux-aarch64 release/irmind-evtx-macos-aarch64 release/irmind-evtx-macos-x86_64 release/irmind-evtx-windows-x86_64.exe release/SHA256SUMS; do
             cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "$EXPECTED_IDENTITY" --certificate-oidc-issuer https://token.actions.githubusercontent.com
           done
-          if test -f release/IRMind-macos-aarch64.dmg; then
-            cosign verify-blob release/IRMind-macos-aarch64.dmg --bundle release/IRMind-macos-aarch64.dmg.sigstore.json --certificate-identity "$EXPECTED_IDENTITY" --certificate-oidc-issuer https://token.actions.githubusercontent.com
-          fi
+          for dmg in release/IRMind-macos-*.dmg; do
+            if test -f "$dmg"; then
+              cosign verify-blob "$dmg" --bundle "$dmg.sigstore.json" --certificate-identity "$EXPECTED_IDENTITY" --certificate-oidc-issuer https://token.actions.githubusercontent.com
+            fi
+          done
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: github.event_name == 'workflow_dispatch'
         with: {name: signed-release-dry-run, path: release/, if-no-files-found: error}
@@ -635,7 +664,7 @@ jobs:
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('release', 'artifacts')) if p.is_dir()]"
   verify_install_linux:
     needs: release
-    if: ${{ needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ !cancelled() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -656,9 +685,36 @@ jobs:
           sh install.sh "$GITHUB_REF_NAME"
           test -x "$HOME/.local/bin/irmind-evtx"
           "$HOME/.local/bin/irmind" --version
+  verify_install_macos:
+    needs: release
+    if: ${{ !cancelled() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with: {cosign-release: 'v3.1.4'}
+      - name: Install and run the verified macOS release in a clean runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test ! -e "$HOME/.local/bin/irmind"
+          test ! -e "$HOME/.local/bin/irmind-evtx"
+          trap 'rm -f "$HOME/.local/bin/irmind" "$HOME/.local/bin/irmind-evtx"' EXIT
+          sh install.sh "$GITHUB_REF_NAME"
+          test -x "$HOME/.local/bin/irmind-evtx"
+          "$HOME/.local/bin/irmind" --version
   verify_install_windows:
     needs: release
-    if: ${{ needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ !cancelled() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: windows-latest
     timeout-minutes: 15
     permissions:

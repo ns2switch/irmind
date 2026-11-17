@@ -21,7 +21,7 @@ if name=='fake_tool':name,args=args[0],args[1:]
 with open(os.environ['IRMIND_INSTALL_TEST_LOG'],'a',encoding='utf-8') as log:
  log.write(json.dumps([name]+args)+'\n')
 if name=='uname':
- print('Linux' if args==['-s'] else 'x86_64')
+ print(os.environ.get('IRMIND_INSTALL_TEST_SYSTEM','Linux') if args==['-s'] else os.environ.get('IRMIND_INSTALL_TEST_MACHINE','x86_64'))
 elif name=='curl':
  url=args[-1]
  if not url.startswith('https://github.com/ns2switch/irmind/releases/download/'):
@@ -96,6 +96,19 @@ class Installers(unittest.TestCase):
             self.assertEqual((self.install/destination).read_bytes(),(self.assets/source).read_bytes())
             self.assertTrue(any(call[:2]==['cosign','verify-blob'] and Path(call[2]).name==source for call in calls))
             self.assertTrue(any(call[:3]==['gh','attestation','verify'] and Path(call[3]).name==source for call in calls))
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX platform selection')
+    def test_macos_intel_installs_and_verifies_both_binaries(self):
+        for field in ('main', 'helper'):
+            previous = getattr(self, field)
+            current = previous.replace('linux-x86_64', 'macos-x86_64')
+            for suffix in ('', '.sigstore.json'):
+                (self.assets / (previous + suffix)).rename(self.assets / (current + suffix))
+            setattr(self, field, current)
+        self.env['IRMIND_INSTALL_TEST_SYSTEM'] = 'Darwin'
+        self.env['IRMIND_INSTALL_TEST_MACHINE'] = 'x86_64'
+        self.checksums()
+        self.test_matching_helper_and_main_are_verified_before_installation()
 
     def test_modified_helper_is_rejected_before_either_binary_is_installed(self):
         (self.assets/self.helper).write_bytes(b'altered helper')
