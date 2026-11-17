@@ -9,6 +9,13 @@ el resultado que falta para [#63](https://github.com/ns2switch/irmind/issues/63)
 pasos de H5 pendientes en [validación manual](manual-validation.md). No marques
 ningún paso como observado antes de ejecutarlo y registrar su resultado.
 
+Mantén el mismo ejecutable y auxiliar durante todo el recorrido. Recompilar un
+candidato de desarrollo o cambiar su lockfile puede cambiar las identidades de
+los mapeos nativos aunque el número de versión mostrado no cambie. Si cambias el
+build, empieza un caso nuevo; no omitas la comprobación de la identidad firmada.
+Conserva el ejecutable creador del caso. Usa `/expand` o Ctrl+O para leer la
+tarjeta completa de `/report`.
+
 ## 0–20 minutos: instalación y laboratorio desechable
 
 Verifica binario, auxiliar, checksums firmados y attestations con la

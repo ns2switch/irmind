@@ -1,0 +1,5 @@
+---
+source: crates/tui/src/case/render/cards.rs
+expression: text
+---
+The model returned no visible answer. Retry or choose another model in /settings model.

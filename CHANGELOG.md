@@ -4,6 +4,9 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Show an actionable notice when a provider completes without a visible answer,
+  while retaining its signed empty reply and reported usage.
+
 - Rebuild mapped evidence through its signed decoder/mapping profile in both CLI
   and TUI; connector decoders do not need automatic file-format detectors.
 

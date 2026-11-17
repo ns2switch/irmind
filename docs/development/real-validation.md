@@ -9,7 +9,11 @@ Do not mark those checks done before recording their actual results.
 ## 0–20 min: verified installation and disposable lab
 
 Verify the release, helper, signed checksums and provenance using [platforms](../platforms.md).
-Record `irmind --version`, commit, OS and terminal size. Keep this version for the
+Record `irmind --version`, commit, OS and terminal size. Keep this exact executable
+and helper fixed throughout the exercise. A rebuilt development candidate or
+changed lockfile can change native mapping identities even if its displayed
+version is unchanged; begin a fresh case after changing the build. Never bypass
+an unavailable signed mapping identity. Keep the creating executable for the
 case. Have Docker Compose v2 and Python 3.11+ available; allocate about 4 GB RAM
 and at least 5 GB free disk. The bounded lab uses explicit free-space watermarks
 (2 GB low, 1 GB high, 512 MB flood stage); disk protection remains enabled. The lab listens only on `127.0.0.1:9200`, with TLS and no
@@ -206,7 +210,7 @@ available. Uncopied local files are resolved only beneath that explicitly chosen
 root. Connector responses retained privately by the case are checked at their
 signed case location by size and SHA-256; no second external copy or repeat
 service query is needed. A missing or altered retained original fails instead
-of falling back to a different file. Review `/report`, proposed findings and pending approvals/tasks.
+of falling back to a different file. Review `/report` (use `/expand` or Ctrl+O for its full card), proposed findings and pending approvals/tasks.
 Only confirmed evidence should support the report. Finish/cancel work before
 `/seal`; review the exact hash and key fingerprint, then `/export` with originals
 if desired. In a separate clean directory/process, run:
