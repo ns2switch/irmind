@@ -99,8 +99,9 @@ jobs:
       - name: Test native release coverage
         run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_release_platforms.py
       - name: Test release-note policy links and retry behavior
-        run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_release_notes.py
-          python3 .github/scripts/test_homebrew_dispatch.py
+        run: |
+          python3 -B .github/scripts/test_release_notes.py
+          python3 -B .github/scripts/test_homebrew_dispatch.py
       - name: Test allocation profile attribution
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_profile_pipeline_allocations.py
       - name: Test current absolute benchmark criteria
