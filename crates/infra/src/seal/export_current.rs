@@ -205,13 +205,13 @@ impl LocalStore {
             else {
                 return Ok(());
             };
-            let mut input = if let Some(root) = source_root {
-                irmind_fs::open_regular_no_follow(root, Path::new(&manifest.source))
-                    .map_err(storage)?
-            } else if manifest.copied {
+            let mut input = if manifest.copied {
                 let case_dir = self.parquet.case_dir(id)?;
                 let relative = format!("originals/{}", manifest.sha256.as_str());
                 irmind_fs::open_regular_no_follow(&case_dir, Path::new(&relative))
+                    .map_err(storage)?
+            } else if let Some(root) = source_root {
+                irmind_fs::open_regular_no_follow(root, Path::new(&manifest.source))
                     .map_err(storage)?
             } else {
                 return Err(storage_reason(

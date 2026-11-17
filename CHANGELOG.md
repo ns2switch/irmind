@@ -11,7 +11,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
   and TUI; connector decoders do not need automatic file-format detectors.
 
 - Verify private originals retained by the case at their signed location instead
-  of requiring a second external duplicate of acquired connector responses.
+  of requiring a second external duplicate of acquired connector responses. The
+  same signed source location is used when including originals in an export.
   Missing, altered or unavailable retained originals still fail verification.
 
 - Confirmed Ctrl+C exits the application from an open case; canceling its modal

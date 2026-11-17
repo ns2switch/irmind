@@ -398,6 +398,10 @@ fn parallel_batch_signs_sources_in_order_and_rejects_duplicate_source_bytes() {
 }
 
 #[test]
+#[allow(
+    clippy::too_many_lines,
+    reason = "One custody lifecycle covers retained copies, export, corruption, absence and cancellation."
+)]
 fn retained_original_is_verified_without_an_external_duplicate_and_has_no_fallback() {
     let root = tempfile::tempdir().unwrap();
     let source_root = root.path().join("inputs");
@@ -438,6 +442,26 @@ fn retained_original_is_verified_without_an_external_duplicate_and_has_no_fallba
     let report = check();
     assert_eq!((report.checked, report.total, report.unchecked), (1, 1, 0));
     assert!(report.missing_or_changed.is_empty());
+    engine.seal(&case.id).unwrap();
+    let export = root.path().join("retained-original.irmind");
+    irmind_app::export_case_with_originals(
+        &engine,
+        store.as_ref(),
+        &case.id,
+        &export,
+        Some(&source_root),
+        true,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    let exported = verify_export_details(&LocalExportVerifier, &export, None).unwrap();
+    assert_eq!(
+        (
+            exported.source_bytes_verified,
+            exported.source_bytes_unavailable
+        ),
+        (1, 0)
+    );
     let retained = root
         .path()
         .join("parquet")
@@ -449,6 +473,20 @@ fn retained_original_is_verified_without_an_external_duplicate_and_has_no_fallba
     fs::write(&retained, altered).unwrap();
     fs::write(&path, original).unwrap();
     assert_eq!(check().missing_or_changed, vec![hash.as_str()]);
+    let failed_export = root.path().join("changed-retained-original.irmind");
+    assert!(
+        irmind_app::export_case_with_originals(
+            &engine,
+            store.as_ref(),
+            &case.id,
+            &failed_export,
+            Some(&source_root),
+            true,
+            &CancellationToken::new()
+        )
+        .is_err()
+    );
+    assert!(!failed_export.exists());
     fs::remove_file(&retained).unwrap();
     assert_eq!(check().missing_or_changed, vec![hash.as_str()]);
     let cancel = CancellationToken::new();
