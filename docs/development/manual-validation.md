@@ -65,10 +65,28 @@ python3 scripts/hunteval_benchmark.py --help
 
 This check is for community testers with Windows 11. Automated Windows Server tests do not establish Windows client compatibility. Use only the synthetic fixture and run as a standard user. EVTX remains experimental until this check is confirmed.
 
-1. Download the matching Windows main and EVTX helper binaries from the [v0.5.0 release](https://github.com/ns2switch/irmind/releases/tag/v0.5.0). Put them in the same directory as `irmind.exe` and `irmind-evtx.exe`. Check `SHA256SUMS`, the cosign bundles and GitHub provenance as described in [platforms](../platforms.md), before renaming either file. The expected signing identity is `https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/v0.5.0`, the issuer is `https://token.actions.githubusercontent.com`, and the provenance source digest must match that tag.
+1. Download the matching Windows main and EVTX helper binaries from the [v0.5.2 release](https://github.com/ns2switch/irmind/releases/tag/v0.5.2). Put them in the same directory as `irmind.exe` and `irmind-evtx.exe`. Check `SHA256SUMS`, the cosign bundles and GitHub provenance as described in [platforms](../platforms.md), before renaming either file. The expected signing identity is `https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/v0.5.2`, the issuer is `https://token.actions.githubusercontent.com`, and the provenance source digest must match that tag.
 2. Start the candidate in Windows Terminal using a fresh test data directory and the file keystore. Do not configure a model or remote connector. Starting IRMind automatically runs the EVTX enforcement self-test before enabling the parser. In `/settings preferences`, check that the experimental EVTX parser is available. If it is unavailable, record its displayed reason; do not disable the firewall, add loopback exemptions or run as administrator to bypass the check.
 3. Download `crates/testkit/fixtures/parser-evtx/source/Security.evtx` from the exact candidate commit. Create a synthetic case with `/new`, then use `/ingest` to select that file. Confirm detection of `parser-evtx`, completion with 14 records, and a visible source manifest. Inspect `/timeline` and `/evidence` and run `/verify` with the source still present.
 4. Close and reopen the candidate. Confirm the self-test runs for the new session and the synthetic case still verifies. Remove the disposable case data after the check.
+
+A clean Windows 11 VM with Windows Terminal is sufficient. Keep BFE and MpsSvc
+running and use a standard user; do not add AppContainer loopback exemptions.
+After verifying/installing the release, download the exact-tag synthetic fixture
+and check its independent digest before ingestion:
+
+```powershell
+Invoke-WebRequest 'https://raw.githubusercontent.com/ns2switch/irmind/v0.5.2/crates/testkit/fixtures/parser-evtx/source/Security.evtx' -OutFile Security.evtx
+$expected = '028a2a2cd636806a3d2e6e086fa099d45c8bf062a3664cc22410e00eed23bc05'
+if ((Get-FileHash .\Security.evtx -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) { throw 'Synthetic fixture checksum mismatch' }
+Get-Service BFE,MpsSvc | Select-Object Name,Status
+.\irmind.exe --home .\irmind-win11-check
+```
+
+Ingest the verified `Security.evtx` through the TUI. Record elapsed self-test and
+ingestion time if practical; a timeout alone is not proof of isolation. There is
+no standalone helper invocation that bypasses the broker's enforcement checks.
+Use the independently saved analyst fingerprint for any export verification.
 
 Publish only the Windows version/build, architecture, candidate commit, available/unavailable result, accepted record count and verification outcome. Do not publish personal paths, keys, credentials or real evidence. Report suspected security weaknesses privately through [SECURITY.md](../../SECURITY.md).
 

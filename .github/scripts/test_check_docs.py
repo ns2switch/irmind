@@ -34,6 +34,14 @@ class LaunchCommandOwners(unittest.TestCase):
         self.assertIn("--bad-irmind-option", check_docs.irmind_flag_citations(
             "docker compose up && irmind --bad-irmind-option"))
 
+    def test_native_signing_flags_belong_to_the_inspection_tools(self):
+        text = 'codesign --verify --strict --verbose=2 ./irmind\nspctl --assess --type execute --verbose=4 ./irmind\nxcrun stapler validate ./IRMind-macos-aarch64.dmg'
+        self.assertEqual(check_docs.irmind_flag_citations(text), set())
+        self.assertEqual(check_docs.COMMAND.findall(text), [])
+        for extra in [' && irmind --made-up-flag', '; ./irmind --made-up-flag', ' $(irmind --made-up-flag)', ' `irmind --made-up-flag`']:
+            self.assertIn('--made-up-flag', check_docs.irmind_flag_citations('codesign --verify ./irmind' + extra))
+        self.assertIn('--made-up-flag', check_docs.irmind_flag_citations('xcrun irmind --made-up-flag'))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -71,3 +71,50 @@ SignPath decide si el proyecto cumple sus condiciones; no se promete aceptación
 No se añaden credenciales ni integración hasta recibir los IDs y aprobar el diseño.
 Una firma tampoco garantiza reputación inmediata en SmartScreen. Mientras tanto,
 [verifica las descargas](platforms.md#windows) sin desactivar las protecciones del SO.
+
+## Comprobar una candidata con firma nativa en macOS
+
+Usa una descarga normal sin quitar su atributo de cuarentena. Sustituye los
+nombres por los ficheros exactos de esa release:
+
+```sh
+codesign --verify --strict --verbose=2 ./irmind
+codesign --verify --strict --verbose=2 ./irmind-evtx
+codesign -dv --verbose=4 ./irmind
+spctl --assess --type execute --verbose=4 ./irmind
+xcrun stapler validate ./IRMind-macos-aarch64.dmg
+spctl --assess --type open --context context:primary-signature --verbose=4 ./IRMind-macos-aarch64.dmg
+```
+
+La identidad debe ser el Developer ID aprobado y las banderas deben incluir
+hardened runtime. Ambas evaluaciones y la validación del ticket del DMG deben
+funcionar. Comprueba también el DMG sin conexión. Un ejecutable CLI suelto no
+admite ticket adjunto: evalúalo con red. Registra versión de macOS, tag y
+resultados. Las releases actuales sin firma nativa no tienen por qué superar
+estas comprobaciones.
+
+## Preparar la solicitud de SignPath
+
+El repositorio no registra el resultado de ninguna solicitud. Solo el mantenedor
+puede confirmar el estado de una solicitud privada. Prepara las URL del proyecto
+y sus releases, licencia, política de firma, procedencia de builds, artefactos
+a firmar y responsables de revisión y aprobación. Comprueba los campos vigentes
+del formulario externo al enviarlo.
+
+Descripción propuesta del proyecto:
+
+> IRMind es un asistente de terminal de código abierto para respuesta defensiva
+> a incidentes y análisis forense. El analista consulta evidencia local o fuentes
+> remotas configuradas explícitamente. La política y las aprobaciones gobiernan
+> las herramientas; los registros del caso se firman. La release Windows incluye
+> la CLI y el decodificador EVTX aislado. Los builds proceden de código revisado
+> mediante GitHub Actions fijadas e incluyen checksums, firmas Sigstore,
+> procedencia y SBOM.
+
+Las [condiciones de la Fundación](https://signpath.org/terms) exigen roles
+explícitos, información de privacidad, builds verificables y aprobación de cada
+solicitud de firma. [CODE_SIGNING.md](../../CODE_SIGNING.md) identifica los roles
+y el estado actual. No atribuyas patrocinio antes de la aceptación. Los metadatos
+de nombre y versión de Windows y las restricciones de artefactos de SignPath
+se comprobarán al integrar: la política por sí sola no demuestra cumplimiento.
+Credenciales y activación requieren una acción posterior del mantenedor.
