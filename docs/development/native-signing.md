@@ -74,11 +74,10 @@ See [Apple's notarization workflow](https://developer.apple.com/documentation/se
 
 ## Windows / SignPath
 
-[Issue #66](https://github.com/ns2switch/irmind/issues/66) has no recorded application
-or acceptance. The maintainer must review [eligibility](https://signpath.org/terms),
-submit [the application](https://signpath.org/apply), name release approvers and
-agree the build/signing policy. IRMind is defensive investigation software; the
-Foundation decides eligibility. No application is submitted automatically.
+The maintainer has submitted the SignPath Foundation application. Acceptance and
+integration configuration are pending; Authenticode is not active. The
+[code signing policy](../../CODE_SIGNING.md) identifies the team and requires
+manual approval of every signing request. The Foundation decides eligibility.
 
 Provide the repository, MIT/Apache license, existing signed release URL, this
 project's code-signing policy, CI/build provenance and the two Windows executables
@@ -108,13 +107,36 @@ cannot carry a stapled ticket; assess them with network access. Record the macOS
 version, candidate tag and outcomes. Current releases without native signing
 are not expected to pass these native assessments.
 
-## SignPath application preparation
+## SignPath integration preparation (inactive)
 
-No application outcome is recorded in this repository; only the maintainer can
-confirm a privately submitted application's status. Prepare project/release URLs,
-license, the code-signing policy, build provenance, intended artifacts and the
-people responsible for review and signing approval. The form is externally
-hosted; check its current fields when applying.
+The release workflow marks the integration point immediately before SBOM
+creation. A future dedicated signing job must run only for a published tag's
+push, use the protected `release` environment and submit both Windows executables
+from that run's GitHub Actions artifact. Every request requires Anibal Cañada's
+manual approval in SignPath. PRs and branch/manual rehearsals cannot request
+production signing. Replace the staged Windows files with the approved, verified
+Authenticode output before generating SHA256SUMS, Sigstore signatures and
+provenance. A rejected, timed-out or invalid request must fail publication.
+
+No SignPath action runs today. After the
+Foundation approves the project and provides its configuration, prepare:
+
+| Environment `release` setting | Purpose |
+| --- | --- |
+| Secret `SIGNPATH_API_TOKEN` | Foundation-provided submission credential for this project; never the approver's interactive credentials. |
+| Variable `SIGNPATH_ORGANIZATION_ID` | Organization identifier. |
+| Variable `SIGNPATH_PROJECT_SLUG` | Approved project identifier. |
+| Variable `SIGNPATH_SIGNING_POLICY_SLUG` | Policy that requires manual approval for release signing. |
+| Variable `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` | Configuration restricting signing to the two project executables and their IRMind product/version metadata. |
+
+The identifiers are configuration, not private keys. The Foundation retains the
+certificate's signing key; no Windows PFX or certificate password belongs in this
+repository. The action can use the job's existing `GITHUB_TOKEN` to read its
+artifact and build metadata; no additional GitHub PAT is planned. Pin the official
+SignPath action to a reviewed full commit when the integration is implemented.
+See the [official GitHub integration](https://docs.signpath.io/trusted-build-systems/github).
+Setting any of these values alone does not activate signing: a reviewed workflow
+change and explicit maintainer activation are still required.
 
 Suggested project description:
 
@@ -128,7 +150,7 @@ Suggested project description:
 The [Foundation's conditions](https://signpath.org/terms) require explicit team
 roles, privacy disclosures, verifiable builds and approval of each signing
 request. [CODE_SIGNING.md](../../CODE_SIGNING.md) identifies the project roles
-and current signing status. Do not claim Foundation sponsorship before acceptance.
+and current signing status. The attribution identifies the intended Windows signing service; the policy explicitly states that integration is not active.
 Windows product-name/version metadata and SignPath artifact restrictions must
 be checked during integration; the policy alone does not establish compliance.
 Any integration credentials and activation require a separate maintainer action.
