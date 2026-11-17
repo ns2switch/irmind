@@ -1,0 +1,107 @@
+[
+  {
+    "build_profile": "release",
+    "engine_commit": "55331ce7dd68acbe1299e50f9548876223e00d19",
+    "run": 1,
+    "scenarios": {
+      "conversation_10_turns": {
+        "cache_read_ceiling_sim": 33408,
+        "compaction_requests": 0,
+        "frozen_archive_cache_read_ceiling_sim": 56704,
+        "input_tokens_sim": 73445,
+        "model_requests": 10
+      },
+      "skill_15_rounds": {
+        "cache_read_ceiling_sim": 107776,
+        "compaction_requests": 0,
+        "frozen_archive_cache_read_ceiling_sim": 107776,
+        "input_tokens_sim": 126382,
+        "model_requests": 15
+      },
+      "skill_15_rounds_long_notes": {
+        "cache_read_ceiling_sim": 129152,
+        "compaction_requests": 3,
+        "frozen_archive_cache_read_ceiling_sim": 128384,
+        "input_tokens_sim": 183594,
+        "model_requests": 18
+      },
+      "three_subagents": {
+        "cache_read_ceiling_sim": 29056,
+        "compaction_requests": 0,
+        "frozen_archive_cache_read_ceiling_sim": 29056,
+        "input_tokens_sim": 48655,
+        "model_requests": 11
+      }
+    }
+  },
+  {
+    "build_profile": "release",
+    "engine_commit": "55331ce7dd68acbe1299e50f9548876223e00d19",
+    "run": 2,
+    "scenarios": {
+      "conversation_10_turns": {
+        "cache_read_ceiling_sim": 33408,
+        "compaction_requests": 0,
+        "frozen_archive_cache_read_ceiling_sim": 56704,
+        "input_tokens_sim": 73445,
+        "model_requests": 10
+      },
+      "skill_15_rounds": {
+        "cache_read_ceiling_sim": 107776,
+        "compaction_requests": 0,
+        "frozen_archive_cache_read_ceiling_sim": 107776,
+        "input_tokens_sim": 126382,
+        "model_requests": 15
+      },
+      "skill_15_rounds_long_notes": {
+        "cache_read_ceiling_sim": 129152,
+        "compaction_requests": 3,
+        "frozen_archive_cache_read_ceiling_sim": 128384,
+        "input_tokens_sim": 183594,
+        "model_requests": 18
+      },
+      "three_subagents": {
+        "cache_read_ceiling_sim": 29056,
+        "compaction_requests": 0,
+        "frozen_archive_cache_read_ceiling_sim": 29056,
+        "input_tokens_sim": 48655,
+        "model_requests": 11
+      }
+    }
+  },
+  {
+    "build_profile": "release",
+    "engine_commit": "55331ce7dd68acbe1299e50f9548876223e00d19",
+    "run": 3,
+    "scenarios": {
+      "conversation_10_turns": {
+        "cache_read_ceiling_sim": 33408,
+        "compaction_requests": 0,
+        "frozen_archive_cache_read_ceiling_sim": 56704,
+        "input_tokens_sim": 73445,
+        "model_requests": 10
+      },
+      "skill_15_rounds": {
+        "cache_read_ceiling_sim": 107776,
+        "compaction_requests": 0,
+        "frozen_archive_cache_read_ceiling_sim": 107776,
+        "input_tokens_sim": 126382,
+        "model_requests": 15
+      },
+      "skill_15_rounds_long_notes": {
+        "cache_read_ceiling_sim": 129152,
+        "compaction_requests": 3,
+        "frozen_archive_cache_read_ceiling_sim": 128384,
+        "input_tokens_sim": 183594,
+        "model_requests": 18
+      },
+      "three_subagents": {
+        "cache_read_ceiling_sim": 29056,
+        "compaction_requests": 0,
+        "frozen_archive_cache_read_ceiling_sim": 29056,
+        "input_tokens_sim": 48655,
+        "model_requests": 11
+      }
+    }
+  }
+]

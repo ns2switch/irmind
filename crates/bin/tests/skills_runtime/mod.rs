@@ -8,6 +8,7 @@ mod authorization;
     feature = "parser-suricata"
 ))]
 mod catalog;
+mod context_cost;
 mod malicious;
 pub(super) mod measurement;
 mod sequence;

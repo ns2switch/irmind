@@ -174,6 +174,7 @@ impl LlmPort for MixedEpisode {
         } else {
             "Reviewing the bounded synthetic sources.".into()
         };
+        let measured = super::context_cost::capture("three_subagents", 1, &request, text.len());
         self.requests.lock().unwrap().push(request);
         Ok(irmind_app::single_completion_stream(
             ModelResponse {
@@ -182,10 +183,10 @@ impl LlmPort for MixedEpisode {
                 raw: "scripted".into(),
                 truncated: false,
             },
-            Some(ModelUsage {
+            measured.or(Some(ModelUsage {
                 input_tokens: 10,
                 output_tokens: 5,
-            }),
+            })),
         ))
     }
 }

@@ -1,0 +1,63 @@
+{
+  "contract": "context-cache-accounting-proposal-v1",
+  "synthetic": true,
+  "rates_microusd_per_million": {
+    "ordinary_input": 1000000,
+    "cache_read": 100000,
+    "cache_write_five_minutes": 1250000,
+    "output": 2000000
+  },
+  "vectors": [
+    {
+      "id": "openai-read",
+      "ordinary_input_tokens": 200,
+      "charged_tokens": 1050,
+      "usage_event_json": "{\"input_tokens\":1000,\"output_tokens\":50,\"estimated_cost_microusd\":380,\"cache\":{\"read_input_tokens\":800,\"write_input_tokens\":0,\"write_lifetime\":\"not-applicable\"}}",
+      "sha256": "1dda59c6284541b8cb0992a289fb1951e1c6831df2b5584a2fe6fe2ae641ab63"
+    },
+    {
+      "id": "deepseek-read",
+      "ordinary_input_tokens": 100,
+      "charged_tokens": 1050,
+      "usage_event_json": "{\"input_tokens\":1000,\"output_tokens\":50,\"estimated_cost_microusd\":290,\"cache\":{\"read_input_tokens\":900,\"write_input_tokens\":0,\"write_lifetime\":\"not-applicable\"}}",
+      "sha256": "2177dabe0c992ec15cb89386fa6fce4771de884e9601d0940966281ff88640e9"
+    },
+    {
+      "id": "anthropic-read-write",
+      "ordinary_input_tokens": 100,
+      "charged_tokens": 1050,
+      "usage_event_json": "{\"input_tokens\":1000,\"output_tokens\":50,\"estimated_cost_microusd\":405,\"cache\":{\"read_input_tokens\":800,\"write_input_tokens\":100,\"write_lifetime\":\"five-minutes\"}}",
+      "sha256": "5506f27174356759abd5c9c509d9126f6722a7c65ad6d0e2105f11bccd7f8981"
+    },
+    {
+      "id": "anthropic-unknown-lifetime",
+      "ordinary_input_tokens": 100,
+      "charged_tokens": 1050,
+      "usage_event_json": "{\"input_tokens\":1000,\"output_tokens\":50,\"estimated_cost_microusd\":null,\"cache\":{\"read_input_tokens\":800,\"write_input_tokens\":100,\"write_lifetime\":\"unknown\"}}",
+      "sha256": "59c69f3c3fb804a5906feccf8916f2d1ab46e9fc2cb4ec7c52c47d93bf4bcc0b"
+    },
+    {
+      "id": "reported-zero",
+      "ordinary_input_tokens": 1000,
+      "charged_tokens": 1025,
+      "usage_event_json": "{\"input_tokens\":1000,\"output_tokens\":25,\"estimated_cost_microusd\":1050,\"cache\":{\"read_input_tokens\":0,\"write_input_tokens\":0,\"write_lifetime\":\"not-applicable\"}}",
+      "sha256": "c25783e4993438e252a3d90074c64be34107125722f88a38bdb03aa6499ef0d2"
+    },
+    {
+      "id": "unknown-breakdown",
+      "ordinary_input_tokens": null,
+      "charged_tokens": 1025,
+      "usage_event_json": "{\"input_tokens\":1000,\"output_tokens\":25,\"estimated_cost_microusd\":null}",
+      "sha256": "e8791cbb710d5ea28caeada61b6654d33bde7592dced927bf98c1f7427ca1b0f"
+    }
+  ],
+  "negative_cases": [
+    "read + write > inclusive input",
+    "u64 or u128 overflow",
+    "conflicting DeepSeek cache representations",
+    "incomplete Anthropic inclusive usage",
+    "reply/receipt cache mismatch",
+    "duplicate settlement",
+    "cache hit presented as budget credit"
+  ]
+}
