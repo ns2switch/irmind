@@ -2,7 +2,7 @@ use super::Partition;
 #[cfg(test)]
 use super::{AppError, EvidenceHash, GraphRecord, invalid_source, storage};
 #[cfg(test)]
-use chrono::{DateTime, SecondsFormat, Utc};
+use irmind_calendar::{DateTime, SecondsFormat, Utc};
 #[cfg(test)]
 use serde_json::Value;
 #[derive(serde::Serialize, serde::Deserialize)]

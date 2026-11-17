@@ -56,7 +56,6 @@ cloud = [
     "hyper",
     "reqwest",
     "reqwest/stream",
-    "chrono/serde",
     "base64",
     "rand",
     "ring",
@@ -101,10 +100,6 @@ default-features = false
 [dependencies.bytes]
 version = "1.0"
 
-[dependencies.chrono]
-version = "0.4.34"
-features = ["clock"]
-default-features = false
 
 [dependencies.form_urlencoded]
 version = "1.2"
@@ -130,8 +125,10 @@ features = ["std"]
 optional = true
 default-features = false
 
-[dependencies.humantime]
-version = "2.1"
+[dependencies.jiff]
+version = "=0.2.39"
+default-features = false
+features = ["std"]
 
 [dependencies.hyper]
 version = "1.2"
@@ -287,3 +284,8 @@ version = "0.3.50"
 [target.'cfg(target_family="unix")'.dev-dependencies.nix]
 version = "0.31.1"
 features = ["fs"]
+
+[dependencies.irmind-calendar]
+version = "0.1.0"
+path = "../../crates/calendar"
+features = ["config-duration"]

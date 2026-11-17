@@ -54,3 +54,5 @@ incremental = false
 
 [patch.crates-io]
 winstructs = { path = "vendor/winstructs" }
+arrow-array = { path = "../../vendor/arrow-array" }
+parquet = { path = "../../vendor/parquet" }

@@ -1,5 +1,5 @@
 use super::time::Calendar;
-use chrono::DateTime;
+use irmind_calendar::DateTime;
 
 pub(super) struct Header<'a> {
     pub(super) time: &'a str,

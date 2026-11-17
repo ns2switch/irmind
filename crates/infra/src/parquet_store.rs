@@ -1,8 +1,8 @@
 //! Bounded local conversion. Only artifacts returned here may enter the signed
 //! manifest; query paths validate that manifest before opening a Parquet file.
 
-use arrow::array::{ArrayRef, StringArray, UInt64Array};
-use arrow::record_batch::RecordBatch;
+use arrow_array::RecordBatch;
+use arrow_array::{ArrayRef, StringArray, UInt64Array};
 use irmind_app::{AppError, CancellationToken, LargeCaseStore, ParseReport, StreamingEventParser};
 use irmind_domain::{CaseId, EvidenceHash, ParquetArtifact, SourceManifestV1};
 use parquet::arrow::ArrowWriter;

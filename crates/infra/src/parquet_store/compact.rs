@@ -2,8 +2,9 @@ use super::{
     AppError, CancellationToken, CaseId, EvidenceHash, File, OpenOptions, ParquetArtifact,
     ParquetStore, Path, StagedArtifact, fs, invalid_source, storage,
 };
-use arrow::compute::{SortColumn, lexsort_to_indices, take};
-use arrow::record_batch::RecordBatch;
+use arrow_array::RecordBatch;
+use arrow_ord::sort::{SortColumn, lexsort_to_indices};
+use arrow_select::take::take;
 use parquet::arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder};
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;

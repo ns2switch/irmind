@@ -18,7 +18,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 use std::time::Duration;
 
-use humantime::{format_duration, parse_duration};
+use jiff::fmt::friendly::SpanPrinter;
+use irmind_calendar::parse_config_duration;
 use reqwest::header::HeaderValue;
 
 use crate::{Error, Result};
@@ -87,7 +88,7 @@ impl Parse for bool {
 
 impl Parse for Duration {
     fn parse(v: &str) -> Result<Self> {
-        parse_duration(v).map_err(|_| Error::Generic {
+        parse_config_duration(v).ok_or_else(|| Error::Generic {
             store: "Config",
             source: format!("failed to parse \"{v}\" as Duration").into(),
         })
@@ -123,7 +124,7 @@ impl Parse for HeaderValue {
 
 pub(crate) fn fmt_duration(duration: &ConfigValue<Duration>) -> String {
     match duration {
-        ConfigValue::Parsed(v) => format_duration(*v).to_string(),
+        ConfigValue::Parsed(v) => SpanPrinter::new().unsigned_duration_to_string(v),
         ConfigValue::Deferred(v) => v.clone(),
     }
 }

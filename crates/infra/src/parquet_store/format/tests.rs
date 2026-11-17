@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
-use arrow::array::TimestampMicrosecondArray;
+use arrow_array::TimestampMicrosecondArray;
 use irmind_app::CancellationToken;
 use irmind_domain::CaseId;
 

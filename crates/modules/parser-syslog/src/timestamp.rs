@@ -1,5 +1,5 @@
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
 use irmind_app::AppError;
+use irmind_calendar::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LegacyTimestamp {
@@ -36,7 +36,7 @@ impl LegacyTimestamp {
             .ok_or_else(super::invalid)?;
         Ok(at
             .with_timezone(&Utc)
-            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+            .to_rfc3339_opts(irmind_calendar::SecondsFormat::Secs, true))
     }
 }
 
@@ -48,5 +48,5 @@ pub(super) fn explicit(raw: &str) -> Result<String, AppError> {
     }
     Ok(at
         .with_timezone(&Utc)
-        .to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true))
+        .to_rfc3339_opts(irmind_calendar::SecondsFormat::AutoSi, true))
 }

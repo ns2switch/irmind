@@ -1,7 +1,7 @@
 //! Batch-lifetime ordering keys; allocate only retained extrema or output rows.
 use super::columns::{TimeColumns, column};
 use super::{AppError, RecordBatch, TimeCell, invalid_source};
-use arrow::array::{Array as _, StringArray, UInt64Array};
+use arrow_array::{Array as _, StringArray, UInt64Array};
 use irmind_app::IndexedTime;
 
 #[derive(Clone, Copy)]

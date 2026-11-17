@@ -58,3 +58,14 @@ modules are omitted. The official EVTX decoder is unchanged. The verified source
 archive and file hashes are recorded in
 [the provenance manifest](helpers/evtx/vendor/winstructs/UPSTREAM.json), with
 [the upstream license](helpers/evtx/vendor/winstructs/LICENSE).
+
+
+## Reviewed Arrow and Parquet source patches
+
+IRMind includes the published Apache `arrow-array` 59.3.2 and `parquet` 59.3.0
+sources under `vendor/`, with calendar dependency substitutions. Both are
+Apache-2.0, copyright The Apache Software Foundation. Their original
+`LICENSE.txt` and `NOTICE.txt`, archive checksums, original file hashes and local
+patch hashes accompany the sources. See each directory's `IRMIND_PATCH.md` and
+`UPSTREAM.json`. The Arrow umbrella is replaced by the same versioned array,
+schema, select and ordering components; no local Arrow cast patch is required.

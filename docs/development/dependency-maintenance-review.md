@@ -20,8 +20,7 @@ where general calendar/format support is required.
   [source manifest](../../helpers/evtx/vendor/winstructs/UPSTREAM.json).
   EVTX decoding, timestamps, protocol and containment are unchanged.
 - The helper's fuzz lockfile no longer contains either retired dependency.
-  The helper's development graph still reaches `chrono` through Parquet/Arrow;
-  removing that path remains part of the work below.
+  The helper development graph now uses the same reviewed Arrow/Parquet sources.
 
 Validation so far: 159 TUI/connector tests, two additional exact-boundary tests,
 14 native Linux EVTX protocol/containment/custody tests and the retained GUID
@@ -42,7 +41,7 @@ version listed. Published Arrow/Parquet 60.1.0 still require `chrono` normally;
 cannot satisfy the removal target. The existing physical-format versions can
 therefore stay pinned while their date dependencies are replaced explicitly.
 
-## Concrete remaining source/dependency proposal
+## Approved replacement and implementation
 
 1. Use **`time = 0.3.55`** directly for the remaining general date consumers.
    It is already present in the main lockfile through AWS and supports strftime
@@ -72,10 +71,19 @@ therefore stay pinned while their date dependencies are replaced explicitly.
    workspaces. The GUID-only **`winstructs 0.3.2`** patch above remains separate
    from the official EVTX decoder; no EVTX fork or isolation change is proposed.
 
-The new direct dependency declarations and local third-party source patches are
-an additional supply-chain choice. They are proposed here; the `time` and Arrow
-changes are not implemented in this slice. None grants permissions or introduces
-credentials, and no IRMind domain/application port change is proposed.
+The approved implementation shares a small safe `irmind-calendar` utility backed
+by `time`, preserving fractional groups and fixed-offset handling. The existing
+Arrow umbrella proved unnecessary: removing it also removes `arrow-cast`, so no
+cast source patch ships. Only array and Parquet sources require local date patches.
+The AWS recorded-response test now uses a small in-memory signed-request
+connector instead of the SDK test utility, whose diagnostic CBOR dependency also
+pulled in `chrono`. This adds no production dependency.
+
+All four lockfiles are free of `chrono` and `humantime`. The principal workspace
+passes the unchanged cargo-deny policy. Frozen reference vectors cover 756 date,
+fraction and offset combinations plus common formatting patterns; the existing
+21 format golden tests pass without changing their expected bytes. Full native CI
+and distribution validation remain completion gates.
 
 ## Completion gates
 

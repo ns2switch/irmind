@@ -1,8 +1,6 @@
 use super::Predicate;
-use arrow::{
-    array::{Array, UInt8Array, UInt16Array, UInt32Array},
-    error::ArrowError,
-};
+use arrow_array::{Array, UInt8Array, UInt16Array, UInt32Array};
+use arrow_schema::ArrowError;
 fn invalid() -> ArrowError {
     ArrowError::SchemaError("invalid common event code column".into())
 }

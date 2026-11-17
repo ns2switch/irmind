@@ -26,7 +26,7 @@ use crate::{RetryConfig, StaticCredentialProvider};
 use async_trait::async_trait;
 use base64::Engine;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
-use chrono::{DateTime, Utc};
+use irmind_calendar::{DateTime, Utc};
 use futures_util::TryFutureExt;
 use http::{HeaderMap, Method};
 use itertools::Itertools;

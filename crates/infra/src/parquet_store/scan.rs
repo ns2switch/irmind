@@ -1,7 +1,7 @@
 use super::{AppError, CancellationToken, CaseId, ParquetArtifact, ParquetStore, Path, storage};
-use arrow::array::BooleanArray;
-use arrow::datatypes::DataType;
-use arrow::record_batch::RecordBatch;
+use arrow_array::BooleanArray;
+use arrow_array::RecordBatch;
+use arrow_schema::DataType;
 use irmind_domain::GraphQueryFilter;
 use parquet::arrow::ProjectionMask;
 use parquet::arrow::arrow_reader::{ArrowPredicateFn, ParquetRecordBatchReaderBuilder, RowFilter};
@@ -265,7 +265,7 @@ fn projection(
             builder
                 .schema()
                 .field_with_name("event_time")
-                .map(arrow::datatypes::Field::data_type),
+                .map(arrow_schema::Field::data_type),
             Ok(DataType::Timestamp(_, _))
         );
         let expected = super::format::expected_type(name, precise);
@@ -292,7 +292,7 @@ fn row_filter(
             builder
                 .schema()
                 .field_with_name("event_time")
-                .map(arrow::datatypes::Field::data_type),
+                .map(arrow_schema::Field::data_type),
             Ok(DataType::Timestamp(_, _))
         )
     {

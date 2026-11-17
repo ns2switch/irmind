@@ -1,10 +1,8 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
-use arrow::{
-    array::{Array, ArrayRef, Int64Array, StringArray, StructArray},
-    datatypes::{DataType, Field, Schema},
-    record_batch::RecordBatch,
-};
+use arrow_array::RecordBatch;
+use arrow_array::{Array, ArrayRef, Int64Array, StringArray, StructArray};
+use arrow_schema::{DataType, Field, Schema};
 use irmind_app::{CancellationToken, ParseReport, SourceDecoder};
 use parquet::arrow::ArrowWriter;
 use std::io::{Cursor, Seek, SeekFrom};

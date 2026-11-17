@@ -1,9 +1,7 @@
 use super::RecordBatch;
 mod numeric;
-use arrow::{
-    array::{Array, StringArray, UInt64Array},
-    error::ArrowError,
-};
+use arrow_array::{Array, StringArray, UInt64Array};
+use arrow_schema::ArrowError;
 use memchr::{memchr, memchr2};
 #[derive(Clone)]
 pub(in crate::parquet_store) enum Predicate {
@@ -55,11 +53,11 @@ impl Predicate {
             }
             let times = column
                 .as_any()
-                .downcast_ref::<arrow::array::TimestampMicrosecondArray>()
+                .downcast_ref::<arrow_array::TimestampMicrosecondArray>()
                 .ok_or_else(|| ArrowError::SchemaError("invalid time column".into()))?;
             let residual = batch
                 .column_by_name("submicro_nanos")
-                .and_then(|a| a.as_any().downcast_ref::<arrow::array::UInt16Array>())
+                .and_then(|a| a.as_any().downcast_ref::<arrow_array::UInt16Array>())
                 .ok_or_else(|| ArrowError::SchemaError("missing residual time".into()))?;
             if times.is_null(row) || residual.is_null(row) {
                 return Ok(false);

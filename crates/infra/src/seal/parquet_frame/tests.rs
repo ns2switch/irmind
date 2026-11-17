@@ -1,9 +1,7 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
-use arrow::{
-    datatypes::{DataType, Field, Schema},
-    record_batch::RecordBatch,
-};
+use arrow_array::RecordBatch;
+use arrow_schema::{DataType, Field, Schema};
 use parquet::arrow::ArrowWriter;
 use sha2::{Digest, Sha256};
 use std::{collections::HashMap, io::Write, sync::Arc};

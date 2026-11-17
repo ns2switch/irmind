@@ -16,11 +16,9 @@
 #[path = "support/current_sources.rs"]
 mod current_sources;
 
-use arrow::{
-    array::{Array, ArrayRef, Int64Array, StringArray, StructArray},
-    datatypes::{DataType, Field, Schema},
-    record_batch::RecordBatch,
-};
+use arrow_array::RecordBatch;
+use arrow_array::{Array, ArrayRef, Int64Array, StringArray, StructArray};
+use arrow_schema::{DataType, Field, Schema};
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,

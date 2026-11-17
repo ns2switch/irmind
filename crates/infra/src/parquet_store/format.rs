@@ -1,8 +1,6 @@
 use super::{AppError, ParquetArtifact, RecordBatch, invalid_source, storage};
-use arrow::{
-    array::{Array, ArrayRef, StringArray, UInt64Array},
-    datatypes::{DataType, Field, Schema, TimeUnit},
-};
+use arrow_array::{Array, ArrayRef, StringArray, UInt64Array};
+use arrow_schema::{DataType, Field, Schema, TimeUnit};
 use std::{collections::BTreeMap, sync::Arc};
 
 pub(super) fn same_family(actual: &str, requested: &str) -> bool {

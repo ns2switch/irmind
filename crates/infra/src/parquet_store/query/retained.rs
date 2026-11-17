@@ -1,7 +1,8 @@
 //! Preserve eager stable ordering/deduplication while owning only retained rows.
 use super::{AppError, EventHit};
 use crate::parquet_store::time_cell::{BorrowedCell, BorrowedRows};
-use arrow::{array::StringArray, record_batch::RecordBatch};
+use arrow_array::RecordBatch;
+use arrow_array::StringArray;
 #[derive(Clone, Copy)]
 enum Origin {
     Retained(usize),

@@ -105,10 +105,10 @@ fn value(field: &Field, depth: usize, budget: &mut Budget) -> Result<SourceValue
     }
 }
 fn temporal(field: &Field) -> Result<String, AppError> {
-    use chrono::{DateTime, NaiveDate, NaiveTime, SecondsFormat, TimeDelta};
+    use irmind_calendar::{DateTime, NaiveDate, NaiveTime, SecondsFormat, TimeDelta};
     match field {
         Field::Date(days) => NaiveDate::from_ymd_opt(1970, 1, 1)
-            .and_then(|d| d.checked_add_signed(TimeDelta::days(i64::from(*days))))
+            .and_then(|d| d.checked_add_signed(TimeDelta::days(*days)))
             .map(|d| d.to_string())
             .ok_or_else(invalid),
         Field::TimeMillis(value) => {

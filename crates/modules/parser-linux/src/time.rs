@@ -1,5 +1,5 @@
 use super::{AppError, LinuxParser, ParserTimeContext, ParserTimeRequirement, bad};
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
+use irmind_calendar::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
 use irmind_domain::{ParserLocation, Provenance, SourceKind, Tainted};
 use serde::Deserialize;
 use std::borrow::Cow;

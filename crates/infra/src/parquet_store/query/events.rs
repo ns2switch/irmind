@@ -148,10 +148,10 @@ impl QueryStore<'_> {
                 if let (Some(categories), Some(outcomes)) = (
                     batch
                         .column_by_name("event_category_bits")
-                        .and_then(|v| v.as_any().downcast_ref::<arrow::array::UInt32Array>()),
+                        .and_then(|v| v.as_any().downcast_ref::<arrow_array::UInt32Array>()),
                     batch
                         .column_by_name("event_outcome")
-                        .and_then(|v| v.as_any().downcast_ref::<arrow::array::UInt8Array>()),
+                        .and_then(|v| v.as_any().downcast_ref::<arrow_array::UInt8Array>()),
                 ) {
                     common_records += batch.num_rows() as u64;
                     classified_records +=
