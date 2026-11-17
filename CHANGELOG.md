@@ -8,8 +8,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 **Format impact:** Optional cache metadata extends signed usage receipts and
 optional cache prices extend signed configuration. Missing fields retain their
-existing canonical bytes. Case, artifact, seal and export versions are unchanged;
-no migration is required for cases created by this minor version.
+existing canonical bytes. Case, artifact, seal and export versions are unchanged. Retain the creating
+executable for full reconstruction of its signed native decoder/mapping profiles.
 
 - Publish native macOS Intel binaries alongside Apple Silicon, Linux x86_64,
   Linux aarch64 and Windows. Verify clean installers even when optional native
