@@ -97,7 +97,7 @@ The byte `0x0f` is covered by the real-binary PTY regression on the CI operating
 
 ## Native signing preparation
 
-Developer ID signing and notarization are prepared but disabled. See the
+Developer ID signing and notarization for both macOS architectures are prepared but disabled. See the
 [maintainer setup](development/native-signing.md); current releases still lack
 Apple native signatures. No production secret or activation is required to use
 the existing Sigstore verification. SignPath application/acceptance remains

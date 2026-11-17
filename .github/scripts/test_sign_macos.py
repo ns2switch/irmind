@@ -10,6 +10,13 @@ spec.loader.exec_module(signing)
 
 
 class GateTests(unittest.TestCase):
+    def test_both_architectures_have_closed_disk_image_names(self):
+        self.assertEqual(signing.disk_image_name('aarch64'), 'IRMind-macos-aarch64.dmg')
+        self.assertEqual(signing.disk_image_name('x86_64'), 'IRMind-macos-x86_64.dmg')
+        for invalid in ('../escape', 'arm64', 'x86_64;id'):
+            with self.assertRaises(ValueError):
+                signing.disk_image_name(invalid)
+
     def environment(self):
         return dict.fromkeys(signing.FIELDS, 'synthetic') | {
             'GITHUB_EVENT_NAME': 'push', 'GITHUB_REF': 'refs/tags/v0.5.1',
@@ -37,7 +44,9 @@ class GateTests(unittest.TestCase):
             self.assertIn(gate, job)
         self.assertNotIn('id-token: write', job)
         self.assertIn("needs.native_macos.result == 'success' || needs.native_macos.result == 'skipped'", text)
-        self.assertIn('IRMind-macos-aarch64.dmg.sigstore.json', text)
+        self.assertIn("subject-path: 'release/IRMind-macos-*.dmg'", text)
+        self.assertIn('irmind-macos-native-x86_64', text)
+        self.assertIn('irmind-macos-native-aarch64', text)
 
 
 if __name__ == '__main__':

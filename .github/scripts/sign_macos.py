@@ -37,7 +37,13 @@ def run(*args):
     return result.stdout.decode('utf-8', errors='replace')
 
 
-def sign(source):
+def disk_image_name(architecture):
+    if architecture not in ('aarch64', 'x86_64'):
+        raise ValueError('Unsupported release architecture')
+    return f'IRMind-macos-{architecture}.dmg'
+
+
+def sign(source, architecture='aarch64'):
     enabled_environment(os.environ)
     if platform.system() != 'Darwin':
         raise ValueError('Developer ID signing requires a macOS runner')
@@ -74,7 +80,7 @@ def sign(source):
                 if details.returncode or b'runtime' not in details.stderr:
                     raise ValueError('Hardened runtime verification failed')
                 shutil.copy2(binary, payload / name)
-            dmg = source / 'IRMind-macos-aarch64.dmg'
+            dmg = source / disk_image_name(architecture)
             run('hdiutil', 'create', '-volname', 'IRMind', '-srcfolder', payload,
                 '-format', 'UDZO', dmg)
             run('codesign', '--force', '--timestamp', '--sign', identity, '--keychain', keychain, dmg)
@@ -104,7 +110,9 @@ def sign(source):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', type=Path)
+    parser.add_argument('--architecture', choices=('aarch64', 'x86_64'), default='aarch64')
     try:
-        sign(parser.parse_args().source)
+        args = parser.parse_args()
+        sign(args.source, args.architecture)
     except (ValueError, RuntimeError, OSError, subprocess.TimeoutExpired):
         raise SystemExit('Native signing/notarization failed closed; no signed artifact published.') from None

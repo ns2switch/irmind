@@ -99,7 +99,7 @@ La prueba PTY del binario real en los sistemas de CI cubre el byte `0x0f`. Esto 
 
 ## Preparación de firma nativa
 
-Developer ID y notarización están preparados pero desactivados; consulta
+Developer ID y notarización para ambas arquitecturas están preparados pero desactivados; consulta
 [la guía del mantenedor](native-signing.md). Las releases actuales siguen sin
 firma nativa de Apple. #66 no contiene aceptación de SignPath registrada.
 Windows puede mostrar «Windows protected your PC», aplicación no reconocida o
