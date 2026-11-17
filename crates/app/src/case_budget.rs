@@ -126,6 +126,20 @@ pub fn case_budget_usage(entries: &[SignedEntry]) -> Result<CaseBudgetUsage, App
     Ok(ledger.finish())
 }
 
+/// Internal overflow check only: an incomplete subtotal is never a displayed bill.
+pub(crate) fn reported_cost_subtotal(entries: &[SignedEntry]) -> Result<u64, AppError> {
+    entries
+        .iter()
+        .filter(|entry| entry.kind == crate::AuditEventKind::ModelUsage)
+        .try_fold(0u64, |total, entry| {
+            let usage: UsageEvent = serde_json::from_str(&entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            total
+                .checked_add(usage.estimated_cost_microusd.unwrap_or(0))
+                .ok_or(AppError::InvalidChain(entry.seq))
+        })
+}
+
 pub(crate) struct UsageAccumulator {
     usage: CaseBudgetUsage,
     models: std::collections::BTreeMap<String, ActorModelUsage>,
@@ -286,6 +300,27 @@ mod tests {
             sig: vec![],
             public_key: vec![],
         }
+    }
+    #[test]
+    fn an_unreported_request_makes_aggregate_cost_and_cache_coverage_unknown() {
+        let mut entries = vec![entry(
+            AuditEventKind::ModelUsage,
+            r#"{"input_tokens":1000,"output_tokens":50,"estimated_cost_microusd":380,"cache":{"read_input_tokens":800,"write_input_tokens":0,"write_lifetime":"not-applicable"}}"#,
+        )];
+        assert_eq!(
+            crate::summarize_usage(&entries)
+                .unwrap()
+                .estimated_cost_microusd,
+            Some(380)
+        );
+        for _ in 0..2 {
+            entries.push(entry(AuditEventKind::ModelRequest, "synthetic"));
+            entries.push(entry(AuditEventKind::ModelReply, "synthetic"));
+        }
+        let summary = crate::summarize_usage(&entries).unwrap();
+        assert_eq!(summary.estimated_cost_microusd, None);
+        assert!(summary.cache.is_none());
+        assert_eq!(reported_cost_subtotal(&entries).unwrap(), 380);
     }
     #[test]
     fn cache_is_charged_in_full_and_unknown_reports_do_not_become_zero() {

@@ -46,9 +46,9 @@ impl Engine<'_> {
                 let owned = id.clone();
                 let previous = self
                     .blocking_local(move |local| {
-                        Ok(summarize_usage(&local.audit_log.entries(&owned)?)?
-                            .estimated_cost_microusd
-                            .unwrap_or(0))
+                        crate::case_budget::reported_cost_subtotal(
+                            &local.audit_log.entries(&owned)?,
+                        )
                     })
                     .await?;
                 previous.checked_add(cost).ok_or(AppError::Fixed(

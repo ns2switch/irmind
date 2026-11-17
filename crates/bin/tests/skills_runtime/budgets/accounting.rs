@@ -34,6 +34,13 @@ fn malformed_usage_is_rejected_before_a_receipt_can_invalidate_the_case() {
 
 #[test]
 fn cumulative_cost_overflow_is_rejected_before_publishing_an_invalid_receipt() {
+    exercise_cost_overflow(false);
+}
+#[test]
+fn unpriced_receipts_do_not_erase_the_cost_overflow_check() {
+    exercise_cost_overflow(true);
+}
+fn exercise_cost_overflow(include_unpriced: bool) {
     let root = tempfile::tempdir().unwrap();
     let (store, engine) = setup(root.path());
     let engine = engine.with_pricing(irmind_app::ModelPricing {
@@ -60,6 +67,20 @@ fn cumulative_cost_overflow_is_rejected_before_publishing_an_invalid_receipt() {
     engine
         .investigate(&case.id, "Discuss the local case.", &model)
         .unwrap();
+    if include_unpriced {
+        let unpriced = BudgetModel {
+            requests: std::sync::Mutex::default(),
+            output: Some("Synthetic unpriced reply."),
+            usage: Some(irmind_app::ModelUsage {
+                input_tokens: 1,
+                output_tokens: 0,
+                cache: None,
+            }),
+        };
+        engine
+            .investigate(&case.id, "Discuss the local context.", &unpriced)
+            .unwrap();
+    }
     let invalid = BudgetModel {
         requests: std::sync::Mutex::default(),
         output: Some("Synthetic reply."),
@@ -84,7 +105,7 @@ fn cumulative_cost_overflow_is_rejected_before_publishing_an_invalid_receipt() {
             .iter()
             .filter(|e| e.kind == AuditEventKind::ModelUsage)
             .count(),
-        1
+        1 + usize::from(include_unpriced)
     );
     engine.verify(&case.id).unwrap();
 }
