@@ -7,6 +7,7 @@ use irmind_app::CaseScope;
 
 mod export;
 mod parsers;
+mod recovery;
 mod skills;
 
 impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
@@ -43,7 +44,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             self.exit_to = super::CaseExit::Settings(Some("connectors".into()), true);
             return Ok(true);
         }
-        if self.session_command(&prompt) {
+        if self.session_command(&prompt) || self.recover_subagents_command(&prompt) {
             return Ok(false);
         }
         if self

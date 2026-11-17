@@ -4,6 +4,12 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Recover an interrupted subagent plan explicitly with `/subagents recover`,
+  after confirmation. Nonblocking interprocess activity/recovery locks protect
+  live previews and children, remain held through reconciliation and prevent
+  concurrent deletion. Recovery preserves committed work and uncertain usage
+  without replaying provider requests or tool effects. Signed formats are unchanged.
+
 - Show an actionable notice when a provider completes without a visible answer,
   while retaining its signed empty reply and reported usage.
 

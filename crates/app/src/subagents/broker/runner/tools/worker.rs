@@ -2,6 +2,7 @@ use super::{AppError, CancellationToken, Engine, TaskEvidenceQuery, TaskEvidence
 impl Engine<'_> {
     pub(super) async fn run_child_query(
         &self,
+        started: &crate::subagents::StartedSubagentPlan,
         view: crate::subagents::VerifiedTaskQueryView,
         query: TaskEvidenceQuery,
         deadline: u64,
@@ -10,8 +11,13 @@ impl Engine<'_> {
         let queries = self.subagents.as_ref().ok_or_else(invalid)?.queries.clone();
         let token = cancel.child_token();
         let worker_cancel = token.clone();
-        let mut worker =
-            tokio::task::spawn_blocking(move || queries.execute(&view, query, &worker_cancel));
+        let activity = started.activity.clone().ok_or_else(invalid)?;
+        let mut worker = tokio::task::spawn_blocking(move || {
+            // Dropping the parent future cannot release coordination while a
+            // synchronous callback still owns its assigned evidence view.
+            let _activity = activity;
+            queries.execute(&view, query, &worker_cancel)
+        });
         let remaining = deadline.saturating_sub(self.clock.now()?).min(600);
         let result = tokio::select! {
             biased;

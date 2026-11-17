@@ -11,6 +11,8 @@ use std::{
     path::Path,
 };
 
+mod activity;
+
 fn active(cancel: &CancellationToken) -> Result<(), AppError> {
     if cancel.is_cancelled() {
         Err(AppError::Cancelled)
@@ -23,6 +25,13 @@ fn invalid() -> AppError {
 }
 
 impl SubagentBranchStore for ParquetStore {
+    fn try_plan_activity(&self, case: &CaseId) -> Result<Box<dyn irmind_app::CaseLock>, AppError> {
+        self.plan_gate(case, true)
+    }
+    fn try_plan_recovery(&self, case: &CaseId) -> Result<Box<dyn irmind_app::CaseLock>, AppError> {
+        self.plan_gate(case, false)
+    }
+
     fn stage(
         &self,
         case: &CaseId,

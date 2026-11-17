@@ -1,4 +1,4 @@
-# Investigaciones en paralelo
+Traducción de docs/subagents.md en el commit 2b0159e078ba73acebb72331203016aa2026eec2; si hay diferencias, prevalece la versión en inglés.
 
 [English](../subagents.md)
 
@@ -75,13 +75,27 @@ y fusiona resultados en orden determinista de tareas. `/verify`, `/seal` y
 V8 incluye las ramas y pruebas de catálogo necesarias para verificar sin conexión.
 Una cancelación normal termina y une el trabajo activo. Un cierre brusco puede
 dejar un plan y sus reservas abiertos. Reabrir autentica el trabajo conservado;
-no cierra el plan automáticamente ni repite efectos remotos. Conserva el caso y
-su ejecutable creador. Si el plan impide continuar, reingiere los originales
-verificados en un caso nuevo. La recuperación explícita necesita
-[coordinación entre procesos](https://github.com/ns2switch/irmind/pull/318).
+no cierra el plan automáticamente ni repite efectos remotos. Usa
+`/subagents recover` tras un cierre brusco: un bloqueo exclusivo impide
+interferir con vistas previas o hijos activos en otras sesiones. No se fuerza.
+Se conservan el trabajo completado y el consumo incierto sin repetir llamadas.
 
 La versión 0.5 usa marcador de caso 4 y export V8. Conserva el ejecutable creador
 para casos anteriores o reingiere originales verificados en un caso nuevo; abrir
 no migra. Consulta [configuración](configuration.md), el
 [contrato de formato](subagents-format-contract.md) y la
 [política de versiones](../development/case-migration.md).
+
+## Recuperar un plan interrumpido
+
+Detén el turno actual con `/pause` y espera a que termine. Ejecuta
+`/subagents recover`, revisa la explicación y elige Confirm; Cancel está
+seleccionado al principio y Esc no cambia nada. Las vistas previas y los hijos
+activos de otra sesión impiden recuperar el plan: termínalos o cancélalos allí
+y reintenta. No existe una opción para forzar el bloqueo.
+
+El motor mantiene un bloqueo exclusivo del sistema operativo durante toda la
+recuperación. Conserva los resultados y el consumo incierto, sin repetir llamadas
+al modelo ni efectos de herramientas. No reanuda hijos ni aprueba solicitudes.
+Ejecuta `/verify` después; una segunda recuperación devuelve cero planes.
+Los casos sellados siguen siendo de solo lectura.

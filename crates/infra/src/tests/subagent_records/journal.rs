@@ -995,10 +995,7 @@ fn stored_history_engine_with_interaction(
     queries: Arc<dyn irmind_app::subagents::TaskEvidenceQueries>,
     interaction: Arc<dyn irmind_app::subagents::AnalystPlanInteraction>,
 ) -> (Arc<LocalStore>, Engine<'static>) {
-    use irmind_app::{
-        CaseMutation, SkillServices,
-        subagents::{SubagentBranchStore, SubagentPorts},
-    };
+    use irmind_app::{CaseMutation, subagents::SubagentBranchStore};
     let store = Arc::new(open_source_store(root).unwrap());
     store
         .transact(
@@ -1026,6 +1023,33 @@ fn stored_history_engine_with_interaction(
             )
             .unwrap();
     }
+    configured_history_engine(root, history, store, queries, interaction)
+}
+fn configured_history_engine(
+    root: &std::path::Path,
+    history: &History,
+    store: Arc<LocalStore>,
+    queries: Arc<dyn irmind_app::subagents::TaskEvidenceQueries>,
+    interaction: Arc<dyn irmind_app::subagents::AnalystPlanInteraction>,
+) -> (Arc<LocalStore>, Engine<'static>) {
+    configured_history_engine_with_branches(
+        root,
+        history,
+        store,
+        queries,
+        interaction,
+        Arc::new(ParquetStore::open(root).unwrap()),
+    )
+}
+fn configured_history_engine_with_branches(
+    root: &std::path::Path,
+    history: &History,
+    store: Arc<LocalStore>,
+    queries: Arc<dyn irmind_app::subagents::TaskEvidenceQueries>,
+    interaction: Arc<dyn irmind_app::subagents::AnalystPlanInteraction>,
+    branches: Arc<dyn irmind_app::subagents::SubagentBranchStore>,
+) -> (Arc<LocalStore>, Engine<'static>) {
+    use irmind_app::{SkillServices, subagents::SubagentPorts};
     let agent = Arc::new(LocalSigner {
         key: SigningKey::from_bytes(&[43; 32]),
         actor: history.agent.actor(),
@@ -1055,7 +1079,7 @@ fn stored_history_engine_with_interaction(
             Arc::new(MandatoryGuard::new().unwrap()),
         )
         .with_subagents(SubagentPorts {
-            branches: Arc::new(ParquetStore::open(root).unwrap()),
+            branches,
             queries,
             analyst: interaction,
         }),

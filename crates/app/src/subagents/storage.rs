@@ -87,6 +87,18 @@ impl BoundedBranchBytes {
 }
 
 pub trait SubagentBranchStore: Send + Sync {
+    /// Runtime-only shared lease; an unavailable adapter never grants activity.
+    fn try_plan_activity(&self, _case: &CaseId) -> Result<Box<dyn crate::CaseLock>, AppError> {
+        Err(AppError::Policy(
+            "Subagent plan coordination is unavailable for this storage adapter".into(),
+        ))
+    }
+    /// Nonblocking exclusive lease, held by the engine throughout recovery.
+    fn try_plan_recovery(&self, _case: &CaseId) -> Result<Box<dyn crate::CaseLock>, AppError> {
+        Err(AppError::Policy(
+            "Interrupted-plan recovery is unavailable for this storage adapter".into(),
+        ))
+    }
     fn stage(
         &self,
         case: &CaseId,

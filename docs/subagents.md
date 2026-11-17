@@ -39,6 +39,17 @@ live task. A request from an ended task can be denied, but cannot execute in the
 parent. Children cannot approve requests, change settings, increase budgets or
 create more subagents. Only the analyst confirms findings.
 
+## Recover an interrupted plan
+
+Stop the current turn with `/pause` and wait for it to finish, then use
+`/subagents recover`. Review the explanation and choose Confirm; Cancel is
+selected initially and Esc changes nothing. A busy message identifies work in
+another session: finish or cancel it there, then retry. Sealed cases are read-only.
+
+Run `/verify` afterward. Recovery does not resume children or approve pending
+requests. Repeating it is harmless and reports zero plans once reconciliation is
+complete. Unknown provider usage remains reserved and cannot fund new requests.
+
 ## Sources, budgets and partial results
 
 Tasks receive a frozen subset of signed sources and, when explicitly assigned,
@@ -75,9 +86,10 @@ terminal results. Export V8 includes the committed branches and catalog proofs
 needed for offline verification. Normal cancellation finishes and joins active
 work. An abrupt process exit can leave a plan and reservations open. Reopening
 authenticates retained work; it does not automatically close the plan or replay
-remote effects. Preserve an interrupted case and its creating executable. If
-its plan still blocks work, re-ingest verified originals into a new case.
-Explicit recovery needs [interprocess coordination](https://github.com/ns2switch/irmind/pull/318).
+remote effects. Use `/subagents recover` after an interrupted session. Recovery
+requires exclusive interprocess ownership: live previews and workers in another
+session block it; there is no force option. Completed work and uncertain usage
+remain intact, and no provider request or tool effect is replayed.
 
 Version 0.5 uses case marker 4 and export V8. Keep the creating executable for
 older cases or re-ingest verified originals into a new case; opening a case does

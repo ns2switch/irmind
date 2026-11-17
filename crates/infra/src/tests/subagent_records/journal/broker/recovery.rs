@@ -1,3 +1,4 @@
+mod process;
 use super::*;
 use irmind_app::subagents::SubagentStatus;
 
