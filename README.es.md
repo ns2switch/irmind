@@ -49,6 +49,15 @@ Consulta el [modelo de seguridad](docs/es/security-model.md) para conocer las ga
 
 ## Instalación
 
+En macOS se recomienda la instalación binaria con el [tap de Homebrew](https://github.com/ns2switch/homebrew-irmind):
+
+```sh
+brew install ns2switch/irmind/irmind
+brew upgrade ns2switch/irmind/irmind
+```
+
+La fórmula instala el binario y el auxiliar EVTX desde GitHub Releases con SHA-256 fijados, sin compilar IRMind. La [guía de plataformas](docs/es/platforms.md#homebrew) explica la confianza y cómo conservar la versión que creó un caso antes de actualizar.
+
 Consulta [Code signing policy — Política de firma de código](CODE_SIGNING.md)
 ([versión en español](CODE_SIGNING.es.md)): atribución, roles del equipo,
 privacidad y estado de la firma nativa por plataforma.
@@ -181,3 +190,5 @@ Consulta [CONTRIBUTING.es.md](CONTRIBUTING.es.md) para las reglas de DCO y datos
 - [Contribuciones](CONTRIBUTING.es.md) · [Código de conducta](CODE_OF_CONDUCT.es.md) · [Reporte privado de vulnerabilidades](SECURITY.md) · [Licencias](LICENSE-MIT)
 
 Licencia dual **MIT OR Apache-2.0**; consulta [LICENSE-MIT](LICENSE-MIT) y [LICENSE-APACHE](LICENSE-APACHE).
+
+Propón una skill sin Rust en [CONTRIBUTING de irmind-skills](https://github.com/ns2switch/irmind-skills/blob/main/CONTRIBUTING.es.md): metodología, fuentes necesarias, falsos positivos y episodios sintéticos.
