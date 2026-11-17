@@ -7,6 +7,28 @@ La clave de producción se genera en tu máquina, fuera de cualquier clon de Git
 IRMind y el agente de desarrollo solo necesitan la clave pública y su `key_id`.
 No compartas la semilla ni la clave privada.
 
+## Clave de producción activa
+
+Activada para IRMind v0.5.4 el 2026-11-17:
+
+```text
+public_key=fb2015c83d13fe018e270a7fe73bf7bccfdb622565e30f7ade436637c3b2c25b
+key_id=f04daae3f8243ed76452d5f787ea527c8fbec895ca0c91a35f453f6677575e4f
+```
+
+El identificador es SHA-256 de los 32 bytes públicos en crudo. El binario acepta
+solo claves compiladas revisadas (como máximo ocho); las sintéticas quedan en
+verificadores de prueba. La semilla privada solo existe en el environment release
+protegido del catálogo. IRMind no descarga raíces ni lee esa clave privada.
+
+Para rotar, genera la nueva semilla localmente y entrega solo la clave pública y
+su identificador para una release revisada de IRMind. Coordina el firmante del
+catálogo con esa lista; un solapamiento acotado permite la transición. Retirar una
+clave también exige una release de IRMind y sus índices dejan de aceptarse. Un
+índice no puede otorgar confianza a otra clave. Distribuye el nuevo ejecutable
+antes de cambiar el firmante. Si se compromete una clave, retírala en la siguiente
+release y deja de usarla; un binario antiguo conserva sus raíces anteriores.
+
 ## Generación local
 
 Necesitas Python 3 y OpenSSL 3. Ejecuta el bloque de

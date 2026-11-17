@@ -4,6 +4,23 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.5.4 — Verified Homebrew installation and the community skill catalog
+
+**Format impact:** No case, artifact, seal, export or definition format changes.
+The catalog's production Ed25519 public key is now compiled into the accepted
+key list. Synthetic fixture keys remain excluded from release trust.
+
+- Install the main executable and EVTX helper from the Homebrew tap on macOS
+  Apple Silicon/Intel and Linux x86_64/arm64. Release dispatch authenticates
+  checksums and runs native installation, audit, demo and uninstall checks.
+- Verify the independently published community catalog with its pinned production
+  key; installation remains explicit, previewed and admitted by an analyst signature.
+  Community contributions, synthetic episodes and review guidance live in
+  `ns2switch/irmind-skills`, separately from the core skills bundled here.
+- Publish the SignPath code signing policy, attribution and release-note link.
+  Foundation approval/integration are pending; Windows Authenticode and Apple
+  notarization are not activated by this release.
+
 ## 0.5.3 — Prompt-cache accounting and interrupted-plan recovery
 
 **Format impact:** Optional cache metadata extends signed usage receipts and
