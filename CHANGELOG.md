@@ -9,6 +9,7 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
   live previews and children, remain held through reconciliation and prevent
   concurrent deletion. Recovery preserves committed work and uncertain usage
   without replaying provider requests or tool effects. Signed formats are unchanged.
+
 - Account for provider-reported prompt-cache reads and writes separately in
   `/budget` and the configurable status bar. Inclusive input still consumes the
   full token budget; estimates require every applicable price. Native Anthropic
